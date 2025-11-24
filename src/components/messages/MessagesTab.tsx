@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,6 +21,7 @@ interface Thread {
 }
 
 export function MessagesTab() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [search, setSearch] = useState('');
@@ -122,6 +124,7 @@ export function MessagesTab() {
           threads.map((thread) => (
             <div
               key={thread.id}
+              onClick={() => navigate(`/messages/${thread.id}`)}
               className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 hover:bg-[#2d1b4e]/80 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
