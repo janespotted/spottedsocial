@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
+import { loginSchema, signupSchema } from '@/lib/auth-validation';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -14,7 +15,6 @@ export default function Auth() {
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -23,46 +23,68 @@ export default function Auth() {
 
     try {
       if (isLogin) {
+        // Validate login inputs
+        const validatedData = loginSchema.parse({ email, password });
+
         const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
+          email: validatedData.email,
+          password: validatedData.password,
         });
 
-        if (error) throw error;
+        if (error) {
+          if (error.message.includes('Invalid login credentials')) {
+            throw new Error('Invalid email or password');
+          }
+          throw error;
+        }
 
-        toast({
-          title: 'Welcome back!',
-          description: 'You\'ve successfully logged in.',
-        });
+        toast.success('Welcome back!');
         navigate('/');
       } else {
-        const redirectUrl = `${window.location.origin}/`;
-        const { error } = await supabase.auth.signUp({
+        // Validate signup inputs
+        const validatedData = signupSchema.parse({
           email,
           password,
+          displayName,
+          username,
+        });
+
+        const redirectUrl = `${window.location.origin}/`;
+        const { error, data } = await supabase.auth.signUp({
+          email: validatedData.email,
+          password: validatedData.password,
           options: {
             emailRedirectTo: redirectUrl,
             data: {
-              display_name: displayName,
-              username: username,
+              display_name: validatedData.displayName,
+              username: validatedData.username,
             },
           },
         });
 
-        if (error) throw error;
+        if (error) {
+          if (error.message.includes('already registered')) {
+            throw new Error('This email is already registered. Please log in instead.');
+          }
+          throw error;
+        }
 
-        toast({
-          title: 'Account created!',
-          description: 'Welcome to Spotted. You\'re now logged in.',
-        });
-        navigate('/');
+        // Check if email confirmation is required
+        if (data?.user && !data.session) {
+          toast.success('Account created! Please check your email to confirm.');
+        } else {
+          toast.success('Welcome to Spotted!');
+          navigate('/');
+        }
       }
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: isLogin ? 'Login failed' : 'Signup failed',
-        description: error.message,
-      });
+      if (error.errors) {
+        // Zod validation errors
+        const firstError = error.errors[0];
+        toast.error(firstError.message);
+      } else {
+        toast.error(error.message || (isLogin ? 'Login failed' : 'Signup failed'));
+      }
     } finally {
       setLoading(false);
     }
@@ -81,7 +103,70 @@ export default function Auth() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
-...
+            {!isLogin && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">Display Name</Label>
+                  <Input
+                    id="displayName"
+                    type="text"
+                    placeholder="Your name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    required={!isLogin}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="@username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required={!isLogin}
+                  />
+                </div>
+              </>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Sign Up'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => setIsLogin(!isLogin)}
+            >
+              {isLogin ? 'Don\'t have an account? Sign up' : 'Already have an account? Sign in'}
+            </Button>
           </form>
         </CardContent>
       </Card>
