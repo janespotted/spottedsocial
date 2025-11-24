@@ -6,9 +6,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
 import { FriendIdCardProvider } from "./contexts/FriendIdCardContext";
+import { VenueIdCardProvider } from "./contexts/VenueIdCardContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { FriendIdCard } from "./components/FriendIdCard";
+import { VenueIdCard } from "./components/VenueIdCard";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
 import Map from "./pages/Map";
@@ -33,104 +35,107 @@ const App = () => (
         <AuthProvider>
           <CheckInProvider>
             <FriendIdCardProvider>
-              <FriendIdCard />
-              <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Home />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/map"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Map />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/leaderboard"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Leaderboard />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/feed"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Feed />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/messages"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Messages />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/messages/:threadId"
-                element={
-                  <ProtectedRoute>
-                    <Thread />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/friend-requests"
-                element={
-                  <ProtectedRoute>
-                    <FriendRequests />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Profile />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/profile/edit"
-                element={
-                  <ProtectedRoute>
-                    <EditProfile />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/demo-settings"
-                element={
-                  <ProtectedRoute>
-                    <DemoSettings />
-                  </ProtectedRoute>
-                }
-              />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <VenueIdCardProvider>
+                <FriendIdCard />
+                <VenueIdCard />
+                <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Home />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/map"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Map />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/leaderboard"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Leaderboard />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/feed"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Feed />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/messages"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Messages />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/messages/:threadId"
+                  element={
+                    <ProtectedRoute>
+                      <Thread />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/friend-requests"
+                  element={
+                    <ProtectedRoute>
+                      <FriendRequests />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Profile />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/profile/edit"
+                  element={
+                    <ProtectedRoute>
+                      <EditProfile />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/demo-settings"
+                  element={
+                    <ProtectedRoute>
+                      <DemoSettings />
+                    </ProtectedRoute>
+                  }
+                />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </VenueIdCardProvider>
             </FriendIdCardProvider>
           </CheckInProvider>
         </AuthProvider>
