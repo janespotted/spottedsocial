@@ -11,49 +11,91 @@ export function MeetUpConfirmation() {
   const navigate = useNavigate();
 
   const handleOpenChat = async () => {
-    if (!user || !recipientUserId) return;
+    console.log('Opening chat with recipient:', recipientUserId, recipientDisplayName);
+    
+    if (!user || !recipientUserId) {
+      console.error('Missing user or recipientUserId:', { user: user?.id, recipientUserId });
+      return;
+    }
 
-    // Find or create thread
-    const { data: existingThreads } = await supabase
-      .from('dm_thread_members')
-      .select('thread_id, dm_threads!inner(*)')
-      .eq('user_id', user.id);
+    try {
+      // Find or create thread
+      console.log('Searching for existing threads...');
+      const { data: existingThreads, error: fetchError } = await supabase
+        .from('dm_thread_members')
+        .select('thread_id, dm_threads!inner(*)')
+        .eq('user_id', user.id);
 
-    let threadId: string | null = null;
+      if (fetchError) {
+        console.error('Error fetching threads:', fetchError);
+        return;
+      }
 
-    if (existingThreads) {
-      for (const thread of existingThreads) {
-        const { data: members } = await supabase
-          .from('dm_thread_members')
-          .select('user_id')
-          .eq('thread_id', thread.thread_id);
+      console.log('Existing threads found:', existingThreads?.length);
 
-        if (members?.length === 2 && members.some(m => m.user_id === recipientUserId)) {
-          threadId = thread.thread_id;
-          break;
+      let threadId: string | null = null;
+
+      if (existingThreads) {
+        for (const thread of existingThreads) {
+          const { data: members, error: membersError } = await supabase
+            .from('dm_thread_members')
+            .select('user_id')
+            .eq('thread_id', thread.thread_id);
+
+          if (membersError) {
+            console.error('Error fetching thread members:', membersError);
+            continue;
+          }
+
+          if (members?.length === 2 && members.some(m => m.user_id === recipientUserId)) {
+            threadId = thread.thread_id;
+            console.log('Found existing thread:', threadId);
+            break;
+          }
         }
       }
-    }
 
-    if (!threadId) {
-      const { data: newThread } = await supabase
-        .from('dm_threads')
-        .insert({})
-        .select()
-        .single();
+      if (!threadId) {
+        console.log('Creating new thread...');
+        const { data: newThread, error: createError } = await supabase
+          .from('dm_threads')
+          .insert({})
+          .select()
+          .single();
 
-      if (newThread) {
-        await supabase.from('dm_thread_members').insert([
-          { thread_id: newThread.id, user_id: user.id },
-          { thread_id: newThread.id, user_id: recipientUserId },
-        ]);
-        threadId = newThread.id;
+        if (createError) {
+          console.error('Error creating thread:', createError);
+          return;
+        }
+
+        if (newThread) {
+          console.log('New thread created:', newThread.id);
+          const { error: membersError } = await supabase
+            .from('dm_thread_members')
+            .insert([
+              { thread_id: newThread.id, user_id: user.id },
+              { thread_id: newThread.id, user_id: recipientUserId },
+            ]);
+
+          if (membersError) {
+            console.error('Error adding thread members:', membersError);
+            return;
+          }
+
+          threadId = newThread.id;
+          console.log('Thread members added successfully');
+        }
       }
-    }
 
-    if (threadId) {
-      closeConfirmation();
-      navigate(`/messages/${threadId}`);
+      if (threadId) {
+        console.log('Navigating to thread:', threadId);
+        closeConfirmation();
+        navigate(`/messages/${threadId}`);
+      } else {
+        console.error('Failed to get threadId');
+      }
+    } catch (error) {
+      console.error('Error in handleOpenChat:', error);
     }
   };
 
