@@ -54,6 +54,8 @@ export default function Map() {
     localStorage.getItem('mapbox_token') || ''
   );
   const [showTokenInput, setShowTokenInput] = useState<boolean>(!localStorage.getItem('mapbox_token'));
+  const [showFriendsList, setShowFriendsList] = useState(false);
+  const friendsListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -463,6 +465,58 @@ export default function Map() {
     return distance.toFixed(1);
   };
 
+  const toggleFriendsList = () => {
+    if (friends.length > 0) {
+      setShowFriendsList(!showFriendsList);
+    }
+  };
+
+  const handleFriendClick = (friend: FriendLocation) => {
+    // Center map on friend
+    if (map.current) {
+      map.current.flyTo({
+        center: [friend.lng, friend.lat],
+        zoom: 15,
+        duration: 1500,
+      });
+    }
+    // Open friend card
+    openFriendCard(friend.user_id);
+  };
+
+  // Get friends with distances sorted
+  const friendsWithDistances = userLocation
+    ? friends
+        .map((friend) => ({
+          ...friend,
+          distance: calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            friend.lat,
+            friend.lng
+          ),
+        }))
+        .sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance))
+    : friends.map((friend) => ({ ...friend, distance: '--' }));
+
+  // Handle click outside friends list
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        friendsListRef.current &&
+        !friendsListRef.current.contains(event.target as Node) &&
+        showFriendsList
+      ) {
+        setShowFriendsList(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFriendsList]);
+
   const centerOnMyLocation = () => {
     if (!map.current) return;
 
@@ -546,12 +600,66 @@ export default function Map() {
         </button>
       </div>
 
-      {/* Pin Legend */}
-      {friends.length > 0 && (
+      {/* Friends Out Pill + List */}
+      {friends.length > 0 ? (
+        <div ref={friendsListRef} className="absolute top-20 left-4 z-10 max-w-sm">
+          {/* Clickable Pill */}
+          <button
+            onClick={toggleFriendsList}
+            className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 hover:bg-[#2d1b4e] transition-colors w-full"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-[#a855f7] rounded-full shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>
+              <span className="text-white/80 text-sm">{friends.length} friends out</span>
+            </div>
+          </button>
+
+          {/* Expanded Friends List */}
+          {showFriendsList && (
+            <div className="mt-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] max-h-96 overflow-y-auto">
+              {friendsWithDistances.map((friend) => (
+                <button
+                  key={friend.user_id}
+                  onClick={() => handleFriendClick(friend)}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+                >
+                  {/* Avatar */}
+                  <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
+                    <AvatarImage
+                      src={
+                        friend.profiles?.avatar_url ||
+                        `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`
+                      }
+                    />
+                    <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+                      {friend.profiles?.display_name?.[0] || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  {/* Name & Venue */}
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-white font-semibold text-sm truncate">
+                      {friend.profiles?.display_name || 'Unknown'}
+                    </p>
+                    <p className="text-[#d4ff00] text-xs truncate">
+                      @ {friend.venue_name || 'Nearby'}
+                    </p>
+                  </div>
+
+                  {/* Distance */}
+                  <span className="text-white/60 text-xs flex-shrink-0">
+                    {friend.distance} mi
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
         <div className="absolute top-20 left-4 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-10">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-[#a855f7] rounded-full shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>
-            <span className="text-white/80 text-sm">{friends.length} friends out</span>
+            <div className="w-3 h-3 bg-[#a855f7]/30 rounded-full"></div>
+            <span className="text-white/60 text-sm">No friends out</span>
           </div>
         </div>
       )}
