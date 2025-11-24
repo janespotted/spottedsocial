@@ -440,7 +440,11 @@ export default function Feed() {
               {/* Post Header */}
               <div className="flex items-center justify-between px-4 pt-4 pb-3">
                 <button 
-                  onClick={() => openFriendCard(post.user_id)}
+                  onClick={() => openFriendCard({
+                    userId: post.user_id,
+                    displayName: post.profiles?.display_name || 'Friend',
+                    avatarUrl: post.profiles?.avatar_url || null,
+                  })}
                   className="flex items-center gap-3 hover:opacity-80 transition-opacity"
                 >
                   <Avatar className="h-12 w-12 cursor-pointer">
@@ -498,7 +502,11 @@ export default function Feed() {
                 {/* Caption */}
                 <div className="text-white/90 text-sm leading-relaxed">
                   <button 
-                    onClick={() => openFriendCard(post.user_id)}
+                    onClick={() => openFriendCard({
+                      userId: post.user_id,
+                      displayName: post.profiles?.display_name || 'Friend',
+                      avatarUrl: post.profiles?.avatar_url || null,
+                    })}
                     className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
                   >
                     {post.profiles?.username}

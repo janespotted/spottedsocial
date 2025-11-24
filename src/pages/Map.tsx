@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
-import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useFriendIdCard, FriendCardData } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
@@ -428,7 +428,16 @@ export default function Map() {
       `;
 
       el.addEventListener('click', () => {
-        openFriendCard(friend.user_id);
+        const friendCardData: FriendCardData = {
+          userId: friend.user_id,
+          displayName: friend.profiles?.display_name || 'Friend',
+          avatarUrl: friend.profiles?.avatar_url || null,
+          venueName: friend.venue_name,
+          lat: friend.lat,
+          lng: friend.lng,
+          relationshipType: friend.relationshipType,
+        };
+        openFriendCard(friendCardData);
       });
 
       const marker = new mapboxgl.Marker(el)
@@ -513,7 +522,16 @@ export default function Map() {
       });
     }
     // Open friend card
-    openFriendCard(friend.user_id);
+    const friendCardData: FriendCardData = {
+      userId: friend.user_id,
+      displayName: friend.profiles?.display_name || 'Friend',
+      avatarUrl: friend.profiles?.avatar_url || null,
+      venueName: friend.venue_name,
+      lat: friend.lat,
+      lng: friend.lng,
+      relationshipType: friend.relationshipType,
+    };
+    openFriendCard(friendCardData);
   };
 
   // Get friends with distances sorted

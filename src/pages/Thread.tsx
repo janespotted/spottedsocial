@@ -178,7 +178,11 @@ export default function Thread() {
           </button>
 
           <button 
-            onClick={() => otherMember && openFriendCard(otherMember.user_id)}
+            onClick={() => otherMember && openFriendCard({
+              userId: otherMember.user_id,
+              displayName: otherMember.display_name,
+              avatarUrl: otherMember.avatar_url,
+            })}
             className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity"
           >
             <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
