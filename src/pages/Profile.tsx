@@ -225,6 +225,15 @@ export default function Profile() {
             Share Profile
           </Button>
         </div>
+        
+        {/* Demo Settings Button */}
+        <Button
+          onClick={() => navigate('/demo-settings')}
+          variant="outline"
+          className="w-full border-[#a855f7]/40 text-[#d4ff00] hover:bg-[#a855f7]/10 rounded-full"
+        >
+          Demo Settings
+        </Button>
 
         {/* Location Sharing Card */}
         <div className="bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4">

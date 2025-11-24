@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
+import { useDemoMode } from '@/hooks/useDemoMode';
 
 interface Post {
   id: string;
@@ -30,6 +31,7 @@ interface Friend {
 export default function Feed() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
+  const demoEnabled = useDemoMode();
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [showCreatePost, setShowCreatePost] = useState(false);
@@ -40,22 +42,31 @@ export default function Feed() {
       fetchPosts();
       subscribeToNewPosts();
     }
-  }, [user]);
+  }, [user, demoEnabled]);
 
   const fetchFriends = async () => {
-    const { data: friendships } = await supabase
+    let query = supabase
       .from('friendships')
       .select('friend_id')
       .eq('user_id', user?.id)
       .eq('status', 'accepted');
 
+    const { data: friendships } = await query;
+
     if (friendships && friendships.length > 0) {
       const friendIds = friendships.map(f => f.friend_id);
       
-      const { data: friendProfiles } = await supabase
+      let profileQuery = supabase
         .from('profiles')
         .select('id, display_name, avatar_url')
         .in('id', friendIds);
+
+      // Filter demo data unless demo mode is enabled
+      if (!demoEnabled) {
+        profileQuery = profileQuery.eq('is_demo', false);
+      }
+
+      const { data: friendProfiles } = await profileQuery;
 
       if (friendProfiles) {
         setFriends(friendProfiles.map(f => ({
@@ -77,7 +88,7 @@ export default function Feed() {
     const friendIds = friendships?.map(f => f.friend_id) || [];
     const userIds = [user?.id, ...friendIds];
 
-    const { data } = await supabase
+    let query = supabase
       .from('posts')
       .select(`
         *,
@@ -90,6 +101,13 @@ export default function Feed() {
       .in('user_id', userIds)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
+
+    // Filter demo data unless demo mode is enabled
+    if (!demoEnabled) {
+      query = query.eq('is_demo', false);
+    }
+
+    const { data } = await query;
 
     setPosts(data || []);
   };
