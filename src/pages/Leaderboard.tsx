@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronUp, ChevronDown, BarChart3, Clock, DollarSign } from 'lucide-react';
@@ -31,6 +32,7 @@ interface BiggestMover {
 
 export default function Leaderboard() {
   const { user } = useAuth();
+  const { openCheckIn } = useCheckIn();
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
 
@@ -167,7 +169,12 @@ export default function Leaderboard() {
             <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
             <p className="text-white/60 text-sm mt-1">Top Places to Go Out Now</p>
           </div>
-          <div className="text-4xl font-bold text-[#d4ff00]">S</div>
+          <button 
+            onClick={openCheckIn} 
+            className="text-4xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
+          >
+            S
+          </button>
         </div>
       </div>
 

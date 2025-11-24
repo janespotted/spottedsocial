@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -21,6 +22,7 @@ interface FriendLocation {
 
 export default function Map() {
   const { user } = useAuth();
+  const { openCheckIn } = useCheckIn();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
@@ -206,7 +208,12 @@ export default function Map() {
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-6 z-10">
         <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
-        <div className="text-4xl font-bold text-[#d4ff00]">S</div>
+        <button 
+          onClick={openCheckIn} 
+          className="text-4xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
+        >
+          S
+        </button>
       </div>
 
       {/* Friend Info Card */}
