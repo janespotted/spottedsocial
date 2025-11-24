@@ -26,6 +26,19 @@ interface YapMessage {
   user_vote: 'up' | 'down' | null;
 }
 
+interface YapComment {
+  id: string;
+  text: string;
+  created_at: string;
+  is_anonymous: boolean;
+  author_handle: string | null;
+  user_id: string;
+  profiles: {
+    display_name: string;
+    avatar_url: string | null;
+  } | null;
+}
+
 export function YapTab() {
   const { user } = useAuth();
   const demoMode = useDemoMode();
@@ -34,6 +47,9 @@ export function YapTab() {
   const [sortBy, setSortBy] = useState<'new' | 'hot'>('new');
   const [newYap, setNewYap] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const [expandedYapId, setExpandedYapId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, YapComment[]>>({});
+  const [newComment, setNewComment] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (user) {
@@ -237,6 +253,63 @@ export function YapTab() {
     }
   };
 
+  const fetchComments = async (yapId: string) => {
+    const { data } = await supabase
+      .from('yap_comments')
+      .select(`
+        *,
+        profiles:user_id (
+          display_name,
+          avatar_url
+        )
+      `)
+      .eq('yap_id', yapId)
+      .order('created_at', { ascending: true });
+
+    if (data) {
+      setComments(prev => ({ ...prev, [yapId]: data }));
+    }
+  };
+
+  const handleToggleComments = async (yapId: string) => {
+    if (expandedYapId === yapId) {
+      setExpandedYapId(null);
+    } else {
+      setExpandedYapId(yapId);
+      if (!comments[yapId]) {
+        await fetchComments(yapId);
+      }
+    }
+  };
+
+  const handlePostComment = async (yapId: string) => {
+    if (!user || !newComment[yapId]?.trim()) return;
+
+    try {
+      const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
+
+      const { error } = await supabase
+        .from('yap_comments')
+        .insert({
+          yap_id: yapId,
+          user_id: user.id,
+          text: newComment[yapId].trim(),
+          is_anonymous: true,
+          author_handle: handle,
+        });
+
+      if (error) throw error;
+
+      setNewComment(prev => ({ ...prev, [yapId]: '' }));
+      toast.success('Comment posted!');
+      await fetchComments(yapId);
+      await fetchYapMessages(); // Refresh to update comment count
+    } catch (error) {
+      console.error('Error posting comment:', error);
+      toast.error('Failed to post comment');
+    }
+  };
+
   const getTimeAgo = (date: string) => {
     const distance = formatDistanceToNow(new Date(date), { addSuffix: false });
     return distance.replace('about ', '').replace(' minutes', 'm').replace(' minute', 'm')
@@ -319,11 +392,61 @@ export function YapTab() {
                     </div>
                     <p className="text-white/90 mt-1 text-[15px]">{msg.text}</p>
                     <div className="flex items-center gap-4 mt-2">
-                      <div className="flex items-center gap-1 text-white/60 text-sm">
+                      <button
+                        onClick={() => handleToggleComments(msg.id)}
+                        className="flex items-center gap-1 text-white/60 hover:text-white transition-colors text-sm"
+                      >
                         <MessageCircle className="h-4 w-4" />
                         <span>{msg.comments_count}</span>
-                      </div>
+                      </button>
                     </div>
+
+                    {/* Comments Section */}
+                    {expandedYapId === msg.id && (
+                      <div className="mt-4 space-y-3 border-t border-[#a855f7]/20 pt-3">
+                        {/* Comments List */}
+                        {comments[msg.id]?.map((comment) => (
+                          <div key={comment.id} className="flex gap-2">
+                            <div className="flex-1 bg-[#1a0f2e]/60 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-white text-sm">
+                                  {comment.author_handle || `User${comment.id.slice(0, 6)}`}
+                                </span>
+                                <span className="text-white/40 text-xs">
+                                  {getTimeAgo(comment.created_at)}
+                                </span>
+                              </div>
+                              <p className="text-white/80 text-sm">{comment.text}</p>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Comment Input */}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newComment[msg.id] || ''}
+                            onChange={(e) => setNewComment(prev => ({ ...prev, [msg.id]: e.target.value }))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handlePostComment(msg.id);
+                              }
+                            }}
+                            placeholder="Add a comment..."
+                            className="flex-1 bg-[#1a0f2e] border border-[#a855f7]/20 rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-[#a855f7]"
+                          />
+                          <Button
+                            onClick={() => handlePostComment(msg.id)}
+                            disabled={!newComment[msg.id]?.trim()}
+                            size="sm"
+                            className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white"
+                          >
+                            <Send className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Vote Controls */}

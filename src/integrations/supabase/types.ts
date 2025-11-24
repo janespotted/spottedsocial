@@ -465,6 +465,51 @@ export type Database = {
           },
         ]
       }
+      yap_comments: {
+        Row: {
+          author_handle: string | null
+          created_at: string | null
+          id: string
+          is_anonymous: boolean | null
+          text: string
+          user_id: string
+          yap_id: string
+        }
+        Insert: {
+          author_handle?: string | null
+          created_at?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          text: string
+          user_id: string
+          yap_id: string
+        }
+        Update: {
+          author_handle?: string | null
+          created_at?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          text?: string
+          user_id?: string
+          yap_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yap_comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yap_comments_yap_id_fkey"
+            columns: ["yap_id"]
+            isOneToOne: false
+            referencedRelation: "yap_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yap_messages: {
         Row: {
           author_handle: string | null
