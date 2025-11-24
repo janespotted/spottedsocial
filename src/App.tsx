@@ -14,6 +14,7 @@ import Leaderboard from "./pages/Leaderboard";
 import Feed from "./pages/Feed";
 import Messages from "./pages/Messages";
 import Thread from "./pages/Thread";
+import FriendRequests from "./pages/FriendRequests";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
@@ -84,6 +85,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Thread />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/friend-requests"
+                element={
+                  <ProtectedRoute>
+                    <FriendRequests />
                   </ProtectedRoute>
                 }
               />

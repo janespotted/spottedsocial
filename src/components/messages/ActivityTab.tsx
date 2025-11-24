@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,6 +18,7 @@ interface Activity {
 }
 
 export function ActivityTab() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
@@ -117,6 +119,7 @@ export function ActivityTab() {
       {/* Friend Requests */}
       {friendRequestCount > 0 && (
         <div
+          onClick={() => navigate('/friend-requests')}
           className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-[#2d1b4e]/80 transition-colors"
         >
           <div className="flex items-center gap-3">
