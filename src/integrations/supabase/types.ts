@@ -14,7 +14,317 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      checkins: {
+        Row: {
+          created_at: string | null
+          id: string
+          lat: number
+          lng: number
+          user_id: string
+          venue_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          lat: number
+          lng: number
+          user_id: string
+          venue_name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          lat?: number
+          lng?: number
+          user_id?: string
+          venue_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_messages: {
+        Row: {
+          created_at: string | null
+          id: string
+          sender_id: string
+          text: string
+          thread_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          sender_id: string
+          text: string
+          thread_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          sender_id?: string
+          text?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "dm_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_thread_members: {
+        Row: {
+          id: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_thread_members_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "dm_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_thread_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_threads: {
+        Row: {
+          created_at: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      friendships: {
+        Row: {
+          created_at: string | null
+          friend_id: string
+          id: string
+          status: Database["public"]["Enums"]["friendship_status_enum"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          friend_id: string
+          id?: string
+          status?: Database["public"]["Enums"]["friendship_status_enum"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          friend_id?: string
+          id?: string
+          status?: Database["public"]["Enums"]["friendship_status_enum"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "friendships_friend_id_fkey"
+            columns: ["friend_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "friendships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      night_statuses: {
+        Row: {
+          expires_at: string | null
+          id: string
+          lat: number | null
+          lng: number | null
+          status: Database["public"]["Enums"]["night_status_enum"]
+          updated_at: string | null
+          user_id: string
+          venue_name: string | null
+        }
+        Insert: {
+          expires_at?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          status?: Database["public"]["Enums"]["night_status_enum"]
+          updated_at?: string | null
+          user_id: string
+          venue_name?: string | null
+        }
+        Update: {
+          expires_at?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          status?: Database["public"]["Enums"]["night_status_enum"]
+          updated_at?: string | null
+          user_id?: string
+          venue_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "night_statuses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          image_url: string | null
+          text: string
+          user_id: string
+          venue_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          image_url?: string | null
+          text: string
+          user_id: string
+          venue_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          image_url?: string | null
+          text?: string
+          user_id?: string
+          venue_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string | null
+          display_name: string
+          home_city: string | null
+          id: string
+          last_active_at: string | null
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          display_name: string
+          home_city?: string | null
+          id: string
+          last_active_at?: string | null
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          display_name?: string
+          home_city?: string | null
+          id?: string
+          last_active_at?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
+      yap_messages: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          is_anonymous: boolean | null
+          text: string
+          user_id: string
+          venue_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          is_anonymous?: boolean | null
+          text: string
+          user_id: string
+          venue_name: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          is_anonymous?: boolean | null
+          text?: string
+          user_id?: string
+          venue_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yap_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +333,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      friendship_status_enum: "pending" | "accepted" | "blocked"
+      night_status_enum: "out" | "heading_out" | "home"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +461,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      friendship_status_enum: ["pending", "accepted", "blocked"],
+      night_status_enum: ["out", "heading_out", "home"],
+    },
   },
 } as const
