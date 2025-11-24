@@ -263,7 +263,7 @@ export default function Leaderboard() {
 
       {/* Biggest Mover Card */}
       {biggestMover && (
-        <div className="fixed bottom-24 left-4 right-4 z-20">
+        <div className="fixed bottom-24 left-0 right-0 z-20 px-4">
           <div className="bg-[#2d1b4e] border-2 border-[#a855f7] rounded-2xl p-4 shadow-[0_0_40px_rgba(168,85,247,0.8)]">
             <div className="flex items-center justify-between">
               <div className="flex-1">
