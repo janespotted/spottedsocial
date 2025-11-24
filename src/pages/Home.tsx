@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { MapPin, Users } from 'lucide-react';
+import { Ghost, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
@@ -213,65 +212,75 @@ export default function Home() {
   };
 
   return (
-    <div className="p-4 space-y-6">
-      <div className="text-center space-y-4 pt-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          Are you out tonight?
-        </h1>
-        <p className="text-muted-foreground">Let your friends know where you are</p>
+    <div className="min-h-screen bg-gradient-to-b from-[#3d2b5f] via-[#2a1f4a] to-black flex flex-col items-center justify-between p-6 pb-20">
+      {/* Header */}
+      <div className="w-full flex items-start justify-between pt-8">
+        <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
+        <div className="text-4xl font-bold text-[#d4ff00]">S</div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        <Button
-          onClick={() => handleStatusUpdate('out')}
-          variant={selectedStatus === 'out' ? 'default' : 'outline'}
-          size="lg"
-          className="h-16 text-lg font-semibold"
-          disabled={isDetectingLocation}
-        >
-          <MapPin className="mr-2 h-5 w-5" />
-          {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes'}
-        </Button>
-        <Button
-          onClick={() => handleStatusUpdate('heading_out')}
-          variant={selectedStatus === 'heading_out' ? 'default' : 'outline'}
-          size="lg"
-          className="h-16 text-lg font-semibold"
-          disabled={isDetectingLocation}
-        >
-          <MapPin className="mr-2 h-5 w-5" />
-          {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : 'Still deciding'}
-        </Button>
-        <Button
-          onClick={() => handleStatusUpdate('home')}
-          variant={selectedStatus === 'home' ? 'default' : 'outline'}
-          size="lg"
-          className="h-16 text-lg font-semibold"
-          disabled={isDetectingLocation}
-        >
-          No
-        </Button>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col items-center justify-center space-y-12 w-full max-w-md">
+        <h2 className="text-5xl font-bold text-[#d4ff00] text-center leading-tight">
+          Are You<br />Out?
+        </h2>
+
+        <div className="w-full space-y-4">
+          <Button
+            onClick={() => handleStatusUpdate('out')}
+            variant="outline"
+            size="lg"
+            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 hover:text-[#d4ff00] shadow-[0_0_20px_rgba(212,255,0,0.3)] disabled:opacity-50"
+            disabled={isDetectingLocation}
+          >
+            {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes'}
+          </Button>
+          <Button
+            onClick={() => handleStatusUpdate('home')}
+            variant="outline"
+            size="lg"
+            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 hover:text-[#d4ff00] shadow-[0_0_20px_rgba(212,255,0,0.3)] disabled:opacity-50"
+            disabled={isDetectingLocation}
+          >
+            No
+          </Button>
+          <Button
+            onClick={() => handleStatusUpdate('heading_out')}
+            variant="outline"
+            size="lg"
+            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-white bg-transparent text-white hover:bg-white/10 hover:text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] disabled:opacity-50"
+            disabled={isDetectingLocation}
+          >
+            {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : 'Still Deciding...'}
+          </Button>
+        </div>
       </div>
 
+      {/* Ghost Icon */}
+      <div className="w-full flex justify-end">
+        <Ghost className="h-8 w-8 text-white/60" />
+      </div>
+
+      {/* Friends List - Show as overlay when available */}
       {friends.length > 0 && (
-        <Card className="p-6 space-y-4">
+        <Card className="fixed bottom-24 left-4 right-4 p-4 bg-background/95 backdrop-blur space-y-3 max-h-64 overflow-y-auto">
           <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Tonight's Friends</h2>
+            <Users className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Tonight's Friends</h3>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {friends.map((friend) => (
-              <div key={friend.user_id} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarFallback>{friend.profiles?.display_name?.[0]}</AvatarFallback>
+              <div key={friend.user_id} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-6 w-6">
+                    <AvatarFallback className="text-xs">{friend.profiles?.display_name?.[0]}</AvatarFallback>
                   </Avatar>
                   <div>
                     <p className="font-medium">{friend.profiles?.display_name}</p>
-                    <p className="text-sm text-muted-foreground">{friend.venue_name}</p>
+                    <p className="text-xs text-muted-foreground">{friend.venue_name}</p>
                   </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge(friend.status)}`}>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(friend.status)}`}>
                   {getStatusLabel(friend.status)}
                 </span>
               </div>
