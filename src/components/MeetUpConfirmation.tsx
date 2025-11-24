@@ -138,9 +138,36 @@ export function MeetUpConfirmation() {
     }
   };
 
-  const handleUndo = (e: React.MouseEvent) => {
+  const handleUndo = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent backdrop click
     console.log('↩️ Undo button clicked - cancelling meet up for:', recipientDisplayName);
+    
+    if (!user || !recipientUserId) {
+      closeConfirmation();
+      return;
+    }
+
+    try {
+      // Delete the most recent unread meetup notification to this recipient
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('sender_id', user.id)
+        .eq('receiver_id', recipientUserId)
+        .eq('type', 'meetup_request')
+        .eq('is_read', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error deleting notification:', error);
+      } else {
+        console.log('✅ Meet Up notification deleted successfully');
+      }
+    } catch (error) {
+      console.error('Error in handleUndo:', error);
+    }
+
     closeConfirmation();
     navigate(-1); // Return to previous screen
   };
