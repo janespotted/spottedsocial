@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { NewChatDialog } from './NewChatDialog';
 
 interface Thread {
   id: string;
@@ -25,6 +26,7 @@ export function MessagesTab() {
   const { user } = useAuth();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [search, setSearch] = useState('');
+  const [showNewChat, setShowNewChat] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -108,10 +110,16 @@ export function MessagesTab() {
       {/* Messages Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">Messages</h2>
-        <button className="text-white hover:text-[#d4ff00] transition-colors">
+        <button 
+          onClick={() => setShowNewChat(true)}
+          className="text-white hover:text-[#d4ff00] transition-colors"
+        >
           <Plus className="h-6 w-6" />
         </button>
       </div>
+
+      {/* New Chat Dialog */}
+      <NewChatDialog open={showNewChat} onOpenChange={setShowNewChat} />
 
       {/* Messages List */}
       <div className="space-y-3">
