@@ -1,18 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { createClient } from '@supabase/supabase-js';
-import { calculateExpiryTime } from './time-utils';
-
-// Create service role client for admin operations (bypasses RLS)
-const supabaseAdmin = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '',
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-);
 
 export const DEMO_VENUES = [
   { name: 'Le Bain', lat: 40.7414, lng: -74.0078 },
@@ -132,25 +118,32 @@ export function markDemoSeeded() {
 
 export async function clearDemoData() {
   try {
-    // Delete demo posts
-    await supabase.from('posts').delete().eq('is_demo', true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/seed-demo-data`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'clear' }),
+      }
+    );
+
+    const result = await response.json();
     
-    // Delete demo checkins
-    await supabase.from('checkins').delete().eq('is_demo', true);
-    
-    // Delete demo night statuses
-    await supabase.from('night_statuses').delete().eq('is_demo', true);
-    
-    // Delete demo yap messages
-    await supabase.from('yap_messages').delete().eq('is_demo', true);
-    
-    // Delete demo profiles (this will cascade delete related data)
-    await supabase.from('profiles').delete().eq('is_demo', true);
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to clear demo data');
+    }
     
     // Reset seeded flag
     const current = getDemoMode();
     localStorage.setItem('demo_mode', JSON.stringify({ ...current, seeded: false }));
-    // Emit custom event so components can react to demo mode changes
     window.dispatchEvent(new Event('demoModeChanged'));
     
     return { success: true };
@@ -176,185 +169,37 @@ function getRandomItems<T>(array: T[], count: number): T[] {
 
 export async function seedDemoData(currentUserId: string) {
   try {
-    const demoUserIds: string[] = [];
-    const timestamp = Date.now();
-    
     console.log('🎬 Starting demo data seeding...');
     
-    // 1. Create 20 demo profiles
-    console.log('Creating 20 demo users...');
-    for (let i = 0; i < DEMO_USERS.length; i++) {
-      const demoUser = DEMO_USERS[i];
-      // Use crypto.randomUUID() for valid UUIDs
-      const userId = crypto.randomUUID();
-      demoUserIds.push(userId);
-      
-      const { error } = await supabaseAdmin.from('profiles').insert({
-        id: userId,
-        display_name: demoUser.display_name,
-        username: `${demoUser.username}_${i}`,
-        avatar_url: demoUser.avatar_url,
-        bio: demoUser.bio,
-        is_demo: true,
-      });
-      
-      if (error) {
-        console.error(`Error creating demo user ${i}:`, error);
-        throw error;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/seed-demo-data`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'seed' }),
       }
-    }
-    console.log(`✅ Created ${demoUserIds.length} demo users`);
+    );
 
-    // 2. Create friendships between current user and ALL demo users
-    console.log('Creating friendships with current user...');
-    const currentUserFriendships = demoUserIds.map(demoUserId => ({
-      user_id: currentUserId,
-      friend_id: demoUserId,
-      status: 'accepted' as const,
-    }));
+    const result = await response.json();
     
-    const { error: friendshipError } = await supabaseAdmin
-      .from('friendships')
-      .insert(currentUserFriendships);
-    
-    if (friendshipError) {
-      console.error('Error creating friendships:', friendshipError);
-      throw friendshipError;
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to seed demo data');
     }
-    console.log(`✅ Created ${currentUserFriendships.length} friendships with you`);
-
-    // 3. Create friendships between demo users (network effect)
-    console.log('Creating friendships between demo users...');
-    const demoFriendships = [];
-    for (let i = 0; i < demoUserIds.length; i++) {
-      const numFriends = 5 + Math.floor(Math.random() * 4);
-      const potentialFriends = demoUserIds.filter((_, idx) => idx !== i);
-      const friends = getRandomItems(potentialFriends, numFriends);
-      
-      for (const friendId of friends) {
-        const exists = demoFriendships.some(
-          f => (f.user_id === demoUserIds[i] && f.friend_id === friendId) ||
-               (f.user_id === friendId && f.friend_id === demoUserIds[i])
-        );
-        if (!exists) {
-          demoFriendships.push({
-            user_id: demoUserIds[i],
-            friend_id: friendId,
-            status: 'accepted' as const,
-          });
-        }
-      }
-    }
-    
-    if (demoFriendships.length > 0) {
-      const { error: demoFriendError } = await supabaseAdmin
-        .from('friendships')
-        .insert(demoFriendships);
-      
-      if (demoFriendError) {
-        console.error('Error creating demo friendships:', demoFriendError);
-        // Don't throw, continue
-      } else {
-        console.log(`✅ Created ${demoFriendships.length} friendships between demo users`);
-      }
-    }
-
-    // 4. Create night statuses for 8-10 users at various venues
-    console.log('Creating active night statuses...');
-    const numActiveUsers = 8 + Math.floor(Math.random() * 3);
-    const activeUsers = getRandomItems(demoUserIds, numActiveUsers);
-    
-    for (const userId of activeUsers) {
-      const venue = DEMO_VENUES[Math.floor(Math.random() * DEMO_VENUES.length)];
-      await supabaseAdmin.from('night_statuses').insert({
-        user_id: userId,
-        status: 'out',
-        venue_name: venue.name,
-        lat: venue.lat,
-        lng: venue.lng,
-        expires_at: calculateExpiryTime(),
-        updated_at: getRecentTimestamp(),
-        is_demo: true,
-      });
-    }
-    console.log(`✅ Created ${activeUsers.length} active night statuses`);
-
-    // 5. Create check-ins (multiple check-ins for active users)
-    console.log('Creating check-ins...');
-    const checkins = [];
-    for (const userId of activeUsers) {
-      const numCheckins = 1 + Math.floor(Math.random() * 3);
-      const venues = getRandomItems(DEMO_VENUES, numCheckins);
-      
-      for (const venue of venues) {
-        checkins.push({
-          user_id: userId,
-          venue_name: venue.name,
-          lat: venue.lat,
-          lng: venue.lng,
-          created_at: getRecentTimestamp(),
-          is_demo: true,
-        });
-      }
-    }
-    await supabaseAdmin.from('checkins').insert(checkins);
-    console.log(`✅ Created ${checkins.length} check-ins`);
-
-    // 6. Create 50 demo posts with realistic timestamps
-    console.log('Creating 50 posts...');
-    const posts = [];
-    for (let i = 0; i < 50; i++) {
-      const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
-      const venue = DEMO_VENUES[Math.floor(Math.random() * DEMO_VENUES.length)];
-      const caption = DEMO_CAPTIONS[Math.floor(Math.random() * DEMO_CAPTIONS.length)];
-      
-      posts.push({
-        user_id: userId,
-        text: caption,
-        venue_name: venue.name,
-        expires_at: calculateExpiryTime(),
-        created_at: getRecentTimestamp(4),
-        is_demo: true,
-      });
-    }
-    await supabaseAdmin.from('posts').insert(posts);
-    console.log(`✅ Created 50 posts`);
-
-    // 7. Create 10 yap messages for hottest venues
-    console.log('Creating 10 yap messages...');
-    const hottestVenues = getRandomItems(DEMO_VENUES, 5);
-    const yapMessages = [];
-    
-    for (let i = 0; i < 10; i++) {
-      const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
-      const venue = hottestVenues[i % hottestVenues.length];
-      const message = DEMO_YAP_MESSAGES[Math.floor(Math.random() * DEMO_YAP_MESSAGES.length)];
-      
-      yapMessages.push({
-        user_id: userId,
-        text: message,
-        venue_name: venue.name,
-        expires_at: calculateExpiryTime(),
-        created_at: getRecentTimestamp(2),
-        is_anonymous: Math.random() > 0.3,
-        is_demo: true,
-      });
-    }
-    await supabaseAdmin.from('yap_messages').insert(yapMessages);
-    console.log(`✅ Created 10 yap messages`);
 
     markDemoSeeded();
     console.log('🎉 Demo data seeded successfully!');
     
     return { 
       success: true, 
-      stats: {
-        users: demoUserIds.length,
-        posts: 50,
-        yaps: 10,
-        venues: DEMO_VENUES.length,
-        activeUsers: activeUsers.length,
-      }
+      stats: result.stats,
     };
   } catch (error) {
     console.error('❌ Error seeding demo data:', error);
