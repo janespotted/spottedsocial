@@ -122,7 +122,7 @@ export function MeetUpConfirmation() {
     >
       <div className="w-[90%] max-w-md">
         {/* Main Card */}
-        <div className="relative bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-3xl p-8 shadow-[0_0_60px_rgba(124,58,237,0.8)] animate-scale-in">
+        <div className="relative bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in">
           {/* Recipient Avatar - Top Left */}
           <Avatar className="absolute top-6 left-6 h-12 w-12 border-2 border-white shadow-lg">
             <AvatarImage src={recipientAvatarUrl || undefined} />
@@ -139,7 +139,7 @@ export function MeetUpConfirmation() {
           {/* Center Content */}
           <div className="flex flex-col items-center text-center mt-4 mb-6">
             {/* Emoji */}
-            <div className="text-7xl mb-4 animate-bounce">😌</div>
+            <div className="text-7xl mb-4 animate-bounce">😊</div>
 
             {/* Text */}
             <h2 className="text-2xl font-bold text-white mb-2">
