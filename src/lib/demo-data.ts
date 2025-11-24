@@ -166,22 +166,31 @@ export async function seedDemoData(currentUserId: string) {
     const demoUserIds: string[] = [];
     const timestamp = Date.now();
     
+    console.log('🎬 Starting demo data seeding...');
+    
     // 1. Create 20 demo profiles
     console.log('Creating 20 demo users...');
     for (let i = 0; i < DEMO_USERS.length; i++) {
       const demoUser = DEMO_USERS[i];
-      const userId = `demo_${demoUser.username}_${timestamp}_${i}`;
+      // Use crypto.randomUUID() for valid UUIDs
+      const userId = crypto.randomUUID();
       demoUserIds.push(userId);
       
-      await supabase.from('profiles').insert({
+      const { error } = await supabase.from('profiles').insert({
         id: userId,
         display_name: demoUser.display_name,
-        username: demoUser.username,
+        username: `${demoUser.username}_${i}`,
         avatar_url: demoUser.avatar_url,
         bio: demoUser.bio,
         is_demo: true,
       });
+      
+      if (error) {
+        console.error(`Error creating demo user ${i}:`, error);
+        throw error;
+      }
     }
+    console.log(`✅ Created ${demoUserIds.length} demo users`);
 
     // 2. Create friendships between current user and ALL demo users
     console.log('Creating friendships with current user...');
@@ -190,19 +199,26 @@ export async function seedDemoData(currentUserId: string) {
       friend_id: demoUserId,
       status: 'accepted' as const,
     }));
-    await supabase.from('friendships').insert(currentUserFriendships);
+    
+    const { error: friendshipError } = await supabase
+      .from('friendships')
+      .insert(currentUserFriendships);
+    
+    if (friendshipError) {
+      console.error('Error creating friendships:', friendshipError);
+      throw friendshipError;
+    }
+    console.log(`✅ Created ${currentUserFriendships.length} friendships with you`);
 
     // 3. Create friendships between demo users (network effect)
     console.log('Creating friendships between demo users...');
     const demoFriendships = [];
     for (let i = 0; i < demoUserIds.length; i++) {
-      // Each demo user is friends with 5-8 random other demo users
       const numFriends = 5 + Math.floor(Math.random() * 4);
       const potentialFriends = demoUserIds.filter((_, idx) => idx !== i);
       const friends = getRandomItems(potentialFriends, numFriends);
       
       for (const friendId of friends) {
-        // Avoid duplicate friendships
         const exists = demoFriendships.some(
           f => (f.user_id === demoUserIds[i] && f.friend_id === friendId) ||
                (f.user_id === friendId && f.friend_id === demoUserIds[i])
@@ -216,7 +232,19 @@ export async function seedDemoData(currentUserId: string) {
         }
       }
     }
-    await supabase.from('friendships').insert(demoFriendships);
+    
+    if (demoFriendships.length > 0) {
+      const { error: demoFriendError } = await supabase
+        .from('friendships')
+        .insert(demoFriendships);
+      
+      if (demoFriendError) {
+        console.error('Error creating demo friendships:', demoFriendError);
+        // Don't throw, continue
+      } else {
+        console.log(`✅ Created ${demoFriendships.length} friendships between demo users`);
+      }
+    }
 
     // 4. Create night statuses for 8-10 users at various venues
     console.log('Creating active night statuses...');
@@ -236,12 +264,12 @@ export async function seedDemoData(currentUserId: string) {
         is_demo: true,
       });
     }
+    console.log(`✅ Created ${activeUsers.length} active night statuses`);
 
     // 5. Create check-ins (multiple check-ins for active users)
     console.log('Creating check-ins...');
     const checkins = [];
     for (const userId of activeUsers) {
-      // Each active user has 1-3 check-ins at different venues
       const numCheckins = 1 + Math.floor(Math.random() * 3);
       const venues = getRandomItems(DEMO_VENUES, numCheckins);
       
@@ -257,6 +285,7 @@ export async function seedDemoData(currentUserId: string) {
       }
     }
     await supabase.from('checkins').insert(checkins);
+    console.log(`✅ Created ${checkins.length} check-ins`);
 
     // 6. Create 50 demo posts with realistic timestamps
     console.log('Creating 50 posts...');
@@ -271,11 +300,12 @@ export async function seedDemoData(currentUserId: string) {
         text: caption,
         venue_name: venue.name,
         expires_at: calculateExpiryTime(),
-        created_at: getRecentTimestamp(4), // Within last 4 hours
+        created_at: getRecentTimestamp(4),
         is_demo: true,
       });
     }
     await supabase.from('posts').insert(posts);
+    console.log(`✅ Created 50 posts`);
 
     // 7. Create 10 yap messages for hottest venues
     console.log('Creating 10 yap messages...');
@@ -292,15 +322,17 @@ export async function seedDemoData(currentUserId: string) {
         text: message,
         venue_name: venue.name,
         expires_at: calculateExpiryTime(),
-        created_at: getRecentTimestamp(2), // Within last 2 hours
-        is_anonymous: Math.random() > 0.3, // 70% anonymous
+        created_at: getRecentTimestamp(2),
+        is_anonymous: Math.random() > 0.3,
         is_demo: true,
       });
     }
     await supabase.from('yap_messages').insert(yapMessages);
+    console.log(`✅ Created 10 yap messages`);
 
     markDemoSeeded();
-    console.log('Demo data seeded successfully!');
+    console.log('🎉 Demo data seeded successfully!');
+    
     return { 
       success: true, 
       stats: {
@@ -312,7 +344,7 @@ export async function seedDemoData(currentUserId: string) {
       }
     };
   } catch (error) {
-    console.error('Error seeding demo data:', error);
+    console.error('❌ Error seeding demo data:', error);
     return { success: false, error };
   }
 }
