@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useMeetUp } from '@/contexts/MeetUpContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -30,6 +31,7 @@ interface FriendsAtVenue {
 
 export function FriendIdCard() {
   const { selectedUserId, closeFriendCard } = useFriendIdCard();
+  const { sendMeetUpNotification } = useMeetUp();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [friendData, setFriendData] = useState<FriendData | null>(null);
@@ -37,7 +39,6 @@ export function FriendIdCard() {
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendsAtVenue[]>([]);
   const [distance, setDistance] = useState<number | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [showMeetUpOptions, setShowMeetUpOptions] = useState(false);
 
   useEffect(() => {
     if (selectedUserId) {
@@ -199,57 +200,15 @@ export function FriendIdCard() {
     }
   };
 
-  const handleSendMeetUpMessage = async () => {
-    if (!user || !selectedUserId || !nightStatus?.venue_name) return;
-
-    const { data: existingThreads } = await supabase
-      .from('dm_thread_members')
-      .select('thread_id')
-      .eq('user_id', user.id);
-
-    let threadId: string | null = null;
-
-    if (existingThreads) {
-      for (const thread of existingThreads) {
-        const { data: members } = await supabase
-          .from('dm_thread_members')
-          .select('user_id')
-          .eq('thread_id', thread.thread_id);
-
-        if (members?.length === 2 && members.some(m => m.user_id === selectedUserId)) {
-          threadId = thread.thread_id;
-          break;
-        }
-      }
-    }
-
-    if (!threadId) {
-      const { data: newThread } = await supabase
-        .from('dm_threads')
-        .insert({})
-        .select()
-        .single();
-
-      if (newThread) {
-        await supabase.from('dm_thread_members').insert([
-          { thread_id: newThread.id, user_id: user.id },
-          { thread_id: newThread.id, user_id: selectedUserId },
-        ]);
-        threadId = newThread.id;
-      }
-    }
-
-    if (threadId) {
-      await supabase.from('dm_messages').insert({
-        thread_id: threadId,
-        sender_id: user.id,
-        text: `Want to meet up at ${nightStatus.venue_name}?`,
-      });
-
-      setShowMeetUpOptions(false);
-      closeFriendCard();
-      navigate(`/thread/${threadId}`);
-    }
+  const handleMeetUp = () => {
+    if (!friendData) return;
+    
+    sendMeetUpNotification(
+      friendData.id,
+      friendData.display_name,
+      friendData.avatar_url
+    );
+    closeFriendCard();
   };
 
   return (
@@ -317,7 +276,7 @@ export function FriendIdCard() {
               {/* Action Buttons */}
               <div className="flex items-center gap-2 flex-1">
                 <button
-                  onClick={() => setShowMeetUpOptions(!showMeetUpOptions)}
+                  onClick={handleMeetUp}
                   className="flex-1 py-2 px-5 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors"
                 >
                   Meet Up
@@ -330,24 +289,6 @@ export function FriendIdCard() {
                 </button>
               </div>
             </div>
-
-            {/* Meet Up Options */}
-            {showMeetUpOptions && nightStatus?.venue_name && (
-              <div className="mt-4 p-3 bg-[#2d1b4e] rounded-2xl space-y-2">
-                <button
-                  onClick={handleSendMeetUpMessage}
-                  className="w-full py-2 px-3 text-left text-white text-sm hover:bg-[#3d2b5e] rounded-xl transition-colors"
-                >
-                  Send DM: "Want to meet up at {nightStatus.venue_name}?"
-                </button>
-                <button
-                  onClick={handleOpenDM}
-                  className="w-full py-2 px-3 text-left text-white text-sm hover:bg-[#3d2b5e] rounded-xl transition-colors"
-                >
-                  Share my current location
-                </button>
-              </div>
-            )}
           </div>
         )}
       </DialogContent>
