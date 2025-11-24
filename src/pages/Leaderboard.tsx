@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronUp, ChevronDown, BarChart3, Clock, DollarSign } from 'lucide-react';
@@ -35,6 +36,7 @@ export default function Leaderboard() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
+  const demoEnabled = useDemoMode();
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
 
@@ -42,11 +44,11 @@ export default function Leaderboard() {
     if (user) {
       fetchLeaderboard();
     }
-  }, [user]);
+  }, [user, demoEnabled]);
 
   const fetchLeaderboard = async () => {
-    // Get all active night statuses with locations
-    const { data: statuses } = await supabase
+    // Build query for night statuses
+    let query = supabase
       .from('night_statuses')
       .select(`
         venue_name,
@@ -62,6 +64,13 @@ export default function Leaderboard() {
       .not('lng', 'is', null)
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString());
+
+    // If demo mode is NOT enabled, filter out demo data
+    if (!demoEnabled) {
+      query = query.eq('is_demo', false);
+    }
+
+    const { data: statuses } = await query;
 
     if (!statuses) return;
 

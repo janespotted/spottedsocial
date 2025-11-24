@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send } from 'lucide-react';
@@ -31,6 +32,7 @@ export default function Home() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
+  const demoEnabled = useDemoMode();
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [hasCheckedToday, setHasCheckedToday] = useState(false);
@@ -42,7 +44,7 @@ export default function Home() {
       fetchPosts();
       subscribeToNewPosts();
     }
-  }, [user]);
+  }, [user, demoEnabled]);
 
   const checkFirstLogin = async () => {
     const { data } = await supabase
@@ -101,7 +103,8 @@ export default function Home() {
     const friendIds = friendships?.map(f => f.friend_id) || [];
     const userIds = [user?.id, ...friendIds];
 
-    const { data } = await supabase
+    // Build query for posts
+    let query = supabase
       .from('posts')
       .select(`
         *,
@@ -111,9 +114,17 @@ export default function Home() {
           avatar_url
         )
       `)
-      .in('user_id', userIds)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
+
+    // If demo mode is enabled, include demo posts, otherwise filter by friends
+    if (demoEnabled) {
+      query = query.or(`user_id.in.(${userIds.join(',')}),is_demo.eq.true`);
+    } else {
+      query = query.in('user_id', userIds).eq('is_demo', false);
+    }
+
+    const { data } = await query;
 
     setPosts(data || []);
   };
