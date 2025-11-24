@@ -26,6 +26,10 @@ export default function Map() {
   const [friends, setFriends] = useState<FriendLocation[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<FriendLocation | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const [mapboxToken, setMapboxToken] = useState<string>(() => 
+    localStorage.getItem('mapbox_token') || ''
+  );
+  const [showTokenInput, setShowTokenInput] = useState<boolean>(!localStorage.getItem('mapbox_token'));
 
   useEffect(() => {
     if (user) {
@@ -65,7 +69,6 @@ export default function Map() {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    const mapboxToken = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN;
     if (!mapboxToken) {
       console.error('Mapbox token not found');
       return;
@@ -89,7 +92,15 @@ export default function Map() {
       markersRef.current.forEach(marker => marker.remove());
       map.current?.remove();
     };
-  }, []);
+  }, [mapboxToken]);
+
+  const handleTokenSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mapboxToken) {
+      localStorage.setItem('mapbox_token', mapboxToken);
+      setShowTokenInput(false);
+    }
+  };
 
   useEffect(() => {
     if (!map.current || friends.length === 0) return;
@@ -156,6 +167,41 @@ export default function Map() {
     <div className="relative h-screen w-full">
       {/* Map Container */}
       <div ref={mapContainer} className="absolute inset-0" />
+
+      {/* Mapbox Token Input */}
+      {showTokenInput && (
+        <div className="absolute inset-0 bg-background/95 backdrop-blur z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md p-6 space-y-4 bg-card border-border">
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold">Mapbox Token Required</h2>
+              <p className="text-sm text-muted-foreground">
+                Enter your Mapbox public token to display the map. Get one at{' '}
+                <a 
+                  href="https://mapbox.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  mapbox.com
+                </a>
+              </p>
+            </div>
+            <form onSubmit={handleTokenSubmit} className="space-y-4">
+              <input
+                type="text"
+                value={mapboxToken}
+                onChange={(e) => setMapboxToken(e.target.value)}
+                placeholder="pk.eyJ1IjoieW91ci11c2VybmFtZSI..."
+                className="w-full px-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                required
+              />
+              <Button type="submit" className="w-full">
+                Save Token
+              </Button>
+            </form>
+          </Card>
+        </div>
+      )}
 
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-6 z-10">
