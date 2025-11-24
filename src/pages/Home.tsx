@@ -76,7 +76,9 @@ export default function Home() {
   const handleStatusUpdate = async (status: 'out' | 'heading_out' | 'home') => {
     setSelectedStatus(status);
 
-    if (status === 'out' || status === 'heading_out') {
+    if (status === 'out') {
+      setShowVenueInput(true);
+    } else if (status === 'heading_out') {
       setShowVenueInput(true);
     } else {
       await updateStatus(status, null, null, null);
@@ -117,7 +119,7 @@ export default function Home() {
 
       toast({
         title: 'Status updated!',
-        description: status === 'home' ? "You're home for the night." : `You're ${status.replace('_', ' ')} at ${venue}!`,
+        description: status === 'home' ? "You're staying in." : status === 'out' ? `You're out at ${venue}!` : `You're still deciding - heading to ${venue}!`,
       });
 
       setShowVenueInput(false);
@@ -163,6 +165,15 @@ export default function Home() {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    const labels = {
+      out: 'Yes',
+      heading_out: 'Still deciding',
+      home: 'No',
+    };
+    return labels[status as keyof typeof labels] || 'No';
+  };
+
   const getStatusBadge = (status: string) => {
     const badges = {
       out: 'bg-primary text-primary-foreground',
@@ -190,7 +201,7 @@ export default function Home() {
             className="h-16 text-lg font-semibold"
           >
             <MapPin className="mr-2 h-5 w-5" />
-            Out
+            Yes
           </Button>
           <Button
             onClick={() => handleStatusUpdate('heading_out')}
@@ -199,7 +210,7 @@ export default function Home() {
             className="h-16 text-lg font-semibold"
           >
             <MapPin className="mr-2 h-5 w-5" />
-            Heading Out
+            Still deciding
           </Button>
           <Button
             onClick={() => handleStatusUpdate('home')}
@@ -207,7 +218,7 @@ export default function Home() {
             size="lg"
             className="h-16 text-lg font-semibold"
           >
-            Home
+            No
           </Button>
         </div>
       ) : (
@@ -257,7 +268,7 @@ export default function Home() {
                   </div>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge(friend.status)}`}>
-                  {friend.status.replace('_', ' ')}
+                  {getStatusLabel(friend.status)}
                 </span>
               </div>
             ))}

@@ -76,7 +76,7 @@ export default function Auth() {
             Spotted
           </CardTitle>
           <CardDescription className="text-base">
-            {isLogin ? 'Welcome back! Sign in to see who\'s out tonight.' : 'Join Spotted to connect with friends on nights out.'}
+            {isLogin ? 'Welcome back! Sign in to see who\'s out tonight.' : 'Join Spotted to see where your friends are tonight.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
