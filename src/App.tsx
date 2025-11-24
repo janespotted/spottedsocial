@@ -13,6 +13,7 @@ import Map from "./pages/Map";
 import Leaderboard from "./pages/Leaderboard";
 import Feed from "./pages/Feed";
 import Messages from "./pages/Messages";
+import Thread from "./pages/Thread";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
@@ -75,6 +76,14 @@ const App = () => (
                     <Layout>
                       <Messages />
                     </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/messages/:threadId"
+                element={
+                  <ProtectedRoute>
+                    <Thread />
                   </ProtectedRoute>
                 }
               />
