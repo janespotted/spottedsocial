@@ -6,14 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Users, Trash2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDemoMode, setDemoMode, seedDemoData, clearDemoData } from '@/lib/demo-data';
+import { getBootstrapMode, setBootstrapMode } from '@/lib/bootstrap-config';
 
 export default function DemoSettings() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [demoEnabled, setDemoEnabled] = useState(false);
+  const [bootstrapEnabled, setBootstrapEnabled] = useState(false);
   const [seeded, setSeeded] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -30,6 +32,10 @@ export default function DemoSettings() {
       
       const mode = getDemoMode();
       setDemoEnabled(mode.enabled);
+      
+      // Check bootstrap mode
+      const bootstrapMode = getBootstrapMode();
+      setBootstrapEnabled(bootstrapMode.enabled);
       
       // Sync seeded state with actual database state
       if (mode.seeded !== actuallySeeded) {
@@ -52,6 +58,17 @@ export default function DemoSettings() {
       toast.info('Demo mode enabled. Tap "Seed Demo Data" to populate.');
     } else if (!enabled) {
       toast.success('Demo mode disabled. Demo data will be hidden.');
+    }
+  };
+
+  const handleToggleBootstrap = (enabled: boolean) => {
+    setBootstrapMode(enabled);
+    setBootstrapEnabled(enabled);
+    
+    if (enabled) {
+      toast.success('Bootstrap mode enabled. Leaderboard will show curated NYC venues.');
+    } else {
+      toast.success('Bootstrap mode disabled. Only real user data will be shown.');
     }
   };
 
@@ -172,6 +189,59 @@ export default function DemoSettings() {
           </CardContent>
         </Card>
 
+        {/* Bootstrap Mode Toggle */}
+        <Card className="bg-[#2d1b4e]/60 border-2 border-[#a855f7]/40">
+          <CardHeader>
+            <CardTitle className="text-[#d4ff00] flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Bootstrap Mode
+            </CardTitle>
+            <CardDescription className="text-white/60">
+              Show curated NYC venues alongside real data (only active when demo mode is OFF)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="bootstrap-mode" className="text-white">
+                Show promoted venues
+              </Label>
+              <Switch
+                id="bootstrap-mode"
+                checked={bootstrapEnabled}
+                onCheckedChange={handleToggleBootstrap}
+                disabled={demoEnabled}
+              />
+            </div>
+            
+            {demoEnabled && (
+              <p className="text-sm text-white/50 italic">
+                Bootstrap mode is disabled while demo mode is ON
+              </p>
+            )}
+            
+            {!demoEnabled && bootstrapEnabled && (
+              <div className="pt-4 border-t border-[#a855f7]/20">
+                <p className="text-sm text-white/70">
+                  <strong className="text-[#d4ff00]">Active:</strong> Leaderboard shows real data + 20 top-ranked NYC venues
+                </p>
+                <div className="mt-3 p-3 bg-[#1a0f2e]/60 rounded-lg border border-[#a855f7]/20 space-y-2 text-xs text-white/60">
+                  <div className="flex justify-between">
+                    <span>Promoted Venues:</span>
+                    <span className="text-[#d4ff00]">20 NYC hotspots</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Data Split:</span>
+                    <span className="text-white/80">~75% promoted / 25% real</span>
+                  </div>
+                  <div className="text-white/50 pt-2">
+                    Includes: Superbueno, Ketchy Shuby, Gospël, The Box, Attaboy, Saint Tuesday, and more...
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Info Card */}
         <Card className="bg-[#2d1b4e]/60 border-2 border-[#a855f7]/40">
           <CardHeader>
@@ -184,15 +254,15 @@ export default function DemoSettings() {
                 <div className="text-white/60 text-xs">Fake Users</div>
               </div>
               <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
-                <div className="text-[#d4ff00] text-2xl font-bold">15</div>
-                <div className="text-white/60 text-xs">NYC Venues</div>
+                <div className="text-[#d4ff00] text-2xl font-bold">20</div>
+                <div className="text-white/60 text-xs">Promoted Venues</div>
               </div>
               <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
-                <div className="text-[#d4ff00] text-2xl font-bold">50</div>
+                <div className="text-[#d4ff00] text-2xl font-bold">60</div>
                 <div className="text-white/60 text-xs">Newsfeed Posts</div>
               </div>
               <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
-                <div className="text-[#d4ff00] text-2xl font-bold">10</div>
+                <div className="text-[#d4ff00] text-2xl font-bold">15</div>
                 <div className="text-white/60 text-xs">Yap Messages</div>
               </div>
             </div>
