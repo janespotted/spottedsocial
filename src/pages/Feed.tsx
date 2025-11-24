@@ -200,6 +200,21 @@ export default function Feed() {
               key={post.id}
               className="bg-[#1a0f2e]/80 backdrop-blur rounded-2xl overflow-hidden"
             >
+              {/* Post Image - Full Width at Top */}
+              {post.image_url && (
+                <div className="w-full">
+                  <img
+                    src={post.image_url}
+                    alt="Post"
+                    loading="lazy"
+                    className="w-full h-80 object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+
               {/* Post Header */}
               <div className="flex items-center justify-between px-4 pt-4 pb-3">
                 <button 
@@ -221,19 +236,6 @@ export default function Feed() {
                 </button>
                 <span className="text-white/50 text-sm">{getTimeAgo(post.created_at)}</span>
               </div>
-
-              {/* Post Image */}
-              {post.image_url && (
-                <div className="px-4 pb-4">
-                  <div className="w-full aspect-square rounded-2xl overflow-hidden">
-                    <img
-                      src={post.image_url}
-                      alt="Post"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-              )}
 
               {/* Post Actions */}
               <div className="px-4 pb-4 space-y-3">

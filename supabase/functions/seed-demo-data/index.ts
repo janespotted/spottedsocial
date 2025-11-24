@@ -69,6 +69,19 @@ const DEMO_CAPTIONS = [
   "Making memories with my favorites ❤️",
 ];
 
+const DEMO_POST_IMAGES = [
+  "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1571266028243-d220c6563ccc?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1519167758481-83f29da8a97e?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1504309092620-4d0ec726efa4?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&h=800&fit=crop",
+];
+
 const DEMO_YAP_MESSAGES = [
   { text: "Pretty sure Justin Bieber just walked in...", score: 78, comments: 9 },
   { text: "This music is awesome who's the DJ right now", score: 50, comments: 9 },
@@ -260,10 +273,15 @@ Deno.serve(async (req) => {
         const venuePool = usePromoted ? PROMOTED_VENUES : DEMO_VENUES;
         const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
         const caption = DEMO_CAPTIONS[Math.floor(Math.random() * DEMO_CAPTIONS.length)];
+        
+        // 60% of posts have images
+        const hasImage = Math.random() < 0.6;
+        const imageUrl = hasImage ? DEMO_POST_IMAGES[Math.floor(Math.random() * DEMO_POST_IMAGES.length)] : null;
 
         posts.push({
           user_id: userId,
           text: caption,
+          image_url: imageUrl,
           venue_name: venue.name,
           expires_at: calculateExpiryTime(),
           created_at: getRecentTimestamp(4),
