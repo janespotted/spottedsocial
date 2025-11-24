@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ export default function FriendRequests() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
+  const { openFriendCard } = useFriendIdCard();
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [suggested, setSuggested] = useState<SuggestedUser[]>([]);
   const [search, setSearch] = useState('');
@@ -263,15 +265,25 @@ export default function FriendRequests() {
                 className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4"
               >
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
-                    <AvatarImage src={request.avatar_url || undefined} />
-                    <AvatarFallback className="bg-[#1a0f2e] text-white">
-                      {request.display_name[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                  <button
+                    onClick={() => openFriendCard(request.user_id)}
+                    className="transition-transform hover:scale-110"
+                  >
+                    <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
+                      <AvatarImage src={request.avatar_url || undefined} />
+                      <AvatarFallback className="bg-[#1a0f2e] text-white">
+                        {request.display_name[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
 
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-white">{request.display_name}</h3>
+                    <button
+                      onClick={() => openFriendCard(request.user_id)}
+                      className="text-left hover:opacity-80 transition-opacity"
+                    >
+                      <h3 className="font-semibold text-white">{request.display_name}</h3>
+                    </button>
                     {request.mutual_friends.length > 0 && (
                       <div className="flex items-center gap-1 mt-1">
                         <div className="flex -space-x-2">
@@ -323,15 +335,25 @@ export default function FriendRequests() {
                   className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4"
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
-                      <AvatarImage src={user.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white">
-                        {user.display_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                    <button
+                      onClick={() => openFriendCard(user.id)}
+                      className="transition-transform hover:scale-110"
+                    >
+                      <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
+                        <AvatarImage src={user.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white">
+                          {user.display_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
 
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-white">{user.display_name}</h3>
+                      <button
+                        onClick={() => openFriendCard(user.id)}
+                        className="text-left hover:opacity-80 transition-opacity"
+                      >
+                        <h3 className="font-semibold text-white">{user.display_name}</h3>
+                      </button>
                       {user.mutual_friends.length > 0 && (
                         <div className="flex items-center gap-1 mt-1">
                           <div className="flex -space-x-2">
