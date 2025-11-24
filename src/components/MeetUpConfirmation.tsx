@@ -10,28 +10,29 @@ export function MeetUpConfirmation() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const handleOpenChat = async () => {
-    console.log('Opening chat with recipient:', recipientUserId, recipientDisplayName);
+  const handleOpenChat = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent backdrop click
+    console.log('🟢 Chat button clicked! Opening chat with:', recipientUserId, recipientDisplayName);
     
     if (!user || !recipientUserId) {
-      console.error('Missing user or recipientUserId:', { user: user?.id, recipientUserId });
+      console.error('❌ Missing user or recipientUserId:', { user: user?.id, recipientUserId });
       return;
     }
 
     try {
       // Find or create thread
-      console.log('Searching for existing threads...');
+      console.log('🔍 Searching for existing threads...');
       const { data: existingThreads, error: fetchError } = await supabase
         .from('dm_thread_members')
         .select('thread_id, dm_threads!inner(*)')
         .eq('user_id', user.id);
 
       if (fetchError) {
-        console.error('Error fetching threads:', fetchError);
+        console.error('❌ Error fetching threads:', fetchError);
         return;
       }
 
-      console.log('Existing threads found:', existingThreads?.length);
+      console.log('📋 Existing threads found:', existingThreads?.length);
 
       let threadId: string | null = null;
 
@@ -43,20 +44,20 @@ export function MeetUpConfirmation() {
             .eq('thread_id', thread.thread_id);
 
           if (membersError) {
-            console.error('Error fetching thread members:', membersError);
+            console.error('❌ Error fetching thread members:', membersError);
             continue;
           }
 
           if (members?.length === 2 && members.some(m => m.user_id === recipientUserId)) {
             threadId = thread.thread_id;
-            console.log('Found existing thread:', threadId);
+            console.log('✅ Found existing thread:', threadId);
             break;
           }
         }
       }
 
       if (!threadId) {
-        console.log('Creating new thread...');
+        console.log('➕ Creating new thread...');
         const { data: newThread, error: createError } = await supabase
           .from('dm_threads')
           .insert({})
@@ -64,12 +65,12 @@ export function MeetUpConfirmation() {
           .single();
 
         if (createError) {
-          console.error('Error creating thread:', createError);
+          console.error('❌ Error creating thread:', createError);
           return;
         }
 
         if (newThread) {
-          console.log('New thread created:', newThread.id);
+          console.log('✅ New thread created:', newThread.id);
           const { error: membersError } = await supabase
             .from('dm_thread_members')
             .insert([
@@ -78,25 +79,32 @@ export function MeetUpConfirmation() {
             ]);
 
           if (membersError) {
-            console.error('Error adding thread members:', membersError);
+            console.error('❌ Error adding thread members:', membersError);
             return;
           }
 
           threadId = newThread.id;
-          console.log('Thread members added successfully');
+          console.log('✅ Thread members added successfully');
         }
       }
 
       if (threadId) {
-        console.log('Navigating to thread:', threadId);
+        console.log('🚀 Navigating to thread:', threadId);
         closeConfirmation();
         navigate(`/messages/${threadId}`);
       } else {
-        console.error('Failed to get threadId');
+        console.error('❌ Failed to get threadId');
       }
     } catch (error) {
-      console.error('Error in handleOpenChat:', error);
+      console.error('❌ Error in handleOpenChat:', error);
     }
+  };
+
+  const handleUndo = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent backdrop click
+    console.log('↩️ Undo button clicked - cancelling meet up for:', recipientDisplayName);
+    closeConfirmation();
+    navigate(-1); // Return to previous screen
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -106,13 +114,6 @@ export function MeetUpConfirmation() {
   };
 
   if (!showConfirmation) return null;
-
-  const handleUndo = () => {
-    // Cancel the meet-up notification and return to previous screen
-    console.log('Meet Up notification cancelled for:', recipientDisplayName);
-    closeConfirmation();
-    navigate(-1); // Return to previous screen
-  };
 
   return (
     <div 
