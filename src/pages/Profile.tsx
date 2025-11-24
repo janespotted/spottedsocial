@@ -86,18 +86,23 @@ export default function Profile() {
   };
 
   const handleLocationSharingChange = async (value: string) => {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ location_sharing_level: value })
-      .eq('id', user?.id);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ location_sharing_level: value })
+        .eq('id', user?.id);
 
-    if (error) {
+      if (error) throw error;
+
+      setLocationSharingLevel(value);
+      
+      // Refresh profile data to sync state
+      await fetchProfileData();
+      
+      toast.success(`Now sharing with ${getLevelDisplayName(value)}`);
+    } catch (error: any) {
       toast.error('Failed to update location sharing');
-      return;
     }
-
-    setLocationSharingLevel(value);
-    toast.success('Location sharing updated');
   };
 
   const handleShareProfile = async () => {

@@ -262,7 +262,11 @@ export type Database = {
           display_name: string
           home_city: string | null
           id: string
+          is_out: boolean | null
           last_active_at: string | null
+          last_known_lat: number | null
+          last_known_lng: number | null
+          last_location_at: string | null
           location_sharing_level: string | null
           username: string
         }
@@ -273,7 +277,11 @@ export type Database = {
           display_name: string
           home_city?: string | null
           id: string
+          is_out?: boolean | null
           last_active_at?: string | null
+          last_known_lat?: number | null
+          last_known_lng?: number | null
+          last_location_at?: string | null
           location_sharing_level?: string | null
           username: string
         }
@@ -284,7 +292,11 @@ export type Database = {
           display_name?: string
           home_city?: string | null
           id?: string
+          is_out?: boolean | null
           last_active_at?: string | null
+          last_known_lat?: number | null
+          last_known_lng?: number | null
+          last_location_at?: string | null
           location_sharing_level?: string | null
           username?: string
         }
