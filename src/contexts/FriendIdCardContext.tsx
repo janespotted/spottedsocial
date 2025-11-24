@@ -1,26 +1,36 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
+export interface FriendCardData {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  venueName?: string;
+  lat?: number;
+  lng?: number;
+  relationshipType?: 'close' | 'direct' | 'mutual';
+}
+
 interface FriendIdCardContextType {
-  selectedUserId: string | null;
-  openFriendCard: (userId: string) => void;
+  selectedFriend: FriendCardData | null;
+  openFriendCard: (friend: FriendCardData) => void;
   closeFriendCard: () => void;
 }
 
 const FriendIdCardContext = createContext<FriendIdCardContextType | undefined>(undefined);
 
 export function FriendIdCardProvider({ children }: { children: ReactNode }) {
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedFriend, setSelectedFriend] = useState<FriendCardData | null>(null);
 
-  const openFriendCard = (userId: string) => {
-    setSelectedUserId(userId);
+  const openFriendCard = (friend: FriendCardData) => {
+    setSelectedFriend(friend);
   };
 
   const closeFriendCard = () => {
-    setSelectedUserId(null);
+    setSelectedFriend(null);
   };
 
   return (
-    <FriendIdCardContext.Provider value={{ selectedUserId, openFriendCard, closeFriendCard }}>
+    <FriendIdCardContext.Provider value={{ selectedFriend, openFriendCard, closeFriendCard }}>
       {children}
     </FriendIdCardContext.Provider>
   );

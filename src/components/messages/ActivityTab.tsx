@@ -157,7 +157,11 @@ export function ActivityTab() {
               <div className="flex-shrink-0">
                 {activity.avatar_url !== undefined ? (
                   <button
-                    onClick={() => activity.user_id && openFriendCard(activity.user_id)}
+                    onClick={() => activity.user_id && openFriendCard({
+                      userId: activity.user_id,
+                      displayName: activity.title,
+                      avatarUrl: activity.avatar_url || null,
+                    })}
                     className="hover:opacity-80 transition-opacity"
                   >
                     <Avatar className="h-12 w-12 border-2 border-[#a855f7] cursor-pointer">

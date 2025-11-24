@@ -30,28 +30,39 @@ interface FriendsAtVenue {
 }
 
 export function FriendIdCard() {
-  const { selectedUserId, closeFriendCard } = useFriendIdCard();
+  const { selectedFriend, closeFriendCard } = useFriendIdCard();
   const { sendMeetUpNotification } = useMeetUp();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [friendData, setFriendData] = useState<FriendData | null>(null);
-  const [nightStatus, setNightStatus] = useState<NightStatus | null>(null);
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendsAtVenue[]>([]);
   const [distance, setDistance] = useState<number | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    if (selectedUserId) {
-      console.log('Friend ID Card opened for user:', selectedUserId);
-      fetchFriendData();
+    if (selectedFriend && user) {
+      console.log('Friend ID Card opened for:', selectedFriend);
       fetchUserLocation();
+      fetchFriendsAtVenue();
     } else {
-      setFriendData(null);
-      setNightStatus(null);
       setFriendsAtVenue([]);
       setDistance(null);
     }
-  }, [selectedUserId]);
+  }, [selectedFriend]);
+
+  // Calculate distance when we have both locations
+  useEffect(() => {
+    if (selectedFriend && selectedFriend.lat && selectedFriend.lng && userLocation) {
+      const dist = calculateDistance(
+        userLocation.lat,
+        userLocation.lng,
+        selectedFriend.lat,
+        selectedFriend.lng
+      );
+      setDistance(dist);
+    } else {
+      setDistance(null);
+    }
+  }, [selectedFriend, userLocation]);
 
   const fetchUserLocation = async () => {
     if (!user) return;
@@ -67,78 +78,34 @@ export function FriendIdCard() {
     }
   };
 
-  const fetchFriendData = async () => {
-    if (!selectedUserId) return;
+  const fetchFriendsAtVenue = async () => {
+    if (!selectedFriend?.venueName || !user) return;
 
-    console.log('Fetching friend data for:', selectedUserId);
+    // Fetch other friends at the same venue
+    const { data: friendships } = await supabase
+      .from('friendships')
+      .select('friend_id')
+      .eq('user_id', user.id)
+      .eq('status', 'accepted');
 
-    // Fetch friend profile
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('id, display_name, username, avatar_url, last_known_lat, last_known_lng')
-      .eq('id', selectedUserId)
-      .single();
+    const friendIds = friendships?.map(f => f.friend_id) || [];
 
-    if (error) {
-      console.error('Error fetching friend data:', error);
-      return;
+    const { data: venueStatuses } = await supabase
+      .from('night_statuses')
+      .select('user_id, profiles:user_id(display_name, avatar_url)')
+      .eq('venue_name', selectedFriend.venueName)
+      .neq('user_id', selectedFriend.userId)
+      .in('user_id', friendIds)
+      .gt('expires_at', new Date().toISOString());
+
+    if (venueStatuses) {
+      const friends = venueStatuses.map(s => ({
+        user_id: s.user_id,
+        display_name: (s.profiles as any)?.display_name || 'Friend',
+        avatar_url: (s.profiles as any)?.avatar_url || null,
+      }));
+      setFriendsAtVenue(friends);
     }
-
-      if (profile) {
-        console.log('Friend data loaded:', profile);
-        setFriendData(profile);
-
-        // Calculate distance if both users have location data
-        if (userLocation && profile.last_known_lat && profile.last_known_lng) {
-          const dist = calculateDistance(
-            userLocation.lat,
-            userLocation.lng,
-            profile.last_known_lat,
-            profile.last_known_lng
-          );
-          setDistance(dist);
-        }
-
-        // Fetch night status
-        const { data: status } = await supabase
-          .from('night_statuses')
-          .select('venue_name, lat, lng')
-          .eq('user_id', selectedUserId)
-          .gt('expires_at', new Date().toISOString())
-          .maybeSingle();
-
-        if (status) {
-          setNightStatus(status);
-
-          // Fetch other friends at the same venue
-          if (status.venue_name) {
-            const { data: friendships } = await supabase
-              .from('friendships')
-              .select('friend_id')
-              .eq('user_id', user?.id)
-              .eq('status', 'accepted');
-
-            const friendIds = friendships?.map(f => f.friend_id) || [];
-
-            const { data: venueStatuses } = await supabase
-              .from('night_statuses')
-              .select('user_id, profiles:user_id(display_name, avatar_url)')
-              .eq('venue_name', status.venue_name)
-              .neq('user_id', selectedUserId)
-              .in('user_id', friendIds)
-              .gt('expires_at', new Date().toISOString());
-
-            if (venueStatuses) {
-              const friends = venueStatuses.map(s => ({
-                user_id: s.user_id,
-                display_name: (s.profiles as any)?.display_name || 'Friend',
-                avatar_url: (s.profiles as any)?.avatar_url || null,
-              }));
-              setFriendsAtVenue(friends);
-            }
-          }
-        }
-      }
   };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -154,7 +121,7 @@ export function FriendIdCard() {
   };
 
   const handleOpenDM = async () => {
-    if (!user || !selectedUserId) return;
+    if (!user || !selectedFriend) return;
 
     // Find or create thread
     const { data: existingThreads } = await supabase
@@ -171,7 +138,7 @@ export function FriendIdCard() {
           .select('user_id')
           .eq('thread_id', thread.thread_id);
 
-        if (members?.length === 2 && members.some(m => m.user_id === selectedUserId)) {
+        if (members?.length === 2 && members.some(m => m.user_id === selectedFriend.userId)) {
           threadId = thread.thread_id;
           break;
         }
@@ -188,7 +155,7 @@ export function FriendIdCard() {
       if (newThread) {
         await supabase.from('dm_thread_members').insert([
           { thread_id: newThread.id, user_id: user.id },
-          { thread_id: newThread.id, user_id: selectedUserId },
+          { thread_id: newThread.id, user_id: selectedFriend.userId },
         ]);
         threadId = newThread.id;
       }
@@ -201,20 +168,20 @@ export function FriendIdCard() {
   };
 
   const handleMeetUp = async () => {
-    if (!friendData) return;
+    if (!selectedFriend) return;
     
     await sendMeetUpNotification(
-      friendData.id,
-      friendData.display_name,
-      friendData.avatar_url
+      selectedFriend.userId,
+      selectedFriend.displayName,
+      selectedFriend.avatarUrl
     );
     closeFriendCard();
   };
 
   return (
-    <Dialog open={!!selectedUserId} onOpenChange={(open) => !open && closeFriendCard()}>
+    <Dialog open={!!selectedFriend} onOpenChange={(open) => !open && closeFriendCard()}>
       <DialogContent className="w-[90%] max-w-[400px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
-        {!friendData ? (
+        {!selectedFriend ? (
           <div className="py-8 px-6 flex items-center justify-center">
             <p className="text-white/60">Loading...</p>
           </div>
@@ -223,28 +190,28 @@ export function FriendIdCard() {
             <div className="flex items-start gap-4 mb-4">
               {/* Large Avatar */}
               <Avatar className="h-20 w-20 border-[3px] border-[#a855f7] flex-shrink-0">
-                <AvatarImage src={friendData.avatar_url || undefined} />
+                <AvatarImage src={selectedFriend.avatarUrl || undefined} />
                 <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
-                  {friendData.display_name[0]}
+                  {selectedFriend.displayName[0]}
                 </AvatarFallback>
               </Avatar>
 
               {/* User Info */}
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-white leading-tight mb-1">
-                  {friendData.display_name}
+                  {selectedFriend.displayName}
                 </h2>
-                {nightStatus?.venue_name && (
+                {selectedFriend.venueName && (
                   <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
-                    @ {nightStatus.venue_name}
+                    @ {selectedFriend.venueName}
                   </p>
                 )}
                 {distance !== null && (
                   <p className="text-white/50 text-sm leading-tight">
-                    {distance.toFixed(1)} mi
+                    {distance.toFixed(1)} mi away
                   </p>
                 )}
-                {!nightStatus?.venue_name && distance === null && (
+                {!selectedFriend.venueName && distance === null && (
                   <p className="text-white/50 text-sm leading-tight mt-1">
                     Location not shared
                   </p>

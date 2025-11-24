@@ -197,7 +197,11 @@ export function VenueIdCard() {
                       <Avatar
                         key={friend.id}
                         className="w-10 h-10 border-2 border-[#2d1b4e] cursor-pointer hover:scale-110 transition-transform"
-                        onClick={() => openFriendCard(friend.id)}
+                        onClick={() => openFriendCard({
+                          userId: friend.id,
+                          displayName: friend.display_name,
+                          avatarUrl: friend.avatar_url,
+                        })}
                       >
                         <AvatarImage 
                           src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} 

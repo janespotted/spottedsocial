@@ -266,7 +266,11 @@ export default function FriendRequests() {
               >
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => openFriendCard(request.user_id)}
+                    onClick={() => openFriendCard({
+                      userId: request.user_id,
+                      displayName: request.display_name,
+                      avatarUrl: request.avatar_url,
+                    })}
                     className="transition-transform hover:scale-110"
                   >
                     <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
@@ -279,7 +283,11 @@ export default function FriendRequests() {
 
                   <div className="flex-1 min-w-0">
                     <button
-                      onClick={() => openFriendCard(request.user_id)}
+                      onClick={() => openFriendCard({
+                        userId: request.user_id,
+                        displayName: request.display_name,
+                        avatarUrl: request.avatar_url,
+                      })}
                       className="text-left hover:opacity-80 transition-opacity"
                     >
                       <h3 className="font-semibold text-white">{request.display_name}</h3>
@@ -336,7 +344,11 @@ export default function FriendRequests() {
                 >
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => openFriendCard(user.id)}
+                      onClick={() => openFriendCard({
+                        userId: user.id,
+                        displayName: user.display_name,
+                        avatarUrl: user.avatar_url,
+                      })}
                       className="transition-transform hover:scale-110"
                     >
                       <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
@@ -349,7 +361,11 @@ export default function FriendRequests() {
 
                     <div className="flex-1 min-w-0">
                       <button
-                        onClick={() => openFriendCard(user.id)}
+                        onClick={() => openFriendCard({
+                          userId: user.id,
+                          displayName: user.display_name,
+                          avatarUrl: user.avatar_url,
+                        })}
                         className="text-left hover:opacity-80 transition-opacity"
                       >
                         <h3 className="font-semibold text-white">{user.display_name}</h3>

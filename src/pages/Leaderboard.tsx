@@ -229,7 +229,11 @@ export default function Leaderboard() {
                       {venue.friends.slice(0, 3).map((friend, idx) => (
                         <button
                           key={idx}
-                          onClick={() => openFriendCard(friend.user_id)}
+                          onClick={() => openFriendCard({
+                            userId: friend.user_id,
+                            displayName: friend.display_name,
+                            avatarUrl: friend.avatar_url,
+                          })}
                           className="transition-transform hover:scale-110"
                         >
                           <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
@@ -301,7 +305,11 @@ export default function Leaderboard() {
                   {venue.friends.slice(0, 3).map((friend, idx) => (
                     <button
                       key={idx}
-                      onClick={() => openFriendCard(friend.user_id)}
+                      onClick={() => openFriendCard({
+                        userId: friend.user_id,
+                        displayName: friend.display_name,
+                        avatarUrl: friend.avatar_url,
+                      })}
                       className="transition-transform hover:scale-110"
                     >
                       <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
@@ -362,7 +370,11 @@ export default function Leaderboard() {
                   {biggestMover.friends.map((friend, idx) => (
                     <button
                       key={idx}
-                      onClick={() => openFriendCard(friend.user_id)}
+                      onClick={() => openFriendCard({
+                        userId: friend.user_id,
+                        displayName: friend.display_name,
+                        avatarUrl: friend.avatar_url,
+                      })}
                       className="transition-transform hover:scale-110"
                     >
                       <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.8)]">

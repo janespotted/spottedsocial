@@ -368,7 +368,11 @@ export default function Home() {
               {/* Post Header */}
               <div className="flex items-center justify-between p-4">
                 <button
-                  onClick={() => openFriendCard(post.user_id)}
+                  onClick={() => openFriendCard({
+                    userId: post.user_id,
+                    displayName: post.profiles?.display_name || 'Friend',
+                    avatarUrl: post.profiles?.avatar_url || null,
+                  })}
                   className="flex items-center gap-3 hover:opacity-80 transition-opacity"
                 >
                   <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
@@ -434,7 +438,11 @@ export default function Home() {
                 {/* Caption */}
                 <div className="text-white/90 text-sm">
                   <button
-                    onClick={() => openFriendCard(post.user_id)}
+                    onClick={() => openFriendCard({
+                      userId: post.user_id,
+                      displayName: post.profiles?.display_name || 'Friend',
+                      avatarUrl: post.profiles?.avatar_url || null,
+                    })}
                     className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
                   >
                     {post.profiles?.username}

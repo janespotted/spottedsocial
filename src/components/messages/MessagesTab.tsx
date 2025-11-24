@@ -143,7 +143,11 @@ export function MessagesTab() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    openFriendCard(thread.user_id);
+                    openFriendCard({
+                      userId: thread.user_id,
+                      displayName: thread.profiles?.display_name || 'Friend',
+                      avatarUrl: thread.profiles?.avatar_url || null,
+                    });
                   }}
                   className="hover:opacity-80 transition-opacity"
                 >
