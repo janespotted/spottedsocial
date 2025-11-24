@@ -126,90 +126,10 @@ export default function Map() {
         setUserLocation(null);
       }
 
-      // Get list of accepted friends
-      const { data: friendships } = await supabase
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', user.id)
-        .eq('status', 'accepted');
-
-      const friendIds = friendships?.map(f => f.friend_id) || [];
-
       let friendLocations: FriendLocation[] = [];
+      let friendIds: string[] = [];
 
-      if (friendIds.length > 0) {
-        // Get friends' profiles with location data
-        let friendQuery = supabase
-          .from('profiles')
-          .select('id, display_name, avatar_url, is_out, last_known_lat, last_known_lng, location_sharing_level')
-          .in('id', friendIds)
-          .eq('is_out', true)
-          .not('last_known_lat', 'is', null)
-          .not('last_known_lng', 'is', null);
-
-        // Filter demo data unless demo mode is enabled
-        if (!demoEnabled) {
-          friendQuery = friendQuery.eq('is_demo', false);
-        }
-
-        const { data: friendProfiles } = await friendQuery;
-
-        // Get friends' venue names from night_statuses
-        const { data: statuses } = await supabase
-          .from('night_statuses')
-          .select('user_id, venue_name')
-          .in('user_id', friendIds)
-          .not('expires_at', 'is', null)
-          .gt('expires_at', new Date().toISOString());
-
-        const venueMap: Record<string, string> = {};
-        statuses?.forEach(s => {
-          venueMap[s.user_id] = s.venue_name;
-        });
-
-        // Get relationship types (close friends, mutual friends)
-        const { data: closeFriends } = await supabase
-          .from('close_friends')
-          .select('close_friend_id')
-          .eq('user_id', user.id);
-
-        const closeFriendIds = new Set(closeFriends?.map(cf => cf.close_friend_id) || []);
-
-        // Determine relationship type for each friend
-        const relationshipTypes: Record<string, 'close' | 'direct' | 'mutual'> = {};
-        
-        for (const friendId of friendIds) {
-          if (closeFriendIds.has(friendId)) {
-            relationshipTypes[friendId] = 'close';
-          } else {
-            // Check if mutual friend (friends-of-friends)
-            const { data: commonFriends } = await supabase
-              .from('friendships')
-              .select('friend_id')
-              .eq('user_id', friendId)
-              .eq('status', 'accepted')
-              .in('friend_id', friendIds);
-
-            const isMutual = commonFriends && commonFriends.length > 0;
-            relationshipTypes[friendId] = isMutual ? 'mutual' : 'direct';
-          }
-        }
-
-        // RLS policies handle visibility filtering - no client-side filtering needed
-        friendLocations = (friendProfiles || []).map((friend: any) => ({
-          user_id: friend.id,
-          lat: friend.last_known_lat,
-          lng: friend.last_known_lng,
-          venue_name: venueMap[friend.id] || 'Out',
-          profiles: {
-            display_name: friend.display_name || 'Unknown',
-            avatar_url: friend.avatar_url,
-          },
-          relationshipType: relationshipTypes[friend.id] || 'direct',
-        }));
-      }
-
-      // If demo mode is enabled, add demo users to the map
+      // When demo mode is ON, show ONLY demo friends (ignore real friends)
       if (demoEnabled) {
         const { data: demoUsers } = await supabase
           .from('profiles')
@@ -233,7 +153,10 @@ export default function Map() {
           demoVenueMap[s.user_id] = s.venue_name;
         });
 
-        const demoLocations: FriendLocation[] = (demoUsers || []).map((user: any) => ({
+        // Assign relationship types to demo friends randomly
+        const relationshipTypes: ('close' | 'direct' | 'mutual')[] = ['close', 'direct', 'mutual'];
+        
+        friendLocations = (demoUsers || []).map((user: any, index: number) => ({
           user_id: user.id,
           lat: user.last_known_lat,
           lng: user.last_known_lng,
@@ -242,9 +165,89 @@ export default function Map() {
             display_name: user.display_name,
             avatar_url: user.avatar_url,
           },
+          // Distribute relationship types: 30% close, 40% direct, 30% mutual
+          relationshipType: index % 10 < 3 ? 'close' : index % 10 < 7 ? 'direct' : 'mutual',
         }));
 
-        friendLocations = [...friendLocations, ...demoLocations];
+        friendIds = demoUserIds;
+      } else {
+        // Normal mode: show real friends only
+        // Get list of accepted friends
+        const { data: friendships } = await supabase
+          .from('friendships')
+          .select('friend_id')
+          .eq('user_id', user.id)
+          .eq('status', 'accepted');
+
+        friendIds = friendships?.map(f => f.friend_id) || [];
+
+        if (friendIds.length > 0) {
+          // Get friends' profiles with location data
+          const friendQuery = supabase
+            .from('profiles')
+            .select('id, display_name, avatar_url, is_out, last_known_lat, last_known_lng, location_sharing_level')
+            .in('id', friendIds)
+            .eq('is_out', true)
+            .eq('is_demo', false)
+            .not('last_known_lat', 'is', null)
+            .not('last_known_lng', 'is', null);
+
+          const { data: friendProfiles } = await friendQuery;
+
+          // Get friends' venue names from night_statuses
+          const { data: statuses } = await supabase
+            .from('night_statuses')
+            .select('user_id, venue_name')
+            .in('user_id', friendIds)
+            .not('expires_at', 'is', null)
+            .gt('expires_at', new Date().toISOString());
+
+          const venueMap: Record<string, string> = {};
+          statuses?.forEach(s => {
+            venueMap[s.user_id] = s.venue_name;
+          });
+
+          // Get relationship types (close friends, mutual friends)
+          const { data: closeFriends } = await supabase
+            .from('close_friends')
+            .select('close_friend_id')
+            .eq('user_id', user.id);
+
+          const closeFriendIds = new Set(closeFriends?.map(cf => cf.close_friend_id) || []);
+
+          // Determine relationship type for each friend
+          const relationshipTypes: Record<string, 'close' | 'direct' | 'mutual'> = {};
+          
+          for (const friendId of friendIds) {
+            if (closeFriendIds.has(friendId)) {
+              relationshipTypes[friendId] = 'close';
+            } else {
+              // Check if mutual friend (friends-of-friends)
+              const { data: commonFriends } = await supabase
+                .from('friendships')
+                .select('friend_id')
+                .eq('user_id', friendId)
+                .eq('status', 'accepted')
+                .in('friend_id', friendIds);
+
+              const isMutual = commonFriends && commonFriends.length > 0;
+              relationshipTypes[friendId] = isMutual ? 'mutual' : 'direct';
+            }
+          }
+
+          // RLS policies handle visibility filtering - no client-side filtering needed
+          friendLocations = (friendProfiles || []).map((friend: any) => ({
+            user_id: friend.id,
+            lat: friend.last_known_lat,
+            lng: friend.last_known_lng,
+            venue_name: venueMap[friend.id] || 'Out',
+            profiles: {
+              display_name: friend.display_name || 'Unknown',
+              avatar_url: friend.avatar_url,
+            },
+            relationshipType: relationshipTypes[friend.id] || 'direct',
+          }));
+        }
       }
 
       setFriends(friendLocations);
@@ -673,14 +676,14 @@ export default function Map() {
             </div>
           )}
         </div>
-      ) : (
+      ) : !demoEnabled ? (
         <div className="absolute top-20 left-4 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-10">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#a855f7]/30 rounded-full"></div>
             <span className="text-white/60 text-sm">No friends out</span>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* My Location Button */}
       <button
