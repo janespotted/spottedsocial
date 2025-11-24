@@ -70,16 +70,26 @@ const DEMO_CAPTIONS = [
 ];
 
 const DEMO_YAP_MESSAGES = [
-  "Anyone here? Looking for my friends 👀",
-  "This DJ set is unreal!!!",
-  "Line is crazy long outside",
-  "Just got here, who's around?",
-  "The energy is INSANE right now",
-  "Best spot in Brooklyn hands down",
-  "Dance floor is PACKED",
-  "Where's the after party at?",
-  "This place never disappoints",
-  "Lost my friend, if you see them tell them I'm by the bar",
+  { text: "Pretty sure Justin Bieber just walked in...", score: 78, comments: 9 },
+  { text: "This music is awesome who's the DJ right now", score: 50, comments: 9 },
+  { text: "What's the story with this couple at the bar they've been fighting for the past hr", score: 45, comments: 9 },
+  { text: "What's everyone's move after close?", score: 5, comments: 9 },
+  { text: "The bouncer is a douche!", score: 9, comments: 9 },
+  { text: "Anyone here? Looking for my friends 👀", score: 12, comments: 3 },
+  { text: "This DJ set is unreal!!!", score: 67, comments: 12 },
+  { text: "Line is crazy long outside", score: 23, comments: 6 },
+  { text: "Just got here, who's around?", score: 8, comments: 2 },
+  { text: "The energy is INSANE right now", score: 89, comments: 15 },
+  { text: "Best spot in Brooklyn hands down", score: 42, comments: 7 },
+  { text: "Dance floor is PACKED", score: 34, comments: 5 },
+  { text: "Where's the after party at?", score: 19, comments: 11 },
+  { text: "This place never disappoints", score: 56, comments: 4 },
+  { text: "Lost my friend, if you see them tell them I'm by the bar", score: 15, comments: 8 },
+  { text: "Bartender hooked it up 🍹", score: 31, comments: 6 },
+  { text: "This lineup is fire", score: 72, comments: 10 },
+  { text: "Why is everyone so good looking here??", score: 93, comments: 18 },
+  { text: "Sound system goes crazy", score: 61, comments: 7 },
+  { text: "Cover was worth it", score: 27, comments: 4 },
 ];
 
 function calculateExpiryTime(): string {
@@ -263,23 +273,33 @@ Deno.serve(async (req) => {
       }
       await supabaseAdmin.from('posts').insert(posts);
 
-      // 7. Create yap messages with promoted venues
-      const hottestVenues = getRandomItems([...PROMOTED_VENUES, ...DEMO_VENUES], 8);
+      // 7. Create yap messages with scores and handles
+      const hottestVenues = getRandomItems([...PROMOTED_VENUES, ...DEMO_VENUES], 10);
       const yapMessages = [];
 
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 40; i++) {
         const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
         const venue = hottestVenues[i % hottestVenues.length];
-        const message = DEMO_YAP_MESSAGES[Math.floor(Math.random() * DEMO_YAP_MESSAGES.length)];
+        const yapData = DEMO_YAP_MESSAGES[i % DEMO_YAP_MESSAGES.length];
         const isPromotedVenue = PROMOTED_VENUES.some(v => v.name === venue.name);
+        
+        // Generate anonymous handle
+        const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
+        
+        // Calculate time ago (2m, 4m, 7m, 9m, 13m pattern)
+        const minutesAgo = [2, 4, 7, 9, 13, 18, 25, 32, 45, 62][i % 10];
+        const timestamp = new Date(Date.now() - minutesAgo * 60000);
 
         yapMessages.push({
           user_id: userId,
-          text: message,
+          text: yapData.text,
           venue_name: venue.name,
           expires_at: calculateExpiryTime(),
-          created_at: getRecentTimestamp(2),
-          is_anonymous: Math.random() > 0.3,
+          created_at: timestamp.toISOString(),
+          is_anonymous: true,
+          author_handle: handle,
+          score: yapData.score,
+          comments_count: yapData.comments,
           is_demo: true,
           is_promoted: isPromotedVenue,
         });
@@ -291,9 +311,9 @@ Deno.serve(async (req) => {
           success: true,
           stats: {
             users: demoUserIds.length,
-            posts: 50,
-            yaps: 10,
-            venues: DEMO_VENUES.length,
+            posts: 60,
+            yaps: yapMessages.length,
+            venues: PROMOTED_VENUES.length + DEMO_VENUES.length,
             activeUsers: activeUsers.length,
           }
         }),
