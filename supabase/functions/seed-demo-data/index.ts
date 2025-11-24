@@ -291,6 +291,79 @@ Deno.serve(async (req) => {
       }
       await supabaseAdmin.from('posts').insert(posts);
 
+      // 6.5 Create post comments
+      const postComments = [];
+      const postsWithComments = getRandomItems(posts, 30); // Add comments to ~30 posts
+      
+      for (const post of postsWithComments) {
+        const numComments = 1 + Math.floor(Math.random() * 4); // 1-4 comments per post
+        const commenters = getRandomItems(demoUserIds, numComments);
+        
+        for (const commenterId of commenters) {
+          const commentTexts = [
+            "Looks amazing! 🔥",
+            "Wish I was there!",
+            "So jealous rn 😭",
+            "See you there!",
+            "On my way!",
+            "This place is fire",
+            "Need to check this out",
+            "Vibes look incredible",
+            "Best spot ever",
+            "Let's go there next weekend!",
+          ];
+          
+          const commentText = commentTexts[Math.floor(Math.random() * commentTexts.length)];
+          
+          postComments.push({
+            post_id: posts.indexOf(post), // This will be fixed below
+            user_id: commenterId,
+            text: commentText,
+            created_at: new Date(new Date(post.created_at).getTime() + Math.random() * 2 * 60 * 60 * 1000).toISOString(),
+          });
+        }
+      }
+
+      // We need to insert posts first to get their IDs, then insert comments
+      // So we'll do this differently
+      const { data: insertedPosts } = await supabaseAdmin.from('posts').select('id').order('created_at', { ascending: false }).limit(60);
+      
+      if (insertedPosts && insertedPosts.length > 0) {
+        const postCommentsWithIds = [];
+        const randomPosts = getRandomItems(insertedPosts, 30);
+        
+        for (const post of randomPosts) {
+          const numComments = 1 + Math.floor(Math.random() * 4);
+          const commenters = getRandomItems(demoUserIds, numComments);
+          
+          for (const commenterId of commenters) {
+            const commentTexts = [
+              "Looks amazing! 🔥",
+              "Wish I was there!",
+              "So jealous rn 😭",
+              "See you there!",
+              "On my way!",
+              "This place is fire",
+              "Need to check this out",
+              "Vibes look incredible",
+              "Best spot ever",
+              "Let's go there next weekend!",
+            ];
+            
+            postCommentsWithIds.push({
+              post_id: post.id,
+              user_id: commenterId,
+              text: commentTexts[Math.floor(Math.random() * commentTexts.length)],
+              created_at: getRecentTimestamp(3),
+            });
+          }
+        }
+        
+        if (postCommentsWithIds.length > 0) {
+          await supabaseAdmin.from('post_comments').insert(postCommentsWithIds);
+        }
+      }
+
       // 7. Create yap messages with scores and handles
       const hottestVenues = getRandomItems([...PROMOTED_VENUES, ...DEMO_VENUES], 10);
       const yapMessages = [];
@@ -338,6 +411,9 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'clear') {
+      await supabaseAdmin.from('post_comments').delete().eq('post_id', '').in('post_id',
+        (await supabaseAdmin.from('posts').select('id').eq('is_demo', true)).data?.map(p => p.id) || []
+      );
       await supabaseAdmin.from('posts').delete().eq('is_demo', true);
       await supabaseAdmin.from('checkins').delete().eq('is_demo', true);
       await supabaseAdmin.from('night_statuses').delete().eq('is_demo', true);
