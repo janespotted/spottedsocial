@@ -400,15 +400,18 @@ Deno.serve(async (req) => {
       // 8. Create stories for demo users
       const storyUsers = getRandomItems(demoUserIds, 15); // 15 users with stories
       const stories = [];
+      const storyVenues = getRandomItems([...PROMOTED_VENUES, ...DEMO_VENUES], 10);
       
       for (const userId of storyUsers) {
         const numStories = 1 + Math.floor(Math.random() * 3); // 1-3 stories per user
         
         for (let i = 0; i < numStories; i++) {
+          const venue = storyVenues[Math.floor(Math.random() * storyVenues.length)];
           stories.push({
             user_id: userId,
             media_url: DEMO_POST_IMAGES[Math.floor(Math.random() * DEMO_POST_IMAGES.length)],
             media_type: 'image',
+            venue_name: venue.name,
             created_at: getRecentTimestamp(12), // Stories from last 12 hours
             expires_at: calculateExpiryTime(),
             is_demo: true,
