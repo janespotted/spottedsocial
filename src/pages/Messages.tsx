@@ -1,20 +1,86 @@
-import { Card } from '@/components/ui/card';
-import { MessageSquare } from 'lucide-react';
+import { useState } from 'react';
+import { useCheckIn } from '@/contexts/CheckInContext';
+import { cn } from '@/lib/utils';
+import { MessagesTab } from '@/components/messages/MessagesTab';
+import { YapTab } from '@/components/messages/YapTab';
+import { ActivityTab } from '@/components/messages/ActivityTab';
+
+type TabType = 'messages' | 'yap' | 'activity';
 
 export default function Messages() {
-  return (
-    <div className="p-4 space-y-4">
-      <h1 className="text-2xl font-bold">Messages</h1>
+  const { openCheckIn } = useCheckIn();
+  const [activeTab, setActiveTab] = useState<TabType>('messages');
 
-      <Card className="p-8 text-center space-y-4">
-        <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground" />
-        <div>
-          <h3 className="text-lg font-semibold mb-2">No conversations yet</h3>
-          <p className="text-muted-foreground">
-            Start chatting with friends from the map or your friends list.
-          </p>
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
+        <div className="flex items-center justify-between p-6">
+          <div>
+            <h1 className="text-2xl font-light tracking-[0.3em] text-white mb-1">Spotted</h1>
+            <p className="text-white/60 text-sm">Everything disappears by 5am</p>
+          </div>
+          <button 
+            onClick={openCheckIn}
+            className="text-4xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
+          >
+            S
+          </button>
         </div>
-      </Card>
+
+        {/* Tabs */}
+        <div className="flex items-center justify-around px-6 pb-4">
+          <button
+            onClick={() => setActiveTab('messages')}
+            className={cn(
+              'relative pb-2 text-lg font-medium transition-colors',
+              activeTab === 'messages' 
+                ? 'text-white' 
+                : 'text-white/40'
+            )}
+          >
+            Messages
+            {activeTab === 'messages' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('yap')}
+            className={cn(
+              'relative pb-2 text-lg font-medium transition-colors',
+              activeTab === 'yap' 
+                ? 'text-white' 
+                : 'text-white/40'
+            )}
+          >
+            Yap
+            {activeTab === 'yap' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('activity')}
+            className={cn(
+              'relative pb-2 text-lg font-medium transition-colors',
+              activeTab === 'activity' 
+                ? 'text-white' 
+                : 'text-white/40'
+            )}
+          >
+            Activity
+            {activeTab === 'activity' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div className="px-4 py-6">
+        {activeTab === 'messages' && <MessagesTab />}
+        {activeTab === 'yap' && <YapTab />}
+        {activeTab === 'activity' && <ActivityTab />}
+      </div>
     </div>
   );
 }
