@@ -17,7 +17,28 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home'>('home');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [shareOption, setShareOption] = useState<'close_friends' | 'friends' | 'mutual_friends'>('close_friends');
+  const [shareOption, setShareOption] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('close_friends');
+
+  // Load current location sharing level from profile
+  useEffect(() => {
+    const loadLocationSharingLevel = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from('profiles')
+        .select('location_sharing_level')
+        .eq('id', user.id)
+        .single();
+      
+      if (data?.location_sharing_level) {
+        setShareOption(data.location_sharing_level as 'close_friends' | 'all_friends' | 'mutual_friends');
+      }
+    };
+    
+    if (open) {
+      loadLocationSharingLevel();
+    }
+  }, [user, open]);
 
   const calculateExpiryTime = () => {
     const now = new Date();
@@ -96,6 +117,16 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const handleShareLocation = async () => {
     setShowShareModal(false);
     setIsDetectingLocation(true);
+
+    // Save location sharing level to profile
+    try {
+      await supabase
+        .from('profiles')
+        .update({ location_sharing_level: shareOption })
+        .eq('id', user?.id);
+    } catch (error) {
+      console.error('Error updating location sharing level:', error);
+    }
 
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -247,17 +278,17 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               </button>
 
               <button
-                onClick={() => setShareOption('friends')}
+                onClick={() => setShareOption('all_friends')}
                 className="w-full flex items-center gap-4 text-left"
               >
                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                  shareOption === 'friends' ? 'border-[#d4ff00]' : 'border-white/40'
+                  shareOption === 'all_friends' ? 'border-[#d4ff00]' : 'border-white/40'
                 }`}>
-                  {shareOption === 'friends' && (
+                  {shareOption === 'all_friends' && (
                     <div className="w-4 h-4 rounded-full bg-[#d4ff00]" />
                   )}
                 </div>
-                <span className="text-lg text-white">Friends 👫</span>
+                <span className="text-lg text-white">All Friends 👫</span>
               </button>
 
               <button
