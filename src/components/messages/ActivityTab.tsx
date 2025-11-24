@@ -117,32 +117,26 @@ export function ActivityTab() {
   return (
     <div className="space-y-4">
       {/* Friend Requests */}
-      {friendRequestCount > 0 && (
-        <div
-          onClick={() => navigate('/friend-requests')}
-          className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-[#2d1b4e]/80 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex -space-x-2">
-              {[1, 2, 3].map((i) => (
-                <Avatar key={i} className="h-10 w-10 border-2 border-[#2d1b4e]">
-                  <AvatarFallback className="bg-[#a855f7] text-white text-xs">
-                    U{i}
-                  </AvatarFallback>
-                </Avatar>
-              ))}
-            </div>
-            <div>
-              <h3 className="font-semibold text-white">Friend requests</h3>
-              <p className="text-white/60 text-sm">jan.e12 + {friendRequestCount - 1} others</p>
-            </div>
+      <div
+        onClick={() => navigate('/friend-requests')}
+        className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-[#2d1b4e]/80 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] flex items-center justify-center">
+            <UserPlus className="h-6 w-6 text-[#d4ff00]" />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="bg-[#a855f7] rounded-full w-2 h-2" />
-            <ChevronRight className="h-5 w-5 text-white/40" />
+          <div>
+            <h3 className="font-semibold text-white">Friend Requests</h3>
+            <p className="text-white/60 text-sm">
+              {friendRequestCount > 0 ? `${friendRequestCount} pending request${friendRequestCount > 1 ? 's' : ''}` : 'Find and add friends'}
+            </p>
           </div>
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          {friendRequestCount > 0 && <div className="bg-[#a855f7] rounded-full w-2 h-2" />}
+          <ChevronRight className="h-5 w-5 text-white/40" />
+        </div>
+      </div>
 
       {/* Activity Header */}
       <h2 className="text-2xl font-bold text-white">Activity</h2>
