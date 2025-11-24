@@ -16,6 +16,7 @@ export default function Home() {
   const [showVenueInput, setShowVenueInput] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
   const [currentStatus, setCurrentStatus] = useState<any>(null);
+  const [capturedLocation, setCapturedLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -76,10 +77,32 @@ export default function Home() {
   const handleStatusUpdate = async (status: 'out' | 'heading_out' | 'home') => {
     setSelectedStatus(status);
 
-    if (status === 'out') {
-      setShowVenueInput(true);
-    } else if (status === 'heading_out') {
-      setShowVenueInput(true);
+    if (status === 'out' || status === 'heading_out') {
+      // Immediately request location
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setCapturedLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+            setShowVenueInput(true);
+          },
+          (error) => {
+            toast({
+              variant: 'destructive',
+              title: 'Location access denied',
+              description: 'Please enable location services to use this feature.',
+            });
+          }
+        );
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Location not available',
+          description: 'Your device does not support location services.',
+        });
+      }
     } else {
       await updateStatus(status, null, null, null);
     }
@@ -144,25 +167,21 @@ export default function Home() {
       return;
     }
 
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          updateStatus(
-            selectedStatus,
-            position.coords.latitude,
-            position.coords.longitude,
-            venueName
-          );
-        },
-        (error) => {
-          toast({
-            variant: 'destructive',
-            title: 'Location access denied',
-            description: 'Please enable location services to use this feature.',
-          });
-        }
-      );
+    if (!capturedLocation) {
+      toast({
+        variant: 'destructive',
+        title: 'Location not available',
+        description: 'Please try again and allow location access.',
+      });
+      return;
     }
+
+    updateStatus(
+      selectedStatus,
+      capturedLocation.lat,
+      capturedLocation.lng,
+      venueName
+    );
   };
 
   const getStatusLabel = (status: string) => {
@@ -241,6 +260,7 @@ export default function Home() {
               onClick={() => {
                 setShowVenueInput(false);
                 setVenueName('');
+                setCapturedLocation(null);
               }}
             >
               Cancel
