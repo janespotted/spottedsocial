@@ -19,6 +19,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_demo: boolean | null
+          is_promoted: boolean | null
           lat: number
           lng: number
           user_id: string
@@ -28,6 +29,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_demo?: boolean | null
+          is_promoted?: boolean | null
           lat: number
           lng: number
           user_id: string
@@ -37,6 +39,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_demo?: boolean | null
+          is_promoted?: boolean | null
           lat?: number
           lng?: number
           user_id?: string
@@ -183,6 +186,7 @@ export type Database = {
           expires_at: string | null
           id: string
           is_demo: boolean | null
+          is_promoted: boolean | null
           lat: number | null
           lng: number | null
           status: Database["public"]["Enums"]["night_status_enum"]
@@ -194,6 +198,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_demo?: boolean | null
+          is_promoted?: boolean | null
           lat?: number | null
           lng?: number | null
           status?: Database["public"]["Enums"]["night_status_enum"]
@@ -205,6 +210,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_demo?: boolean | null
+          is_promoted?: boolean | null
           lat?: number | null
           lng?: number | null
           status?: Database["public"]["Enums"]["night_status_enum"]
@@ -229,6 +235,7 @@ export type Database = {
           id: string
           image_url: string | null
           is_demo: boolean | null
+          is_promoted: boolean | null
           text: string
           user_id: string
           venue_name: string | null
@@ -239,6 +246,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_demo?: boolean | null
+          is_promoted?: boolean | null
           text: string
           user_id: string
           venue_name?: string | null
@@ -249,6 +257,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_demo?: boolean | null
+          is_promoted?: boolean | null
           text?: string
           user_id?: string
           venue_name?: string | null
@@ -393,6 +402,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_demo: boolean | null
+          is_promoted: boolean | null
           lat: number
           lng: number
           name: string
@@ -403,6 +413,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_demo?: boolean | null
+          is_promoted?: boolean | null
           lat: number
           lng: number
           name: string
@@ -413,6 +424,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_demo?: boolean | null
+          is_promoted?: boolean | null
           lat?: number
           lng?: number
           name?: string
@@ -460,6 +472,7 @@ export type Database = {
           id: string
           is_anonymous: boolean | null
           is_demo: boolean | null
+          is_promoted: boolean | null
           text: string
           user_id: string
           venue_name: string
@@ -470,6 +483,7 @@ export type Database = {
           id?: string
           is_anonymous?: boolean | null
           is_demo?: boolean | null
+          is_promoted?: boolean | null
           text: string
           user_id: string
           venue_name: string
@@ -480,6 +494,7 @@ export type Database = {
           id?: string
           is_anonymous?: boolean | null
           is_demo?: boolean | null
+          is_promoted?: boolean | null
           text?: string
           user_id?: string
           venue_name?: string
