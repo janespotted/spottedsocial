@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Plus } from 'lucide-react';
@@ -9,6 +10,7 @@ import { NewChatDialog } from './NewChatDialog';
 
 interface Thread {
   id: string;
+  user_id: string;
   profiles: {
     display_name: string;
     avatar_url: string | null;
@@ -24,6 +26,7 @@ interface Thread {
 export function MessagesTab() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openFriendCard } = useFriendIdCard();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [search, setSearch] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
@@ -78,6 +81,7 @@ export function MessagesTab() {
 
         return {
           id: thread_id,
+          user_id: members?.user_id,
           profiles: members?.profiles,
           venue_name: status?.venue_name || null,
           last_message: latestMessage,
@@ -136,12 +140,20 @@ export function MessagesTab() {
               className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 hover:bg-[#2d1b4e]/80 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
-                  <AvatarImage src={thread.profiles?.avatar_url || undefined} />
-                  <AvatarFallback className="bg-[#1a0f2e] text-white">
-                    {thread.profiles?.display_name?.[0]}
-                  </AvatarFallback>
-                </Avatar>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openFriendCard(thread.user_id);
+                  }}
+                  className="hover:opacity-80 transition-opacity"
+                >
+                  <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
+                    <AvatarImage src={thread.profiles?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-[#1a0f2e] text-white">
+                      {thread.profiles?.display_name?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
 
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-white truncate">

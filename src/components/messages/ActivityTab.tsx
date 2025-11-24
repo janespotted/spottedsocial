@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -14,12 +15,14 @@ interface Activity {
   subtitle?: string;
   timestamp: string;
   avatar_url?: string | null;
+  user_id?: string;
   action?: 'meet_up' | 'view' | 'accept_decline' | 'message';
 }
 
 export function ActivityTab() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openFriendCard } = useFriendIdCard();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
 
@@ -76,6 +79,7 @@ export function ActivityTab() {
             subtitle: checkIn.venue_name,
             timestamp: checkIn.created_at,
             avatar_url: checkIn.profiles?.avatar_url,
+            user_id: checkIn.user_id,
             action: 'meet_up',
           });
         });
@@ -152,12 +156,17 @@ export function ActivityTab() {
               {/* Icon/Avatar */}
               <div className="flex-shrink-0">
                 {activity.avatar_url !== undefined ? (
-                  <Avatar className="h-12 w-12 border-2 border-[#a855f7]">
-                    <AvatarImage src={activity.avatar_url || undefined} />
-                    <AvatarFallback className="bg-[#1a0f2e] text-white">
-                      {activity.title[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                  <button
+                    onClick={() => activity.user_id && openFriendCard(activity.user_id)}
+                    className="hover:opacity-80 transition-opacity"
+                  >
+                    <Avatar className="h-12 w-12 border-2 border-[#a855f7] cursor-pointer">
+                      <AvatarImage src={activity.avatar_url || undefined} />
+                      <AvatarFallback className="bg-[#1a0f2e] text-white">
+                        {activity.title[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] flex items-center justify-center">
                     {getActivityIcon(activity.type)}

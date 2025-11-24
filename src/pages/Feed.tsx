@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send, Plus } from 'lucide-react';
@@ -31,6 +32,7 @@ interface Friend {
 export default function Feed() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
+  const { openFriendCard } = useFriendIdCard();
   const demoEnabled = useDemoMode();
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -167,14 +169,18 @@ export default function Feed() {
           <div className="px-6 py-4">
             <div className="flex gap-4 overflow-x-auto scrollbar-hide">
               {friends.map((friend) => (
-                <div key={friend.user_id} className="flex-shrink-0">
-                  <Avatar className="h-16 w-16 border-[3px] border-[#d4ff00] ring-2 ring-[#d4ff00]/30">
+                <button 
+                  key={friend.user_id} 
+                  onClick={() => openFriendCard(friend.user_id)}
+                  className="flex-shrink-0"
+                >
+                  <Avatar className="h-16 w-16 border-[3px] border-[#d4ff00] ring-2 ring-[#d4ff00]/30 cursor-pointer hover:scale-105 transition-transform">
                     <AvatarImage src={friend.avatar_url || undefined} />
                     <AvatarFallback className="bg-[#1a0f2e] text-white">
                       {friend.display_name[0]}
                     </AvatarFallback>
                   </Avatar>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -196,20 +202,23 @@ export default function Feed() {
             >
               {/* Post Header */}
               <div className="flex items-center justify-between px-4 pt-4 pb-3">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
+                <button 
+                  onClick={() => openFriendCard(post.user_id)}
+                  className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                >
+                  <Avatar className="h-12 w-12 cursor-pointer">
                     <AvatarImage src={post.profiles?.avatar_url || undefined} />
                     <AvatarFallback className="bg-[#2d1b4e] text-white">
                       {post.profiles?.display_name?.[0]}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
+                  <div className="text-left">
                     <p className="font-semibold text-white text-base">{post.profiles?.display_name}</p>
                     {post.venue_name && (
                       <p className="text-[#d4ff00] font-medium text-sm">{post.venue_name}</p>
                     )}
                   </div>
-                </div>
+                </button>
                 <span className="text-white/50 text-sm">{getTimeAgo(post.created_at)}</span>
               </div>
 

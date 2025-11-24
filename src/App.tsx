@@ -5,8 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
+import { FriendIdCardProvider } from "./contexts/FriendIdCardContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
+import { FriendIdCard } from "./components/FriendIdCard";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
 import Map from "./pages/Map";
@@ -30,7 +32,9 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <CheckInProvider>
-            <Routes>
+            <FriendIdCardProvider>
+              <FriendIdCard />
+              <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route
                 path="/"
@@ -124,9 +128,10 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </FriendIdCardProvider>
           </CheckInProvider>
         </AuthProvider>
       </BrowserRouter>
