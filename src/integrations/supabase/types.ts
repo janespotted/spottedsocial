@@ -314,6 +314,39 @@ export type Database = {
         }
         Relationships: []
       }
+      venues: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_demo: boolean | null
+          lat: number
+          lng: number
+          name: string
+          neighborhood: string
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_demo?: boolean | null
+          lat: number
+          lng: number
+          name: string
+          neighborhood: string
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_demo?: boolean | null
+          lat?: number
+          lng?: number
+          name?: string
+          neighborhood?: string
+          type?: string
+        }
+        Relationships: []
+      }
       wishlist_places: {
         Row: {
           created_at: string | null
