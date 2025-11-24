@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send } from 'lucide-react';
@@ -29,6 +30,7 @@ interface Friend {
 export default function Home() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
+  const { openFriendCard } = useFriendIdCard();
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [hasCheckedToday, setHasCheckedToday] = useState(false);
@@ -167,14 +169,18 @@ export default function Home() {
           <div className="px-6 pb-4">
             <div className="flex gap-4 overflow-x-auto scrollbar-hide">
               {friends.map((friend) => (
-                <div key={friend.user_id} className="flex-shrink-0">
+                <button
+                  key={friend.user_id}
+                  onClick={() => openFriendCard(friend.user_id)}
+                  className="flex-shrink-0 transition-transform hover:scale-105"
+                >
                   <Avatar className="h-16 w-16 border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)]">
                     <AvatarImage src={friend.avatar_url || undefined} />
                     <AvatarFallback className="bg-[#1a0f2e] text-white">
                       {friend.display_name[0]}
                     </AvatarFallback>
                   </Avatar>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -196,20 +202,23 @@ export default function Home() {
             >
               {/* Post Header */}
               <div className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
+                <button
+                  onClick={() => openFriendCard(post.user_id)}
+                  className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                >
                   <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
                     <AvatarImage src={post.profiles?.avatar_url || undefined} />
                     <AvatarFallback className="bg-[#1a0f2e] text-white">
                       {post.profiles?.display_name?.[0]}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
+                  <div className="text-left">
                     <p className="font-semibold text-white">{post.profiles?.display_name}</p>
                     {post.venue_name && (
                       <p className="text-[#d4ff00] font-medium text-sm">{post.venue_name}</p>
                     )}
                   </div>
-                </div>
+                </button>
                 <span className="text-white/60 text-sm">{getTimeAgo(post.created_at)}</span>
               </div>
 
@@ -259,7 +268,12 @@ export default function Home() {
 
                 {/* Caption */}
                 <div className="text-white/90 text-sm">
-                  <span className="font-semibold">{post.profiles?.username}</span>{' '}
+                  <button
+                    onClick={() => openFriendCard(post.user_id)}
+                    className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
+                  >
+                    {post.profiles?.username}
+                  </button>{' '}
                   {post.text}
                 </div>
               </div>
