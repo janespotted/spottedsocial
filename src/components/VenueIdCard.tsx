@@ -4,6 +4,7 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { MapPin, Clock, DollarSign, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -131,24 +132,15 @@ export function VenueIdCard() {
     }
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      closeVenueCard();
-    }
-  };
-
   if (!selectedVenueId || !venue) return null;
 
   const visibleFriends = friendsAtVenue.slice(0, 4);
   const remainingCount = friendsAtVenue.length - visibleFriends.length;
 
   return (
-    <div 
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-fade-in"
-      onClick={handleBackdropClick}
-    >
-      <div className="absolute bottom-0 left-0 right-0 animate-slide-in-up">
-        <div className="bg-gradient-to-br from-[#2d1b4e] to-[#1a0f2e] border-t-2 border-[#a855f7]/50 rounded-t-3xl shadow-[0_-10px_50px_rgba(168,85,247,0.5)] p-6 mb-16">
+    <Dialog open={!!selectedVenueId} onOpenChange={(open) => !open && closeVenueCard()}>
+      <DialogContent className="w-[90%] max-w-[400px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
+        <div className="p-5">
           {/* Top Row: Image + Info */}
           <div className="flex gap-4 mb-4">
             {/* Venue Image */}
@@ -233,7 +225,7 @@ export function VenueIdCard() {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
