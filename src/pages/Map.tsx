@@ -59,8 +59,10 @@ export default function Map() {
 
       // Update user's location state
       if (myProfile?.is_out && myProfile.last_known_lat && myProfile.last_known_lng) {
+        console.log('Setting user location:', { lat: myProfile.last_known_lat, lng: myProfile.last_known_lng, is_out: myProfile.is_out });
         setUserLocation({ lat: myProfile.last_known_lat, lng: myProfile.last_known_lng });
       } else {
+        console.log('User location not set - is_out:', myProfile?.is_out, 'has coords:', !!myProfile?.last_known_lat);
         setUserLocation(null);
       }
 
@@ -175,10 +177,7 @@ export default function Map() {
       zoom: 13,
     });
 
-    map.current.on('load', () => {
-      // Add purple tint to the map
-      map.current?.setPaintProperty('background', 'background-color', '#1a0f2e');
-    });
+    // Map is ready - no need to modify background layer
 
     return () => {
       markersRef.current.forEach(marker => marker.remove());
