@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -25,6 +26,7 @@ export default function Map() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
+  const demoEnabled = useDemoMode();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
@@ -45,7 +47,7 @@ export default function Map() {
       
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user, demoEnabled]);
 
   const fetchFriendsLocations = async () => {
     if (!user) return;
@@ -76,67 +78,103 @@ export default function Map() {
 
       const friendIds = friendships?.map(f => f.friend_id) || [];
 
-      if (friendIds.length === 0) {
-        setFriends([]);
-        
-        // Center on user if they're out
-        if (myProfile?.is_out && myProfile.last_known_lat && myProfile.last_known_lng && map.current) {
-          map.current.flyTo({
-            center: [myProfile.last_known_lng, myProfile.last_known_lat],
-            zoom: 13,
-          });
+      let friendLocations: FriendLocation[] = [];
+
+      if (friendIds.length > 0) {
+        // Get friends' profiles with location data
+        let friendQuery = supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url, is_out, last_known_lat, last_known_lng, location_sharing_level')
+          .in('id', friendIds)
+          .eq('is_out', true)
+          .not('last_known_lat', 'is', null)
+          .not('last_known_lng', 'is', null);
+
+        // Filter demo data unless demo mode is enabled
+        if (!demoEnabled) {
+          friendQuery = friendQuery.eq('is_demo', false);
         }
-        return;
+
+        const { data: friendProfiles } = await friendQuery;
+
+        // Get friends' venue names from night_statuses
+        const { data: statuses } = await supabase
+          .from('night_statuses')
+          .select('user_id, venue_name')
+          .in('user_id', friendIds)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', new Date().toISOString());
+
+        const venueMap: Record<string, string> = {};
+        statuses?.forEach(s => {
+          venueMap[s.user_id] = s.venue_name;
+        });
+
+        // Filter friends based on visibility rules
+        const visibleFriends = (friendProfiles || []).filter((friend: any) => {
+          const friendLevel = friend.location_sharing_level || 'all_friends';
+          
+          if (friendLevel === 'all_friends') return true;
+          
+          // For mutual_friends, check if user is also out
+          if (friendLevel === 'mutual_friends') {
+            return myProfile?.is_out === true;
+          }
+          
+          // For close_friends, would need additional close_friends relationship data
+          // For now, treat as all_friends
+          return true;
+        });
+
+        friendLocations = visibleFriends.map((friend: any) => ({
+          user_id: friend.id,
+          lat: friend.last_known_lat,
+          lng: friend.last_known_lng,
+          venue_name: venueMap[friend.id] || 'Out',
+          profiles: {
+            display_name: friend.display_name || 'Unknown',
+            avatar_url: friend.avatar_url,
+          },
+        }));
       }
 
-      // Get friends' profiles with location data
-      const { data: friendProfiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url, is_out, last_known_lat, last_known_lng, location_sharing_level')
-        .in('id', friendIds)
-        .eq('is_out', true)
-        .not('last_known_lat', 'is', null)
-        .not('last_known_lng', 'is', null);
+      // If demo mode is enabled, add demo users to the map
+      if (demoEnabled) {
+        const { data: demoUsers } = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url, last_known_lat, last_known_lng')
+          .eq('is_demo', true)
+          .not('last_known_lat', 'is', null)
+          .not('last_known_lng', 'is', null)
+          .limit(20);
 
-      // Get friends' venue names from night_statuses
-      const { data: statuses } = await supabase
-        .from('night_statuses')
-        .select('user_id, venue_name')
-        .in('user_id', friendIds)
-        .not('expires_at', 'is', null)
-        .gt('expires_at', new Date().toISOString());
+        // Get demo users' venue names
+        const demoUserIds = demoUsers?.map(u => u.id) || [];
+        const { data: demoStatuses } = await supabase
+          .from('night_statuses')
+          .select('user_id, venue_name')
+          .in('user_id', demoUserIds)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', new Date().toISOString());
 
-      const venueMap: Record<string, string> = {};
-      statuses?.forEach(s => {
-        venueMap[s.user_id] = s.venue_name;
-      });
+        const demoVenueMap: Record<string, string> = {};
+        demoStatuses?.forEach(s => {
+          demoVenueMap[s.user_id] = s.venue_name;
+        });
 
-      // Filter friends based on visibility rules
-      const visibleFriends = (friendProfiles || []).filter((friend: any) => {
-        const friendLevel = friend.location_sharing_level || 'all_friends';
-        
-        if (friendLevel === 'all_friends') return true;
-        
-        // For mutual_friends, check if user is also out
-        if (friendLevel === 'mutual_friends') {
-          return myProfile?.is_out === true;
-        }
-        
-        // For close_friends, would need additional close_friends relationship data
-        // For now, treat as all_friends
-        return true;
-      });
+        const demoLocations: FriendLocation[] = (demoUsers || []).map((user: any) => ({
+          user_id: user.id,
+          lat: user.last_known_lat,
+          lng: user.last_known_lng,
+          venue_name: demoVenueMap[user.id] || 'Out',
+          profiles: {
+            display_name: user.display_name,
+            avatar_url: user.avatar_url,
+          },
+        }));
 
-      const friendLocations: FriendLocation[] = visibleFriends.map((friend: any) => ({
-        user_id: friend.id,
-        lat: friend.last_known_lat,
-        lng: friend.last_known_lng,
-        venue_name: venueMap[friend.id] || 'Out',
-        profiles: {
-          display_name: friend.display_name || 'Unknown',
-          avatar_url: friend.avatar_url,
-        },
-      }));
+        friendLocations = [...friendLocations, ...demoLocations];
+      }
 
       setFriends(friendLocations);
 
