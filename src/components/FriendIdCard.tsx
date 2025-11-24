@@ -200,10 +200,10 @@ export function FriendIdCard() {
     }
   };
 
-  const handleMeetUp = () => {
+  const handleMeetUp = async () => {
     if (!friendData) return;
     
-    sendMeetUpNotification(
+    await sendMeetUpNotification(
       friendData.id,
       friendData.display_name,
       friendData.avatar_url
