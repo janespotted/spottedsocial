@@ -38,11 +38,17 @@ export default function DemoSettings() {
     
     setLoading(true);
     try {
+      toast.info('Seeding demo data... This may take a moment.');
       const result = await seedDemoData(user.id);
-      if (result.success) {
+      if (result.success && result.stats) {
         setSeeded(true);
-        toast.success(`Demo data seeded! ${result.count} demo users created.`);
-        setTimeout(() => navigate('/'), 1000);
+        toast.success(
+          `Demo environment created!\n` +
+          `${result.stats.users} users • ${result.stats.posts} posts • ` +
+          `${result.stats.yaps} yaps • ${result.stats.venues} venues`,
+          { duration: 5000 }
+        );
+        setTimeout(() => navigate('/feed'), 1500);
       } else {
         toast.error('Failed to seed demo data');
       }
@@ -147,23 +153,41 @@ export default function DemoSettings() {
         {/* Info Card */}
         <Card className="bg-[#2d1b4e]/60 border-2 border-[#a855f7]/40">
           <CardHeader>
-            <CardTitle className="text-white">What is Demo Mode?</CardTitle>
+            <CardTitle className="text-white">What Gets Created?</CardTitle>
           </CardHeader>
-          <CardContent className="text-white/70 space-y-2 text-sm">
-            <p>
-              Demo mode creates fake users, posts, and activity to help you see how the app looks with real data.
-            </p>
-            <p>
-              All demo data is marked with <code className="text-[#d4ff00]">isDemo = true</code> so you can:
-            </p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Filter it out when needed</li>
-              <li>Clear it anytime without affecting real data</li>
-              <li>Use it for testing and demos</li>
-            </ul>
-            <p className="pt-2 text-white/50">
-              Demo users will appear as your friends, post content, and check in to venues.
-            </p>
+          <CardContent className="text-white/70 space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
+                <div className="text-[#d4ff00] text-2xl font-bold">20</div>
+                <div className="text-white/60 text-xs">Fake Users</div>
+              </div>
+              <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
+                <div className="text-[#d4ff00] text-2xl font-bold">15</div>
+                <div className="text-white/60 text-xs">NYC Venues</div>
+              </div>
+              <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
+                <div className="text-[#d4ff00] text-2xl font-bold">50</div>
+                <div className="text-white/60 text-xs">Newsfeed Posts</div>
+              </div>
+              <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
+                <div className="text-[#d4ff00] text-2xl font-bold">10</div>
+                <div className="text-white/60 text-xs">Yap Messages</div>
+              </div>
+            </div>
+            
+            <div className="pt-2 space-y-2">
+              <p>
+                All demo data is marked with <code className="text-[#d4ff00]">isDemo = true</code> so you can:
+              </p>
+              <ul className="list-disc list-inside space-y-1 ml-2 text-white/60">
+                <li>Filter it out when needed</li>
+                <li>Clear it anytime without affecting real data</li>
+                <li>Use it for testing and presentations</li>
+              </ul>
+              <p className="text-white/50 text-xs pt-2">
+                Posts and yaps have realistic timestamps within the last 4 hours. Demo users are interconnected as friends to make the map and leaderboard look active.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
