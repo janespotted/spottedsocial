@@ -235,6 +235,18 @@ export default function Profile() {
           Demo Settings
         </Button>
 
+        {/* Logout Button */}
+        <Button
+          onClick={async () => {
+            await supabase.auth.signOut();
+            navigate('/auth');
+          }}
+          variant="outline"
+          className="w-full border-red-500/40 text-red-400 hover:bg-red-500/10 rounded-full"
+        >
+          Log Out
+        </Button>
+
         {/* Location Sharing Card */}
         <div className="bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4">
           <div className="flex items-center justify-between">
