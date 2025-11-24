@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import mapboxgl from 'mapbox-gl';
@@ -11,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MessageSquare, Crosshair, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { VenueCard } from '@/components/VenueCard';
 
 interface FriendLocation {
   user_id: string;
@@ -39,14 +39,13 @@ export default function Map() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
+  const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
   const { toast } = useToast();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
-  const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
-  const [friendsAtSelectedVenue, setFriendsAtSelectedVenue] = useState<Array<{ id: string; display_name: string; avatar_url: string | null }>>([]);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const venueMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
@@ -306,8 +305,24 @@ export default function Map() {
 
     // Map is ready - no need to modify background layer
 
+    // Listen for custom event to center map on venue
+    const handleCenterMapOnVenue = (e: Event) => {
+      const customEvent = e as CustomEvent<{ lat: number; lng: number }>;
+      if (map.current && customEvent.detail) {
+        map.current.flyTo({
+          center: [customEvent.detail.lng, customEvent.detail.lat],
+          zoom: 15,
+          duration: 1500,
+        });
+      }
+    };
+
+    window.addEventListener('centerMapOnVenue', handleCenterMapOnVenue);
+
     return () => {
+      window.removeEventListener('centerMapOnVenue', handleCenterMapOnVenue);
       markersRef.current.forEach(marker => marker.remove());
+      venueMarkersRef.current.forEach(marker => marker.remove());
       userMarkerRef.current?.remove();
       map.current?.remove();
     };
@@ -423,33 +438,8 @@ export default function Map() {
         </div>
       `;
 
-      el.addEventListener('click', async () => {
-        // Center map on venue
-        map.current?.flyTo({
-          center: [venue.lng, venue.lat],
-          zoom: 15,
-          duration: 1500,
-        });
-
-        // Get friends at this venue
-        const friendsAtVenue = friends.filter(
-          (f) => f.venue_name.toLowerCase() === venue.name.toLowerCase()
-        );
-
-        // Fetch full friend profiles
-        if (friendsAtVenue.length > 0) {
-          const friendIds = friendsAtVenue.map(f => f.user_id);
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, display_name, avatar_url')
-            .in('id', friendIds);
-
-          setFriendsAtSelectedVenue(profiles || []);
-        } else {
-          setFriendsAtSelectedVenue([]);
-        }
-
-        setSelectedVenue(venue);
+      el.addEventListener('click', () => {
+        openVenueCard(venue.id);
       });
 
       const marker = new mapboxgl.Marker(el)
@@ -574,16 +564,6 @@ export default function Map() {
       >
         <Crosshair className="w-5 h-5 text-white" />
       </button>
-
-      {/* Venue Card */}
-      {selectedVenue && (
-        <VenueCard
-          open={!!selectedVenue}
-          onClose={() => setSelectedVenue(null)}
-          venue={selectedVenue}
-          friendsAtVenue={friendsAtSelectedVenue}
-        />
-      )}
     </div>
   );
 }
