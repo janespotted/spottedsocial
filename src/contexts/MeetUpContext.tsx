@@ -14,6 +14,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { getDemoMode } from '@/lib/demo-data';
 
 interface MeetUpContextType {
   recipientUserId: string | null;
@@ -44,6 +45,18 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      const demoMode = getDemoMode();
+      
+      // In demo mode, skip database operations and just show confirmation
+      if (demoMode.enabled) {
+        console.log('Demo mode: Skipping notification insert, showing confirmation card');
+        setRecipientUserId(userId);
+        setRecipientDisplayName(displayName);
+        setRecipientAvatarUrl(avatarUrl);
+        setShowConfirmation(true);
+        return;
+      }
+
       // Check for recent notifications to prevent spam
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const { data: recentNotifications, error: checkError } = await supabase
