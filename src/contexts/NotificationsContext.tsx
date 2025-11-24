@@ -85,7 +85,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           filter: `receiver_id=eq.${user.id}`
         },
         async (payload) => {
-          console.log('New notification received:', payload);
+          console.log('New notification received (realtime):', payload);
           
           // Fetch sender profile
           const { data: profile } = await supabase
@@ -94,10 +94,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             .eq('id', payload.new.sender_id)
             .single();
 
+          console.log('Sender profile fetched:', profile);
+
           const newNotification = {
             ...payload.new,
             sender_profile: profile || undefined
           } as Notification;
+
+          console.log('Setting latest notification:', newNotification);
 
           setNotifications(prev => [newNotification, ...prev]);
           setLatestNotification(newNotification);

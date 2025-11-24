@@ -1,3 +1,15 @@
+/*
+ * Meet Up Notification System
+ * 
+ * Manual Test Checklist:
+ * 1. Log in as User A and User B in two separate browser sessions/windows
+ * 2. User A opens User B's friend card and taps "Meet Up" button
+ * 3. User A should see the purple confirmation card: "You sent a Meet Up Notification to [User B's name]!"
+ * 4. User B should immediately see an in-app notification banner at the top: "[User A's first name] wants to meet up with you"
+ * 5. The notification should auto-dismiss after 5 seconds or when User B clicks the X button
+ * 6. Check browser console for debug logs to verify notification creation and realtime delivery
+ */
+
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
@@ -62,11 +74,19 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
 
       if (profileError) throw profileError;
 
-      const senderName = senderProfile?.display_name || 'Someone';
-      const message = `${senderName} wants to meet up with you`;
+      // Extract first name from display name
+      const fullName = senderProfile?.display_name || 'Someone';
+      const firstName = fullName.split(' ')[0];
+      const message = `${firstName} wants to meet up with you`;
+
+      console.log('Sending meet up notification:', { 
+        from: user.id, 
+        to: userId, 
+        message 
+      });
 
       // Insert notification
-      const { error: insertError } = await supabase
+      const { data: insertedNotification, error: insertError } = await supabase
         .from('notifications')
         .insert({
           sender_id: user.id,
@@ -74,9 +94,13 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
           type: 'meetup_request',
           message: message,
           is_read: false
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) throw insertError;
+
+      console.log('Meet up notification created successfully:', insertedNotification);
 
       // Show confirmation card
       setRecipientUserId(userId);
