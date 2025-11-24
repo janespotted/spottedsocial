@@ -199,23 +199,6 @@ export default function Map() {
 
       // Fetch venues and calculate heat scores
       await fetchVenuesWithHeatScores(friendIds);
-
-      // Center map on user if they're out, otherwise show all friends
-      if (map.current) {
-        if (myProfile?.is_out && myProfile.last_known_lat && myProfile.last_known_lng) {
-          map.current.flyTo({
-            center: [myProfile.last_known_lng, myProfile.last_known_lat],
-            zoom: 13,
-          });
-        } else if (friendLocations.length > 0) {
-          // Fit bounds to show all friends
-          const bounds = new mapboxgl.LngLatBounds();
-          friendLocations.forEach(friend => {
-            bounds.extend([friend.lng, friend.lat]);
-          });
-          map.current.fitBounds(bounds, { padding: 80 });
-        }
-      }
     } catch (error) {
       console.error('Error fetching friends locations:', error);
     }
