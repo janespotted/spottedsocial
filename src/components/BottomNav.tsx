@@ -1,35 +1,56 @@
-import { Home, MapPin, Trophy, Newspaper, MessageSquare, User } from 'lucide-react';
+import { Home, MapPin, BarChart3, MessageSquare } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
-  { to: '/map', icon: MapPin, label: 'Map' },
-  { to: '/leaderboard', icon: Trophy, label: 'Leaderboard' },
-  { to: '/feed', icon: Newspaper, label: 'Feed' },
+  { to: '/leaderboard', icon: BarChart3, label: 'Activity' },
+  { to: '/map', icon: MapPin, label: 'Map', isCenter: true },
   { to: '/messages', icon: MessageSquare, label: 'Messages' },
-  { to: '/profile', icon: User, label: 'Profile' },
+  { to: '/profile', icon: null, label: 'S', isSpecial: true },
 ];
 
 export function BottomNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border/50 backdrop-blur-lg bg-opacity-90 z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-[#2d1b4e] to-[#1a0f2e] border-t border-[#a855f7]/20 backdrop-blur-lg z-50">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
-        {navItems.map(({ to, icon: Icon, label }) => {
+        {navItems.map(({ to, icon: Icon, label, isCenter, isSpecial }) => {
           const isActive = location.pathname === to;
           return (
             <Link
               key={to}
               to={to}
               className={cn(
-                'flex flex-col items-center justify-center flex-1 h-full transition-colors',
-                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                'flex flex-col items-center justify-center flex-1 h-full transition-all',
+                isActive 
+                  ? 'text-[#d4ff00]' 
+                  : 'text-white/40 hover:text-white/60',
+                isCenter && isActive && 'scale-110'
               )}
             >
-              <Icon className="h-5 w-5" />
-              <span className="text-xs mt-1">{label}</span>
+              {isSpecial ? (
+                <div className={cn(
+                  'text-2xl font-bold transition-all',
+                  isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]'
+                )}>
+                  {label}
+                </div>
+              ) : Icon ? (
+                <>
+                  <Icon 
+                    className={cn(
+                      'h-6 w-6 transition-all',
+                      isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]',
+                      isCenter && 'h-7 w-7'
+                    )} 
+                  />
+                  {!isCenter && (
+                    <span className="text-xs mt-0.5">{label}</span>
+                  )}
+                </>
+              ) : null}
             </Link>
           );
         })}
