@@ -276,14 +276,16 @@ export function FriendIdCard() {
                   {friendData.display_name}
                 </h2>
                 {nightStatus?.venue_name && (
-                  <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
-                    @ {nightStatus.venue_name}
-                  </p>
-                )}
-                {distance !== null && (
-                  <p className="text-white/50 text-sm leading-tight">
-                    Meatpacking ({distance < 1 ? `${(distance * 5280).toFixed(0)} ft` : `${distance.toFixed(1)} mi`})
-                  </p>
+                  <>
+                    <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
+                      @ {nightStatus.venue_name}
+                    </p>
+                    {distance !== null && (
+                      <p className="text-white/50 text-sm leading-tight">
+                        Meatpacking ({distance < 1 ? `${(distance * 5280).toFixed(0)} ft` : `${distance.toFixed(1)} mi`})
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
