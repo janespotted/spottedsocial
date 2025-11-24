@@ -124,8 +124,8 @@ export default function Leaderboard() {
     const nonPromotedVenues = venueArray.filter(v => !v.isPromoted);
     nonPromotedVenues.sort((a, b) => b.count - a.count);
     
-    // Take top 20 non-promoted venues for ranking
-    const rankedVenues = nonPromotedVenues.slice(0, 20).map((venue, index) => ({
+    // Take top 15 non-promoted venues for ranking
+    const rankedVenues = nonPromotedVenues.slice(0, 15).map((venue, index) => ({
       ...venue,
       rank: index + 1,
       movement: Math.random() > 0.5 ? 'up' : (Math.random() > 0.5 ? 'down' : 'same') as 'up' | 'down' | 'same',
