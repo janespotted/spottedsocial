@@ -313,7 +313,7 @@ export default function Map() {
 
     const mapboxToken = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN;
     if (!mapboxToken) {
-      console.error('Mapbox token not configured');
+      console.error('MAPBOX token missing – set VITE_MAPBOX_PUBLIC_TOKEN in environment');
       return;
     }
 

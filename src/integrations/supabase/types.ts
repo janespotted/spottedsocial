@@ -55,6 +55,27 @@ export type Database = {
           },
         ]
       }
+      close_friends: {
+        Row: {
+          close_friend_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          close_friend_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          close_friend_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       dm_messages: {
         Row: {
           created_at: string | null
@@ -682,7 +703,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      can_see_location: {
+        Args: { target_user_id: string; viewer_id: string }
+        Returns: boolean
+      }
+      is_close_friend: {
+        Args: { target_user_id: string; viewer_id: string }
+        Returns: boolean
+      }
+      is_direct_friend: {
+        Args: { target_user_id: string; viewer_id: string }
+        Returns: boolean
+      }
+      is_mutual_friend: {
+        Args: { target_user_id: string; viewer_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       friendship_status_enum: "pending" | "accepted" | "blocked"
