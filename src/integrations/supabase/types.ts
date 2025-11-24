@@ -263,6 +263,7 @@ export type Database = {
           home_city: string | null
           id: string
           last_active_at: string | null
+          location_sharing_level: string | null
           username: string
         }
         Insert: {
@@ -273,6 +274,7 @@ export type Database = {
           home_city?: string | null
           id: string
           last_active_at?: string | null
+          location_sharing_level?: string | null
           username: string
         }
         Update: {
@@ -283,9 +285,42 @@ export type Database = {
           home_city?: string | null
           id?: string
           last_active_at?: string | null
+          location_sharing_level?: string | null
           username?: string
         }
         Relationships: []
+      }
+      wishlist_places: {
+        Row: {
+          created_at: string | null
+          id: string
+          user_id: string
+          venue_image_url: string | null
+          venue_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          user_id: string
+          venue_image_url?: string | null
+          venue_name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          user_id?: string
+          venue_image_url?: string | null
+          venue_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wishlist_places_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       yap_messages: {
         Row: {
