@@ -9,7 +9,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Crosshair } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface FriendLocation {
   user_id: string;
@@ -27,6 +28,7 @@ export default function Map() {
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
   const demoEnabled = useDemoMode();
+  const { toast } = useToast();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
@@ -315,6 +317,38 @@ export default function Map() {
     return distance.toFixed(1);
   };
 
+  const centerOnMyLocation = () => {
+    if (!map.current) return;
+
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          map.current?.flyTo({
+            center: [longitude, latitude],
+            zoom: 14,
+            duration: 1500,
+            essential: true
+          });
+        },
+        (error) => {
+          console.error('Location error:', error);
+          toast({
+            title: "Location unavailable",
+            description: "Turn on location services to use this feature",
+            variant: "destructive"
+          });
+        }
+      );
+    } else {
+      toast({
+        title: "Location unavailable",
+        description: "Your device doesn't support location services",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="relative h-screen w-full">
       {/* Map Container */}
@@ -375,6 +409,15 @@ export default function Map() {
           </div>
         </div>
       )}
+
+      {/* My Location Button */}
+      <button
+        onClick={centerOnMyLocation}
+        className="absolute bottom-24 right-6 w-12 h-12 rounded-full bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/50 flex items-center justify-center z-10 hover:bg-[#2d1b4e] transition-colors shadow-[0_0_20px_rgba(168,85,247,0.4)]"
+        aria-label="Center on my location"
+      >
+        <Crosshair className="w-5 h-5 text-white" />
+      </button>
     </div>
   );
 }
