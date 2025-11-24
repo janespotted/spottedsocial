@@ -270,7 +270,12 @@ export default function Feed() {
 
                 {/* Caption */}
                 <div className="text-white/90 text-sm leading-relaxed">
-                  <span className="font-semibold text-white">{post.profiles?.username}</span>{' '}
+                  <button 
+                    onClick={() => openFriendCard(post.user_id)}
+                    className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
+                  >
+                    {post.profiles?.username}
+                  </button>{' '}
                   {post.text}
                 </div>
               </div>
