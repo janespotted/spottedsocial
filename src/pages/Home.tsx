@@ -5,8 +5,10 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { StoryViewer } from '@/components/StoryViewer';
+import { CreateStoryDialog } from '@/components/CreateStoryDialog';
 
 interface Post {
   id: string;
@@ -28,6 +30,14 @@ interface Friend {
   avatar_url: string | null;
 }
 
+interface StoryUser {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  has_unviewed: boolean;
+  story_count: number;
+}
+
 export default function Home() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
@@ -36,13 +46,18 @@ export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [hasCheckedToday, setHasCheckedToday] = useState(false);
+  const [storyUsers, setStoryUsers] = useState<StoryUser[]>([]);
+  const [selectedStoryUser, setSelectedStoryUser] = useState<string | null>(null);
+  const [createStoryOpen, setCreateStoryOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
       checkFirstLogin();
       fetchFriends();
       fetchPosts();
+      fetchStories();
       subscribeToNewPosts();
+      subscribeToNewStories();
     }
   }, [user, demoEnabled]);
 
@@ -129,6 +144,101 @@ export default function Home() {
     setPosts(data || []);
   };
 
+  const fetchStories = async () => {
+    const { data: friendships } = await supabase
+      .from('friendships')
+      .select('friend_id')
+      .eq('user_id', user?.id)
+      .eq('status', 'accepted');
+
+    const friendIds = friendships?.map(f => f.friend_id) || [];
+    const userIds = [user?.id, ...friendIds];
+
+    // Fetch stories
+    let query = supabase
+      .from('stories')
+      .select(`
+        id,
+        user_id,
+        profiles:user_id (
+          display_name,
+          avatar_url
+        )
+      `)
+      .gt('expires_at', new Date().toISOString());
+
+    if (demoEnabled) {
+      query = query.or(`user_id.in.(${userIds.join(',')}),is_demo.eq.true`);
+    } else {
+      query = query.in('user_id', userIds).eq('is_demo', false);
+    }
+
+    const { data: stories } = await query;
+
+    if (!stories) {
+      setStoryUsers([]);
+      return;
+    }
+
+    // Fetch story views for current user
+    const storyIds = stories.map(s => s.id);
+    const { data: views } = await supabase
+      .from('story_views')
+      .select('story_id')
+      .eq('user_id', user?.id)
+      .in('story_id', storyIds);
+
+    const viewedStoryIds = new Set(views?.map(v => v.story_id) || []);
+
+    // Group stories by user
+    const userStoryMap = new Map<string, { profile: any; stories: any[]; hasUnviewed: boolean }>();
+
+    stories.forEach(story => {
+      const userId = story.user_id;
+      if (!userStoryMap.has(userId)) {
+        userStoryMap.set(userId, {
+          profile: story.profiles,
+          stories: [],
+          hasUnviewed: false,
+        });
+      }
+      const userStory = userStoryMap.get(userId)!;
+      userStory.stories.push(story);
+      if (!viewedStoryIds.has(story.id)) {
+        userStory.hasUnviewed = true;
+      }
+    });
+
+    // Convert to array and add current user's story status
+    const storyUsersList: StoryUser[] = [];
+
+    // Add current user first if they have stories
+    if (userStoryMap.has(user?.id!)) {
+      const myStories = userStoryMap.get(user?.id!)!;
+      storyUsersList.push({
+        user_id: user?.id!,
+        display_name: 'Your Story',
+        avatar_url: myStories.profile?.avatar_url,
+        has_unviewed: false,
+        story_count: myStories.stories.length,
+      });
+      userStoryMap.delete(user?.id!);
+    }
+
+    // Add friends with stories
+    userStoryMap.forEach((data, userId) => {
+      storyUsersList.push({
+        user_id: userId,
+        display_name: data.profile?.display_name || 'Unknown',
+        avatar_url: data.profile?.avatar_url,
+        has_unviewed: data.hasUnviewed,
+        story_count: data.stories.length,
+      });
+    });
+
+    setStoryUsers(storyUsersList);
+  };
+
   const subscribeToNewPosts = () => {
     const channel = supabase
       .channel('posts_changes')
@@ -141,6 +251,27 @@ export default function Home() {
         },
         () => {
           fetchPosts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const subscribeToNewStories = () => {
+    const channel = supabase
+      .channel('stories_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'stories',
+        },
+        () => {
+          fetchStories();
         }
       )
       .subscribe();
@@ -175,27 +306,50 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Friends Story Row */}
-        {friends.length > 0 && (
-          <div className="px-6 pb-4">
-            <div className="flex gap-4 overflow-x-auto scrollbar-hide">
-              {friends.map((friend) => (
-                <button
-                  key={friend.user_id}
-                  onClick={() => openFriendCard(friend.user_id)}
-                  className="flex-shrink-0 transition-transform hover:scale-105"
+        {/* Stories Row */}
+        <div className="px-6 pb-4">
+          <div className="flex gap-4 overflow-x-auto scrollbar-hide">
+            {/* Add Story Button */}
+            <button
+              onClick={() => setCreateStoryOpen(true)}
+              className="flex-shrink-0 transition-transform hover:scale-105"
+            >
+              <div className="relative">
+                <Avatar className="h-16 w-16 border-2 border-[#a855f7]/40">
+                  <AvatarImage src={user?.user_metadata?.avatar_url} />
+                  <AvatarFallback className="bg-[#1a0f2e] text-white">
+                    {user?.user_metadata?.display_name?.[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute bottom-0 right-0 bg-[#a855f7] rounded-full p-1">
+                  <Plus className="h-3 w-3 text-white" />
+                </div>
+              </div>
+            </button>
+
+            {/* Story Users */}
+            {storyUsers.map((storyUser, idx) => (
+              <button
+                key={storyUser.user_id}
+                onClick={() => setSelectedStoryUser(storyUser.user_id)}
+                className="flex-shrink-0 transition-transform hover:scale-105"
+              >
+                <Avatar 
+                  className={`h-16 w-16 border-2 ${
+                    storyUser.has_unviewed 
+                      ? 'border-[#d4ff00] shadow-[0_0_20px_rgba(212,255,0,0.8)]' 
+                      : 'border-[#a855f7]/40'
+                  }`}
                 >
-                  <Avatar className="h-16 w-16 border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)]">
-                    <AvatarImage src={friend.avatar_url || undefined} />
-                    <AvatarFallback className="bg-[#1a0f2e] text-white">
-                      {friend.display_name[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-              ))}
-            </div>
+                  <AvatarImage src={storyUser.avatar_url || undefined} />
+                  <AvatarFallback className="bg-[#1a0f2e] text-white">
+                    {storyUser.display_name[0]}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            ))}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Posts Feed */}
@@ -292,6 +446,19 @@ export default function Home() {
           ))
         )}
       </div>
+
+      {/* Story Viewer */}
+      {selectedStoryUser && (
+        <StoryViewer
+          userId={selectedStoryUser}
+          onClose={() => setSelectedStoryUser(null)}
+          allStoryUsers={storyUsers.map(u => u.user_id)}
+          currentUserIndex={storyUsers.findIndex(u => u.user_id === selectedStoryUser)}
+        />
+      )}
+
+      {/* Create Story Dialog */}
+      <CreateStoryDialog open={createStoryOpen} onOpenChange={setCreateStoryOpen} />
     </div>
   );
 }
