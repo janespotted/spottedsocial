@@ -129,47 +129,33 @@ export default function Map() {
       let friendLocations: FriendLocation[] = [];
       let friendIds: string[] = [];
 
-      // When demo mode is ON, show ONLY demo friends (ignore real friends)
+      // When demo mode is ON, use static demo friends dataset
       if (demoEnabled) {
-        const { data: demoUsers } = await supabase
-          .from('profiles')
-          .select('id, display_name, avatar_url, last_known_lat, last_known_lng')
-          .eq('is_demo', true)
-          .not('last_known_lat', 'is', null)
-          .not('last_known_lng', 'is', null)
-          .limit(20);
+        // Static demo friends - always visible in demo mode
+        const staticDemoFriends = [
+          { name: 'Emma Davis', venue: 'The Nines', lat: 40.748817, lng: -73.985428, type: 'close' as const },
+          { name: 'Noah Wilson', venue: 'Blue Note', lat: 40.730610, lng: -73.935242, type: 'direct' as const },
+          { name: 'Sophia Martinez', venue: 'Spotted Lounge', lat: 40.758896, lng: -73.985130, type: 'close' as const },
+          { name: 'Liam Anderson', venue: 'The Nines', lat: 40.749000, lng: -73.986000, type: 'mutual' as const },
+          { name: 'Olivia Taylor', venue: 'Jazz Bar', lat: 40.741895, lng: -73.989308, type: 'direct' as const },
+          { name: 'James Brown', venue: 'Rooftop NYC', lat: 40.752726, lng: -73.977229, type: 'mutual' as const },
+          { name: 'Ava Johnson', venue: 'Blue Note', lat: 40.730800, lng: -73.935500, type: 'close' as const },
+          { name: 'Lucas Garcia', venue: 'The Nines', lat: 40.748500, lng: -73.985800, type: 'direct' as const },
+        ];
 
-        // Get demo users' venue names
-        const demoUserIds = demoUsers?.map(u => u.id) || [];
-        const { data: demoStatuses } = await supabase
-          .from('night_statuses')
-          .select('user_id, venue_name')
-          .in('user_id', demoUserIds)
-          .not('expires_at', 'is', null)
-          .gt('expires_at', new Date().toISOString());
-
-        const demoVenueMap: Record<string, string> = {};
-        demoStatuses?.forEach(s => {
-          demoVenueMap[s.user_id] = s.venue_name;
-        });
-
-        // Assign relationship types to demo friends randomly
-        const relationshipTypes: ('close' | 'direct' | 'mutual')[] = ['close', 'direct', 'mutual'];
-        
-        friendLocations = (demoUsers || []).map((user: any, index: number) => ({
-          user_id: user.id,
-          lat: user.last_known_lat,
-          lng: user.last_known_lng,
-          venue_name: demoVenueMap[user.id] || 'Out',
+        friendLocations = staticDemoFriends.map((friend, index) => ({
+          user_id: `demo-${index}`,
+          lat: friend.lat,
+          lng: friend.lng,
+          venue_name: friend.venue,
           profiles: {
-            display_name: user.display_name,
-            avatar_url: user.avatar_url,
+            display_name: friend.name,
+            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.name}`,
           },
-          // Distribute relationship types: 30% close, 40% direct, 30% mutual
-          relationshipType: index % 10 < 3 ? 'close' : index % 10 < 7 ? 'direct' : 'mutual',
+          relationshipType: friend.type,
         }));
 
-        friendIds = demoUserIds;
+        friendIds = friendLocations.map(f => f.user_id);
       } else {
         // Normal mode: show real friends only
         // Get list of accepted friends
