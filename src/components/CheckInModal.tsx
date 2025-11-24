@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareOption, setShareOption] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('close_friends');
+  const locationIntervalRef = useRef<number | null>(null);
 
   // Load current location sharing level from profile
   useEffect(() => {
@@ -39,6 +40,63 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       loadLocationSharingLevel();
     }
   }, [user, open]);
+
+  // Clean up location interval on unmount
+  useEffect(() => {
+    return () => {
+      if (locationIntervalRef.current) {
+        clearInterval(locationIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const startLocationTracking = (initialLat: number, initialLng: number) => {
+    // Clear any existing interval
+    if (locationIntervalRef.current) {
+      clearInterval(locationIntervalRef.current);
+    }
+
+    // Update location every 15 seconds
+    locationIntervalRef.current = window.setInterval(() => {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            await supabase
+              .from('profiles')
+              .update({ 
+                last_known_lat: lat,
+                last_known_lng: lng,
+                last_location_at: new Date().toISOString()
+              })
+              .eq('id', user?.id);
+          },
+          (error) => {
+            console.error('Location update error:', error);
+          }
+        );
+      }
+    }, 15000); // 15 seconds
+  };
+
+  const stopLocationTracking = async () => {
+    if (locationIntervalRef.current) {
+      clearInterval(locationIntervalRef.current);
+      locationIntervalRef.current = null;
+    }
+
+    await supabase
+      .from('profiles')
+      .update({ 
+        is_out: false,
+        last_known_lat: null,
+        last_known_lng: null,
+        last_location_at: null
+      })
+      .eq('id', user?.id);
+  };
 
   const calculateExpiryTime = () => {
     const now = new Date();
@@ -109,6 +167,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         );
       }
     } else {
+      await stopLocationTracking();
       await updateStatus(status, null, null, null);
       onOpenChange(false);
     }
@@ -118,32 +177,53 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     setShowShareModal(false);
     setIsDetectingLocation(true);
 
-    // Save location sharing level to profile
-    try {
-      await supabase
-        .from('profiles')
-        .update({ location_sharing_level: shareOption })
-        .eq('id', user?.id);
-    } catch (error) {
-      console.error('Error updating location sharing level:', error);
-    }
-
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           const venueName = await reverseGeocode(lat, lng);
-          await updateStatus('out', lat, lng, venueName);
-          setIsDetectingLocation(false);
-          onOpenChange(false);
+          
+          // Save all location data to profile
+          try {
+            await supabase
+              .from('profiles')
+              .update({ 
+                is_out: true,
+                location_sharing_level: shareOption,
+                last_known_lat: lat,
+                last_known_lng: lng,
+                last_location_at: new Date().toISOString()
+              })
+              .eq('id', user?.id);
+
+            // Start tracking location updates
+            startLocationTracking(lat, lng);
+
+            await updateStatus('out', lat, lng, venueName);
+            setIsDetectingLocation(false);
+            onOpenChange(false);
+
+            toast({
+              title: 'Location sharing enabled',
+              description: 'Your location is now being shared',
+            });
+          } catch (error) {
+            console.error('Error updating location sharing:', error);
+            setIsDetectingLocation(false);
+            toast({
+              variant: 'destructive',
+              title: 'Error',
+              description: 'Failed to enable location sharing',
+            });
+          }
         },
         (error) => {
           setIsDetectingLocation(false);
           toast({
             variant: 'destructive',
-            title: 'Location access denied',
-            description: 'Please enable location services to use this feature.',
+            title: 'Turn on location to share where you are',
+            description: 'Location permission is required to share your location.',
           });
         }
       );
