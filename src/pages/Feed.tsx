@@ -3,8 +3,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { CreatePostDialog } from '@/components/CreatePostDialog';
 
 interface Post {
   id: string;
@@ -31,6 +32,7 @@ export default function Feed() {
   const { openCheckIn } = useCheckIn();
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [showCreatePost, setShowCreatePost] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -244,6 +246,17 @@ export default function Feed() {
           ))
         )}
       </div>
+
+      {/* Floating Create Post Button */}
+      <button
+        onClick={() => setShowCreatePost(true)}
+        className="fixed bottom-24 right-6 z-20 h-14 w-14 rounded-full bg-[#d4ff00] shadow-[0_0_30px_rgba(212,255,0,0.8)] hover:scale-110 transition-transform flex items-center justify-center"
+      >
+        <Plus className="h-7 w-7 text-[#1a0f2e]" />
+      </button>
+
+      {/* Create Post Dialog */}
+      <CreatePostDialog open={showCreatePost} onOpenChange={setShowCreatePost} />
     </div>
   );
 }
