@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronUp, ChevronDown, BarChart3, Clock, DollarSign } from 'lucide-react';
@@ -33,6 +34,7 @@ interface BiggestMover {
 export default function Leaderboard() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
+  const { openFriendCard } = useFriendIdCard();
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
 
@@ -232,15 +234,18 @@ export default function Leaderboard() {
               <div className="flex-shrink-0 flex items-center">
                 <div className="flex -space-x-2">
                   {venue.friends.slice(0, 3).map((friend, idx) => (
-                    <Avatar
+                    <button
                       key={idx}
-                      className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]"
+                      onClick={() => openFriendCard(friend.user_id)}
+                      className="transition-transform hover:scale-110"
                     >
-                      <AvatarImage src={friend.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
-                        {friend.display_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                      <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
+                        <AvatarImage src={friend.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                          {friend.display_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
                   ))}
                 </div>
                 {venue.friends.length > 3 && (
@@ -290,15 +295,18 @@ export default function Leaderboard() {
               <div className="flex items-center">
                 <div className="flex -space-x-2">
                   {biggestMover.friends.map((friend, idx) => (
-                    <Avatar
+                    <button
                       key={idx}
-                      className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.8)]"
+                      onClick={() => openFriendCard(friend.user_id)}
+                      className="transition-transform hover:scale-110"
                     >
-                      <AvatarImage src={friend.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white text-sm">
-                        {friend.display_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                      <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.8)]">
+                        <AvatarImage src={friend.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white text-sm">
+                          {friend.display_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
                   ))}
                 </div>
                 {biggestMover.friends.length > 0 && (
