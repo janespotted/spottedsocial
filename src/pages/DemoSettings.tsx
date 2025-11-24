@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -17,9 +18,30 @@ export default function DemoSettings() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const mode = getDemoMode();
-    setDemoEnabled(mode.enabled);
-    setSeeded(mode.seeded);
+    const checkActualDemoData = async () => {
+      // Check if demo data actually exists in database
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_demo', true)
+        .limit(1);
+      
+      const actuallySeeded = profiles && profiles.length > 0;
+      
+      const mode = getDemoMode();
+      setDemoEnabled(mode.enabled);
+      
+      // Sync seeded state with actual database state
+      if (mode.seeded !== actuallySeeded) {
+        const correctedMode = { enabled: mode.enabled, seeded: actuallySeeded };
+        localStorage.setItem('demo_mode', JSON.stringify(correctedMode));
+        setSeeded(actuallySeeded);
+      } else {
+        setSeeded(mode.seeded);
+      }
+    };
+    
+    checkActualDemoData();
   }, []);
 
   const handleToggleDemo = async (enabled: boolean) => {
