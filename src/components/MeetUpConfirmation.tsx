@@ -49,7 +49,7 @@ export function MeetUpConfirmation() {
   }, [showConfirmation]);
 
   const handleOpenChat = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent backdrop click
+    e.stopPropagation();
     console.log('🟢 Chat button clicked! Opening chat with:', recipientUserId, recipientDisplayName);
     
     if (!user || !recipientUserId) {
@@ -58,83 +58,61 @@ export function MeetUpConfirmation() {
     }
 
     try {
-      // Find or create thread
-      console.log('🔍 Searching for existing threads...');
-      const { data: existingThreads, error: fetchError } = await supabase
+      closeConfirmation();
+      
+      // Find existing thread with this user
+      const { data: myThreads, error: fetchError } = await supabase
         .from('dm_thread_members')
-        .select('thread_id, dm_threads!inner(*)')
+        .select('thread_id')
         .eq('user_id', user.id);
 
-      if (fetchError) {
-        console.error('❌ Error fetching threads:', fetchError);
-        return;
-      }
-
-      console.log('📋 Existing threads found:', existingThreads?.length);
+      if (fetchError) throw fetchError;
 
       let threadId: string | null = null;
 
-      if (existingThreads) {
-        for (const thread of existingThreads) {
-          const { data: members, error: membersError } = await supabase
+      if (myThreads && myThreads.length > 0) {
+        // Check each thread to see if it's a 1-on-1 with recipient
+        for (const thread of myThreads) {
+          const { data: members } = await supabase
             .from('dm_thread_members')
             .select('user_id')
             .eq('thread_id', thread.thread_id);
 
-          if (membersError) {
-            console.error('❌ Error fetching thread members:', membersError);
-            continue;
-          }
-
           if (members?.length === 2 && members.some(m => m.user_id === recipientUserId)) {
             threadId = thread.thread_id;
-            console.log('✅ Found existing thread:', threadId);
             break;
           }
         }
       }
 
+      // Create new thread if none exists
       if (!threadId) {
-        console.log('➕ Creating new thread...');
         const { data: newThread, error: createError } = await supabase
           .from('dm_threads')
           .insert({})
           .select()
           .single();
 
-        if (createError) {
-          console.error('❌ Error creating thread:', createError);
-          return;
-        }
+        if (createError) throw createError;
 
         if (newThread) {
-          console.log('✅ New thread created:', newThread.id);
-          const { error: membersError } = await supabase
+          await supabase
             .from('dm_thread_members')
             .insert([
               { thread_id: newThread.id, user_id: user.id },
               { thread_id: newThread.id, user_id: recipientUserId },
             ]);
-
-          if (membersError) {
-            console.error('❌ Error adding thread members:', membersError);
-            return;
-          }
-
+          
           threadId = newThread.id;
-          console.log('✅ Thread members added successfully');
         }
       }
 
       if (threadId) {
-        console.log('🚀 Navigating to thread:', threadId);
-        closeConfirmation();
+        console.log('✅ Navigating to thread:', threadId);
         navigate(`/messages/${threadId}`);
-      } else {
-        console.error('❌ Failed to get threadId');
       }
     } catch (error) {
-      console.error('❌ Error in handleOpenChat:', error);
+      console.error('❌ Error opening chat:', error);
     }
   };
 
