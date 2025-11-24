@@ -12,11 +12,9 @@ export default function Home() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home'>('home');
-  const [venueName, setVenueName] = useState('');
-  const [showVenueInput, setShowVenueInput] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
   const [currentStatus, setCurrentStatus] = useState<any>(null);
-  const [capturedLocation, setCapturedLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -74,21 +72,60 @@ export default function Home() {
     return tomorrow.toISOString();
   };
 
+  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'Spotted App',
+          },
+        }
+      );
+      const data = await response.json();
+      
+      // Try to get a meaningful location name
+      const address = data.address;
+      const locationName = 
+        address?.amenity || 
+        address?.building || 
+        address?.shop || 
+        address?.restaurant || 
+        address?.bar || 
+        address?.road || 
+        address?.neighbourhood || 
+        address?.suburb || 
+        address?.city ||
+        'Current Location';
+      
+      return locationName;
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      return 'Current Location';
+    }
+  };
+
   const handleStatusUpdate = async (status: 'out' | 'heading_out' | 'home') => {
     setSelectedStatus(status);
 
     if (status === 'out' || status === 'heading_out') {
-      // Immediately request location
+      setIsDetectingLocation(true);
+      
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setCapturedLocation({
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            });
-            setShowVenueInput(true);
+          async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            // Get location name from coordinates
+            const venueName = await reverseGeocode(lat, lng);
+            
+            // Immediately update status with detected location
+            await updateStatus(status, lat, lng, venueName);
+            setIsDetectingLocation(false);
           },
           (error) => {
+            setIsDetectingLocation(false);
             toast({
               variant: 'destructive',
               title: 'Location access denied',
@@ -97,6 +134,7 @@ export default function Home() {
           }
         );
       } else {
+        setIsDetectingLocation(false);
         toast({
           variant: 'destructive',
           title: 'Location not available',
@@ -145,8 +183,6 @@ export default function Home() {
         description: status === 'home' ? "You're staying in." : status === 'out' ? `You're out at ${venue}!` : `You're still deciding - heading to ${venue}!`,
       });
 
-      setShowVenueInput(false);
-      setVenueName('');
       fetchCurrentStatus();
     } catch (error: any) {
       toast({
@@ -157,32 +193,6 @@ export default function Home() {
     }
   };
 
-  const handleVenueSubmit = () => {
-    if (!venueName.trim()) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Please enter a venue name',
-      });
-      return;
-    }
-
-    if (!capturedLocation) {
-      toast({
-        variant: 'destructive',
-        title: 'Location not available',
-        description: 'Please try again and allow location access.',
-      });
-      return;
-    }
-
-    updateStatus(
-      selectedStatus,
-      capturedLocation.lat,
-      capturedLocation.lng,
-      venueName
-    );
-  };
 
   const getStatusLabel = (status: string) => {
     const labels = {
@@ -211,63 +221,37 @@ export default function Home() {
         <p className="text-muted-foreground">Let your friends know where you are</p>
       </div>
 
-      {!showVenueInput ? (
-        <div className="grid grid-cols-1 gap-4">
-          <Button
-            onClick={() => handleStatusUpdate('out')}
-            variant={selectedStatus === 'out' ? 'default' : 'outline'}
-            size="lg"
-            className="h-16 text-lg font-semibold"
-          >
-            <MapPin className="mr-2 h-5 w-5" />
-            Yes
-          </Button>
-          <Button
-            onClick={() => handleStatusUpdate('heading_out')}
-            variant={selectedStatus === 'heading_out' ? 'default' : 'outline'}
-            size="lg"
-            className="h-16 text-lg font-semibold"
-          >
-            <MapPin className="mr-2 h-5 w-5" />
-            Still deciding
-          </Button>
-          <Button
-            onClick={() => handleStatusUpdate('home')}
-            variant={selectedStatus === 'home' ? 'default' : 'outline'}
-            size="lg"
-            className="h-16 text-lg font-semibold"
-          >
-            No
-          </Button>
-        </div>
-      ) : (
-        <Card className="p-6 space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Where are you?</label>
-            <Input
-              placeholder="Enter venue name"
-              value={venueName}
-              onChange={(e) => setVenueName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleVenueSubmit()}
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={handleVenueSubmit} className="flex-1">
-              Confirm
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowVenueInput(false);
-                setVenueName('');
-                setCapturedLocation(null);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
-        </Card>
-      )}
+      <div className="grid grid-cols-1 gap-4">
+        <Button
+          onClick={() => handleStatusUpdate('out')}
+          variant={selectedStatus === 'out' ? 'default' : 'outline'}
+          size="lg"
+          className="h-16 text-lg font-semibold"
+          disabled={isDetectingLocation}
+        >
+          <MapPin className="mr-2 h-5 w-5" />
+          {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes'}
+        </Button>
+        <Button
+          onClick={() => handleStatusUpdate('heading_out')}
+          variant={selectedStatus === 'heading_out' ? 'default' : 'outline'}
+          size="lg"
+          className="h-16 text-lg font-semibold"
+          disabled={isDetectingLocation}
+        >
+          <MapPin className="mr-2 h-5 w-5" />
+          {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : 'Still deciding'}
+        </Button>
+        <Button
+          onClick={() => handleStatusUpdate('home')}
+          variant={selectedStatus === 'home' ? 'default' : 'outline'}
+          size="lg"
+          className="h-16 text-lg font-semibold"
+          disabled={isDetectingLocation}
+        >
+          No
+        </Button>
+      </div>
 
       {friends.length > 0 && (
         <Card className="p-6 space-y-4">
