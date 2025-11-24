@@ -1,21 +1,40 @@
 import { supabase } from '@/integrations/supabase/client';
 
+// Real NYC top-tier venues (scraped from top NYC bar/club rankings 2025)
+// These are "promoted" venues that appear in bootstrap mode (75% of leaderboard)
+export const PROMOTED_VENUES = [
+  // Top Bars
+  { name: "Superbueno", lat: 40.7249, lng: -73.9865, neighborhood: "East Village", type: "bar" },
+  { name: "Sunken Harbor Club", lat: 40.6923, lng: -73.9872, neighborhood: "Downtown Brooklyn", type: "bar" },
+  { name: "Bar Snack", lat: 40.7258, lng: -73.9874, neighborhood: "East Village", type: "bar" },
+  { name: "Attaboy", lat: 40.7185, lng: -73.9885, neighborhood: "Lower East Side", type: "bar" },
+  { name: "schmuck.", lat: 40.7251, lng: -73.9863, neighborhood: "East Village", type: "bar" },
+  { name: "Saint Tuesday", lat: 40.7169, lng: -73.9982, neighborhood: "Tribeca", type: "bar" },
+  { name: "The Dead Rabbit", lat: 40.7040, lng: -74.0124, neighborhood: "Financial District", type: "bar" },
+  { name: "Sunn's", lat: 40.7161, lng: -73.9977, neighborhood: "Chinatown", type: "bar" },
+  
+  // Top Clubs
+  { name: "Ketchy Shuby", lat: 40.7231, lng: -73.9969, neighborhood: "SoHo", type: "club" },
+  { name: "Gospël", lat: 40.7241, lng: -73.9977, neighborhood: "SoHo", type: "club" },
+  { name: "Jean's", lat: 40.7251, lng: -73.9988, neighborhood: "Downtown", type: "club" },
+  { name: "The Box", lat: 40.7216, lng: -73.9935, neighborhood: "Lower East Side", type: "club" },
+  { name: "Paul's Casablanca", lat: 40.7235, lng: -73.9969, neighborhood: "SoHo", type: "club" },
+  { name: "Paul's Cocktail Lounge", lat: 40.7171, lng: -74.0089, neighborhood: "Tribeca", type: "lounge" },
+  { name: "The Mulberry", lat: 40.7221, lng: -73.9951, neighborhood: "Nolita", type: "bar" },
+  { name: "The Nines", lat: 40.7268, lng: -73.9945, neighborhood: "NoHo", type: "lounge" },
+  { name: "Unveiled", lat: 40.7106, lng: -73.9638, neighborhood: "Williamsburg", type: "club" },
+  { name: "Little Sister Lounge", lat: 40.7267, lng: -73.9857, neighborhood: "East Village", type: "club" },
+  { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529, neighborhood: "Brooklyn", type: "lounge" },
+  { name: "Amber Room", lat: 40.7198, lng: -73.9891, neighborhood: "East Village", type: "bar" },
+];
+
+// Additional non-promoted demo venues (only appear when full demo mode is ON)
 export const DEMO_VENUES = [
-  { name: 'Le Bain', lat: 40.7414, lng: -74.0078 },
-  { name: 'Silo', lat: 40.7489, lng: -73.9680 },
-  { name: 'Attaboy', lat: 40.7217, lng: -73.9876 },
-  { name: 'The Box', lat: 40.7223, lng: -73.9934 },
-  { name: 'House of Yes', lat: 40.7089, lng: -73.9332 },
-  { name: 'Elsewhere', lat: 40.7067, lng: -73.9278 },
-  { name: 'Output', lat: 40.7234, lng: -73.9567 },
-  { name: 'Marquee', lat: 40.7489, lng: -73.9921 },
-  { name: 'Brooklyn Mirage', lat: 40.7158, lng: -73.9289 },
-  { name: 'Good Room', lat: 40.7089, lng: -73.9425 },
-  { name: 'Unter', lat: 40.7156, lng: -73.9567 },
-  { name: 'Public Records', lat: 40.7045, lng: -73.9378 },
-  { name: 'Mood Ring', lat: 40.7123, lng: -73.9234 },
-  { name: 'Nowadays', lat: 40.7089, lng: -73.9445 },
-  { name: 'Knockdown Center', lat: 40.7267, lng: -73.9123 },
+  { name: "Le Bain", lat: 40.7414, lng: -74.0078 },
+  { name: "Silo", lat: 40.7489, lng: -73.9680 },
+  { name: "House of Yes", lat: 40.7089, lng: -73.9332 },
+  { name: "Elsewhere", lat: 40.7067, lng: -73.9278 },
+  { name: "Output", lat: 40.7234, lng: -73.9567 },
 ];
 
 export const DEMO_USERS = [

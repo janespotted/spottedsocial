@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { shouldShowPromotedVenues } from '@/lib/bootstrap-config';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronUp, ChevronDown, BarChart3, Clock, DollarSign } from 'lucide-react';
@@ -47,6 +48,8 @@ export default function Leaderboard() {
   }, [user, demoEnabled]);
 
   const fetchLeaderboard = async () => {
+    const bootstrapMode = shouldShowPromotedVenues();
+    
     // Build query for night statuses
     let query = supabase
       .from('night_statuses')
@@ -54,6 +57,7 @@ export default function Leaderboard() {
         venue_name,
         user_id,
         updated_at,
+        is_promoted,
         profiles:user_id (
           display_name,
           avatar_url
@@ -65,10 +69,15 @@ export default function Leaderboard() {
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString());
 
-    // If demo mode is NOT enabled, filter out demo data
-    if (!demoEnabled) {
+    // Hybrid mode: show real data + promoted venues (75% fake / 25% real)
+    if (bootstrapMode && !demoEnabled) {
+      // Show real data OR promoted demo venues (but not all demo data)
+      query = query.or('is_demo.eq.false,and(is_demo.eq.true,is_promoted.eq.true)');
+    } else if (!demoEnabled) {
+      // Pure real mode (only real data when bootstrap is off)
       query = query.eq('is_demo', false);
     }
+    // If demoEnabled is true, show everything (no filter)
 
     const { data: statuses } = await query;
 
@@ -79,6 +88,8 @@ export default function Leaderboard() {
     
     statuses.forEach((status: any) => {
       const venueName = status.venue_name;
+      const isPromoted = status.is_promoted || false;
+      
       if (!venueMap.has(venueName)) {
         venueMap.set(venueName, {
           venue_name: venueName,
@@ -87,6 +98,7 @@ export default function Leaderboard() {
           movement: 'same',
           friends: [],
           energyLevel: 0,
+          isPromoted,
         });
       }
       
@@ -99,48 +111,31 @@ export default function Leaderboard() {
       });
     });
 
-    // Convert to array and sort by count
-    let venueArray = Array.from(venueMap.values())
-      .sort((a, b) => b.count - a.count)
-      .map((venue, index) => ({
-        ...venue,
-        rank: index + 1,
-        movement: Math.random() > 0.5 ? 'up' : (Math.random() > 0.5 ? 'down' : 'same') as 'up' | 'down' | 'same',
-        energyLevel: Math.min(venue.count, 3),
-      }));
+    // Convert to array, separate real vs promoted, then sort
+    const venueArray = Array.from(venueMap.values());
+    
+    // Separate real data from promoted
+    const realVenues = venueArray.filter(v => !v.isPromoted);
+    const promotedVenuesData = venueArray.filter(v => v.isPromoted);
+    
+    // Sort both groups by count
+    realVenues.sort((a, b) => b.count - a.count);
+    promotedVenuesData.sort((a, b) => b.count - a.count);
+    
+    // In bootstrap mode: prioritize real data, then fill with promoted
+    const finalVenues = bootstrapMode 
+      ? [...realVenues, ...promotedVenuesData]  // Real first, promoted second
+      : realVenues;  // Only real venues when not bootstrapping
+    
+    // Assign ranks and energy levels
+    const rankedVenues = finalVenues.map((venue, index) => ({
+      ...venue,
+      rank: index + 1,
+      movement: Math.random() > 0.5 ? 'up' : (Math.random() > 0.5 ? 'down' : 'same') as 'up' | 'down' | 'same',
+      energyLevel: Math.min(venue.count, 3),
+    }));
 
-    // Add promoted venues at top (mock data)
-    const promotedVenues: VenueStats[] = [
-      {
-        venue_name: 'Silo',
-        count: 4,
-        rank: 0,
-        movement: 'same',
-        friends: [
-          { user_id: '1', display_name: 'User1', avatar_url: null },
-          { user_id: '2', display_name: 'User2', avatar_url: null },
-          { user_id: '3', display_name: 'User3', avatar_url: null },
-          { user_id: '4', display_name: 'User4', avatar_url: null },
-        ],
-        energyLevel: 2,
-        isPromoted: true,
-      },
-      {
-        venue_name: 'Attaboy',
-        count: 3,
-        rank: 0,
-        movement: 'same',
-        friends: [
-          { user_id: '5', display_name: 'User5', avatar_url: null },
-          { user_id: '6', display_name: 'User6', avatar_url: null },
-          { user_id: '7', display_name: 'User7', avatar_url: null },
-        ],
-        energyLevel: 2,
-        isPromoted: true,
-      },
-    ];
-
-    setVenues([...promotedVenues, ...venueArray]);
+    setVenues(rankedVenues);
 
     // Set biggest mover (mock data)
     if (venueArray.length > 0) {

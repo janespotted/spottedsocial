@@ -1,21 +1,36 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
+// Real NYC top-tier venues (scraped from top rankings)
+const PROMOTED_VENUES = [
+  { name: "Superbueno", lat: 40.7249, lng: -73.9865 },
+  { name: "Sunken Harbor Club", lat: 40.6923, lng: -73.9872 },
+  { name: "Bar Snack", lat: 40.7258, lng: -73.9874 },
+  { name: "Attaboy", lat: 40.7185, lng: -73.9885 },
+  { name: "schmuck.", lat: 40.7251, lng: -73.9863 },
+  { name: "Saint Tuesday", lat: 40.7169, lng: -73.9982 },
+  { name: "The Dead Rabbit", lat: 40.7040, lng: -74.0124 },
+  { name: "Sunn's", lat: 40.7161, lng: -73.9977 },
+  { name: "Ketchy Shuby", lat: 40.7231, lng: -73.9969 },
+  { name: "Gospël", lat: 40.7241, lng: -73.9977 },
+  { name: "Jean's", lat: 40.7251, lng: -73.9988 },
+  { name: "The Box", lat: 40.7216, lng: -73.9935 },
+  { name: "Paul's Casablanca", lat: 40.7235, lng: -73.9969 },
+  { name: "Paul's Cocktail Lounge", lat: 40.7171, lng: -74.0089 },
+  { name: "The Mulberry", lat: 40.7221, lng: -73.9951 },
+  { name: "The Nines", lat: 40.7268, lng: -73.9945 },
+  { name: "Unveiled", lat: 40.7106, lng: -73.9638 },
+  { name: "Little Sister Lounge", lat: 40.7267, lng: -73.9857 },
+  { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529 },
+  { name: "Amber Room", lat: 40.7198, lng: -73.9891 },
+];
+
+// Non-promoted demo venues (only for full demo mode)
 const DEMO_VENUES = [
   { name: 'Le Bain', lat: 40.7414, lng: -74.0078 },
   { name: 'Silo', lat: 40.7489, lng: -73.9680 },
-  { name: 'Attaboy', lat: 40.7217, lng: -73.9876 },
-  { name: 'The Box', lat: 40.7223, lng: -73.9934 },
   { name: 'House of Yes', lat: 40.7089, lng: -73.9332 },
   { name: 'Elsewhere', lat: 40.7067, lng: -73.9278 },
   { name: 'Output', lat: 40.7234, lng: -73.9567 },
-  { name: 'Marquee', lat: 40.7489, lng: -73.9921 },
-  { name: 'Brooklyn Mirage', lat: 40.7158, lng: -73.9289 },
-  { name: 'Good Room', lat: 40.7089, lng: -73.9425 },
-  { name: 'Unter', lat: 40.7156, lng: -73.9567 },
-  { name: 'Public Records', lat: 40.7045, lng: -73.9378 },
-  { name: 'Mood Ring', lat: 40.7123, lng: -73.9234 },
-  { name: 'Nowadays', lat: 40.7089, lng: -73.9445 },
-  { name: 'Knockdown Center', lat: 40.7267, lng: -73.9123 },
 ];
 
 const DEMO_USERS = [
@@ -180,12 +195,17 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('friendships').insert(demoFriendships);
       }
 
-      // 4. Create night statuses
-      const numActiveUsers = 8 + Math.floor(Math.random() * 3);
+      // 4. Create night statuses with promoted venues
+      const numActiveUsers = 12 + Math.floor(Math.random() * 5);  // More users for promoted venues
       const activeUsers = getRandomItems(demoUserIds, numActiveUsers);
 
       for (const userId of activeUsers) {
-        const venue = DEMO_VENUES[Math.floor(Math.random() * DEMO_VENUES.length)];
+        // 75% chance to use promoted venue, 25% regular demo venue
+        const usePromoted = Math.random() < 0.75;
+        const venue = usePromoted 
+          ? PROMOTED_VENUES[Math.floor(Math.random() * PROMOTED_VENUES.length)]
+          : DEMO_VENUES[Math.floor(Math.random() * DEMO_VENUES.length)];
+          
         await supabaseAdmin.from('night_statuses').insert({
           user_id: userId,
           status: 'out',
@@ -195,14 +215,17 @@ Deno.serve(async (req) => {
           expires_at: calculateExpiryTime(),
           updated_at: getRecentTimestamp(),
           is_demo: true,
+          is_promoted: usePromoted,
         });
       }
 
-      // 5. Create check-ins
+      // 5. Create check-ins with promoted venues
       const checkins = [];
       for (const userId of activeUsers) {
-        const numCheckins = 1 + Math.floor(Math.random() * 3);
-        const venues = getRandomItems(DEMO_VENUES, numCheckins);
+        const numCheckins = 2 + Math.floor(Math.random() * 3);
+        const usePromoted = Math.random() < 0.75;
+        const venuePool = usePromoted ? PROMOTED_VENUES : DEMO_VENUES;
+        const venues = getRandomItems(venuePool, numCheckins);
 
         for (const venue of venues) {
           checkins.push({
@@ -212,16 +235,20 @@ Deno.serve(async (req) => {
             lng: venue.lng,
             created_at: getRecentTimestamp(),
             is_demo: true,
+            is_promoted: usePromoted,
           });
         }
       }
+
       await supabaseAdmin.from('checkins').insert(checkins);
 
-      // 6. Create posts
+      // 6. Create posts with promoted venues
       const posts = [];
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 60; i++) {
         const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
-        const venue = DEMO_VENUES[Math.floor(Math.random() * DEMO_VENUES.length)];
+        const usePromoted = Math.random() < 0.75;
+        const venuePool = usePromoted ? PROMOTED_VENUES : DEMO_VENUES;
+        const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
         const caption = DEMO_CAPTIONS[Math.floor(Math.random() * DEMO_CAPTIONS.length)];
 
         posts.push({
@@ -231,18 +258,20 @@ Deno.serve(async (req) => {
           expires_at: calculateExpiryTime(),
           created_at: getRecentTimestamp(4),
           is_demo: true,
+          is_promoted: usePromoted,
         });
       }
       await supabaseAdmin.from('posts').insert(posts);
 
-      // 7. Create yap messages
-      const hottestVenues = getRandomItems(DEMO_VENUES, 5);
+      // 7. Create yap messages with promoted venues
+      const hottestVenues = getRandomItems([...PROMOTED_VENUES, ...DEMO_VENUES], 8);
       const yapMessages = [];
 
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 15; i++) {
         const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
         const venue = hottestVenues[i % hottestVenues.length];
         const message = DEMO_YAP_MESSAGES[Math.floor(Math.random() * DEMO_YAP_MESSAGES.length)];
+        const isPromotedVenue = PROMOTED_VENUES.some(v => v.name === venue.name);
 
         yapMessages.push({
           user_id: userId,
@@ -252,6 +281,7 @@ Deno.serve(async (req) => {
           created_at: getRecentTimestamp(2),
           is_anonymous: Math.random() > 0.3,
           is_demo: true,
+          is_promoted: isPromotedVenue,
         });
       }
       await supabaseAdmin.from('yap_messages').insert(yapMessages);
