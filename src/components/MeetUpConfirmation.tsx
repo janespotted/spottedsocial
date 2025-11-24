@@ -66,9 +66,10 @@ export function MeetUpConfirmation() {
   if (!showConfirmation) return null;
 
   const handleUndo = () => {
-    // TODO: When backend is ready, send a "cancel meet up notification" request
+    // Cancel the meet-up notification and return to previous screen
     console.log('Meet Up notification cancelled for:', recipientDisplayName);
     closeConfirmation();
+    navigate(-1); // Return to previous screen
   };
 
   return (
