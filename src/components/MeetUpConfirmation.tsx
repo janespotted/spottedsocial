@@ -65,6 +65,12 @@ export function MeetUpConfirmation() {
 
   if (!showConfirmation) return null;
 
+  const handleUndo = () => {
+    // TODO: When backend is ready, send a "cancel meet up notification" request
+    console.log('Meet Up notification cancelled for:', recipientDisplayName);
+    closeConfirmation();
+  };
+
   return (
     <div 
       className="fixed inset-0 z-[100] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"
@@ -72,7 +78,7 @@ export function MeetUpConfirmation() {
     >
       <div className="w-[90%] max-w-md">
         {/* Main Card */}
-        <div className="relative bg-gradient-to-br from-[#a855f7] to-[#8b5cf6] rounded-3xl p-8 shadow-[0_0_60px_rgba(168,85,247,0.8)] animate-scale-in">
+        <div className="relative bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-3xl p-8 shadow-[0_0_60px_rgba(124,58,237,0.8)] animate-scale-in">
           {/* Recipient Avatar - Top Left */}
           <Avatar className="absolute top-6 left-6 h-12 w-12 border-2 border-white shadow-lg">
             <AvatarImage src={recipientAvatarUrl || undefined} />
@@ -99,11 +105,11 @@ export function MeetUpConfirmation() {
 
           {/* Action Buttons */}
           <div className="flex items-center justify-center gap-6 mt-6">
-            {/* Back Button */}
+            {/* Undo Button */}
             <button
-              onClick={closeConfirmation}
+              onClick={handleUndo}
               className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-lg"
-              aria-label="Go back"
+              aria-label="Undo meet up"
             >
               <ArrowLeft className="w-7 h-7 text-white" />
             </button>
@@ -112,7 +118,7 @@ export function MeetUpConfirmation() {
             <button
               onClick={handleOpenChat}
               className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-lg"
-              aria-label="Open chat"
+              aria-label="Send message"
             >
               <MessageCircle className="w-7 h-7 text-white" />
             </button>
