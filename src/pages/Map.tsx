@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -23,10 +24,10 @@ interface FriendLocation {
 export default function Map() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
+  const { openFriendCard } = useFriendIdCard();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
-  const [selectedFriend, setSelectedFriend] = useState<FriendLocation | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -252,7 +253,7 @@ export default function Map() {
       `;
 
       el.addEventListener('click', () => {
-        setSelectedFriend(friend);
+        openFriendCard(friend.user_id);
       });
 
       const marker = new mapboxgl.Marker(el)
@@ -327,59 +328,8 @@ export default function Map() {
         </button>
       </div>
 
-      {/* Friend Info Card */}
-      {selectedFriend && (
-        <div className="absolute bottom-24 left-4 right-4 z-20">
-          <Card className="bg-[#2d1b4e] border-2 border-[#a855f7] shadow-[0_0_30px_rgba(168,85,247,0.6)] p-6 space-y-4">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
-                <AvatarImage src={selectedFriend.profiles?.avatar_url || undefined} />
-                <AvatarFallback className="bg-[#1a0f2e] text-white">
-                  {selectedFriend.profiles?.display_name?.[0]}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-white">
-                  {selectedFriend.profiles?.display_name}
-                </h3>
-                <p className="text-[#d4ff00] font-medium">
-                  {selectedFriend.venue_name}
-                </p>
-                <p className="text-white/60 text-sm">
-                  {/* Distance calculation would need user's current location */}
-                  Nearby
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1 border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 rounded-full font-semibold"
-              >
-                Meet Up
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 rounded-full"
-              >
-                <MessageSquare className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <button
-              onClick={() => setSelectedFriend(null)}
-              className="absolute top-4 right-4 text-white/60 hover:text-white"
-            >
-              ✕
-            </button>
-          </Card>
-        </div>
-      )}
-
-      {/* Pin Legend (optional) */}
-      {!selectedFriend && friends.length > 0 && (
+      {/* Pin Legend */}
+      {friends.length > 0 && (
         <div className="absolute top-20 left-4 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-10">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#a855f7] rounded-full shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>

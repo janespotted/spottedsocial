@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,7 @@ interface Message {
 }
 
 interface ThreadMember {
+  user_id: string;
   display_name: string;
   username: string;
   avatar_url: string | null;
@@ -28,6 +30,7 @@ export default function Thread() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
+  const { openFriendCard } = useFriendIdCard();
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherMember, setOtherMember] = useState<ThreadMember | null>(null);
   const [newMessage, setNewMessage] = useState('');
@@ -71,6 +74,7 @@ export default function Thread() {
         .maybeSingle();
 
       setOtherMember({
+        user_id: member.user_id,
         ...member.profiles,
         venue_name: status?.venue_name || null,
       });
@@ -173,14 +177,17 @@ export default function Thread() {
             <ChevronLeft className="h-6 w-6" />
           </button>
 
-          <div className="flex items-center gap-3 flex-1 mx-4">
-            <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
+          <button 
+            onClick={() => otherMember && openFriendCard(otherMember.user_id)}
+            className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity"
+          >
+            <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
               <AvatarImage src={otherMember?.avatar_url || undefined} />
               <AvatarFallback className="bg-[#1a0f2e] text-white">
                 {otherMember?.display_name?.[0]}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 text-left">
               <h2 className="font-semibold text-white truncate">{otherMember?.display_name}</h2>
               <p className="text-white/60 text-sm truncate">{otherMember?.username}</p>
             </div>
@@ -189,7 +196,7 @@ export default function Thread() {
                 @{otherMember.venue_name}
               </div>
             )}
-          </div>
+          </button>
 
           <button 
             onClick={openCheckIn}
