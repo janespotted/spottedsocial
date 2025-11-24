@@ -9,8 +9,9 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { VenueCard } from '@/components/VenueCard';
 
 interface FriendLocation {
   user_id: string;
@@ -23,6 +24,17 @@ interface FriendLocation {
   };
 }
 
+interface Venue {
+  id: string;
+  name: string;
+  neighborhood: string;
+  type: string;
+  lat: number;
+  lng: number;
+  is_demo: boolean;
+  heatScore: number;
+}
+
 export default function Map() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
@@ -32,7 +44,11 @@ export default function Map() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
+  const [friendsAtSelectedVenue, setFriendsAtSelectedVenue] = useState<Array<{ id: string; display_name: string; avatar_url: string | null }>>([]);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const venueMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>(() => 
@@ -180,6 +196,9 @@ export default function Map() {
 
       setFriends(friendLocations);
 
+      // Fetch venues and calculate heat scores
+      await fetchVenuesWithHeatScores(friendIds);
+
       // Center map on user if they're out, otherwise show all friends
       if (map.current) {
         if (myProfile?.is_out && myProfile.last_known_lat && myProfile.last_known_lng) {
@@ -198,6 +217,73 @@ export default function Map() {
       }
     } catch (error) {
       console.error('Error fetching friends locations:', error);
+    }
+  };
+
+  const fetchVenuesWithHeatScores = async (friendIds: string[]) => {
+    try {
+      // Fetch all venues (only demo venues for now)
+      const { data: venuesData } = await supabase
+        .from('venues')
+        .select('*')
+        .eq('is_demo', true);
+
+      if (!venuesData) return;
+
+      // Calculate heat score for each venue
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+      const venuesWithHeat = await Promise.all(
+        venuesData.map(async (venue) => {
+          // Count friends at this venue
+          const friendsAtVenue = friends.filter(
+            (f) => f.venue_name.toLowerCase() === venue.name.toLowerCase()
+          ).length;
+
+          // Count recent posts at this venue
+          const { data: recentPosts } = await supabase
+            .from('posts')
+            .select('id')
+            .eq('venue_name', venue.name)
+            .gte('created_at', twoHoursAgo);
+
+          // Count recent yaps at this venue
+          const { data: recentYaps } = await supabase
+            .from('yap_messages')
+            .select('id')
+            .eq('venue_name', venue.name)
+            .gte('created_at', twoHoursAgo);
+
+          const heatScore = friendsAtVenue + (recentPosts?.length || 0) + (recentYaps?.length || 0);
+
+          return {
+            ...venue,
+            heatScore,
+          };
+        })
+      );
+
+      // Filter venues within radius if user has location
+      let filteredVenues = venuesWithHeat;
+      if (userLocation) {
+        const radius = 5; // miles
+        filteredVenues = venuesWithHeat.filter((venue) => {
+          const distance = calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            venue.lat,
+            venue.lng
+          );
+          return parseFloat(distance) <= radius;
+        });
+      }
+
+      // Sort by heat score
+      filteredVenues.sort((a, b) => b.heatScore - a.heatScore);
+
+      setVenues(filteredVenues);
+    } catch (error) {
+      console.error('Error fetching venues:', error);
     }
   };
 
@@ -303,6 +389,76 @@ export default function Map() {
       markersRef.current.push(marker);
     });
   }, [friends]);
+
+  // Render venue markers
+  useEffect(() => {
+    if (!map.current) return;
+
+    // Clear existing venue markers
+    venueMarkersRef.current.forEach(marker => marker.remove());
+    venueMarkersRef.current = [];
+
+    // Add markers for each venue
+    venues.forEach((venue, index) => {
+      const isTopHot = index < 3 && venue.heatScore > 0;
+      const size = venue.heatScore > 0 ? Math.min(50 + venue.heatScore * 5, 80) : 40;
+      const opacity = venue.heatScore > 0 ? 1 : 0.5;
+
+      const el = document.createElement('div');
+      el.className = 'venue-marker';
+      el.style.width = `${size}px`;
+      el.style.height = `${size}px`;
+      el.style.cursor = 'pointer';
+      el.style.transition = 'all 0.3s ease';
+      
+      // Create venue pin with glow for hot venues
+      el.innerHTML = `
+        <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+          ${isTopHot ? `<div style="position: absolute; inset: -10px; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.6) 0%, transparent 70%); animation: pulse 2s infinite;"></div>` : ''}
+          <div style="width: 100%; height: 100%; background: #a855f7; border-radius: 50%; opacity: ${opacity}; box-shadow: 0 0 ${isTopHot ? '30px' : '15px'} rgba(168, 85, 247, ${isTopHot ? '0.9' : '0.6'}); display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255, 255, 255, 0.9);">
+            <svg width="${size * 0.5}" height="${size * 0.5}" viewBox="0 0 24 24" fill="white">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+          </div>
+        </div>
+      `;
+
+      el.addEventListener('click', async () => {
+        // Center map on venue
+        map.current?.flyTo({
+          center: [venue.lng, venue.lat],
+          zoom: 15,
+          duration: 1500,
+        });
+
+        // Get friends at this venue
+        const friendsAtVenue = friends.filter(
+          (f) => f.venue_name.toLowerCase() === venue.name.toLowerCase()
+        );
+
+        // Fetch full friend profiles
+        if (friendsAtVenue.length > 0) {
+          const friendIds = friendsAtVenue.map(f => f.user_id);
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, display_name, avatar_url')
+            .in('id', friendIds);
+
+          setFriendsAtSelectedVenue(profiles || []);
+        } else {
+          setFriendsAtSelectedVenue([]);
+        }
+
+        setSelectedVenue(venue);
+      });
+
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([venue.lng, venue.lat])
+        .addTo(map.current!);
+
+      venueMarkersRef.current.push(marker);
+    });
+  }, [venues, friends]);
 
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
     const R = 3959; // Earth's radius in miles
@@ -418,6 +574,16 @@ export default function Map() {
       >
         <Crosshair className="w-5 h-5 text-white" />
       </button>
+
+      {/* Venue Card */}
+      {selectedVenue && (
+        <VenueCard
+          open={!!selectedVenue}
+          onClose={() => setSelectedVenue(null)}
+          venue={selectedVenue}
+          friendsAtVenue={friendsAtSelectedVenue}
+        />
+      )}
     </div>
   );
 }
