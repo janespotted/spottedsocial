@@ -3,8 +3,8 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { X, MessageCircle } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface FriendData {
@@ -253,95 +253,91 @@ export function FriendIdCard() {
   };
 
   return (
-    <Sheet open={!!selectedUserId} onOpenChange={(open) => !open && closeFriendCard()}>
-      <SheetContent 
-        side="bottom" 
-        className="h-auto max-h-[80vh] bg-[#1a0f2e] border-t-2 border-[#a855f7] rounded-t-3xl"
-      >
-        <button
-          onClick={closeFriendCard}
-          className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors z-10"
-        >
-          <X className="h-6 w-6" />
-        </button>
-
+    <Dialog open={!!selectedUserId} onOpenChange={(open) => !open && closeFriendCard()}>
+      <DialogContent className="w-[90%] max-w-[400px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
         {!friendData ? (
-          <div className="py-6 px-4 flex items-center justify-center">
+          <div className="py-8 px-6 flex items-center justify-center">
             <p className="text-white/60">Loading...</p>
           </div>
         ) : (
-          <div className="py-6 px-4">
-            {/* User Info Section */}
-            <div className="flex items-start gap-4 mb-6">
-              <Avatar className="h-20 w-20 border-[3px] border-[#a855f7]">
+          <div className="p-5">
+            <div className="flex items-start gap-4 mb-4">
+              {/* Large Avatar */}
+              <Avatar className="h-20 w-20 border-[3px] border-[#a855f7] flex-shrink-0">
                 <AvatarImage src={friendData.avatar_url || undefined} />
                 <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
                   {friendData.display_name[0]}
                 </AvatarFallback>
               </Avatar>
 
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-white mb-1">{friendData.display_name}</h2>
+              {/* User Info */}
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-white leading-tight mb-1">
+                  {friendData.display_name}
+                </h2>
                 {nightStatus?.venue_name && (
-                  <p className="text-[#d4ff00] text-lg font-medium mb-1">
+                  <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
                     @ {nightStatus.venue_name}
                   </p>
                 )}
                 {distance !== null && (
-                  <p className="text-white/50 text-sm">
-                    {distance < 1 ? `${(distance * 5280).toFixed(0)} ft` : `${distance.toFixed(1)} mi`}
+                  <p className="text-white/50 text-sm leading-tight">
+                    Meatpacking ({distance < 1 ? `${(distance * 5280).toFixed(0)} ft` : `${distance.toFixed(1)} mi`})
                   </p>
                 )}
               </div>
             </div>
 
-            {/* Friends at Venue */}
-            {friendsAtVenue.length > 0 && (
-              <div className="flex items-center gap-2 mb-6">
-                <div className="flex -space-x-2">
-                  {friendsAtVenue.slice(0, 3).map((friend) => (
-                    <Avatar key={friend.user_id} className="h-8 w-8 border-2 border-[#1a0f2e]">
-                      <AvatarImage src={friend.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                        {friend.display_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                  ))}
+            {/* Bottom Row: Friends + Buttons */}
+            <div className="flex items-center gap-3">
+              {/* Friends at Venue */}
+              {friendsAtVenue.length > 0 && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex -space-x-2">
+                    {friendsAtVenue.slice(0, 2).map((friend) => (
+                      <Avatar key={friend.user_id} className="h-7 w-7 border-2 border-[#1a0f2e]">
+                        <AvatarImage src={friend.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                          {friend.display_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                  </div>
+                  {friendsAtVenue.length > 2 && (
+                    <span className="text-white text-sm font-medium">+{friendsAtVenue.length - 2}</span>
+                  )}
                 </div>
-                {friendsAtVenue.length > 3 && (
-                  <span className="text-white text-sm font-medium">+{friendsAtVenue.length - 3}</span>
-                )}
-              </div>
-            )}
+              )}
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setShowMeetUpOptions(!showMeetUpOptions)}
-                className="flex-1 py-3 px-6 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] font-semibold hover:bg-[#d4ff00]/10 transition-colors"
-              >
-                Meet Up
-              </button>
-              <button
-                onClick={handleOpenDM}
-                className="p-3 rounded-full bg-[#2d1b4e] text-white hover:bg-[#3d2b5e] transition-colors"
-              >
-                <MessageCircle className="h-6 w-6" />
-              </button>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 flex-1">
+                <button
+                  onClick={() => setShowMeetUpOptions(!showMeetUpOptions)}
+                  className="flex-1 py-2 px-5 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors"
+                >
+                  Meet Up
+                </button>
+                <button
+                  onClick={handleOpenDM}
+                  className="p-2 rounded-full bg-transparent border-2 border-white/20 text-white hover:bg-white/10 transition-colors"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             {/* Meet Up Options */}
             {showMeetUpOptions && nightStatus?.venue_name && (
-              <div className="mt-4 p-4 bg-[#2d1b4e] rounded-2xl space-y-3">
+              <div className="mt-4 p-3 bg-[#2d1b4e] rounded-2xl space-y-2">
                 <button
                   onClick={handleSendMeetUpMessage}
-                  className="w-full py-3 px-4 text-left text-white hover:bg-[#3d2b5e] rounded-xl transition-colors"
+                  className="w-full py-2 px-3 text-left text-white text-sm hover:bg-[#3d2b5e] rounded-xl transition-colors"
                 >
                   Send DM: "Want to meet up at {nightStatus.venue_name}?"
                 </button>
                 <button
                   onClick={handleOpenDM}
-                  className="w-full py-3 px-4 text-left text-white hover:bg-[#3d2b5e] rounded-xl transition-colors"
+                  className="w-full py-2 px-3 text-left text-white text-sm hover:bg-[#3d2b5e] rounded-xl transition-colors"
                 >
                   Share my current location
                 </button>
@@ -349,7 +345,7 @@ export function FriendIdCard() {
             )}
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
