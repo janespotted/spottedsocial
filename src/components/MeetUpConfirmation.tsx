@@ -139,7 +139,7 @@ export function MeetUpConfirmation() {
           {/* Center Content */}
           <div className="flex flex-col items-center text-center mt-4 mb-6">
             {/* Emoji */}
-            <div className="text-7xl mb-4 animate-bounce">😊</div>
+            <div className="text-7xl mb-4 animate-bounce">🥳</div>
 
             {/* Text */}
             <h2 className="text-2xl font-bold text-white mb-2">
