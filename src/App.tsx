@@ -8,12 +8,15 @@ import { CheckInProvider } from "./contexts/CheckInContext";
 import { FriendIdCardProvider } from "./contexts/FriendIdCardContext";
 import { VenueIdCardProvider } from "./contexts/VenueIdCardContext";
 import { MeetUpProvider } from "./contexts/MeetUpContext";
+import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { FriendIdCard } from "./components/FriendIdCard";
 import { VenueIdCard } from "./components/VenueIdCard";
 import { MeetUpConfirmation } from "./components/MeetUpConfirmation";
+import { NotificationBanner } from "./components/NotificationBanner";
 import Auth from "./pages/Auth";
+import Notifications from "./pages/Notifications";
 import Home from "./pages/Home";
 import Map from "./pages/Map";
 import Leaderboard from "./pages/Leaderboard";
@@ -39,10 +42,12 @@ const App = () => (
             <FriendIdCardProvider>
               <VenueIdCardProvider>
                 <MeetUpProvider>
-                  <FriendIdCard />
-                  <VenueIdCard />
-                  <MeetUpConfirmation />
-                  <Routes>
+                  <NotificationsProvider>
+                    <FriendIdCard />
+                    <VenueIdCard />
+                    <MeetUpConfirmation />
+                    <NotificationBanner />
+                    <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route
                     path="/"
@@ -136,9 +141,18 @@ const App = () => (
                       </ProtectedRoute>
                     }
                   />
+                  <Route
+                    path="/notifications"
+                    element={
+                      <ProtectedRoute>
+                        <Notifications />
+                      </ProtectedRoute>
+                    }
+                  />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
+                  </NotificationsProvider>
                 </MeetUpProvider>
               </VenueIdCardProvider>
             </FriendIdCardProvider>
