@@ -4,7 +4,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MapPin, Users, ChevronDown, Share2 } from 'lucide-react';
+import { MapPin, Users, ChevronDown, Share2, Settings, LogOut } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -153,7 +153,13 @@ export default function Profile() {
         <div className="flex items-center justify-between p-6">
           <div className="flex-1" />
           <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-          <div className="flex-1 flex justify-end">
+          <div className="flex-1 flex justify-end gap-3">
+            <button 
+              onClick={() => navigate('/demo-settings')}
+              className="w-10 h-10 rounded-full bg-[#2d1b4e] border border-[#a855f7]/40 flex items-center justify-center text-white hover:bg-[#a855f7]/20 transition-colors"
+            >
+              <Settings className="h-5 w-5" />
+            </button>
             <button 
               onClick={openCheckIn}
               className="w-10 h-10 rounded-full bg-[#d4ff00] flex items-center justify-center text-2xl font-bold text-[#1a0f2e] hover:scale-110 transition-transform"
@@ -225,27 +231,6 @@ export default function Profile() {
             Share Profile
           </Button>
         </div>
-        
-        {/* Demo Settings Button */}
-        <Button
-          onClick={() => navigate('/demo-settings')}
-          variant="outline"
-          className="w-full border-[#a855f7]/40 text-[#d4ff00] hover:bg-[#a855f7]/10 rounded-full"
-        >
-          Demo Settings
-        </Button>
-
-        {/* Logout Button */}
-        <Button
-          onClick={async () => {
-            await supabase.auth.signOut();
-            navigate('/auth');
-          }}
-          variant="outline"
-          className="w-full border-red-500/40 text-red-400 hover:bg-red-500/10 rounded-full"
-        >
-          Log Out
-        </Button>
 
         {/* Location Sharing Card */}
         <div className="bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4">
@@ -320,6 +305,19 @@ export default function Profile() {
             </div>
           )}
         </div>
+
+        {/* Logout Button at Bottom */}
+        <Button
+          onClick={async () => {
+            await supabase.auth.signOut();
+            navigate('/auth');
+          }}
+          variant="outline"
+          className="w-full border-red-500/40 text-red-400 hover:bg-red-500/10 rounded-full"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Log Out
+        </Button>
       </div>
     </div>
   );
