@@ -28,6 +28,8 @@ export default function Map() {
   const [friends, setFriends] = useState<FriendLocation[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<FriendLocation | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>(() => 
     localStorage.getItem('mapbox_token') || ''
   );
@@ -54,6 +56,13 @@ export default function Map() {
         .select('is_out, last_known_lat, last_known_lng, location_sharing_level')
         .eq('id', user.id)
         .single();
+
+      // Update user's location state
+      if (myProfile?.is_out && myProfile.last_known_lat && myProfile.last_known_lng) {
+        setUserLocation({ lat: myProfile.last_known_lat, lng: myProfile.last_known_lng });
+      } else {
+        setUserLocation(null);
+      }
 
       // Get list of accepted friends
       const { data: friendships } = await supabase
@@ -173,6 +182,7 @@ export default function Map() {
 
     return () => {
       markersRef.current.forEach(marker => marker.remove());
+      userMarkerRef.current?.remove();
       map.current?.remove();
     };
   }, [mapboxToken]);
@@ -185,10 +195,40 @@ export default function Map() {
     }
   };
 
+  // Add user's marker
   useEffect(() => {
-    if (!map.current || friends.length === 0) return;
+    if (!map.current || !userLocation) {
+      userMarkerRef.current?.remove();
+      userMarkerRef.current = null;
+      return;
+    }
 
-    // Clear existing markers
+    // Remove old marker
+    userMarkerRef.current?.remove();
+
+    // Create user marker with distinct styling (yellow glow)
+    const el = document.createElement('div');
+    el.className = 'user-marker';
+    el.style.width = '70px';
+    el.style.height = '70px';
+    el.style.cursor = 'pointer';
+    
+    el.innerHTML = `
+      <div style="position: relative; width: 100%; height: 100%;">
+        <div style="position: absolute; inset: 0; border-radius: 50%; border: 4px solid #d4ff00; box-shadow: 0 0 30px rgba(212, 255, 0, 0.9), inset 0 0 20px rgba(212, 255, 0, 0.4);"></div>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; background: #d4ff00; border-radius: 50%; box-shadow: 0 0 10px rgba(212, 255, 0, 1);"></div>
+      </div>
+    `;
+
+    userMarkerRef.current = new mapboxgl.Marker(el)
+      .setLngLat([userLocation.lng, userLocation.lat])
+      .addTo(map.current);
+  }, [userLocation]);
+
+  useEffect(() => {
+    if (!map.current) return;
+
+    // Clear existing friend markers
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
@@ -222,15 +262,6 @@ export default function Map() {
 
       markersRef.current.push(marker);
     });
-
-    // Fit map to show all friends
-    if (friends.length > 0) {
-      const bounds = new mapboxgl.LngLatBounds();
-      friends.forEach(friend => {
-        bounds.extend([friend.lng, friend.lat]);
-      });
-      map.current.fitBounds(bounds, { padding: 80 });
-    }
   }, [friends]);
 
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
