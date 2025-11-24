@@ -26,6 +26,7 @@ import Thread from "./pages/Thread";
 import FriendRequests from "./pages/FriendRequests";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
+import CloseFriends from "./pages/CloseFriends";
 import DemoSettings from "./pages/DemoSettings";
 import NotFound from "./pages/NotFound";
 
@@ -130,6 +131,14 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <EditProfile />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/profile/close-friends"
+                    element={
+                      <ProtectedRoute>
+                        <CloseFriends />
                       </ProtectedRoute>
                     }
                   />
