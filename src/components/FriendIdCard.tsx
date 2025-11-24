@@ -280,18 +280,21 @@ export function FriendIdCard() {
                     <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
                       @ {nightStatus.venue_name}
                     </p>
-                    {distance !== null && (
-                      <p className="text-white/50 text-sm leading-tight">
-                        Meatpacking ({distance < 1 ? `${(distance * 5280).toFixed(0)} ft` : `${distance.toFixed(1)} mi`})
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  distance !== null && (
-                    <p className="text-white/50 text-sm leading-tight mt-1">
-                      {distance < 1 ? `${(distance * 5280).toFixed(0)} ft away` : `${distance.toFixed(1)} mi away`}
+                    <p className="text-white/50 text-sm leading-tight">
+                      {distance !== null 
+                        ? `Meatpacking (${distance < 1 ? `${(distance * 5280).toFixed(0)} ft` : `${distance.toFixed(1)} mi`})`
+                        : 'Meatpacking'
+                      }
                     </p>
-                  )
+                  </>
+                ) : distance !== null ? (
+                  <p className="text-white/50 text-sm leading-tight mt-1">
+                    {distance < 1 ? `${(distance * 5280).toFixed(0)} ft away` : `${distance.toFixed(1)} mi away`}
+                  </p>
+                ) : (
+                  <p className="text-white/50 text-sm leading-tight mt-1">
+                    Location not shared
+                  </p>
                 )}
               </div>
             </div>
