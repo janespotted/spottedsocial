@@ -1,415 +1,272 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Ghost, Users } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Heart, MessageCircle, Send } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
+interface Post {
+  id: string;
+  user_id: string;
+  text: string;
+  image_url: string | null;
+  venue_name: string | null;
+  created_at: string;
+  profiles: {
+    display_name: string;
+    username: string;
+    avatar_url: string | null;
+  };
+}
+
+interface Friend {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
 
 export default function Home() {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home'>('home');
-  const [friends, setFriends] = useState<any[]>([]);
-  const [currentStatus, setCurrentStatus] = useState<any>(null);
-  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [shareOption, setShareOption] = useState<'close_friends' | 'friends' | 'mutual_friends'>('close_friends');
+  const { openCheckIn } = useCheckIn();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [hasCheckedToday, setHasCheckedToday] = useState(false);
 
   useEffect(() => {
     if (user) {
-      fetchCurrentStatus();
-      fetchFriendsStatus();
+      checkFirstLogin();
+      fetchFriends();
+      fetchPosts();
+      subscribeToNewPosts();
     }
   }, [user]);
 
-  const fetchCurrentStatus = async () => {
+  const checkFirstLogin = async () => {
     const { data } = await supabase
       .from('night_statuses')
-      .select('*')
+      .select('updated_at')
       .eq('user_id', user?.id)
       .maybeSingle();
-    
-    if (data) {
-      setCurrentStatus(data);
-      setSelectedStatus(data.status);
+
+    if (!data) {
+      openCheckIn();
+      setHasCheckedToday(false);
+    } else {
+      const lastUpdate = new Date(data.updated_at);
+      const today = new Date();
+      const isToday = lastUpdate.toDateString() === today.toDateString();
+      setHasCheckedToday(isToday);
+      
+      if (!isToday) {
+        openCheckIn();
+      }
     }
   };
 
-  const fetchFriendsStatus = async () => {
+  const fetchFriends = async () => {
     const { data: friendships } = await supabase
       .from('friendships')
       .select('friend_id')
       .eq('user_id', user?.id)
       .eq('status', 'accepted');
 
-    if (friendships) {
+    if (friendships && friendships.length > 0) {
       const friendIds = friendships.map(f => f.friend_id);
       
-      const { data: friendStatuses } = await supabase
-        .from('night_statuses')
-        .select(`
-          *,
-          profiles:user_id (
-            display_name,
-            username,
-            avatar_url
-          )
-        `)
-        .in('user_id', friendIds)
-        .not('expires_at', 'is', null)
-        .gt('expires_at', new Date().toISOString());
+      const { data: friendProfiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', friendIds);
 
-      setFriends(friendStatuses || []);
+      if (friendProfiles) {
+        setFriends(friendProfiles.map(f => ({
+          user_id: f.id,
+          display_name: f.display_name,
+          avatar_url: f.avatar_url,
+        })));
+      }
     }
   };
 
-  const calculateExpiryTime = () => {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(5, 0, 0, 0);
-    return tomorrow.toISOString();
+  const fetchPosts = async () => {
+    const { data: friendships } = await supabase
+      .from('friendships')
+      .select('friend_id')
+      .eq('user_id', user?.id)
+      .eq('status', 'accepted');
+
+    const friendIds = friendships?.map(f => f.friend_id) || [];
+    const userIds = [user?.id, ...friendIds];
+
+    const { data } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles:user_id (
+          display_name,
+          username,
+          avatar_url
+        )
+      `)
+      .in('user_id', userIds)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+
+    setPosts(data || []);
   };
 
-  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+  const subscribeToNewPosts = () => {
+    const channel = supabase
+      .channel('posts_changes')
+      .on(
+        'postgres_changes',
         {
-          headers: {
-            'User-Agent': 'Spotted App',
-          },
-        }
-      );
-      const data = await response.json();
-      
-      // Try to get a meaningful location name
-      const address = data.address;
-      const locationName = 
-        address?.amenity || 
-        address?.building || 
-        address?.shop || 
-        address?.restaurant || 
-        address?.bar || 
-        address?.road || 
-        address?.neighbourhood || 
-        address?.suburb || 
-        address?.city ||
-        'Current Location';
-      
-      return locationName;
-    } catch (error) {
-      console.error('Reverse geocoding error:', error);
-      return 'Current Location';
-    }
-  };
-
-  const handleStatusUpdate = async (status: 'out' | 'heading_out' | 'home') => {
-    setSelectedStatus(status);
-
-    if (status === 'out') {
-      // Show sharing modal for "Yes"
-      setShowShareModal(true);
-    } else if (status === 'heading_out') {
-      setIsDetectingLocation(true);
-      
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            
-            // Get location name from coordinates
-            const venueName = await reverseGeocode(lat, lng);
-            
-            // Immediately update status with detected location
-            await updateStatus(status, lat, lng, venueName);
-            setIsDetectingLocation(false);
-          },
-          (error) => {
-            setIsDetectingLocation(false);
-            toast({
-              variant: 'destructive',
-              title: 'Location access denied',
-              description: 'Please enable location services to use this feature.',
-            });
-          }
-        );
-      } else {
-        setIsDetectingLocation(false);
-        toast({
-          variant: 'destructive',
-          title: 'Location not available',
-          description: 'Your device does not support location services.',
-        });
-      }
-    } else {
-      await updateStatus(status, null, null, null);
-    }
-  };
-
-  const handleShareLocation = async () => {
-    setShowShareModal(false);
-    setIsDetectingLocation(true);
-
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          
-          // Get location name from coordinates
-          const venueName = await reverseGeocode(lat, lng);
-          
-          // Update status with detected location
-          await updateStatus('out', lat, lng, venueName);
-          setIsDetectingLocation(false);
+          event: 'INSERT',
+          schema: 'public',
+          table: 'posts',
         },
-        (error) => {
-          setIsDetectingLocation(false);
-          toast({
-            variant: 'destructive',
-            title: 'Location access denied',
-            description: 'Please enable location services to use this feature.',
-          });
+        () => {
+          fetchPosts();
         }
-      );
-    } else {
-      setIsDetectingLocation(false);
-      toast({
-        variant: 'destructive',
-        title: 'Location not available',
-        description: 'Your device does not support location services.',
-      });
-    }
-  };
+      )
+      .subscribe();
 
-  const updateStatus = async (
-    status: 'out' | 'heading_out' | 'home',
-    lat: number | null,
-    lng: number | null,
-    venue: string | null
-  ) => {
-    try {
-      const statusData = {
-        user_id: user?.id,
-        status,
-        lat,
-        lng,
-        venue_name: venue,
-        updated_at: new Date().toISOString(),
-        expires_at: status === 'home' ? null : calculateExpiryTime(),
-      };
-
-      const { error } = await supabase
-        .from('night_statuses')
-        .upsert(statusData, { onConflict: 'user_id' });
-
-      if (error) throw error;
-
-      if (status !== 'home' && lat && lng && venue) {
-        await supabase.from('checkins').insert({
-          user_id: user?.id,
-          venue_name: venue,
-          lat,
-          lng,
-        });
-      }
-
-      toast({
-        title: 'Status updated!',
-        description: status === 'home' ? "You're staying in." : status === 'out' ? `You're out at ${venue}!` : `You're still deciding - heading to ${venue}!`,
-      });
-
-      fetchCurrentStatus();
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message,
-      });
-    }
-  };
-
-
-  const getStatusLabel = (status: string) => {
-    const labels = {
-      out: 'Yes',
-      heading_out: 'Still deciding',
-      home: 'No',
+    return () => {
+      supabase.removeChannel(channel);
     };
-    return labels[status as keyof typeof labels] || 'No';
   };
 
-  const getStatusBadge = (status: string) => {
-    const badges = {
-      out: 'bg-primary text-primary-foreground',
-      heading_out: 'bg-accent text-accent-foreground',
-      home: 'bg-muted text-muted-foreground',
-    };
-    return badges[status as keyof typeof badges] || badges.home;
+  const getTimeAgo = (date: string) => {
+    const distance = formatDistanceToNow(new Date(date), { addSuffix: false });
+    return distance.replace('about ', '').replace(' minutes', 'm').replace(' minute', 'm')
+      .replace(' hours', 'h').replace(' hour', 'h')
+      .replace(' days', 'd').replace(' day', 'd');
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#3d2b5f] via-[#2a1f4a] to-black flex flex-col items-center justify-between p-6 pb-20">
+    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
       {/* Header */}
-      <div className="w-full flex items-start justify-between pt-8">
-        <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
-        <div className="text-4xl font-bold text-[#d4ff00]">S</div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center space-y-12 w-full max-w-md">
-        <h2 className="text-5xl font-bold text-[#d4ff00] text-center leading-tight">
-          Are You<br />Out?
-        </h2>
-
-        <div className="w-full space-y-4">
-          <Button
-            onClick={() => handleStatusUpdate('out')}
-            variant="outline"
-            size="lg"
-            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 hover:text-[#d4ff00] shadow-[0_0_20px_rgba(212,255,0,0.3)] disabled:opacity-50"
-            disabled={isDetectingLocation}
+      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
+        <div className="flex items-center justify-between p-6">
+          <div>
+            <h1 className="text-2xl font-light tracking-[0.3em] text-white mb-1">Spotted</h1>
+            <h2 className="text-3xl font-bold text-white">Newsfeed</h2>
+            <p className="text-white/60 text-sm mt-1">Everything disappears by 5am</p>
+          </div>
+          <button 
+            onClick={openCheckIn}
+            className="text-4xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
           >
-            {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes'}
-          </Button>
-          <Button
-            onClick={() => handleStatusUpdate('home')}
-            variant="outline"
-            size="lg"
-            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 hover:text-[#d4ff00] shadow-[0_0_20px_rgba(212,255,0,0.3)] disabled:opacity-50"
-            disabled={isDetectingLocation}
-          >
-            No
-          </Button>
-          <Button
-            onClick={() => handleStatusUpdate('heading_out')}
-            variant="outline"
-            size="lg"
-            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-white bg-transparent text-white hover:bg-white/10 hover:text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] disabled:opacity-50"
-            disabled={isDetectingLocation}
-          >
-            {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : 'Still Deciding...'}
-          </Button>
+            S
+          </button>
         </div>
+
+        {/* Friends Story Row */}
+        {friends.length > 0 && (
+          <div className="px-6 pb-4">
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide">
+              {friends.map((friend) => (
+                <div key={friend.user_id} className="flex-shrink-0">
+                  <Avatar className="h-16 w-16 border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)]">
+                    <AvatarImage src={friend.avatar_url || undefined} />
+                    <AvatarFallback className="bg-[#1a0f2e] text-white">
+                      {friend.display_name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Ghost Icon */}
-      <div className="w-full flex justify-end">
-        <Ghost className="h-8 w-8 text-white/60" />
-      </div>
-
-      {/* Share Location Modal */}
-      <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
-        <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm mx-4 p-0 overflow-hidden">
-          <div className="relative p-6 space-y-6">
-            {/* Yellow S in corner */}
-            <div className="absolute top-4 right-4 text-2xl font-bold text-[#d4ff00]">S</div>
-            
-            {/* Header */}
-            <div className="space-y-2">
-              <h3 className="text-xl font-semibold text-white">Share Your Location With:</h3>
-              <div className="h-px bg-white/20" />
-            </div>
-
-            {/* Radio Options */}
-            <div className="space-y-4">
-              <button
-                onClick={() => setShareOption('close_friends')}
-                className="w-full flex items-center gap-4 text-left"
-              >
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                  shareOption === 'close_friends' 
-                    ? 'border-[#d4ff00]' 
-                    : 'border-white/40'
-                }`}>
-                  {shareOption === 'close_friends' && (
-                    <div className="w-4 h-4 rounded-full bg-[#d4ff00]" />
-                  )}
-                </div>
-                <span className="text-lg text-white">Close Friends 💛</span>
-              </button>
-
-              <button
-                onClick={() => setShareOption('friends')}
-                className="w-full flex items-center gap-4 text-left"
-              >
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                  shareOption === 'friends' 
-                    ? 'border-[#d4ff00]' 
-                    : 'border-white/40'
-                }`}>
-                  {shareOption === 'friends' && (
-                    <div className="w-4 h-4 rounded-full bg-[#d4ff00]" />
-                  )}
-                </div>
-                <span className="text-lg text-white">Friends 👫</span>
-              </button>
-
-              <button
-                onClick={() => setShareOption('mutual_friends')}
-                className="w-full flex items-center gap-4 text-left"
-              >
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                  shareOption === 'mutual_friends' 
-                    ? 'border-[#d4ff00]' 
-                    : 'border-white/40'
-                }`}>
-                  {shareOption === 'mutual_friends' && (
-                    <div className="w-4 h-4 rounded-full bg-[#d4ff00]" />
-                  )}
-                </div>
-                <span className="text-lg text-white">Mutual Friends 🔗</span>
-              </button>
-            </div>
-
-            {/* Share Button */}
-            <Button
-              onClick={handleShareLocation}
-              className="w-full h-14 text-lg font-semibold rounded-full bg-[#5b21b6] text-[#d4ff00] border-2 border-[#d4ff00] hover:bg-[#6d28d9] shadow-[0_0_20px_rgba(212,255,0,0.4)]"
+      {/* Posts Feed */}
+      <div className="px-4 py-6 space-y-6">
+        {posts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-white/60">No posts yet from friends</p>
+            <p className="text-white/40 text-sm mt-2">Posts disappear by 5am</p>
+          </div>
+        ) : (
+          posts.map((post) => (
+            <div
+              key={post.id}
+              className="bg-[#0a0118] border-2 border-[#a855f7]/40 rounded-3xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.4)]"
             >
-              Share Location
-            </Button>
-
-            {/* Footer Text */}
-            <p className="text-center text-sm text-white/60 italic">
-              Location stops sharing at 5am
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Friends List - Show as overlay when available */}
-      {friends.length > 0 && (
-        <Card className="fixed bottom-24 left-4 right-4 p-4 bg-background/95 backdrop-blur space-y-3 max-h-64 overflow-y-auto">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Tonight's Friends</h3>
-          </div>
-          <div className="space-y-2">
-            {friends.map((friend) => (
-              <div key={friend.user_id} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-6 w-6">
-                    <AvatarFallback className="text-xs">{friend.profiles?.display_name?.[0]}</AvatarFallback>
+              {/* Post Header */}
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
+                    <AvatarImage src={post.profiles?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-[#1a0f2e] text-white">
+                      {post.profiles?.display_name?.[0]}
+                    </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium">{friend.profiles?.display_name}</p>
-                    <p className="text-xs text-muted-foreground">{friend.venue_name}</p>
+                    <p className="font-semibold text-white">{post.profiles?.display_name}</p>
+                    {post.venue_name && (
+                      <p className="text-[#d4ff00] font-medium text-sm">{post.venue_name}</p>
+                    )}
                   </div>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(friend.status)}`}>
-                  {getStatusLabel(friend.status)}
-                </span>
+                <span className="text-white/60 text-sm">{getTimeAgo(post.created_at)}</span>
               </div>
-            ))}
-          </div>
-        </Card>
-      )}
+
+              {/* Post Image */}
+              {post.image_url && (
+                <div className="w-full aspect-square">
+                  <img
+                    src={post.image_url}
+                    alt="Post"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
+              {/* Post Actions */}
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-4">
+                  <button className="flex items-center gap-2 text-white hover:text-[#d4ff00] transition-colors">
+                    <Heart className="h-6 w-6" />
+                    <span className="font-semibold">5</span>
+                  </button>
+                  <button className="flex items-center gap-2 text-white hover:text-[#d4ff00] transition-colors">
+                    <MessageCircle className="h-6 w-6" />
+                    <span className="font-semibold">4</span>
+                  </button>
+                  <button className="text-white hover:text-[#d4ff00] transition-colors ml-auto">
+                    <Send className="h-6 w-6" />
+                  </button>
+                </div>
+
+                {/* Liked By */}
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    {friends.slice(0, 3).map((friend, idx) => (
+                      <Avatar key={idx} className="h-6 w-6 border-2 border-[#0a0118]">
+                        <AvatarImage src={friend.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                          {friend.display_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                  </div>
+                  <p className="text-white/80 text-sm">
+                    Liked by <span className="font-semibold">janelovespotted</span> and others
+                  </p>
+                </div>
+
+                {/* Caption */}
+                <div className="text-white/90 text-sm">
+                  <span className="font-semibold">{post.profiles?.username}</span>{' '}
+                  {post.text}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

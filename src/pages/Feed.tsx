@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send } from 'lucide-react';
@@ -27,6 +28,7 @@ interface Friend {
 
 export default function Feed() {
   const { user } = useAuth();
+  const { openCheckIn } = useCheckIn();
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
 
@@ -129,7 +131,12 @@ export default function Feed() {
             <h2 className="text-3xl font-bold text-white">Newsfeed</h2>
             <p className="text-white/60 text-sm mt-1">Everything disappears by 5am</p>
           </div>
-          <div className="text-4xl font-bold text-[#d4ff00]">S</div>
+          <button 
+            onClick={openCheckIn} 
+            className="text-4xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
+          >
+            S
+          </button>
         </div>
 
         {/* Friends Story Row */}
