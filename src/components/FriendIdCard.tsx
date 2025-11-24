@@ -41,6 +41,7 @@ export function FriendIdCard() {
 
   useEffect(() => {
     if (selectedUserId) {
+      console.log('Friend ID Card opened for user:', selectedUserId);
       fetchFriendData();
       fetchUserLocation();
     } else {
@@ -68,14 +69,22 @@ export function FriendIdCard() {
   const fetchFriendData = async () => {
     if (!selectedUserId) return;
 
+    console.log('Fetching friend data for:', selectedUserId);
+
     // Fetch friend profile
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
       .from('profiles')
       .select('id, display_name, username, avatar_url, last_known_lat, last_known_lng')
       .eq('id', selectedUserId)
       .single();
 
+    if (error) {
+      console.error('Error fetching friend data:', error);
+      return;
+    }
+
     if (profile) {
+      console.log('Friend data loaded:', profile);
       setFriendData(profile);
 
       // Fetch night status
@@ -243,22 +252,24 @@ export function FriendIdCard() {
     }
   };
 
-  if (!friendData) return null;
-
   return (
-    <>
-      <Sheet open={!!selectedUserId} onOpenChange={(open) => !open && closeFriendCard()}>
-        <SheetContent 
-          side="bottom" 
-          className="h-auto max-h-[80vh] bg-[#1a0f2e] border-t-2 border-[#a855f7] rounded-t-3xl"
+    <Sheet open={!!selectedUserId} onOpenChange={(open) => !open && closeFriendCard()}>
+      <SheetContent 
+        side="bottom" 
+        className="h-auto max-h-[80vh] bg-[#1a0f2e] border-t-2 border-[#a855f7] rounded-t-3xl"
+      >
+        <button
+          onClick={closeFriendCard}
+          className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors z-10"
         >
-          <button
-            onClick={closeFriendCard}
-            className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
+          <X className="h-6 w-6" />
+        </button>
 
+        {!friendData ? (
+          <div className="py-6 px-4 flex items-center justify-center">
+            <p className="text-white/60">Loading...</p>
+          </div>
+        ) : (
           <div className="py-6 px-4">
             {/* User Info Section */}
             <div className="flex items-start gap-4 mb-6">
@@ -337,8 +348,8 @@ export function FriendIdCard() {
               </div>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
-    </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
