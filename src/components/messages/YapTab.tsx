@@ -66,7 +66,7 @@ export function YapTab() {
     if (!user) return;
 
     // Fetch yap messages with vote information
-    const { data: yaps } = await supabase
+    let query = supabase
       .from('yap_messages')
       .select(`
         *,
@@ -75,9 +75,17 @@ export function YapTab() {
           avatar_url
         )
       `)
-      .eq('venue_name', selectedVenue)
-      .gt('expires_at', new Date().toISOString())
-      .or(demoMode ? 'is_demo.eq.true,is_demo.eq.false' : 'is_demo.eq.false');
+      .gt('expires_at', new Date().toISOString());
+
+    // In demo mode, show all demo yaps OR yaps for current venue
+    // In normal mode, only show yaps for current venue (non-demo)
+    if (demoMode) {
+      query = query.or(`venue_name.eq.${selectedVenue},is_demo.eq.true`);
+    } else {
+      query = query.eq('venue_name', selectedVenue).eq('is_demo', false);
+    }
+
+    const { data: yaps } = await query;
 
     if (!yaps) return;
 
