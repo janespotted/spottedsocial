@@ -467,34 +467,43 @@ export type Database = {
       }
       yap_messages: {
         Row: {
+          author_handle: string | null
+          comments_count: number | null
           created_at: string | null
           expires_at: string
           id: string
           is_anonymous: boolean | null
           is_demo: boolean | null
           is_promoted: boolean | null
+          score: number | null
           text: string
           user_id: string
           venue_name: string
         }
         Insert: {
+          author_handle?: string | null
+          comments_count?: number | null
           created_at?: string | null
           expires_at: string
           id?: string
           is_anonymous?: boolean | null
           is_demo?: boolean | null
           is_promoted?: boolean | null
+          score?: number | null
           text: string
           user_id: string
           venue_name: string
         }
         Update: {
+          author_handle?: string | null
+          comments_count?: number | null
           created_at?: string | null
           expires_at?: string
           id?: string
           is_anonymous?: boolean | null
           is_demo?: boolean | null
           is_promoted?: boolean | null
+          score?: number | null
           text?: string
           user_id?: string
           venue_name?: string
@@ -505,6 +514,45 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yap_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          user_id: string
+          vote_type: string
+          yap_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          user_id: string
+          vote_type: string
+          yap_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          user_id?: string
+          vote_type?: string
+          yap_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yap_votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yap_votes_yap_id_fkey"
+            columns: ["yap_id"]
+            isOneToOne: false
+            referencedRelation: "yap_messages"
             referencedColumns: ["id"]
           },
         ]
