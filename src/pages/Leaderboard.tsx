@@ -110,37 +110,47 @@ export default function Leaderboard() {
       });
     });
 
-    // Convert to array, separate real vs promoted, then sort
+    // Convert to array and separate promoted from non-promoted
     const venueArray = Array.from(venueMap.values());
     
-    // Separate real data from promoted
-    const realVenues = venueArray.filter(v => !v.isPromoted);
-    const promotedVenuesData = venueArray.filter(v => v.isPromoted);
+    // Get all promoted venues and sort by count
+    const allPromotedVenues = venueArray.filter(v => v.isPromoted);
+    allPromotedVenues.sort((a, b) => b.count - a.count);
     
-    // Sort both groups by count
-    realVenues.sort((a, b) => b.count - a.count);
-    promotedVenuesData.sort((a, b) => b.count - a.count);
+    // Get top 2 promoted venues only
+    const topPromotedVenues = allPromotedVenues.slice(0, 2);
     
-    // In bootstrap mode: prioritize real data, then fill with promoted
-    const finalVenues = bootstrapEnabled 
-      ? [...realVenues, ...promotedVenuesData]  // Real first, promoted second
-      : realVenues;  // Only real venues when not bootstrapping
+    // Get all non-promoted venues and sort by count
+    const nonPromotedVenues = venueArray.filter(v => !v.isPromoted);
+    nonPromotedVenues.sort((a, b) => b.count - a.count);
     
-    // Assign ranks and energy levels
-    const rankedVenues = finalVenues.map((venue, index) => ({
+    // Take top 20 non-promoted venues for ranking
+    const rankedVenues = nonPromotedVenues.slice(0, 20).map((venue, index) => ({
       ...venue,
       rank: index + 1,
       movement: Math.random() > 0.5 ? 'up' : (Math.random() > 0.5 ? 'down' : 'same') as 'up' | 'down' | 'same',
       energyLevel: Math.min(venue.count, 3),
     }));
 
-    setVenues(rankedVenues);
+    // Assign properties to promoted venues (no rank)
+    const promotedWithProps = topPromotedVenues.map(venue => ({
+      ...venue,
+      rank: 0, // No rank for promoted
+      movement: 'same' as const,
+      energyLevel: Math.min(venue.count, 3),
+    }));
 
-    // Set biggest mover (mock data)
-    if (venueArray.length > 0) {
+    // Combine: promoted first, then ranked
+    const finalVenues = [...promotedWithProps, ...rankedVenues];
+
+    setVenues(finalVenues);
+
+    // Set biggest mover (from non-promoted venues only)
+    if (nonPromotedVenues.length > 0) {
+      const moverVenue = nonPromotedVenues[Math.floor(Math.random() * Math.min(5, nonPromotedVenues.length))];
       setBiggestMover({
-        venue_name: venueArray[0].venue_name,
-        friends: venueArray[0].friends.slice(0, 3),
+        venue_name: moverVenue.venue_name,
+        friends: moverVenue.friends.slice(0, 3),
         timeAgo: '10m',
         coverCharge: 20,
       });
@@ -185,29 +195,81 @@ export default function Leaderboard() {
 
       {/* Leaderboard List */}
       <div className="px-4 py-6 space-y-3">
-        {venues.map((venue, index) => (
+        {/* Promoted Section */}
+        {venues.filter(v => v.isPromoted).length > 0 && (
+          <>
+            {venues.filter(v => v.isPromoted).map((venue) => (
+              <div
+                key={venue.venue_name}
+                className="relative overflow-hidden rounded-2xl p-4 bg-[#2d1b4e]/60 border border-[#a855f7]/30"
+              >
+                <div className="flex items-center gap-4">
+                  {/* Promoted Badge */}
+                  <div className="flex-shrink-0">
+                    <div className="px-3 py-1 bg-[#a855f7]/20 rounded-full text-xs text-[#a855f7] font-medium">
+                      Promoted
+                    </div>
+                  </div>
+
+                  {/* Venue Name */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-white truncate">
+                      {venue.venue_name}
+                    </h3>
+                  </div>
+
+                  {/* Energy Bars */}
+                  <div className="flex-shrink-0">
+                    {renderEnergyBars(venue.energyLevel)}
+                  </div>
+
+                  {/* Friend Avatars */}
+                  <div className="flex-shrink-0 flex items-center">
+                    <div className="flex -space-x-2">
+                      {venue.friends.slice(0, 3).map((friend, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => openFriendCard(friend.user_id)}
+                          className="transition-transform hover:scale-110"
+                        >
+                          <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
+                            <AvatarImage src={friend.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                              {friend.display_name[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                        </button>
+                      ))}
+                    </div>
+                    {venue.friends.length > 3 && (
+                      <span className="ml-2 text-sm text-white font-medium">
+                        +{venue.friends.length - 3}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {/* Separator */}
+            <div className="py-2">
+              <div className="border-t border-[#a855f7]/20"></div>
+            </div>
+          </>
+        )}
+
+        {/* Ranked Section */}
+        {venues.filter(v => !v.isPromoted).map((venue) => (
           <div
             key={venue.venue_name}
-            className={`
-              relative overflow-hidden rounded-2xl p-4
-              ${venue.isPromoted 
-                ? 'bg-[#2d1b4e]/60 border border-[#a855f7]/30' 
-                : 'bg-[#2d1b4e]/80 border border-[#a855f7]/20 shadow-[0_0_20px_rgba(168,85,247,0.3)]'
-              }
-            `}
+            className="relative overflow-hidden rounded-2xl p-4 bg-[#2d1b4e]/80 border border-[#a855f7]/20 shadow-[0_0_20px_rgba(168,85,247,0.3)]"
           >
             <div className="flex items-center gap-4">
-              {/* Rank or Promoted Badge */}
+              {/* Rank Number */}
               <div className="flex-shrink-0">
-                {venue.isPromoted ? (
-                  <div className="px-3 py-1 bg-[#a855f7]/20 rounded-full text-xs text-[#a855f7] font-medium">
-                    Promoted
-                  </div>
-                ) : (
-                  <div className="text-3xl font-bold text-[#d4ff00] w-8 text-center">
-                    {venue.rank}
-                  </div>
-                )}
+                <div className="text-3xl font-bold text-[#d4ff00] w-8 text-center">
+                  {venue.rank}
+                </div>
               </div>
 
               {/* Venue Name */}
@@ -216,7 +278,7 @@ export default function Leaderboard() {
                   <h3 className="text-lg font-semibold text-white truncate">
                     {venue.venue_name}
                   </h3>
-                  {!venue.isPromoted && venue.movement !== 'same' && (
+                  {venue.movement !== 'same' && (
                     <div>
                       {venue.movement === 'up' ? (
                         <ChevronUp className="w-4 h-4 text-[#d4ff00]" />
