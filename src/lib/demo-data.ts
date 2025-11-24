@@ -1,5 +1,18 @@
 import { supabase } from '@/integrations/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { calculateExpiryTime } from './time-utils';
+
+// Create service role client for admin operations (bypasses RLS)
+const supabaseAdmin = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
 
 export const DEMO_VENUES = [
   { name: 'Le Bain', lat: 40.7414, lng: -74.0078 },
@@ -176,7 +189,7 @@ export async function seedDemoData(currentUserId: string) {
       const userId = crypto.randomUUID();
       demoUserIds.push(userId);
       
-      const { error } = await supabase.from('profiles').insert({
+      const { error } = await supabaseAdmin.from('profiles').insert({
         id: userId,
         display_name: demoUser.display_name,
         username: `${demoUser.username}_${i}`,
@@ -200,7 +213,7 @@ export async function seedDemoData(currentUserId: string) {
       status: 'accepted' as const,
     }));
     
-    const { error: friendshipError } = await supabase
+    const { error: friendshipError } = await supabaseAdmin
       .from('friendships')
       .insert(currentUserFriendships);
     
@@ -234,7 +247,7 @@ export async function seedDemoData(currentUserId: string) {
     }
     
     if (demoFriendships.length > 0) {
-      const { error: demoFriendError } = await supabase
+      const { error: demoFriendError } = await supabaseAdmin
         .from('friendships')
         .insert(demoFriendships);
       
@@ -253,7 +266,7 @@ export async function seedDemoData(currentUserId: string) {
     
     for (const userId of activeUsers) {
       const venue = DEMO_VENUES[Math.floor(Math.random() * DEMO_VENUES.length)];
-      await supabase.from('night_statuses').insert({
+      await supabaseAdmin.from('night_statuses').insert({
         user_id: userId,
         status: 'out',
         venue_name: venue.name,
@@ -284,7 +297,7 @@ export async function seedDemoData(currentUserId: string) {
         });
       }
     }
-    await supabase.from('checkins').insert(checkins);
+    await supabaseAdmin.from('checkins').insert(checkins);
     console.log(`✅ Created ${checkins.length} check-ins`);
 
     // 6. Create 50 demo posts with realistic timestamps
@@ -304,7 +317,7 @@ export async function seedDemoData(currentUserId: string) {
         is_demo: true,
       });
     }
-    await supabase.from('posts').insert(posts);
+    await supabaseAdmin.from('posts').insert(posts);
     console.log(`✅ Created 50 posts`);
 
     // 7. Create 10 yap messages for hottest venues
@@ -327,7 +340,7 @@ export async function seedDemoData(currentUserId: string) {
         is_demo: true,
       });
     }
-    await supabase.from('yap_messages').insert(yapMessages);
+    await supabaseAdmin.from('yap_messages').insert(yapMessages);
     console.log(`✅ Created 10 yap messages`);
 
     markDemoSeeded();
