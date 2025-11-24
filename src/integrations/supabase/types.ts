@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_demo: boolean | null
           lat: number
           lng: number
           user_id: string
@@ -26,6 +27,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          is_demo?: boolean | null
           lat: number
           lng: number
           user_id: string
@@ -34,6 +36,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          is_demo?: boolean | null
           lat?: number
           lng?: number
           user_id?: string
@@ -179,6 +182,7 @@ export type Database = {
         Row: {
           expires_at: string | null
           id: string
+          is_demo: boolean | null
           lat: number | null
           lng: number | null
           status: Database["public"]["Enums"]["night_status_enum"]
@@ -189,6 +193,7 @@ export type Database = {
         Insert: {
           expires_at?: string | null
           id?: string
+          is_demo?: boolean | null
           lat?: number | null
           lng?: number | null
           status?: Database["public"]["Enums"]["night_status_enum"]
@@ -199,6 +204,7 @@ export type Database = {
         Update: {
           expires_at?: string | null
           id?: string
+          is_demo?: boolean | null
           lat?: number | null
           lng?: number | null
           status?: Database["public"]["Enums"]["night_status_enum"]
@@ -222,6 +228,7 @@ export type Database = {
           expires_at: string
           id: string
           image_url: string | null
+          is_demo: boolean | null
           text: string
           user_id: string
           venue_name: string | null
@@ -231,6 +238,7 @@ export type Database = {
           expires_at: string
           id?: string
           image_url?: string | null
+          is_demo?: boolean | null
           text: string
           user_id: string
           venue_name?: string | null
@@ -240,6 +248,7 @@ export type Database = {
           expires_at?: string
           id?: string
           image_url?: string | null
+          is_demo?: boolean | null
           text?: string
           user_id?: string
           venue_name?: string | null
@@ -262,6 +271,7 @@ export type Database = {
           display_name: string
           home_city: string | null
           id: string
+          is_demo: boolean | null
           is_out: boolean | null
           last_active_at: string | null
           last_known_lat: number | null
@@ -277,6 +287,7 @@ export type Database = {
           display_name: string
           home_city?: string | null
           id: string
+          is_demo?: boolean | null
           is_out?: boolean | null
           last_active_at?: string | null
           last_known_lat?: number | null
@@ -292,6 +303,7 @@ export type Database = {
           display_name?: string
           home_city?: string | null
           id?: string
+          is_demo?: boolean | null
           is_out?: boolean | null
           last_active_at?: string | null
           last_known_lat?: number | null
@@ -340,6 +352,7 @@ export type Database = {
           expires_at: string
           id: string
           is_anonymous: boolean | null
+          is_demo: boolean | null
           text: string
           user_id: string
           venue_name: string
@@ -349,6 +362,7 @@ export type Database = {
           expires_at: string
           id?: string
           is_anonymous?: boolean | null
+          is_demo?: boolean | null
           text: string
           user_id: string
           venue_name: string
@@ -358,6 +372,7 @@ export type Database = {
           expires_at?: string
           id?: string
           is_anonymous?: boolean | null
+          is_demo?: boolean | null
           text?: string
           user_id?: string
           venue_name?: string
