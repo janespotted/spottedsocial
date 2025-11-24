@@ -83,61 +83,61 @@ export function FriendIdCard() {
       return;
     }
 
-    if (profile) {
-      console.log('Friend data loaded:', profile);
-      setFriendData(profile);
+      if (profile) {
+        console.log('Friend data loaded:', profile);
+        setFriendData(profile);
 
-      // Fetch night status
-      const { data: status } = await supabase
-        .from('night_statuses')
-        .select('venue_name, lat, lng')
-        .eq('user_id', selectedUserId)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle();
-
-      if (status) {
-        setNightStatus(status);
-
-        // Calculate distance if we have both locations
-        if (userLocation && status.lat && status.lng) {
+        // Calculate distance if both users have location data
+        if (userLocation && profile.last_known_lat && profile.last_known_lng) {
           const dist = calculateDistance(
             userLocation.lat,
             userLocation.lng,
-            status.lat,
-            status.lng
+            profile.last_known_lat,
+            profile.last_known_lng
           );
           setDistance(dist);
         }
 
-        // Fetch other friends at the same venue
-        if (status.venue_name) {
-          const { data: friendships } = await supabase
-            .from('friendships')
-            .select('friend_id')
-            .eq('user_id', user?.id)
-            .eq('status', 'accepted');
+        // Fetch night status
+        const { data: status } = await supabase
+          .from('night_statuses')
+          .select('venue_name, lat, lng')
+          .eq('user_id', selectedUserId)
+          .gt('expires_at', new Date().toISOString())
+          .maybeSingle();
 
-          const friendIds = friendships?.map(f => f.friend_id) || [];
+        if (status) {
+          setNightStatus(status);
 
-          const { data: venueStatuses } = await supabase
-            .from('night_statuses')
-            .select('user_id, profiles:user_id(display_name, avatar_url)')
-            .eq('venue_name', status.venue_name)
-            .neq('user_id', selectedUserId)
-            .in('user_id', friendIds)
-            .gt('expires_at', new Date().toISOString());
+          // Fetch other friends at the same venue
+          if (status.venue_name) {
+            const { data: friendships } = await supabase
+              .from('friendships')
+              .select('friend_id')
+              .eq('user_id', user?.id)
+              .eq('status', 'accepted');
 
-          if (venueStatuses) {
-            const friends = venueStatuses.map(s => ({
-              user_id: s.user_id,
-              display_name: (s.profiles as any)?.display_name || 'Friend',
-              avatar_url: (s.profiles as any)?.avatar_url || null,
-            }));
-            setFriendsAtVenue(friends);
+            const friendIds = friendships?.map(f => f.friend_id) || [];
+
+            const { data: venueStatuses } = await supabase
+              .from('night_statuses')
+              .select('user_id, profiles:user_id(display_name, avatar_url)')
+              .eq('venue_name', status.venue_name)
+              .neq('user_id', selectedUserId)
+              .in('user_id', friendIds)
+              .gt('expires_at', new Date().toISOString());
+
+            if (venueStatuses) {
+              const friends = venueStatuses.map(s => ({
+                user_id: s.user_id,
+                display_name: (s.profiles as any)?.display_name || 'Friend',
+                avatar_url: (s.profiles as any)?.avatar_url || null,
+              }));
+              setFriendsAtVenue(friends);
+            }
           }
         }
       }
-    }
   };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -275,7 +275,7 @@ export function FriendIdCard() {
                 <h2 className="text-xl font-bold text-white leading-tight mb-1">
                   {friendData.display_name}
                 </h2>
-                {nightStatus?.venue_name && (
+                {nightStatus?.venue_name ? (
                   <>
                     <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
                       @ {nightStatus.venue_name}
@@ -286,6 +286,12 @@ export function FriendIdCard() {
                       </p>
                     )}
                   </>
+                ) : (
+                  distance !== null && (
+                    <p className="text-white/50 text-sm leading-tight mt-1">
+                      {distance < 1 ? `${(distance * 5280).toFixed(0)} ft away` : `${distance.toFixed(1)} mi away`}
+                    </p>
+                  )
                 )}
               </div>
             </div>
