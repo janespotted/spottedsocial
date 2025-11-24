@@ -56,12 +56,53 @@ export default function Map() {
   useEffect(() => {
     if (user) {
       fetchFriendsLocations();
-      
-      // Refresh every 15 seconds to get updated locations
-      const interval = setInterval(fetchFriendsLocations, 15000);
-      
-      return () => clearInterval(interval);
     }
+  }, [user, demoEnabled]);
+
+  // Real-time subscription for location updates
+  useEffect(() => {
+    if (!user) return;
+
+    // Subscribe to profile changes (location updates)
+    const profileChannel = supabase
+      .channel('profile-location-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+        },
+        (payload) => {
+          console.log('Profile location updated:', payload);
+          // Refresh friends locations when any profile updates
+          fetchFriendsLocations();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to night status changes (venue updates)
+    const statusChannel = supabase
+      .channel('night-status-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'night_statuses',
+        },
+        (payload) => {
+          console.log('Night status updated:', payload);
+          // Refresh friends locations when statuses change
+          fetchFriendsLocations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(profileChannel);
+      supabase.removeChannel(statusChannel);
+    };
   }, [user, demoEnabled]);
 
   const fetchFriendsLocations = async () => {
