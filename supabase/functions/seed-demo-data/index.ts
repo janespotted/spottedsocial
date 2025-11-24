@@ -397,12 +397,36 @@ Deno.serve(async (req) => {
       }
       await supabaseAdmin.from('yap_messages').insert(yapMessages);
 
+      // 8. Create stories for demo users
+      const storyUsers = getRandomItems(demoUserIds, 15); // 15 users with stories
+      const stories = [];
+      
+      for (const userId of storyUsers) {
+        const numStories = 1 + Math.floor(Math.random() * 3); // 1-3 stories per user
+        
+        for (let i = 0; i < numStories; i++) {
+          stories.push({
+            user_id: userId,
+            media_url: DEMO_POST_IMAGES[Math.floor(Math.random() * DEMO_POST_IMAGES.length)],
+            media_type: 'image',
+            created_at: getRecentTimestamp(12), // Stories from last 12 hours
+            expires_at: calculateExpiryTime(),
+            is_demo: true,
+          });
+        }
+      }
+      
+      if (stories.length > 0) {
+        await supabaseAdmin.from('stories').insert(stories);
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
           stats: {
             users: demoUserIds.length,
             posts: 60,
+            stories: stories.length,
             yaps: yapMessages.length,
             venues: PROMOTED_VENUES.length + DEMO_VENUES.length,
             activeUsers: activeUsers.length,
@@ -414,6 +438,7 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from('post_comments').delete().eq('post_id', '').in('post_id',
         (await supabaseAdmin.from('posts').select('id').eq('is_demo', true)).data?.map(p => p.id) || []
       );
+      await supabaseAdmin.from('stories').delete().eq('is_demo', true);
       await supabaseAdmin.from('posts').delete().eq('is_demo', true);
       await supabaseAdmin.from('checkins').delete().eq('is_demo', true);
       await supabaseAdmin.from('night_statuses').delete().eq('is_demo', true);
