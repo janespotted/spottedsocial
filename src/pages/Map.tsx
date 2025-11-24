@@ -388,6 +388,13 @@ export default function Map() {
   useEffect(() => {
     if (!map.current) return;
 
+    // Only clear markers if we have friends data to replace them with
+    // This prevents markers from disappearing during state updates
+    if (friends.length === 0 && markersRef.current.length > 0) {
+      // Don't remove markers if friends is empty - might be a temporary state
+      return;
+    }
+
     // Clear existing friend markers
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
