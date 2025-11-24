@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateExpiryTime } from '@/lib/time-utils';
@@ -23,6 +23,26 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [venueName, setVenueName] = useState<string | null>(null);
+
+  // Fetch current venue when dialog opens
+  useEffect(() => {
+    if (open && user) {
+      fetchCurrentVenue();
+    }
+  }, [open, user]);
+
+  const fetchCurrentVenue = async () => {
+    const { data } = await supabase
+      .from('night_statuses')
+      .select('venue_name, status')
+      .eq('user_id', user?.id)
+      .single();
+
+    if (data && data.status === 'out' && data.venue_name) {
+      setVenueName(data.venue_name);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -70,6 +90,7 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
           user_id: user.id,
           media_url: publicUrl,
           media_type: file.type.startsWith('image/') ? 'image' : 'video',
+          venue_name: venueName,
           expires_at: calculateExpiryTime(),
         });
 

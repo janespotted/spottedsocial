@@ -374,6 +374,7 @@ export type Database = {
           media_type: string
           media_url: string
           user_id: string
+          venue_name: string | null
         }
         Insert: {
           created_at?: string
@@ -383,6 +384,7 @@ export type Database = {
           media_type: string
           media_url: string
           user_id: string
+          venue_name?: string | null
         }
         Update: {
           created_at?: string
@@ -392,6 +394,7 @@ export type Database = {
           media_type?: string
           media_url?: string
           user_id?: string
+          venue_name?: string | null
         }
         Relationships: [
           {

@@ -10,6 +10,7 @@ interface Story {
   media_url: string;
   media_type: 'image' | 'video';
   created_at: string;
+  venue_name: string | null;
   profiles: {
     display_name: string;
     username: string;
@@ -145,7 +146,10 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
           </Avatar>
           <div>
             <p className="font-semibold text-white">{currentStory.profiles?.display_name}</p>
-            <p className="text-white/80 text-xs">
+            {currentStory.venue_name && (
+              <p className="text-white/90 text-sm">@ {currentStory.venue_name}</p>
+            )}
+            <p className="text-white/60 text-xs">
               {formatDistanceToNow(new Date(currentStory.created_at), { addSuffix: true })}
             </p>
           </div>
