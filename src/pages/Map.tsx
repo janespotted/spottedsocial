@@ -22,6 +22,7 @@ interface FriendLocation {
     display_name: string;
     avatar_url: string | null;
   };
+  relationshipType?: 'close' | 'direct' | 'mutual';
 }
 
 interface Venue {
@@ -166,6 +167,34 @@ export default function Map() {
           venueMap[s.user_id] = s.venue_name;
         });
 
+        // Get relationship types (close friends, mutual friends)
+        const { data: closeFriends } = await supabase
+          .from('close_friends')
+          .select('close_friend_id')
+          .eq('user_id', user.id);
+
+        const closeFriendIds = new Set(closeFriends?.map(cf => cf.close_friend_id) || []);
+
+        // Determine relationship type for each friend
+        const relationshipTypes: Record<string, 'close' | 'direct' | 'mutual'> = {};
+        
+        for (const friendId of friendIds) {
+          if (closeFriendIds.has(friendId)) {
+            relationshipTypes[friendId] = 'close';
+          } else {
+            // Check if mutual friend (friends-of-friends)
+            const { data: commonFriends } = await supabase
+              .from('friendships')
+              .select('friend_id')
+              .eq('user_id', friendId)
+              .eq('status', 'accepted')
+              .in('friend_id', friendIds);
+
+            const isMutual = commonFriends && commonFriends.length > 0;
+            relationshipTypes[friendId] = isMutual ? 'mutual' : 'direct';
+          }
+        }
+
         // RLS policies handle visibility filtering - no client-side filtering needed
         friendLocations = (friendProfiles || []).map((friend: any) => ({
           user_id: friend.id,
@@ -176,6 +205,7 @@ export default function Map() {
             display_name: friend.display_name || 'Unknown',
             avatar_url: friend.avatar_url,
           },
+          relationshipType: relationshipTypes[friend.id] || 'direct',
         }));
       }
 
@@ -380,16 +410,31 @@ export default function Map() {
       el.style.width = '60px';
       el.style.height = '60px';
       el.style.cursor = 'pointer';
+      el.style.position = 'relative';
       
-      // Create avatar with neon ring
+      // Determine ring color and badge based on relationship type
+      const ringColors = {
+        close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.8)', badge: '💛' },
+        direct: { border: '#a855f7', shadow: 'rgba(168, 85, 247, 0.8)', badge: '' },
+        mutual: { border: '#6366f1', shadow: 'rgba(99, 102, 241, 0.8)', badge: '🔗' },
+      };
+      
+      const colors = ringColors[friend.relationshipType || 'direct'];
+      
+      // Create avatar with colored ring
       el.innerHTML = `
         <div style="position: relative; width: 100%; height: 100%;">
-          <div style="position: absolute; inset: 0; border-radius: 50%; border: 3px solid #a855f7; box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), inset 0 0 20px rgba(168, 85, 247, 0.3);"></div>
+          <div style="position: absolute; inset: 0; border-radius: 50%; border: 3px solid ${colors.border}; box-shadow: 0 0 20px ${colors.shadow}, inset 0 0 20px ${colors.shadow.replace('0.8', '0.3')}"></div>
           <img 
             src="${friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`}" 
             style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; padding: 4px;"
             alt="${friend.profiles?.display_name}"
           />
+          ${colors.badge ? `
+            <div style="position: absolute; bottom: -2px; right: -2px; width: 20px; height: 20px; background: #1a0f2e; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid ${colors.border}; font-size: 12px;">
+              ${colors.badge}
+            </div>
+          ` : ''}
         </div>
       `;
 
@@ -587,7 +632,7 @@ export default function Map() {
                   className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
                 >
                   {/* Avatar */}
-                  <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
+                  <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50 relative">
                     <AvatarImage
                       src={
                         friend.profiles?.avatar_url ||
@@ -597,6 +642,16 @@ export default function Map() {
                     <AvatarFallback className="bg-[#a855f7] text-white text-sm">
                       {friend.profiles?.display_name?.[0] || '?'}
                     </AvatarFallback>
+                    {friend.relationshipType === 'close' && (
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#1a0f2e] border-2 border-[#d4ff00] rounded-full flex items-center justify-center text-xs">
+                        💛
+                      </div>
+                    )}
+                    {friend.relationshipType === 'mutual' && (
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#1a0f2e] border-2 border-[#6366f1] rounded-full flex items-center justify-center text-xs">
+                        🔗
+                      </div>
+                    )}
                   </Avatar>
 
                   {/* Name & Venue */}
@@ -635,6 +690,29 @@ export default function Map() {
       >
         <Crosshair className="w-5 h-5 text-white" />
       </button>
+
+      {/* Legend */}
+      <div className="absolute bottom-40 right-6 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-10 shadow-[0_0_20px_rgba(168,85,247,0.4)] max-w-[160px]">
+        <p className="text-white/80 text-xs font-semibold mb-2">Relationship</p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full border-2 border-[#d4ff00] flex items-center justify-center text-[8px] bg-[#1a0f2e] shadow-[0_0_8px_rgba(212,255,0,0.6)]">
+              💛
+            </div>
+            <span className="text-white/70 text-xs">Close Friend</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full border-2 border-[#a855f7] bg-[#1a0f2e] shadow-[0_0_8px_rgba(168,85,247,0.6)]"></div>
+            <span className="text-white/70 text-xs">Friend</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full border-2 border-[#6366f1] flex items-center justify-center text-[8px] bg-[#1a0f2e] shadow-[0_0_8px_rgba(99,102,241,0.6)]">
+              🔗
+            </div>
+            <span className="text-white/70 text-xs">Mutual</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
