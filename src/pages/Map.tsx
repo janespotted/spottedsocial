@@ -166,23 +166,8 @@ export default function Map() {
           venueMap[s.user_id] = s.venue_name;
         });
 
-        // Filter friends based on visibility rules
-        const visibleFriends = (friendProfiles || []).filter((friend: any) => {
-          const friendLevel = friend.location_sharing_level || 'all_friends';
-          
-          if (friendLevel === 'all_friends') return true;
-          
-          // For mutual_friends, check if user is also out
-          if (friendLevel === 'mutual_friends') {
-            return myProfile?.is_out === true;
-          }
-          
-          // For close_friends, would need additional close_friends relationship data
-          // For now, treat as all_friends
-          return true;
-        });
-
-        friendLocations = visibleFriends.map((friend: any) => ({
+        // RLS policies handle visibility filtering - no client-side filtering needed
+        friendLocations = (friendProfiles || []).map((friend: any) => ({
           user_id: friend.id,
           lat: friend.last_known_lat,
           lng: friend.last_known_lng,

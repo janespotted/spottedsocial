@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronLeft, LogOut } from 'lucide-react';
+import { ChevronLeft, LogOut, Users, Heart, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function EditProfile() {
@@ -19,6 +19,7 @@ export default function EditProfile() {
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [locationSharing, setLocationSharing] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('all_friends');
 
   useEffect(() => {
     if (user) {
@@ -39,6 +40,10 @@ export default function EditProfile() {
       setHomeCity(data.home_city || '');
       setBio(data.bio || '');
       setAvatarUrl(data.avatar_url || '');
+      const sharing = data.location_sharing_level || 'all_friends';
+      if (sharing === 'close_friends' || sharing === 'all_friends' || sharing === 'mutual_friends') {
+        setLocationSharing(sharing);
+      }
     }
   };
 
@@ -52,6 +57,7 @@ export default function EditProfile() {
           username,
           home_city: homeCity,
           bio,
+          location_sharing_level: locationSharing,
         })
         .eq('id', user?.id);
 
@@ -154,6 +160,77 @@ export default function EditProfile() {
               className="bg-[#2d1b4e]/60 border-[#a855f7]/20 text-white min-h-[100px]"
               placeholder="Tell us about yourself..."
             />
+          </div>
+
+          {/* Location Sharing Privacy */}
+          <div className="space-y-3">
+            <Label className="text-white">Location Sharing</Label>
+            <p className="text-sm text-white/60">Choose who can see your location when you're out</p>
+            
+            <div className="space-y-3 bg-[#2d1b4e]/40 rounded-lg p-4 border border-[#a855f7]/20">
+              <button
+                onClick={() => setLocationSharing('close_friends')}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#a855f7]/10 transition-colors"
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  locationSharing === 'close_friends' ? 'border-[#d4ff00]' : 'border-white/40'
+                }`}>
+                  {locationSharing === 'close_friends' && (
+                    <div className="w-3 h-3 rounded-full bg-[#d4ff00]" />
+                  )}
+                </div>
+                <Heart className="w-5 h-5 text-[#d4ff00]" />
+                <div className="flex-1 text-left">
+                  <p className="text-white font-medium">Close Friends</p>
+                  <p className="text-xs text-white/60">Only close friends you've marked</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setLocationSharing('all_friends')}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#a855f7]/10 transition-colors"
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  locationSharing === 'all_friends' ? 'border-[#d4ff00]' : 'border-white/40'
+                }`}>
+                  {locationSharing === 'all_friends' && (
+                    <div className="w-3 h-3 rounded-full bg-[#d4ff00]" />
+                  )}
+                </div>
+                <Users className="w-5 h-5 text-[#a855f7]" />
+                <div className="flex-1 text-left">
+                  <p className="text-white font-medium">All Friends</p>
+                  <p className="text-xs text-white/60">All your direct friends</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setLocationSharing('mutual_friends')}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#a855f7]/10 transition-colors"
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  locationSharing === 'mutual_friends' ? 'border-[#d4ff00]' : 'border-white/40'
+                }`}>
+                  {locationSharing === 'mutual_friends' && (
+                    <div className="w-3 h-3 rounded-full bg-[#d4ff00]" />
+                  )}
+                </div>
+                <Link2 className="w-5 h-5 text-[#a855f7]" />
+                <div className="flex-1 text-left">
+                  <p className="text-white font-medium">Mutual Friends</p>
+                  <p className="text-xs text-white/60">Friends-of-friends only</p>
+                </div>
+              </button>
+            </div>
+
+            <Button
+              onClick={() => navigate('/profile/close-friends')}
+              variant="outline"
+              className="w-full border-[#a855f7] text-white hover:bg-[#a855f7]/10"
+            >
+              <Heart className="w-4 h-4 mr-2" />
+              Manage Close Friends
+            </Button>
           </div>
 
           <Button
