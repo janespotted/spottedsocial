@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
-import { shouldShowPromotedVenues } from '@/lib/bootstrap-config';
+import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronUp, ChevronDown, BarChart3, Clock, DollarSign } from 'lucide-react';
@@ -38,6 +38,7 @@ export default function Leaderboard() {
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
   const demoEnabled = useDemoMode();
+  const bootstrapEnabled = useBootstrapMode();
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
 
@@ -45,11 +46,9 @@ export default function Leaderboard() {
     if (user) {
       fetchLeaderboard();
     }
-  }, [user, demoEnabled]);
+  }, [user, demoEnabled, bootstrapEnabled]);
 
   const fetchLeaderboard = async () => {
-    const bootstrapMode = shouldShowPromotedVenues();
-    
     // Build query for night statuses
     let query = supabase
       .from('night_statuses')
@@ -70,7 +69,7 @@ export default function Leaderboard() {
       .gt('expires_at', new Date().toISOString());
 
     // Hybrid mode: show real data + promoted venues (75% fake / 25% real)
-    if (bootstrapMode && !demoEnabled) {
+    if (bootstrapEnabled && !demoEnabled) {
       // Show real data OR promoted demo venues (but not all demo data)
       query = query.or('is_demo.eq.false,and(is_demo.eq.true,is_promoted.eq.true)');
     } else if (!demoEnabled) {
@@ -123,7 +122,7 @@ export default function Leaderboard() {
     promotedVenuesData.sort((a, b) => b.count - a.count);
     
     // In bootstrap mode: prioritize real data, then fill with promoted
-    const finalVenues = bootstrapMode 
+    const finalVenues = bootstrapEnabled 
       ? [...realVenues, ...promotedVenuesData]  // Real first, promoted second
       : realVenues;  // Only real venues when not bootstrapping
     
