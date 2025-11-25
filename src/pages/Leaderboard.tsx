@@ -4,6 +4,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
+import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronUp, ChevronDown, BarChart3, Clock, DollarSign } from 'lucide-react';
@@ -39,6 +40,7 @@ export default function Leaderboard() {
   const { openFriendCard } = useFriendIdCard();
   const demoEnabled = useDemoMode();
   const bootstrapEnabled = useBootstrapMode();
+  useAutoVenueTracking(); // Trigger auto-venue tracking on leaderboard view
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
 

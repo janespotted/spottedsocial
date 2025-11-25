@@ -4,6 +4,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard, FriendCardData } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -43,6 +44,7 @@ export default function Map() {
   const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
   const { toast } = useToast();
+  useAutoVenueTracking(); // Trigger auto-venue tracking on map view
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ interface WishlistPlace {
 export default function Profile() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
+  useAutoVenueTracking(); // Trigger auto-venue tracking on profile view
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
   const [friendsCount, setFriendsCount] = useState(0);

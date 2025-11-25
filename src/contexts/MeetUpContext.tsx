@@ -16,6 +16,7 @@ import { useAuth } from './AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { getDemoMode } from '@/lib/demo-data';
 import { captureLocationWithVenue } from '@/lib/location-service';
+import { autoTrackVenue } from '@/lib/auto-venue-tracker';
 
 interface MeetUpContextType {
   recipientUserId: string | null;
@@ -47,8 +48,11 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
 
     try {
       // Capture fresh GPS coordinates at the moment of sending meet up
+      // This also triggers auto-venue tracking
       let locationData = null;
       try {
+        await autoTrackVenue(user.id);
+        
         locationData = await captureLocationWithVenue();
         console.log('Captured location for meet up:', locationData);
         
