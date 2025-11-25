@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FriendData {
   id: string;
@@ -259,51 +259,19 @@ export function FriendIdCard() {
     return R * c;
   };
 
-  const handleOpenDM = async () => {
-    if (!user || !selectedFriend) return;
+  const handleOpenDM = () => {
+    if (!selectedFriend) return;
 
-    // Find or create thread
-    const { data: existingThreads } = await supabase
-      .from('dm_thread_members')
-      .select('thread_id, dm_threads!inner(*)')
-      .eq('user_id', user.id);
-
-    let threadId: string | null = null;
-
-    if (existingThreads) {
-      for (const thread of existingThreads) {
-        const { data: members } = await supabase
-          .from('dm_thread_members')
-          .select('user_id')
-          .eq('thread_id', thread.thread_id);
-
-        if (members?.length === 2 && members.some(m => m.user_id === selectedFriend.userId)) {
-          threadId = thread.thread_id;
-          break;
+    closeFriendCard();
+    navigate('/messages', { 
+      state: { 
+        preselectedUser: {
+          id: selectedFriend.userId,
+          display_name: selectedFriend.displayName,
+          avatar_url: selectedFriend.avatarUrl
         }
-      }
-    }
-
-    if (!threadId) {
-      const { data: newThread } = await supabase
-        .from('dm_threads')
-        .insert({})
-        .select()
-        .single();
-
-      if (newThread) {
-        await supabase.from('dm_thread_members').insert([
-          { thread_id: newThread.id, user_id: user.id },
-          { thread_id: newThread.id, user_id: selectedFriend.userId },
-        ]);
-        threadId = newThread.id;
-      }
-    }
-
-    if (threadId) {
-      closeFriendCard();
-      navigate(`/thread/${threadId}`);
-    }
+      } 
+    });
   };
 
   const handleMeetUp = async () => {
