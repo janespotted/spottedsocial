@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send, Plus } from 'lucide-react';
@@ -60,6 +61,7 @@ export default function Feed() {
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
   const demoEnabled = useDemoMode();
+  useAutoVenueTracking(); // Trigger auto-venue tracking on feed view
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [showCreatePost, setShowCreatePost] = useState(false);

@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
 import { FriendIdCardProvider } from "./contexts/FriendIdCardContext";
@@ -15,6 +16,8 @@ import { FriendIdCard } from "./components/FriendIdCard";
 import { VenueIdCard } from "./components/VenueIdCard";
 import { MeetUpConfirmation } from "./components/MeetUpConfirmation";
 import { NotificationBanner } from "./components/NotificationBanner";
+import { useAuth } from "./contexts/AuthContext";
+import { autoTrackVenue } from "./lib/auto-venue-tracker";
 import Auth from "./pages/Auth";
 import Notifications from "./pages/Notifications";
 import Home from "./pages/Home";
@@ -32,6 +35,20 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Component to trigger auto-tracking on app open
+function AutoTracker() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      console.log('🔄 App opened - triggering auto venue tracking');
+      autoTrackVenue(user.id);
+    }
+  }, [user]);
+
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -44,6 +61,7 @@ const App = () => (
               <VenueIdCardProvider>
                 <MeetUpProvider>
                   <NotificationsProvider>
+                    <AutoTracker />
                     <FriendIdCard />
                     <VenueIdCard />
                     <MeetUpConfirmation />

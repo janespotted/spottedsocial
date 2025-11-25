@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { cn } from '@/lib/utils';
 import { MessagesTab } from '@/components/messages/MessagesTab';
 import { YapTab } from '@/components/messages/YapTab';
@@ -9,6 +10,7 @@ type TabType = 'messages' | 'yap' | 'activity';
 
 export default function Messages() {
   const { openCheckIn } = useCheckIn();
+  useAutoVenueTracking(); // Trigger auto-venue tracking on messages view
   const [activeTab, setActiveTab] = useState<TabType>('messages');
 
   return (

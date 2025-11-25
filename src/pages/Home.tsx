@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send, Plus } from 'lucide-react';
@@ -45,6 +46,7 @@ export default function Home() {
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
   const demoEnabled = useDemoMode();
+  useAutoVenueTracking(); // Trigger auto-venue tracking on home view
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [hasCheckedToday, setHasCheckedToday] = useState(false);
