@@ -417,7 +417,7 @@ export default function Home() {
 
         {/* Stories Row */}
         <div className="pb-4 overflow-hidden">
-          <div className="flex gap-4 overflow-x-auto scrollbar-hide px-6 -mx-6">
+          <div className="flex gap-4 overflow-x-auto scrollbar-hide px-6">
             {/* Add Story Button */}
             <button
               onClick={() => setCreateStoryOpen(true)}
