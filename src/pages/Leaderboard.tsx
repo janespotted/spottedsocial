@@ -48,6 +48,24 @@ export default function Leaderboard() {
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
 
+  const handleVenueClick = async (venueName: string, venueId?: string | null) => {
+    if (venueId) {
+      openVenueCard(venueId);
+      return;
+    }
+
+    // If no venue_id, look it up by name
+    const { data } = await supabase
+      .from('venues')
+      .select('id')
+      .eq('name', venueName)
+      .maybeSingle();
+
+    if (data?.id) {
+      openVenueCard(data.id);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchLeaderboard();
@@ -221,10 +239,9 @@ export default function Leaderboard() {
                     </div>
                   </div>
 
-                  {/* Venue Name */}
                   <div className="flex-1 min-w-0">
                     <button
-                      onClick={() => venue.venue_id && openVenueCard(venue.venue_id)}
+                      onClick={() => handleVenueClick(venue.venue_name, venue.venue_id)}
                       className="text-lg font-semibold text-white truncate hover:text-[#d4ff00] transition-colors"
                     >
                       {venue.venue_name}
@@ -290,11 +307,10 @@ export default function Leaderboard() {
                 </div>
               </div>
 
-              {/* Venue Name */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => venue.venue_id && openVenueCard(venue.venue_id)}
+                    onClick={() => handleVenueClick(venue.venue_name, venue.venue_id)}
                     className="text-lg font-semibold text-white truncate hover:text-[#d4ff00] transition-colors"
                   >
                     {venue.venue_name}
@@ -365,7 +381,7 @@ export default function Leaderboard() {
               <div className="flex-1">
                 <p className="text-[#a855f7] text-sm font-medium mb-1">Biggest Mover</p>
                 <button
-                  onClick={() => biggestMover.venue_id && openVenueCard(biggestMover.venue_id)}
+                  onClick={() => handleVenueClick(biggestMover.venue_name, biggestMover.venue_id)}
                   className="text-2xl font-bold text-[#d4ff00] flex items-center gap-2 hover:text-[#d4ff00]/80 transition-colors"
                 >
                   {biggestMover.venue_name}
