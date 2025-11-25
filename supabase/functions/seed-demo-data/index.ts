@@ -232,23 +232,71 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('friendships').insert(demoFriendships);
       }
 
-      // 4. Create night statuses - ensure we cover at least 20 different venues
-      console.log('Creating night statuses across 20+ venues...');
+      // 4. Insert all promoted venues into venues table first
+      console.log('Inserting all 39 promoted venues...');
+      const venuesToInsert = PROMOTED_VENUES.map(v => ({
+        name: v.name,
+        lat: v.lat,
+        lng: v.lng,
+        neighborhood: 'Manhattan', // Will be derived from coordinates in production
+        type: 'nightclub',
+        is_demo: true,
+        is_promoted: true,
+      }));
+
+      const { data: insertedVenues, error: venuesError } = await supabaseAdmin
+        .from('venues')
+        .insert(venuesToInsert)
+        .select('id, name');
+
+      if (venuesError) {
+        console.error('Error inserting venues:', venuesError);
+        throw venuesError;
+      }
+
+      // Create lookup map: venue name -> venue ID
+      const venueIdMap = new Map(insertedVenues.map(v => [v.name, v.id]));
+      console.log(`Inserted ${insertedVenues.length} venues`);
+
+      // 5. Create night statuses - distribute demo users across ALL venues
+      console.log('Creating night statuses across all venues...');
       
-      // Select 20 venues to ensure good distribution
-      const activeVenues = getRandomItems(PROMOTED_VENUES, 20);
-      
-      // Distribute all demo users across these venues (1-2 users per venue)
+      // Distribute 20 demo users across all 39 venues
+      // This ensures 15-20+ venues have activity
       const nightStatuses = [];
-      for (let i = 0; i < activeVenues.length; i++) {
-        const venue = activeVenues[i];
-        const numUsersAtVenue = 1 + Math.floor(Math.random() * 3); // 1-3 users per venue
+      for (let i = 0; i < demoUserIds.length; i++) {
+        // Each user goes to 1 venue
+        const venue = PROMOTED_VENUES[i % PROMOTED_VENUES.length];
+        const venueId = venueIdMap.get(venue.name);
         
-        for (let j = 0; j < numUsersAtVenue; j++) {
-          const userIndex = (i * 3 + j) % demoUserIds.length;
+        nightStatuses.push({
+          user_id: demoUserIds[i],
+          status: 'out',
+          venue_id: venueId,
+          venue_name: venue.name,
+          lat: venue.lat,
+          lng: venue.lng,
+          expires_at: calculateExpiryTime(),
+          updated_at: getRecentTimestamp(),
+          is_demo: true,
+          is_promoted: true,
+        });
+      }
+      
+      // Add some extra users to random venues for higher energy levels
+      const extraAssignments = 10;
+      for (let i = 0; i < extraAssignments; i++) {
+        const venue = PROMOTED_VENUES[Math.floor(Math.random() * PROMOTED_VENUES.length)];
+        const venueId = venueIdMap.get(venue.name);
+        const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
+        
+        // Check if this user is already at this venue
+        const alreadyThere = nightStatuses.some(s => s.user_id === userId && s.venue_id === venueId);
+        if (!alreadyThere) {
           nightStatuses.push({
-            user_id: demoUserIds[userIndex],
+            user_id: userId,
             status: 'out',
+            venue_id: venueId,
             venue_name: venue.name,
             lat: venue.lat,
             lng: venue.lng,
@@ -262,12 +310,13 @@ Deno.serve(async (req) => {
       
       await supabaseAdmin.from('night_statuses').insert(nightStatuses);
 
-      // 5. Create check-ins matching the night statuses
+      // 6. Create check-ins matching the night statuses
       console.log('Creating check-ins...');
       const checkins = [];
       for (const status of nightStatuses) {
         checkins.push({
           user_id: status.user_id,
+          venue_id: status.venue_id,
           venue_name: status.venue_name,
           lat: status.lat,
           lng: status.lng,
@@ -279,13 +328,14 @@ Deno.serve(async (req) => {
 
       await supabaseAdmin.from('checkins').insert(checkins);
 
-      // 6. Create posts with promoted venues
+      // 7. Create posts with promoted venues
       const posts = [];
       for (let i = 0; i < 60; i++) {
         const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
         const usePromoted = Math.random() < 0.75;
         const venuePool = usePromoted ? PROMOTED_VENUES : DEMO_VENUES;
         const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
+        const venueId = venueIdMap.get(venue.name);
         const caption = DEMO_CAPTIONS[Math.floor(Math.random() * DEMO_CAPTIONS.length)];
         
         // 60% of posts have images
@@ -296,6 +346,7 @@ Deno.serve(async (req) => {
           user_id: userId,
           text: caption,
           image_url: imageUrl,
+          venue_id: venueId,
           venue_name: venue.name,
           expires_at: calculateExpiryTime(),
           created_at: getRecentTimestamp(4),
@@ -513,10 +564,12 @@ Deno.serve(async (req) => {
         
         // Update demo user's venue in night_statuses
         const venueData = PROMOTED_VENUES.find(v => v.name === config.venue) || PROMOTED_VENUES[0];
+        const venueId = venueIdMap.get(venueData.name);
         
         await supabaseAdmin.from('night_statuses').upsert({
           user_id: demoUserId,
           status: 'out',
+          venue_id: venueId,
           venue_name: venueData.name,
           lat: venueData.lat,
           lng: venueData.lng,
@@ -569,18 +622,25 @@ Deno.serve(async (req) => {
       // Delete in correct order (respecting foreign keys)
       if (postIds.length > 0) {
         await supabaseAdmin.from('post_comments').delete().in('post_id', postIds);
+        await supabaseAdmin.from('post_likes').delete().in('post_id', postIds);
       }
       if (threadIds.length > 0) {
         await supabaseAdmin.from('dm_messages').delete().in('thread_id', threadIds);
         await supabaseAdmin.from('dm_thread_members').delete().in('thread_id', threadIds);
         await supabaseAdmin.from('dm_threads').delete().in('id', threadIds);
       }
+      await supabaseAdmin.from('yap_comments').delete().eq('is_demo', true);
+      await supabaseAdmin.from('yap_votes').delete().eq('is_demo', true);
+      await supabaseAdmin.from('yap_messages').delete().eq('is_demo', true);
+      await supabaseAdmin.from('story_views').delete().eq('is_demo', true);
       await supabaseAdmin.from('stories').delete().eq('is_demo', true);
       await supabaseAdmin.from('posts').delete().eq('is_demo', true);
       await supabaseAdmin.from('checkins').delete().eq('is_demo', true);
       await supabaseAdmin.from('night_statuses').delete().eq('is_demo', true);
-      await supabaseAdmin.from('yap_messages').delete().eq('is_demo', true);
+      await supabaseAdmin.from('venues').delete().eq('is_demo', true);
       if (demoIds.length > 0) {
+        await supabaseAdmin.from('close_friends').delete().in('user_id', demoIds);
+        await supabaseAdmin.from('close_friends').delete().in('close_friend_id', demoIds);
         await supabaseAdmin.from('friendships').delete().in('user_id', demoIds);
         await supabaseAdmin.from('friendships').delete().in('friend_id', demoIds);
       }
