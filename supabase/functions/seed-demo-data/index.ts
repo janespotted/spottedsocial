@@ -1,41 +1,44 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-// Real NYC top-tier venues (scraped from top rankings)
+// Real NYC top-tier venues (scraped from top rankings) - ordered by popularity
 const PROMOTED_VENUES = [
-  { name: "Superbueno", lat: 40.7249, lng: -73.9865 },
-  { name: "Sunken Harbor Club", lat: 40.6923, lng: -73.9872 },
-  { name: "Bar Snack", lat: 40.7258, lng: -73.9874 },
-  { name: "Attaboy", lat: 40.7185, lng: -73.9885 },
-  { name: "schmuck.", lat: 40.7251, lng: -73.9863 },
-  { name: "Saint Tuesday", lat: 40.7169, lng: -73.9982 },
-  { name: "The Dead Rabbit", lat: 40.7040, lng: -74.0124 },
-  { name: "Sunn's", lat: 40.7161, lng: -73.9977 },
-  { name: "The Mulberry", lat: 40.7221, lng: -73.9951 },
-  { name: "Amber Room", lat: 40.7198, lng: -73.9891 },
-  { name: "Patent Pending", lat: 40.7234, lng: -73.9914 },
-  { name: "Double Chicken Please", lat: 40.7195, lng: -73.9921 },
-  { name: "Dante NYC", lat: 40.7310, lng: -74.0029 },
-  { name: "Ketchy Shuby", lat: 40.7231, lng: -73.9969 },
-  { name: "Gospël", lat: 40.7241, lng: -73.9977 },
-  { name: "Jean's", lat: 40.7251, lng: -73.9988 },
-  { name: "The Box", lat: 40.7216, lng: -73.9935 },
-  { name: "Paul's Casablanca", lat: 40.7235, lng: -73.9969 },
-  { name: "Paul's Cocktail Lounge", lat: 40.7171, lng: -74.0089 },
-  { name: "The Nines", lat: 40.7268, lng: -73.9945 },
-  { name: "Little Sister Lounge", lat: 40.7267, lng: -73.9857 },
-  { name: "Le Bain", lat: 40.7414, lng: -74.0078 },
-  { name: "Schimanski", lat: 40.7089, lng: -73.9332 },
-  { name: "Public Hotel Rooftop", lat: 40.7252, lng: -73.9881 },
-  { name: "Unveiled", lat: 40.7106, lng: -73.9638 },
-  { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529 },
-  { name: "House of Yes", lat: 40.7089, lng: -73.9332 },
-  { name: "Elsewhere", lat: 40.7067, lng: -73.9278 },
-  { name: "Nowadays", lat: 40.7067, lng: -73.9278 },
-  { name: "Good Room", lat: 40.7089, lng: -73.9343 },
-  { name: "TBA Brooklyn", lat: 40.7234, lng: -73.9567 },
-  { name: "PHD Rooftop", lat: 40.7614, lng: -73.9776 },
-  { name: "230 Fifth", lat: 40.7448, lng: -73.9873 },
-  { name: "The Campbell", lat: 40.7527, lng: -73.9772 },
+  // TOP 20 - Most popular venues (will be shown in leaderboard)
+  { name: "Le Bain", lat: 40.7414, lng: -74.0078, rank: 1 },
+  { name: "House of Yes", lat: 40.7089, lng: -73.9332, rank: 2 },
+  { name: "The Box", lat: 40.7216, lng: -73.9935, rank: 3 },
+  { name: "Elsewhere", lat: 40.7067, lng: -73.9278, rank: 4 },
+  { name: "TBA Brooklyn", lat: 40.7234, lng: -73.9567, rank: 5 },
+  { name: "Nowadays", lat: 40.7067, lng: -73.9278, rank: 6 },
+  { name: "Double Chicken Please", lat: 40.7195, lng: -73.9921, rank: 7 },
+  { name: "The Dead Rabbit", lat: 40.7040, lng: -74.0124, rank: 8 },
+  { name: "Dante NYC", lat: 40.7310, lng: -74.0029, rank: 9 },
+  { name: "Attaboy", lat: 40.7185, lng: -73.9885, rank: 10 },
+  { name: "PHD Rooftop", lat: 40.7614, lng: -73.9776, rank: 11 },
+  { name: "230 Fifth", lat: 40.7448, lng: -73.9873, rank: 12 },
+  { name: "Schimanski", lat: 40.7089, lng: -73.9332, rank: 13 },
+  { name: "Good Room", lat: 40.7089, lng: -73.9343, rank: 14 },
+  { name: "Superbueno", lat: 40.7249, lng: -73.9865, rank: 15 },
+  { name: "Sunken Harbor Club", lat: 40.6923, lng: -73.9872, rank: 16 },
+  { name: "schmuck.", lat: 40.7251, lng: -73.9863, rank: 17 },
+  { name: "Public Hotel Rooftop", lat: 40.7252, lng: -73.9881, rank: 18 },
+  { name: "Jean's", lat: 40.7251, lng: -73.9988, rank: 19 },
+  { name: "The Campbell", lat: 40.7527, lng: -73.9772, rank: 20 },
+  
+  // REMAINING 19 - Less popular, may not appear in demo leaderboard
+  { name: "Bar Snack", lat: 40.7258, lng: -73.9874, rank: 21 },
+  { name: "Saint Tuesday", lat: 40.7169, lng: -73.9982, rank: 22 },
+  { name: "Sunn's", lat: 40.7161, lng: -73.9977, rank: 23 },
+  { name: "The Mulberry", lat: 40.7221, lng: -73.9951, rank: 24 },
+  { name: "Amber Room", lat: 40.7198, lng: -73.9891, rank: 25 },
+  { name: "Patent Pending", lat: 40.7234, lng: -73.9914, rank: 26 },
+  { name: "Ketchy Shuby", lat: 40.7231, lng: -73.9969, rank: 27 },
+  { name: "Gospël", lat: 40.7241, lng: -73.9977, rank: 28 },
+  { name: "Paul's Casablanca", lat: 40.7235, lng: -73.9969, rank: 29 },
+  { name: "Paul's Cocktail Lounge", lat: 40.7171, lng: -74.0089, rank: 30 },
+  { name: "The Nines", lat: 40.7268, lng: -73.9945, rank: 31 },
+  { name: "Little Sister Lounge", lat: 40.7267, lng: -73.9857, rank: 32 },
+  { name: "Unveiled", lat: 40.7106, lng: -73.9638, rank: 33 },
+  { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529, rank: 34 },
 ];
 
 // Non-promoted demo venues (only for full demo mode)
@@ -174,12 +177,14 @@ Deno.serve(async (req) => {
 
     if (action === 'seed') {
       const demoUserIds: string[] = [];
+      const DEMO_USER_COUNT = 50; // Create 50 users for better venue distribution
 
       // 1. Create demo profiles
-      console.log('Creating 20 demo users...');
+      console.log('Creating 50 demo users...');
       const timestamp = Date.now();
-      for (let i = 0; i < DEMO_USERS.length; i++) {
-        const demoUser = DEMO_USERS[i];
+      for (let i = 0; i < DEMO_USER_COUNT; i++) {
+        // Cycle through the 20 base demo users, repeating as needed
+        const demoUser = DEMO_USERS[i % DEMO_USERS.length];
         const userId = crypto.randomUUID();
         demoUserIds.push(userId);
 
@@ -234,7 +239,7 @@ Deno.serve(async (req) => {
       }
 
       // 4. Insert all promoted venues into venues table first
-      console.log('Inserting all 39 promoted venues...');
+      console.log('Inserting all 34 promoted venues...');
       const venuesToInsert = PROMOTED_VENUES.map(v => ({
         name: v.name,
         lat: v.lat,
@@ -243,6 +248,7 @@ Deno.serve(async (req) => {
         type: 'nightclub',
         is_demo: true,
         is_promoted: true,
+        popularity_rank: v.rank,
       }));
 
       const { data: insertedVenues, error: venuesError } = await supabaseAdmin
@@ -259,15 +265,15 @@ Deno.serve(async (req) => {
       const venueIdMap = new Map(insertedVenues.map(v => [v.name, v.id]));
       console.log(`Inserted ${insertedVenues.length} venues`);
 
-      // 5. Create night statuses - distribute demo users across ALL venues
-      console.log('Creating night statuses across all venues...');
+      // 5. Create night statuses - popularity-based distribution
+      console.log('Creating night statuses with popularity-based distribution...');
       
-      // Distribute 20 demo users across all 39 venues
-      // This ensures 15-20+ venues have activity
       const nightStatuses = [];
-      for (let i = 0; i < demoUserIds.length; i++) {
-        // Each user goes to 1 venue
-        const venue = PROMOTED_VENUES[i % PROMOTED_VENUES.length];
+      const TOP_20_VENUES = PROMOTED_VENUES.slice(0, 20); // Top 20 by popularity_rank
+      
+      // First 20 users: assign one to each top 20 venue (ensures all top 20 have at least 1 user)
+      for (let i = 0; i < 20; i++) {
+        const venue = TOP_20_VENUES[i];
         const venueId = venueIdMap.get(venue.name);
         
         nightStatuses.push({
@@ -284,29 +290,39 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Add some extra users to random venues for higher energy levels
-      const extraAssignments = 10;
-      for (let i = 0; i < extraAssignments; i++) {
-        const venue = PROMOTED_VENUES[Math.floor(Math.random() * PROMOTED_VENUES.length)];
-        const venueId = venueIdMap.get(venue.name);
-        const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
+      // Remaining 30 users: distribute biased toward top venues
+      // Top venues (rank 1-5) get more users than mid-tier (rank 6-15) and lower (rank 16-20)
+      for (let i = 20; i < demoUserIds.length; i++) {
+        // Weighted selection: lower rank = higher probability
+        // 50% chance top 5, 35% chance rank 6-15, 15% chance rank 16-20
+        const rand = Math.random();
+        let selectedVenue;
         
-        // Check if this user is already at this venue
-        const alreadyThere = nightStatuses.some(s => s.user_id === userId && s.venue_id === venueId);
-        if (!alreadyThere) {
-          nightStatuses.push({
-            user_id: userId,
-            status: 'out',
-            venue_id: venueId,
-            venue_name: venue.name,
-            lat: venue.lat,
-            lng: venue.lng,
-            expires_at: calculateExpiryTime(),
-            updated_at: getRecentTimestamp(),
-            is_demo: true,
-            is_promoted: true,
-          });
+        if (rand < 0.5) {
+          // Top 5 venues (50% of remaining users)
+          selectedVenue = TOP_20_VENUES[Math.floor(Math.random() * 5)];
+        } else if (rand < 0.85) {
+          // Rank 6-15 venues (35% of remaining users)
+          selectedVenue = TOP_20_VENUES[5 + Math.floor(Math.random() * 10)];
+        } else {
+          // Rank 16-20 venues (15% of remaining users)
+          selectedVenue = TOP_20_VENUES[15 + Math.floor(Math.random() * 5)];
         }
+        
+        const venueId = venueIdMap.get(selectedVenue.name);
+        
+        nightStatuses.push({
+          user_id: demoUserIds[i],
+          status: 'out',
+          venue_id: venueId,
+          venue_name: selectedVenue.name,
+          lat: selectedVenue.lat,
+          lng: selectedVenue.lng,
+          expires_at: calculateExpiryTime(),
+          updated_at: getRecentTimestamp(),
+          is_demo: true,
+          is_promoted: true,
+        });
       }
       
       await supabaseAdmin.from('night_statuses').insert(nightStatuses);

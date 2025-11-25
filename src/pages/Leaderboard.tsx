@@ -73,7 +73,7 @@ export default function Leaderboard() {
   }, [user, demoEnabled, bootstrapEnabled]);
 
   const fetchLeaderboard = async () => {
-    // Build query for night statuses
+    // Build query for night statuses with venue popularity_rank
     let query = supabase
       .from('night_statuses')
       .select(`
@@ -85,7 +85,8 @@ export default function Leaderboard() {
         profiles:user_id (
           display_name,
           avatar_url
-        )
+        ),
+        venues!inner(popularity_rank)
       `)
       .not('venue_name', 'is', null)
       .not('lat', 'is', null)
@@ -107,13 +108,14 @@ export default function Leaderboard() {
 
     if (!statuses) return;
 
-    // Group by venue
-    const venueMap = new Map<string, VenueStats>();
+    // Group by venue, including popularity_rank
+    const venueMap = new Map<string, VenueStats & { popularity_rank: number }>();
     
     statuses.forEach((status: any) => {
       const venueName = status.venue_name;
       const venueId = status.venue_id;
       const isPromoted = status.is_promoted || false;
+      const popularityRank = status.venues?.popularity_rank || 999;
       
       if (!venueMap.has(venueName)) {
         venueMap.set(venueName, {
@@ -125,6 +127,7 @@ export default function Leaderboard() {
           friends: [],
           energyLevel: 0,
           isPromoted,
+          popularity_rank: popularityRank,
         });
       }
       
@@ -140,19 +143,25 @@ export default function Leaderboard() {
     // Convert to array and separate promoted from non-promoted
     const venueArray = Array.from(venueMap.values());
     
-    // Get all promoted venues and sort by count
+    // Get all promoted venues and sort by count desc, then popularity_rank asc
     const allPromotedVenues = venueArray.filter(v => v.isPromoted);
-    allPromotedVenues.sort((a, b) => b.count - a.count);
+    allPromotedVenues.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.popularity_rank - b.popularity_rank;
+    });
     
     // Get top 2 promoted venues only
     const topPromotedVenues = allPromotedVenues.slice(0, 2);
     
-    // Get all non-promoted venues and sort by count
+    // Get all non-promoted venues and sort by count desc, then popularity_rank asc
     const nonPromotedVenues = venueArray.filter(v => !v.isPromoted);
-    nonPromotedVenues.sort((a, b) => b.count - a.count);
+    nonPromotedVenues.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.popularity_rank - b.popularity_rank;
+    });
     
-    // Take top 15 non-promoted venues for ranking
-    const rankedVenues = nonPromotedVenues.slice(0, 15).map((venue, index) => ({
+    // Take top 20 non-promoted venues for ranking (user requested top 20)
+    const rankedVenues = nonPromotedVenues.slice(0, 20).map((venue, index) => ({
       ...venue,
       rank: index + 1,
       movement: Math.random() > 0.5 ? 'up' : (Math.random() > 0.5 ? 'down' : 'same') as 'up' | 'down' | 'same',
