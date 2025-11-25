@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, X, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateExpiryTime } from '@/lib/time-utils';
+import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -23,12 +24,16 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [capturingLocation, setCapturingLocation] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
+  const [showVenuePrompt, setShowVenuePrompt] = useState(false);
+  const [customVenueName, setCustomVenueName] = useState('');
 
   useEffect(() => {
     if (user && open) {
       fetchProfile();
-      fetchCurrentLocation();
+      captureLocation();
     }
   }, [user, open]);
 
@@ -42,16 +47,60 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
     setProfile(data);
   };
 
-  const fetchCurrentLocation = async () => {
-    // Check if user has an active "out" status with a location
-    const { data } = await supabase
-      .from('night_statuses')
-      .select('venue_name, status')
-      .eq('user_id', user?.id)
-      .single();
+  const captureLocation = async () => {
+    setCapturingLocation(true);
+    try {
+      const locData = await captureLocationWithVenue();
+      setLocationData(locData);
+      
+      if (locData.venueName) {
+        // Found a venue
+        setLocation(locData.venueName);
+      } else {
+        // No venue found - prompt user to create one
+        setShowVenuePrompt(true);
+      }
+    } catch (error) {
+      console.error('Error capturing location:', error);
+      toast.error('Could not get location. Please enter venue manually.');
+    } finally {
+      setCapturingLocation(false);
+    }
+  };
 
-    if (data && data.status === 'out' && data.venue_name) {
-      setLocation(data.venue_name);
+  const handleCreateVenue = async () => {
+    if (!customVenueName.trim() || !locationData) {
+      toast.error('Please enter a venue name');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const venueId = await createNewVenue(
+        customVenueName.trim(),
+        locationData.lat,
+        locationData.lng,
+        'Unknown', // User can't specify neighborhood in this flow
+        'bar' // Default type
+      );
+
+      if (venueId) {
+        setLocationData({
+          ...locationData,
+          venueId,
+          venueName: customVenueName.trim(),
+        });
+        setLocation(customVenueName.trim());
+        setShowVenuePrompt(false);
+        toast.success('Venue created!');
+      } else {
+        toast.error('Failed to create venue');
+      }
+    } catch (error) {
+      console.error('Error creating venue:', error);
+      toast.error('Failed to create venue');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -120,12 +169,13 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         }
       }
 
-      // Create post
+      // Create post with location data
       const { error } = await supabase.from('posts').insert({
         user_id: user.id,
         text: caption,
         image_url: imageUrl,
-        venue_name: location || null,
+        venue_name: locationData?.venueName || location || null,
+        venue_id: locationData?.venueId || null,
         expires_at: calculateExpiryTime(),
       });
 
@@ -221,12 +271,43 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
               <MapPin className="h-4 w-4" />
               Location
             </Label>
-            <Input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Where are you?"
-              className="bg-[#0a0118] border-[#a855f7]/40 text-white placeholder:text-white/40"
-            />
+            {capturingLocation ? (
+              <div className="text-sm text-white/60 italic">Detecting location...</div>
+            ) : showVenuePrompt ? (
+              <div className="space-y-2">
+                <p className="text-sm text-white/60">No venue found nearby. Add a new one?</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={customVenueName}
+                    onChange={(e) => setCustomVenueName(e.target.value)}
+                    placeholder="Enter venue name"
+                    className="bg-[#0a0118] border-[#a855f7]/40 text-white placeholder:text-white/40 flex-1"
+                  />
+                  <Button
+                    onClick={handleCreateVenue}
+                    disabled={loading}
+                    className="bg-[#a855f7] hover:bg-[#a855f7]/90"
+                  >
+                    Add
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowVenuePrompt(false)}
+                  className="text-white/60 hover:text-white"
+                >
+                  Skip
+                </Button>
+              </div>
+            ) : (
+              <Input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Where are you?"
+                className="bg-[#0a0118] border-[#a855f7]/40 text-white placeholder:text-white/40"
+              />
+            )}
           </div>
 
           {/* Actions */}

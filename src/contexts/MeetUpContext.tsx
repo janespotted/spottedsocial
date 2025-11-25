@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { getDemoMode } from '@/lib/demo-data';
+import { captureLocationWithVenue } from '@/lib/location-service';
 
 interface MeetUpContextType {
   recipientUserId: string | null;
@@ -45,6 +46,25 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      // Capture fresh GPS coordinates at the moment of sending meet up
+      let locationData = null;
+      try {
+        locationData = await captureLocationWithVenue();
+        console.log('Captured location for meet up:', locationData);
+        
+        // Update sender's profile with fresh location
+        await supabase
+          .from('profiles')
+          .update({
+            last_known_lat: locationData.lat,
+            last_known_lng: locationData.lng,
+            last_location_at: locationData.timestamp,
+          })
+          .eq('id', user.id);
+      } catch (locError) {
+        console.warn('Could not capture location for meet up, continuing anyway:', locError);
+      }
+
       const demoMode = getDemoMode();
       
       // In demo mode, skip database operations and just show confirmation
