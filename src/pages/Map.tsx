@@ -467,7 +467,7 @@ export default function Map() {
     // Add markers for each venue
     venues.forEach((venue, index) => {
       const isTopHot = index < 3 && venue.heatScore > 0;
-      const size = venue.heatScore > 0 ? Math.min(50 + venue.heatScore * 5, 80) : 40;
+      const size = 50; // All pins same size
       const opacity = venue.heatScore > 0 ? 1 : 0.5;
 
       const el = document.createElement('div');
