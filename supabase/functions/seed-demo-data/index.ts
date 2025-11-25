@@ -177,6 +177,7 @@ Deno.serve(async (req) => {
 
       // 1. Create demo profiles
       console.log('Creating 20 demo users...');
+      const timestamp = Date.now();
       for (let i = 0; i < DEMO_USERS.length; i++) {
         const demoUser = DEMO_USERS[i];
         const userId = crypto.randomUUID();
@@ -185,7 +186,7 @@ Deno.serve(async (req) => {
         const { error } = await supabaseAdmin.from('profiles').insert({
           id: userId,
           display_name: demoUser.display_name,
-          username: `${demoUser.username}_${i}`,
+          username: `${demoUser.username}_${timestamp}_${i}`,
           avatar_url: demoUser.avatar_url,
           bio: demoUser.bio,
           is_demo: true,
@@ -239,7 +240,7 @@ Deno.serve(async (req) => {
         lat: v.lat,
         lng: v.lng,
         neighborhood: 'Manhattan', // Will be derived from coordinates in production
-        type: 'nightclub',
+        type: 'club',
         is_demo: true,
         is_promoted: true,
       }));
