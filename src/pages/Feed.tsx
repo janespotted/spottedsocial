@@ -511,8 +511,8 @@ export default function Feed() {
         </div>
 
         {/* Stories Row */}
-        <div className="px-6 py-4">
-          <div className="flex gap-4 overflow-x-auto scrollbar-hide">
+        <div className="py-4 overflow-hidden">
+          <div className="flex gap-4 overflow-x-auto scrollbar-hide px-6 -mx-6">
             {/* Add Story Button - User's Avatar */}
             <button
               onClick={() => setCreateStoryOpen(true)}
