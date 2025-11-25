@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
@@ -11,6 +12,7 @@ import { ChevronUp, ChevronDown, BarChart3, Clock, DollarSign } from 'lucide-rea
 
 interface VenueStats {
   venue_name: string;
+  venue_id: string | null;
   count: number;
   rank: number;
   movement: 'up' | 'down' | 'same';
@@ -25,6 +27,7 @@ interface VenueStats {
 
 interface BiggestMover {
   venue_name: string;
+  venue_id: string | null;
   friends: {
     user_id: string;
     display_name: string;
@@ -38,6 +41,7 @@ export default function Leaderboard() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
+  const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
   const bootstrapEnabled = useBootstrapMode();
   useAutoVenueTracking(); // Trigger auto-venue tracking on leaderboard view
@@ -56,6 +60,7 @@ export default function Leaderboard() {
       .from('night_statuses')
       .select(`
         venue_name,
+        venue_id,
         user_id,
         updated_at,
         is_promoted,
@@ -89,11 +94,13 @@ export default function Leaderboard() {
     
     statuses.forEach((status: any) => {
       const venueName = status.venue_name;
+      const venueId = status.venue_id;
       const isPromoted = status.is_promoted || false;
       
       if (!venueMap.has(venueName)) {
         venueMap.set(venueName, {
           venue_name: venueName,
+          venue_id: venueId,
           count: 0,
           rank: 0,
           movement: 'same',
@@ -152,6 +159,7 @@ export default function Leaderboard() {
       const moverVenue = nonPromotedVenues[Math.floor(Math.random() * Math.min(5, nonPromotedVenues.length))];
       setBiggestMover({
         venue_name: moverVenue.venue_name,
+        venue_id: moverVenue.venue_id,
         friends: moverVenue.friends.slice(0, 3),
         timeAgo: '10m',
         coverCharge: 20,
@@ -215,9 +223,12 @@ export default function Leaderboard() {
 
                   {/* Venue Name */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-white truncate">
+                    <button
+                      onClick={() => venue.venue_id && openVenueCard(venue.venue_id)}
+                      className="text-lg font-semibold text-white truncate hover:text-[#d4ff00] transition-colors"
+                    >
                       {venue.venue_name}
-                    </h3>
+                    </button>
                   </div>
 
                   {/* Energy Bars */}
@@ -282,9 +293,12 @@ export default function Leaderboard() {
               {/* Venue Name */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold text-white truncate">
+                  <button
+                    onClick={() => venue.venue_id && openVenueCard(venue.venue_id)}
+                    className="text-lg font-semibold text-white truncate hover:text-[#d4ff00] transition-colors"
+                  >
                     {venue.venue_name}
-                  </h3>
+                  </button>
                   {venue.movement !== 'same' && (
                     <div>
                       {venue.movement === 'up' ? (
@@ -350,10 +364,13 @@ export default function Leaderboard() {
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-[#a855f7] text-sm font-medium mb-1">Biggest Mover</p>
-                <h3 className="text-2xl font-bold text-[#d4ff00] flex items-center gap-2">
+                <button
+                  onClick={() => biggestMover.venue_id && openVenueCard(biggestMover.venue_id)}
+                  className="text-2xl font-bold text-[#d4ff00] flex items-center gap-2 hover:text-[#d4ff00]/80 transition-colors"
+                >
                   {biggestMover.venue_name}
                   <BarChart3 className="h-5 w-5" />
-                </h3>
+                </button>
                 <div className="flex items-center gap-4 mt-2">
                   <div className="flex items-center gap-1 text-white/80 text-sm">
                     <Clock className="h-4 w-4" />
