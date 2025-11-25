@@ -39,6 +39,24 @@ export default function Thread() {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const handleVenueClick = async (venueName: string, venueId?: string | null) => {
+    if (venueId) {
+      openVenueCard(venueId);
+      return;
+    }
+
+    // If no venue_id, look it up by name
+    const { data } = await supabase
+      .from('venues')
+      .select('id')
+      .eq('name', venueName)
+      .maybeSingle();
+
+    if (data?.id) {
+      openVenueCard(data.id);
+    }
+  };
+
   useEffect(() => {
     if (threadId && user) {
       fetchThreadData();
@@ -201,21 +219,15 @@ export default function Thread() {
               <p className="text-white/60 text-sm truncate">{otherMember?.username}</p>
             </div>
             {otherMember?.venue_name && (
-              otherMember.venue_id ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openVenueCard(otherMember.venue_id!);
-                  }}
-                  className="text-[#d4ff00] text-sm font-medium hover:text-[#d4ff00]/80 transition-colors"
-                >
-                  @{otherMember.venue_name}
-                </button>
-              ) : (
-                <div className="text-[#d4ff00] text-sm font-medium">
-                  @{otherMember.venue_name}
-                </div>
-              )
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleVenueClick(otherMember.venue_name!, otherMember.venue_id);
+                }}
+                className="text-[#d4ff00] text-sm font-medium hover:text-[#d4ff00]/80 transition-colors"
+              >
+                @{otherMember.venue_name}
+              </button>
             )}
           </button>
 

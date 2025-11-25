@@ -63,6 +63,24 @@ export default function Feed() {
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
+
+  const handleVenueClick = async (venueName: string, venueId?: string | null) => {
+    if (venueId) {
+      openVenueCard(venueId);
+      return;
+    }
+
+    // If no venue_id, look it up by name
+    const { data } = await supabase
+      .from('venues')
+      .select('id')
+      .eq('name', venueName)
+      .maybeSingle();
+
+    if (data?.id) {
+      openVenueCard(data.id);
+    }
+  };
   const demoEnabled = useDemoMode();
   useAutoVenueTracking(); // Trigger auto-venue tracking on feed view
   const [posts, setPosts] = useState<Post[]>([]);
@@ -598,21 +616,15 @@ export default function Feed() {
                       {post.profiles?.display_name}
                     </button>
                     {post.venue_name && (
-                      post.venue_id ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openVenueCard(post.venue_id);
-                          }}
-                          className="text-[#d4ff00] font-medium text-sm hover:text-[#d4ff00]/80 transition-colors block"
-                        >
-                          @{post.venue_name}
-                        </button>
-                      ) : (
-                        <span className="text-[#d4ff00] font-medium text-sm block">
-                          @{post.venue_name}
-                        </span>
-                      )
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleVenueClick(post.venue_name!, post.venue_id);
+                        }}
+                        className="text-[#d4ff00] font-medium text-sm hover:text-[#d4ff00]/80 transition-colors block"
+                      >
+                        @{post.venue_name}
+                      </button>
                     )}
                   </div>
                 </div>
