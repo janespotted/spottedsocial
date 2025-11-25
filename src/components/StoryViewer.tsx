@@ -197,7 +197,7 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
   const currentStory = stories[currentStoryIndex];
 
   return (
-    <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full bg-black z-50 flex items-center justify-center overflow-hidden">
+    <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full bg-black z-[60] flex items-center justify-center overflow-hidden">
       {/* Progress bars */}
       <div className="absolute top-4 left-0 right-0 flex gap-1 px-4 z-10 max-w-full">
         {stories.map((_, idx) => (
