@@ -328,10 +328,16 @@ export default function Feed() {
 
   const getTimeAgo = (date: string) => {
     const distance = formatDistanceToNow(new Date(date), { addSuffix: false });
-    // Simplify to just show "15m", "2h", etc.
-    return distance.replace('about ', '').replace(' minutes', 'm').replace(' minute', 'm')
-      .replace(' hours', 'h').replace(' hour', 'h')
-      .replace(' days', 'd').replace(' day', 'd');
+    // Simplify to just show "1m", "15m", "2h", etc.
+    return distance
+      .replace(/less than a minute|a few seconds/i, '1m')
+      .replace('about ', '')
+      .replace(' minutes', 'm')
+      .replace(' minute', 'm')
+      .replace(' hours', 'h')
+      .replace(' hour', 'h')
+      .replace(' days', 'd')
+      .replace(' day', 'd');
   };
 
   const fetchComments = async (postId: string) => {
