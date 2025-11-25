@@ -48,85 +48,38 @@ export function MeetUpConfirmation() {
     }
   }, [showConfirmation]);
 
-  const handleOpenChat = async (e: React.MouseEvent) => {
+  const handleOpenChat = (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (!user || !recipientUserId) {
-      console.error('❌ Missing user or recipientUserId:', { user: user?.id, recipientUserId });
+    if (!recipientUserId || !recipientDisplayName) {
+      console.error('❌ Missing recipient info');
       return;
     }
 
-    try {
-      // Find existing 1-on-1 thread between current user and recipient
-      const { data: myThreads, error: fetchError } = await supabase
-        .from('dm_thread_members')
-        .select('thread_id')
-        .eq('user_id', user.id);
-
-      if (fetchError) throw fetchError;
-
-      let threadId: string | null = null;
-
-      // Check if any thread is a 1-on-1 with recipient
-      if (myThreads && myThreads.length > 0) {
-        for (const thread of myThreads) {
-          const { data: members } = await supabase
-            .from('dm_thread_members')
-            .select('user_id')
-            .eq('thread_id', thread.thread_id);
-
-          if (members?.length === 2 && members.some(m => m.user_id === recipientUserId)) {
-            threadId = thread.thread_id;
-            break;
-          }
+    closeConfirmation();
+    navigate('/messages', { 
+      state: { 
+        preselectedUser: {
+          id: recipientUserId,
+          display_name: recipientDisplayName,
+          avatar_url: recipientAvatarUrl
         }
-      }
-
-      // Create new thread if none exists
-      if (!threadId) {
-        const { data: newThread, error: createError } = await supabase
-          .from('dm_threads')
-          .insert({})
-          .select()
-          .single();
-
-        if (createError) throw createError;
-
-        if (newThread) {
-          const { error: membersError } = await supabase
-            .from('dm_thread_members')
-            .insert([
-              { thread_id: newThread.id, user_id: user.id },
-              { thread_id: newThread.id, user_id: recipientUserId },
-            ]);
-
-          if (membersError) throw membersError;
-          
-          threadId = newThread.id;
-        }
-      }
-
-      if (threadId) {
-        closeConfirmation();
-        navigate(`/messages/${threadId}`);
-      }
-    } catch (error) {
-      console.error('❌ Error opening chat:', error);
-    }
+      } 
+    });
   };
 
   const handleUndo = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent backdrop click
-    console.log('↩️ Undo button clicked - cancelling meet up for:', recipientDisplayName);
+    e.stopPropagation();
     
     if (!user || !recipientUserId) {
       closeConfirmation();
+      navigate(-1);
       return;
     }
 
     try {
       // Delete the most recent unread meetup notification to this recipient
-      const { error } = await supabase
+      await supabase
         .from('notifications')
         .delete()
         .eq('sender_id', user.id)
@@ -135,18 +88,12 @@ export function MeetUpConfirmation() {
         .eq('is_read', false)
         .order('created_at', { ascending: false })
         .limit(1);
-
-      if (error) {
-        console.error('Error deleting notification:', error);
-      } else {
-        console.log('✅ Meet Up notification deleted successfully');
-      }
     } catch (error) {
-      console.error('Error in handleUndo:', error);
+      console.error('Error canceling Meet Up:', error);
     }
 
     closeConfirmation();
-    navigate(-1); // Return to previous screen
+    navigate(-1);
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {

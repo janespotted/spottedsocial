@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { cn } from '@/lib/utils';
@@ -8,10 +9,26 @@ import { ActivityTab } from '@/components/messages/ActivityTab';
 
 type TabType = 'messages' | 'yap' | 'activity';
 
+interface PreselectedUser {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 export default function Messages() {
   const { openCheckIn } = useCheckIn();
   useAutoVenueTracking(); // Trigger auto-venue tracking on messages view
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<TabType>('messages');
+  const [preselectedUser, setPreselectedUser] = useState<PreselectedUser | null>(null);
+
+  useEffect(() => {
+    // Check if we have a preselected user from navigation state
+    if (location.state?.preselectedUser) {
+      setPreselectedUser(location.state.preselectedUser);
+      setActiveTab('messages');
+    }
+  }, [location.state]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
@@ -79,7 +96,12 @@ export default function Messages() {
 
       {/* Tab Content */}
       <div className="px-4 py-6">
-        {activeTab === 'messages' && <MessagesTab />}
+        {activeTab === 'messages' && (
+          <MessagesTab 
+            preselectedUser={preselectedUser}
+            onClearPreselection={() => setPreselectedUser(null)}
+          />
+        )}
         {activeTab === 'yap' && <YapTab />}
         {activeTab === 'activity' && <ActivityTab />}
       </div>
