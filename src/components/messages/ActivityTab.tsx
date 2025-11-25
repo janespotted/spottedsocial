@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useMeetUp } from '@/contexts/MeetUpContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ interface Activity {
   timestamp: string;
   avatar_url?: string | null;
   user_id?: string;
+  display_name?: string;
   action?: 'meet_up' | 'view' | 'accept_decline' | 'message';
 }
 
@@ -23,6 +25,7 @@ export function ActivityTab() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { openFriendCard } = useFriendIdCard();
+  const { sendMeetUpNotification } = useMeetUp();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
 
@@ -80,6 +83,7 @@ export function ActivityTab() {
             timestamp: checkIn.created_at,
             avatar_url: checkIn.profiles?.avatar_url,
             user_id: checkIn.user_id,
+            display_name: checkIn.profiles?.display_name,
             action: 'meet_up',
           });
         });
@@ -116,6 +120,16 @@ export function ActivityTab() {
       default:
         return null;
     }
+  };
+
+  const handleMeetUp = async (activity: Activity) => {
+    if (!activity.user_id || !activity.display_name) return;
+    
+    await sendMeetUpNotification(
+      activity.user_id,
+      activity.display_name,
+      activity.avatar_url || null
+    );
   };
 
   return (
@@ -193,6 +207,7 @@ export function ActivityTab() {
               {/* Action */}
               {activity.action === 'meet_up' && (
                 <Button
+                  onClick={() => handleMeetUp(activity)}
                   variant="outline"
                   className="border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 hover:text-[#d4ff00] rounded-full px-4 py-1"
                 >
