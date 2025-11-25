@@ -232,49 +232,49 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('friendships').insert(demoFriendships);
       }
 
-      // 4. Create night statuses with promoted venues
-      const numActiveUsers = 12 + Math.floor(Math.random() * 5);  // More users for promoted venues
-      const activeUsers = getRandomItems(demoUserIds, numActiveUsers);
-
-      for (const userId of activeUsers) {
-        // 75% chance to use promoted venue, 25% regular demo venue
-        const usePromoted = Math.random() < 0.75;
-        const venue = usePromoted 
-          ? PROMOTED_VENUES[Math.floor(Math.random() * PROMOTED_VENUES.length)]
-          : DEMO_VENUES[Math.floor(Math.random() * DEMO_VENUES.length)];
-          
-        await supabaseAdmin.from('night_statuses').insert({
-          user_id: userId,
-          status: 'out',
-          venue_name: venue.name,
-          lat: venue.lat,
-          lng: venue.lng,
-          expires_at: calculateExpiryTime(),
-          updated_at: getRecentTimestamp(),
-          is_demo: true,
-          is_promoted: usePromoted,
-        });
-      }
-
-      // 5. Create check-ins with promoted venues
-      const checkins = [];
-      for (const userId of activeUsers) {
-        const numCheckins = 2 + Math.floor(Math.random() * 3);
-        const usePromoted = Math.random() < 0.75;
-        const venuePool = usePromoted ? PROMOTED_VENUES : DEMO_VENUES;
-        const venues = getRandomItems(venuePool, numCheckins);
-
-        for (const venue of venues) {
-          checkins.push({
-            user_id: userId,
+      // 4. Create night statuses - ensure we cover at least 20 different venues
+      console.log('Creating night statuses across 20+ venues...');
+      
+      // Select 20 venues to ensure good distribution
+      const activeVenues = getRandomItems(PROMOTED_VENUES, 20);
+      
+      // Distribute all demo users across these venues (1-2 users per venue)
+      const nightStatuses = [];
+      for (let i = 0; i < activeVenues.length; i++) {
+        const venue = activeVenues[i];
+        const numUsersAtVenue = 1 + Math.floor(Math.random() * 3); // 1-3 users per venue
+        
+        for (let j = 0; j < numUsersAtVenue; j++) {
+          const userIndex = (i * 3 + j) % demoUserIds.length;
+          nightStatuses.push({
+            user_id: demoUserIds[userIndex],
+            status: 'out',
             venue_name: venue.name,
             lat: venue.lat,
             lng: venue.lng,
-            created_at: getRecentTimestamp(),
+            expires_at: calculateExpiryTime(),
+            updated_at: getRecentTimestamp(),
             is_demo: true,
-            is_promoted: usePromoted,
+            is_promoted: true,
           });
         }
+      }
+      
+      await supabaseAdmin.from('night_statuses').insert(nightStatuses);
+
+      // 5. Create check-ins matching the night statuses
+      console.log('Creating check-ins...');
+      const checkins = [];
+      for (const status of nightStatuses) {
+        checkins.push({
+          user_id: status.user_id,
+          venue_name: status.venue_name,
+          lat: status.lat,
+          lng: status.lng,
+          created_at: getRecentTimestamp(),
+          is_demo: true,
+          is_promoted: true,
+        });
       }
 
       await supabaseAdmin.from('checkins').insert(checkins);
@@ -523,7 +523,7 @@ Deno.serve(async (req) => {
             yaps: yapMessages.length,
             threads: threadCount,
             venues: PROMOTED_VENUES.length + DEMO_VENUES.length,
-            activeUsers: activeUsers.length,
+            activeUsers: nightStatuses.length,
           }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
