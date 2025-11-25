@@ -23,7 +23,18 @@ interface Thread {
   unread_count: number;
 }
 
-export function MessagesTab() {
+interface PreselectedUser {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+interface MessagesTabProps {
+  preselectedUser?: PreselectedUser | null;
+  onClearPreselection?: () => void;
+}
+
+export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTabProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { openFriendCard } = useFriendIdCard();
@@ -36,6 +47,13 @@ export function MessagesTab() {
       fetchThreads();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Auto-open dialog if we have a preselected user
+    if (preselectedUser) {
+      setShowNewChat(true);
+    }
+  }, [preselectedUser]);
 
   const fetchThreads = async () => {
     // Get user's thread memberships
@@ -123,7 +141,16 @@ export function MessagesTab() {
       </div>
 
       {/* New Chat Dialog */}
-      <NewChatDialog open={showNewChat} onOpenChange={setShowNewChat} />
+      <NewChatDialog 
+        open={showNewChat} 
+        onOpenChange={(open) => {
+          setShowNewChat(open);
+          if (!open && onClearPreselection) {
+            onClearPreselection();
+          }
+        }}
+        preselectedUser={preselectedUser}
+      />
 
       {/* Messages List */}
       <div className="space-y-3">

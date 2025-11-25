@@ -15,12 +15,19 @@ interface Friend {
   venue_name: string | null;
 }
 
+interface PreselectedUser {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 interface NewChatDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  preselectedUser?: PreselectedUser | null;
 }
 
-export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
+export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDialogProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -31,6 +38,13 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
       fetchFriends();
     }
   }, [open, user]);
+
+  useEffect(() => {
+    // If we have a preselected user, automatically create thread
+    if (open && preselectedUser && user) {
+      createThread(preselectedUser.id);
+    }
+  }, [open, preselectedUser, user]);
 
   const fetchFriends = async () => {
     // Get accepted friendships
