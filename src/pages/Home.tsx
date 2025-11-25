@@ -17,6 +17,7 @@ interface Post {
   image_url: string | null;
   venue_name: string | null;
   created_at: string;
+  likes_count: number;
   profiles: {
     display_name: string;
     username: string;
@@ -49,6 +50,7 @@ export default function Home() {
   const [storyUsers, setStoryUsers] = useState<StoryUser[]>([]);
   const [selectedStoryUser, setSelectedStoryUser] = useState<string | null>(null);
   const [createStoryOpen, setCreateStoryOpen] = useState(false);
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -58,6 +60,7 @@ export default function Home() {
       fetchStories();
       subscribeToNewPosts();
       subscribeToNewStories();
+      subscribeToLikes();
     }
   }, [user, demoEnabled]);
 
@@ -142,6 +145,18 @@ export default function Home() {
     const { data } = await query;
 
     setPosts(data || []);
+    
+    // Fetch user's likes for these posts
+    if (data && data.length > 0) {
+      const postIds = data.map(p => p.id);
+      const { data: likes } = await supabase
+        .from('post_likes')
+        .select('post_id')
+        .eq('user_id', user?.id)
+        .in('post_id', postIds);
+      
+      setLikedPosts(new Set(likes?.map(l => l.post_id) || []));
+    }
   };
 
   const fetchStories = async () => {
@@ -281,11 +296,73 @@ export default function Home() {
     };
   };
 
+  const subscribeToLikes = () => {
+    const channel = supabase
+      .channel('likes_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'post_likes',
+        },
+        () => {
+          fetchPosts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
   const getTimeAgo = (date: string) => {
     const distance = formatDistanceToNow(new Date(date), { addSuffix: false });
     return distance.replace('about ', '').replace(' minutes', 'm').replace(' minute', 'm')
       .replace(' hours', 'h').replace(' hour', 'h')
       .replace(' days', 'd').replace(' day', 'd');
+  };
+
+  const handleLikePost = async (postId: string) => {
+    if (!user) return;
+
+    const isLiked = likedPosts.has(postId);
+
+    if (isLiked) {
+      // Unlike
+      const { error } = await supabase
+        .from('post_likes')
+        .delete()
+        .eq('post_id', postId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error unliking post:', error);
+        return;
+      }
+
+      setLikedPosts(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(postId);
+        return newSet;
+      });
+    } else {
+      // Like
+      const { error } = await supabase
+        .from('post_likes')
+        .insert({
+          post_id: postId,
+          user_id: user.id,
+        });
+
+      if (error) {
+        console.error('Error liking post:', error);
+        return;
+      }
+
+      setLikedPosts(prev => new Set(prev).add(postId));
+    }
   };
 
   return (
@@ -405,9 +482,19 @@ export default function Home() {
               {/* Post Actions */}
               <div className="p-4 space-y-3">
                 <div className="flex items-center gap-4">
-                  <button className="flex items-center gap-2 text-white hover:text-[#d4ff00] transition-colors">
-                    <Heart className="h-6 w-6" />
-                    <span className="font-semibold">5</span>
+                  <button 
+                    onClick={() => handleLikePost(post.id)}
+                    className={`flex items-center gap-2 transition-colors ${
+                      likedPosts.has(post.id) 
+                        ? 'text-[#d4ff00]' 
+                        : 'text-white hover:text-[#d4ff00]'
+                    }`}
+                  >
+                    <Heart 
+                      className="h-6 w-6" 
+                      fill={likedPosts.has(post.id) ? 'currentColor' : 'none'}
+                    />
+                    <span className="font-semibold">{post.likes_count || 0}</span>
                   </button>
                   <button className="flex items-center gap-2 text-white hover:text-[#d4ff00] transition-colors">
                     <MessageCircle className="h-6 w-6" />
