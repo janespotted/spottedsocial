@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Ghost, MapPin, Edit3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
 
 interface CheckInModalProps {
   open: boolean;
@@ -26,7 +27,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [detectedVenue, setDetectedVenue] = useState<string>('');
   const [customVenue, setCustomVenue] = useState<string>('');
   const [isEditingVenue, setIsEditingVenue] = useState(false);
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
   const locationIntervalRef = useRef<number | null>(null);
 
   // Load current location sharing level from profile
@@ -115,49 +116,34 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     return tomorrow.toISOString();
   };
 
-  // Calculate distance between two points using Haversine formula
-  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lng2 - lng1) * Math.PI / 180;
-
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c; // Distance in meters
-  };
-
-  // Find nearest venue from database within 150 meters
-  const findNearestVenue = async (lat: number, lng: number): Promise<string | null> => {
+  // Capture location and derive venue using location service
+  const captureAndDeriveVenue = async () => {
+    setIsDetectingLocation(true);
     try {
-      const { data: venues, error } = await supabase
-        .from('venues')
-        .select('name, lat, lng');
-
-      if (error) throw error;
-      if (!venues || venues.length === 0) return null;
-
-      // Find venue within 150m radius
-      let nearestVenue: { name: string; distance: number } | null = null;
+      const locData = await captureLocationWithVenue();
+      setLocationData(locData);
       
-      for (const venue of venues) {
-        const distance = calculateDistance(lat, lng, venue.lat, venue.lng);
-        
-        if (distance <= 150) { // Within 150 meters
-          if (!nearestVenue || distance < nearestVenue.distance) {
-            nearestVenue = { name: venue.name, distance };
-          }
-        }
+      if (locData.venueName && locData.venueId) {
+        // Found a venue
+        setDetectedVenue(locData.venueName);
+        setCustomVenue(locData.venueName);
+        setShowVenueConfirm(true);
+      } else {
+        // No venue found - prompt for manual entry
+        setDetectedVenue('');
+        setCustomVenue('');
+        setIsEditingVenue(true);
+        setShowVenueConfirm(true);
       }
-
-      return nearestVenue?.name || null;
     } catch (error) {
-      console.error('Error finding nearest venue:', error);
-      return null;
+      console.error('Error capturing location:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Location error',
+        description: 'Could not get your location. Please try again.',
+      });
+    } finally {
+      setIsDetectingLocation(false);
     }
   };
 
@@ -167,43 +153,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if (status === 'out') {
       setShowShareModal(true);
     } else if (status === 'heading_out') {
-      setIsDetectingLocation(true);
-      
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            setCurrentLocation({ lat, lng });
-            
-            // Try to find nearest venue
-            const nearestVenue = await findNearestVenue(lat, lng);
-            
-            if (nearestVenue) {
-              // Found a venue nearby - show confirmation
-              setDetectedVenue(nearestVenue);
-              setCustomVenue(nearestVenue);
-              setShowVenueConfirm(true);
-              setIsDetectingLocation(false);
-            } else {
-              // No venue found - prompt for manual entry
-              setDetectedVenue('');
-              setCustomVenue('');
-              setIsEditingVenue(true);
-              setShowVenueConfirm(true);
-              setIsDetectingLocation(false);
-            }
-          },
-          (error) => {
-            setIsDetectingLocation(false);
-            toast({
-              variant: 'destructive',
-              title: 'Location access denied',
-              description: 'Please enable location services to use this feature.',
-            });
-          }
-        );
-      }
+      await captureAndDeriveVenue();
     } else {
       await stopLocationTracking();
       await updateStatus(status, null, null, null);
@@ -216,44 +166,50 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     setIsDetectingLocation(true);
 
     if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          setCurrentLocation({ lat, lng });
-          
-          // Try to find nearest venue
-          const nearestVenue = await findNearestVenue(lat, lng);
-          
-          if (nearestVenue) {
-            // Found a venue nearby - show confirmation
-            setDetectedVenue(nearestVenue);
-            setCustomVenue(nearestVenue);
-            setShowVenueConfirm(true);
-            setIsDetectingLocation(false);
-          } else {
-            // No venue found - prompt for manual entry
-            setDetectedVenue('');
-            setCustomVenue('');
-            setIsEditingVenue(true);
-            setShowVenueConfirm(true);
-            setIsDetectingLocation(false);
-          }
-        },
-        (error) => {
-          setIsDetectingLocation(false);
-          toast({
-            variant: 'destructive',
-            title: 'Turn on location to share where you are',
-            description: 'Location permission is required to share your location.',
-          });
-        }
-      );
+      captureAndDeriveVenue().catch((error) => {
+        setIsDetectingLocation(false);
+        toast({
+          variant: 'destructive',
+          title: 'Turn on location to share where you are',
+          description: 'Location permission is required to share your location.',
+        });
+      });
     }
   };
 
   const handleVenueConfirm = async () => {
-    if (!currentLocation || !customVenue.trim()) {
+    if (!locationData) {
+      toast({
+        variant: 'destructive',
+        title: 'Location data missing',
+        description: 'Please try capturing location again',
+      });
+      return;
+    }
+
+    let finalVenueId = locationData.venueId;
+    let finalVenueName = customVenue.trim() || locationData.venueName;
+
+    // If user entered custom venue and no venue ID, create new venue
+    if (!finalVenueId && customVenue.trim()) {
+      const newVenueId = await createNewVenue(
+        customVenue.trim(),
+        locationData.lat,
+        locationData.lng,
+        'Unknown',
+        'bar'
+      );
+      
+      if (newVenueId) {
+        finalVenueId = newVenueId;
+        toast({
+          title: 'Venue created',
+          description: `${customVenue.trim()} has been added!`,
+        });
+      }
+    }
+
+    if (!finalVenueName) {
       toast({
         variant: 'destructive',
         title: 'Venue required',
@@ -263,9 +219,6 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     }
 
     setShowVenueConfirm(false);
-    
-    const { lat, lng } = currentLocation;
-    const venueName = customVenue.trim();
 
     if (selectedStatus === 'out') {
       // Save all location data to profile
@@ -275,21 +228,21 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           .update({ 
             is_out: true,
             location_sharing_level: shareOption,
-            last_known_lat: lat,
-            last_known_lng: lng,
-            last_location_at: new Date().toISOString()
+            last_known_lat: locationData.lat,
+            last_known_lng: locationData.lng,
+            last_location_at: locationData.timestamp
           })
           .eq('id', user?.id);
 
         // Start tracking location updates
-        startLocationTracking(lat, lng);
+        startLocationTracking(locationData.lat, locationData.lng);
 
-        await updateStatus('out', lat, lng, venueName);
+        await updateStatus('out', locationData.lat, locationData.lng, finalVenueName, finalVenueId);
         onOpenChange(false);
 
         toast({
           title: 'Location sharing enabled',
-          description: `You're out at ${venueName}!`,
+          description: `You're out at ${finalVenueName}!`,
         });
       } catch (error) {
         console.error('Error updating location sharing:', error);
@@ -300,7 +253,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         });
       }
     } else if (selectedStatus === 'heading_out') {
-      await updateStatus('heading_out', lat, lng, venueName);
+      await updateStatus('heading_out', locationData.lat, locationData.lng, finalVenueName, finalVenueId);
       onOpenChange(false);
     }
   };
@@ -309,7 +262,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     status: 'out' | 'heading_out' | 'home',
     lat: number | null,
     lng: number | null,
-    venue: string | null
+    venue: string | null,
+    venueId: string | null = null
   ) => {
     try {
       const statusData = {
@@ -318,6 +272,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         lat,
         lng,
         venue_name: venue,
+        venue_id: venueId,
         updated_at: new Date().toISOString(),
         expires_at: status === 'home' ? null : calculateExpiryTime(),
       };
@@ -332,6 +287,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         await supabase.from('checkins').insert({
           user_id: user?.id,
           venue_name: venue,
+          venue_id: venueId,
           lat,
           lng,
         });
