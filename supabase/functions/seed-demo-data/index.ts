@@ -437,6 +437,82 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('stories').insert(stories);
       }
 
+      // 9. Create demo message threads with current user
+      console.log('Creating demo message threads...');
+      const messageThreadUsers = getRandomItems(demoUserIds, 6); // 6 conversations
+      const messageVenues = ["Le Bain", "Employees Only", "Baby Grand"];
+      const messageTexts = [
+        "2 new messages",
+        "Come it's popping off...",
+        "Sent",
+        "Are you coming tonight?",
+        "This place is amazing!",
+        "Just got here, where are you?",
+      ];
+      const timestamps = [4, 5, 10, 12, 15, 20]; // minutes ago
+      
+      let threadCount = 0;
+      for (let i = 0; i < messageThreadUsers.length; i++) {
+        const demoUserId = messageThreadUsers[i];
+        
+        // Create thread
+        const { data: newThread, error: threadError } = await supabaseAdmin
+          .from('dm_threads')
+          .insert({})
+          .select()
+          .single();
+          
+        if (threadError || !newThread) {
+          console.error('Error creating thread:', threadError);
+          continue;
+        }
+        
+        // Add thread members
+        const { error: membersError } = await supabaseAdmin
+          .from('dm_thread_members')
+          .insert([
+            { thread_id: newThread.id, user_id: user.id },
+            { thread_id: newThread.id, user_id: demoUserId },
+          ]);
+          
+        if (membersError) {
+          console.error('Error adding thread members:', membersError);
+          continue;
+        }
+        
+        // Create messages in thread
+        const numMessages = 2 + Math.floor(Math.random() * 3); // 2-4 messages
+        const messageTimestamp = new Date(Date.now() - timestamps[i] * 60000);
+        
+        for (let j = 0; j < numMessages; j++) {
+          const isFromUser = j % 2 === 0; // Alternate between user and demo user
+          await supabaseAdmin.from('dm_messages').insert({
+            thread_id: newThread.id,
+            sender_id: isFromUser ? user.id : demoUserId,
+            text: messageTexts[i],
+            created_at: new Date(messageTimestamp.getTime() - j * 2 * 60000).toISOString(),
+          });
+        }
+        
+        // Update demo user's venue in night_statuses
+        const venue = messageVenues[i % messageVenues.length];
+        const venueData = PROMOTED_VENUES.find(v => v.name === venue) || PROMOTED_VENUES[0];
+        
+        await supabaseAdmin.from('night_statuses').upsert({
+          user_id: demoUserId,
+          status: 'out',
+          venue_name: venueData.name,
+          lat: venueData.lat,
+          lng: venueData.lng,
+          expires_at: calculateExpiryTime(),
+          updated_at: messageTimestamp.toISOString(),
+          is_demo: true,
+          is_promoted: true,
+        });
+        
+        threadCount++;
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
@@ -445,6 +521,7 @@ Deno.serve(async (req) => {
             posts: 60,
             stories: stories.length,
             yaps: yapMessages.length,
+            threads: threadCount,
             venues: PROMOTED_VENUES.length + DEMO_VENUES.length,
             activeUsers: activeUsers.length,
           }
@@ -452,17 +529,45 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'clear') {
-      await supabaseAdmin.from('post_comments').delete().eq('post_id', '').in('post_id',
-        (await supabaseAdmin.from('posts').select('id').eq('is_demo', true)).data?.map(p => p.id) || []
-      );
+      // Get demo profile IDs first
+      const { data: demoProfiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('is_demo', true);
+      const demoIds = demoProfiles?.map(p => p.id) || [];
+      
+      // Get demo post IDs
+      const { data: demoPosts } = await supabaseAdmin
+        .from('posts')
+        .select('id')
+        .eq('is_demo', true);
+      const postIds = demoPosts?.map(p => p.id) || [];
+      
+      // Get threads involving demo users
+      const { data: demoThreads } = await supabaseAdmin
+        .from('dm_thread_members')
+        .select('thread_id')
+        .in('user_id', demoIds);
+      const threadIds = demoThreads?.map(t => t.thread_id) || [];
+      
+      // Delete in correct order (respecting foreign keys)
+      if (postIds.length > 0) {
+        await supabaseAdmin.from('post_comments').delete().in('post_id', postIds);
+      }
+      if (threadIds.length > 0) {
+        await supabaseAdmin.from('dm_messages').delete().in('thread_id', threadIds);
+        await supabaseAdmin.from('dm_thread_members').delete().in('thread_id', threadIds);
+        await supabaseAdmin.from('dm_threads').delete().in('id', threadIds);
+      }
       await supabaseAdmin.from('stories').delete().eq('is_demo', true);
       await supabaseAdmin.from('posts').delete().eq('is_demo', true);
       await supabaseAdmin.from('checkins').delete().eq('is_demo', true);
       await supabaseAdmin.from('night_statuses').delete().eq('is_demo', true);
       await supabaseAdmin.from('yap_messages').delete().eq('is_demo', true);
-      await supabaseAdmin.from('friendships').delete().eq('user_id', '').in('user_id', 
-        (await supabaseAdmin.from('profiles').select('id').eq('is_demo', true)).data?.map(p => p.id) || []
-      );
+      if (demoIds.length > 0) {
+        await supabaseAdmin.from('friendships').delete().in('user_id', demoIds);
+        await supabaseAdmin.from('friendships').delete().in('friend_id', demoIds);
+      }
       await supabaseAdmin.from('profiles').delete().eq('is_demo', true);
 
       return new Response(
