@@ -50,7 +50,6 @@ export function MeetUpConfirmation() {
 
   const handleOpenChat = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('🟢 Chat button clicked! Opening chat with:', recipientUserId, recipientDisplayName);
     
     if (!user || !recipientUserId) {
       console.error('❌ Missing user or recipientUserId:', { user: user?.id, recipientUserId });
@@ -58,21 +57,23 @@ export function MeetUpConfirmation() {
     }
 
     try {
-      closeConfirmation();
-      
-      // Find existing thread with this user
-      const { data: myThreads, error: fetchError } = await supabase
+      // Find existing 1-on-1 thread between current user and recipient
+      const { data: existingThreads, error: fetchError } = await supabase
         .from('dm_thread_members')
-        .select('thread_id')
+        .select(`
+          thread_id,
+          dm_threads!inner(id),
+          ...dm_thread_members!thread_id(user_id)
+        `)
         .eq('user_id', user.id);
 
       if (fetchError) throw fetchError;
 
       let threadId: string | null = null;
 
-      if (myThreads && myThreads.length > 0) {
-        // Check each thread to see if it's a 1-on-1 with recipient
-        for (const thread of myThreads) {
+      // Check if any thread is a 1-on-1 with recipient
+      if (existingThreads && existingThreads.length > 0) {
+        for (const thread of existingThreads) {
           const { data: members } = await supabase
             .from('dm_thread_members')
             .select('user_id')
@@ -96,19 +97,21 @@ export function MeetUpConfirmation() {
         if (createError) throw createError;
 
         if (newThread) {
-          await supabase
+          const { error: membersError } = await supabase
             .from('dm_thread_members')
             .insert([
               { thread_id: newThread.id, user_id: user.id },
               { thread_id: newThread.id, user_id: recipientUserId },
             ]);
+
+          if (membersError) throw membersError;
           
           threadId = newThread.id;
         }
       }
 
       if (threadId) {
-        console.log('✅ Navigating to thread:', threadId);
+        closeConfirmation();
         navigate(`/messages/${threadId}`);
       }
     } catch (error) {
