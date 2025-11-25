@@ -318,6 +318,42 @@ export type Database = {
           },
         ]
       }
+      post_likes: {
+        Row: {
+          created_at: string | null
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           comments_count: number | null
@@ -327,6 +363,7 @@ export type Database = {
           image_url: string | null
           is_demo: boolean | null
           is_promoted: boolean | null
+          likes_count: number | null
           text: string
           user_id: string
           venue_name: string | null
@@ -339,6 +376,7 @@ export type Database = {
           image_url?: string | null
           is_demo?: boolean | null
           is_promoted?: boolean | null
+          likes_count?: number | null
           text: string
           user_id: string
           venue_name?: string | null
@@ -351,6 +389,7 @@ export type Database = {
           image_url?: string | null
           is_demo?: boolean | null
           is_promoted?: boolean | null
+          likes_count?: number | null
           text?: string
           user_id?: string
           venue_name?: string | null
