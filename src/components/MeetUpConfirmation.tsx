@@ -58,13 +58,9 @@ export function MeetUpConfirmation() {
 
     try {
       // Find existing 1-on-1 thread between current user and recipient
-      const { data: existingThreads, error: fetchError } = await supabase
+      const { data: myThreads, error: fetchError } = await supabase
         .from('dm_thread_members')
-        .select(`
-          thread_id,
-          dm_threads!inner(id),
-          ...dm_thread_members!thread_id(user_id)
-        `)
+        .select('thread_id')
         .eq('user_id', user.id);
 
       if (fetchError) throw fetchError;
@@ -72,8 +68,8 @@ export function MeetUpConfirmation() {
       let threadId: string | null = null;
 
       // Check if any thread is a 1-on-1 with recipient
-      if (existingThreads && existingThreads.length > 0) {
-        for (const thread of existingThreads) {
+      if (myThreads && myThreads.length > 0) {
+        for (const thread of myThreads) {
           const { data: members } = await supabase
             .from('dm_thread_members')
             .select('user_id')
