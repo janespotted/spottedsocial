@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ interface ThreadMember {
   username: string;
   avatar_url: string | null;
   venue_name: string | null;
+  venue_id: string | null;
 }
 
 export default function Thread() {
@@ -31,6 +33,7 @@ export default function Thread() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
+  const { openVenueCard } = useVenueIdCard();
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherMember, setOtherMember] = useState<ThreadMember | null>(null);
   const [newMessage, setNewMessage] = useState('');
@@ -69,7 +72,7 @@ export default function Thread() {
       // Get their venue
       const { data: status } = await supabase
         .from('night_statuses')
-        .select('venue_name')
+        .select('venue_name, venue_id')
         .eq('user_id', member.user_id)
         .maybeSingle();
 
@@ -77,6 +80,7 @@ export default function Thread() {
         user_id: member.user_id,
         ...member.profiles,
         venue_name: status?.venue_name || null,
+        venue_id: status?.venue_id || null,
       });
     }
   };
@@ -197,9 +201,21 @@ export default function Thread() {
               <p className="text-white/60 text-sm truncate">{otherMember?.username}</p>
             </div>
             {otherMember?.venue_name && (
-              <div className="text-[#d4ff00] text-sm font-medium">
-                @{otherMember.venue_name}
-              </div>
+              otherMember.venue_id ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openVenueCard(otherMember.venue_id!);
+                  }}
+                  className="text-[#d4ff00] text-sm font-medium hover:text-[#d4ff00]/80 transition-colors"
+                >
+                  @{otherMember.venue_name}
+                </button>
+              ) : (
+                <div className="text-[#d4ff00] text-sm font-medium">
+                  @{otherMember.venue_name}
+                </div>
+              )
             )}
           </button>
 
