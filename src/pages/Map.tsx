@@ -249,11 +249,10 @@ export default function Map() {
 
   const fetchVenuesWithHeatScores = async (friendIds: string[]) => {
     try {
-      // Fetch all venues (only demo venues for now)
+      // Fetch all venues
       const { data: venuesData } = await supabase
         .from('venues')
-        .select('*')
-        .eq('is_demo', true);
+        .select('*');
 
       if (!venuesData) return;
 
