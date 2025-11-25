@@ -177,7 +177,7 @@ export default function Leaderboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1a0f2e] pb-24">
+    <div className="min-h-screen bg-[#1a0f2e] pb-48">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-center justify-between p-6">
