@@ -81,10 +81,10 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
           .neq('user_id', user?.id)
           .single();
 
-        // Get latest message
+        // Get latest message with sender info
         const { data: latestMessage } = await supabase
           .from('dm_messages')
-          .select('text, created_at')
+          .select('text, created_at, sender_id')
           .eq('thread_id', thread_id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -97,13 +97,17 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
           .eq('user_id', members?.user_id)
           .maybeSingle();
 
+        // Calculate unread: if last message is from other user and within 30 min, show unread
+        const isUnread = latestMessage?.sender_id === members?.user_id && 
+                        (Date.now() - new Date(latestMessage.created_at).getTime() < 30 * 60000);
+
         return {
           id: thread_id,
           user_id: members?.user_id,
           profiles: members?.profiles,
           venue_name: status?.venue_name || null,
           last_message: latestMessage,
-          unread_count: Math.floor(Math.random() * 3), // Mock unread count
+          unread_count: isUnread ? 1 : 0,
         };
       })
     );

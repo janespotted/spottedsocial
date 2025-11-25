@@ -440,20 +440,21 @@ Deno.serve(async (req) => {
       // 9. Create demo message threads with current user
       console.log('Creating demo message threads...');
       const messageThreadUsers = getRandomItems(demoUserIds, 6); // 6 conversations
-      const messageVenues = ["Le Bain", "Employees Only", "Baby Grand"];
-      const messageTexts = [
-        "2 new messages",
-        "Come it's popping off...",
-        "Sent",
-        "Are you coming tonight?",
-        "This place is amazing!",
-        "Just got here, where are you?",
+      
+      // Match the screenshot exactly
+      const threadConfigs = [
+        { venue: "Le Bain", lastMessage: "Yeah I'm heading there now!", minutesAgo: 4, hasMultiple: true },
+        { venue: "Employees Only", lastMessage: "Come it's popping off...", minutesAgo: 5, hasMultiple: false },
+        { venue: "Employees Only", lastMessage: "See you soon!", minutesAgo: 10, hasMultiple: false },
+        { venue: "Baby Grand", lastMessage: "Just got here!", minutesAgo: 12, hasMultiple: false },
+        { venue: "Le Bain", lastMessage: "Where are you?", minutesAgo: 15, hasMultiple: true },
+        { venue: "Le Bain", lastMessage: "This place is amazing!", minutesAgo: 20, hasMultiple: true },
       ];
-      const timestamps = [4, 5, 10, 12, 15, 20]; // minutes ago
       
       let threadCount = 0;
       for (let i = 0; i < messageThreadUsers.length; i++) {
         const demoUserId = messageThreadUsers[i];
+        const config = threadConfigs[i];
         
         // Create thread
         const { data: newThread, error: threadError } = await supabaseAdmin
@@ -481,22 +482,37 @@ Deno.serve(async (req) => {
         }
         
         // Create messages in thread
-        const numMessages = 2 + Math.floor(Math.random() * 3); // 2-4 messages
-        const messageTimestamp = new Date(Date.now() - timestamps[i] * 60000);
+        const messageTimestamp = new Date(Date.now() - config.minutesAgo * 60000);
+        const messages = [];
         
-        for (let j = 0; j < numMessages; j++) {
-          const isFromUser = j % 2 === 0; // Alternate between user and demo user
-          await supabaseAdmin.from('dm_messages').insert({
+        if (config.hasMultiple) {
+          // Create 2-3 recent messages for threads with multiple messages
+          messages.push({
             thread_id: newThread.id,
-            sender_id: isFromUser ? user.id : demoUserId,
-            text: messageTexts[i],
-            created_at: new Date(messageTimestamp.getTime() - j * 2 * 60000).toISOString(),
+            sender_id: demoUserId,
+            text: config.lastMessage,
+            created_at: messageTimestamp.toISOString(),
+          });
+          messages.push({
+            thread_id: newThread.id,
+            sender_id: user.id,
+            text: "Nice! What's the vibe?",
+            created_at: new Date(messageTimestamp.getTime() - 60000).toISOString(),
+          });
+        } else {
+          // Single message for simpler threads
+          messages.push({
+            thread_id: newThread.id,
+            sender_id: demoUserId,
+            text: config.lastMessage,
+            created_at: messageTimestamp.toISOString(),
           });
         }
         
+        await supabaseAdmin.from('dm_messages').insert(messages);
+        
         // Update demo user's venue in night_statuses
-        const venue = messageVenues[i % messageVenues.length];
-        const venueData = PROMOTED_VENUES.find(v => v.name === venue) || PROMOTED_VENUES[0];
+        const venueData = PROMOTED_VENUES.find(v => v.name === config.venue) || PROMOTED_VENUES[0];
         
         await supabaseAdmin.from('night_statuses').upsert({
           user_id: demoUserId,
