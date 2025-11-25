@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
+import { PostLikesModal } from '@/components/PostLikesModal';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { StoryViewer } from '@/components/StoryViewer';
 import { CreateStoryDialog } from '@/components/CreateStoryDialog';
@@ -70,6 +71,8 @@ export default function Feed() {
   const [createStoryOpen, setCreateStoryOpen] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
+  const [animatingLike, setAnimatingLike] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -386,6 +389,12 @@ export default function Feed() {
     if (!user) return;
 
     const isLiked = likedPosts.has(postId);
+    
+    // Trigger animation
+    if (!isLiked) {
+      setAnimatingLike(postId);
+      setTimeout(() => setAnimatingLike(null), 500);
+    }
 
     if (isLiked) {
       // Unlike
@@ -546,17 +555,22 @@ export default function Feed() {
                 <div className="flex items-center gap-5">
                   <button 
                     onClick={() => handleLikePost(post.id)}
-                    className={`flex items-center gap-2 transition-colors ${
+                    className={`flex items-center gap-2 transition-all ${
                       likedPosts.has(post.id) 
                         ? 'text-[#d4ff00]' 
                         : 'text-white hover:text-[#d4ff00]'
-                    }`}
+                    } ${animatingLike === post.id ? 'animate-scale-in' : ''}`}
                   >
                     <Heart 
-                      className="h-7 w-7" 
+                      className={`h-7 w-7 ${animatingLike === post.id ? 'animate-scale-in' : ''}`}
                       fill={likedPosts.has(post.id) ? 'currentColor' : 'none'}
                     />
-                    <span className="font-semibold text-base">{post.likes_count || 0}</span>
+                  </button>
+                  <button 
+                    onClick={() => setSelectedPostForLikes(post.id)}
+                    className="font-semibold text-base text-white hover:text-[#d4ff00] transition-colors"
+                  >
+                    {post.likes_count || 0} {post.likes_count === 1 ? 'like' : 'likes'}
                   </button>
                   <button 
                     onClick={() => handleToggleComments(post.id)}
@@ -691,6 +705,15 @@ export default function Feed() {
 
       {/* Create Story Dialog */}
       <CreateStoryDialog open={createStoryOpen} onOpenChange={setCreateStoryOpen} />
+
+      {/* Post Likes Modal */}
+      {selectedPostForLikes && (
+        <PostLikesModal
+          postId={selectedPostForLikes}
+          isOpen={!!selectedPostForLikes}
+          onClose={() => setSelectedPostForLikes(null)}
+        />
+      )}
     </div>
   );
 }

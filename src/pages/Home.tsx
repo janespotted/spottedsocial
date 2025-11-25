@@ -9,6 +9,7 @@ import { Heart, MessageCircle, Send, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { StoryViewer } from '@/components/StoryViewer';
 import { CreateStoryDialog } from '@/components/CreateStoryDialog';
+import { PostLikesModal } from '@/components/PostLikesModal';
 
 interface Post {
   id: string;
@@ -51,6 +52,8 @@ export default function Home() {
   const [selectedStoryUser, setSelectedStoryUser] = useState<string | null>(null);
   const [createStoryOpen, setCreateStoryOpen] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
+  const [animatingLike, setAnimatingLike] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -328,6 +331,12 @@ export default function Home() {
     if (!user) return;
 
     const isLiked = likedPosts.has(postId);
+    
+    // Trigger animation
+    if (!isLiked) {
+      setAnimatingLike(postId);
+      setTimeout(() => setAnimatingLike(null), 500);
+    }
 
     if (isLiked) {
       // Unlike
@@ -484,17 +493,22 @@ export default function Home() {
                 <div className="flex items-center gap-4">
                   <button 
                     onClick={() => handleLikePost(post.id)}
-                    className={`flex items-center gap-2 transition-colors ${
+                    className={`flex items-center gap-2 transition-all ${
                       likedPosts.has(post.id) 
                         ? 'text-[#d4ff00]' 
                         : 'text-white hover:text-[#d4ff00]'
-                    }`}
+                    } ${animatingLike === post.id ? 'animate-scale-in' : ''}`}
                   >
                     <Heart 
-                      className="h-6 w-6" 
+                      className={`h-6 w-6 ${animatingLike === post.id ? 'animate-scale-in' : ''}`}
                       fill={likedPosts.has(post.id) ? 'currentColor' : 'none'}
                     />
-                    <span className="font-semibold">{post.likes_count || 0}</span>
+                  </button>
+                  <button 
+                    onClick={() => setSelectedPostForLikes(post.id)}
+                    className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
+                  >
+                    {post.likes_count || 0} {post.likes_count === 1 ? 'like' : 'likes'}
                   </button>
                   <button className="flex items-center gap-2 text-white hover:text-[#d4ff00] transition-colors">
                     <MessageCircle className="h-6 w-6" />
@@ -554,6 +568,15 @@ export default function Home() {
 
       {/* Create Story Dialog */}
       <CreateStoryDialog open={createStoryOpen} onOpenChange={setCreateStoryOpen} />
+
+      {/* Post Likes Modal */}
+      {selectedPostForLikes && (
+        <PostLikesModal
+          postId={selectedPostForLikes}
+          isOpen={!!selectedPostForLikes}
+          onClose={() => setSelectedPostForLikes(null)}
+        />
+      )}
     </div>
   );
 }
