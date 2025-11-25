@@ -182,6 +182,7 @@ export default function Thread() {
               userId: otherMember.user_id,
               displayName: otherMember.display_name,
               avatarUrl: otherMember.avatar_url,
+              venueName: otherMember.venue_name || undefined,
             })}
             className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity"
           >

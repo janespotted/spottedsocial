@@ -186,13 +186,14 @@ export function VenueIdCard() {
                 <>
                   <div className="flex -space-x-2">
                     {visibleFriends.map((friend) => (
-                      <Avatar
+                      <Avatar 
                         key={friend.id}
                         className="w-10 h-10 border-2 border-[#2d1b4e] cursor-pointer hover:scale-110 transition-transform"
                         onClick={() => openFriendCard({
                           userId: friend.id,
                           displayName: friend.display_name,
                           avatarUrl: friend.avatar_url,
+                          venueName: venue?.name,
                         })}
                       >
                         <AvatarImage 
