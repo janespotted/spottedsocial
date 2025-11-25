@@ -120,7 +120,7 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
   const currentStory = stories[currentStoryIndex];
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 bg-black z-50 flex items-center justify-center overflow-hidden max-w-[100vw] max-h-[100vh]">
       {/* Progress bars */}
       <div className="absolute top-4 left-0 right-0 flex gap-1 px-4 z-10 max-w-full">
         {stories.map((_, idx) => (
@@ -163,17 +163,17 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
       </div>
 
       {/* Story content */}
-      <div className="relative w-full h-full max-w-full max-h-full flex items-center justify-center overflow-hidden">
+      <div className="relative w-full h-full max-w-[100vw] max-h-[100vh] flex items-center justify-center overflow-hidden">
         {currentStory.media_type === 'image' ? (
           <img
             src={currentStory.media_url}
             alt="Story"
-            className="w-full h-full object-contain max-w-full max-h-full"
+            className="max-w-[100vw] max-h-[100vh] w-auto h-auto object-contain"
           />
         ) : (
           <video
             src={currentStory.media_url}
-            className="w-full h-full object-contain max-w-full max-h-full"
+            className="max-w-[100vw] max-h-[100vh] w-auto h-auto object-contain"
             autoPlay
             muted
             playsInline
