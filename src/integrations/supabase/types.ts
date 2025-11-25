@@ -581,6 +581,7 @@ export type Database = {
           lng: number
           name: string
           neighborhood: string
+          popularity_rank: number | null
           type: string
         }
         Insert: {
@@ -592,6 +593,7 @@ export type Database = {
           lng: number
           name: string
           neighborhood: string
+          popularity_rank?: number | null
           type: string
         }
         Update: {
@@ -603,6 +605,7 @@ export type Database = {
           lng?: number
           name?: string
           neighborhood?: string
+          popularity_rank?: number | null
           type?: string
         }
         Relationships: []
