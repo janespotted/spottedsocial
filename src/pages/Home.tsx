@@ -487,16 +487,22 @@ export default function Home() {
                     >
                       {post.profiles?.display_name}
                     </button>
-                    {post.venue_name && post.venue_id && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openVenueCard(post.venue_id!);
-                        }}
-                        className="text-[#d4ff00] font-medium text-sm hover:text-[#d4ff00]/80 transition-colors block"
-                      >
-                        {post.venue_name}
-                      </button>
+                    {post.venue_name && (
+                      post.venue_id ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openVenueCard(post.venue_id);
+                          }}
+                          className="text-[#d4ff00] font-medium text-sm hover:text-[#d4ff00]/80 transition-colors block"
+                        >
+                          @{post.venue_name}
+                        </button>
+                      ) : (
+                        <span className="text-[#d4ff00] font-medium text-sm block">
+                          @{post.venue_name}
+                        </span>
+                      )
                     )}
                   </div>
                 </div>
