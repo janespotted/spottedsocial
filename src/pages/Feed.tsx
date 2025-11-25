@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -19,6 +20,7 @@ interface Post {
   text: string;
   image_url: string | null;
   venue_name: string | null;
+  venue_id: string | null;
   created_at: string;
   comments_count: number;
   likes_count: number;
@@ -60,6 +62,7 @@ export default function Feed() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
+  const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
   useAutoVenueTracking(); // Trigger auto-venue tracking on feed view
   const [posts, setPosts] = useState<Post[]>([]);
@@ -565,28 +568,48 @@ export default function Feed() {
 
               {/* Post Header */}
               <div className="flex items-center justify-between px-4 pt-4 pb-3">
-                <button 
-                  onClick={() => openFriendCard({
-                    userId: post.user_id,
-                    displayName: post.profiles?.display_name || 'Friend',
-                    avatarUrl: post.profiles?.avatar_url || null,
-                    venueName: post.venue_name || undefined,
-                  })}
-                  className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-                >
-                  <Avatar className="h-12 w-12 cursor-pointer">
-                    <AvatarImage src={post.profiles?.avatar_url || undefined} />
-                    <AvatarFallback className="bg-[#2d1b4e] text-white">
-                      {post.profiles?.display_name?.[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => openFriendCard({
+                      userId: post.user_id,
+                      displayName: post.profiles?.display_name || 'Friend',
+                      avatarUrl: post.profiles?.avatar_url || null,
+                      venueName: post.venue_name || undefined,
+                    })}
+                    className="hover:opacity-80 transition-opacity"
+                  >
+                    <Avatar className="h-12 w-12 cursor-pointer">
+                      <AvatarImage src={post.profiles?.avatar_url || undefined} />
+                      <AvatarFallback className="bg-[#2d1b4e] text-white">
+                        {post.profiles?.display_name?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
                   <div className="text-left">
-                    <p className="font-semibold text-white text-base">{post.profiles?.display_name}</p>
-                    {post.venue_name && (
-                      <p className="text-[#d4ff00] font-medium text-sm">{post.venue_name}</p>
+                    <button
+                      onClick={() => openFriendCard({
+                        userId: post.user_id,
+                        displayName: post.profiles?.display_name || 'Friend',
+                        avatarUrl: post.profiles?.avatar_url || null,
+                        venueName: post.venue_name || undefined,
+                      })}
+                      className="font-semibold text-white text-base hover:text-[#d4ff00] transition-colors"
+                    >
+                      {post.profiles?.display_name}
+                    </button>
+                    {post.venue_name && post.venue_id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openVenueCard(post.venue_id!);
+                        }}
+                        className="text-[#d4ff00] font-medium text-sm hover:text-[#d4ff00]/80 transition-colors block"
+                      >
+                        {post.venue_name}
+                      </button>
                     )}
                   </div>
-                </button>
+                </div>
                 <span className="text-white/50 text-sm">{getTimeAgo(post.created_at)}</span>
               </div>
 
