@@ -30,6 +30,16 @@ interface FriendsAtVenue {
   avatar_url: string | null;
 }
 
+interface UserStatus {
+  isOut: boolean;
+  currentVenue: string | null;
+  lastUpdatedAt: string | null;
+  lastEndedAt: string | null;
+  lat: number | null;
+  lng: number | null;
+  canSeeLocation: boolean;
+}
+
 export function FriendIdCard() {
   const { selectedFriend, closeFriendCard } = useFriendIdCard();
   const { sendMeetUpNotification } = useMeetUp();
@@ -39,21 +49,33 @@ export function FriendIdCard() {
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendsAtVenue[]>([]);
   const [distance, setDistance] = useState<number | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
+  const [statusSubtitle, setStatusSubtitle] = useState<string>('');
 
   useEffect(() => {
     if (selectedFriend && user) {
       console.log('Friend ID Card opened for:', selectedFriend);
-      fetchUserLocation();
-      fetchFriendsAtVenue();
+      if (demoEnabled) {
+        // In demo mode, use the provided venue directly
+        setStatusSubtitle(selectedFriend.venueName || '');
+        fetchUserLocation();
+        fetchFriendsAtVenue();
+      } else {
+        // In production, fetch real status
+        fetchUserStatus();
+        fetchUserLocation();
+      }
     } else {
       setFriendsAtVenue([]);
       setDistance(null);
+      setUserStatus(null);
+      setStatusSubtitle('');
     }
-  }, [selectedFriend]);
+  }, [selectedFriend, demoEnabled]);
 
   // Calculate distance when we have both locations
   useEffect(() => {
-    if (selectedFriend && selectedFriend.lat && selectedFriend.lng && userLocation) {
+    if (demoEnabled && selectedFriend && selectedFriend.lat && selectedFriend.lng && userLocation) {
       const dist = calculateDistance(
         userLocation.lat,
         userLocation.lng,
@@ -61,10 +83,123 @@ export function FriendIdCard() {
         selectedFriend.lng
       );
       setDistance(dist);
+    } else if (!demoEnabled && userStatus && userStatus.lat && userStatus.lng && userLocation) {
+      const dist = calculateDistance(
+        userLocation.lat,
+        userLocation.lng,
+        userStatus.lat,
+        userStatus.lng
+      );
+      setDistance(dist);
     } else {
       setDistance(null);
     }
-  }, [selectedFriend, userLocation]);
+  }, [selectedFriend, userLocation, userStatus, demoEnabled]);
+
+  const fetchUserStatus = async () => {
+    if (!selectedFriend || !user) return;
+
+    try {
+      // Check if viewer can see this user's location
+      const { data: canSeeData } = await supabase.rpc('can_see_location', {
+        viewer_id: user.id,
+        target_user_id: selectedFriend.userId
+      });
+
+      const canSeeLocation = canSeeData || false;
+
+      // Fetch the most recent active check-in (ended_at is null)
+      const { data: activeCheckIn } = await supabase
+        .from('checkins')
+        .select('venue_name, lat, lng, last_updated_at')
+        .eq('user_id', selectedFriend.userId)
+        .is('ended_at', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (activeCheckIn && canSeeLocation) {
+        // User is currently out at a venue
+        const lastUpdated = new Date(activeCheckIn.last_updated_at);
+        const minutesAgo = Math.floor((Date.now() - lastUpdated.getTime()) / 60000);
+        
+        setUserStatus({
+          isOut: true,
+          currentVenue: activeCheckIn.venue_name,
+          lastUpdatedAt: activeCheckIn.last_updated_at,
+          lastEndedAt: null,
+          lat: activeCheckIn.lat,
+          lng: activeCheckIn.lng,
+          canSeeLocation: true
+        });
+
+        const timeAgo = minutesAgo < 1 ? 'just now' : 
+                       minutesAgo < 60 ? `${minutesAgo} min ago` : 
+                       `${Math.floor(minutesAgo / 60)} hr ago`;
+        
+        setStatusSubtitle(`@ ${activeCheckIn.venue_name} • ${timeAgo}`);
+        
+        // Fetch friends at this venue
+        fetchFriendsAtVenue(activeCheckIn.venue_name);
+      } else if (!canSeeLocation) {
+        // Location sharing is OFF or viewer doesn't have permission
+        setUserStatus({
+          isOut: false,
+          currentVenue: null,
+          lastUpdatedAt: null,
+          lastEndedAt: null,
+          lat: null,
+          lng: null,
+          canSeeLocation: false
+        });
+        setStatusSubtitle('Location hidden');
+      } else {
+        // User is no longer out - fetch their last ended check-in
+        const { data: lastCheckIn } = await supabase
+          .from('checkins')
+          .select('venue_name, ended_at')
+          .eq('user_id', selectedFriend.userId)
+          .not('ended_at', 'is', null)
+          .order('ended_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lastCheckIn && canSeeLocation) {
+          const hoursAgo = Math.floor((Date.now() - new Date(lastCheckIn.ended_at).getTime()) / 3600000);
+          
+          setUserStatus({
+            isOut: false,
+            currentVenue: null,
+            lastUpdatedAt: null,
+            lastEndedAt: lastCheckIn.ended_at,
+            lat: null,
+            lng: null,
+            canSeeLocation: true
+          });
+
+          const timeAgo = hoursAgo < 1 ? 'less than an hour ago' : 
+                         hoursAgo === 1 ? '1 hour ago' : 
+                         `${hoursAgo} hours ago`;
+          
+          setStatusSubtitle(`In for the night • Last at ${lastCheckIn.venue_name} ${timeAgo}`);
+        } else {
+          setUserStatus({
+            isOut: false,
+            currentVenue: null,
+            lastUpdatedAt: null,
+            lastEndedAt: null,
+            lat: null,
+            lng: null,
+            canSeeLocation: true
+          });
+          setStatusSubtitle('In for the night');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user status:', error);
+      setStatusSubtitle('Status unavailable');
+    }
+  };
 
   const fetchUserLocation = async () => {
     if (!user) return;
@@ -80,8 +215,9 @@ export function FriendIdCard() {
     }
   };
 
-  const fetchFriendsAtVenue = async () => {
-    if (!selectedFriend?.venueName || !user) return;
+  const fetchFriendsAtVenue = async (venueName?: string) => {
+    const venue = venueName || selectedFriend?.venueName;
+    if (!venue || !user) return;
 
     // Fetch other friends at the same venue
     const { data: friendships } = await supabase
@@ -92,19 +228,20 @@ export function FriendIdCard() {
 
     const friendIds = friendships?.map(f => f.friend_id) || [];
 
-    const { data: venueStatuses } = await supabase
-      .from('night_statuses')
+    // Find active check-ins at this venue
+    const { data: activeCheckIns } = await supabase
+      .from('checkins')
       .select('user_id, profiles:user_id(display_name, avatar_url)')
-      .eq('venue_name', selectedFriend.venueName)
+      .eq('venue_name', venue)
       .neq('user_id', selectedFriend.userId)
       .in('user_id', friendIds)
-      .gt('expires_at', new Date().toISOString());
+      .is('ended_at', null);
 
-    if (venueStatuses) {
-      const friends = venueStatuses.map(s => ({
-        user_id: s.user_id,
-        display_name: (s.profiles as any)?.display_name || 'Friend',
-        avatar_url: (s.profiles as any)?.avatar_url || null,
+    if (activeCheckIns) {
+      const friends = activeCheckIns.map(c => ({
+        user_id: c.user_id,
+        display_name: (c.profiles as any)?.display_name || 'Friend',
+        avatar_url: (c.profiles as any)?.avatar_url || null,
       }));
       setFriendsAtVenue(friends);
     }
@@ -203,20 +340,34 @@ export function FriendIdCard() {
                 <h2 className="text-xl font-bold text-white leading-tight mb-1">
                   {selectedFriend.displayName}
                 </h2>
-                {selectedFriend.venueName && (
-                  <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
-                    @ {selectedFriend.venueName}
-                  </p>
-                )}
-                {distance !== null && (
-                  <p className="text-white/50 text-sm leading-tight">
-                    {distance.toFixed(1)} mi away
-                  </p>
-                )}
-                {!selectedFriend.venueName && distance === null && !demoEnabled && (
-                  <p className="text-white/50 text-sm leading-tight mt-1">
-                    Location not shared
-                  </p>
+                {demoEnabled ? (
+                  <>
+                    {selectedFriend.venueName && (
+                      <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
+                        @ {selectedFriend.venueName}
+                      </p>
+                    )}
+                    {distance !== null && (
+                      <p className="text-white/50 text-sm leading-tight">
+                        {distance.toFixed(1)} mi away
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {statusSubtitle && (
+                      <p className={`text-base font-medium leading-tight mb-1 ${
+                        userStatus?.isOut ? 'text-[#d4ff00]' : 'text-white/70'
+                      }`}>
+                        {statusSubtitle}
+                      </p>
+                    )}
+                    {distance !== null && userStatus?.isOut && (
+                      <p className="text-white/50 text-sm leading-tight">
+                        {distance.toFixed(1)} mi away
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

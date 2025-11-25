@@ -17,33 +17,42 @@ export type Database = {
       checkins: {
         Row: {
           created_at: string | null
+          ended_at: string | null
           id: string
           is_demo: boolean | null
           is_promoted: boolean | null
+          last_updated_at: string | null
           lat: number
           lng: number
+          started_at: string | null
           user_id: string
           venue_id: string | null
           venue_name: string
         }
         Insert: {
           created_at?: string | null
+          ended_at?: string | null
           id?: string
           is_demo?: boolean | null
           is_promoted?: boolean | null
+          last_updated_at?: string | null
           lat: number
           lng: number
+          started_at?: string | null
           user_id: string
           venue_id?: string | null
           venue_name: string
         }
         Update: {
           created_at?: string | null
+          ended_at?: string | null
           id?: string
           is_demo?: boolean | null
           is_promoted?: boolean | null
+          last_updated_at?: string | null
           lat?: number
           lng?: number
+          started_at?: string | null
           user_id?: string
           venue_id?: string | null
           venue_name?: string

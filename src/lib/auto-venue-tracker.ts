@@ -8,6 +8,9 @@ interface LastCheckin {
   venue_id: string | null;
   venue_name: string;
   created_at: string;
+  started_at?: string;
+  ended_at?: string | null;
+  last_updated_at?: string;
 }
 
 interface TrackingState {
@@ -66,7 +69,7 @@ const isInNightlifeZone = async (lat: number, lng: number): Promise<boolean> => 
 };
 
 /**
- * Get user's last check-in
+ * Get user's last check-in (active or most recent ended)
  */
 const getLastCheckin = async (userId: string): Promise<LastCheckin | null> => {
   try {
@@ -74,12 +77,12 @@ const getLastCheckin = async (userId: string): Promise<LastCheckin | null> => {
       .from('checkins')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
+      .order('started_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
-    return data as LastCheckin;
+    return data as LastCheckin | null;
   } catch (error) {
     console.error('Error fetching last checkin:', error);
     return null;
@@ -115,7 +118,7 @@ const isUserOut = async (userId: string): Promise<boolean> => {
 };
 
 /**
- * Create a new checkin record
+ * Create a new checkin record and end any active check-ins
  */
 const createCheckin = async (
   userId: string,
@@ -124,12 +127,22 @@ const createCheckin = async (
   venueName: string
 ): Promise<void> => {
   try {
+    // End any active check-ins before creating new one
+    await supabase
+      .from('checkins')
+      .update({ ended_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .is('ended_at', null);
+
+    // Create new check-in with tracking fields
     await supabase.from('checkins').insert({
       user_id: userId,
       venue_name: venueName,
       venue_id: venueId,
       lat: locationData.lat,
       lng: locationData.lng,
+      started_at: locationData.timestamp,
+      last_updated_at: locationData.timestamp,
     });
 
     // Update night_statuses with new venue
@@ -181,7 +194,7 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
     }
 
     // Check if last checkin was within 90 minutes
-    const lastCheckinTime = new Date(lastCheckin.created_at).getTime();
+    const lastCheckinTime = new Date(lastCheckin.started_at || lastCheckin.created_at).getTime();
     const now = Date.now();
     const minutesSinceLastCheckin = (now - lastCheckinTime) / (1000 * 60);
     
@@ -205,7 +218,15 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
 
     // If <200m, no update needed
     if (distanceMeters < 200) {
-      console.log('🔵 Still at same venue (<200m), updating GPS only');
+      console.log('🔵 Still at same venue (<200m), updating GPS and check-in timestamp');
+      
+      // Update the active check-in's last_updated_at
+      await supabase
+        .from('checkins')
+        .update({ last_updated_at: locationData.timestamp })
+        .eq('user_id', userId)
+        .is('ended_at', null);
+      
       // Update profile with fresh GPS but keep same venue
       await supabase
         .from('profiles')
