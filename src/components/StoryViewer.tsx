@@ -120,7 +120,7 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
   const currentStory = stories[currentStoryIndex];
 
   return (
-    <div className="fixed top-0 left-0 w-screen h-screen bg-black z-50 flex items-center justify-center overflow-hidden">
+    <div className="fixed top-0 left-0 right-0 bottom-0 w-full h-full bg-black z-50 flex items-center justify-center overflow-hidden">
       {/* Progress bars */}
       <div className="absolute top-4 left-0 right-0 flex gap-1 px-4 z-10 max-w-full">
         {stories.map((_, idx) => (
@@ -163,7 +163,7 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
       </div>
 
       {/* Story content */}
-      <div className="relative w-screen h-screen flex items-center justify-center overflow-hidden">
+      <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
         {currentStory.media_type === 'image' ? (
           <img
             src={currentStory.media_url}
