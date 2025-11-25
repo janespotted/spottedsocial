@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 // Real NYC top-tier venues (scraped from top rankings) - ordered by popularity
-const PROMOTED_VENUES = [
+const NYC_VENUES = [
   // TOP 20 - Most popular venues (will be shown in leaderboard)
   { name: "Le Bain", lat: 40.7414, lng: -74.0078, rank: 1 },
   { name: "House of Yes", lat: 40.7089, lng: -73.9332, rank: 2 },
@@ -238,16 +238,18 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('friendships').insert(demoFriendships);
       }
 
-      // 4. Insert all promoted venues into venues table first
-      console.log('Inserting all 34 promoted venues...');
-      const venuesToInsert = PROMOTED_VENUES.map(v => ({
+      // 4. Insert all NYC venues into venues table first
+      console.log('Inserting all 34 NYC venues...');
+      const PROMOTED_VENUE_NAMES = ['Le Bain', 'Superbueno'];
+      
+      const venuesToInsert = NYC_VENUES.map(v => ({
         name: v.name,
         lat: v.lat,
         lng: v.lng,
         neighborhood: 'Manhattan', // Will be derived from coordinates in production
         type: 'nightclub',
         is_demo: true,
-        is_promoted: true,
+        is_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
         popularity_rank: v.rank,
       }));
 
@@ -269,7 +271,7 @@ Deno.serve(async (req) => {
       console.log('Creating night statuses with popularity-based distribution...');
       
       const nightStatuses = [];
-      const TOP_20_VENUES = PROMOTED_VENUES.slice(0, 20); // Top 20 by popularity_rank
+      const TOP_20_VENUES = NYC_VENUES.slice(0, 20); // Top 20 by popularity_rank
       
       // First 20 users: assign one to each top 20 venue (ensures all top 20 have at least 1 user)
       for (let i = 0; i < 20; i++) {
@@ -286,7 +288,7 @@ Deno.serve(async (req) => {
           expires_at: calculateExpiryTime(),
           updated_at: getRecentTimestamp(),
           is_demo: true,
-          is_promoted: true,
+          is_promoted: false,
         });
       }
       
@@ -321,7 +323,7 @@ Deno.serve(async (req) => {
           expires_at: calculateExpiryTime(),
           updated_at: getRecentTimestamp(),
           is_demo: true,
-          is_promoted: true,
+          is_promoted: false,
         });
       }
       
@@ -339,7 +341,7 @@ Deno.serve(async (req) => {
           lng: status.lng,
           created_at: getRecentTimestamp(),
           is_demo: true,
-          is_promoted: true,
+          is_promoted: false,
         });
       }
 
@@ -350,7 +352,7 @@ Deno.serve(async (req) => {
       for (let i = 0; i < 60; i++) {
         const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
         const usePromoted = Math.random() < 0.75;
-        const venuePool = usePromoted ? PROMOTED_VENUES : DEMO_VENUES;
+        const venuePool = usePromoted ? NYC_VENUES : DEMO_VENUES;
         const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
         const venueId = venueIdMap.get(venue.name);
         const caption = DEMO_CAPTIONS[Math.floor(Math.random() * DEMO_CAPTIONS.length)];
@@ -447,14 +449,14 @@ Deno.serve(async (req) => {
       }
 
       // 7. Create yap messages with scores and handles
-      const hottestVenues = getRandomItems([...PROMOTED_VENUES, ...DEMO_VENUES], 10);
+      const hottestVenues = getRandomItems([...NYC_VENUES, ...DEMO_VENUES], 10);
       const yapMessages = [];
 
       for (let i = 0; i < 40; i++) {
         const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
         const venue = hottestVenues[i % hottestVenues.length];
         const yapData = DEMO_YAP_MESSAGES[i % DEMO_YAP_MESSAGES.length];
-        const isPromotedVenue = PROMOTED_VENUES.some(v => v.name === venue.name);
+        const isPromotedVenue = NYC_VENUES.some((v: any) => v.name === venue.name);
         
         // Generate anonymous handle
         const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
@@ -482,7 +484,7 @@ Deno.serve(async (req) => {
       // 8. Create stories for demo users
       const storyUsers = getRandomItems(demoUserIds, 15); // 15 users with stories
       const stories = [];
-      const storyVenues = getRandomItems([...PROMOTED_VENUES, ...DEMO_VENUES], 10);
+      const storyVenues = getRandomItems([...NYC_VENUES, ...DEMO_VENUES], 10);
       
       for (const userId of storyUsers) {
         const numStories = 1 + Math.floor(Math.random() * 3); // 1-3 stories per user
@@ -580,7 +582,7 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('dm_messages').insert(messages);
         
         // Update demo user's venue in night_statuses
-        const venueData = PROMOTED_VENUES.find(v => v.name === config.venue) || PROMOTED_VENUES[0];
+        const venueData = NYC_VENUES.find((v: any) => v.name === config.venue) || NYC_VENUES[0];
         const venueId = venueIdMap.get(venueData.name);
         
         await supabaseAdmin.from('night_statuses').upsert({
@@ -608,7 +610,7 @@ Deno.serve(async (req) => {
             stories: stories.length,
             yaps: yapMessages.length,
             threads: threadCount,
-            venues: PROMOTED_VENUES.length + DEMO_VENUES.length,
+            venues: NYC_VENUES.length + DEMO_VENUES.length,
             activeUsers: nightStatuses.length,
           }
         }),
