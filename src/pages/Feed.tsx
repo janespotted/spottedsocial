@@ -691,12 +691,14 @@ export default function Feed() {
       </div>
 
       {/* Floating Create Post Button */}
-      <button
-        onClick={() => setShowCreatePost(true)}
-        className="fixed bottom-24 right-6 z-20 h-14 w-14 rounded-full bg-[#d4ff00] shadow-[0_0_30px_rgba(212,255,0,0.8)] hover:scale-110 transition-transform flex items-center justify-center"
-      >
-        <Plus className="h-7 w-7 text-[#1a0f2e]" />
-      </button>
+      <div className="fixed bottom-24 right-0 left-0 z-20 flex justify-end px-6 pointer-events-none max-w-[430px] mx-auto">
+        <button
+          onClick={() => setShowCreatePost(true)}
+          className="h-14 w-14 rounded-full bg-[#d4ff00] shadow-[0_0_30px_rgba(212,255,0,0.8)] hover:scale-110 transition-transform flex items-center justify-center pointer-events-auto"
+        >
+          <Plus className="h-7 w-7 text-[#1a0f2e]" />
+        </button>
+      </div>
 
       {/* Create Post Dialog */}
       <CreatePostDialog open={showCreatePost} onOpenChange={setShowCreatePost} />
