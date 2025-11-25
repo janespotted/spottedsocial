@@ -161,6 +161,7 @@ export function ActivityTab() {
                       userId: activity.user_id,
                       displayName: activity.title,
                       avatarUrl: activity.avatar_url || null,
+                      venueName: activity.type === 'check_in' ? activity.subtitle : undefined,
                     })}
                     className="hover:opacity-80 transition-opacity"
                   >

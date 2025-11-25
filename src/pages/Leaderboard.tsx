@@ -235,6 +235,7 @@ export default function Leaderboard() {
                             userId: friend.user_id,
                             displayName: friend.display_name,
                             avatarUrl: friend.avatar_url,
+                            venueName: venue.venue_name,
                           })}
                           className="transition-transform hover:scale-110"
                         >
@@ -311,6 +312,7 @@ export default function Leaderboard() {
                         userId: friend.user_id,
                         displayName: friend.display_name,
                         avatarUrl: friend.avatar_url,
+                        venueName: venue.venue_name,
                       })}
                       className="transition-transform hover:scale-110"
                     >
@@ -376,6 +378,7 @@ export default function Leaderboard() {
                         userId: friend.user_id,
                         displayName: friend.display_name,
                         avatarUrl: friend.avatar_url,
+                        venueName: biggestMover.venue_name,
                       })}
                       className="transition-transform hover:scale-110"
                     >

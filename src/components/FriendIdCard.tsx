@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useDemoMode } from '@/hooks/useDemoMode';
 
 interface FriendData {
   id: string;
@@ -34,6 +35,7 @@ export function FriendIdCard() {
   const { sendMeetUpNotification } = useMeetUp();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const demoEnabled = useDemoMode();
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendsAtVenue[]>([]);
   const [distance, setDistance] = useState<number | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -211,7 +213,7 @@ export function FriendIdCard() {
                     {distance.toFixed(1)} mi away
                   </p>
                 )}
-                {!selectedFriend.venueName && distance === null && (
+                {!selectedFriend.venueName && distance === null && !demoEnabled && (
                   <p className="text-white/50 text-sm leading-tight mt-1">
                     Location not shared
                   </p>

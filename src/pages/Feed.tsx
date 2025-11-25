@@ -570,6 +570,7 @@ export default function Feed() {
                     userId: post.user_id,
                     displayName: post.profiles?.display_name || 'Friend',
                     avatarUrl: post.profiles?.avatar_url || null,
+                    venueName: post.venue_name || undefined,
                   })}
                   className="flex items-center gap-3 hover:opacity-80 transition-opacity"
                 >
@@ -647,6 +648,7 @@ export default function Feed() {
                       userId: post.user_id,
                       displayName: post.profiles?.display_name || 'Friend',
                       avatarUrl: post.profiles?.avatar_url || null,
+                      venueName: post.venue_name || undefined,
                     })}
                     className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
                   >

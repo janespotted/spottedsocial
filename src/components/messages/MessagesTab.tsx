@@ -140,17 +140,18 @@ export function MessagesTab() {
               className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 hover:bg-[#2d1b4e]/80 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openFriendCard({
-                      userId: thread.user_id,
-                      displayName: thread.profiles?.display_name || 'Friend',
-                      avatarUrl: thread.profiles?.avatar_url || null,
-                    });
-                  }}
-                  className="hover:opacity-80 transition-opacity"
-                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openFriendCard({
+                        userId: thread.user_id,
+                        displayName: thread.profiles?.display_name || 'Friend',
+                        avatarUrl: thread.profiles?.avatar_url || null,
+                        venueName: thread.venue_name || undefined,
+                      });
+                    }}
+                    className="hover:opacity-80 transition-opacity"
+                  >
                   <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
                     <AvatarImage src={thread.profiles?.avatar_url || undefined} />
                     <AvatarFallback className="bg-[#1a0f2e] text-white">
