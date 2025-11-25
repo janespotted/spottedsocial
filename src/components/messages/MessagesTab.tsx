@@ -79,22 +79,29 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
     // For each thread, get the other member and latest message
     const threadsData = await Promise.all(
       threadMemberships.map(async ({ thread_id }) => {
-        // Get other member
-        const { data: members, error: membersError } = await supabase
+        // Get ALL members of this thread
+        const { data: allMembers } = await supabase
           .from('dm_thread_members')
-          .select(`
-            user_id,
-            profiles:user_id (
-              display_name,
-              avatar_url
-            )
-          `)
-          .eq('thread_id', thread_id)
-          .neq('user_id', user?.id)
+          .select('user_id')
+          .eq('thread_id', thread_id);
+
+        // Find the other user (not current user)
+        const otherUserId = allMembers?.find(m => m.user_id !== user?.id)?.user_id;
+        
+        if (!otherUserId) {
+          console.log('No other user found for thread:', thread_id);
+          return null;
+        }
+
+        // Get other user's profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url')
+          .eq('id', otherUserId)
           .single();
 
-        if (membersError) {
-          console.error('Error fetching thread members:', membersError);
+        if (!profile) {
+          console.log('Profile not found for user:', otherUserId);
           return null;
         }
 
@@ -111,34 +118,25 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
         const { data: status } = await supabase
           .from('night_statuses')
           .select('venue_name')
-          .eq('user_id', members?.user_id)
+          .eq('user_id', otherUserId)
           .maybeSingle();
 
         // Calculate unread: if last message is from other user and within 30 min, show unread
-        const isUnread = latestMessage?.sender_id === members?.user_id && 
+        const isUnread = latestMessage?.sender_id === otherUserId && 
                         (Date.now() - new Date(latestMessage.created_at).getTime() < 30 * 60000);
 
-        const threadData = {
+        return {
           id: thread_id,
-          user_id: members?.user_id,
-          profiles: members?.profiles,
+          user_id: otherUserId,
+          profiles: profile,
           venue_name: status?.venue_name || null,
           last_message: latestMessage,
           unread_count: isUnread ? 1 : 0,
         };
-        
-        console.log('Thread data:', {
-          id: thread_id.slice(0, 8),
-          hasProfiles: !!members?.profiles,
-          hasMessage: !!latestMessage,
-          venue: status?.venue_name,
-        });
-        
-        return threadData;
       })
     );
 
-    const validThreads = threadsData.filter(t => t && t.profiles);
+    const validThreads = threadsData.filter(t => t !== null);
     console.log('Valid threads:', validThreads.length);
     setThreads(validThreads);
   };
