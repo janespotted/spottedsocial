@@ -240,7 +240,7 @@ Deno.serve(async (req) => {
         lat: v.lat,
         lng: v.lng,
         neighborhood: 'Manhattan', // Will be derived from coordinates in production
-        type: 'club',
+        type: 'nightclub',
         is_demo: true,
         is_promoted: true,
       }));
