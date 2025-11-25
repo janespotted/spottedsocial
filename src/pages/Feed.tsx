@@ -144,13 +144,14 @@ export default function Feed() {
           avatar_url
         )
       `)
-      .in('user_id', userIds)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
 
-    // Filter demo data unless demo mode is enabled
-    if (!demoEnabled) {
-      query = query.eq('is_demo', false);
+    // If demo mode is enabled, include demo posts, otherwise filter by friends
+    if (demoEnabled) {
+      query = query.or(`user_id.in.(${userIds.join(',')}),is_demo.eq.true`);
+    } else {
+      query = query.in('user_id', userIds).eq('is_demo', false);
     }
 
     const { data } = await query;
