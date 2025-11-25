@@ -94,8 +94,8 @@ export default function Auth() {
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
       <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#0a0118] rounded-3xl">
         <CardHeader className="space-y-2 text-center pt-8">
-          <CardTitle className="text-5xl font-bold text-[#d4ff00] tracking-[0.3em]">
-            SPOTTED
+          <CardTitle className="text-4xl font-bold text-white tracking-wider">
+            Spotted
           </CardTitle>
           <CardDescription className="text-base text-white/60">
             {isLogin ? 'Welcome back! Sign in to see who\'s out tonight.' : 'Join Spotted to see where your friends are tonight.'}
