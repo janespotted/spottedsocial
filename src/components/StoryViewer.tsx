@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Send } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface Story {
   id: string;
@@ -31,6 +34,9 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
   const [progress, setProgress] = useState(0);
   const [userIndex, setUserIndex] = useState(currentUserIndex);
   const [loading, setLoading] = useState(true);
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchStories(allStoryUsers[userIndex]);
@@ -106,6 +112,77 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
       setCurrentStoryIndex(prev => prev - 1);
     } else if (userIndex > 0) {
       setUserIndex(prev => prev - 1);
+    }
+  };
+
+  const handleReply = async () => {
+    if (!replyText.trim() || sending) return;
+
+    setSending(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const storyAuthorId = currentStory.user_id;
+      
+      // Find or create thread
+      const { data: existingThreads } = await supabase
+        .from('dm_thread_members')
+        .select('thread_id')
+        .eq('user_id', user.id);
+
+      let threadId: string | null = null;
+
+      if (existingThreads && existingThreads.length > 0) {
+        for (const t of existingThreads) {
+          const { data: members } = await supabase
+            .from('dm_thread_members')
+            .select('user_id')
+            .eq('thread_id', t.thread_id);
+
+          if (members && members.length === 2 && members.some(m => m.user_id === storyAuthorId)) {
+            threadId = t.thread_id;
+            break;
+          }
+        }
+      }
+
+      if (!threadId) {
+        const { data: newThread } = await supabase
+          .from('dm_threads')
+          .insert({})
+          .select()
+          .single();
+
+        if (newThread) {
+          threadId = newThread.id;
+          await supabase.from('dm_thread_members').insert([
+            { thread_id: threadId, user_id: user.id },
+            { thread_id: threadId, user_id: storyAuthorId }
+          ]);
+        }
+      }
+
+      if (threadId) {
+        const contextMessage = currentStory.venue_name 
+          ? `Replied to your story at ${currentStory.venue_name}: ${replyText}`
+          : `Replied to your story: ${replyText}`;
+
+        await supabase.from('dm_messages').insert({
+          thread_id: threadId,
+          sender_id: user.id,
+          text: contextMessage
+        });
+
+        toast.success('Reply sent!');
+        onClose();
+        navigate(`/messages/thread/${threadId}`);
+      }
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      toast.error('Failed to send reply');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -193,6 +270,27 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
         >
           <ChevronRight className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
+      </div>
+
+      {/* Reply input */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 z-10 bg-gradient-to-t from-black/80 to-transparent">
+        <div className="flex items-center gap-2">
+          <Input
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleReply()}
+            placeholder="Send a message..."
+            className="flex-1 bg-white/20 border-white/30 text-white placeholder:text-white/60"
+            disabled={sending}
+          />
+          <button
+            onClick={handleReply}
+            disabled={!replyText.trim() || sending}
+            className="p-2 rounded-full bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send className="h-5 w-5" />
+          </button>
+        </div>
       </div>
     </div>
   );
