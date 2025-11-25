@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
-import { Ghost } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Ghost, MapPin, Edit3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -20,7 +21,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home'>('home');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showVenueConfirm, setShowVenueConfirm] = useState(false);
   const [shareOption, setShareOption] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('close_friends');
+  const [detectedVenue, setDetectedVenue] = useState<string>('');
+  const [customVenue, setCustomVenue] = useState<string>('');
+  const [isEditingVenue, setIsEditingVenue] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const locationIntervalRef = useRef<number | null>(null);
 
   // Load current location sharing level from profile
@@ -109,35 +115,49 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     return tomorrow.toISOString();
   };
 
-  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+  // Calculate distance between two points using Haversine formula
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
+  };
+
+  // Find nearest venue from database within 150 meters
+  const findNearestVenue = async (lat: number, lng: number): Promise<string | null> => {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-        {
-          headers: {
-            'User-Agent': 'Spotted App',
-          },
+      const { data: venues, error } = await supabase
+        .from('venues')
+        .select('name, lat, lng');
+
+      if (error) throw error;
+      if (!venues || venues.length === 0) return null;
+
+      // Find venue within 150m radius
+      let nearestVenue: { name: string; distance: number } | null = null;
+      
+      for (const venue of venues) {
+        const distance = calculateDistance(lat, lng, venue.lat, venue.lng);
+        
+        if (distance <= 150) { // Within 150 meters
+          if (!nearestVenue || distance < nearestVenue.distance) {
+            nearestVenue = { name: venue.name, distance };
+          }
         }
-      );
-      const data = await response.json();
-      
-      const address = data.address;
-      const locationName = 
-        address?.amenity || 
-        address?.building || 
-        address?.shop || 
-        address?.restaurant || 
-        address?.bar || 
-        address?.road || 
-        address?.neighbourhood || 
-        address?.suburb || 
-        address?.city ||
-        'Current Location';
-      
-      return locationName;
+      }
+
+      return nearestVenue?.name || null;
     } catch (error) {
-      console.error('Reverse geocoding error:', error);
-      return 'Current Location';
+      console.error('Error finding nearest venue:', error);
+      return null;
     }
   };
 
@@ -154,10 +174,25 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           async (position) => {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
-            const venueName = await reverseGeocode(lat, lng);
-            await updateStatus(status, lat, lng, venueName);
-            setIsDetectingLocation(false);
-            onOpenChange(false);
+            setCurrentLocation({ lat, lng });
+            
+            // Try to find nearest venue
+            const nearestVenue = await findNearestVenue(lat, lng);
+            
+            if (nearestVenue) {
+              // Found a venue nearby - show confirmation
+              setDetectedVenue(nearestVenue);
+              setCustomVenue(nearestVenue);
+              setShowVenueConfirm(true);
+              setIsDetectingLocation(false);
+            } else {
+              // No venue found - prompt for manual entry
+              setDetectedVenue('');
+              setCustomVenue('');
+              setIsEditingVenue(true);
+              setShowVenueConfirm(true);
+              setIsDetectingLocation(false);
+            }
           },
           (error) => {
             setIsDetectingLocation(false);
@@ -185,40 +220,24 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         async (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
-          const venueName = await reverseGeocode(lat, lng);
+          setCurrentLocation({ lat, lng });
           
-          // Save all location data to profile
-          try {
-            await supabase
-              .from('profiles')
-              .update({ 
-                is_out: true,
-                location_sharing_level: shareOption,
-                last_known_lat: lat,
-                last_known_lng: lng,
-                last_location_at: new Date().toISOString()
-              })
-              .eq('id', user?.id);
-
-            // Start tracking location updates
-            startLocationTracking(lat, lng);
-
-            await updateStatus('out', lat, lng, venueName);
+          // Try to find nearest venue
+          const nearestVenue = await findNearestVenue(lat, lng);
+          
+          if (nearestVenue) {
+            // Found a venue nearby - show confirmation
+            setDetectedVenue(nearestVenue);
+            setCustomVenue(nearestVenue);
+            setShowVenueConfirm(true);
             setIsDetectingLocation(false);
-            onOpenChange(false);
-
-            toast({
-              title: 'Location sharing enabled',
-              description: 'Your location is now being shared',
-            });
-          } catch (error) {
-            console.error('Error updating location sharing:', error);
+          } else {
+            // No venue found - prompt for manual entry
+            setDetectedVenue('');
+            setCustomVenue('');
+            setIsEditingVenue(true);
+            setShowVenueConfirm(true);
             setIsDetectingLocation(false);
-            toast({
-              variant: 'destructive',
-              title: 'Error',
-              description: 'Failed to enable location sharing',
-            });
           }
         },
         (error) => {
@@ -230,6 +249,59 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           });
         }
       );
+    }
+  };
+
+  const handleVenueConfirm = async () => {
+    if (!currentLocation || !customVenue.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Venue required',
+        description: 'Please enter a venue name',
+      });
+      return;
+    }
+
+    setShowVenueConfirm(false);
+    
+    const { lat, lng } = currentLocation;
+    const venueName = customVenue.trim();
+
+    if (selectedStatus === 'out') {
+      // Save all location data to profile
+      try {
+        await supabase
+          .from('profiles')
+          .update({ 
+            is_out: true,
+            location_sharing_level: shareOption,
+            last_known_lat: lat,
+            last_known_lng: lng,
+            last_location_at: new Date().toISOString()
+          })
+          .eq('id', user?.id);
+
+        // Start tracking location updates
+        startLocationTracking(lat, lng);
+
+        await updateStatus('out', lat, lng, venueName);
+        onOpenChange(false);
+
+        toast({
+          title: 'Location sharing enabled',
+          description: `You're out at ${venueName}!`,
+        });
+      } catch (error) {
+        console.error('Error updating location sharing:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to enable location sharing',
+        });
+      }
+    } else if (selectedStatus === 'heading_out') {
+      await updateStatus('heading_out', lat, lng, venueName);
+      onOpenChange(false);
     }
   };
 
@@ -396,17 +468,82 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     </div>
   );
 
+  const VenueConfirmContent = () => (
+    <div className="relative p-6 space-y-6">
+      <div className="absolute top-4 right-4 text-2xl font-bold text-[#d4ff00]">S</div>
+      
+      <div className="space-y-2">
+        <h3 className="text-xl font-semibold text-white">
+          {detectedVenue ? 'Confirm Your Location' : 'Where Are You?'}
+        </h3>
+        <div className="h-px bg-white/20" />
+      </div>
+
+      {detectedVenue && !isEditingVenue ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 p-4 bg-[#5b21b6]/20 border-2 border-[#d4ff00] rounded-xl">
+            <MapPin className="h-6 w-6 text-[#d4ff00]" />
+            <span className="text-lg text-white font-medium flex-1">{detectedVenue}</span>
+            <button
+              onClick={() => setIsEditingVenue(true)}
+              className="text-white/60 hover:text-white transition-colors"
+            >
+              <Edit3 className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="text-sm text-white/60 text-center">
+            We detected you're near this venue
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <Input
+            value={customVenue}
+            onChange={(e) => setCustomVenue(e.target.value)}
+            placeholder={detectedVenue ? "Enter different venue..." : "Enter venue name..."}
+            className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#d4ff00] text-white placeholder:text-white/40 focus:ring-[#d4ff00]"
+            autoFocus
+          />
+          {detectedVenue && (
+            <button
+              onClick={() => {
+                setCustomVenue(detectedVenue);
+                setIsEditingVenue(false);
+              }}
+              className="text-sm text-[#d4ff00] hover:underline"
+            >
+              Use detected venue: {detectedVenue}
+            </button>
+          )}
+          {!detectedVenue && (
+            <p className="text-sm text-white/60 text-center">
+              No nearby venues found. Enter manually.
+            </p>
+          )}
+        </div>
+      )}
+
+      <Button
+        onClick={handleVenueConfirm}
+        disabled={!customVenue.trim()}
+        className="w-full h-14 text-lg font-semibold rounded-full bg-[#5b21b6] text-[#d4ff00] border-2 border-[#d4ff00] hover:bg-[#6d28d9] shadow-[0_0_20px_rgba(212,255,0,0.4)] disabled:opacity-50"
+      >
+        Confirm
+      </Button>
+    </div>
+  );
+
   return (
     <>
       {/* Status Modal */}
       {isMobile ? (
-        <Drawer open={open && !showShareModal} onOpenChange={onOpenChange}>
+        <Drawer open={open && !showShareModal && !showVenueConfirm} onOpenChange={onOpenChange}>
           <DrawerContent className="bg-gradient-to-b from-[#3d2b5f] via-[#2a1f4a] to-black border-0">
             <StatusContent />
           </DrawerContent>
         </Drawer>
       ) : (
-        <Dialog open={open && !showShareModal} onOpenChange={onOpenChange}>
+        <Dialog open={open && !showShareModal && !showVenueConfirm} onOpenChange={onOpenChange}>
           <DialogContent className="bg-gradient-to-b from-[#3d2b5f] via-[#2a1f4a] to-black border-0 shadow-[0_0_60px_rgba(147,51,234,0.8)] max-w-md p-0 overflow-hidden">
             <StatusContent />
           </DialogContent>
@@ -424,6 +561,21 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
           <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden">
             <ShareLocationContent />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Venue Confirmation Modal */}
+      {isMobile ? (
+        <Drawer open={showVenueConfirm} onOpenChange={setShowVenueConfirm}>
+          <DrawerContent className="bg-[#2d1b4e] border-0">
+            <VenueConfirmContent />
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={showVenueConfirm} onOpenChange={setShowVenueConfirm}>
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden">
+            <VenueConfirmContent />
           </DialogContent>
         </Dialog>
       )}
