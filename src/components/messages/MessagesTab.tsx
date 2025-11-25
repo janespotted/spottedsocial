@@ -56,19 +56,31 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
   }, [preselectedUser]);
 
   const fetchThreads = async () => {
+    console.log('📨 Fetching message threads...');
+    
     // Get user's thread memberships
-    const { data: threadMemberships } = await supabase
+    const { data: threadMemberships, error: membershipsError } = await supabase
       .from('dm_thread_members')
       .select('thread_id')
       .eq('user_id', user?.id);
 
-    if (!threadMemberships) return;
+    console.log('Thread memberships:', threadMemberships?.length || 0, 'threads');
+    
+    if (membershipsError) {
+      console.error('Error fetching thread memberships:', membershipsError);
+      return;
+    }
+
+    if (!threadMemberships || threadMemberships.length === 0) {
+      console.log('No thread memberships found');
+      return;
+    }
 
     // For each thread, get the other member and latest message
     const threadsData = await Promise.all(
       threadMemberships.map(async ({ thread_id }) => {
         // Get other member
-        const { data: members } = await supabase
+        const { data: members, error: membersError } = await supabase
           .from('dm_thread_members')
           .select(`
             user_id,
@@ -80,6 +92,11 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
           .eq('thread_id', thread_id)
           .neq('user_id', user?.id)
           .single();
+
+        if (membersError) {
+          console.error('Error fetching thread members:', membersError);
+          return null;
+        }
 
         // Get latest message with sender info
         const { data: latestMessage } = await supabase
@@ -101,7 +118,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
         const isUnread = latestMessage?.sender_id === members?.user_id && 
                         (Date.now() - new Date(latestMessage.created_at).getTime() < 30 * 60000);
 
-        return {
+        const threadData = {
           id: thread_id,
           user_id: members?.user_id,
           profiles: members?.profiles,
@@ -109,10 +126,21 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
           last_message: latestMessage,
           unread_count: isUnread ? 1 : 0,
         };
+        
+        console.log('Thread data:', {
+          id: thread_id.slice(0, 8),
+          hasProfiles: !!members?.profiles,
+          hasMessage: !!latestMessage,
+          venue: status?.venue_name,
+        });
+        
+        return threadData;
       })
     );
 
-    setThreads(threadsData.filter(t => t.profiles));
+    const validThreads = threadsData.filter(t => t && t.profiles);
+    console.log('Valid threads:', validThreads.length);
+    setThreads(validThreads);
   };
 
   const getTimeAgo = (date: string) => {
