@@ -23,6 +23,7 @@ export type Database = {
           lat: number
           lng: number
           user_id: string
+          venue_id: string | null
           venue_name: string
         }
         Insert: {
@@ -33,6 +34,7 @@ export type Database = {
           lat: number
           lng: number
           user_id: string
+          venue_id?: string | null
           venue_name: string
         }
         Update: {
@@ -43,6 +45,7 @@ export type Database = {
           lat?: number
           lng?: number
           user_id?: string
+          venue_id?: string | null
           venue_name?: string
         }
         Relationships: [
@@ -51,6 +54,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkins_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
             referencedColumns: ["id"]
           },
         ]
@@ -213,6 +223,7 @@ export type Database = {
           status: Database["public"]["Enums"]["night_status_enum"]
           updated_at: string | null
           user_id: string
+          venue_id: string | null
           venue_name: string | null
         }
         Insert: {
@@ -225,6 +236,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["night_status_enum"]
           updated_at?: string | null
           user_id: string
+          venue_id?: string | null
           venue_name?: string | null
         }
         Update: {
@@ -237,6 +249,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["night_status_enum"]
           updated_at?: string | null
           user_id?: string
+          venue_id?: string | null
           venue_name?: string | null
         }
         Relationships: [
@@ -245,6 +258,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "night_statuses_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
             referencedColumns: ["id"]
           },
         ]
@@ -366,6 +386,7 @@ export type Database = {
           likes_count: number | null
           text: string
           user_id: string
+          venue_id: string | null
           venue_name: string | null
         }
         Insert: {
@@ -379,6 +400,7 @@ export type Database = {
           likes_count?: number | null
           text: string
           user_id: string
+          venue_id?: string | null
           venue_name?: string | null
         }
         Update: {
@@ -392,6 +414,7 @@ export type Database = {
           likes_count?: number | null
           text?: string
           user_id?: string
+          venue_id?: string | null
           venue_name?: string | null
         }
         Relationships: [
@@ -400,6 +423,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posts_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
             referencedColumns: ["id"]
           },
         ]
@@ -745,6 +775,14 @@ export type Database = {
       can_see_location: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
+      }
+      find_nearest_venue: {
+        Args: { radius_meters?: number; user_lat: number; user_lng: number }
+        Returns: {
+          distance_meters: number
+          venue_id: string
+          venue_name: string
+        }[]
       }
       is_close_friend: {
         Args: { target_user_id: string; viewer_id: string }
