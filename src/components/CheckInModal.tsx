@@ -284,13 +284,30 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       if (error) throw error;
 
       if (status !== 'home' && lat && lng && venue) {
+        // End any active check-ins before creating a new one
+        await supabase
+          .from('checkins')
+          .update({ ended_at: new Date().toISOString() })
+          .eq('user_id', user?.id)
+          .is('ended_at', null);
+
+        // Create new check-in with tracking fields
         await supabase.from('checkins').insert({
           user_id: user?.id,
           venue_name: venue,
           venue_id: venueId,
           lat,
           lng,
+          started_at: new Date().toISOString(),
+          last_updated_at: new Date().toISOString(),
         });
+      } else if (status === 'home') {
+        // End all active check-ins when going home
+        await supabase
+          .from('checkins')
+          .update({ ended_at: new Date().toISOString() })
+          .eq('user_id', user?.id)
+          .is('ended_at', null);
       }
 
       toast({
