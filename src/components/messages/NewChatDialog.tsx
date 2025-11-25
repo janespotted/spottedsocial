@@ -42,9 +42,14 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   useEffect(() => {
     // If we have a preselected user, automatically create thread
     if (open && preselectedUser && user) {
-      createThread(preselectedUser.id);
+      createThreadWithPreselectedUser();
     }
   }, [open, preselectedUser, user]);
+
+  const createThreadWithPreselectedUser = async () => {
+    if (!preselectedUser || !user) return;
+    await createThread(preselectedUser.id);
+  };
 
   const fetchFriends = async () => {
     // Get accepted friendships
