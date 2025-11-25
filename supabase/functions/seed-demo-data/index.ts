@@ -240,7 +240,7 @@ Deno.serve(async (req) => {
 
       // 4. Insert all NYC venues into venues table first
       console.log('Inserting all 34 NYC venues...');
-      const PROMOTED_VENUE_NAMES = ['Le Bain', 'Superbueno'];
+      const PROMOTED_VENUE_NAMES = ['Unveiled', 'Studio Maison Nur'];
       
       const venuesToInsert = NYC_VENUES.map(v => ({
         name: v.name,
