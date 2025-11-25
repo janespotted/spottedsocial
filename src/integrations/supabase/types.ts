@@ -805,6 +805,7 @@ export type Database = {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
       }
+      user_is_thread_member: { Args: { thread_uuid: string }; Returns: boolean }
     }
     Enums: {
       friendship_status_enum: "pending" | "accepted" | "blocked"
