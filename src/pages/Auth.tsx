@@ -91,13 +91,13 @@ export default function Auth() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-background via-background to-accent/10">
-      <Card className="w-full max-w-[430px] border-primary/20 shadow-lg shadow-primary/5">
-        <CardHeader className="space-y-2 text-center">
-          <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Spotted
+    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
+      <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#0a0118] rounded-3xl">
+        <CardHeader className="space-y-2 text-center pt-8">
+          <CardTitle className="text-5xl font-bold text-[#d4ff00] tracking-[0.3em]">
+            SPOTTED
           </CardTitle>
-          <CardDescription className="text-base">
+          <CardDescription className="text-base text-white/60">
             {isLogin ? 'Welcome back! Sign in to see who\'s out tonight.' : 'Join Spotted to see where your friends are tonight.'}
           </CardDescription>
         </CardHeader>
@@ -106,7 +106,7 @@ export default function Auth() {
             {!isLogin && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="displayName">Display Name</Label>
+                  <Label htmlFor="displayName" className="text-white">Display Name</Label>
                   <Input
                     id="displayName"
                     type="text"
@@ -114,10 +114,11 @@ export default function Auth() {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     required={!isLogin}
+                    className="border-[#a855f7]/40 focus:border-[#a855f7] focus:shadow-[0_0_15px_rgba(168,85,247,0.4)] bg-[#1a0f2e] text-white"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="username" className="text-white">Username</Label>
                   <Input
                     id="username"
                     type="text"
@@ -125,12 +126,13 @@ export default function Auth() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required={!isLogin}
+                    className="border-[#a855f7]/40 focus:border-[#a855f7] focus:shadow-[0_0_15px_rgba(168,85,247,0.4)] bg-[#1a0f2e] text-white"
                   />
                 </div>
               </>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-white">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -138,10 +140,11 @@ export default function Auth() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="border-[#a855f7]/40 focus:border-[#a855f7] focus:shadow-[0_0_15px_rgba(168,85,247,0.4)] bg-[#1a0f2e] text-white"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-white">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -150,11 +153,12 @@ export default function Auth() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
+                className="border-[#a855f7]/40 focus:border-[#a855f7] focus:shadow-[0_0_15px_rgba(168,85,247,0.4)] bg-[#1a0f2e] text-white"
               />
             </div>
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+              className="w-full bg-[#a855f7] hover:bg-[#a855f7]/90 shadow-[0_0_15px_rgba(168,85,247,0.6)] hover:shadow-[0_0_25px_rgba(168,85,247,0.8)] transition-all text-white font-semibold"
               disabled={loading}
             >
               {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Sign Up'}
@@ -162,7 +166,7 @@ export default function Auth() {
             <Button
               type="button"
               variant="ghost"
-              className="w-full"
+              className="w-full text-white/80 hover:text-white hover:bg-[#a855f7]/20"
               onClick={() => setIsLogin(!isLogin)}
             >
               {isLogin ? 'Don\'t have an account? Sign up' : 'Already have an account? Sign in'}
