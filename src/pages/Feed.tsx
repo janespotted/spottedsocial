@@ -398,6 +398,17 @@ export default function Feed() {
 
     const isLiked = likedPosts.has(postId);
     
+    // Optimistically update UI immediately
+    setPosts(prev => prev.map(p => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          likes_count: isLiked ? Math.max((p.likes_count || 0) - 1, 0) : (p.likes_count || 0) + 1
+        };
+      }
+      return p;
+    }));
+
     // Trigger animation
     if (!isLiked) {
       setAnimatingLike(postId);
@@ -414,6 +425,16 @@ export default function Feed() {
 
       if (error) {
         console.error('Error unliking post:', error);
+        // Revert optimistic update on error
+        setPosts(prev => prev.map(p => {
+          if (p.id === postId) {
+            return {
+              ...p,
+              likes_count: (p.likes_count || 0) + 1
+            };
+          }
+          return p;
+        }));
         return;
       }
 
@@ -433,6 +454,16 @@ export default function Feed() {
 
       if (error) {
         console.error('Error liking post:', error);
+        // Revert optimistic update on error
+        setPosts(prev => prev.map(p => {
+          if (p.id === postId) {
+            return {
+              ...p,
+              likes_count: Math.max((p.likes_count || 0) - 1, 0)
+            };
+          }
+          return p;
+        }));
         return;
       }
 
