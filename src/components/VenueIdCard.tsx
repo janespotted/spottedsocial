@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { MapPin, Clock, DollarSign, Plus } from 'lucide-react';
+import { MapPin, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface VenueData {
@@ -30,8 +30,6 @@ export function VenueIdCard() {
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendAtVenue[]>([]);
   const [distance, setDistance] = useState<string>('--');
-  const [timeIndicator] = useState('10m'); // Placeholder
-  const [priceIndicator] = useState('$20'); // Placeholder
 
   useEffect(() => {
     if (selectedVenueId) {
@@ -163,18 +161,6 @@ export function VenueIdCard() {
               <p className="text-sm text-white/60 italic">
                 {venue.neighborhood} ({distance} miles)
               </p>
-            </div>
-          </div>
-
-          {/* Stats Row */}
-          <div className="flex gap-4 mb-4">
-            <div className="flex items-center gap-2 px-3 py-2 bg-[#a855f7]/10 rounded-lg border border-[#a855f7]/20">
-              <Clock className="w-4 h-4 text-[#d4ff00]" />
-              <span className="text-[#d4ff00] font-semibold text-sm">{timeIndicator}</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-2 bg-[#a855f7]/10 rounded-lg border border-[#a855f7]/20">
-              <DollarSign className="w-4 h-4 text-[#d4ff00]" />
-              <span className="text-[#d4ff00] font-semibold text-sm">{priceIndicator}</span>
             </div>
           </div>
 
