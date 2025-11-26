@@ -8,7 +8,7 @@ import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronUp, ChevronDown, BarChart3, Clock, DollarSign } from 'lucide-react';
+import { ChevronUp, ChevronDown, BarChart3 } from 'lucide-react';
 
 interface VenueStats {
   venue_name: string;
@@ -33,8 +33,6 @@ interface BiggestMover {
     display_name: string;
     avatar_url: string | null;
   }[];
-  timeAgo: string;
-  coverCharge?: number;
 }
 
 export default function Leaderboard() {
@@ -47,6 +45,32 @@ export default function Leaderboard() {
   useAutoVenueTracking(); // Trigger auto-venue tracking on leaderboard view
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
+
+  const calculateEnergyLevel = (
+    userCount: number, 
+    popularityRank: number, 
+    isBootstrapMode: boolean
+  ): number => {
+    if (!isBootstrapMode) {
+      // Production mode: 100% user data
+      return Math.min(userCount, 3) || 1;
+    }
+    
+    // Bootstrap/Hybrid mode: 75% reputation + 25% user data
+    let reputationScore: number;
+    if (popularityRank <= 7) {
+      reputationScore = 3; // Top tier venues
+    } else if (popularityRank <= 15) {
+      reputationScore = 2; // Mid tier venues
+    } else {
+      reputationScore = 1; // Lower tier venues
+    }
+    
+    const userScore = Math.min(userCount, 3) || 1;
+    const weightedScore = (0.75 * reputationScore) + (0.25 * userScore);
+    
+    return Math.round(weightedScore);
+  };
 
   const handleVenueClick = async (venueName: string, venueId?: string | null) => {
     if (venueId) {
@@ -165,7 +189,7 @@ export default function Leaderboard() {
       ...venue,
       rank: index + 1,
       movement: Math.random() > 0.5 ? 'up' : (Math.random() > 0.5 ? 'down' : 'same') as 'up' | 'down' | 'same',
-      energyLevel: Math.min(venue.count, 3),
+      energyLevel: calculateEnergyLevel(venue.count, venue.popularity_rank, bootstrapEnabled),
     }));
 
     // Assign properties to promoted venues (no rank)
@@ -173,7 +197,7 @@ export default function Leaderboard() {
       ...venue,
       rank: 0, // No rank for promoted
       movement: 'same' as const,
-      energyLevel: Math.min(venue.count, 3),
+      energyLevel: calculateEnergyLevel(venue.count, venue.popularity_rank, bootstrapEnabled),
     }));
 
     // Combine: promoted first, then ranked
@@ -188,8 +212,6 @@ export default function Leaderboard() {
         venue_name: moverVenue.venue_name,
         venue_id: moverVenue.venue_id,
         friends: moverVenue.friends.slice(0, 3),
-        timeAgo: '10m',
-        coverCharge: 20,
       });
     }
   };
@@ -396,18 +418,6 @@ export default function Leaderboard() {
                   {biggestMover.venue_name}
                   <BarChart3 className="h-5 w-5" />
                 </button>
-                <div className="flex items-center gap-4 mt-2">
-                  <div className="flex items-center gap-1 text-white/80 text-sm">
-                    <Clock className="h-4 w-4" />
-                    <span>{biggestMover.timeAgo}</span>
-                  </div>
-                  {biggestMover.coverCharge && (
-                    <div className="flex items-center gap-1 text-white/80 text-sm">
-                      <DollarSign className="h-4 w-4" />
-                      <span>${biggestMover.coverCharge}</span>
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/* Friend Avatars */}
