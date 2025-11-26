@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Story {
   id: string;
@@ -37,6 +38,7 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchStories(allStoryUsers[userIndex]);
@@ -117,19 +119,36 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
 
   const handleReply = async () => {
     if (!replyText.trim() || sending) return;
+    
+    if (!user) {
+      toast.error('Please sign in to reply to stories');
+      return;
+    }
+
+    const currentStory = stories[currentStoryIndex];
+    const storyAuthorId = currentStory.user_id;
+    
+    // Don't allow replying to your own story
+    if (storyAuthorId === user.id) {
+      toast.error("You can't reply to your own story");
+      setSending(false);
+      return;
+    }
 
     setSending(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const storyAuthorId = currentStory.user_id;
-      
       // Find or create thread
-      const { data: existingThreads } = await supabase
+      const { data: existingThreads, error: threadSearchError } = await supabase
         .from('dm_thread_members')
         .select('thread_id')
         .eq('user_id', user.id);
+
+      if (threadSearchError) {
+        console.error('Error searching threads:', threadSearchError);
+        toast.error('Failed to send reply');
+        setSending(false);
+        return;
+      }
 
       let threadId: string | null = null;
 
@@ -148,36 +167,55 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
       }
 
       if (!threadId) {
-        const { data: newThread } = await supabase
+        const { data: newThread, error: createError } = await supabase
           .from('dm_threads')
           .insert({})
           .select()
           .single();
 
-        if (newThread) {
-          threadId = newThread.id;
-          await supabase.from('dm_thread_members').insert([
-            { thread_id: threadId, user_id: user.id },
-            { thread_id: threadId, user_id: storyAuthorId }
-          ]);
+        if (createError || !newThread) {
+          console.error('Error creating thread:', createError);
+          toast.error('Failed to create conversation');
+          setSending(false);
+          return;
+        }
+
+        threadId = newThread.id;
+        
+        const { error: membersError } = await supabase.from('dm_thread_members').insert([
+          { thread_id: threadId, user_id: user.id },
+          { thread_id: threadId, user_id: storyAuthorId }
+        ]);
+
+        if (membersError) {
+          console.error('Error adding thread members:', membersError);
+          toast.error('Failed to create conversation');
+          setSending(false);
+          return;
         }
       }
 
-      if (threadId) {
-        const contextMessage = currentStory.venue_name 
-          ? `Replied to your story at ${currentStory.venue_name}: ${replyText}`
-          : `Replied to your story: ${replyText}`;
+      const contextMessage = currentStory.venue_name 
+        ? `Replied to your story at ${currentStory.venue_name}: ${replyText}`
+        : `Replied to your story: ${replyText}`;
 
-        await supabase.from('dm_messages').insert({
-          thread_id: threadId,
-          sender_id: user.id,
-          text: contextMessage
-        });
+      const { error: messageError } = await supabase.from('dm_messages').insert({
+        thread_id: threadId,
+        sender_id: user.id,
+        text: contextMessage
+      });
 
-        toast.success('Reply sent!');
-        onClose();
-        navigate(`/messages/thread/${threadId}`);
+      if (messageError) {
+        console.error('Error sending message:', messageError);
+        toast.error('Failed to send reply');
+        setSending(false);
+        return;
       }
+
+      toast.success('Reply sent!');
+      setReplyText('');
+      onClose();
+      navigate(`/messages/thread/${threadId}`);
     } catch (error) {
       console.error('Error sending reply:', error);
       toast.error('Failed to send reply');
