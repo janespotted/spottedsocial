@@ -362,7 +362,10 @@ export default function Home() {
 
   const getTimeAgo = (date: string) => {
     const distance = formatDistanceToNow(new Date(date), { addSuffix: false });
-    return distance.replace('about ', '').replace(' minutes', 'm').replace(' minute', 'm')
+    return distance
+      .replace(/less than a minute|a few seconds/i, '1m')
+      .replace('about ', '')
+      .replace(' minutes', 'm').replace(' minute', 'm')
       .replace(' hours', 'h').replace(' hour', 'h')
       .replace(' days', 'd').replace(' day', 'd');
   };
