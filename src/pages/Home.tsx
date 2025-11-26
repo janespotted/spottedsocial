@@ -21,7 +21,21 @@ interface Post {
   venue_name: string | null;
   venue_id: string | null;
   created_at: string;
+  comments_count: number;
   likes_count: number;
+  profiles: {
+    display_name: string;
+    username: string;
+    avatar_url: string | null;
+  };
+}
+
+interface PostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  text: string;
+  created_at: string;
   profiles: {
     display_name: string;
     username: string;
@@ -77,6 +91,9 @@ export default function Home() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [animatingLike, setAnimatingLike] = useState<string | null>(null);
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [comments, setComments] = useState<{ [key: string]: PostComment[] }>({});
+  const [newComment, setNewComment] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     if (user) {
@@ -350,6 +367,59 @@ export default function Home() {
       .replace(' days', 'd').replace(' day', 'd');
   };
 
+  const fetchComments = async (postId: string) => {
+    const { data } = await supabase
+      .from('post_comments')
+      .select(`
+        *,
+        profiles:user_id (
+          display_name,
+          username,
+          avatar_url
+        )
+      `)
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+
+    if (data) {
+      setComments(prev => ({ ...prev, [postId]: data }));
+    }
+  };
+
+  const handleToggleComments = async (postId: string) => {
+    if (expandedPostId === postId) {
+      setExpandedPostId(null);
+    } else {
+      setExpandedPostId(postId);
+      if (!comments[postId]) {
+        await fetchComments(postId);
+      }
+    }
+  };
+
+  const handlePostComment = async (postId: string) => {
+    const commentText = newComment[postId]?.trim();
+    if (!commentText || !user) return;
+
+    const { error } = await supabase.from('post_comments').insert({
+      post_id: postId,
+      user_id: user.id,
+      text: commentText,
+    });
+
+    if (error) {
+      console.error('Error posting comment:', error);
+      return;
+    }
+
+    // Clear input
+    setNewComment(prev => ({ ...prev, [postId]: '' }));
+    
+    // Refresh comments and posts
+    await fetchComments(postId);
+    await fetchPosts();
+  };
+
   const handleLikePost = async (postId: string) => {
     if (!user) return;
 
@@ -585,9 +655,12 @@ export default function Home() {
                   >
                     {post.likes_count || 0} {post.likes_count === 1 ? 'like' : 'likes'}
                   </button>
-                  <button className="flex items-center gap-2 text-white hover:text-[#d4ff00] transition-colors">
+                  <button 
+                    onClick={() => handleToggleComments(post.id)}
+                    className="flex items-center gap-2 text-white hover:text-[#d4ff00] transition-colors"
+                  >
                     <MessageCircle className="h-6 w-6" />
-                    <span className="font-semibold">4</span>
+                    <span className="font-semibold">{post.comments_count || 0}</span>
                   </button>
                   <button className="text-white hover:text-[#d4ff00] transition-colors ml-auto">
                     <Send className="h-6 w-6" />
@@ -626,6 +699,67 @@ export default function Home() {
                   </button>{' '}
                   {post.text}
                 </div>
+
+                {/* Comments Section */}
+                {expandedPostId === post.id && (
+                  <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+                    {/* Comments List */}
+                    {comments[post.id]?.map((comment) => (
+                      <div key={comment.id} className="flex gap-3">
+                        <Avatar className="h-8 w-8 flex-shrink-0">
+                          <AvatarImage src={comment.profiles?.avatar_url || undefined} />
+                          <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                            {comment.profiles?.display_name?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="bg-[#1a0f2e]/60 rounded-lg px-3 py-2">
+                            <p className="font-semibold text-white text-sm">
+                              {comment.profiles?.display_name}
+                            </p>
+                            <p className="text-white/80 text-sm break-words">{comment.text}</p>
+                          </div>
+                          <p className="text-white/40 text-xs mt-1 ml-1">
+                            {getTimeAgo(comment.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Add Comment Input */}
+                    <div className="flex gap-2 items-end pt-2">
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarImage src={user?.user_metadata?.avatar_url} />
+                        <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                          {user?.email?.[0].toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 flex gap-2">
+                        <input
+                          type="text"
+                          value={newComment[post.id] || ''}
+                          onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handlePostComment(post.id);
+                            }
+                          }}
+                          placeholder="Add a comment..."
+                          maxLength={500}
+                          className="flex-1 bg-[#1a0f2e]/60 border border-white/10 rounded-full px-4 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-[#d4ff00]/40"
+                        />
+                        <button
+                          onClick={() => handlePostComment(post.id)}
+                          disabled={!newComment[post.id]?.trim()}
+                          className="text-[#d4ff00] hover:text-[#d4ff00]/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Send className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))
