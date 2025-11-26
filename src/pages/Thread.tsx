@@ -188,9 +188,10 @@ export default function Thread() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex flex-col pb-24">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
+    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
+      <div className="max-w-[430px] mx-auto min-h-screen flex flex-col pb-24">
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-center justify-between p-4">
           <button 
             onClick={() => navigate('/messages')}
@@ -314,5 +315,6 @@ export default function Thread() {
         </form>
       </div>
     </div>
+  </div>
   );
 }
