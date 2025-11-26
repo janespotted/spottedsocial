@@ -361,8 +361,23 @@ export default function Home() {
       setTimeout(() => setAnimatingLike(null), 500);
     }
 
+    // Optimistic UI update
+    setPosts(prevPosts =>
+      prevPosts.map(post =>
+        post.id === postId
+          ? { ...post, likes_count: (post.likes_count || 0) + (isLiked ? -1 : 1) }
+          : post
+      )
+    );
+
     if (isLiked) {
       // Unlike
+      setLikedPosts(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(postId);
+        return newSet;
+      });
+
       const { error } = await supabase
         .from('post_likes')
         .delete()
@@ -371,16 +386,21 @@ export default function Home() {
 
       if (error) {
         console.error('Error unliking post:', error);
+        // Revert optimistic update
+        setPosts(prevPosts =>
+          prevPosts.map(post =>
+            post.id === postId
+              ? { ...post, likes_count: (post.likes_count || 0) + 1 }
+              : post
+          )
+        );
+        setLikedPosts(prev => new Set(prev).add(postId));
         return;
       }
-
-      setLikedPosts(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(postId);
-        return newSet;
-      });
     } else {
       // Like
+      setLikedPosts(prev => new Set(prev).add(postId));
+
       const { error } = await supabase
         .from('post_likes')
         .insert({
@@ -390,10 +410,21 @@ export default function Home() {
 
       if (error) {
         console.error('Error liking post:', error);
+        // Revert optimistic update
+        setPosts(prevPosts =>
+          prevPosts.map(post =>
+            post.id === postId
+              ? { ...post, likes_count: (post.likes_count || 0) - 1 }
+              : post
+          )
+        );
+        setLikedPosts(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(postId);
+          return newSet;
+        });
         return;
       }
-
-      setLikedPosts(prev => new Set(prev).add(postId));
     }
   };
 
