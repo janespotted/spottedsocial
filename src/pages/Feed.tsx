@@ -6,13 +6,20 @@ import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Plus } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { StoryViewer } from '@/components/StoryViewer';
 import { CreateStoryDialog } from '@/components/CreateStoryDialog';
+import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Post {
   id: string;
@@ -492,6 +499,25 @@ export default function Feed() {
     }
   };
 
+  const handleDeletePost = async (postId: string) => {
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', postId)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error deleting post:', error);
+      toast.error('Failed to delete post');
+      return;
+    }
+    
+    setPosts(prev => prev.filter(p => p.id !== postId));
+    toast.success('Post deleted');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
       {/* Header */}
@@ -628,7 +654,27 @@ export default function Feed() {
                     )}
                   </div>
                 </div>
-                <span className="text-white/50 text-sm">{getTimeAgo(post.created_at)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-white/50 text-sm">{getTimeAgo(post.created_at)}</span>
+                  {post.user_id === user?.id && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="text-white/50 hover:text-white transition-colors p-1">
+                          <MoreHorizontal className="h-5 w-5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#4a3566]">
+                        <DropdownMenuItem 
+                          onClick={() => handleDeletePost(post.id)}
+                          className="text-red-500 hover:text-red-400 focus:text-red-400 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Post
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </div>
 
               {/* Post Actions */}
