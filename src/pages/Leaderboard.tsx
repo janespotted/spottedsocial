@@ -128,14 +128,34 @@ export default function Leaderboard() {
     }
     // If demoEnabled is true, show everything (no filter)
 
-    const { data: statuses } = await query;
+    // Also fetch promoted venues directly to ensure they always appear
+    const { data: promotedVenues } = await supabase
+      .from('venues')
+      .select('id, name, popularity_rank, is_promoted')
+      .eq('is_promoted', true);
 
-    if (!statuses) return;
+    const { data: statuses } = await query;
 
     // Group by venue, including popularity_rank
     const venueMap = new Map<string, VenueStats & { popularity_rank: number }>();
     
-    statuses.forEach((status: any) => {
+    // First, add promoted venues to ensure they always appear (even with 0 check-ins)
+    promotedVenues?.forEach((venue) => {
+      venueMap.set(venue.name, {
+        venue_name: venue.name,
+        venue_id: venue.id,
+        count: 0,
+        rank: 0,
+        movement: 'same',
+        friends: [],
+        energyLevel: 1,
+        isPromoted: true,
+        popularity_rank: venue.popularity_rank || 999,
+      });
+    });
+    
+    // Then process night statuses
+    statuses?.forEach((status: any) => {
       const venueName = status.venue_name;
       const venueId = status.venue_id;
       const isPromoted = status.venues?.is_promoted || false;

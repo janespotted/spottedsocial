@@ -272,6 +272,10 @@ Deno.serve(async (req) => {
       
       const nightStatuses = [];
       const TOP_20_VENUES = NYC_VENUES.slice(0, 20); // Top 20 by popularity_rank
+      const PROMOTED_VENUES = NYC_VENUES.filter(v => PROMOTED_VENUE_NAMES.includes(v.name));
+      
+      // Reserve last 4 demo users for promoted venues (ensures promoted venues have activity)
+      const promotedUserStartIndex = demoUserIds.length - 4;
       
       // First 20 users: assign one to each top 20 venue (ensures all top 20 have at least 1 user)
       for (let i = 0; i < 20; i++) {
@@ -292,22 +296,16 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Remaining 30 users: distribute biased toward top venues
-      // Top venues (rank 1-5) get more users than mid-tier (rank 6-15) and lower (rank 16-20)
-      for (let i = 20; i < demoUserIds.length; i++) {
-        // Weighted selection: lower rank = higher probability
-        // 50% chance top 5, 35% chance rank 6-15, 15% chance rank 16-20
+      // Next 26 users (index 20-45): distribute biased toward top venues
+      for (let i = 20; i < promotedUserStartIndex; i++) {
         const rand = Math.random();
         let selectedVenue;
         
         if (rand < 0.5) {
-          // Top 5 venues (50% of remaining users)
           selectedVenue = TOP_20_VENUES[Math.floor(Math.random() * 5)];
         } else if (rand < 0.85) {
-          // Rank 6-15 venues (35% of remaining users)
           selectedVenue = TOP_20_VENUES[5 + Math.floor(Math.random() * 10)];
         } else {
-          // Rank 16-20 venues (15% of remaining users)
           selectedVenue = TOP_20_VENUES[15 + Math.floor(Math.random() * 5)];
         }
         
@@ -324,6 +322,27 @@ Deno.serve(async (req) => {
           updated_at: getRecentTimestamp(),
           is_demo: true,
           is_promoted: false,
+        });
+      }
+      
+      // Last 4 users (index 46-49): assign to promoted venues (ensures they have activity)
+      console.log('Adding demo users to promoted venues...');
+      for (let i = 0; i < PROMOTED_VENUES.length && i < 4; i++) {
+        const venue = PROMOTED_VENUES[i];
+        const venueId = venueIdMap.get(venue.name);
+        const userId = demoUserIds[promotedUserStartIndex + i];
+        
+        nightStatuses.push({
+          user_id: userId,
+          status: 'out',
+          venue_id: venueId,
+          venue_name: venue.name,
+          lat: venue.lat,
+          lng: venue.lng,
+          expires_at: calculateExpiryTime(),
+          updated_at: getRecentTimestamp(),
+          is_demo: true,
+          is_promoted: true,
         });
       }
       
