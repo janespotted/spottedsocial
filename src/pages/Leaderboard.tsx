@@ -118,10 +118,10 @@ export default function Leaderboard() {
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString());
 
-    // Hybrid mode: show real data + promoted venues (75% fake / 25% real)
+    // Hybrid mode: show real data + ALL demo data to populate leaderboard
     if (bootstrapEnabled && !demoEnabled) {
-      // Show real data OR promoted demo venues (but not all demo data)
-      query = query.or('is_demo.eq.false,and(is_demo.eq.true,is_promoted.eq.true)');
+      // Show everything (both real and demo) to ensure leaderboard is populated
+      // No filter needed - promoted venues handled separately
     } else if (!demoEnabled) {
       // Pure real mode (only real data when bootstrap is off)
       query = query.eq('is_demo', false);
