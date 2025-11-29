@@ -680,6 +680,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_anonymous: boolean | null
+          is_demo: boolean | null
           score: number | null
           text: string
           user_id: string
@@ -690,6 +691,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_anonymous?: boolean | null
+          is_demo?: boolean | null
           score?: number | null
           text: string
           user_id: string
@@ -700,6 +702,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_anonymous?: boolean | null
+          is_demo?: boolean | null
           score?: number | null
           text?: string
           user_id?: string

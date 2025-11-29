@@ -498,7 +498,63 @@ Deno.serve(async (req) => {
           is_promoted: isPromotedVenue,
         });
       }
-      await supabaseAdmin.from('yap_messages').insert(yapMessages);
+      
+      // Insert yap messages and get their IDs back
+      const { data: insertedYaps } = await supabaseAdmin
+        .from('yap_messages')
+        .insert(yapMessages)
+        .select('id, comments_count');
+
+      // 7.5 Create demo comments for yap messages
+      console.log('Creating demo yap comments...');
+      const yapCommentTemplates = [
+        "lmaooo no way 💀",
+        "fr fr",
+        "I saw that too!!",
+        "who?? 👀",
+        "nah you're lying",
+        "this is wild",
+        "deadass",
+        "omg same",
+        "where exactly?",
+        "let's gooo",
+        "I'm dying 😂",
+        "facts",
+        "wait which one",
+        "no shot",
+        "for real though",
+        "bruh moment",
+        "I can't 😭",
+        "tell me more",
+        "need context",
+        "spill the tea ☕",
+      ];
+
+      const yapComments = [];
+      for (const yap of insertedYaps || []) {
+        const commentCount = yap.comments_count || 0;
+        for (let i = 0; i < commentCount; i++) {
+          const commentUserId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
+          const commentHandle = `User${Math.floor(100000 + Math.random() * 900000)}`;
+          const commentMinutesAgo = Math.floor(Math.random() * 25) + 1;
+          
+          yapComments.push({
+            yap_id: yap.id,
+            user_id: commentUserId,
+            text: yapCommentTemplates[Math.floor(Math.random() * yapCommentTemplates.length)],
+            is_anonymous: true,
+            author_handle: commentHandle,
+            score: Math.floor(Math.random() * 15) - 3, // -3 to 11 range
+            is_demo: true,
+            created_at: new Date(Date.now() - commentMinutesAgo * 60000).toISOString(),
+          });
+        }
+      }
+
+      if (yapComments.length > 0) {
+        await supabaseAdmin.from('yap_comments').insert(yapComments);
+        console.log(`Created ${yapComments.length} demo yap comments`);
+      }
 
       // 8. Create stories for demo users
       const storyUsers = getRandomItems(demoUserIds, 15); // 15 users with stories
@@ -666,6 +722,16 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('dm_messages').delete().in('thread_id', threadIds);
         await supabaseAdmin.from('dm_thread_members').delete().in('thread_id', threadIds);
         await supabaseAdmin.from('dm_threads').delete().in('id', threadIds);
+      }
+      // Get demo yap comment IDs for deleting related votes
+      const { data: demoYapComments } = await supabaseAdmin
+        .from('yap_comments')
+        .select('id')
+        .eq('is_demo', true);
+      const yapCommentIds = demoYapComments?.map(c => c.id) || [];
+      
+      if (yapCommentIds.length > 0) {
+        await supabaseAdmin.from('yap_comment_votes').delete().in('comment_id', yapCommentIds);
       }
       await supabaseAdmin.from('yap_comments').delete().eq('is_demo', true);
       await supabaseAdmin.from('yap_votes').delete().eq('is_demo', true);
