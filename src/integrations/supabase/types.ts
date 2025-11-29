@@ -642,12 +642,45 @@ export type Database = {
           },
         ]
       }
+      yap_comment_votes: {
+        Row: {
+          comment_id: string
+          created_at: string | null
+          id: string
+          user_id: string
+          vote_type: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string | null
+          id?: string
+          user_id: string
+          vote_type: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string
+          vote_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yap_comment_votes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "yap_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yap_comments: {
         Row: {
           author_handle: string | null
           created_at: string | null
           id: string
           is_anonymous: boolean | null
+          score: number | null
           text: string
           user_id: string
           yap_id: string
@@ -657,6 +690,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_anonymous?: boolean | null
+          score?: number | null
           text: string
           user_id: string
           yap_id: string
@@ -666,6 +700,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_anonymous?: boolean | null
+          score?: number | null
           text?: string
           user_id?: string
           yap_id?: string

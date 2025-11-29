@@ -33,6 +33,8 @@ interface YapComment {
   is_anonymous: boolean;
   author_handle: string | null;
   user_id: string;
+  score: number;
+  user_vote: 'up' | 'down' | null;
   profiles: {
     display_name: string;
     avatar_url: string | null;
@@ -254,6 +256,8 @@ export function YapTab() {
   };
 
   const fetchComments = async (yapId: string) => {
+    if (!user) return;
+
     const { data } = await supabase
       .from('yap_comments')
       .select(`
@@ -267,8 +271,82 @@ export function YapTab() {
       .order('created_at', { ascending: true });
 
     if (data) {
-      setComments(prev => ({ ...prev, [yapId]: data }));
+      // Fetch user's votes for these comments
+      const commentIds = data.map(c => c.id);
+      const { data: votes } = await supabase
+        .from('yap_comment_votes')
+        .select('comment_id, vote_type')
+        .eq('user_id', user.id)
+        .in('comment_id', commentIds);
+
+      const voteMap = new Map(votes?.map(v => [v.comment_id, v.vote_type as 'up' | 'down']) || []);
+
+      const commentsWithVotes = data.map(comment => ({
+        ...comment,
+        score: comment.score || 0,
+        user_vote: voteMap.get(comment.id) || null,
+      }));
+
+      setComments(prev => ({ ...prev, [yapId]: commentsWithVotes }));
     }
+  };
+
+  const handleCommentVote = async (yapId: string, commentId: string, voteType: 'up' | 'down') => {
+    if (!user) return;
+
+    const yapComments = comments[yapId];
+    if (!yapComments) return;
+
+    const currentComment = yapComments.find(c => c.id === commentId);
+    if (!currentComment) return;
+
+    const existingVote = currentComment.user_vote;
+    let scoreDelta = 0;
+
+    // Calculate score change
+    if (existingVote === voteType) {
+      // Remove vote
+      scoreDelta = voteType === 'up' ? -1 : 1;
+      await supabase
+        .from('yap_comment_votes')
+        .delete()
+        .eq('comment_id', commentId)
+        .eq('user_id', user.id);
+    } else if (existingVote) {
+      // Change vote
+      scoreDelta = voteType === 'up' ? 2 : -2;
+      await supabase
+        .from('yap_comment_votes')
+        .update({ vote_type: voteType })
+        .eq('comment_id', commentId)
+        .eq('user_id', user.id);
+    } else {
+      // New vote
+      scoreDelta = voteType === 'up' ? 1 : -1;
+      await supabase
+        .from('yap_comment_votes')
+        .insert({ comment_id: commentId, user_id: user.id, vote_type: voteType });
+    }
+
+    // Update score in database
+    await supabase
+      .from('yap_comments')
+      .update({ score: currentComment.score + scoreDelta })
+      .eq('id', commentId);
+
+    // Update local state
+    setComments(prev => ({
+      ...prev,
+      [yapId]: prev[yapId].map(c =>
+        c.id === commentId
+          ? {
+              ...c,
+              score: c.score + scoreDelta,
+              user_vote: existingVote === voteType ? null : voteType,
+            }
+          : c
+      ),
+    }));
   };
 
   const handleToggleComments = async (yapId: string) => {
@@ -417,6 +495,40 @@ export function YapTab() {
                                 </span>
                               </div>
                               <p className="text-white/80 text-sm">{comment.text}</p>
+                            </div>
+                            {/* Comment Vote Controls */}
+                            <div className="flex flex-col items-center gap-0.5">
+                              <button
+                                onClick={() => handleCommentVote(msg.id, comment.id, 'up')}
+                                className={cn(
+                                  'transition-colors',
+                                  comment.user_vote === 'up'
+                                    ? 'text-[#d4ff00]'
+                                    : 'text-white/40 hover:text-[#d4ff00]'
+                                )}
+                              >
+                                <ChevronUp className="h-4 w-4" />
+                              </button>
+                              <span className={cn(
+                                'font-bold text-xs',
+                                comment.score > 10 ? 'text-[#d4ff00]' :
+                                comment.score > 0 ? 'text-white' :
+                                comment.score < 0 ? 'text-red-400' :
+                                'text-white/60'
+                              )}>
+                                {comment.score}
+                              </span>
+                              <button
+                                onClick={() => handleCommentVote(msg.id, comment.id, 'down')}
+                                className={cn(
+                                  'transition-colors',
+                                  comment.user_vote === 'down'
+                                    ? 'text-[#a855f7]'
+                                    : 'text-white/40 hover:text-[#a855f7]'
+                                )}
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </button>
                             </div>
                           </div>
                         ))}
