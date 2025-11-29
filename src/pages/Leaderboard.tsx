@@ -110,7 +110,7 @@ export default function Leaderboard() {
           display_name,
           avatar_url
         ),
-        venues!inner(popularity_rank)
+        venues!inner(popularity_rank, is_promoted)
       `)
       .not('venue_name', 'is', null)
       .not('lat', 'is', null)
@@ -138,7 +138,7 @@ export default function Leaderboard() {
     statuses.forEach((status: any) => {
       const venueName = status.venue_name;
       const venueId = status.venue_id;
-      const isPromoted = status.is_promoted || false;
+      const isPromoted = status.venues?.is_promoted || false;
       const popularityRank = status.venues?.popularity_rank || 999;
       
       if (!venueMap.has(venueName)) {
