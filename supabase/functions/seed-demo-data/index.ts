@@ -255,7 +255,7 @@ Deno.serve(async (req) => {
 
       const { data: insertedVenues, error: venuesError } = await supabaseAdmin
         .from('venues')
-        .insert(venuesToInsert)
+        .upsert(venuesToInsert, { onConflict: 'name', ignoreDuplicates: false })
         .select('id, name');
 
       if (venuesError) {
