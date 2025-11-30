@@ -523,7 +523,7 @@ export default function Feed() {
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[#2d1b4e] border-b border-[#4a3566]">
-        <div className="flex items-center justify-between px-6 pt-6 pb-3">
+        <div className="flex items-start justify-between px-6 pt-6 pb-3">
           <div>
             <h1 className="text-2xl font-light tracking-[0.3em] text-white mb-1">Spotted</h1>
             <h2 className="text-3xl font-bold text-white">Newsfeed</h2>
