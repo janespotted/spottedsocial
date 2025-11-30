@@ -17,6 +17,7 @@ import { toast } from '@/hooks/use-toast';
 import { getDemoMode } from '@/lib/demo-data';
 import { captureLocationWithVenue } from '@/lib/location-service';
 import { autoTrackVenue } from '@/lib/auto-venue-tracker';
+import { haptic } from '@/lib/haptics';
 
 interface MeetUpContextType {
   recipientUserId: string | null;
@@ -144,6 +145,9 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
       setRecipientDisplayName(displayName);
       setRecipientAvatarUrl(avatarUrl);
       setShowConfirmation(true);
+      
+      // Haptic feedback for successful meet up
+      haptic.success();
       
       console.log('Meet Up notification sent to:', displayName);
     } catch (error) {

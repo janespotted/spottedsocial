@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
+import { haptic } from '@/lib/haptics';
 
 interface CheckInModalProps {
   open: boolean;
@@ -283,6 +284,9 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         .upsert(statusData, { onConflict: 'user_id' });
 
       if (error) throw error;
+
+      // Haptic feedback for successful check-in
+      haptic.medium();
 
       if (status !== 'home' && lat && lng && venue) {
         // End any active check-ins before creating a new one

@@ -8,6 +8,7 @@ import { MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 
 interface FriendData {
   id: string;
@@ -285,9 +286,17 @@ export function FriendIdCard() {
     closeFriendCard();
   };
 
+  const swipeHandlers = useSwipeGesture({
+    onSwipeDown: closeFriendCard,
+    threshold: 50
+  });
+
   return (
     <Dialog open={!!selectedFriend} onOpenChange={(open) => !open && closeFriendCard()}>
-      <DialogContent className="w-[90%] max-w-[400px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
+      <DialogContent 
+        className="w-[90%] max-w-[400px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden"
+        {...swipeHandlers}
+      >
         {!selectedFriend ? (
           <div className="py-8 px-6 flex items-center justify-center">
             <p className="text-white/60">Loading...</p>
