@@ -8,6 +8,7 @@ import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { PullToRefresh } from '@/components/PullToRefresh';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { ChevronUp, ChevronDown, BarChart3 } from 'lucide-react';
 
@@ -274,7 +275,8 @@ export default function Leaderboard() {
       </div>
 
       {/* Leaderboard List */}
-      <div className="px-4 py-6 space-y-3">
+      <PullToRefresh onRefresh={fetchLeaderboard}>
+        <div className="px-4 py-6 space-y-3">
         {/* Promoted Section */}
         {venues.filter(v => v.isPromoted).length > 0 && (
           <>
@@ -418,12 +420,20 @@ export default function Leaderboard() {
         ))}
 
         {venues.length === 0 && (
-          <div className="text-center py-12">
-            <BarChart3 className="h-16 w-16 mx-auto text-white/20 mb-4" />
-            <p className="text-white/60">No venues with active check-ins yet</p>
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+              <BarChart3 className="h-10 w-10 text-[#a855f7]/60" />
+            </div>
+            <h3 className="text-xl font-semibold text-white mb-2">
+              No venues trending yet
+            </h3>
+            <p className="text-white/50 text-sm max-w-xs">
+              Check in to be the first! Venues appear here when friends are out.
+            </p>
           </div>
         )}
-      </div>
+        </div>
+      </PullToRefresh>
 
       {/* Biggest Mover Card */}
       {biggestMover && (

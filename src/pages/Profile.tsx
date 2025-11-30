@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { MapPin, Users, ChevronDown, Share2, Settings, LogOut } from 'lucide-react';
+import { MapPin, Users, ChevronDown, Share2, Settings, LogOut, Bookmark } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -301,9 +301,16 @@ export default function Profile() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <p className="text-white/60">Add places you want to go</p>
-              <p className="text-white/40 text-sm mt-2">to your Wishlist</p>
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-[#2d1b4e]/30 rounded-2xl border border-[#a855f7]/10">
+              <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+                <Bookmark className="h-8 w-8 text-[#a855f7]/60" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">
+                No saved places yet
+              </h3>
+              <p className="text-white/50 text-sm max-w-xs">
+                Tap the ❤️ on venues you want to visit and they'll appear here
+              </p>
             </div>
           )}
         </div>

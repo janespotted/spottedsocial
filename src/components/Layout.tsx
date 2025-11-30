@@ -1,8 +1,10 @@
 import { ReactNode } from 'react';
 import { BottomNav } from './BottomNav';
 import { CheckInModal } from './CheckInModal';
+import { OnboardingCarousel } from './OnboardingCarousel';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useNotifications } from '@/contexts/NotificationsContext';
+import { useOnboarding } from '@/hooks/useOnboarding';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,7 +15,13 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const { showCheckIn, closeCheckIn } = useCheckIn();
   const { unreadCount } = useNotifications();
+  const { showOnboarding, completeOnboarding, loading: onboardingLoading } = useOnboarding();
   const navigate = useNavigate();
+
+  // Show onboarding for new users
+  if (!onboardingLoading && showOnboarding) {
+    return <OnboardingCarousel onComplete={completeOnboarding} />;
+  }
 
   return (
     <div className="min-h-screen bg-background pb-16">

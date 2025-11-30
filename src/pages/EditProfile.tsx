@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronLeft, LogOut, Users, Heart, Link2 } from 'lucide-react';
+import { ChevronLeft, LogOut, Users, Heart, Link2, Camera, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function EditProfile() {
@@ -19,7 +19,9 @@ export default function EditProfile() {
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [locationSharing, setLocationSharing] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('all_friends');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -44,6 +46,62 @@ export default function EditProfile() {
       if (sharing === 'close_friends' || sharing === 'all_friends' || sharing === 'mutual_friends') {
         setLocationSharing(sharing);
       }
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please upload a JPEG, PNG, or WebP image');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      // Get file extension
+      const ext = file.name.split('.').pop() || 'jpg';
+      const filePath = `${user.id}/avatar.${ext}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Add cache buster to URL
+      const newAvatarUrl = `${publicUrl}?t=${Date.now()}`;
+
+      // Update profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: newAvatarUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      setAvatarUrl(newAvatarUrl);
+      toast.success('Profile photo updated!');
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error);
+      toast.error(error.message || 'Failed to upload photo');
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -102,17 +160,34 @@ export default function EditProfile() {
       <div className="px-4 py-6 space-y-6">
         {/* Avatar */}
         <div className="flex flex-col items-center gap-4">
-          <Avatar className="h-24 w-24 border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)]">
-            <AvatarImage src={avatarUrl || undefined} />
-            <AvatarFallback className="bg-[#1a0f2e] text-white text-2xl">
-              {displayName?.[0] || 'U'}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="h-24 w-24 border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)]">
+              <AvatarImage src={avatarUrl || undefined} />
+              <AvatarFallback className="bg-[#1a0f2e] text-white text-2xl">
+                {displayName?.[0] || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            {uploadingAvatar && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
+                <Loader2 className="h-6 w-6 text-white animate-spin" />
+              </div>
+            )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleAvatarChange}
+            className="hidden"
+          />
           <Button 
             variant="outline" 
             className="border-[#a855f7] text-white hover:bg-[#a855f7]/10"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingAvatar}
           >
-            Change Photo
+            <Camera className="h-4 w-4 mr-2" />
+            {uploadingAvatar ? 'Uploading...' : 'Change Photo'}
           </Button>
         </div>
 
