@@ -1,6 +1,7 @@
 import { Home, MapPin, BarChart3, MessageSquare } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
@@ -31,12 +32,14 @@ export function BottomNav() {
               )}
             >
               {isSpecial ? (
-                <div className={cn(
-                  'text-2xl font-bold transition-all',
-                  isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]'
-                )}>
-                  {label}
-                </div>
+                <img 
+                  src={spottedLogo}
+                  alt="Profile"
+                  className={cn(
+                    'h-7 w-7 object-contain transition-all',
+                    isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]'
+                  )}
+                />
               ) : Icon ? (
                 <>
                   <Icon 

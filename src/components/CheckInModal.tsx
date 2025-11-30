@@ -7,6 +7,7 @@ import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
 import { Ghost, MapPin, Edit3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
 
@@ -328,7 +329,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       {/* Header */}
       <div className="w-full flex items-start justify-between pt-4">
         <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-        <div className="text-3xl font-bold text-[#d4ff00]">S</div>
+        <img src={spottedLogo} alt="Spotted" className="h-8 w-8 object-contain" />
       </div>
 
       {/* Main Content */}
@@ -377,7 +378,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const ShareLocationContent = () => (
     <div className="relative p-6 space-y-6">
-      <div className="absolute top-4 right-4 text-2xl font-bold text-[#d4ff00]">S</div>
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-8 w-8 object-contain" />
       
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-white">Share Your Location With:</h3>
@@ -443,7 +444,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const VenueConfirmContent = () => (
     <div className="relative p-6 space-y-6">
-      <div className="absolute top-4 right-4 text-2xl font-bold text-[#d4ff00]">S</div>
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-8 w-8 object-contain" />
       
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-white">

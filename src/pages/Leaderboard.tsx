@@ -8,6 +8,7 @@ import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { ChevronUp, ChevronDown, BarChart3 } from 'lucide-react';
 
 interface VenueStats {
@@ -265,9 +266,9 @@ export default function Leaderboard() {
           </div>
           <button 
             onClick={openCheckIn} 
-            className="text-4xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
+            className="hover:scale-110 transition-transform"
           >
-            S
+            <img src={spottedLogo} alt="Check In" className="h-10 w-10 object-contain" />
           </button>
         </div>
       </div>
