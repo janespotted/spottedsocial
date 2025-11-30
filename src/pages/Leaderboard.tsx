@@ -258,7 +258,7 @@ export default function Leaderboard() {
     <div className="min-h-screen bg-[#1a0f2e] pb-48">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
-        <div className="flex items-center justify-between p-6">
+        <div className="flex items-start justify-between p-6">
           <div>
             <h1 className="text-2xl font-light tracking-[0.3em] text-white mb-2">Spotted</h1>
             <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
