@@ -36,7 +36,7 @@ export function BottomNav() {
                   src={spottedLogo}
                   alt="Profile"
                   className={cn(
-                    'h-8 w-8 object-contain transition-all',
+                    'h-10 w-10 object-contain transition-all',
                     isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]'
                   )}
                 />
