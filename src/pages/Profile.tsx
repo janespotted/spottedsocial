@@ -153,10 +153,9 @@ export default function Profile() {
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
-        <div className="flex items-center justify-between p-6">
-          <div className="flex-1" />
+        <div className="flex items-center justify-between px-4 py-6">
           <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-          <div className="flex-1 flex justify-end gap-3">
+          <div className="flex gap-3">
             <button 
               onClick={() => navigate('/demo-settings')}
               className="w-10 h-10 rounded-full bg-[#2d1b4e] border border-[#a855f7]/40 flex items-center justify-center text-white hover:bg-[#a855f7]/20 transition-colors"
