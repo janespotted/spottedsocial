@@ -35,7 +35,7 @@ export default function Messages() {
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
-        <div className="flex items-center justify-between p-6">
+        <div className="flex items-start justify-between p-6">
           <div>
             <h1 className="text-2xl font-light tracking-[0.3em] text-white mb-1">Spotted</h1>
             <p className="text-white/60 text-sm">Everything disappears by 5am</p>
