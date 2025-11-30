@@ -122,7 +122,7 @@ export function MeetUpConfirmation() {
           </Avatar>
 
           {/* Spotted S - Top Right */}
-          <div className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center">
+          <div className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center">
             <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain" />
           </div>
 
