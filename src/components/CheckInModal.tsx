@@ -329,7 +329,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       {/* Header */}
       <div className="w-full flex items-start justify-between pt-4">
         <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-        <img src={spottedLogo} alt="Spotted" className="h-8 w-8 object-contain" />
+        <img src={spottedLogo} alt="Spotted" className="h-10 w-10 object-contain" />
       </div>
 
       {/* Main Content */}
@@ -378,7 +378,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const ShareLocationContent = () => (
     <div className="relative p-6 space-y-6">
-      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-8 w-8 object-contain" />
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
       
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-white">Share Your Location With:</h3>
@@ -444,7 +444,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const VenueConfirmContent = () => (
     <div className="relative p-6 space-y-6">
-      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-8 w-8 object-contain" />
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
       
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-white">

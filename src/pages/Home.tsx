@@ -542,7 +542,7 @@ export default function Home() {
             onClick={openCheckIn}
             className="hover:scale-110 transition-transform"
           >
-            <img src={spottedLogo} alt="Check In" className="h-10 w-10 object-contain" />
+            <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
           </button>
         </div>
 
