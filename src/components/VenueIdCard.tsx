@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { MapPin, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 
 interface VenueData {
   id: string;
@@ -130,6 +131,11 @@ export function VenueIdCard() {
     }
   };
 
+  const swipeHandlers = useSwipeGesture({
+    onSwipeDown: closeVenueCard,
+    threshold: 50
+  });
+
   if (!selectedVenueId || !venue) return null;
 
   const visibleFriends = friendsAtVenue.slice(0, 4);
@@ -137,7 +143,10 @@ export function VenueIdCard() {
 
   return (
     <Dialog open={!!selectedVenueId} onOpenChange={(open) => !open && closeVenueCard()}>
-      <DialogContent className="w-[90%] max-w-[400px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
+      <DialogContent 
+        className="w-[90%] max-w-[400px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden"
+        {...swipeHandlers}
+      >
         <div className="p-5">
           {/* Top Row: Image + Info */}
           <div className="flex gap-4 mb-4">
