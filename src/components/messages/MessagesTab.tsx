@@ -4,9 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, MessageSquare } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { NewChatDialog } from './NewChatDialog';
+import { PullToRefresh } from '@/components/PullToRefresh';
 
 interface Thread {
   id: string;
@@ -146,49 +147,63 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
   };
 
   return (
-    <div className="space-y-4">
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
-        <input
-          type="text"
-          placeholder="Search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-[#0a0118] border border-[#a855f7]/20 rounded-full pl-12 pr-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-[#a855f7]/50"
+    <PullToRefresh onRefresh={fetchThreads}>
+      <div className="space-y-4">
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
+          <input
+            type="text"
+            placeholder="Search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-[#0a0118] border border-[#a855f7]/20 rounded-full pl-12 pr-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-[#a855f7]/50"
+          />
+        </div>
+
+        {/* Messages Header */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white">Messages</h2>
+          <button 
+            onClick={() => setShowNewChat(true)}
+            className="text-white hover:text-[#d4ff00] transition-colors"
+          >
+            <Plus className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* New Chat Dialog */}
+        <NewChatDialog 
+          open={showNewChat} 
+          onOpenChange={(open) => {
+            setShowNewChat(open);
+            if (!open && onClearPreselection) {
+              onClearPreselection();
+            }
+          }}
+          preselectedUser={preselectedUser}
         />
-      </div>
 
-      {/* Messages Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Messages</h2>
-        <button 
-          onClick={() => setShowNewChat(true)}
-          className="text-white hover:text-[#d4ff00] transition-colors"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
-      </div>
-
-      {/* New Chat Dialog */}
-      <NewChatDialog 
-        open={showNewChat} 
-        onOpenChange={(open) => {
-          setShowNewChat(open);
-          if (!open && onClearPreselection) {
-            onClearPreselection();
-          }
-        }}
-        preselectedUser={preselectedUser}
-      />
-
-      {/* Messages List */}
-      <div className="space-y-3">
-        {threads.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-white/60">No messages yet</p>
-            <p className="text-white/40 text-sm mt-2">Start chatting with friends</p>
-          </div>
+        {/* Messages List */}
+        <div className="space-y-3">
+          {threads.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+                <MessageSquare className="h-10 w-10 text-[#a855f7]/60" />
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">
+                No messages yet
+              </h3>
+              <p className="text-white/50 text-sm max-w-xs mb-6">
+                Start a conversation with friends to see your messages here
+              </p>
+              <button
+                onClick={() => setShowNewChat(true)}
+                className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6 py-2 font-medium transition-colors"
+              >
+                Start a Chat
+              </button>
+            </div>
         ) : (
           threads.map((thread) => (
             <div
@@ -247,5 +262,6 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
         )}
       </div>
     </div>
+    </PullToRefresh>
   );
 }

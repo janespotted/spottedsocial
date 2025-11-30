@@ -15,6 +15,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { StoryViewer } from '@/components/StoryViewer';
 import { CreateStoryDialog } from '@/components/CreateStoryDialog';
 import { toast } from 'sonner';
+import { PullToRefresh } from '@/components/PullToRefresh';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -584,11 +585,19 @@ export default function Feed() {
       </div>
 
       {/* Posts Feed */}
-      <div className="px-4 py-6 space-y-6">
+      <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); }}>
+        <div className="px-4 py-6 space-y-6">
         {posts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-white/60">No posts yet from friends</p>
-            <p className="text-white/40 text-sm mt-2">Posts disappear by 5am</p>
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+              <MessageCircle className="h-10 w-10 text-[#a855f7]/60" />
+            </div>
+            <h3 className="text-xl font-semibold text-white mb-2">
+              Your friends are quiet tonight
+            </h3>
+            <p className="text-white/50 text-sm max-w-xs">
+              When they check in and post, their updates will appear here. Posts disappear by 5am.
+            </p>
           </div>
         ) : (
           posts.map((post) => (
@@ -809,7 +818,8 @@ export default function Feed() {
             </div>
           ))
         )}
-      </div>
+        </div>
+      </PullToRefresh>
 
       {/* Floating Create Post Button */}
       <div className="fixed bottom-24 right-0 left-0 z-20 flex justify-end px-6 pointer-events-none max-w-[430px] mx-auto">

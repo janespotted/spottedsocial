@@ -449,6 +449,7 @@ export type Database = {
           bio: string | null
           created_at: string | null
           display_name: string
+          has_onboarded: boolean | null
           home_city: string | null
           id: string
           is_demo: boolean | null
@@ -465,6 +466,7 @@ export type Database = {
           bio?: string | null
           created_at?: string | null
           display_name: string
+          has_onboarded?: boolean | null
           home_city?: string | null
           id: string
           is_demo?: boolean | null
@@ -481,6 +483,7 @@ export type Database = {
           bio?: string | null
           created_at?: string | null
           display_name?: string
+          has_onboarded?: boolean | null
           home_city?: string | null
           id?: string
           is_demo?: boolean | null
