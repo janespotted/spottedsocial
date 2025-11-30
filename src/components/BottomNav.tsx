@@ -5,7 +5,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
-  { to: '/leaderboard', icon: BarChart3, label: 'Activity' },
+  { to: '/leaderboard', icon: BarChart3, label: 'Leaderboard' },
   { to: '/map', icon: MapPin, label: 'Map', isCenter: true },
   { to: '/messages', icon: MessageSquare, label: 'Messages' },
   { to: '/profile', icon: null, label: 'S', isSpecial: true },
