@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { cn } from '@/lib/utils';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { MessagesTab } from '@/components/messages/MessagesTab';
 import { YapTab } from '@/components/messages/YapTab';
 import { ActivityTab } from '@/components/messages/ActivityTab';
@@ -41,9 +42,9 @@ export default function Messages() {
           </div>
           <button 
             onClick={openCheckIn}
-            className="text-4xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
+            className="hover:scale-110 transition-transform"
           >
-            S
+            <img src={spottedLogo} alt="Check In" className="h-10 w-10 object-contain" />
           </button>
         </div>
 

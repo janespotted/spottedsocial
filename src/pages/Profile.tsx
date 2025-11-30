@@ -5,6 +5,7 @@ import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { MapPin, Users, ChevronDown, Share2, Settings, LogOut } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
@@ -164,9 +165,9 @@ export default function Profile() {
             </button>
             <button 
               onClick={openCheckIn}
-              className="w-10 h-10 rounded-full bg-[#d4ff00] flex items-center justify-center text-2xl font-bold text-[#1a0f2e] hover:scale-110 transition-transform"
+              className="hover:scale-110 transition-transform"
             >
-              S
+              <img src={spottedLogo} alt="Check In" className="h-10 w-10 object-contain" />
             </button>
           </div>
         </div>

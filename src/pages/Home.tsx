@@ -18,6 +18,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { StoryViewer } from '@/components/StoryViewer';
 import { CreateStoryDialog } from '@/components/CreateStoryDialog';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { PostLikesModal } from '@/components/PostLikesModal';
 
 interface Post {
@@ -539,9 +540,9 @@ export default function Home() {
           </div>
           <button 
             onClick={openCheckIn}
-            className="text-4xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
+            className="hover:scale-110 transition-transform"
           >
-            S
+            <img src={spottedLogo} alt="Check In" className="h-10 w-10 object-contain" />
           </button>
         </div>
 

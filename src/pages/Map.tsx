@@ -8,6 +8,7 @@ import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -617,9 +618,9 @@ export default function Map() {
         <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
         <button 
           onClick={openCheckIn} 
-          className="text-4xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
+          className="hover:scale-110 transition-transform"
         >
-          S
+          <img src={spottedLogo} alt="Check In" className="h-10 w-10 object-contain" />
         </button>
       </div>
 

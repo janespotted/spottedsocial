@@ -11,6 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { StoryViewer } from '@/components/StoryViewer';
 import { CreateStoryDialog } from '@/components/CreateStoryDialog';
 import { toast } from 'sonner';
@@ -530,9 +531,9 @@ export default function Feed() {
           </div>
           <button 
             onClick={openCheckIn} 
-            className="text-5xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
+            className="hover:scale-110 transition-transform"
           >
-            S
+            <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
           </button>
         </div>
 

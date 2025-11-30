@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, MessageCircle } from 'lucide-react';
 import { useEffect } from 'react';
 import confetti from 'canvas-confetti';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 
 export function MeetUpConfirmation() {
   const { recipientUserId, recipientDisplayName, recipientAvatarUrl, showConfirmation, closeConfirmation } = useMeetUp();
@@ -121,8 +122,8 @@ export function MeetUpConfirmation() {
           </Avatar>
 
           {/* Spotted S - Top Right */}
-          <div className="absolute top-6 right-6 w-10 h-10 rounded-full bg-[#d4ff00] flex items-center justify-center shadow-[0_0_20px_rgba(212,255,0,0.8)]">
-            <span className="text-[#2d1b4e] text-xl font-bold">S</span>
+          <div className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center">
+            <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain" />
           </div>
 
           {/* Center Content */}
