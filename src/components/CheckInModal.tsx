@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
-import { Ghost, MapPin, Edit3, Clock, Bell } from 'lucide-react';
+import { Ghost, MapPin, Edit3, Clock, Bell, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
 import { haptic } from '@/lib/haptics';
+import { requestNotificationPermission } from '@/lib/notifications';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -42,6 +43,22 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const locationIntervalRef = useRef<number | null>(null);
   const [showCustomReminder, setShowCustomReminder] = useState(false);
   const [customReminderMinutes, setCustomReminderMinutes] = useState('');
+  const [hasPendingReminder, setHasPendingReminder] = useState(false);
+  const [pendingReminderTime, setPendingReminderTime] = useState<number | null>(null);
+
+  // Check for pending reminder when modal opens
+  useEffect(() => {
+    if (open) {
+      const reminderTime = localStorage.getItem('checkin_reminder');
+      if (reminderTime) {
+        setHasPendingReminder(true);
+        setPendingReminderTime(Number(reminderTime));
+      } else {
+        setHasPendingReminder(false);
+        setPendingReminderTime(null);
+      }
+    }
+  }, [open]);
 
   // Load current location sharing level from profile
   useEffect(() => {
@@ -174,7 +191,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     }
   };
 
-  const handleSetReminder = (minutes: number) => {
+  const handleSetReminder = async (minutes: number) => {
+    // Request notification permission
+    await requestNotificationPermission();
+    
     const reminderTime = Date.now() + minutes * 60 * 1000;
     localStorage.setItem('checkin_reminder', String(reminderTime));
     
@@ -182,6 +202,28 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     const label = minutes >= 60 ? `${minutes / 60} hr${minutes > 60 ? 's' : ''}` : `${minutes} mins`;
     sonnerToast.success(`We'll remind you in ${label}! ⏰`);
     onOpenChange(false);
+  };
+
+  const handleCancelReminder = () => {
+    localStorage.removeItem('checkin_reminder');
+    setHasPendingReminder(false);
+    setPendingReminderTime(null);
+    haptic.light();
+    sonnerToast.success('Reminder cancelled');
+  };
+
+  const getRemainingTime = (): string => {
+    if (!pendingReminderTime) return '';
+    const remaining = pendingReminderTime - Date.now();
+    if (remaining <= 0) return '';
+    
+    const mins = Math.ceil(remaining / 60000);
+    if (mins >= 60) {
+      const hrs = Math.floor(mins / 60);
+      const remainingMins = mins % 60;
+      return remainingMins > 0 ? `${hrs}h ${remainingMins}m` : `${hrs}h`;
+    }
+    return `${mins}m`;
   };
 
   const handleCustomReminderSubmit = () => {
@@ -436,6 +478,17 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                 side="top"
                 sideOffset={8}
               >
+              {hasPendingReminder && (
+                  <>
+                    <DropdownMenuItem 
+                      onClick={handleCancelReminder} 
+                      className="text-red-400 hover:bg-red-500/10 cursor-pointer py-3"
+                    >
+                      <X className="w-4 h-4 mr-3" /> Cancel reminder ({getRemainingTime()} left)
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                  </>
+                )}
                 <DropdownMenuLabel className="text-white/60 text-center py-3">
                   <Bell className="inline w-4 h-4 mr-2" />
                   Remind me to share if I'm out
