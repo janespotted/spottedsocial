@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp, MapPin, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { getDemoMode, setDemoMode, seedDemoData, clearDemoData } from '@/lib/demo-data';
+import { getDemoMode, setDemoMode, clearDemoData } from '@/lib/demo-data';
 import { getBootstrapMode, setBootstrapMode } from '@/lib/bootstrap-config';
 import { useUserCity } from '@/hooks/useUserCity';
 import { cacheCity, clearCachedCity, detectUserCity, type SupportedCity } from '@/lib/city-detection';
@@ -76,19 +76,29 @@ export default function DemoSettings() {
     }
   };
 
-  const handleSeedData = async () => {
+  const handleSeedData = async (targetCity?: SupportedCity) => {
     if (!user) return;
+    
+    const seedCity = targetCity || city;
+    const seedCityLabel = seedCity === 'la' ? 'LA' : 'NYC';
     
     setLoading(true);
     try {
-      toast.info(`Seeding ${cityLabel} demo data... This may take a moment.`);
-      const result = await seedDemoData(user.id);
-      if (result.success && result.stats) {
+      toast.info(`Seeding ${seedCityLabel} demo data... This may take a moment.`);
+      
+      // Call edge function with city parameter
+      const { data, error } = await supabase.functions.invoke('seed-demo-data', {
+        body: { action: 'seed', city: seedCity }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.stats) {
         setSeeded(true);
         toast.success(
-          `Demo environment created!\n` +
-          `${result.stats.users} users • ${result.stats.posts} posts • ` +
-          `${result.stats.yaps} yaps • ${result.stats.venues} venues`,
+          `${seedCityLabel} demo environment created!\n` +
+          `${data.stats.users} users • ${data.stats.posts} posts • ` +
+          `${data.stats.yaps} yaps • ${data.stats.venues} venues`,
           { duration: 5000 }
         );
         setTimeout(() => navigate('/feed'), 1500);
@@ -277,24 +287,54 @@ export default function DemoSettings() {
                 </p>
                 
                 {!seeded ? (
-                  <Button
-                    onClick={handleSeedData}
-                    disabled={loading}
-                    className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    {loading ? 'Seeding...' : 'Seed Demo Data'}
-                  </Button>
+                  <div className="space-y-2">
+                    <Button
+                      onClick={() => handleSeedData('nyc')}
+                      disabled={loading}
+                      className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      {loading ? 'Seeding...' : 'Seed NYC Data'}
+                    </Button>
+                    <Button
+                      onClick={() => handleSeedData('la')}
+                      disabled={loading}
+                      className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      {loading ? 'Seeding...' : 'Seed LA Data'}
+                    </Button>
+                  </div>
                 ) : (
-                  <Button
-                    onClick={handleClearData}
-                    disabled={loading}
-                    variant="outline"
-                    className="w-full border-red-500/40 text-red-400 hover:bg-red-500/10"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    {loading ? 'Clearing...' : 'Clear Demo Data'}
-                  </Button>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleSeedData('nyc')}
+                        disabled={loading}
+                        variant="outline"
+                        className="flex-1 border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10"
+                      >
+                        Re-seed NYC
+                      </Button>
+                      <Button
+                        onClick={() => handleSeedData('la')}
+                        disabled={loading}
+                        variant="outline"
+                        className="flex-1 border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10"
+                      >
+                        Re-seed LA
+                      </Button>
+                    </div>
+                    <Button
+                      onClick={handleClearData}
+                      disabled={loading}
+                      variant="outline"
+                      className="w-full border-red-500/40 text-red-400 hover:bg-red-500/10"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {loading ? 'Clearing...' : 'Clear All Demo Data'}
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
