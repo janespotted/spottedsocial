@@ -176,25 +176,27 @@ export default function EditProfile() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
-        <div className="flex items-center justify-between p-6">
-          <button 
-            onClick={() => navigate('/profile')}
-            className="text-white/60 hover:text-white transition-colors"
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </button>
-          <h1 className="text-xl font-semibold text-white">Edit Profile</h1>
-          <button 
-            onClick={handleSignOut}
-            className="text-white/60 hover:text-white transition-colors"
-          >
-            <LogOut className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
+    <>
+      <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
+        <div className="max-w-[430px] mx-auto min-h-screen pb-24">
+          {/* Header */}
+          <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
+            <div className="flex items-center justify-between p-6">
+              <button 
+                onClick={() => navigate('/profile')}
+                className="text-white/60 hover:text-white transition-colors"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              <h1 className="text-xl font-semibold text-white">Edit Profile</h1>
+              <button 
+                onClick={handleSignOut}
+                className="text-white/60 hover:text-white transition-colors"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
 
       {/* Content */}
       <div className="px-4 py-6 space-y-6">
@@ -375,6 +377,8 @@ export default function EditProfile() {
             </Button>
           </div>
         </div>
+        </div>
+        </div>
       </div>
 
       {/* Delete Account Dialog */}
@@ -424,6 +428,6 @@ export default function EditProfile() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
