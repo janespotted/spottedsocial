@@ -81,8 +81,8 @@ function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
       },
       {
         enableHighAccuracy: false,
-        timeout: 5000,
-        maximumAge: 300000, // Cache for 5 minutes
+        timeout: 10000,
+        maximumAge: 0, // Force fresh GPS reading
       }
     );
   });
