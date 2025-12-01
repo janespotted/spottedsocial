@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { BottomNav } from './BottomNav';
 import { CheckInModal } from './CheckInModal';
 import { OnboardingCarousel } from './OnboardingCarousel';
@@ -13,10 +13,29 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { showCheckIn, closeCheckIn } = useCheckIn();
+  const { showCheckIn, closeCheckIn, openCheckIn } = useCheckIn();
   const { unreadCount } = useNotifications();
   const { showOnboarding, completeOnboarding, loading: onboardingLoading } = useOnboarding();
   const navigate = useNavigate();
+
+  // Check for pending check-in reminders
+  useEffect(() => {
+    const checkReminder = () => {
+      const reminderTime = localStorage.getItem('checkin_reminder');
+      if (reminderTime && Date.now() >= Number(reminderTime)) {
+        localStorage.removeItem('checkin_reminder');
+        openCheckIn();
+      }
+    };
+    
+    // Check immediately on mount
+    checkReminder();
+    
+    // Check every 30 seconds
+    const interval = setInterval(checkReminder, 30000);
+    
+    return () => clearInterval(interval);
+  }, [openCheckIn]);
 
   // Show onboarding for new users
   if (!onboardingLoading && showOnboarding) {

@@ -5,12 +5,21 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
-import { Ghost, MapPin, Edit3 } from 'lucide-react';
+import { Ghost, MapPin, Edit3, Clock, Bell } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
 import { haptic } from '@/lib/haptics';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
+import { toast as sonnerToast } from 'sonner';
 
 interface CheckInModalProps {
   open: boolean;
@@ -31,6 +40,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [isEditingVenue, setIsEditingVenue] = useState(false);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const locationIntervalRef = useRef<number | null>(null);
+  const [showCustomReminder, setShowCustomReminder] = useState(false);
+  const [customReminderMinutes, setCustomReminderMinutes] = useState('');
 
   // Load current location sharing level from profile
   useEffect(() => {
@@ -160,6 +171,25 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       await stopLocationTracking();
       await updateStatus(status, null, null, null);
       onOpenChange(false);
+    }
+  };
+
+  const handleSetReminder = (minutes: number) => {
+    const reminderTime = Date.now() + minutes * 60 * 1000;
+    localStorage.setItem('checkin_reminder', String(reminderTime));
+    
+    haptic.light();
+    const label = minutes >= 60 ? `${minutes / 60} hr${minutes > 60 ? 's' : ''}` : `${minutes} mins`;
+    sonnerToast.success(`We'll remind you in ${label}! ⏰`);
+    onOpenChange(false);
+  };
+
+  const handleCustomReminderSubmit = () => {
+    const mins = parseInt(customReminderMinutes, 10);
+    if (!isNaN(mins) && mins > 0) {
+      handleSetReminder(mins);
+      setShowCustomReminder(false);
+      setCustomReminderMinutes('');
     }
   };
 
@@ -361,15 +391,84 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           >
             No
           </Button>
-          <Button
-            onClick={() => handleStatusUpdate('heading_out')}
-            variant="outline"
-            size="lg"
-            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-white bg-transparent text-white hover:bg-white/10 hover:text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] disabled:opacity-50"
-            disabled={isDetectingLocation}
-          >
-            {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : 'Still Deciding...'}
-          </Button>
+          {showCustomReminder ? (
+            <div className="space-y-3">
+              <Input
+                type="number"
+                value={customReminderMinutes}
+                onChange={(e) => setCustomReminderMinutes(e.target.value)}
+                placeholder="Enter minutes..."
+                className="h-14 text-lg bg-[#1a0f2e] border-2 border-white text-white placeholder:text-white/40 focus:ring-white"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setShowCustomReminder(false)}
+                  variant="outline"
+                  className="flex-1 h-12 rounded-full border-2 border-white/40 bg-transparent text-white hover:bg-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCustomReminderSubmit}
+                  disabled={!customReminderMinutes || parseInt(customReminderMinutes, 10) <= 0}
+                  className="flex-1 h-12 rounded-full bg-[#d4ff00] text-[#2d1b4e] font-semibold hover:bg-[#d4ff00]/90"
+                >
+                  Set Reminder
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full h-16 text-xl font-semibold rounded-full border-2 border-white bg-transparent text-white hover:bg-white/10 hover:text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] disabled:opacity-50"
+                  disabled={isDetectingLocation}
+                >
+                  {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : 'Still Deciding...'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent 
+                className="w-72 bg-[#1a0f2e] border-2 border-white/20 rounded-xl z-[100]"
+                align="center"
+                side="top"
+                sideOffset={8}
+              >
+                <DropdownMenuLabel className="text-white/60 text-center py-3">
+                  <Bell className="inline w-4 h-4 mr-2" />
+                  Remind me to share if I'm out
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem 
+                  onClick={() => handleSetReminder(30)} 
+                  className="text-white hover:bg-white/10 cursor-pointer py-3"
+                >
+                  <Clock className="w-4 h-4 mr-3 text-[#d4ff00]" /> In 30 minutes
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleSetReminder(60)} 
+                  className="text-white hover:bg-white/10 cursor-pointer py-3"
+                >
+                  <Clock className="w-4 h-4 mr-3 text-[#d4ff00]" /> In 1 hour
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleSetReminder(120)} 
+                  className="text-white hover:bg-white/10 cursor-pointer py-3"
+                >
+                  <Clock className="w-4 h-4 mr-3 text-[#d4ff00]" /> In 2 hours
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem 
+                  onClick={() => setShowCustomReminder(true)} 
+                  className="text-white hover:bg-white/10 cursor-pointer py-3"
+                >
+                  <Edit3 className="w-4 h-4 mr-3 text-[#d4ff00]" /> Custom time...
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
