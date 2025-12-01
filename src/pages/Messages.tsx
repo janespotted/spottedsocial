@@ -7,6 +7,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { MessagesTab } from '@/components/messages/MessagesTab';
 import { YapTab } from '@/components/messages/YapTab';
 import { ActivityTab } from '@/components/messages/ActivityTab';
+import { CityBadge } from '@/components/CityBadge';
 
 type TabType = 'messages' | 'yap' | 'activity';
 
@@ -37,7 +38,10 @@ export default function Messages() {
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-start justify-between p-6">
           <div>
-            <h1 className="text-2xl font-light tracking-[0.3em] text-white mb-1">Spotted</h1>
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
+              <CityBadge />
+            </div>
             <p className="text-white/60 text-sm">Everything disappears by 5am</p>
           </div>
           <button 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
@@ -10,6 +10,7 @@ import { MapPin, Users, ChevronDown, Share2, Settings, LogOut, Bookmark } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { CityBadge } from '@/components/CityBadge';
 
 interface WishlistPlace {
   id: string;
@@ -28,6 +29,31 @@ export default function Profile() {
   const [isLocationSharing, setIsLocationSharing] = useState(false);
   const [locationSharingLevel, setLocationSharingLevel] = useState('all_friends');
   const [wishlistPlaces, setWishlistPlaces] = useState<WishlistPlace[]>([]);
+  
+  // Triple-tap secret access to demo settings
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleHeaderTripleTap = () => {
+    tapCountRef.current += 1;
+
+    // Clear existing timer
+    if (tapTimerRef.current) {
+      clearTimeout(tapTimerRef.current);
+    }
+
+    // If triple-tapped, navigate to demo settings
+    if (tapCountRef.current === 3) {
+      navigate('/demo-settings');
+      tapCountRef.current = 0;
+      return;
+    }
+
+    // Reset counter after 500ms
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 500);
+  };
 
   useEffect(() => {
     if (user) {
@@ -154,10 +180,18 @@ export default function Profile() {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-center justify-between px-4 py-6">
-          <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleHeaderTripleTap}
+              className="text-2xl font-light tracking-[0.3em] text-white select-none"
+            >
+              Spotted
+            </button>
+            <CityBadge />
+          </div>
           <div className="flex gap-3">
             <button 
-              onClick={() => navigate('/demo-settings')}
+              onClick={() => navigate('/settings')}
               className="w-10 h-10 rounded-full bg-[#2d1b4e] border border-[#a855f7]/40 flex items-center justify-center text-white hover:bg-[#a855f7]/20 transition-colors"
             >
               <Settings className="h-5 w-5" />

@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { CityBadge } from '@/components/CityBadge';
 
 export default function Feed() {
   const { user } = useAuth();
@@ -130,7 +131,10 @@ export default function Feed() {
       <div className="sticky top-0 z-10 bg-[#2d1b4e] border-b border-[#4a3566]">
         <div className="flex items-start justify-between px-6 pt-6 pb-3">
           <div>
-            <h1 className="text-2xl font-light tracking-[0.3em] text-white mb-1">Spotted</h1>
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
+              <CityBadge />
+            </div>
             <h2 className="text-3xl font-bold text-white">Newsfeed</h2>
             <p className="text-white/50 text-sm mt-1">Everything disappears by 5am</p>
           </div>
