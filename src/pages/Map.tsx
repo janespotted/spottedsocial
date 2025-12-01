@@ -377,6 +377,18 @@ export default function Map() {
     };
   }, []);
 
+  // Re-center map when city changes
+  useEffect(() => {
+    if (!map.current) return;
+    
+    const cityCenter = CITY_CENTERS[city];
+    map.current.flyTo({
+      center: [cityCenter.lng, cityCenter.lat],
+      zoom: 13,
+      duration: 1500, // Smooth 1.5 second animation
+    });
+  }, [city]);
+
   // Add user's marker
   useEffect(() => {
     if (!map.current || !userLocation) {
