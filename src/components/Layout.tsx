@@ -7,6 +7,7 @@ import { useNotifications } from '@/contexts/NotificationsContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { showBrowserNotification } from '@/lib/notifications';
 
 interface LayoutProps {
   children: ReactNode;
@@ -24,6 +25,13 @@ export function Layout({ children }: LayoutProps) {
       const reminderTime = localStorage.getItem('checkin_reminder');
       if (reminderTime && Date.now() >= Number(reminderTime)) {
         localStorage.removeItem('checkin_reminder');
+        
+        // Show browser notification
+        showBrowserNotification(
+          'Have you made up your mind?',
+          'Are you going out tonight? Tap to let your friends know!'
+        );
+        
         openCheckIn();
       }
     };
