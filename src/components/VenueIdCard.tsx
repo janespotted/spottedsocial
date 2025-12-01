@@ -7,7 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Plus, Check, Star, Pencil } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { MapPin, Plus, Check, Star, Pencil, ChevronDown } from 'lucide-react';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -62,6 +63,7 @@ export function VenueIdCard() {
   const [averageRating, setAverageRating] = useState<number>(0);
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
 
   useEffect(() => {
     if (selectedVenueId) {
@@ -394,44 +396,66 @@ export function VenueIdCard() {
 
               {/* Reviews Section */}
               <div className="border-t border-[#a855f7]/20 pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-white">Reviews</h3>
-                  {!hasUserReviewed && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowWriteReview(true)}
-                      className="text-[#d4ff00] hover:text-[#d4ff00] hover:bg-[#d4ff00]/10"
-                    >
-                      <Pencil className="w-4 h-4 mr-1" />
-                      Write Review
-                    </Button>
-                  )}
-                </div>
+                <Collapsible open={reviewsOpen} onOpenChange={setReviewsOpen}>
+                  <CollapsibleTrigger className="w-full">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-semibold text-white">Reviews</h3>
+                        <span className="text-white/50">({reviews.length})</span>
+                        {reviews.length > 0 && (
+                          <span className="text-[#d4ff00]">{averageRating.toFixed(1)} ★</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!hasUserReviewed && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowWriteReview(true);
+                            }}
+                            className="text-[#d4ff00] hover:text-[#d4ff00] hover:bg-[#d4ff00]/10"
+                          >
+                            <Pencil className="w-4 h-4 mr-1" />
+                            Write Review
+                          </Button>
+                        )}
+                        <ChevronDown 
+                          className={`w-5 h-5 text-white/70 transition-transform duration-200 ${
+                            reviewsOpen ? 'rotate-180' : ''
+                          }`} 
+                        />
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
 
-                {reviews.length > 0 ? (
-                  <div className="space-y-3">
-                    {reviews.slice(0, 5).map((review) => (
-                      <ReviewCard
-                        key={review.id}
-                        review={review}
-                        currentUserVote={getUserVote(review.id)}
-                        onVoteChange={fetchReviews}
-                      />
-                    ))}
-                    {reviews.length > 5 && (
-                      <p className="text-sm text-white/50 text-center">
-                        +{reviews.length - 5} more reviews
-                      </p>
+                  <CollapsibleContent>
+                    {reviews.length > 0 ? (
+                      <div className="space-y-3">
+                        {reviews.slice(0, 5).map((review) => (
+                          <ReviewCard
+                            key={review.id}
+                            review={review}
+                            currentUserVote={getUserVote(review.id)}
+                            onVoteChange={fetchReviews}
+                          />
+                        ))}
+                        {reviews.length > 5 && (
+                          <p className="text-sm text-white/50 text-center">
+                            +{reviews.length - 5} more reviews
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <Star className="w-10 h-10 text-white/20 mx-auto mb-2" />
+                        <p className="text-white/50 text-sm">No reviews yet</p>
+                        <p className="text-white/30 text-xs">Be the first to review!</p>
+                      </div>
                     )}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <Star className="w-10 h-10 text-white/20 mx-auto mb-2" />
-                    <p className="text-white/50 text-sm">No reviews yet</p>
-                    <p className="text-white/30 text-xs">Be the first to review!</p>
-                  </div>
-                )}
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
             </div>
           </ScrollArea>
