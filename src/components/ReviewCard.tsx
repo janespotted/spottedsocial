@@ -15,6 +15,7 @@ interface ReviewCardProps {
     is_anonymous: boolean;
     score: number;
     created_at: string;
+    image_url?: string | null;
     profile?: {
       display_name: string;
       avatar_url: string | null;
@@ -155,6 +156,15 @@ export function ReviewCard({ review, currentUserVote, onVoteChange }: ReviewCard
           </div>
           {review.review_text && (
             <p className="text-sm text-white/70 leading-relaxed">{review.review_text}</p>
+          )}
+          {review.image_url && (
+            <div className="mt-2 rounded-lg overflow-hidden">
+              <img 
+                src={review.image_url} 
+                alt="Review photo"
+                className="w-full h-32 object-cover"
+              />
+            </div>
           )}
           <p className="text-xs text-white/40 mt-1">
             {formatDistanceToNow(new Date(review.created_at), { addSuffix: true })}

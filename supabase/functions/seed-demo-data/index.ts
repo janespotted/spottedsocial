@@ -99,6 +99,35 @@ const DEMO_POST_IMAGES = [
   "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&h=800&fit=crop",
 ];
 
+const DEMO_REVIEW_IMAGES = [
+  "https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=600&h=400&fit=crop", // bar interior
+  "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=600&h=400&fit=crop", // drinks
+  "https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=600&h=400&fit=crop", // cocktails
+  "https://images.unsplash.com/photo-1587574293340-e0011c4e8ecf?w=600&h=400&fit=crop", // club lights
+  "https://images.unsplash.com/photo-1604882737321-e781f3cde3a5?w=600&h=400&fit=crop", // bar counter
+  "https://images.unsplash.com/photo-1545128485-c400e7702796?w=600&h=400&fit=crop", // drinks neon
+  "https://images.unsplash.com/photo-1560148271-00b5e5850812?w=600&h=400&fit=crop", // club vibe
+  "https://images.unsplash.com/photo-1563841930606-67e2bce48b78?w=600&h=400&fit=crop", // venue interior
+];
+
+const DEMO_REVIEW_TEXTS = [
+  "Amazing vibes! DJ was incredible and the crowd was super friendly. Will definitely come back!",
+  "Best cocktails in the city hands down. The bartender hooked us up with some crazy off-menu drinks.",
+  "The energy here is unmatched. Danced till 4am and didn't want to leave!",
+  "Perfect spot for a night out. Music was on point and drinks were reasonably priced.",
+  "This place never disappoints. Always a great time with good people.",
+  "Hidden gem! Not too crowded but still great atmosphere. Love the intimate vibe.",
+  "Sound system is insane! You can really feel the bass. True audiophile spot.",
+  "Great for groups. We had a table and bottle service was top notch.",
+  "The rooftop view is stunning. Perfect for summer nights in the city.",
+  "A bit pricey but worth it for special occasions. The ambiance is next level.",
+  "Staff was super friendly and helpful. Made our night even better.",
+  "Love the aesthetic here. Very Instagram-worthy but also genuinely fun.",
+  null, // Some reviews are rating-only
+  null,
+  null,
+];
+
 const DEMO_YAP_MESSAGES = [
   { text: "Pretty sure Justin Bieber just walked in...", score: 78, comments: 9 },
   { text: "This music is awesome who's the DJ right now", score: 50, comments: 9 },
@@ -574,7 +603,7 @@ Deno.serve(async (req) => {
             created_at: getRecentTimestamp(12), // Stories from last 12 hours
             expires_at: calculateExpiryTime(),
             is_demo: true,
-          });
+        });
         }
       }
       
@@ -582,7 +611,54 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('stories').insert(stories);
       }
 
-      // 9. Create demo message threads with current user
+      // 9. Create venue reviews
+      console.log('Creating demo venue reviews...');
+      const venueReviews = [];
+      const reviewedVenues = getRandomItems(NYC_VENUES.slice(0, 20), 15); // Reviews for top 15 venues
+      
+      for (const venue of reviewedVenues) {
+        const venueId = venueIdMap.get(venue.name);
+        if (!venueId) continue;
+        
+        // 3-8 reviews per venue
+        const numReviews = 3 + Math.floor(Math.random() * 6);
+        const reviewers = getRandomItems(demoUserIds, numReviews);
+        
+        for (let i = 0; i < reviewers.length; i++) {
+          const rating = 3 + Math.floor(Math.random() * 3); // 3-5 stars
+          const reviewText = DEMO_REVIEW_TEXTS[Math.floor(Math.random() * DEMO_REVIEW_TEXTS.length)];
+          const hasImage = Math.random() < 0.4; // 40% have images
+          const imageUrl = hasImage ? DEMO_REVIEW_IMAGES[Math.floor(Math.random() * DEMO_REVIEW_IMAGES.length)] : null;
+          const isAnonymous = Math.random() < 0.3; // 30% anonymous
+          const score = Math.floor(Math.random() * 20) - 3; // -3 to 16 score range
+          
+          venueReviews.push({
+            venue_id: venueId,
+            user_id: reviewers[i],
+            rating,
+            review_text: reviewText,
+            is_anonymous: isAnonymous,
+            image_url: imageUrl,
+            score,
+            created_at: getRecentTimestamp(72), // Reviews from last 3 days
+          });
+        }
+      }
+      
+      if (venueReviews.length > 0) {
+        // Use upsert to handle potential duplicates
+        const { error: reviewsError } = await supabaseAdmin
+          .from('venue_reviews')
+          .insert(venueReviews);
+          
+        if (reviewsError) {
+          console.error('Error inserting reviews:', reviewsError);
+        } else {
+          console.log(`Created ${venueReviews.length} demo venue reviews`);
+        }
+      }
+
+      // 10. Create demo message threads with current user
       console.log('Creating demo message threads...');
       const messageThreadUsers = getRandomItems(demoUserIds, 6); // 6 conversations
       
@@ -741,6 +817,22 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from('posts').delete().eq('is_demo', true);
       await supabaseAdmin.from('checkins').delete().eq('is_demo', true);
       await supabaseAdmin.from('night_statuses').delete().eq('is_demo', true);
+      
+      // Delete venue reviews (via demo user IDs since no is_demo column)
+      if (demoIds.length > 0) {
+        // First get review IDs to delete related votes
+        const { data: demoReviews } = await supabaseAdmin
+          .from('venue_reviews')
+          .select('id')
+          .in('user_id', demoIds);
+        const reviewIds = demoReviews?.map(r => r.id) || [];
+        
+        if (reviewIds.length > 0) {
+          await supabaseAdmin.from('review_votes').delete().in('review_id', reviewIds);
+        }
+        await supabaseAdmin.from('venue_reviews').delete().in('user_id', demoIds);
+      }
+      
       await supabaseAdmin.from('venues').delete().eq('is_demo', true);
       if (demoIds.length > 0) {
         await supabaseAdmin.from('close_friends').delete().in('user_id', demoIds);
