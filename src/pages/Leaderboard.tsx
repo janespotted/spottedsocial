@@ -27,6 +27,7 @@ interface VenueStats {
   }[];
   energyLevel: number;
   isPromoted?: boolean;
+  isNewlyOpened?: boolean;
 }
 
 interface BiggestMover {
@@ -115,7 +116,7 @@ export default function Leaderboard() {
           display_name,
           avatar_url
         ),
-        venues!inner(popularity_rank, is_promoted, city)
+        venues!inner(popularity_rank, is_promoted, city, opened_at)
       `)
       .eq('venues.city', city)
       .not('venue_name', 'is', null)
@@ -137,17 +138,25 @@ export default function Leaderboard() {
     // Also fetch promoted venues directly to ensure they always appear, filtered by city
     const { data: promotedVenues } = await supabase
       .from('venues')
-      .select('id, name, popularity_rank, is_promoted')
+      .select('id, name, popularity_rank, is_promoted, opened_at')
       .eq('is_promoted', true)
       .eq('city', city);
 
     const { data: statuses } = await query;
+
+    // Calculate if venue is newly opened (within last 3 months)
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
     // Group by venue, including popularity_rank
     const venueMap = new Map<string, VenueStats & { popularity_rank: number }>();
     
     // First, add promoted venues to ensure they always appear (even with 0 check-ins)
     promotedVenues?.forEach((venue) => {
+      const isNewlyOpened = venue.opened_at 
+        ? new Date(venue.opened_at) > threeMonthsAgo 
+        : false;
+      
       venueMap.set(venue.name, {
         venue_name: venue.name,
         venue_id: venue.id,
@@ -157,6 +166,7 @@ export default function Leaderboard() {
         friends: [],
         energyLevel: 1,
         isPromoted: true,
+        isNewlyOpened,
         popularity_rank: venue.popularity_rank || 999,
       });
     });
@@ -167,6 +177,10 @@ export default function Leaderboard() {
       const venueId = status.venue_id;
       const isPromoted = status.venues?.is_promoted || false;
       const popularityRank = status.venues?.popularity_rank || 999;
+      const openedAt = status.venues?.opened_at;
+      const isNewlyOpened = openedAt 
+        ? new Date(openedAt) > threeMonthsAgo 
+        : false;
       
       if (!venueMap.has(venueName)) {
         venueMap.set(venueName, {
@@ -178,6 +192,7 @@ export default function Leaderboard() {
           friends: [],
           energyLevel: 0,
           isPromoted,
+          isNewlyOpened,
           popularity_rank: popularityRank,
         });
       }
@@ -302,12 +317,19 @@ export default function Leaderboard() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <button
-                      onClick={() => handleVenueClick(venue.venue_name, venue.venue_id)}
-                      className="text-lg font-semibold text-white truncate hover:text-[#d4ff00] transition-colors"
-                    >
-                      {venue.venue_name}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleVenueClick(venue.venue_name, venue.venue_id)}
+                        className="text-lg font-semibold text-white truncate hover:text-[#d4ff00] transition-colors"
+                      >
+                        {venue.venue_name}
+                      </button>
+                      {venue.isNewlyOpened && (
+                        <span className="px-2 py-0.5 bg-[#d4ff00]/20 rounded-full text-xs text-[#d4ff00] font-medium">
+                          NEW
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Energy Bars */}
@@ -377,6 +399,11 @@ export default function Leaderboard() {
                   >
                     {venue.venue_name}
                   </button>
+                  {venue.isNewlyOpened && (
+                    <span className="px-2 py-0.5 bg-[#d4ff00]/20 rounded-full text-xs text-[#d4ff00] font-medium">
+                      NEW
+                    </span>
+                  )}
                   {venue.movement !== 'same' && (
                     <div>
                       {venue.movement === 'up' ? (
