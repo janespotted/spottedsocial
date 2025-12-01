@@ -667,6 +667,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          image_url: string | null
           is_anonymous: boolean | null
           rating: number
           review_text: string | null
@@ -677,6 +678,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          image_url?: string | null
           is_anonymous?: boolean | null
           rating: number
           review_text?: string | null
@@ -687,6 +689,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          image_url?: string | null
           is_anonymous?: boolean | null
           rating?: number
           review_text?: string | null

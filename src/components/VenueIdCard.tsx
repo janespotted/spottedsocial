@@ -37,6 +37,7 @@ interface Review {
   is_anonymous: boolean;
   score: number;
   created_at: string;
+  image_url?: string | null;
   profile?: {
     display_name: string;
     avatar_url: string | null;
