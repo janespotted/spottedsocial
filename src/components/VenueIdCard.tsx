@@ -8,12 +8,14 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { MapPin, Plus, Check, Star, Pencil, ChevronDown } from 'lucide-react';
+import { MapPin, Plus, Check, Star, Pencil, ChevronDown, Clock } from 'lucide-react';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { ReviewCard } from './ReviewCard';
 import { WriteReviewDialog } from './WriteReviewDialog';
+import { VenueHoursDisplay, getHoursDisplayString } from '@/lib/venue-hours';
+import type { VenueHours } from '@/lib/venue-hours';
 
 interface VenueData {
   id: string;
@@ -64,13 +66,45 @@ export function VenueIdCard() {
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [venueHours, setVenueHours] = useState<VenueHoursDisplay | null>(null);
+  const [loadingHours, setLoadingHours] = useState(false);
 
   useEffect(() => {
     if (selectedVenueId) {
       fetchVenueData();
       fetchReviews();
+      fetchVenueHours();
     }
   }, [selectedVenueId]);
+
+  const fetchVenueHours = async () => {
+    if (!selectedVenueId) return;
+
+    setLoadingHours(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-venue-hours', {
+        body: { venueId: selectedVenueId }
+      });
+
+      if (error) {
+        console.error('Error fetching venue hours:', error);
+        setVenueHours(null);
+        return;
+      }
+
+      if (data?.operating_hours) {
+        const hoursDisplay = getHoursDisplayString(data.operating_hours as VenueHours);
+        setVenueHours(hoursDisplay);
+      } else {
+        setVenueHours(null);
+      }
+    } catch (error) {
+      console.error('Error fetching venue hours:', error);
+      setVenueHours(null);
+    } finally {
+      setLoadingHours(false);
+    }
+  };
 
   const fetchVenueData = async () => {
     if (!selectedVenueId || !user) return;
@@ -323,6 +357,28 @@ export function VenueIdCard() {
                   <p className="text-sm text-white/60 italic">
                     {venue.neighborhood} ({distance} miles)
                   </p>
+                  
+                  {/* Operating Hours Status */}
+                  {venueHours && !loadingHours && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        venueHours.isOpen 
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                      }`}>
+                        {venueHours.isOpen ? 'Open' : 'Closed'}
+                      </span>
+                      <span className="text-xs text-white/50 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {venueHours.displayText}
+                      </span>
+                    </div>
+                  )}
+                  {loadingHours && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-xs text-white/40">Checking hours...</span>
+                    </div>
+                  )}
                   {/* Average Rating */}
                   {reviews.length > 0 && (
                     <div className="flex items-center gap-1.5 mt-2">
