@@ -334,7 +334,30 @@ export function FriendIdCard() {
               <p className="text-white/60">Loading...</p>
             </div>
           ) : (
-            <div className="p-5">
+            <div className="p-5 relative">
+              {/* Three-dot menu positioned below the X close button */}
+              <DropdownMenu>
+                <DropdownMenuTrigger className="absolute right-0 top-8 p-1 rounded-full hover:bg-white/10 transition-colors">
+                  <MoreVertical className="h-5 w-5 text-white/60" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
+                  <DropdownMenuItem 
+                    onClick={() => setShowReportDialog(true)}
+                    className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
+                  >
+                    <Flag className="h-4 w-4 mr-2" />
+                    Report User
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleBlockUser}
+                    className="text-red-400 hover:bg-red-500/20 cursor-pointer"
+                  >
+                    <Ban className="h-4 w-4 mr-2" />
+                    Block User
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <div className="flex items-start gap-4 mb-4">
                 {/* Large Avatar */}
                 <Avatar className="h-20 w-20 border-[3px] border-[#a855f7] flex-shrink-0">
@@ -346,32 +369,9 @@ export function FriendIdCard() {
 
                 {/* User Info */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between">
-                    <h2 className="text-xl font-bold text-white leading-tight mb-1">
-                      {selectedFriend.displayName}
-                    </h2>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="p-1 rounded-full hover:bg-white/10 transition-colors">
-                        <MoreVertical className="h-5 w-5 text-white/60" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
-                        <DropdownMenuItem 
-                          onClick={() => setShowReportDialog(true)}
-                          className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
-                        >
-                          <Flag className="h-4 w-4 mr-2" />
-                          Report User
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={handleBlockUser}
-                          className="text-red-400 hover:bg-red-500/20 cursor-pointer"
-                        >
-                          <Ban className="h-4 w-4 mr-2" />
-                          Block User
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                  <h2 className="text-xl font-bold text-white leading-tight mb-1 pr-8">
+                    {selectedFriend.displayName}
+                  </h2>
                   {demoEnabled ? (
                     <>
                       {selectedFriend.venueName && (
