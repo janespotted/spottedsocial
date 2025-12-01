@@ -837,6 +837,47 @@ export type Database = {
           venue_name: string
         }[]
       }
+      get_profile_safe: {
+        Args: { target_user_id: string }
+        Returns: {
+          avatar_url: string
+          bio: string
+          can_view_location: boolean
+          created_at: string
+          display_name: string
+          has_onboarded: boolean
+          home_city: string
+          id: string
+          is_demo: boolean
+          is_out: boolean
+          last_active_at: string
+          last_known_lat: number
+          last_known_lng: number
+          last_location_at: string
+          location_sharing_level: string
+          username: string
+        }[]
+      }
+      get_profiles_safe: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          bio: string
+          created_at: string
+          display_name: string
+          has_onboarded: boolean
+          home_city: string
+          id: string
+          is_demo: boolean
+          is_out: boolean
+          last_active_at: string
+          last_known_lat: number
+          last_known_lng: number
+          last_location_at: string
+          location_sharing_level: string
+          username: string
+        }[]
+      }
       is_close_friend: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
