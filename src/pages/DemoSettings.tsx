@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp, MapPin, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDemoMode, setDemoMode, seedDemoData, clearDemoData } from '@/lib/demo-data';
 import { getBootstrapMode, setBootstrapMode } from '@/lib/bootstrap-config';
 import { useUserCity } from '@/hooks/useUserCity';
+import { cacheCity, clearCachedCity, detectUserCity, type SupportedCity } from '@/lib/city-detection';
 
 export default function DemoSettings() {
   const { user } = useAuth();
@@ -119,6 +120,27 @@ export default function DemoSettings() {
     }
   };
 
+  const handleCitySelect = (selectedCity: SupportedCity) => {
+    cacheCity(selectedCity);
+    const label = selectedCity === 'la' ? 'LA' : 'NYC';
+    toast.success(`City set to ${label}`);
+  };
+
+  const handleRedetectCity = async () => {
+    setLoading(true);
+    toast.info('Re-detecting your location...');
+    try {
+      clearCachedCity();
+      const detectedCity = await detectUserCity();
+      const label = detectedCity === 'la' ? 'LA' : 'NYC';
+      toast.success(`Detected: ${label}!`);
+    } catch (error) {
+      toast.error('Failed to detect location');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#1a0f2e] pb-24">
       {/* Header */}
@@ -138,6 +160,59 @@ export default function DemoSettings() {
       </div>
 
       <div className="p-6 space-y-6">
+        {/* City Selection */}
+        <Card className="bg-[#2d1b4e]/60 border-2 border-[#a855f7]/40">
+          <CardHeader>
+            <CardTitle className="text-[#d4ff00] flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              City Selection
+            </CardTitle>
+            <CardDescription className="text-white/60">
+              Override GPS detection and manually switch cities
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <p className="text-sm text-white/70">
+                Currently showing: <strong className="text-[#d4ff00]">{cityLabel}</strong>
+              </p>
+              
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => handleCitySelect('nyc')}
+                  variant={city === 'nyc' ? 'default' : 'outline'}
+                  className={city === 'nyc' 
+                    ? 'flex-1 bg-[#a855f7] text-white hover:bg-[#a855f7]/90' 
+                    : 'flex-1 border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10'
+                  }
+                >
+                  NYC
+                </Button>
+                <Button
+                  onClick={() => handleCitySelect('la')}
+                  variant={city === 'la' ? 'default' : 'outline'}
+                  className={city === 'la' 
+                    ? 'flex-1 bg-[#a855f7] text-white hover:bg-[#a855f7]/90' 
+                    : 'flex-1 border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10'
+                  }
+                >
+                  LA
+                </Button>
+              </div>
+
+              <Button
+                onClick={handleRedetectCity}
+                disabled={loading}
+                variant="outline"
+                className="w-full border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                {loading ? 'Detecting...' : 'Re-detect via GPS'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Demo Mode Toggle */}
         <Card className="bg-[#2d1b4e]/60 border-2 border-[#a855f7]/40">
           <CardHeader>
