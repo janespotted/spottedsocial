@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronLeft, LogOut, Users, Heart, Link2, Camera, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ChevronLeft, LogOut, Users, Heart, Link2, Camera, Loader2, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function EditProfile() {
@@ -22,6 +23,11 @@ export default function EditProfile() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [locationSharing, setLocationSharing] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('all_friends');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Delete account state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -133,6 +139,40 @@ export default function EditProfile() {
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      toast.error('Please type DELETE to confirm');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await supabase.functions.invoke('delete-account', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to delete account');
+      }
+
+      toast.success('Account deleted successfully');
+      navigate('/auth');
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      toast.error(error.message || 'Failed to delete account');
+    } finally {
+      setDeleting(false);
+      setShowDeleteDialog(false);
+    }
   };
 
   return (
@@ -315,8 +355,75 @@ export default function EditProfile() {
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>
+
+          {/* Danger Zone */}
+          <div className="mt-8 pt-6 border-t border-red-500/30">
+            <h3 className="text-red-400 font-semibold mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Danger Zone
+            </h3>
+            <p className="text-sm text-white/60 mb-4">
+              Permanently delete your account and all associated data. This action cannot be undone.
+            </p>
+            <Button
+              onClick={() => setShowDeleteDialog(true)}
+              variant="outline"
+              className="w-full border-red-500 text-red-400 hover:bg-red-500/10"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Account
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Delete Account Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="w-[90%] max-w-[400px] bg-[#1a0f2e] border-red-500/40 rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-red-400 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Delete Account
+            </DialogTitle>
+            <DialogDescription className="text-white/60">
+              This will permanently delete your account and all your data including posts, 
+              messages, check-ins, and friendships. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <Label className="text-white/80 text-sm">
+              Type <span className="font-bold text-red-400">DELETE</span> to confirm
+            </Label>
+            <Input
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              placeholder="DELETE"
+              className="mt-2 bg-[#2d1b4e]/60 border-red-500/20 text-white"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setDeleteConfirmation('');
+              }}
+              className="flex-1 border-white/20 text-white hover:bg-white/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmation !== 'DELETE' || deleting}
+              className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+            >
+              {deleting ? 'Deleting...' : 'Delete Account'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

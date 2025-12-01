@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { loginSchema, signupSchema } from '@/lib/auth-validation';
@@ -14,6 +15,7 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -47,6 +49,7 @@ export default function Auth() {
           password,
           displayName,
           username,
+          agreedToTerms,
         });
 
         const redirectUrl = `${window.location.origin}/`;
@@ -156,6 +159,39 @@ export default function Auth() {
                 className="border-[#a855f7]/40 focus:border-[#a855f7] focus:shadow-[0_0_15px_rgba(168,85,247,0.4)] bg-[#1a0f2e] text-white"
               />
             </div>
+            
+            {isLogin && (
+              <div className="text-right">
+                <Link 
+                  to="/reset-password" 
+                  className="text-sm text-[#a855f7] hover:text-[#a855f7]/80 transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            )}
+
+            {!isLogin && (
+              <div className="flex items-start space-x-3 py-2">
+                <Checkbox
+                  id="terms"
+                  checked={agreedToTerms}
+                  onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+                  className="border-[#a855f7]/40 data-[state=checked]:bg-[#a855f7] data-[state=checked]:border-[#a855f7] mt-0.5"
+                />
+                <label htmlFor="terms" className="text-sm text-white/80 leading-tight cursor-pointer">
+                  I agree to the{' '}
+                  <Link to="/terms" className="text-[#a855f7] hover:underline">
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link to="/privacy" className="text-[#a855f7] hover:underline">
+                    Privacy Policy
+                  </Link>
+                </label>
+              </div>
+            )}
+
             <Button
               type="submit"
               className="w-full bg-[#a855f7] hover:bg-[#a855f7]/90 shadow-[0_0_15px_rgba(168,85,247,0.6)] hover:shadow-[0_0_25px_rgba(168,85,247,0.8)] transition-all text-white font-semibold"
@@ -167,7 +203,10 @@ export default function Auth() {
               type="button"
               variant="ghost"
               className="w-full text-white/80 hover:text-white hover:bg-[#a855f7]/20"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setAgreedToTerms(false);
+              }}
             >
               {isLogin ? 'Don\'t have an account? Sign up' : 'Already have an account? Sign in'}
             </Button>
