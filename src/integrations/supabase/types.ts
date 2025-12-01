@@ -711,6 +711,8 @@ export type Database = {
         Row: {
           city: string | null
           created_at: string | null
+          google_place_id: string | null
+          hours_last_updated: string | null
           id: string
           is_demo: boolean | null
           is_promoted: boolean | null
@@ -719,12 +721,15 @@ export type Database = {
           name: string
           neighborhood: string
           opened_at: string | null
+          operating_hours: Json | null
           popularity_rank: number | null
           type: string
         }
         Insert: {
           city?: string | null
           created_at?: string | null
+          google_place_id?: string | null
+          hours_last_updated?: string | null
           id?: string
           is_demo?: boolean | null
           is_promoted?: boolean | null
@@ -733,12 +738,15 @@ export type Database = {
           name: string
           neighborhood: string
           opened_at?: string | null
+          operating_hours?: Json | null
           popularity_rank?: number | null
           type: string
         }
         Update: {
           city?: string | null
           created_at?: string | null
+          google_place_id?: string | null
+          hours_last_updated?: string | null
           id?: string
           is_demo?: boolean | null
           is_promoted?: boolean | null
@@ -747,6 +755,7 @@ export type Database = {
           name?: string
           neighborhood?: string
           opened_at?: string | null
+          operating_hours?: Json | null
           popularity_rank?: number | null
           type?: string
         }
