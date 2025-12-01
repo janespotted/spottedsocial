@@ -131,11 +131,45 @@ export default function DemoSettings() {
     toast.info('Re-detecting your location...');
     try {
       clearCachedCity();
-      const detectedCity = await detectUserCity();
+      
+      // Force fresh GPS with high accuracy
+      const position = await new Promise<{lat: number, lng: number}>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation not supported'));
+          return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          (err) => reject(err),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+      
+      // Show the actual coordinates for debugging
+      toast.info(`GPS: ${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`);
+      
+      // Calculate distance to both cities
+      const { calculateDistance, CITY_CENTERS } = await import('@/lib/city-detection');
+      const nycDistance = calculateDistance(position, CITY_CENTERS.nyc);
+      const laDistance = calculateDistance(position, CITY_CENTERS.la);
+      
+      // Determine closest city
+      const detectedCity: SupportedCity = nycDistance < laDistance ? 'nyc' : 'la';
+      cacheCity(detectedCity);
+      
       const label = detectedCity === 'la' ? 'LA' : 'NYC';
-      toast.success(`Detected: ${label}!`);
-    } catch (error) {
-      toast.error('Failed to detect location');
+      toast.success(`Detected: ${label}! (${Math.round(detectedCity === 'nyc' ? nycDistance : laDistance)} miles away)`);
+    } catch (error: any) {
+      if (error?.code === 1) {
+        toast.error('GPS permission denied. Please enable location access.');
+      } else if (error?.code === 2) {
+        toast.error('GPS unavailable on this device.');
+      } else if (error?.code === 3) {
+        toast.error('GPS timed out. Try again or select city manually.');
+      } else {
+        toast.error('Failed to detect location. Try selecting city manually.');
+      }
     } finally {
       setLoading(false);
     }
