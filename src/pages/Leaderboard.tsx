@@ -446,16 +446,16 @@ export default function Leaderboard() {
       {/* Biggest Mover Card */}
       {biggestMover && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-20 w-full max-w-[430px] px-4">
-          <div className="bg-[#2d1b4e] border-2 border-[#a855f7] rounded-2xl p-4 shadow-[0_0_40px_rgba(168,85,247,0.8)]">
+          <div className="bg-[#2d1b4e] border border-[#a855f7] rounded-2xl p-3 shadow-[0_0_20px_rgba(168,85,247,0.6)]">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-[#a855f7] text-sm font-medium mb-1">Biggest Mover</p>
+                <p className="text-[#a855f7] text-sm font-medium mb-0.5">Biggest Mover</p>
                 <button
                   onClick={() => handleVenueClick(biggestMover.venue_name, biggestMover.venue_id)}
-                  className="text-2xl font-bold text-[#d4ff00] flex items-center gap-2 hover:text-[#d4ff00]/80 transition-colors"
+                  className="text-lg font-bold text-[#d4ff00] flex items-center gap-2 hover:text-[#d4ff00]/80 transition-colors"
                 >
                   {biggestMover.venue_name}
-                  <BarChart3 className="h-5 w-5" />
+                  <BarChart3 className="h-4 w-4" />
                 </button>
               </div>
 
@@ -473,9 +473,9 @@ export default function Leaderboard() {
                       })}
                       className="transition-transform hover:scale-110"
                     >
-                      <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.8)]">
+                      <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
                         <AvatarImage src={friend.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#1a0f2e] text-white text-sm">
+                        <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
                           {friend.display_name[0]}
                         </AvatarFallback>
                       </Avatar>
