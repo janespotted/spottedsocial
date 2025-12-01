@@ -5,9 +5,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { MapPin, Plus } from 'lucide-react';
+import { MapPin, Plus, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
+import { haptic } from '@/lib/haptics';
+import { toast } from 'sonner';
 
 interface VenueData {
   id: string;
@@ -31,6 +33,7 @@ export function VenueIdCard() {
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendAtVenue[]>([]);
   const [distance, setDistance] = useState<string>('--');
+  const [isInWishlist, setIsInWishlist] = useState(false);
 
   useEffect(() => {
     if (selectedVenueId) {
@@ -51,6 +54,16 @@ export function VenueIdCard() {
 
       if (venueData) {
         setVenue(venueData);
+
+        // Check if venue is in wishlist
+        const { data: wishlistEntry } = await supabase
+          .from('wishlist_places')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('venue_name', venueData.name)
+          .maybeSingle();
+
+        setIsInWishlist(!!wishlistEntry);
 
         // Get user's location for distance calculation
         const { data: myProfile } = await supabase
@@ -131,6 +144,36 @@ export function VenueIdCard() {
     }
   };
 
+  const handleWishlistToggle = async () => {
+    if (!venue || !user) return;
+
+    if (isInWishlist) {
+      // Remove from wishlist
+      await supabase
+        .from('wishlist_places')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('venue_name', venue.name);
+
+      setIsInWishlist(false);
+      haptic.light();
+      toast.success('Removed from wishlist');
+    } else {
+      // Add to wishlist
+      await supabase
+        .from('wishlist_places')
+        .insert({
+          user_id: user.id,
+          venue_name: venue.name,
+          venue_image_url: null
+        });
+
+      setIsInWishlist(true);
+      haptic.success();
+      toast.success('Added to wishlist! 🎉');
+    }
+  };
+
   const swipeHandlers = useSwipeGesture({
     onSwipeDown: closeVenueCard,
     threshold: 50
@@ -156,10 +199,18 @@ export function VenueIdCard() {
                 {/* Placeholder gradient - replace with actual venue image when available */}
                 <div className="w-full h-full bg-gradient-to-br from-[#a855f7]/40 to-[#d4ff00]/40" />
               </div>
-              {/* Location marker badge */}
-              <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-[#d4ff00] border-2 border-[#2d1b4e] flex items-center justify-center shadow-[0_0_15px_rgba(212,255,0,0.6)]">
-                <Plus className="w-4 h-4 text-[#2d1b4e]" />
-              </div>
+              {/* Wishlist toggle button */}
+              <button
+                onClick={handleWishlistToggle}
+                className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-[#d4ff00] border-2 border-[#2d1b4e] flex items-center justify-center shadow-[0_0_15px_rgba(212,255,0,0.6)] hover:scale-110 transition-transform"
+                aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+              >
+                {isInWishlist ? (
+                  <Check className="w-4 h-4 text-[#2d1b4e]" />
+                ) : (
+                  <Plus className="w-4 h-4 text-[#2d1b4e]" />
+                )}
+              </button>
             </div>
 
             {/* Venue Info */}

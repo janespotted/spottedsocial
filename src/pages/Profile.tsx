@@ -309,7 +309,7 @@ export default function Profile() {
                 No saved places yet
               </h3>
               <p className="text-white/50 text-sm max-w-xs">
-                Tap the ❤️ on venues you want to visit and they'll appear here
+                Tap the + on venues you want to visit and they'll appear here
               </p>
             </div>
           )}
