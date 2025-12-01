@@ -110,23 +110,315 @@ const DEMO_REVIEW_IMAGES = [
   "https://images.unsplash.com/photo-1563841930606-67e2bce48b78?w=600&h=400&fit=crop", // venue interior
 ];
 
-const DEMO_REVIEW_TEXTS = [
-  "Amazing vibes! DJ was incredible and the crowd was super friendly. Will definitely come back!",
-  "Best cocktails in the city hands down. The bartender hooked us up with some crazy off-menu drinks.",
-  "The energy here is unmatched. Danced till 4am and didn't want to leave!",
-  "Perfect spot for a night out. Music was on point and drinks were reasonably priced.",
-  "This place never disappoints. Always a great time with good people.",
-  "Hidden gem! Not too crowded but still great atmosphere. Love the intimate vibe.",
-  "Sound system is insane! You can really feel the bass. True audiophile spot.",
-  "Great for groups. We had a table and bottle service was top notch.",
-  "The rooftop view is stunning. Perfect for summer nights in the city.",
-  "A bit pricey but worth it for special occasions. The ambiance is next level.",
-  "Staff was super friendly and helpful. Made our night even better.",
-  "Love the aesthetic here. Very Instagram-worthy but also genuinely fun.",
-  null, // Some reviews are rating-only
-  null,
-  null,
-];
+// Venue-specific reviews with accurate details from real-world research
+const VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | null; rating: number }> }> = {
+  "Le Bain": {
+    reviews: [
+      { text: "The rooftop views of the Hudson are incredible! Danced in the pool area until 3am. The DJs always deliver deep house vibes.", rating: 4 },
+      { text: "Great vibes but it gets PACKED. Come early or expect a long wait. Worth it for the Standard views though.", rating: 3 },
+      { text: "One of NYC's most iconic clubs. The sunset from up here is unmatched. Pool parties in summer are legendary.", rating: 5 },
+      { text: "Door can be tough but once you're in, the energy is unreal. Rooftop dance floor with skyline views - can't beat it.", rating: 4 },
+      { text: "A bit pretentious crowd sometimes but the music selection is always on point. Industrial chic aesthetic.", rating: 3 },
+    ]
+  },
+  "House of Yes": {
+    reviews: [
+      { text: "If you want weird and wonderful, this is your spot. The aerial performances are mind-blowing! Most creative crowd in Brooklyn.", rating: 5 },
+      { text: "Dress code is serious - costumes encouraged! Came as a disco ball and fit right in. Immersive shows are incredible.", rating: 5 },
+      { text: "The circus performances during sets are like nothing else in NYC. Truly an experience, not just a club.", rating: 5 },
+      { text: "Body positive, queer-friendly, and pure creative chaos. Everyone should experience this place at least once.", rating: 5 },
+      { text: "Theme nights are insane - went to Dirty Circus and my mind was blown. Acrobats on the ceiling!", rating: 4 },
+    ]
+  },
+  "The Box": {
+    reviews: [
+      { text: "The most provocative, boundary-pushing performances in NYC. Not for the faint of heart but absolutely unforgettable.", rating: 5 },
+      { text: "Burlesque, variety acts, and pure debauchery. The shows are shocking in the best way. Very exclusive door.", rating: 4 },
+      { text: "If you can get in, prepare for a wild ride. The performers are world-class and the crowd is A-list.", rating: 5 },
+      { text: "Expensive but worth it for special occasions. The theatrical performances are truly one of a kind.", rating: 4 },
+      { text: "Old school NYC nightlife energy. Dark, mysterious, and absolutely wild. Not your average night out.", rating: 5 },
+    ]
+  },
+  "Elsewhere": {
+    reviews: [
+      { text: "Three floors of different vibes! The rooftop is perfect for breaks between dancing. Best sound system in Brooklyn.", rating: 5 },
+      { text: "Zone One gets the best DJs. Saw a 6-hour set here that changed my life. True techno temple.", rating: 5 },
+      { text: "Love that you can escape to the Hall or Loft when Zone One gets too intense. Something for everyone.", rating: 4 },
+      { text: "The lineups are consistently incredible. From techno to indie, they book quality acts across genres.", rating: 5 },
+      { text: "Industrial warehouse vibes done right. Good crowd, reasonable drinks, and dancing until sunrise.", rating: 4 },
+    ]
+  },
+  "TBA Brooklyn": {
+    reviews: [
+      { text: "Warehouse vibes with amazing sound. The courtyard is perfect for summer nights. Real underground energy.", rating: 5 },
+      { text: "Gets some of the best techno acts in the city. No frills, just great music and people who love to dance.", rating: 4 },
+      { text: "Love the outdoor space. Perfect for those 4am breaks when you need fresh air before diving back in.", rating: 5 },
+      { text: "Raw, industrial, and exactly what Brooklyn nightlife should be. Come for the music, stay for the vibes.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Nowadays": {
+    reviews: [
+      { text: "The outdoor space is HUGE! Perfect for summer day parties. Great food vendors and chill daytime vibes.", rating: 5 },
+      { text: "Love that it works both as a day party spot and late night club. The garden area is magical.", rating: 5 },
+      { text: "Best sound system for an outdoor venue. They really care about the music quality here.", rating: 4 },
+      { text: "Ridgewood gem! More relaxed than Williamsburg spots but still gets great DJs.", rating: 4 },
+      { text: "Day parties here are legendary. BBQ, good tunes, and dancing in the sun. What more could you want?", rating: 5 },
+    ]
+  },
+  "Double Chicken Please": {
+    reviews: [
+      { text: "Ranked #2 bar in North America for a reason. The cocktails are literal art. Try the off-menu specials!", rating: 5 },
+      { text: "Best fried chicken sandwich in NYC, hands down. And the drinks are next level creative. Design-forward everything.", rating: 5 },
+      { text: "Hard to get a reservation but SO worth it. Every cocktail tells a story. The presentation is insane.", rating: 5 },
+      { text: "The upstairs speakeasy vibe is even better than downstairs. Ask about the secret menu!", rating: 5 },
+      { text: "Innovative cocktails that actually taste amazing, not just look cool. Bartenders are true artists.", rating: 4 },
+    ]
+  },
+  "The Dead Rabbit": {
+    reviews: [
+      { text: "Best Irish bar in America, full stop. The whiskey selection is unmatched and the cocktails are perfection.", rating: 5 },
+      { text: "Three floors of different vibes - pub downstairs, cocktail parlor upstairs. The Irish coffee is legendary.", rating: 5 },
+      { text: "Won World's Best Bar for good reason. Every drink is crafted with incredible attention to detail.", rating: 5 },
+      { text: "The historical cocktail menu is fascinating. Like drinking through time. Staff really knows their stuff.", rating: 4 },
+      { text: "Come early or wait forever. Worth the hype though - best cocktails in the Financial District.", rating: 4 },
+    ]
+  },
+  "Dante NYC": {
+    reviews: [
+      { text: "World's Best Bar vibes! The Negronis here are perfection. Italian aperitivo culture done right in the Village.", rating: 5 },
+      { text: "Garibaldi is their signature and it's incredible - fluffy orange juice with Campari. Brunch here is elite.", rating: 5 },
+      { text: "Been around since 1915 and still killing it. Classic NYC institution with modern cocktail excellence.", rating: 5 },
+      { text: "Outdoor seating on MacDougal is perfect for people watching. Spritz game is unmatched.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Attaboy": {
+    reviews: [
+      { text: "No menu - just tell them what you like and they'll make magic. The bartenders here are true artists.", rating: 5 },
+      { text: "Speakeasy vibes done right. Tiny space, incredible drinks, zero pretension. Just good conversation and great cocktails.", rating: 5 },
+      { text: "From the Milk & Honey family. If you trust them, they'll make exactly what you didn't know you wanted.", rating: 5 },
+      { text: "Best bespoke cocktail experience in NYC. Come with an open mind and let them surprise you.", rating: 4 },
+      { text: "Intimate, personal, and genuinely great service. Worth the wait to get in.", rating: 5 },
+    ]
+  },
+  "PHD Rooftop": {
+    reviews: [
+      { text: "Dream Hotel's crown jewel. The terrace views are stunning. Gets a bottle service crowd but the vibes are fun.", rating: 4 },
+      { text: "Perfect for special occasions. Dress up, bring your credit card, and enjoy the skyline.", rating: 4 },
+      { text: "Penthouse House vibes - literally. Great for impressing a date or celebrating with friends.", rating: 4 },
+      { text: "Can be douchey on weekends but weeknight views are worth it. Sunset cocktails are magical.", rating: 3 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "230 Fifth": {
+    reviews: [
+      { text: "Biggest rooftop in NYC! Empire State Building views are unreal. The robes in winter are iconic.", rating: 4 },
+      { text: "Tourist trap? Maybe. But the views are genuinely incredible and the space is massive.", rating: 3 },
+      { text: "Come for the views, not the drinks. Great for out-of-town guests who want the NYC experience.", rating: 3 },
+      { text: "The heated rooftop garden in winter with the red robes is actually really fun.", rating: 4 },
+      { text: "Basic but beautiful. Sometimes you just want to sip a drink with the Empire State Building in front of you.", rating: 4 },
+    ]
+  },
+  "Schimanski": {
+    reviews: [
+      { text: "Williamsburg's best club for serious techno and house. The Funktion-One sound system hits different.", rating: 5 },
+      { text: "Gets great international DJs. The room isn't huge but that makes it more intimate.", rating: 4 },
+      { text: "Finally a club in Brooklyn that focuses on the music. None of the Manhattan pretension.", rating: 4 },
+      { text: "Late night vibes only. Don't show up before 1am if you want to see it at its best.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Good Room": {
+    reviews: [
+      { text: "Two rooms, two vibes! Front room for disco and funk, back room for deeper cuts. Perfect setup.", rating: 5 },
+      { text: "Greenpoint's best kept secret. The sound is incredible and the crowd actually dances.", rating: 5 },
+      { text: "Love the DJ booth in the middle of the dance floor. Real connection between artist and crowd.", rating: 4 },
+      { text: "Not too big, not too small. Just the right size for a proper dance party.", rating: 4 },
+      { text: "The outdoor back patio is clutch for breaks. Great programming across genres.", rating: 5 },
+    ]
+  },
+  "Superbueno": {
+    reviews: [
+      { text: "East Village gem! Mezcal cocktails and late night dancing. The back room gets sweaty in the best way.", rating: 4 },
+      { text: "Love the Mexican-inspired drinks. The vibe shifts from chill bar to dance party as the night goes on.", rating: 4 },
+      { text: "No cover, great drinks, and actual dancing. What more could you want from an East Village spot?", rating: 5 },
+      { text: "Neighborhood bar energy that transforms into a proper party. Love the unpretentious crowd.", rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Sunken Harbor Club": {
+    reviews: [
+      { text: "Tiki heaven in Carroll Gardens! The rum cocktails are legit and the tropical vibes transport you.", rating: 5 },
+      { text: "Best tiki bar in Brooklyn. The attention to detail in the decor and drinks is impressive.", rating: 5 },
+      { text: "Escape NYC without leaving. Every drink comes in beautiful vintage glassware.", rating: 4 },
+      { text: "The Leyenda team knows their rum. Complex, balanced tiki drinks - not just sugar bombs.", rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "schmuck.": {
+    reviews: [
+      { text: "Jewish deli meets cocktail bar and it works! The pastrami is incredible and the drinks are creative.", rating: 4 },
+      { text: "Only in NYC would a deli-bar concept work this well. Late night pastrami sandwiches hit different.", rating: 4 },
+      { text: "Love the irreverent vibe. Great for a weird date or hanging with friends who appreciate the absurd.", rating: 4 },
+      { text: "The cocktail menu is genuinely good, not just a gimmick. Plus midnight deli food.", rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Public Hotel Rooftop": {
+    reviews: [
+      { text: "Ian Schrager's latest. The views are gorgeous and the design is impeccable. Very scene-y on weekends.", rating: 4 },
+      { text: "Downtown views from above. The indoor/outdoor flow is great. Expect a fashionable crowd.", rating: 4 },
+      { text: "Beautiful space, pricey drinks, but worth it for the atmosphere. Best at sunset.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: "The rooftop pool scene in summer is legendary. Very European Riviera vibes.", rating: 5 },
+    ]
+  },
+  "Jean's": {
+    reviews: [
+      { text: "NoMad hotel's hidden gem. Feels like a Parisian salon. The cocktails and small plates are refined.", rating: 5 },
+      { text: "Sophisticated without being stuffy. Perfect for a grown-up night out in Midtown.", rating: 4 },
+      { text: "Love the intimate booths. Great for conversation and actually being able to hear your friends.", rating: 4 },
+      { text: "Daniel Boulud quality extends to the bar. Every cocktail is perfectly balanced.", rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "The Campbell": {
+    reviews: [
+      { text: "Grand Central's secret! The Jazz Age architecture is stunning. Feel like you're in The Great Gatsby.", rating: 5 },
+      { text: "Historic space that was once a 1920s mogul's office. The hand-painted ceiling is jaw-dropping.", rating: 5 },
+      { text: "Perfect pre-train cocktail spot. Classic drinks in an incomparable setting.", rating: 4 },
+      { text: "Touristy but worth it. The room itself is the star - one of NYC's most beautiful bars.", rating: 4 },
+      { text: "Old money vibes in the best way. Dress up and sip a martini like it's 1929.", rating: 5 },
+    ]
+  },
+  "Bar Snack": {
+    reviews: [
+      { text: "Natural wines and creative small plates. The perfect neighborhood spot for East Village locals.", rating: 4 },
+      { text: "Love the casual wine bar energy. Knowledgeable staff and interesting, affordable bottles.", rating: 4 },
+      { text: "Great first date spot - intimate, not too loud, and the wine selection is curated.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: "Finally a wine bar that doesn't feel pretentious. Just good juice and good vibes.", rating: 5 },
+    ]
+  },
+  "Saint Tuesday": {
+    reviews: [
+      { text: "Speakeasy hidden in a taco shop! The cocktails are strong and the vibe is mysterious.", rating: 4 },
+      { text: "The reveal when you walk through the back is so fun. Great for impressing a date.", rating: 4 },
+      { text: "Dark, moody, and the drinks pack a punch. Perfect LES late night spot.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: "One of the few speakeasies that's actually hard to find. Worth the hunt.", rating: 5 },
+    ]
+  },
+  "Sunn's": {
+    reviews: [
+      { text: "Filipino flavors meet craft cocktails. The lumpia and drinks pairing is chef's kiss.", rating: 4 },
+      { text: "Finally representation in the cocktail scene! The ube cocktail is beautiful and delicious.", rating: 5 },
+      { text: "Small but mighty. The bartenders really care about what they're making.", rating: 4 },
+      { text: "Love supporting this spot. Creative drinks with ingredients you don't see elsewhere.", rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "The Mulberry": {
+    reviews: [
+      { text: "Little Italy charm with solid cocktails. The outdoor seating on Mulberry is perfect for summer.", rating: 4 },
+      { text: "Old school neighborhood bar energy. Nothing fancy but consistently good times.", rating: 4 },
+      { text: "Great for pregaming before dinner in Little Italy. Classic drinks, friendly bartenders.", rating: 4 },
+      { text: null, rating: 3 },
+      { text: "Unpretentious spot in an increasingly touristy neighborhood. The locals still love it.", rating: 4 },
+    ]
+  },
+  "Amber Room": {
+    reviews: [
+      { text: "Cozy cocktail lounge with vintage vibes. The amber lighting creates such a warm atmosphere.", rating: 4 },
+      { text: "Great for intimate conversations. The seating is comfortable and drinks are well-crafted.", rating: 4 },
+      { text: "Hidden gem in the neighborhood. Not trying to be anything other than a solid bar.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: "The whiskey selection is impressive for such a small spot. Bartender knows their stuff.", rating: 4 },
+    ]
+  },
+  "Patent Pending": {
+    reviews: [
+      { text: "Science-themed cocktails in NoMad! The presentation is wild - smoking beakers and all.", rating: 4 },
+      { text: "More than a gimmick - the drinks actually taste great. Fun for groups.", rating: 4 },
+      { text: "The laboratory aesthetic is Instagram gold. Come for the photos, stay for the cocktails.", rating: 4 },
+      { text: "Creative and playful without being cheesy. Each drink is a little experiment.", rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Ketchy Shuby": {
+    reviews: [
+      { text: "NYC's only ski lodge bar! The apres-ski vibes are so fun, especially in winter.", rating: 4 },
+      { text: "Raclette and mulled wine in Manhattan. The theme is committed and charming.", rating: 4 },
+      { text: "Like being transported to the Alps. Cozy, kitschy, and genuinely enjoyable.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: "Perfect for escaping the cold. The fondue and hot cocktails warm you right up.", rating: 5 },
+    ]
+  },
+  "Gospël": {
+    reviews: [
+      { text: "Cajun brunch cocktails and Southern hospitality! The beignets are addictive.", rating: 4 },
+      { text: "New Orleans vibes in NYC. The jazz brunch is a proper party.", rating: 4 },
+      { text: "Strong drinks and bold flavors. Come hungry and thirsty.", rating: 4 },
+      { text: "The Southern-inspired cocktails are creative and delicious. Great for groups.", rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Paul's Casablanca": {
+    reviews: [
+      { text: "Dive bar meets dance floor. The karaoke nights are legendary and the drinks are cheap.", rating: 4 },
+      { text: "No pretense, just fun. This is what NYC nightlife used to be before everything got fancy.", rating: 4 },
+      { text: "Late night chaos in the best way. The crowd is always down to party.", rating: 4 },
+      { text: "Classic LES energy. Come after midnight when things really get going.", rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Paul's Cocktail Lounge": {
+    reviews: [
+      { text: "More refined than its sister spot but still fun. Great cocktails in a swanky setting.", rating: 4 },
+      { text: "The velvet booths and disco ball give retro glam vibes. Perfect for date night.", rating: 4 },
+      { text: "A little bit disco, a little bit lounge. The DJ sets are surprisingly good.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: "Elevated without being pretentious. The sweet spot between dive bar and fancy cocktail spot.", rating: 4 },
+    ]
+  },
+  "The Nines": {
+    reviews: [
+      { text: "Classic cocktails done right. The bartenders here really know their craft.", rating: 4 },
+      { text: "Old fashioned specialists. If brown spirits are your thing, this is your spot.", rating: 4 },
+      { text: "Intimate and sophisticated. Great for a nightcap after dinner.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: "No frills, just excellent drinks. The kind of bar every neighborhood needs.", rating: 4 },
+    ]
+  },
+  "Little Sister Lounge": {
+    reviews: [
+      { text: "Asian-inspired cocktails with a clubby vibe. The lychee martini is dangerously good.", rating: 4 },
+      { text: "Late night spot that actually has good drinks. The crowd is fun and the music is decent.", rating: 4 },
+      { text: "Great for groups who want to drink and dance. More lounge than club but gets going late.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: "The Pan-Asian cocktails are creative and strong. Perfect LES after hours spot.", rating: 4 },
+    ]
+  },
+  "Unveiled": {
+    reviews: [
+      { text: "Bushwick underground vibes! The warehouse setting is authentic and the music is always fire.", rating: 4 },
+      { text: "Real Brooklyn nightlife energy. Come for the late night sets and stay till sunrise.", rating: 4 },
+      { text: "No fancy bottle service, just good DJs and people who love to dance.", rating: 5 },
+      { text: "The outdoor area is perfect for Brooklyn summer nights. Great local scene.", rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Studio Maison Nur": {
+    reviews: [
+      { text: "Bed-Stuy's best kept secret! The space is beautiful and the vibe is inclusive.", rating: 5 },
+      { text: "Black-owned and community-focused. The events here celebrate culture and creativity.", rating: 5 },
+      { text: "More than a bar - it's a creative space. The programming is always interesting.", rating: 4 },
+      { text: "Love the intimate setting. Great for actually connecting with people.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+};
 
 const DEMO_YAP_MESSAGES = [
   { text: "Pretty sure Justin Bieber just walked in...", score: 78, comments: 9 },
@@ -611,22 +903,22 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('stories').insert(stories);
       }
 
-      // 9. Create venue reviews
-      console.log('Creating demo venue reviews...');
+      // 9. Create venue reviews with real-world accurate data
+      console.log('Creating demo venue reviews with accurate data...');
       const venueReviews = [];
-      const reviewedVenues = getRandomItems(NYC_VENUES.slice(0, 20), 15); // Reviews for top 15 venues
       
-      for (const venue of reviewedVenues) {
+      // Create reviews for ALL 34 venues using venue-specific data
+      for (const venue of NYC_VENUES) {
         const venueId = venueIdMap.get(venue.name);
         if (!venueId) continue;
         
-        // 3-8 reviews per venue
-        const numReviews = 3 + Math.floor(Math.random() * 6);
-        const reviewers = getRandomItems(demoUserIds, numReviews);
+        const venueReviewData = VENUE_SPECIFIC_REVIEWS[venue.name];
+        if (!venueReviewData) continue;
         
-        for (let i = 0; i < reviewers.length; i++) {
-          const rating = 3 + Math.floor(Math.random() * 3); // 3-5 stars
-          const reviewText = DEMO_REVIEW_TEXTS[Math.floor(Math.random() * DEMO_REVIEW_TEXTS.length)];
+        const reviewers = getRandomItems(demoUserIds, venueReviewData.reviews.length);
+        
+        for (let i = 0; i < venueReviewData.reviews.length; i++) {
+          const review = venueReviewData.reviews[i];
           const hasImage = Math.random() < 0.4; // 40% have images
           const imageUrl = hasImage ? DEMO_REVIEW_IMAGES[Math.floor(Math.random() * DEMO_REVIEW_IMAGES.length)] : null;
           const isAnonymous = Math.random() < 0.3; // 30% anonymous
@@ -635,12 +927,12 @@ Deno.serve(async (req) => {
           venueReviews.push({
             venue_id: venueId,
             user_id: reviewers[i],
-            rating,
-            review_text: reviewText,
+            rating: review.rating,
+            review_text: review.text,
             is_anonymous: isAnonymous,
             image_url: imageUrl,
             score,
-            created_at: getRecentTimestamp(72), // Reviews from last 3 days
+            created_at: getRecentTimestamp(168), // Reviews from last 7 days
           });
         }
       }
