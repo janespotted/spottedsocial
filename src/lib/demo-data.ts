@@ -1,8 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { SupportedCity } from './city-detection';
 
 // Real NYC top-tier venues (scraped from top NYC bar/club rankings 2025)
 // These are "promoted" venues that appear in bootstrap mode (75% of leaderboard)
-export const PROMOTED_VENUES = [
+export const NYC_PROMOTED_VENUES = [
   // Top Manhattan Bars
   { name: "Superbueno", lat: 40.7249, lng: -73.9865, neighborhood: "East Village", type: "bar" },
   { name: "Sunken Harbor Club", lat: 40.6923, lng: -73.9872, neighborhood: "Downtown Brooklyn", type: "bar" },
@@ -46,8 +47,53 @@ export const PROMOTED_VENUES = [
   { name: "The Campbell", lat: 40.7527, lng: -73.9772, neighborhood: "Grand Central", type: "bar" },
 ];
 
+// Real LA top-tier venues (top LA nightlife spots 2025)
+// These are "promoted" venues that appear in bootstrap mode for LA users
+export const LA_PROMOTED_VENUES = [
+  // West Hollywood / Hollywood
+  { name: "Sound Nightclub", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "club" },
+  { name: "Academy LA", lat: 34.1020, lng: -118.3261, neighborhood: "Hollywood", type: "club" },
+  { name: "Avalon Hollywood", lat: 34.1020, lng: -118.3261, neighborhood: "Hollywood", type: "club" },
+  { name: "Exchange LA", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "club" },
+  { name: "The Abbey", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "bar" },
+  { name: "Sunset Room Hollywood", lat: 34.0907, lng: -118.3871, neighborhood: "West Hollywood", type: "club" },
+  { name: "The Highlight Room", lat: 34.0907, lng: -118.3871, neighborhood: "Hollywood", type: "lounge" },
+  { name: "Create Nightclub", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "club" },
+  
+  // Downtown LA
+  { name: "Resident DTLA", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "club" },
+  { name: "No Vacancy", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
+  { name: "EP & LP", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
+  { name: "Death & Co LA", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "bar" },
+  { name: "Warwick", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
+  
+  // Arts District / Silverlake
+  { name: "Good Times at Davey Wayne's", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
+  { name: "The Roger Room", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "bar" },
+  { name: "Harvard & Stone", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
+  { name: "Mom's Bar", lat: 34.0877, lng: -118.2706, neighborhood: "Silverlake", type: "bar" },
+  { name: "Villains Tavern", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "bar" },
+  { name: "The Well", lat: 34.0481, lng: -118.2394, neighborhood: "Downtown", type: "bar" },
+  
+  // High-end / Restaurants with nightlife
+  { name: "Catch LA", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
+  { name: "Delilah", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
+  { name: "Nightingale Plaza", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
+  { name: "The Piano Bar", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
+  { name: "Seven Grand", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "bar" },
+  { name: "Dirty Laundry", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
+  { name: "Hyde Sunset", lat: 34.0907, lng: -118.3871, neighborhood: "West Hollywood", type: "lounge" },
+  { name: "On The Rocks", lat: 34.0907, lng: -118.3871, neighborhood: "Sunset Strip", type: "club" },
+  { name: "Bootsy Bellows", lat: 34.0907, lng: -118.3871, neighborhood: "West Hollywood", type: "club" },
+  { name: "Poppy", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
+  
+  // Santa Monica / Westside
+  { name: "Boa Steakhouse", lat: 34.0195, lng: -118.4912, neighborhood: "Santa Monica", type: "lounge" },
+  { name: "The Bungalow", lat: 34.0195, lng: -118.4912, neighborhood: "Santa Monica", type: "bar" },
+];
+
 // Additional non-promoted demo venues (only appear when full demo mode is ON)
-export const DEMO_VENUES = [
+export const NYC_DEMO_VENUES = [
   { name: "Silo", lat: 40.7489, lng: -73.9680 },
   { name: "Output", lat: 40.7234, lng: -73.9567 },
   { name: "Marquee New York", lat: 40.7412, lng: -73.9971 },
@@ -55,7 +101,15 @@ export const DEMO_VENUES = [
   { name: "Tao Downtown", lat: 40.7403, lng: -74.0068 },
 ];
 
-export const DEMO_USERS = [
+export const LA_DEMO_VENUES = [
+  { name: "1Oak LA", lat: 34.0877, lng: -118.3840 },
+  { name: "Greystone Manor", lat: 34.0877, lng: -118.3840 },
+  { name: "Lure Nightclub", lat: 34.0481, lng: -118.2394 },
+  { name: "Heart Weho", lat: 34.0877, lng: -118.3840 },
+  { name: "Boardner's", lat: 34.0481, lng: -118.2394 },
+];
+
+export const NYC_DEMO_USERS = [
   { display_name: 'Alex Rivera', username: 'alex_spotted', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex', bio: 'NYC nightlife enthusiast 🌃' },
   { display_name: 'Sam Chen', username: 'samthenight', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sam', bio: 'Always out, always vibing ✨' },
   { display_name: 'Jordan Lee', username: 'jordanspots', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jordan', bio: 'Finding the best spots in Brooklyn' },
@@ -76,6 +130,29 @@ export const DEMO_USERS = [
   { display_name: 'Parker Adams', username: 'parkerspotted', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Parker', bio: 'Deep house devotee' },
   { display_name: 'Sage Turner', username: 'sagenights', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sage', bio: 'Brooklyn nightlife 💜' },
   { display_name: 'River Hayes', username: 'riverout', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=River', bio: 'Techno till dawn 🌃' },
+];
+
+export const LA_DEMO_USERS = [
+  { display_name: 'Luna Martinez', username: 'luna_la', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna', bio: 'LA nightlife explorer 🌴' },
+  { display_name: 'Chase Bennett', username: 'chasenights', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Chase', bio: 'West Coast vibes only 🌊' },
+  { display_name: 'Mia Rodriguez', username: 'mia_out', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mia', bio: 'Hollywood nights 🎬' },
+  { display_name: 'Dylan Cooper', username: 'dylanspots', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Dylan', bio: 'DTLA regular 🏙️' },
+  { display_name: 'Zoe Williams', username: 'zoevibes', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Zoe', bio: 'Sunset Strip enthusiast' },
+  { display_name: 'Blake Torres', username: 'blakeout', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Blake', bio: 'House music lover 🎵' },
+  { display_name: 'Aria Santos', username: 'arianights', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aria', bio: 'WeHo nightlife 💜' },
+  { display_name: 'Mason Clark', username: 'masonraves', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mason', bio: 'LA club connoisseur' },
+  { display_name: 'Ivy Nguyen', username: 'ivy_spots', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ivy', bio: 'Always at Exchange 🔥' },
+  { display_name: 'Kai Foster', username: 'kai_nights', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kai', bio: 'Sound Nightclub regular' },
+  { display_name: 'Nova Gray', username: 'novavibes', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Nova', bio: 'LA after hours 🌙' },
+  { display_name: 'River Stone', username: 'riverdances', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=RiverLA', bio: 'Deep house devotee' },
+  { display_name: 'Sage Mitchell', username: 'sage_la', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sage', bio: 'Arts District nights 🎨' },
+  { display_name: 'Phoenix Reed', username: 'phoenixout', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Phoenix', bio: 'Hollywood Hills vibes' },
+  { display_name: 'Rowan Price', username: 'rowanspots', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rowan', bio: 'LA techno scene 🎧' },
+  { display_name: 'Aspen Cruz', username: 'aspenights', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aspen', bio: 'Silverlake regular' },
+  { display_name: 'Cody James', username: 'codyraves', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Cody', bio: 'LA warehouse parties 🏭' },
+  { display_name: 'Eden Walsh', username: 'eden_vibes', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Eden', bio: 'West Coast beats' },
+  { display_name: 'Flynn Hayes', username: 'flynn_la', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Flynn', bio: 'LA nightlife curator 🌟' },
+  { display_name: 'Harper Lane', username: 'harpernights', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Harper', bio: 'Living for LA nights ✨' },
 ];
 
 export const DEMO_CAPTIONS = [
@@ -133,6 +210,24 @@ export const DEMO_YAP_MESSAGES = [
   { text: "Sound system goes crazy", score: 61, comments: 7 },
   { text: "Cover was worth it", score: 27, comments: 4 },
 ];
+
+// City-specific getter functions
+export function getPromotedVenuesForCity(city: SupportedCity) {
+  return city === 'la' ? LA_PROMOTED_VENUES : NYC_PROMOTED_VENUES;
+}
+
+export function getDemoVenuesForCity(city: SupportedCity) {
+  return city === 'la' ? LA_DEMO_VENUES : NYC_DEMO_VENUES;
+}
+
+export function getDemoUsersForCity(city: SupportedCity) {
+  return city === 'la' ? LA_DEMO_USERS : NYC_DEMO_USERS;
+}
+
+// Keep legacy export for backwards compatibility
+export const PROMOTED_VENUES = NYC_PROMOTED_VENUES;
+export const DEMO_VENUES = NYC_DEMO_VENUES;
+export const DEMO_USERS = NYC_DEMO_USERS;
 
 interface DemoModeState {
   enabled: boolean;
