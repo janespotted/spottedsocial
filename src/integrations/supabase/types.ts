@@ -709,6 +709,7 @@ export type Database = {
       }
       venues: {
         Row: {
+          city: string | null
           created_at: string | null
           id: string
           is_demo: boolean | null
@@ -721,6 +722,7 @@ export type Database = {
           type: string
         }
         Insert: {
+          city?: string | null
           created_at?: string | null
           id?: string
           is_demo?: boolean | null
@@ -733,6 +735,7 @@ export type Database = {
           type: string
         }
         Update: {
+          city?: string | null
           created_at?: string | null
           id?: string
           is_demo?: boolean | null

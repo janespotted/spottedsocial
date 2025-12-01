@@ -1,6 +1,9 @@
 // Bootstrap mode configuration for hybrid demo/real data experience
 // This mode is active until the app reaches critical mass
 
+import type { SupportedCity } from './city-detection';
+import { getCachedCity } from './city-detection';
+
 export interface BootstrapConfig {
   enabled: boolean;
   thresholds: {
@@ -25,6 +28,7 @@ export function isBootstrapModeEnabled(): boolean {
 
 interface BootstrapModeState {
   enabled: boolean;
+  city: SupportedCity;
 }
 
 export function getBootstrapMode(): BootstrapModeState {
@@ -37,12 +41,14 @@ export function getBootstrapMode(): BootstrapModeState {
     console.error('Error reading bootstrap mode:', error);
   }
   
-  // Default: bootstrap mode is ON
-  return { enabled: true };
+  // Default: bootstrap mode is ON with detected/cached city
+  const city = getCachedCity() || 'nyc';
+  return { enabled: true, city };
 }
 
 export function setBootstrapMode(enabled: boolean): void {
-  const state: BootstrapModeState = { enabled };
+  const current = getBootstrapMode();
+  const state: BootstrapModeState = { enabled, city: current.city };
   localStorage.setItem('bootstrap_mode', JSON.stringify(state));
   
   // Dispatch event for reactive components
