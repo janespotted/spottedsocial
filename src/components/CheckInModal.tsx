@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
-import { Ghost, MapPin, Edit3, Clock, Bell, X } from 'lucide-react';
+import { Ghost, MapPin, Edit3, Clock, Bell, X, AlarmClock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -29,6 +30,7 @@ interface CheckInModalProps {
 
 export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const { user } = useAuth();
+  const { isReminderTriggered } = useCheckIn();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home'>('home');
@@ -224,6 +226,14 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       return remainingMins > 0 ? `${hrs}h ${remainingMins}m` : `${hrs}h`;
     }
     return `${mins}m`;
+  };
+
+  const handleSnooze = (minutes: number) => {
+    const snoozeTime = Date.now() + minutes * 60 * 1000;
+    localStorage.setItem('checkin_reminder', String(snoozeTime));
+    haptic.light();
+    sonnerToast.success(`Snoozed for ${minutes} minutes! 😴`);
+    onOpenChange(false);
   };
 
   const handleCustomReminderSubmit = () => {
@@ -521,6 +531,32 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+
+          {/* Snooze options when reminder triggered */}
+          {isReminderTriggered && (
+            <div className="pt-4 space-y-3">
+              <p className="text-white/60 text-center text-sm flex items-center justify-center gap-2">
+                <AlarmClock className="w-4 h-4" />
+                Need more time?
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => handleSnooze(15)}
+                  variant="outline"
+                  className="flex-1 h-12 rounded-full border border-white/30 bg-transparent text-white hover:bg-white/10"
+                >
+                  Snooze 15m
+                </Button>
+                <Button
+                  onClick={() => handleSnooze(30)}
+                  variant="outline"
+                  className="flex-1 h-12 rounded-full border border-white/30 bg-transparent text-white hover:bg-white/10"
+                >
+                  Snooze 30m
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -14,7 +14,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { showCheckIn, closeCheckIn, openCheckIn } = useCheckIn();
+  const { showCheckIn, closeCheckIn, openCheckInFromReminder } = useCheckIn();
   const { unreadCount } = useNotifications();
   const { showOnboarding, completeOnboarding, loading: onboardingLoading } = useOnboarding();
   const navigate = useNavigate();
@@ -32,7 +32,7 @@ export function Layout({ children }: LayoutProps) {
           'Are you going out tonight? Tap to let your friends know!'
         );
         
-        openCheckIn();
+        openCheckInFromReminder();
       }
     };
     
@@ -43,7 +43,7 @@ export function Layout({ children }: LayoutProps) {
     const interval = setInterval(checkReminder, 30000);
     
     return () => clearInterval(interval);
-  }, [openCheckIn]);
+  }, [openCheckInFromReminder]);
 
   // Show onboarding for new users
   if (!onboardingLoading && showOnboarding) {
