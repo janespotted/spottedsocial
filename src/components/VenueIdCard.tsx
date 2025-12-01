@@ -231,10 +231,9 @@ export function VenueIdCard() {
 
   const handleMapPinClick = () => {
     if (venue) {
-      // Dispatch custom event to center map
-      window.dispatchEvent(new CustomEvent('centerMapOnVenue', {
-        detail: { lat: venue.lat, lng: venue.lng }
-      }));
+      // Open Apple Maps with directions from current location to venue
+      const appleMapsUrl = `https://maps.apple.com/?daddr=${venue.lat},${venue.lng}&dirflg=d`;
+      window.open(appleMapsUrl, '_blank');
     }
   };
 
