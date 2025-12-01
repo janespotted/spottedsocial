@@ -4,7 +4,9 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard, FriendCardData } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useUserCity } from '@/hooks/useUserCity';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
+import { CITY_CENTERS } from '@/lib/city-detection';
 import { supabase } from '@/integrations/supabase/client';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -44,6 +46,7 @@ export default function Map() {
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
+  const { city } = useUserCity();
   const { toast } = useToast();
   useAutoVenueTracking(); // Trigger auto-venue tracking on map view
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -134,8 +137,8 @@ export default function Map() {
 
       // When demo mode is ON, use static demo friends dataset
       if (demoEnabled) {
-        // Static demo friends - always visible in demo mode
-        const staticDemoFriends = [
+        // Static demo friends for NYC
+        const nycDemoFriends = [
           { name: 'Emma Davis', venue: 'The Nines', lat: 40.748817, lng: -73.985428, type: 'close' as const },
           { name: 'Noah Wilson', venue: 'Blue Note', lat: 40.730610, lng: -73.935242, type: 'direct' as const },
           { name: 'Sophia Martinez', venue: 'Spotted Lounge', lat: 40.758896, lng: -73.985130, type: 'close' as const },
@@ -145,6 +148,20 @@ export default function Map() {
           { name: 'Ava Johnson', venue: 'Blue Note', lat: 40.730800, lng: -73.935500, type: 'close' as const },
           { name: 'Lucas Garcia', venue: 'The Nines', lat: 40.748500, lng: -73.985800, type: 'direct' as const },
         ];
+
+        // Static demo friends for LA
+        const laDemoFriends = [
+          { name: 'Maya Rodriguez', venue: 'Academy LA', lat: 34.0479, lng: -118.2565, type: 'close' as const },
+          { name: 'Alex Chen', venue: 'Sound Nightclub', lat: 34.0412, lng: -118.2468, type: 'direct' as const },
+          { name: 'Jordan Blake', venue: 'Exchange LA', lat: 34.0441, lng: -118.2504, type: 'close' as const },
+          { name: 'Riley Park', venue: 'Academy LA', lat: 34.0480, lng: -118.2566, type: 'mutual' as const },
+          { name: 'Casey Williams', venue: 'The Mayan', lat: 34.0493, lng: -118.2577, type: 'direct' as const },
+          { name: 'Morgan Davis', venue: 'Sound Nightclub', lat: 34.0413, lng: -118.2469, type: 'mutual' as const },
+          { name: 'Avery Thompson', venue: 'Exchange LA', lat: 34.0442, lng: -118.2505, type: 'close' as const },
+          { name: 'Drew Martinez', venue: 'Academy LA', lat: 34.0481, lng: -118.2567, type: 'direct' as const },
+        ];
+
+        const staticDemoFriends = city === 'la' ? laDemoFriends : nycDemoFriends;
 
         friendLocations = staticDemoFriends.map((friend, index) => ({
           user_id: `demo-${index}`,
@@ -325,10 +342,12 @@ export default function Map() {
 
     mapboxgl.accessToken = mapboxToken;
     
+    const cityCenter = CITY_CENTERS[city];
+    
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/dark-v11',
-      center: [-73.985428, 40.748817], // NYC default
+      center: [cityCenter.lng, cityCenter.lat],
       zoom: 13,
     });
 
