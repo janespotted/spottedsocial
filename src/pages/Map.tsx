@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MessageSquare, Crosshair, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { CityBadge } from '@/components/CityBadge';
 
 interface FriendLocation {
   user_id: string;
@@ -634,7 +635,10 @@ export default function Map() {
 
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-6 z-10">
-        <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
+          <CityBadge />
+        </div>
         <button 
           onClick={openCheckIn} 
           className="hover:scale-110 transition-transform"

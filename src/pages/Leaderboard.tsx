@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { ChevronUp, ChevronDown, BarChart3 } from 'lucide-react';
+import { CityBadge } from '@/components/CityBadge';
 
 interface VenueStats {
   venue_name: string;
@@ -265,7 +266,10 @@ export default function Leaderboard() {
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-start justify-between p-6">
           <div>
-            <h1 className="text-2xl font-light tracking-[0.3em] text-white mb-2">Spotted</h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
+              <CityBadge />
+            </div>
             <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
             <p className="text-white/60 text-sm mt-1">Top Places to Go Out Now</p>
           </div>
