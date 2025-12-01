@@ -718,6 +718,7 @@ export type Database = {
           lng: number
           name: string
           neighborhood: string
+          opened_at: string | null
           popularity_rank: number | null
           type: string
         }
@@ -731,6 +732,7 @@ export type Database = {
           lng: number
           name: string
           neighborhood: string
+          opened_at?: string | null
           popularity_rank?: number | null
           type: string
         }
@@ -744,6 +746,7 @@ export type Database = {
           lng?: number
           name?: string
           neighborhood?: string
+          opened_at?: string | null
           popularity_rank?: number | null
           type?: string
         }
