@@ -4,11 +4,14 @@ import { useMeetUp } from '@/contexts/MeetUpContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { MessageCircle } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MessageCircle, MoreVertical, Flag, Ban } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
+import { ReportDialog } from '@/components/ReportDialog';
+import { toast } from 'sonner';
 
 interface FriendData {
   id: string;
@@ -52,6 +55,7 @@ export function FriendIdCard() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
   const [statusSubtitle, setStatusSubtitle] = useState<string>('');
+  const [showReportDialog, setShowReportDialog] = useState(false);
 
   useEffect(() => {
     if (selectedFriend && user) {
@@ -286,109 +290,172 @@ export function FriendIdCard() {
     closeFriendCard();
   };
 
+  const handleBlockUser = async () => {
+    if (!selectedFriend || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('blocked_users')
+        .insert({
+          blocker_id: user.id,
+          blocked_id: selectedFriend.userId,
+        });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.info('User already blocked');
+        } else {
+          throw error;
+        }
+      } else {
+        toast.success(`Blocked ${selectedFriend.displayName}`);
+      }
+      closeFriendCard();
+    } catch (error: any) {
+      console.error('Error blocking user:', error);
+      toast.error('Failed to block user');
+    }
+  };
+
   const swipeHandlers = useSwipeGesture({
     onSwipeDown: closeFriendCard,
     threshold: 50
   });
 
   return (
-    <Dialog open={!!selectedFriend} onOpenChange={(open) => !open && closeFriendCard()}>
-      <DialogContent 
-        className="w-[90%] max-w-[400px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden"
-        {...swipeHandlers}
-      >
-        {!selectedFriend ? (
-          <div className="py-8 px-6 flex items-center justify-center">
-            <p className="text-white/60">Loading...</p>
-          </div>
-        ) : (
-          <div className="p-5">
-            <div className="flex items-start gap-4 mb-4">
-              {/* Large Avatar */}
-              <Avatar className="h-20 w-20 border-[3px] border-[#a855f7] flex-shrink-0">
-                <AvatarImage src={selectedFriend.avatarUrl || undefined} />
-                <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
-                  {selectedFriend.displayName[0]}
-                </AvatarFallback>
-              </Avatar>
-
-              {/* User Info */}
-              <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-white leading-tight mb-1">
-                  {selectedFriend.displayName}
-                </h2>
-                {demoEnabled ? (
-                  <>
-                    {selectedFriend.venueName && (
-                      <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
-                        @ {selectedFriend.venueName}
-                      </p>
-                    )}
-                    {distance !== null && (
-                      <p className="text-white/50 text-sm leading-tight">
-                        {distance.toFixed(1)} mi away
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {statusSubtitle && (
-                      <p className={`text-base font-medium leading-tight mb-1 ${
-                        userStatus?.isOut ? 'text-[#d4ff00]' : 'text-white/70'
-                      }`}>
-                        {statusSubtitle}
-                      </p>
-                    )}
-                    {distance !== null && userStatus?.isOut && (
-                      <p className="text-white/50 text-sm leading-tight">
-                        {distance.toFixed(1)} mi away
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
+    <>
+      <Dialog open={!!selectedFriend} onOpenChange={(open) => !open && closeFriendCard()}>
+        <DialogContent 
+          className="w-[90%] max-w-[400px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden"
+          {...swipeHandlers}
+        >
+          {!selectedFriend ? (
+            <div className="py-8 px-6 flex items-center justify-center">
+              <p className="text-white/60">Loading...</p>
             </div>
+          ) : (
+            <div className="p-5">
+              <div className="flex items-start gap-4 mb-4">
+                {/* Large Avatar */}
+                <Avatar className="h-20 w-20 border-[3px] border-[#a855f7] flex-shrink-0">
+                  <AvatarImage src={selectedFriend.avatarUrl || undefined} />
+                  <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
+                    {selectedFriend.displayName[0]}
+                  </AvatarFallback>
+                </Avatar>
 
-            {/* Bottom Row: Friends + Buttons */}
-            <div className="flex items-center gap-3">
-              {/* Friends at Venue */}
-              {friendsAtVenue.length > 0 && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <div className="flex -space-x-2">
-                    {friendsAtVenue.slice(0, 2).map((friend) => (
-                      <Avatar key={friend.user_id} className="h-7 w-7 border-2 border-[#1a0f2e]">
-                        <AvatarImage src={friend.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                          {friend.display_name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    ))}
+                {/* User Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between">
+                    <h2 className="text-xl font-bold text-white leading-tight mb-1">
+                      {selectedFriend.displayName}
+                    </h2>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="p-1 rounded-full hover:bg-white/10 transition-colors">
+                        <MoreVertical className="h-5 w-5 text-white/60" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
+                        <DropdownMenuItem 
+                          onClick={() => setShowReportDialog(true)}
+                          className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
+                        >
+                          <Flag className="h-4 w-4 mr-2" />
+                          Report User
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={handleBlockUser}
+                          className="text-red-400 hover:bg-red-500/20 cursor-pointer"
+                        >
+                          <Ban className="h-4 w-4 mr-2" />
+                          Block User
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  {friendsAtVenue.length > 2 && (
-                    <span className="text-white text-sm font-medium">+{friendsAtVenue.length - 2}</span>
+                  {demoEnabled ? (
+                    <>
+                      {selectedFriend.venueName && (
+                        <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
+                          @ {selectedFriend.venueName}
+                        </p>
+                      )}
+                      {distance !== null && (
+                        <p className="text-white/50 text-sm leading-tight">
+                          {distance.toFixed(1)} mi away
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {statusSubtitle && (
+                        <p className={`text-base font-medium leading-tight mb-1 ${
+                          userStatus?.isOut ? 'text-[#d4ff00]' : 'text-white/70'
+                        }`}>
+                          {statusSubtitle}
+                        </p>
+                      )}
+                      {distance !== null && userStatus?.isOut && (
+                        <p className="text-white/50 text-sm leading-tight">
+                          {distance.toFixed(1)} mi away
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
-              )}
+              </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 flex-1">
-                <button
-                  onClick={handleMeetUp}
-                  className="flex-1 py-2 px-5 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors"
-                >
-                  Meet Up
-                </button>
-                <button
-                  onClick={handleOpenDM}
-                  className="p-2 rounded-full bg-transparent border-2 border-white/20 text-white hover:bg-white/10 transition-colors"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                </button>
+              {/* Bottom Row: Friends + Buttons */}
+              <div className="flex items-center gap-3">
+                {/* Friends at Venue */}
+                {friendsAtVenue.length > 0 && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex -space-x-2">
+                      {friendsAtVenue.slice(0, 2).map((friend) => (
+                        <Avatar key={friend.user_id} className="h-7 w-7 border-2 border-[#1a0f2e]">
+                          <AvatarImage src={friend.avatar_url || undefined} />
+                          <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                            {friend.display_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                      ))}
+                    </div>
+                    {friendsAtVenue.length > 2 && (
+                      <span className="text-white text-sm font-medium">+{friendsAtVenue.length - 2}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 flex-1">
+                  <button
+                    onClick={handleMeetUp}
+                    className="flex-1 py-2 px-5 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors"
+                  >
+                    Meet Up
+                  </button>
+                  <button
+                    onClick={handleOpenDM}
+                    className="p-2 rounded-full bg-transparent border-2 border-white/20 text-white hover:bg-white/10 transition-colors"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Dialog */}
+      {selectedFriend && (
+        <ReportDialog
+          open={showReportDialog}
+          onOpenChange={setShowReportDialog}
+          reportType="user"
+          targetId={selectedFriend.userId}
+          targetName={selectedFriend.displayName}
+        />
+      )}
+    </>
   );
 }
