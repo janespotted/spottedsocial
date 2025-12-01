@@ -10,10 +10,13 @@ import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDemoMode, setDemoMode, seedDemoData, clearDemoData } from '@/lib/demo-data';
 import { getBootstrapMode, setBootstrapMode } from '@/lib/bootstrap-config';
+import { useUserCity } from '@/hooks/useUserCity';
 
 export default function DemoSettings() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { city } = useUserCity();
+  const cityLabel = city === 'la' ? 'LA' : 'NYC';
   const [demoEnabled, setDemoEnabled] = useState(false);
   const [bootstrapEnabled, setBootstrapEnabled] = useState(false);
   const [seeded, setSeeded] = useState(false);
@@ -66,7 +69,7 @@ export default function DemoSettings() {
     setBootstrapEnabled(enabled);
     
     if (enabled) {
-      toast.success('Bootstrap mode enabled. Leaderboard will show curated NYC venues.');
+      toast.success(`Bootstrap mode enabled. Leaderboard will show curated ${cityLabel} venues.`);
     } else {
       toast.success('Bootstrap mode disabled. Only real user data will be shown.');
     }
@@ -77,7 +80,7 @@ export default function DemoSettings() {
     
     setLoading(true);
     try {
-      toast.info('Seeding demo data... This may take a moment.');
+      toast.info(`Seeding ${cityLabel} demo data... This may take a moment.`);
       const result = await seedDemoData(user.id);
       if (result.success && result.stats) {
         setSeeded(true);
@@ -197,7 +200,7 @@ export default function DemoSettings() {
               Bootstrap Mode
             </CardTitle>
             <CardDescription className="text-white/60">
-              Show curated NYC venues alongside real data (only active when demo mode is OFF)
+              Show curated {cityLabel} venues alongside real data (only active when demo mode is OFF)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -222,19 +225,21 @@ export default function DemoSettings() {
             {!demoEnabled && bootstrapEnabled && (
               <div className="pt-4 border-t border-[#a855f7]/20">
                 <p className="text-sm text-white/70">
-                  <strong className="text-[#d4ff00]">Active:</strong> Leaderboard shows real data + 20 top-ranked NYC venues
+                  <strong className="text-[#d4ff00]">Active:</strong> Leaderboard shows real data + 20 top-ranked {cityLabel} venues
                 </p>
                 <div className="mt-3 p-3 bg-[#1a0f2e]/60 rounded-lg border border-[#a855f7]/20 space-y-2 text-xs text-white/60">
                   <div className="flex justify-between">
                     <span>Promoted Venues:</span>
-                    <span className="text-[#d4ff00]">20 NYC hotspots</span>
+                    <span className="text-[#d4ff00]">20 {cityLabel} hotspots</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Data Split:</span>
                     <span className="text-white/80">~75% promoted / 25% real</span>
                   </div>
                   <div className="text-white/50 pt-2">
-                    Includes: Superbueno, Ketchy Shuby, Gospël, The Box, Attaboy, Saint Tuesday, and more...
+                    Includes: {city === 'la' 
+                      ? 'Sunset Room, Sound Nightclub, The Abbey, Death & Co LA, and more...'
+                      : 'Superbueno, Ketchy Shuby, Gospël, The Box, Attaboy, Saint Tuesday, and more...'}
                   </div>
                 </div>
               </div>
