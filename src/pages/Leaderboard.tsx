@@ -5,6 +5,7 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
+import { useUserCity } from '@/hooks/useUserCity';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -43,7 +44,8 @@ export default function Leaderboard() {
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
-  const bootstrapEnabled = useBootstrapMode();
+  const { bootstrapEnabled } = useBootstrapMode();
+  const { city } = useUserCity();
   useAutoVenueTracking(); // Trigger auto-venue tracking on leaderboard view
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
@@ -96,10 +98,10 @@ export default function Leaderboard() {
     if (user) {
       fetchLeaderboard();
     }
-  }, [user, demoEnabled, bootstrapEnabled]);
+  }, [user, demoEnabled, bootstrapEnabled, city]);
 
   const fetchLeaderboard = async () => {
-    // Build query for night statuses with venue popularity_rank
+    // Build query for night statuses with venue popularity_rank, filtered by city
     let query = supabase
       .from('night_statuses')
       .select(`
@@ -112,8 +114,9 @@ export default function Leaderboard() {
           display_name,
           avatar_url
         ),
-        venues!inner(popularity_rank, is_promoted)
+        venues!inner(popularity_rank, is_promoted, city)
       `)
+      .eq('venues.city', city)
       .not('venue_name', 'is', null)
       .not('lat', 'is', null)
       .not('lng', 'is', null)
@@ -130,11 +133,12 @@ export default function Leaderboard() {
     }
     // If demoEnabled is true, show everything (no filter)
 
-    // Also fetch promoted venues directly to ensure they always appear
+    // Also fetch promoted venues directly to ensure they always appear, filtered by city
     const { data: promotedVenues } = await supabase
       .from('venues')
       .select('id, name, popularity_rank, is_promoted')
-      .eq('is_promoted', true);
+      .eq('is_promoted', true)
+      .eq('city', city);
 
     const { data: statuses } = await query;
 

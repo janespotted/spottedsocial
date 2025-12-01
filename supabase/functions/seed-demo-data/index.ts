@@ -41,6 +41,42 @@ const NYC_VENUES = [
   { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529, rank: 34 },
 ];
 
+// LA venues - ordered by popularity (32 venues)
+const LA_VENUES = [
+  { name: "Academy LA", lat: 34.0479, lng: -118.2565, rank: 1 },
+  { name: "Sound Nightclub", lat: 34.0412, lng: -118.2468, rank: 2 },
+  { name: "Exchange LA", lat: 34.0441, lng: -118.2504, rank: 3 },
+  { name: "The Mayan", lat: 34.0493, lng: -118.2577, rank: 4 },
+  { name: "Catch One", lat: 34.0352, lng: -118.3085, rank: 5 },
+  { name: "Avalon Hollywood", lat: 34.1020, lng: -118.3268, rank: 6 },
+  { name: "Break Room 86", lat: 34.0781, lng: -118.3650, rank: 7 },
+  { name: "No Vacancy", lat: 34.0989, lng: -118.3267, rank: 8 },
+  { name: "EP & LP", lat: 34.0789, lng: -118.3661, rank: 9 },
+  { name: "Warwick", lat: 34.1019, lng: -118.3277, rank: 10 },
+  { name: "The Bungalow", lat: 34.0062, lng: -118.4715, rank: 11 },
+  { name: "Nightingale Plaza", lat: 34.0789, lng: -118.3628, rank: 12 },
+  { name: "Spotlight LA", lat: 34.0478, lng: -118.2505, rank: 13 },
+  { name: "Resident", lat: 34.0488, lng: -118.2518, rank: 14 },
+  { name: "Skybar", lat: 34.0949, lng: -118.3853, rank: 15 },
+  { name: "Good Times at Davey Wayne's", lat: 34.0990, lng: -118.3855, rank: 16 },
+  { name: "The Rooftop at The Standard", lat: 34.0488, lng: -118.2504, rank: 17 },
+  { name: "The Varnish", lat: 34.0448, lng: -118.2489, rank: 18 },
+  { name: "Seven Grand", lat: 34.0465, lng: -118.2508, rank: 19 },
+  { name: "The Edison", lat: 34.0483, lng: -118.2513, rank: 20 },
+  { name: "The Roger Room", lat: 34.0810, lng: -118.3700, rank: 21 },
+  { name: "Dirty Laundry", lat: 34.0992, lng: -118.3291, rank: 22 },
+  { name: "The Flats", lat: 34.0790, lng: -118.3653, rank: 23 },
+  { name: "Clifton's Republic", lat: 34.0466, lng: -118.2507, rank: 24 },
+  { name: "The Argyle", lat: 34.0985, lng: -118.3856, rank: 25 },
+  { name: "Genghis Cohen", lat: 34.0989, lng: -118.3268, rank: 26 },
+  { name: "The Satellite", lat: 34.1076, lng: -118.2923, rank: 27 },
+  { name: "Davey Wayne's Basement", lat: 34.0991, lng: -118.3856, rank: 28 },
+  { name: "The Escondite", lat: 34.0488, lng: -118.2506, rank: 29 },
+  { name: "The Falls", lat: 34.0790, lng: -118.3655, rank: 30 },
+  { name: "Bootleg Theater", lat: 34.0782, lng: -118.2617, rank: 31 },
+  { name: "Adults Only", lat: 34.0448, lng: -118.2486, rank: 32 },
+];
+
 // Non-promoted demo venues (only for full demo mode)
 const DEMO_VENUES = [
   { name: 'Silo', lat: 40.7489, lng: -73.9680 },
@@ -420,6 +456,64 @@ const VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | n
   },
 };
 
+// LA venue-specific reviews (minimal set for key venues)
+const LA_VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | null; rating: number }> }> = {
+  "Academy LA": {
+    reviews: [
+      { text: "Best sound system in LA! The DJ lineups are insane. True underground vibe.", rating: 5 },
+      { text: "DTLA's premier techno spot. Gets packed but the energy is worth it.", rating: 4 },
+      { text: "No frills, just great music and people who actually love to dance.", rating: 5 },
+      { text: null, rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Sound Nightclub": {
+    reviews: [
+      { text: "Massive club with incredible production. The light shows are next level.", rating: 4 },
+      { text: "Gets the biggest EDM acts. If you want the LA mega-club experience, this is it.", rating: 4 },
+      { text: "Three floors of different vibes. Sound quality lives up to the name.", rating: 5 },
+      { text: null, rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Exchange LA": {
+    reviews: [
+      { text: "The old stock exchange building is stunning! Historic LA architecture meets modern clubbing.", rating: 5 },
+      { text: "World-class DJs in a gorgeous space. One of LA's most iconic venues.", rating: 5 },
+      { text: "The main room is breathtaking. Multiple floors and spaces to explore.", rating: 4 },
+      { text: null, rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "The Mayan": {
+    reviews: [
+      { text: "The Mayan temple decor is wild! Unique atmosphere you won't find anywhere else.", rating: 4 },
+      { text: "Gets great Latin music nights. The architecture alone is worth the visit.", rating: 4 },
+      { text: "Historic venue with character. Multiple levels and balconies.", rating: 4 },
+      { text: null, rating: 3 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "EP & LP": {
+    reviews: [
+      { text: "Best rooftop bar in West Hollywood! The Asian fusion food is actually good.", rating: 5 },
+      { text: "Upstairs EP has stunning views, downstairs LP has the party vibe. Love both.", rating: 5 },
+      { text: "Great for sunset drinks before hitting the clubs. The cocktails are top tier.", rating: 4 },
+      { text: null, rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "The Bungalow": {
+    reviews: [
+      { text: "Santa Monica beach vibes! Perfect day-to-night spot with ocean breeze.", rating: 5 },
+      { text: "Feels like a beachside house party. More relaxed than Hollywood spots.", rating: 4 },
+      { text: "Great cocktails and the patio is amazing. Worth the drive to the beach.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+};
+
 const DEMO_YAP_MESSAGES = [
   { text: "Pretty sure Justin Bieber just walked in...", score: 78, comments: 9 },
   { text: "This music is awesome who's the DJ right now", score: 50, comments: 9 },
@@ -494,9 +588,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { action } = await req.json();
+    const { action, city = 'nyc' } = await req.json();
 
     if (action === 'seed') {
+      // Select venues based on city (defaults to NYC)
+      const SELECTED_VENUES = city === 'la' ? LA_VENUES : NYC_VENUES;
+      const SELECTED_REVIEWS = city === 'la' ? LA_VENUE_SPECIFIC_REVIEWS : VENUE_SPECIFIC_REVIEWS;
+      
       const demoUserIds: string[] = [];
       const DEMO_USER_COUNT = 50; // Create 50 users for better venue distribution
 
@@ -559,19 +657,24 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('friendships').insert(demoFriendships);
       }
 
-      // 4. Insert all NYC venues into venues table first
-      console.log('Inserting all 34 NYC venues...');
-      const PROMOTED_VENUE_NAMES = ['Unveiled', 'Studio Maison Nur', 'Little Sister Lounge', 'Patent Pending'];
+      // 4. Insert all venues into venues table first (city-specific)
+      console.log(`Inserting ${city.toUpperCase()} venues...`);
       
-      const venuesToInsert = NYC_VENUES.map(v => ({
+      // Define promoted venues per city
+      const NYC_PROMOTED_NAMES = ['Unveiled', 'Studio Maison Nur', 'Little Sister Lounge', 'Patent Pending'];
+      const LA_PROMOTED_NAMES = ['Adults Only', 'Bootleg Theater', 'The Falls', 'The Escondite'];
+      const PROMOTED_VENUE_NAMES = city === 'la' ? LA_PROMOTED_NAMES : NYC_PROMOTED_NAMES;
+      
+      const venuesToInsert = SELECTED_VENUES.map(v => ({
         name: v.name,
         lat: v.lat,
         lng: v.lng,
-        neighborhood: 'Manhattan', // Will be derived from coordinates in production
+        neighborhood: city === 'la' ? 'Los Angeles' : 'Manhattan', // Will be derived from coordinates in production
         type: 'nightclub',
         is_demo: true,
         is_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
         popularity_rank: v.rank,
+        city: city,
       }));
 
       const { data: insertedVenues, error: venuesError } = await supabaseAdmin
@@ -592,8 +695,8 @@ Deno.serve(async (req) => {
       console.log('Creating night statuses with popularity-based distribution...');
       
       const nightStatuses = [];
-      const TOP_20_VENUES = NYC_VENUES.slice(0, 20); // Top 20 by popularity_rank
-      const PROMOTED_VENUES = NYC_VENUES.filter(v => PROMOTED_VENUE_NAMES.includes(v.name));
+      const TOP_20_VENUES = SELECTED_VENUES.slice(0, 20); // Top 20 by popularity_rank
+      const PROMOTED_VENUES = SELECTED_VENUES.filter(v => PROMOTED_VENUE_NAMES.includes(v.name));
       
       // Reserve last 4 demo users for promoted venues (ensures promoted venues have activity)
       const promotedUserStartIndex = demoUserIds.length - 4;
@@ -692,7 +795,7 @@ Deno.serve(async (req) => {
       for (let i = 0; i < 60; i++) {
         const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
         const usePromoted = Math.random() < 0.75;
-        const venuePool = usePromoted ? NYC_VENUES : DEMO_VENUES;
+        const venuePool = usePromoted ? SELECTED_VENUES : DEMO_VENUES;
         const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
         const venueId = venueIdMap.get(venue.name);
         const caption = DEMO_CAPTIONS[Math.floor(Math.random() * DEMO_CAPTIONS.length)];
@@ -789,14 +892,14 @@ Deno.serve(async (req) => {
       }
 
       // 7. Create yap messages with scores and handles
-      const hottestVenues = getRandomItems([...NYC_VENUES, ...DEMO_VENUES], 10);
+      const hottestVenues = getRandomItems([...SELECTED_VENUES, ...DEMO_VENUES], 10);
       const yapMessages = [];
 
       for (let i = 0; i < 40; i++) {
         const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
         const venue = hottestVenues[i % hottestVenues.length];
         const yapData = DEMO_YAP_MESSAGES[i % DEMO_YAP_MESSAGES.length];
-        const isPromotedVenue = NYC_VENUES.some((v: any) => v.name === venue.name);
+        const isPromotedVenue = SELECTED_VENUES.some((v: any) => v.name === venue.name);
         
         // Generate anonymous handle
         const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
@@ -880,7 +983,7 @@ Deno.serve(async (req) => {
       // 8. Create stories for demo users
       const storyUsers = getRandomItems(demoUserIds, 15); // 15 users with stories
       const stories = [];
-      const storyVenues = getRandomItems([...NYC_VENUES, ...DEMO_VENUES], 10);
+      const storyVenues = getRandomItems([...SELECTED_VENUES, ...DEMO_VENUES], 10);
       
       for (const userId of storyUsers) {
         const numStories = 1 + Math.floor(Math.random() * 3); // 1-3 stories per user
@@ -907,12 +1010,12 @@ Deno.serve(async (req) => {
       console.log('Creating demo venue reviews with accurate data...');
       const venueReviews = [];
       
-      // Create reviews for ALL 34 venues using venue-specific data
-      for (const venue of NYC_VENUES) {
+      // Create reviews for all selected city venues using venue-specific data
+      for (const venue of SELECTED_VENUES) {
         const venueId = venueIdMap.get(venue.name);
         if (!venueId) continue;
         
-        const venueReviewData = VENUE_SPECIFIC_REVIEWS[venue.name];
+        const venueReviewData = SELECTED_REVIEWS[venue.name];
         if (!venueReviewData) continue;
         
         const reviewers = getRandomItems(demoUserIds, venueReviewData.reviews.length);
@@ -954,14 +1057,15 @@ Deno.serve(async (req) => {
       console.log('Creating demo message threads...');
       const messageThreadUsers = getRandomItems(demoUserIds, 6); // 6 conversations
       
-      // Match the screenshot exactly
+      // Pick venues from the selected city for message threads
+      const topVenues = SELECTED_VENUES.slice(0, 3); // Use top 3 venues from city
       const threadConfigs = [
-        { venue: "Le Bain", lastMessage: "Yeah I'm heading there now!", minutesAgo: 4, hasMultiple: true },
-        { venue: "Employees Only", lastMessage: "Come it's popping off...", minutesAgo: 5, hasMultiple: false },
-        { venue: "Employees Only", lastMessage: "See you soon!", minutesAgo: 10, hasMultiple: false },
-        { venue: "Baby Grand", lastMessage: "Just got here!", minutesAgo: 12, hasMultiple: false },
-        { venue: "Le Bain", lastMessage: "Where are you?", minutesAgo: 15, hasMultiple: true },
-        { venue: "Le Bain", lastMessage: "This place is amazing!", minutesAgo: 20, hasMultiple: true },
+        { venue: topVenues[0].name, lastMessage: "Yeah I'm heading there now!", minutesAgo: 4, hasMultiple: true },
+        { venue: topVenues[1].name, lastMessage: "Come it's popping off...", minutesAgo: 5, hasMultiple: false },
+        { venue: topVenues[1].name, lastMessage: "See you soon!", minutesAgo: 10, hasMultiple: false },
+        { venue: topVenues[2].name, lastMessage: "Just got here!", minutesAgo: 12, hasMultiple: false },
+        { venue: topVenues[0].name, lastMessage: "Where are you?", minutesAgo: 15, hasMultiple: true },
+        { venue: topVenues[0].name, lastMessage: "This place is amazing!", minutesAgo: 20, hasMultiple: true },
       ];
       
       let threadCount = 0;
@@ -1025,7 +1129,7 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('dm_messages').insert(messages);
         
         // Update demo user's venue in night_statuses
-        const venueData = NYC_VENUES.find((v: any) => v.name === config.venue) || NYC_VENUES[0];
+        const venueData = SELECTED_VENUES.find((v: any) => v.name === config.venue) || SELECTED_VENUES[0];
         const venueId = venueIdMap.get(venueData.name);
         
         await supabaseAdmin.from('night_statuses').upsert({
@@ -1053,8 +1157,9 @@ Deno.serve(async (req) => {
             stories: stories.length,
             yaps: yapMessages.length,
             threads: threadCount,
-            venues: NYC_VENUES.length + DEMO_VENUES.length,
+            venues: SELECTED_VENUES.length + DEMO_VENUES.length,
             activeUsers: nightStatuses.length,
+            city: city,
           }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
