@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Camera } from 'lucide-react';
 
 interface TextBuzzItem {
   type: 'text';
@@ -34,6 +36,7 @@ interface BuzzItemProps {
 }
 
 export function BuzzItem({ item }: BuzzItemProps) {
+  const [imageError, setImageError] = useState(false);
   const timeAgo = formatDistanceToNowStrict(new Date(item.created_at), { addSuffix: false });
   const shortTime = timeAgo
     .replace(' seconds', 's')
@@ -71,13 +74,21 @@ export function BuzzItem({ item }: BuzzItemProps) {
   return (
     <div className="p-3 bg-[#2d1b4e]/30 rounded-lg border border-[#a855f7]/10">
       <div className="flex items-start gap-3">
-        <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-black">
+        <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-[#2d1b4e]">
           {item.media_type === 'image' ? (
-            <img 
-              src={item.media_url} 
-              alt="Buzz clip" 
-              className="w-full h-full object-cover"
-            />
+            imageError ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <Camera className="h-6 w-6 text-white/40" />
+              </div>
+            ) : (
+              <img 
+                src={item.media_url} 
+                alt="Buzz clip" 
+                className="w-full h-full object-cover"
+                onError={() => setImageError(true)}
+                loading="lazy"
+              />
+            )
           ) : (
             <video 
               src={item.media_url} 
