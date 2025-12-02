@@ -488,12 +488,14 @@ export function VenueIdCard() {
                       {venueHours.isOpen ? '○ Open' : '● Closed'}
                     </span>
                   )}
-                  {/* Energy Level - Tiny Pill */}
-                  <span className="px-2 py-0.5 rounded-full text-xs bg-[#d4ff00]/20 text-[#d4ff00] border border-[#d4ff00]/30">
-                    {friendsAtVenue.length === 0 && '🌙 Chill'}
-                    {friendsAtVenue.length > 0 && friendsAtVenue.length <= 3 && '🔥 Buzzing'}
-                    {friendsAtVenue.length > 3 && '🚀 Packed'}
-                  </span>
+                  {/* Energy Level - Only show when venue is open */}
+                  {venueHours?.isOpen && (
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-[#d4ff00]/20 text-[#d4ff00] border border-[#d4ff00]/30">
+                      {friendsAtVenue.length === 0 && '🌙 Chill'}
+                      {friendsAtVenue.length > 0 && friendsAtVenue.length <= 3 && '🔥 Buzzing'}
+                      {friendsAtVenue.length > 3 && '🚀 Packed'}
+                    </span>
+                  )}
                 </div>
               </div>
 
