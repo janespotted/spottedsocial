@@ -11,7 +11,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { ChevronUp, ChevronDown, BarChart3 } from 'lucide-react';
+import { ChevronUp, ChevronDown, BarChart3, Bell } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '@/contexts/NotificationsContext';
 import { CityBadge } from '@/components/CityBadge';
 
 interface VenueStats {
@@ -48,6 +50,8 @@ export default function Leaderboard() {
   const demoEnabled = useDemoMode();
   const { bootstrapEnabled } = useBootstrapMode();
   const { city } = useUserCity();
+  const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
   useAutoVenueTracking(); // Trigger auto-venue tracking on leaderboard view
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
@@ -288,12 +292,26 @@ export default function Leaderboard() {
             <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
             <p className="text-white/60 text-sm mt-1">Top Places to Go Out Now</p>
           </div>
-          <button 
-            onClick={openCheckIn} 
-            className="hover:scale-110 transition-transform"
-          >
-            <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/notifications')}
+              className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
+              aria-label="View notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs font-bold flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            <button 
+              onClick={openCheckIn} 
+              className="hover:scale-110 transition-transform"
+            >
+              <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
+            </button>
+          </div>
         </div>
       </div>
 

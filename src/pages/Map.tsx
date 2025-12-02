@@ -14,7 +14,9 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, Bell } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '@/contexts/NotificationsContext';
 import { useToast } from '@/hooks/use-toast';
 import { CityBadge } from '@/components/CityBadge';
 
@@ -49,6 +51,8 @@ export default function Map() {
   const demoEnabled = useDemoMode();
   const { city } = useUserCity();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
   useAutoVenueTracking(); // Trigger auto-venue tracking on map view
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -651,12 +655,26 @@ export default function Map() {
           <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
           <CityBadge />
         </div>
-        <button 
-          onClick={openCheckIn} 
-          className="hover:scale-110 transition-transform"
-        >
-          <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/notifications')}
+            className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
+            aria-label="View notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs font-bold flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+          <button 
+            onClick={openCheckIn} 
+            className="hover:scale-110 transition-transform"
+          >
+            <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
+          </button>
+        </div>
       </div>
 
       {/* Friends Out Pill + List */}
