@@ -9,7 +9,9 @@ import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '@/contexts/NotificationsContext';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { useDemoMode } from '@/hooks/useDemoMode';
@@ -32,6 +34,8 @@ export default function Feed() {
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
+  const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
   useAutoVenueTracking();
 
   const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends, cacheStories, getCachedStories } = useOfflineCache();
@@ -138,12 +142,26 @@ export default function Feed() {
             <h2 className="text-3xl font-bold text-white">Newsfeed</h2>
             <p className="text-white/50 text-sm mt-1">Everything disappears by 5am</p>
           </div>
-          <button 
-            onClick={openCheckIn} 
-            className="hover:scale-110 transition-transform"
-          >
-            <img src={spottedLogo} alt="Check In" className="h-14 w-14 object-contain" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/notifications')}
+              className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
+              aria-label="View notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs font-bold flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            <button 
+              onClick={openCheckIn} 
+              className="hover:scale-110 transition-transform"
+            >
+              <img src={spottedLogo} alt="Check In" className="h-14 w-14 object-contain" />
+            </button>
+          </div>
         </div>
 
         {/* Stories Row */}

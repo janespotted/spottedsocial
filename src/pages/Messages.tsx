@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
+import { useNotifications } from '@/contexts/NotificationsContext';
 import { cn } from '@/lib/utils';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { MessagesTab } from '@/components/messages/MessagesTab';
 import { YapTab } from '@/components/messages/YapTab';
 import { ActivityTab } from '@/components/messages/ActivityTab';
 import { CityBadge } from '@/components/CityBadge';
+import { Bell } from 'lucide-react';
 
 type TabType = 'messages' | 'yap' | 'activity';
 
@@ -19,6 +21,8 @@ interface PreselectedUser {
 
 export default function Messages() {
   const { openCheckIn } = useCheckIn();
+  const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
   useAutoVenueTracking(); // Trigger auto-venue tracking on messages view
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<TabType>('messages');
@@ -44,12 +48,26 @@ export default function Messages() {
             </div>
             <p className="text-white/60 text-sm">Everything disappears by 5am</p>
           </div>
-          <button 
-            onClick={openCheckIn}
-            className="hover:scale-110 transition-transform"
-          >
-            <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/notifications')}
+              className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
+              aria-label="View notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs font-bold flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            <button 
+              onClick={openCheckIn}
+              className="hover:scale-110 transition-transform"
+            >
+              <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}

@@ -6,7 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { MapPin, Users, ChevronDown, Share2, Settings, LogOut, Bookmark } from 'lucide-react';
+import { MapPin, Users, ChevronDown, Share2, Settings, LogOut, Bookmark, Bell } from 'lucide-react';
+import { useNotifications } from '@/contexts/NotificationsContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -21,6 +22,7 @@ interface WishlistPlace {
 export default function Profile() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
+  const { unreadCount } = useNotifications();
   useAutoVenueTracking(); // Trigger auto-venue tracking on profile view
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
@@ -195,6 +197,18 @@ export default function Profile() {
               className="w-10 h-10 rounded-full bg-[#2d1b4e] border border-[#a855f7]/40 flex items-center justify-center text-white hover:bg-[#a855f7]/20 transition-colors"
             >
               <Settings className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => navigate('/notifications')}
+              className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
+              aria-label="View notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs font-bold flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             <button 
               onClick={openCheckIn}
