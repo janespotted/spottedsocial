@@ -450,7 +450,7 @@ export function VenueIdCard() {
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full z-50 flex items-center justify-center px-4 pointer-events-none">
               {/* Card */}
               <div 
-                className="relative w-full max-w-[390px] h-[85vh] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-in fade-in-0 zoom-in-95"
+                className="relative w-full max-w-[390px] max-h-[85vh] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-in fade-in-0 zoom-in-95"
                 {...swipeHandlers}
               >
                 {/* Close button */}
@@ -461,7 +461,7 @@ export function VenueIdCard() {
                   <CloseIcon className="h-4 w-4 text-white" />
                   <span className="sr-only">Close</span>
                 </button>
-                <ScrollArea className="h-full">
+                <ScrollArea className="max-h-[85vh]">
                   <div className="p-5">
               {/* Photo Carousel */}
               {googlePhotos.length > 0 ? (
