@@ -80,6 +80,7 @@ export function VenueIdCard() {
     google_rating: number | null;
   }>>([]);
   const [similarVenuesOpen, setSimilarVenuesOpen] = useState(false);
+  const [isUserAtVenue, setIsUserAtVenue] = useState(false);
 
   useEffect(() => {
     if (selectedVenueId) {
@@ -218,6 +219,17 @@ export function VenueIdCard() {
         } else {
           setFriendsAtVenue([]);
         }
+
+        // Check if current user is at this venue
+        const { data: userStatus } = await supabase
+          .from('night_statuses')
+          .select('venue_id')
+          .eq('user_id', user.id)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', new Date().toISOString())
+          .maybeSingle();
+
+        setIsUserAtVenue(userStatus?.venue_id === selectedVenueId);
       }
     } catch (error) {
       console.error('Error fetching venue data:', error);
@@ -462,46 +474,32 @@ export function VenueIdCard() {
                   </h2>
                 </div>
 
-                <p className="text-sm text-white/60 italic mb-2">
-                  {venue.neighborhood} ({distance} miles)
-                </p>
-
-                {/* Operating Hours Badge */}
-                {venueHours && !loadingHours && (
-                  <div className="mb-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-white/60 italic">
+                    {venue.neighborhood} • {distance} mi
+                  </p>
+                  {/* Operating Hours Badge */}
+                  {venueHours && !loadingHours && (
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                       venueHours.isOpen 
                         ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
                         : 'bg-red-500/20 text-red-400 border border-red-500/30'
                     }`}>
-                      {venueHours.isOpen ? 'Open' : 'Closed'}
+                      {venueHours.isOpen ? '○ Open' : '● Closed'}
                     </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Energy Meter - based on check-ins */}
-              <div className="mb-4 p-3 bg-gradient-to-r from-[#2d1b4e]/80 to-[#a855f7]/30 rounded-xl border border-[#a855f7]/40">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-white/60 uppercase tracking-wide mb-1">Energy Level</p>
-                    <p className="text-lg font-bold text-white">
-                      {friendsAtVenue.length === 0 && '🌙 Chill'}
-                      {friendsAtVenue.length > 0 && friendsAtVenue.length <= 3 && '🔥 Getting There'}
-                      {friendsAtVenue.length > 3 && '🚀 Packed'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-[#d4ff00]">{friendsAtVenue.length}</p>
-                    <p className="text-xs text-white/60">checked in</p>
-                  </div>
+                  )}
+                  {/* Energy Level - Tiny Pill */}
+                  <span className="px-2 py-0.5 rounded-full text-xs bg-[#d4ff00]/20 text-[#d4ff00] border border-[#d4ff00]/30">
+                    {friendsAtVenue.length === 0 && '🌙 Chill'}
+                    {friendsAtVenue.length > 0 && friendsAtVenue.length <= 3 && '🔥 Buzzing'}
+                    {friendsAtVenue.length > 3 && '🚀 Packed'}
+                  </span>
                 </div>
               </div>
 
-              {/* Friends at Venue */}
-              {friendsAtVenue.length > 0 && (
-                <div className="mb-4 p-3 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/20">
-                  <p className="text-sm text-white/70 mb-2">Your friends here tonight:</p>
+              {/* Friends at Venue - HERO SECTION */}
+              {friendsAtVenue.length > 0 ? (
+                <div className="mb-4 p-4 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/40">
                   <div className="flex -space-x-2">
                     {visibleFriends.map((friend) => (
                       <button
@@ -531,6 +529,10 @@ export function VenueIdCard() {
                     )}
                   </div>
                 </div>
+              ) : (
+                <div className="mb-4 p-3 bg-[#2d1b4e]/30 rounded-xl border border-[#a855f7]/20">
+                  <p className="text-sm text-white/50 text-center">No friends here yet</p>
+                </div>
               )}
 
               {/* Tonight's Buzz Section */}
@@ -542,7 +544,7 @@ export function VenueIdCard() {
                       <p className="text-xs text-white/50">What people are saying</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {!hasUserReviewed && (
+                      {!hasUserReviewed && isUserAtVenue && (
                         <Button
                           onClick={(e) => {
                             e.stopPropagation();
