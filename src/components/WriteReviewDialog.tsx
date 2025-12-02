@@ -145,42 +145,37 @@ export function WriteReviewDialog({
       <DialogContent className="w-[90%] max-w-[400px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl">
         <DialogHeader>
           <DialogTitle className="text-white text-center">
-            Review {venueName}
+            Drop a Vibe Check ✨
           </DialogTitle>
+          <p className="text-sm text-white/60 text-center">What's the vibe at {venueName}?</p>
         </DialogHeader>
 
         <div className="space-y-5 pt-2">
-          {/* Star Rating */}
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-sm text-white/60">Tap to rate</p>
-            <div className="flex gap-2">
-              {Array.from({ length: 5 }).map((_, i) => (
+          {/* Emoji Vibe Picker */}
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-white/60">Pick the vibe</p>
+            <div className="flex gap-3 justify-center">
+              {[
+                { emoji: '🔥', label: 'Fire', value: 5 },
+                { emoji: '💃', label: 'Dancing', value: 4 },
+                { emoji: '🍸', label: 'Drinks', value: 3 },
+                { emoji: '🎵', label: 'Music', value: 2 },
+                { emoji: '✨', label: 'Vibes', value: 1 }
+              ].map((vibe) => (
                 <button
-                  key={i}
-                  onClick={() => setRating(i + 1)}
-                  onMouseEnter={() => setHoverRating(i + 1)}
-                  onMouseLeave={() => setHoverRating(0)}
-                  className="p-1 transition-transform hover:scale-110"
+                  key={vibe.value}
+                  onClick={() => setRating(vibe.value)}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
+                    rating === vibe.value
+                      ? 'bg-[#d4ff00]/20 border-2 border-[#d4ff00] scale-110'
+                      : 'bg-[#2d1b4e]/50 border-2 border-transparent hover:scale-105'
+                  }`}
                 >
-                  <Star
-                    className={`w-8 h-8 transition-colors ${
-                      i < displayRating
-                        ? 'text-[#d4ff00] fill-[#d4ff00]'
-                        : 'text-white/20'
-                    }`}
-                  />
+                  <span className="text-3xl">{vibe.emoji}</span>
+                  <span className="text-xs text-white/60">{vibe.label}</span>
                 </button>
               ))}
             </div>
-            {displayRating > 0 && (
-              <p className="text-sm text-[#d4ff00]">
-                {displayRating === 1 && 'Poor'}
-                {displayRating === 2 && 'Fair'}
-                {displayRating === 3 && 'Good'}
-                {displayRating === 4 && 'Great'}
-                {displayRating === 5 && 'Amazing!'}
-              </p>
-            )}
           </div>
 
           {/* Photo Upload */}
@@ -219,17 +214,17 @@ export function WriteReviewDialog({
             )}
           </div>
 
-          {/* Review Text */}
+          {/* Vibe Check Text */}
           <div className="space-y-2">
-            <Label className="text-white/70">Review (optional)</Label>
+            <Label className="text-white/70">What's happening? (optional)</Label>
             <Textarea
-              placeholder="Share your experience..."
+              placeholder="Drop your vibe... 🎉"
               value={reviewText}
-              onChange={(e) => setReviewText(e.target.value.slice(0, 280))}
+              onChange={(e) => setReviewText(e.target.value.slice(0, 140))}
               className="bg-[#2d1b4e]/50 border-[#a855f7]/30 text-white placeholder:text-white/40 resize-none"
-              rows={3}
+              rows={2}
             />
-            <p className="text-xs text-white/40 text-right">{reviewText.length}/280</p>
+            <p className="text-xs text-white/40 text-right">{reviewText.length}/140</p>
           </div>
 
           {/* Anonymous Toggle */}
@@ -250,7 +245,7 @@ export function WriteReviewDialog({
             disabled={rating === 0 || isSubmitting}
             className="w-full bg-[#d4ff00] text-[#2d1b4e] hover:bg-[#d4ff00]/90 font-semibold"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Review'}
+            {isSubmitting ? 'Dropping...' : 'Drop the Vibe ✨'}
           </Button>
         </div>
       </DialogContent>

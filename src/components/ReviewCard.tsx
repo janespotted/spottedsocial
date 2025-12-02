@@ -143,16 +143,14 @@ export function ReviewCard({ review, currentUserVote, onVoteChange }: ReviewCard
               )}
             </Avatar>
             <span className="text-sm font-medium text-white">{displayName}</span>
-            <div className="flex gap-0.5">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star
-                  key={i}
-                  className={`w-3 h-3 ${
-                    i < review.rating ? 'text-[#d4ff00] fill-[#d4ff00]' : 'text-white/20'
-                  }`}
-                />
-              ))}
-            </div>
+            {/* Emoji rating display */}
+            <span className="text-base">
+              {review.rating === 5 && '🔥'}
+              {review.rating === 4 && '💃'}
+              {review.rating === 3 && '🍸'}
+              {review.rating === 2 && '🎵'}
+              {review.rating === 1 && '✨'}
+            </span>
           </div>
           {review.review_text && (
             <p className="text-sm text-white/70 leading-relaxed">{review.review_text}</p>

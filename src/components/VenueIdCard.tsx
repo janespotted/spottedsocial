@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { MapPin, Plus, Check, Star, Pencil, ChevronDown, Clock } from 'lucide-react';
+import { MapPin, Plus, Check, ChevronDown } from 'lucide-react';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -466,22 +466,9 @@ export function VenueIdCard() {
                   {venue.neighborhood} ({distance} miles)
                 </p>
 
-                {/* Google Rating */}
-                {googleRating && (
-                  <div className="flex items-center gap-2 mb-2">
-                    <Star className="w-4 h-4 text-[#d4ff00] fill-[#d4ff00]" />
-                    <span className="text-white font-medium">
-                      {googleRating.toFixed(1)}
-                    </span>
-                    <span className="text-white/50 text-sm">
-                      on Google ({googleRatingsCount.toLocaleString()})
-                    </span>
-                  </div>
-                )}
-                
-                {/* Operating Hours Status */}
+                {/* Operating Hours Badge */}
                 {venueHours && !loadingHours && (
-                  <div className="flex items-center gap-2">
+                  <div className="mb-2">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                       venueHours.isOpen 
                         ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
@@ -489,184 +476,165 @@ export function VenueIdCard() {
                     }`}>
                       {venueHours.isOpen ? 'Open' : 'Closed'}
                     </span>
-                    <span className="text-xs text-white/50 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {venueHours.displayText}
-                    </span>
-                  </div>
-                )}
-                {loadingHours && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-white/40">Checking hours...</span>
                   </div>
                 )}
               </div>
 
-              {/* Friends + Map Pin */}
-              <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#a855f7]/20">
-                {/* Friend Avatars */}
-                <div className="flex items-center gap-2">
-                  {friendsAtVenue.length > 0 ? (
-                    <>
-                      <div className="flex -space-x-2">
-                        {visibleFriends.map((friend) => (
-                          <Avatar 
-                            key={friend.id}
-                            className="w-10 h-10 border-2 border-[#2d1b4e] cursor-pointer hover:scale-110 transition-transform"
-                            onClick={() => openFriendCard({
-                              userId: friend.id,
-                              displayName: friend.display_name,
-                              avatarUrl: friend.avatar_url,
-                              venueName: venue?.name,
-                            })}
-                          >
-                            <AvatarImage 
-                              src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} 
-                            />
-                            <AvatarFallback className="bg-[#a855f7] text-white">
-                              {friend.display_name[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                        ))}
-                      </div>
-                      {remainingCount > 0 && (
-                        <span className="text-sm text-white/60 ml-1">
-                          +{remainingCount}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-sm text-white/40">No friends here yet</span>
-                  )}
+              {/* Energy Meter - based on check-ins */}
+              <div className="mb-4 p-3 bg-gradient-to-r from-[#2d1b4e]/80 to-[#a855f7]/30 rounded-xl border border-[#a855f7]/40">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-white/60 uppercase tracking-wide mb-1">Energy Level</p>
+                    <p className="text-lg font-bold text-white">
+                      {friendsAtVenue.length === 0 && '🌙 Chill'}
+                      {friendsAtVenue.length > 0 && friendsAtVenue.length <= 3 && '🔥 Getting There'}
+                      {friendsAtVenue.length > 3 && '🚀 Packed'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-[#d4ff00]">{friendsAtVenue.length}</p>
+                    <p className="text-xs text-white/60">checked in</p>
+                  </div>
                 </div>
-
-                {/* Map Pin Button */}
-                <button
-                  onClick={handleMapPinClick}
-                  className="w-12 h-12 rounded-full bg-white hover:bg-white/90 flex items-center justify-center shadow-lg transition-all hover:scale-110"
-                  aria-label="Show on map"
-                >
-                  <MapPin className="w-6 h-6 text-[#a855f7]" />
-                </button>
               </div>
 
-              {/* Reviews Section */}
-              <div>
-                <Collapsible open={reviewsOpen} onOpenChange={setReviewsOpen}>
-                  <CollapsibleTrigger className="w-full group">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-[#a855f7]/5 hover:bg-[#a855f7]/10 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-semibold text-white">Reviews</h3>
-                        {reviews.length > 0 && (
-                          <>
-                            <span className="text-[#d4ff00] flex items-center gap-1">
-                              {averageRating.toFixed(1)} <Star className="w-4 h-4 fill-[#d4ff00]" />
-                            </span>
-                            <span className="text-white/40 text-sm">({reviews.length})</span>
-                          </>
-                        )}
-                      </div>
-                      <ChevronDown className={`w-5 h-5 text-white/60 transition-transform duration-300 ${reviewsOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                  </CollapsibleTrigger>
-
-                  <CollapsibleContent className="pt-3">
-                    {reviews.length > 0 ? (
-                      <div className="space-y-3">
-                        {reviews.slice(0, 5).map((review) => (
-                          <ReviewCard
-                            key={review.id}
-                            review={review}
-                            currentUserVote={getUserVote(review.id)}
-                            onVoteChange={fetchReviews}
-                          />
-                        ))}
-                        {reviews.length > 5 && (
-                          <p className="text-sm text-white/50 text-center">
-                            +{reviews.length - 5} more reviews
-                          </p>
-                        )}
-                        
-                        {/* Write Review Button at Bottom */}
-                        {!hasUserReviewed && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowWriteReview(true)}
-                            className="w-full mt-2 text-[#d4ff00] border-[#d4ff00]/30 hover:bg-[#d4ff00]/10 hover:border-[#d4ff00]"
-                          >
-                            <Pencil className="w-4 h-4 mr-2" />
-                            Write a Review
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      /* Empty State */
-                      <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
-                        <Star className="w-12 h-12 text-white/20 mb-3" />
-                        <p className="text-white/40 text-sm mb-1">No reviews yet</p>
-                        <p className="text-white/30 text-xs mb-4">Be the first to share your experience!</p>
-                        {!hasUserReviewed && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => setShowWriteReview(true)}
-                            className="bg-[#d4ff00] text-[#2d1b4e] hover:bg-[#d4ff00]/90 font-semibold"
-                          >
-                            <Pencil className="w-4 h-4 mr-2" />
-                            Write First Review
-                          </Button>
-                        )}
+              {/* Friends at Venue */}
+              {friendsAtVenue.length > 0 && (
+                <div className="mb-4 p-3 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/20">
+                  <p className="text-sm text-white/70 mb-2">Your friends here tonight:</p>
+                  <div className="flex -space-x-2">
+                    {visibleFriends.map((friend) => (
+                      <button
+                        key={friend.id}
+                        onClick={() => openFriendCard({
+                          userId: friend.id,
+                          displayName: friend.display_name,
+                          avatarUrl: friend.avatar_url,
+                          venueName: venue.name,
+                          lat: venue.lat,
+                          lng: venue.lng,
+                        })}
+                        className="hover:scale-110 transition-transform"
+                      >
+                        <Avatar className="w-10 h-10 border-2 border-[#2d1b4e]">
+                          <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                          <AvatarFallback className="bg-[#a855f7] text-white">
+                            {friend.display_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
+                    ))}
+                    {remainingCount > 0 && (
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#a855f7]/30 border-2 border-[#2d1b4e] text-xs text-white">
+                        +{remainingCount}
                       </div>
                     )}
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
-
-              {/* Similar Venues Section */}
-              {similarVenues.length > 0 && (
-                <div className="mt-4">
-                  <Collapsible open={similarVenuesOpen} onOpenChange={setSimilarVenuesOpen}>
-                    <CollapsibleTrigger className="w-full group">
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-[#a855f7]/5 hover:bg-[#a855f7]/10 transition-colors">
-                        <h3 className="text-lg font-semibold text-white">Similar Venues</h3>
-                        <ChevronDown className={`w-5 h-5 text-white/60 transition-transform duration-300 ${similarVenuesOpen ? 'rotate-180' : ''}`} />
-                      </div>
-                    </CollapsibleTrigger>
-
-                    <CollapsibleContent className="pt-3">
-                      <div className="space-y-2">
-                        {similarVenues.map((simVenue) => (
-                          <button
-                            key={simVenue.id}
-                            onClick={() => {
-                              closeVenueCard();
-                              // Small delay to allow close animation, then open new venue
-                              setTimeout(() => {
-                                openVenueCard(simVenue.id);
-                              }, 150);
-                            }}
-                            className="w-full p-3 rounded-lg bg-[#2d1b4e]/50 border border-[#a855f7]/20 hover:bg-[#2d1b4e]/70 hover:border-[#a855f7]/40 transition-all text-left"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <p className="text-white font-medium">{simVenue.name}</p>
-                                <p className="text-white/50 text-sm">{simVenue.neighborhood}</p>
-                              </div>
-                              {simVenue.google_rating && (
-                                <div className="flex items-center gap-1 ml-2">
-                                  <Star className="w-4 h-4 text-[#d4ff00] fill-[#d4ff00]" />
-                                  <span className="text-white/70 text-sm">{simVenue.google_rating.toFixed(1)}</span>
-                                </div>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
+                  </div>
                 </div>
               )}
+
+              {/* Tonight's Buzz Section */}
+              <Collapsible open={reviewsOpen} onOpenChange={setReviewsOpen}>
+                <CollapsibleTrigger className="w-full mb-3">
+                  <div className="flex items-center justify-between p-3 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/20 hover:bg-[#2d1b4e]/70 transition-colors">
+                    <div className="flex flex-col items-start">
+                      <h3 className="text-lg font-semibold text-white">Tonight's Buzz ({reviews.length})</h3>
+                      <p className="text-xs text-white/50">What people are saying</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!hasUserReviewed && (
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowWriteReview(true);
+                          }}
+                          size="sm"
+                          className="bg-[#d4ff00] text-[#2d1b4e] hover:bg-[#d4ff00]/90 font-semibold"
+                        >
+                          Drop a Vibe ✨
+                        </Button>
+                      )}
+                      <ChevronDown 
+                        className={`w-5 h-5 text-white/60 transition-transform ${
+                          reviewsOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-3 mb-3">
+                    {reviews.length > 0 ? (
+                      reviews.map((review) => (
+                        <ReviewCard
+                          key={review.id}
+                          review={review}
+                          currentUserVote={getUserVote(review.id)}
+                          onVoteChange={fetchReviews}
+                        />
+                      ))
+                    ) : (
+                      <p className="text-center text-white/50 py-4">No vibes yet. Drop yours! ✨</p>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Trending Nearby Section */}
+              {similarVenues.length > 0 && (
+                <Collapsible open={similarVenuesOpen} onOpenChange={setSimilarVenuesOpen}>
+                  <CollapsibleTrigger className="w-full mb-3">
+                    <div className="flex items-center justify-between p-3 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/20 hover:bg-[#2d1b4e]/70 transition-colors">
+                      <div className="flex flex-col items-start">
+                        <h3 className="text-lg font-semibold text-white">Trending Nearby</h3>
+                        <p className="text-xs text-white/50">Check out these spots</p>
+                      </div>
+                      <ChevronDown 
+                        className={`w-5 h-5 text-white/60 transition-transform ${
+                          similarVenuesOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="space-y-2 mb-3">
+                      {similarVenues.map((similarVenue) => (
+                        <button
+                          key={similarVenue.id}
+                          onClick={() => {
+                            closeVenueCard();
+                            setTimeout(() => openVenueCard(similarVenue.id), 100);
+                          }}
+                          className="w-full p-3 bg-[#2d1b4e]/30 rounded-lg border border-[#a855f7]/10 hover:bg-[#2d1b4e]/50 hover:border-[#a855f7]/30 transition-all text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-white font-medium">{similarVenue.name}</p>
+                              <p className="text-xs text-white/50">{similarVenue.neighborhood}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {/* Google Info - Small at bottom */}
+              {googleRating && (
+                <div className="text-center text-xs text-white/40 mb-3">
+                  {googleRating.toFixed(1)} ⭐ on Google ({googleRatingsCount.toLocaleString()})
+                </div>
+              )}
+
+              {/* Directions Button */}
+              <Button
+                onClick={handleMapPinClick}
+                className="w-full bg-[#a855f7] hover:bg-[#a855f7]/90 text-white"
+              >
+                <MapPin className="w-4 h-4 mr-2" />
+                Get Directions
+              </Button>
             </div>
           </ScrollArea>
         </DialogContent>
