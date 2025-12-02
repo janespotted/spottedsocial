@@ -407,7 +407,7 @@ export function VenueIdCard() {
     <>
       <Dialog open={!!selectedVenueId} onOpenChange={(open) => !open && closeVenueCard()}>
         <DialogContent 
-          className="w-[90%] max-w-[400px] max-h-[85vh] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden"
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-[390px] max-h-[85vh] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden"
           {...swipeHandlers}
         >
           <ScrollArea className="max-h-[85vh]">
