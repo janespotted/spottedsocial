@@ -88,14 +88,23 @@ export default function FriendRequests() {
   };
 
   const fetchSuggested = async () => {
-    // Get current friends
-    const { data: myFriends } = await supabase
+    // Get current friends (both directions)
+    const { data: sentFriendships } = await supabase
       .from('friendships')
       .select('friend_id')
       .eq('user_id', user?.id)
       .eq('status', 'accepted');
 
-    const friendIds = myFriends?.map(f => f.friend_id) || [];
+    const { data: receivedFriendships } = await supabase
+      .from('friendships')
+      .select('user_id')
+      .eq('friend_id', user?.id)
+      .eq('status', 'accepted');
+
+    const friendIds = [
+      ...(sentFriendships?.map(f => f.friend_id) || []),
+      ...(receivedFriendships?.map(f => f.user_id) || [])
+    ];
 
     // Get all users except me and my friends
     const { data: allUsers } = await supabase
@@ -120,25 +129,43 @@ export default function FriendRequests() {
   };
 
   const getMutualFriends = async (userId: string) => {
-    // Get my friends
-    const { data: myFriends } = await supabase
+    // Get my friends (both directions)
+    const { data: mySentFriendships } = await supabase
       .from('friendships')
       .select('friend_id')
       .eq('user_id', user?.id)
       .eq('status', 'accepted');
 
-    const myFriendIds = myFriends?.map(f => f.friend_id) || [];
+    const { data: myReceivedFriendships } = await supabase
+      .from('friendships')
+      .select('user_id')
+      .eq('friend_id', user?.id)
+      .eq('status', 'accepted');
+
+    const myFriendIds = [
+      ...(mySentFriendships?.map(f => f.friend_id) || []),
+      ...(myReceivedFriendships?.map(f => f.user_id) || [])
+    ];
 
     if (myFriendIds.length === 0) return [];
 
-    // Get their friends
-    const { data: theirFriends } = await supabase
+    // Get their friends (both directions)
+    const { data: theirSentFriendships } = await supabase
       .from('friendships')
       .select('friend_id')
       .eq('user_id', userId)
       .eq('status', 'accepted');
 
-    const theirFriendIds = theirFriends?.map(f => f.friend_id) || [];
+    const { data: theirReceivedFriendships } = await supabase
+      .from('friendships')
+      .select('user_id')
+      .eq('friend_id', userId)
+      .eq('status', 'accepted');
+
+    const theirFriendIds = [
+      ...(theirSentFriendships?.map(f => f.friend_id) || []),
+      ...(theirReceivedFriendships?.map(f => f.user_id) || [])
+    ];
 
     // Find intersection
     const mutualIds = myFriendIds.filter(id => theirFriendIds.includes(id));

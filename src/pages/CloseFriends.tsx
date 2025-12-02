@@ -29,14 +29,23 @@ export default function CloseFriends() {
 
   const fetchFriends = async () => {
     try {
-      // Get all accepted friendships
-      const { data: friendships } = await supabase
+      // Get all accepted friendships (both directions)
+      const { data: sentFriendships } = await supabase
         .from('friendships')
         .select('friend_id')
         .eq('user_id', user?.id)
         .eq('status', 'accepted');
 
-      const friendIds = friendships?.map(f => f.friend_id) || [];
+      const { data: receivedFriendships } = await supabase
+        .from('friendships')
+        .select('user_id')
+        .eq('friend_id', user?.id)
+        .eq('status', 'accepted');
+
+      const friendIds = [
+        ...(sentFriendships?.map(f => f.friend_id) || []),
+        ...(receivedFriendships?.map(f => f.user_id) || [])
+      ];
 
       if (friendIds.length === 0) {
         setFriends([]);

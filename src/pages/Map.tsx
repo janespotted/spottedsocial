@@ -183,14 +183,23 @@ export default function Map() {
         friendIds = friendLocations.map(f => f.user_id);
       } else {
         // Normal mode: show real friends only
-        // Get list of accepted friends
-        const { data: friendships } = await supabase
+        // Get list of accepted friends (both directions)
+        const { data: sentFriendships } = await supabase
           .from('friendships')
           .select('friend_id')
           .eq('user_id', user.id)
           .eq('status', 'accepted');
 
-        friendIds = friendships?.map(f => f.friend_id) || [];
+        const { data: receivedFriendships } = await supabase
+          .from('friendships')
+          .select('user_id')
+          .eq('friend_id', user.id)
+          .eq('status', 'accepted');
+
+        friendIds = [
+          ...(sentFriendships?.map(f => f.friend_id) || []),
+          ...(receivedFriendships?.map(f => f.user_id) || [])
+        ];
 
         if (friendIds.length > 0) {
           // Get friends' profiles with location data
