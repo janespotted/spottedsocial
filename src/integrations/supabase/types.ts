@@ -606,30 +606,39 @@ export type Database = {
           created_at: string
           expires_at: string
           id: string
+          is_anonymous: boolean | null
           is_demo: boolean | null
+          is_public_buzz: boolean | null
           media_type: string
           media_url: string
           user_id: string
+          venue_id: string | null
           venue_name: string | null
         }
         Insert: {
           created_at?: string
           expires_at: string
           id?: string
+          is_anonymous?: boolean | null
           is_demo?: boolean | null
+          is_public_buzz?: boolean | null
           media_type: string
           media_url: string
           user_id: string
+          venue_id?: string | null
           venue_name?: string | null
         }
         Update: {
           created_at?: string
           expires_at?: string
           id?: string
+          is_anonymous?: boolean | null
           is_demo?: boolean | null
+          is_public_buzz?: boolean | null
           media_type?: string
           media_url?: string
           user_id?: string
+          venue_id?: string | null
           venue_name?: string | null
         }
         Relationships: [
@@ -638,6 +647,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stories_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
             referencedColumns: ["id"]
           },
         ]
@@ -674,6 +690,53 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venue_buzz_messages: {
+        Row: {
+          created_at: string | null
+          emoji_vibe: string | null
+          expires_at: string
+          id: string
+          is_anonymous: boolean | null
+          is_demo: boolean | null
+          text: string
+          user_id: string
+          venue_id: string
+          venue_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          emoji_vibe?: string | null
+          expires_at: string
+          id?: string
+          is_anonymous?: boolean | null
+          is_demo?: boolean | null
+          text: string
+          user_id: string
+          venue_id: string
+          venue_name: string
+        }
+        Update: {
+          created_at?: string | null
+          emoji_vibe?: string | null
+          expires_at?: string
+          id?: string
+          is_anonymous?: boolean | null
+          is_demo?: boolean | null
+          text?: string
+          user_id?: string
+          venue_id?: string
+          venue_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_buzz_messages_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
             referencedColumns: ["id"]
           },
         ]
