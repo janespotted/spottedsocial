@@ -393,9 +393,7 @@ export default function Leaderboard() {
                       </span>
                     )}
                   </>
-                ) : (
-                  <span className="text-white/40 text-xs">Be the first here tonight 👀</span>
-                )}
+                ) : null}
               </div>
                 </div>
               </div>
@@ -483,9 +481,7 @@ export default function Leaderboard() {
                       </span>
                     )}
                   </>
-                ) : (
-                  <span className="text-white/40 text-xs">Be the first here tonight 👀</span>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
