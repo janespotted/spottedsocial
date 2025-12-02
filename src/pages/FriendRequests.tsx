@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, Search, X, UserPlus } from 'lucide-react';
+import { ChevronLeft, Search, X, UserPlus, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FriendRequest {
@@ -243,7 +243,8 @@ export default function FriendRequests() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
+      <div className="max-w-[430px] mx-auto pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-center justify-between p-6">
@@ -271,6 +272,15 @@ export default function FriendRequests() {
       {/* Content */}
       <div className="px-4 py-6 space-y-6">
         <h2 className="text-2xl font-bold text-white text-center">Friend Requests</h2>
+
+        {/* Manage Close Friends Button */}
+        <button
+          onClick={() => navigate('/profile/close-friends')}
+          className="w-full flex items-center justify-center gap-2 bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 text-white hover:bg-[#a855f7]/20 transition-colors"
+        >
+          <Heart className="h-5 w-5 text-[#d4ff00]" />
+          <span>Manage Close Friends</span>
+        </button>
 
         {/* Search */}
         <div className="relative">
@@ -442,6 +452,7 @@ export default function FriendRequests() {
             <p className="text-white/60">No friend requests</p>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
