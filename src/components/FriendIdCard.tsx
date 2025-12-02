@@ -3,9 +3,9 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MessageCircle, MoreVertical, Flag, Ban } from 'lucide-react';
+import { MessageCircle, MoreVertical, Flag, Ban, X as CloseIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAuth } from '@/contexts/AuthContext';
@@ -324,17 +324,30 @@ export function FriendIdCard() {
 
   return (
     <>
-      <Dialog open={!!selectedFriend} onOpenChange={(open) => !open && closeFriendCard()}>
-        <DialogContent 
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-[390px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden"
-          {...swipeHandlers}
-        >
-          {!selectedFriend ? (
-            <div className="py-8 px-6 flex items-center justify-center">
-              <p className="text-white/60">Loading...</p>
-            </div>
-          ) : (
-            <div className="p-5 relative">
+      {selectedFriend && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 z-50 bg-black/80 animate-in fade-in-0"
+            onClick={closeFriendCard}
+          />
+          {/* Mobile frame constrained container */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div className="w-full max-w-[430px] h-full flex items-center justify-center px-4">
+              {/* Card */}
+              <div 
+                className="relative w-full max-w-[390px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-in fade-in-0 zoom-in-95"
+                {...swipeHandlers}
+              >
+                {/* Close button */}
+                <button 
+                  onClick={closeFriendCard}
+                  className="absolute right-4 top-4 z-20 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <CloseIcon className="h-4 w-4 text-white" />
+                  <span className="sr-only">Close</span>
+                </button>
+                <div className="p-5 pt-12 relative">
               {/* Three-dot menu positioned below the X close button */}
               <DropdownMenu>
                 <DropdownMenuTrigger className="absolute right-0 top-8 p-1 rounded-full hover:bg-white/10 transition-colors">
@@ -437,25 +450,27 @@ export function FriendIdCard() {
                     onClick={handleOpenDM}
                     className="p-2 rounded-full bg-transparent border-2 border-white/20 text-white hover:bg-white/10 transition-colors"
                   >
-                    <MessageCircle className="h-5 w-5" />
+                   <MessageCircle className="h-5 w-5" />
                   </button>
                 </div>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      </div>
+      </>
+    )}
 
-      {/* Report Dialog */}
-      {selectedFriend && (
-        <ReportDialog
-          open={showReportDialog}
-          onOpenChange={setShowReportDialog}
-          reportType="user"
-          targetId={selectedFriend.userId}
-          targetName={selectedFriend.displayName}
-        />
-      )}
-    </>
-  );
+    {/* Report Dialog */}
+    {selectedFriend && (
+      <ReportDialog
+        open={showReportDialog}
+        onOpenChange={setShowReportDialog}
+        reportType="user"
+        targetId={selectedFriend.userId}
+        targetName={selectedFriend.displayName}
+      />
+    )}
+  </>
+);
 }

@@ -5,12 +5,12 @@ import { useVenueInvite } from '@/contexts/VenueInviteContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { MapPin, Plus, Check, ChevronDown, UserPlus } from 'lucide-react';
+import { MapPin, Plus, Check, ChevronDown, UserPlus, X as CloseIcon } from 'lucide-react';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -405,13 +405,31 @@ export function VenueIdCard() {
 
   return (
     <>
-      <Dialog open={!!selectedVenueId} onOpenChange={(open) => !open && closeVenueCard()}>
-        <DialogContent 
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-[390px] max-h-[85vh] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden"
-          {...swipeHandlers}
-        >
-          <ScrollArea className="max-h-[85vh]">
-            <div className="p-5">
+      {selectedVenueId && venue && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 z-50 bg-black/80 animate-in fade-in-0"
+            onClick={closeVenueCard}
+          />
+          {/* Mobile frame constrained container */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div className="w-full max-w-[430px] h-full flex items-center justify-center px-4">
+              {/* Card */}
+              <div 
+                className="relative w-full max-w-[390px] max-h-[85vh] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-in fade-in-0 zoom-in-95"
+                {...swipeHandlers}
+              >
+                {/* Close button */}
+                <button 
+                  onClick={closeVenueCard}
+                  className="absolute right-4 top-4 z-20 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <CloseIcon className="h-4 w-4 text-white" />
+                  <span className="sr-only">Close</span>
+                </button>
+                <ScrollArea className="max-h-[85vh]">
+                  <div className="p-5">
               {/* Photo Carousel */}
               {googlePhotos.length > 0 ? (
                 <div className="relative mb-4 -mx-5 -mt-5">
@@ -649,10 +667,13 @@ export function VenueIdCard() {
                 <MapPin className="w-4 h-4 mr-2" />
                 Get Directions
               </Button>
+                </div>
+              </ScrollArea>
             </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+        </>
+      )}
 
       <WriteReviewDialog
         open={showWriteReview}
