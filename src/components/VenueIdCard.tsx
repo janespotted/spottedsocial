@@ -453,40 +453,24 @@ export function VenueIdCard() {
               {/* Reviews Section */}
               <div className="border-t border-[#a855f7]/20 pt-4">
                 <Collapsible open={reviewsOpen} onOpenChange={setReviewsOpen}>
-                  <CollapsibleTrigger className="w-full">
-                    <div className="flex items-center justify-between mb-3">
+                  <CollapsibleTrigger className="w-full group">
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-[#a855f7]/5 hover:bg-[#a855f7]/10 transition-colors">
                       <div className="flex items-center gap-2">
                         <h3 className="text-lg font-semibold text-white">Reviews</h3>
-                        <span className="text-white/50">({reviews.length})</span>
                         {reviews.length > 0 && (
-                          <span className="text-[#d4ff00]">{averageRating.toFixed(1)} ★</span>
+                          <>
+                            <span className="text-[#d4ff00] flex items-center gap-1">
+                              {averageRating.toFixed(1)} <Star className="w-4 h-4 fill-[#d4ff00]" />
+                            </span>
+                            <span className="text-white/40 text-sm">({reviews.length})</span>
+                          </>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        {!hasUserReviewed && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowWriteReview(true);
-                            }}
-                            className="text-[#d4ff00] hover:text-[#d4ff00] hover:bg-[#d4ff00]/10"
-                          >
-                            <Pencil className="w-4 h-4 mr-1" />
-                            Write Review
-                          </Button>
-                        )}
-                        <ChevronDown 
-                          className={`w-5 h-5 text-white/70 transition-transform duration-200 ${
-                            reviewsOpen ? 'rotate-180' : ''
-                          }`} 
-                        />
-                      </div>
+                      <ChevronDown className={`w-5 h-5 text-white/60 transition-transform duration-300 ${reviewsOpen ? 'rotate-180' : ''}`} />
                     </div>
                   </CollapsibleTrigger>
 
-                  <CollapsibleContent>
+                  <CollapsibleContent className="pt-3">
                     {reviews.length > 0 ? (
                       <div className="space-y-3">
                         {reviews.slice(0, 5).map((review) => (
@@ -502,12 +486,37 @@ export function VenueIdCard() {
                             +{reviews.length - 5} more reviews
                           </p>
                         )}
+                        
+                        {/* Write Review Button at Bottom */}
+                        {!hasUserReviewed && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowWriteReview(true)}
+                            className="w-full mt-2 text-[#d4ff00] border-[#d4ff00]/30 hover:bg-[#d4ff00]/10 hover:border-[#d4ff00]"
+                          >
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Write a Review
+                          </Button>
+                        )}
                       </div>
                     ) : (
-                      <div className="text-center py-6">
-                        <Star className="w-10 h-10 text-white/20 mx-auto mb-2" />
-                        <p className="text-white/50 text-sm">No reviews yet</p>
-                        <p className="text-white/30 text-xs">Be the first to review!</p>
+                      /* Empty State */
+                      <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                        <Star className="w-12 h-12 text-white/20 mb-3" />
+                        <p className="text-white/40 text-sm mb-1">No reviews yet</p>
+                        <p className="text-white/30 text-xs mb-4">Be the first to share your experience!</p>
+                        {!hasUserReviewed && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => setShowWriteReview(true)}
+                            className="bg-[#d4ff00] text-[#2d1b4e] hover:bg-[#d4ff00]/90 font-semibold"
+                          >
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Write First Review
+                          </Button>
+                        )}
                       </div>
                     )}
                   </CollapsibleContent>
