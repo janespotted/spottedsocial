@@ -5,7 +5,7 @@ import { useVenueInvite } from '@/contexts/VenueInviteContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -14,8 +14,8 @@ import { MapPin, ChevronDown, UserPlus, X as CloseIcon, Share2 } from 'lucide-re
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
-import { ReviewCard } from './ReviewCard';
-import { WriteReviewDialog } from './WriteReviewDialog';
+import { BuzzItem } from './BuzzItem';
+import { DropVibeDialog } from './DropVibeDialog';
 import { VenueHoursDisplay, getHoursDisplayString } from '@/lib/venue-hours';
 import type { VenueHours } from '@/lib/venue-hours';
 
@@ -35,24 +35,19 @@ interface FriendAtVenue {
   avatar_url: string | null;
 }
 
-interface Review {
+interface BuzzItemData {
+  type: 'text' | 'media';
   id: string;
-  user_id: string;
-  rating: number;
-  review_text: string | null;
+  text?: string;
+  emoji_vibe?: string | null;
+  media_url?: string;
+  media_type?: string;
   is_anonymous: boolean;
-  score: number;
   created_at: string;
-  image_url?: string | null;
   profile?: {
     display_name: string;
     avatar_url: string | null;
   };
-}
-
-interface UserVote {
-  review_id: string;
-  vote_type: 'up' | 'down';
 }
 
 export function VenueIdCard() {
@@ -64,11 +59,8 @@ export function VenueIdCard() {
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendAtVenue[]>([]);
   const [distance, setDistance] = useState<string>('--');
   const [isInWishlist, setIsInWishlist] = useState(false);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [userVotes, setUserVotes] = useState<UserVote[]>([]);
-  const [averageRating, setAverageRating] = useState<number>(0);
-  const [hasUserReviewed, setHasUserReviewed] = useState(false);
-  const [showWriteReview, setShowWriteReview] = useState(false);
+  const [buzzItems, setBuzzItems] = useState<BuzzItemData[]>([]);
+  const [showDropVibe, setShowDropVibe] = useState(false);
   const [moreInfoOpen, setMoreInfoOpen] = useState(false);
   const [venueHours, setVenueHours] = useState<VenueHoursDisplay | null>(null);
   const [loadingHours, setLoadingHours] = useState(false);
@@ -87,7 +79,7 @@ export function VenueIdCard() {
   useEffect(() => {
     if (selectedVenueId) {
       fetchVenueData();
-      fetchReviews();
+      fetchBuzzItems();
       fetchVenueHours();
     }
   }, [selectedVenueId]);
@@ -242,68 +234,83 @@ export function VenueIdCard() {
     }
   };
 
-  const fetchReviews = async () => {
+  const fetchBuzzItems = async () => {
     if (!selectedVenueId || !user) return;
 
     try {
-      // Fetch reviews with profile data
-      const { data: reviewsData } = await supabase
-        .from('venue_reviews')
+      const now = new Date().toISOString();
+
+      // Fetch text vibes
+      const { data: textVibes } = await supabase
+        .from('venue_buzz_messages')
         .select('*')
         .eq('venue_id', selectedVenueId)
-        .order('score', { ascending: false })
+        .gt('expires_at', now)
         .order('created_at', { ascending: false });
 
-      if (reviewsData && reviewsData.length > 0) {
-        // Fetch profiles for non-anonymous reviews
-        const nonAnonUserIds = reviewsData
-          .filter(r => !r.is_anonymous)
-          .map(r => r.user_id);
+      // Fetch media clips (stories with is_public_buzz = true)
+      const { data: mediaClips } = await supabase
+        .from('stories')
+        .select('*')
+        .eq('venue_id', selectedVenueId)
+        .eq('is_public_buzz', true)
+        .gt('expires_at', now)
+        .order('created_at', { ascending: false });
 
-        let profilesMap: Record<string, { display_name: string; avatar_url: string | null }> = {};
-        
-        if (nonAnonUserIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, display_name, avatar_url')
-            .in('id', nonAnonUserIds);
+      // Get user profiles for non-anonymous items
+      const textUserIds = (textVibes || [])
+        .filter(v => !v.is_anonymous)
+        .map(v => v.user_id);
+      const mediaUserIds = (mediaClips || [])
+        .filter(c => !c.is_anonymous)
+        .map(c => c.user_id);
+      const allUserIds = [...new Set([...textUserIds, ...mediaUserIds])];
 
-          if (profiles) {
-            profilesMap = profiles.reduce((acc, p) => {
-              acc[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url };
-              return acc;
-            }, {} as typeof profilesMap);
-          }
+      let profilesMap: Record<string, { display_name: string; avatar_url: string | null }> = {};
+
+      if (allUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', allUserIds);
+
+        if (profiles) {
+          profilesMap = profiles.reduce((acc, p) => {
+            acc[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url };
+            return acc;
+          }, {} as typeof profilesMap);
         }
-
-        const enrichedReviews = reviewsData.map(r => ({
-          ...r,
-          profile: profilesMap[r.user_id]
-        }));
-
-        setReviews(enrichedReviews);
-
-        // Calculate average rating
-        const avgRating = reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length;
-        setAverageRating(avgRating);
-
-        // Check if user has reviewed
-        setHasUserReviewed(reviewsData.some(r => r.user_id === user.id));
-      } else {
-        setReviews([]);
-        setAverageRating(0);
-        setHasUserReviewed(false);
       }
 
-      // Fetch user's votes
-      const { data: votes } = await supabase
-        .from('review_votes')
-        .select('review_id, vote_type')
-        .eq('user_id', user.id);
+      // Transform and combine items
+      const textItems: BuzzItemData[] = (textVibes || []).map(v => ({
+        type: 'text' as const,
+        id: v.id,
+        text: v.text,
+        emoji_vibe: v.emoji_vibe,
+        is_anonymous: v.is_anonymous || false,
+        created_at: v.created_at || '',
+        profile: profilesMap[v.user_id],
+      }));
 
-      setUserVotes(votes as UserVote[] || []);
+      const mediaItems: BuzzItemData[] = (mediaClips || []).map(c => ({
+        type: 'media' as const,
+        id: c.id,
+        media_url: c.media_url,
+        media_type: c.media_type,
+        is_anonymous: c.is_anonymous || false,
+        created_at: c.created_at,
+        profile: profilesMap[c.user_id],
+      }));
+
+      // Combine and sort by created_at (most recent first)
+      const allItems = [...textItems, ...mediaItems].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setBuzzItems(allItems);
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      console.error('Error fetching buzz items:', error);
     }
   };
 
@@ -424,11 +431,6 @@ export function VenueIdCard() {
     onSwipeDown: closeVenueCard,
     threshold: 50
   });
-
-  const getUserVote = (reviewId: string): 'up' | 'down' | null => {
-    const vote = userVotes.find(v => v.review_id === reviewId);
-    return vote?.vote_type || null;
-  };
 
   if (!selectedVenueId || !venue) return null;
 
@@ -629,10 +631,10 @@ export function VenueIdCard() {
                   {/* Tonight's Buzz sub-section */}
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-semibold text-white">Tonight's Buzz ({reviews.length})</h4>
-                      {!hasUserReviewed && isUserAtVenue && (
+                      <h4 className="text-sm font-semibold text-white">Tonight's Buzz ({buzzItems.length})</h4>
+                      {isUserAtVenue && (
                         <Button
-                          onClick={() => setShowWriteReview(true)}
+                          onClick={() => setShowDropVibe(true)}
                           size="sm"
                           className="bg-[#d4ff00] text-[#2d1b4e] hover:bg-[#d4ff00]/90 font-semibold text-xs h-7"
                         >
@@ -641,14 +643,9 @@ export function VenueIdCard() {
                       )}
                     </div>
                     <div className="space-y-3">
-                      {reviews.length > 0 ? (
-                        reviews.map((review) => (
-                          <ReviewCard
-                            key={review.id}
-                            review={review}
-                            currentUserVote={getUserVote(review.id)}
-                            onVoteChange={fetchReviews}
-                          />
+                      {buzzItems.length > 0 ? (
+                        buzzItems.map((item) => (
+                          <BuzzItem key={item.id} item={item as any} />
                         ))
                       ) : (
                         <p className="text-center text-white/50 py-3 text-sm">No vibes yet. Drop yours! ✨</p>
@@ -697,12 +694,12 @@ export function VenueIdCard() {
         </>
       )}
 
-      <WriteReviewDialog
-        open={showWriteReview}
-        onOpenChange={setShowWriteReview}
+      <DropVibeDialog
+        open={showDropVibe}
+        onOpenChange={setShowDropVibe}
         venueId={venue?.id || ''}
         venueName={venue?.name || ''}
-        onReviewSubmitted={fetchReviews}
+        onVibeSubmitted={fetchBuzzItems}
       />
     </>
   );
