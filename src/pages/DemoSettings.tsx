@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp, MapPin, RefreshCw } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp, MapPin, RefreshCw, Navigation } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDemoMode, setDemoMode, clearDemoData } from '@/lib/demo-data';
 import { getBootstrapMode, setBootstrapMode } from '@/lib/bootstrap-config';
@@ -22,6 +23,8 @@ export default function DemoSettings() {
   const [bootstrapEnabled, setBootstrapEnabled] = useState(false);
   const [seeded, setSeeded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [venues, setVenues] = useState<Array<{ id: string; name: string; lat: number; lng: number }>>([]);
+  const [selectedVenueId, setSelectedVenueId] = useState<string>('');
 
   useEffect(() => {
     const checkActualDemoData = async () => {
@@ -53,6 +56,23 @@ export default function DemoSettings() {
     
     checkActualDemoData();
   }, []);
+
+  // Fetch venues for the current city
+  useEffect(() => {
+    const fetchVenues = async () => {
+      const { data } = await supabase
+        .from('venues')
+        .select('id, name, lat, lng')
+        .eq('city', city)
+        .order('popularity_rank', { ascending: true });
+      
+      if (data) {
+        setVenues(data);
+      }
+    };
+    
+    fetchVenues();
+  }, [city]);
 
   const handleToggleDemo = async (enabled: boolean) => {
     setDemoMode(enabled);
@@ -180,6 +200,50 @@ export default function DemoSettings() {
       } else {
         toast.error('Failed to detect location. Try selecting city manually.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSimulateCheckin = async () => {
+    if (!user || !selectedVenueId) {
+      toast.error('Please select a venue first');
+      return;
+    }
+
+    const venue = venues.find(v => v.id === selectedVenueId);
+    if (!venue) return;
+
+    setLoading(true);
+    try {
+      // Calculate expiry time (5 AM next morning)
+      const now = new Date();
+      const expiresAt = new Date(now);
+      if (now.getHours() >= 5) {
+        expiresAt.setDate(expiresAt.getDate() + 1);
+      }
+      expiresAt.setHours(5, 0, 0, 0);
+
+      // Upsert night_status for the user
+      const { error } = await supabase
+        .from('night_statuses')
+        .upsert({
+          user_id: user.id,
+          status: 'out',
+          venue_id: venue.id,
+          venue_name: venue.name,
+          lat: venue.lat,
+          lng: venue.lng,
+          expires_at: expiresAt.toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+
+      if (error) throw error;
+
+      toast.success(`You're now "at" ${venue.name}! Open its Venue Card to test Drop a Vibe.`, { duration: 5000 });
+    } catch (error) {
+      console.error('Error simulating check-in:', error);
+      toast.error('Failed to simulate check-in');
     } finally {
       setLoading(false);
     }
@@ -396,6 +460,53 @@ export default function DemoSettings() {
           </CardContent>
         </Card>
 
+        {/* Simulate Check-in */}
+        <Card className="bg-[#2d1b4e]/60 border-2 border-[#a855f7]/40">
+          <CardHeader>
+            <CardTitle className="text-[#d4ff00] flex items-center gap-2">
+              <Navigation className="h-5 w-5" />
+              Simulate Check-in
+            </CardTitle>
+            <CardDescription className="text-white/60">
+              Pretend you're at a venue to test "Drop a Vibe" feature
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <Label className="text-white">Select a venue:</Label>
+              <Select value={selectedVenueId} onValueChange={setSelectedVenueId}>
+                <SelectTrigger className="w-full bg-[#1a0f2e]/60 border-[#a855f7]/40 text-white">
+                  <SelectValue placeholder="Choose venue..." />
+                </SelectTrigger>
+                <SelectContent className="bg-[#2d1b4e] border-[#a855f7]/40">
+                  {venues.map((venue) => (
+                    <SelectItem 
+                      key={venue.id} 
+                      value={venue.id}
+                      className="text-white hover:bg-[#a855f7]/20 focus:bg-[#a855f7]/20"
+                    >
+                      {venue.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Button
+                onClick={handleSimulateCheckin}
+                disabled={loading || !selectedVenueId}
+                className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
+              >
+                <Navigation className="h-4 w-4 mr-2" />
+                {loading ? 'Checking in...' : 'Simulate Check-in'}
+              </Button>
+              
+              <p className="text-xs text-white/50">
+                After check-in, go to the Leaderboard → tap the venue → expand "More Info" → you'll see the "Drop a Vibe ✨" button
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Info Card */}
         <Card className="bg-[#2d1b4e]/60 border-2 border-[#a855f7]/40">
           <CardHeader>
@@ -416,8 +527,8 @@ export default function DemoSettings() {
                 <div className="text-white/60 text-xs">Newsfeed Posts</div>
               </div>
               <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
-                <div className="text-[#d4ff00] text-2xl font-bold">15</div>
-                <div className="text-white/60 text-xs">Yap Messages</div>
+                <div className="text-[#d4ff00] text-2xl font-bold">15+</div>
+                <div className="text-white/60 text-xs">Yaps + Buzz</div>
               </div>
             </div>
             
