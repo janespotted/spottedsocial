@@ -193,14 +193,23 @@ export function VenueIdCard() {
         if (statuses && statuses.length > 0) {
           const userIds = statuses.map(s => s.user_id);
           
-          // Get friend profiles
-          const { data: friendships } = await supabase
+          // Get friend profiles (both directions)
+          const { data: sentFriendships } = await supabase
             .from('friendships')
             .select('friend_id')
             .eq('user_id', user.id)
             .eq('status', 'accepted');
 
-          const friendIds = friendships?.map(f => f.friend_id) || [];
+          const { data: receivedFriendships } = await supabase
+            .from('friendships')
+            .select('user_id')
+            .eq('friend_id', user.id)
+            .eq('status', 'accepted');
+
+          const friendIds = [
+            ...(sentFriendships?.map(f => f.friend_id) || []),
+            ...(receivedFriendships?.map(f => f.user_id) || [])
+          ];
           const friendsAtVenueIds = userIds.filter(id => friendIds.includes(id));
 
           if (friendsAtVenueIds.length > 0) {

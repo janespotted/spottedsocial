@@ -52,19 +52,28 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   };
 
   const fetchFriends = async () => {
-    // Get accepted friendships
-    const { data: friendships } = await supabase
+    // Get accepted friendships (both directions)
+    const { data: sentFriendships } = await supabase
       .from('friendships')
       .select('friend_id')
       .eq('user_id', user?.id)
       .eq('status', 'accepted');
 
-    if (!friendships || friendships.length === 0) {
+    const { data: receivedFriendships } = await supabase
+      .from('friendships')
+      .select('user_id')
+      .eq('friend_id', user?.id)
+      .eq('status', 'accepted');
+
+    const friendIds = [
+      ...(sentFriendships?.map(f => f.friend_id) || []),
+      ...(receivedFriendships?.map(f => f.user_id) || [])
+    ];
+
+    if (friendIds.length === 0) {
       setFriends([]);
       return;
     }
-
-    const friendIds = friendships.map(f => f.friend_id);
 
     // Get friend profiles (exclude demo users in bootstrap mode)
     const { data: profiles } = await supabase

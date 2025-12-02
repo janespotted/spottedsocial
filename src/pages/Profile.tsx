@@ -88,14 +88,20 @@ export default function Profile() {
 
     setIsLocationSharing(!!nightStatus);
 
-    // Get friends count
-    const { data: friendships } = await supabase
+    // Get friends count (both directions)
+    const { data: sentFriendships } = await supabase
       .from('friendships')
       .select('id')
       .eq('user_id', user?.id)
       .eq('status', 'accepted');
 
-    setFriendsCount(friendships?.length || 0);
+    const { data: receivedFriendships } = await supabase
+      .from('friendships')
+      .select('id')
+      .eq('friend_id', user?.id)
+      .eq('status', 'accepted');
+
+    setFriendsCount((sentFriendships?.length || 0) + (receivedFriendships?.length || 0));
 
     // Get places count (unique venues from check-ins)
     const { data: checkins } = await supabase
