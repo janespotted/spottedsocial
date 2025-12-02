@@ -55,7 +55,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Notifications Button */}
       <button
         onClick={() => navigate('/notifications')}
-        className="fixed top-4 right-4 z-50 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all"
+        className="fixed top-4 right-20 z-50 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all"
         aria-label="View notifications"
       >
         <Bell className="w-5 h-5" />
