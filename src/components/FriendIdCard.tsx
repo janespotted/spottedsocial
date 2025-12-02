@@ -331,9 +331,9 @@ export function FriendIdCard() {
             className="fixed inset-0 z-50 bg-black/80 animate-in fade-in-0"
             onClick={closeFriendCard}
           />
-          {/* Mobile frame constrained container */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <div className="w-full max-w-[430px] h-full flex items-center justify-center px-4">
+      {/* Mobile frame constrained container */}
+      <div className="fixed inset-0 z-50 pointer-events-none">
+        <div className="max-w-[430px] mx-auto h-full flex items-center justify-center px-4">
               {/* Card */}
               <div 
                 className="relative w-full max-w-[390px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-in fade-in-0 zoom-in-95"
