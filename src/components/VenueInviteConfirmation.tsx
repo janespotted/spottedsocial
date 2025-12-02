@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVenueInvite } from '@/contexts/VenueInviteContext';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -12,6 +13,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 
 export function VenueInviteConfirmation() {
   const { showConfirmation, invitedFriends, venueName, closeConfirmation } = useVenueInvite();
+  const { openFriendCard } = useFriendIdCard();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -64,6 +66,16 @@ export function VenueInviteConfirmation() {
     }
   };
 
+  const handleAvatarClick = (friend: typeof invitedFriends[0]) => {
+    closeConfirmation();
+    openFriendCard({
+      userId: friend.id,
+      displayName: friend.displayName,
+      avatarUrl: friend.avatarUrl,
+      relationshipType: 'direct'
+    });
+  };
+
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       closeConfirmation();
@@ -83,7 +95,7 @@ export function VenueInviteConfirmation() {
       className="fixed inset-0 z-[100] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"
       onClick={handleBackdropClick}
     >
-      <div className="w-full max-w-md bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in">
+      <div className="w-full max-w-md bg-gradient-to-br from-[#6b21a8] via-[#581c87] to-[#4c1d95] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in">
         {/* Spotted Logo */}
         <div className="flex justify-center mb-4">
           <img src={spottedLogo} alt="Spotted" className="w-12 h-12" />
@@ -105,12 +117,18 @@ export function VenueInviteConfirmation() {
         {/* Friend Avatars */}
         <div className="flex justify-center -space-x-3 mb-6">
           {invitedFriends.slice(0, 3).map((friend) => (
-            <Avatar key={friend.id} className="w-12 h-12 border-2 border-[#2d1b4e]">
-              <AvatarImage src={friend.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.displayName}`} />
-              <AvatarFallback className="bg-[#a855f7] text-white">
-                {friend.displayName[0]}
-              </AvatarFallback>
-            </Avatar>
+            <button
+              key={friend.id}
+              onClick={() => handleAvatarClick(friend)}
+              className="cursor-pointer hover:scale-110 transition-transform"
+            >
+              <Avatar className="w-12 h-12 border-2 border-[#2d1b4e]">
+                <AvatarImage src={friend.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.displayName}`} />
+                <AvatarFallback className="bg-[#a855f7] text-white">
+                  {friend.displayName[0]}
+                </AvatarFallback>
+              </Avatar>
+            </button>
           ))}
         </div>
 
