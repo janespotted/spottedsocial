@@ -140,6 +140,31 @@ const DEMO_REVIEW_IMAGES = [
   "https://images.unsplash.com/photo-1563841930606-67e2bce48b78?w=600&h=400&fit=crop", // venue interior
 ];
 
+// Demo buzz messages for Tonight's Buzz (Quick Vibes)
+const DEMO_BUZZ_MESSAGES = [
+  { text: "DJ is absolutely killing it right now 🔥", emoji_vibe: "🔥" },
+  { text: "Line was long but SO worth it", emoji_vibe: "💃" },
+  { text: "Best drinks in Brooklyn, hands down", emoji_vibe: "🍸" },
+  { text: "The sound system here is insane", emoji_vibe: "🎵" },
+  { text: "Crowd is perfect tonight ✨", emoji_vibe: "✨" },
+  { text: "Just vibing", emoji_vibe: "💃" },
+  { text: "This place never disappoints", emoji_vibe: "🔥" },
+  { text: "Who else is here? The rooftop is packed!", emoji_vibe: "✨" },
+  { text: "Energy is unmatched rn", emoji_vibe: "⚡" },
+  { text: "3am and we're not leaving anytime soon", emoji_vibe: "🌙" },
+  { text: "Bartender just made me something off menu 👀", emoji_vibe: "🍸" },
+  { text: "Finally found my people here", emoji_vibe: "💜" },
+];
+
+// Demo media for buzz clips (stories with is_public_buzz = true)
+const DEMO_BUZZ_MEDIA = [
+  "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=600&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1587574293340-e0011c4e8ecf?w=600&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&h=800&fit=crop",
+  "https://images.unsplash.com/photo-1571266028243-d220c6563ccc?w=800&h=800&fit=crop",
+];
+
 // Venue-specific reviews with accurate details from real-world research
 const VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | null; rating: number }> }> = {
   "Le Bain": {
@@ -1248,17 +1273,79 @@ Deno.serve(async (req) => {
         threadCount++;
       }
 
+      // Create demo buzz data for Tonight's Buzz
+      const buzzMessages = [];
+      const buzzStories = [];
+      const buzzVenues = SELECTED_VENUES.slice(0, 10); // Top 10 venues get buzz data
+
+      for (const venue of buzzVenues) {
+        const venueId = venueIdMap.get(venue.name);
+        if (!venueId) continue;
+
+        // Add 3-5 text buzz messages per venue
+        const numMessages = 3 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < numMessages; i++) {
+          const buzz = DEMO_BUZZ_MESSAGES[Math.floor(Math.random() * DEMO_BUZZ_MESSAGES.length)];
+          const randomUser = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
+          const minutesAgo = Math.floor(Math.random() * 180); // Within last 3 hours
+          
+          buzzMessages.push({
+            user_id: randomUser,
+            venue_id: venueId,
+            venue_name: venue.name,
+            text: buzz.text,
+            emoji_vibe: buzz.emoji_vibe,
+            is_anonymous: Math.random() > 0.3, // 70% anonymous
+            expires_at: calculateExpiryTime(),
+            created_at: new Date(Date.now() - minutesAgo * 60000).toISOString(),
+            is_demo: true,
+          });
+        }
+
+        // Add 1-2 media clips (stories with is_public_buzz) per top 5 venues
+        if (buzzVenues.indexOf(venue) < 5) {
+          const numClips = 1 + Math.floor(Math.random() * 2);
+          for (let i = 0; i < numClips; i++) {
+            const mediaUrl = DEMO_BUZZ_MEDIA[Math.floor(Math.random() * DEMO_BUZZ_MEDIA.length)];
+            const randomUser = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
+            const minutesAgo = Math.floor(Math.random() * 120); // Within last 2 hours
+            
+            buzzStories.push({
+              user_id: randomUser,
+              venue_id: venueId,
+              venue_name: venue.name,
+              media_url: mediaUrl,
+              media_type: 'image',
+              is_public_buzz: true,
+              is_anonymous: Math.random() > 0.7, // 30% anonymous for clips
+              expires_at: calculateExpiryTime(),
+              created_at: new Date(Date.now() - minutesAgo * 60000).toISOString(),
+              is_demo: true,
+            });
+          }
+        }
+      }
+
+      // Insert buzz data
+      if (buzzMessages.length > 0) {
+        await supabaseAdmin.from('venue_buzz_messages').insert(buzzMessages);
+      }
+      if (buzzStories.length > 0) {
+        await supabaseAdmin.from('stories').insert(buzzStories);
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
           stats: {
             users: demoUserIds.length,
             posts: 60,
-            stories: stories.length,
+            stories: stories.length + buzzStories.length,
             yaps: yapMessages.length,
             threads: threadCount,
             venues: SELECTED_VENUES.length,
             activeUsers: nightStatuses.length,
+            buzzMessages: buzzMessages.length,
             city: city,
           }
         }),
@@ -1309,6 +1396,7 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from('yap_comments').delete().eq('is_demo', true);
       await supabaseAdmin.from('yap_votes').delete().eq('is_demo', true);
       await supabaseAdmin.from('yap_messages').delete().eq('is_demo', true);
+      await supabaseAdmin.from('venue_buzz_messages').delete().eq('is_demo', true);
       await supabaseAdmin.from('story_views').delete().eq('is_demo', true);
       await supabaseAdmin.from('stories').delete().eq('is_demo', true);
       await supabaseAdmin.from('posts').delete().eq('is_demo', true);
