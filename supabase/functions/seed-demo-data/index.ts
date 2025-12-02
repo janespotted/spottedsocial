@@ -712,14 +712,31 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 2. Create friendships with current user
-      const currentUserFriendships = demoUserIds.map(demoUserId => ({
-        user_id: user.id,
-        friend_id: demoUserId,
-        status: 'accepted',
-      }));
+      // 2. Get ALL real (non-demo) users and create friendships with demo users
+      const { data: realUsers } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('is_demo', false);
 
-      await supabaseAdmin.from('friendships').insert(currentUserFriendships);
+      const realUserIds = realUsers?.map(u => u.id) || [];
+      console.log(`Found ${realUserIds.length} real users to befriend demo users`);
+
+      // Create friendships between ALL real users and ALL demo users
+      const allFriendships: Array<{ user_id: string; friend_id: string; status: string }> = [];
+      for (const realUserId of realUserIds) {
+        for (const demoUserId of demoUserIds) {
+          allFriendships.push({
+            user_id: realUserId,
+            friend_id: demoUserId,
+            status: 'accepted',
+          });
+        }
+      }
+
+      if (allFriendships.length > 0) {
+        await supabaseAdmin.from('friendships').insert(allFriendships);
+        console.log(`Created ${allFriendships.length} friendships for ${realUserIds.length} real users`);
+      }
 
       // 3. Create friendships between demo users
       const demoFriendships: Array<{ user_id: string; friend_id: string; status: string }> = [];
