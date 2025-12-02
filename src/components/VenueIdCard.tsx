@@ -22,6 +22,7 @@ interface VenueData {
   id: string;
   name: string;
   neighborhood: string;
+  city: string;
   type: string;
   lat: number;
   lng: number;
@@ -54,7 +55,7 @@ interface UserVote {
 }
 
 export function VenueIdCard() {
-  const { selectedVenueId, closeVenueCard } = useVenueIdCard();
+  const { selectedVenueId, closeVenueCard, openVenueCard } = useVenueIdCard();
   const { openFriendCard } = useFriendIdCard();
   const { user } = useAuth();
   const [venue, setVenue] = useState<VenueData | null>(null);
@@ -72,6 +73,13 @@ export function VenueIdCard() {
   const [googlePhotos, setGooglePhotos] = useState<string[]>([]);
   const [googleRating, setGoogleRating] = useState<number | null>(null);
   const [googleRatingsCount, setGoogleRatingsCount] = useState<number>(0);
+  const [similarVenues, setSimilarVenues] = useState<Array<{
+    id: string;
+    name: string;
+    neighborhood: string;
+    google_rating: number | null;
+  }>>([]);
+  const [similarVenuesOpen, setSimilarVenuesOpen] = useState(false);
 
   useEffect(() => {
     if (selectedVenueId) {
@@ -80,6 +88,12 @@ export function VenueIdCard() {
       fetchVenueHours();
     }
   }, [selectedVenueId]);
+
+  useEffect(() => {
+    if (venue) {
+      fetchSimilarVenues();
+    }
+  }, [venue?.id]);
 
   const fetchVenueHours = async () => {
     if (!selectedVenueId) return;
@@ -272,6 +286,40 @@ export function VenueIdCard() {
       setUserVotes(votes as UserVote[] || []);
     } catch (error) {
       console.error('Error fetching reviews:', error);
+    }
+  };
+
+  const fetchSimilarVenues = async () => {
+    if (!selectedVenueId || !venue) return;
+
+    try {
+      // First try to find venues in the same neighborhood and city
+      let { data: similar } = await supabase
+        .from('venues')
+        .select('id, name, neighborhood, google_rating')
+        .eq('neighborhood', venue.neighborhood)
+        .eq('city', venue.city)
+        .neq('id', selectedVenueId)
+        .order('popularity_rank', { ascending: true })
+        .limit(4);
+
+      // If not enough venues in the same neighborhood, fall back to same city
+      if (!similar || similar.length < 3) {
+        const { data: cityVenues } = await supabase
+          .from('venues')
+          .select('id, name, neighborhood, google_rating')
+          .eq('city', venue.city)
+          .neq('id', selectedVenueId)
+          .order('popularity_rank', { ascending: true })
+          .limit(4);
+
+        similar = cityVenues || [];
+      }
+
+      setSimilarVenues(similar || []);
+    } catch (error) {
+      console.error('Error fetching similar venues:', error);
+      setSimilarVenues([]);
     }
   };
 
@@ -574,6 +622,51 @@ export function VenueIdCard() {
                   </CollapsibleContent>
                 </Collapsible>
               </div>
+
+              {/* Similar Venues Section */}
+              {similarVenues.length > 0 && (
+                <div className="mt-4">
+                  <Collapsible open={similarVenuesOpen} onOpenChange={setSimilarVenuesOpen}>
+                    <CollapsibleTrigger className="w-full group">
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-[#a855f7]/5 hover:bg-[#a855f7]/10 transition-colors">
+                        <h3 className="text-lg font-semibold text-white">Similar Venues</h3>
+                        <ChevronDown className={`w-5 h-5 text-white/60 transition-transform duration-300 ${similarVenuesOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent className="pt-3">
+                      <div className="space-y-2">
+                        {similarVenues.map((simVenue) => (
+                          <button
+                            key={simVenue.id}
+                            onClick={() => {
+                              closeVenueCard();
+                              // Small delay to allow close animation, then open new venue
+                              setTimeout(() => {
+                                openVenueCard(simVenue.id);
+                              }, 150);
+                            }}
+                            className="w-full p-3 rounded-lg bg-[#2d1b4e]/50 border border-[#a855f7]/20 hover:bg-[#2d1b4e]/70 hover:border-[#a855f7]/40 transition-all text-left"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="text-white font-medium">{simVenue.name}</p>
+                                <p className="text-white/50 text-sm">{simVenue.neighborhood}</p>
+                              </div>
+                              {simVenue.google_rating && (
+                                <div className="flex items-center gap-1 ml-2">
+                                  <Star className="w-4 h-4 text-[#d4ff00] fill-[#d4ff00]" />
+                                  <span className="text-white/70 text-sm">{simVenue.google_rating.toFixed(1)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
+              )}
             </div>
           </ScrollArea>
         </DialogContent>

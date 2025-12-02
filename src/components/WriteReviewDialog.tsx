@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Star } from 'lucide-react';
+import { Star, Camera, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { haptic } from '@/lib/haptics';
@@ -31,6 +31,58 @@ export function WriteReviewDialog({
   const [reviewText, setReviewText] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image must be smaller than 10MB');
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('File must be an image');
+      return;
+    }
+
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+  };
+
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile || !user) return null;
+
+    const fileExt = imageFile.name.split('.').pop();
+    const filePath = `reviews/${user.id}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('post-images')
+      .upload(filePath, imageFile);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('post-images')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  };
 
   const handleSubmit = async () => {
     if (!user || rating === 0) {
@@ -41,6 +93,12 @@ export function WriteReviewDialog({
     setIsSubmitting(true);
 
     try {
+      // Upload image if present
+      let imageUrl: string | null = null;
+      if (imageFile) {
+        imageUrl = await uploadImage();
+      }
+
       const { error } = await supabase
         .from('venue_reviews')
         .insert({
@@ -48,7 +106,8 @@ export function WriteReviewDialog({
           user_id: user.id,
           rating,
           review_text: reviewText.trim() || null,
-          is_anonymous: isAnonymous
+          is_anonymous: isAnonymous,
+          image_url: imageUrl
         });
 
       if (error) {
@@ -69,6 +128,8 @@ export function WriteReviewDialog({
       setRating(0);
       setReviewText('');
       setIsAnonymous(false);
+      setImageFile(null);
+      setImagePreview(null);
     } catch (error) {
       console.error('Error submitting review:', error);
       toast.error('Failed to submit review');
@@ -119,6 +180,42 @@ export function WriteReviewDialog({
                 {displayRating === 4 && 'Great'}
                 {displayRating === 5 && 'Amazing!'}
               </p>
+            )}
+          </div>
+
+          {/* Photo Upload */}
+          <div className="space-y-2">
+            <Label className="text-white/70">Photo (optional)</Label>
+            {!imagePreview ? (
+              <label 
+                htmlFor="review-image" 
+                className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-[#a855f7]/30 rounded-xl cursor-pointer hover:border-[#a855f7]/60 transition-colors bg-[#2d1b4e]/30"
+              >
+                <Camera className="w-5 h-5 text-white/60" />
+                <span className="text-sm text-white/60">Add Photo</span>
+                <input
+                  id="review-image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </label>
+            ) : (
+              <div className="relative rounded-xl overflow-hidden border-2 border-[#a855f7]/30">
+                <img
+                  src={imagePreview}
+                  alt="Review preview"
+                  className="w-full h-48 object-cover"
+                />
+                <button
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center transition-colors"
+                  type="button"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
+              </div>
             )}
           </div>
 
