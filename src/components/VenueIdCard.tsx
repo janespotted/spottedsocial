@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { MapPin, Plus, Check, ChevronDown, UserPlus, X as CloseIcon } from 'lucide-react';
+import { MapPin, Plus, Check, ChevronDown, UserPlus, X as CloseIcon, Share2 } from 'lucide-react';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -388,6 +388,34 @@ export function VenueIdCard() {
     }
   };
 
+  const handleShareVenue = async () => {
+    if (!venue) return;
+    
+    const shareText = `Check out ${venue.name} in ${venue.neighborhood}! 🎉`;
+    const shareUrl = `${window.location.origin}/?venue=${selectedVenueId}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: venue.name,
+          text: shareText,
+          url: shareUrl,
+        });
+        haptic.success();
+      } catch {
+        // User cancelled share
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+        haptic.light();
+        toast.success('Link copied!');
+      } catch {
+        toast.error("Couldn't copy link");
+      }
+    }
+  };
+
   const swipeHandlers = useSwipeGesture({
     onSwipeDown: closeVenueCard,
     threshold: 50
@@ -564,14 +592,23 @@ export function VenueIdCard() {
                 </div>
               </div>
 
-              {/* Get Directions Button - Moved up for social-first layout */}
-              <Button
-                onClick={handleMapPinClick}
-                className="w-full mb-4 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white"
-              >
-                <MapPin className="w-4 h-4 mr-2" />
-                Get Directions
-              </Button>
+              {/* Action Buttons Row */}
+              <div className="flex gap-2 mb-4">
+                <Button
+                  onClick={handleMapPinClick}
+                  className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white"
+                >
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Get Directions
+                </Button>
+                <Button
+                  onClick={handleShareVenue}
+                  variant="outline"
+                  className="border-[#a855f7]/40 hover:bg-[#a855f7]/20 text-white"
+                >
+                  <Share2 className="w-4 h-4" />
+                </Button>
+              </div>
 
               {/* More Info - Single collapsible, closed by default */}
               <Collapsible open={moreInfoOpen} onOpenChange={setMoreInfoOpen}>
