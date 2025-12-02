@@ -5,12 +5,12 @@ import { useVenueInvite } from '@/contexts/VenueInviteContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X } from 'lucide-react';
+import { X, Bookmark, BookmarkCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { MapPin, Plus, Check, ChevronDown, UserPlus, X as CloseIcon, Share2 } from 'lucide-react';
+import { MapPin, ChevronDown, UserPlus, X as CloseIcon, Share2 } from 'lucide-react';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -82,6 +82,7 @@ export function VenueIdCard() {
     google_rating: number | null;
   }>>([]);
   const [isUserAtVenue, setIsUserAtVenue] = useState(false);
+  const [totalCheckIns, setTotalCheckIns] = useState(0);
 
   useEffect(() => {
     if (selectedVenueId) {
@@ -186,13 +187,16 @@ export function VenueIdCard() {
           setDistance(dist);
         }
 
-        // Fetch friends at this venue
+        // Fetch ALL users at this venue (for total check-ins count)
         const { data: statuses } = await supabase
           .from('night_statuses')
           .select('user_id')
           .eq('venue_name', venueData.name)
           .not('expires_at', 'is', null)
           .gt('expires_at', new Date().toISOString());
+
+        // Set total check-ins count
+        setTotalCheckIns(statuses?.length || 0);
 
         if (statuses && statuses.length > 0) {
           const userIds = statuses.map(s => s.user_id);
@@ -481,35 +485,11 @@ export function VenueIdCard() {
                       </>
                     )}
                   </Carousel>
-                  {/* Wishlist toggle button overlaid on carousel */}
-                  <button
-                    onClick={handleWishlistToggle}
-                    className="absolute top-3 right-3 w-10 h-10 rounded-full bg-[#d4ff00] border-2 border-[#2d1b4e] flex items-center justify-center shadow-[0_0_15px_rgba(212,255,0,0.6)] hover:scale-110 transition-transform z-10"
-                    aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
-                  >
-                    {isInWishlist ? (
-                      <Check className="w-5 h-5 text-[#2d1b4e]" />
-                    ) : (
-                      <Plus className="w-5 h-5 text-[#2d1b4e]" />
-                    )}
-                  </button>
                 </div>
               ) : (
                 /* Fallback gradient if no photos */
                 <div className="relative mb-4 -mx-5 -mt-5">
                   <div className="w-full h-56 bg-gradient-to-br from-[#a855f7]/40 to-[#d4ff00]/40" />
-                  {/* Wishlist toggle button */}
-                  <button
-                    onClick={handleWishlistToggle}
-                    className="absolute top-3 right-3 w-10 h-10 rounded-full bg-[#d4ff00] border-2 border-[#2d1b4e] flex items-center justify-center shadow-[0_0_15px_rgba(212,255,0,0.6)] hover:scale-110 transition-transform"
-                    aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
-                  >
-                    {isInWishlist ? (
-                      <Check className="w-5 h-5 text-[#2d1b4e]" />
-                    ) : (
-                      <Plus className="w-5 h-5 text-[#2d1b4e]" />
-                    )}
-                  </button>
                 </div>
               )}
 
@@ -535,12 +515,12 @@ export function VenueIdCard() {
                       {venueHours.isOpen ? '○ Open' : '● Closed'}
                     </span>
                   )}
-                  {/* Energy Level - Only show when venue is open */}
-                  {venueHours?.isOpen && (
+                  {/* Energy Level - Based on total check-ins, only show when venue is open */}
+                  {venueHours?.isOpen && totalCheckIns > 0 && (
                     <span className="px-2 py-0.5 rounded-full text-xs bg-[#d4ff00]/20 text-[#d4ff00] border border-[#d4ff00]/30">
-                      {friendsAtVenue.length === 0 && '🌙 Chill'}
-                      {friendsAtVenue.length > 0 && friendsAtVenue.length <= 3 && '🔥 Buzzing'}
-                      {friendsAtVenue.length > 3 && '🚀 Packed'}
+                      {totalCheckIns <= 5 && '🌙 Chill'}
+                      {totalCheckIns > 5 && totalCheckIns <= 15 && '🔥 Buzzing'}
+                      {totalCheckIns > 15 && '🚀 Packed'}
                     </span>
                   )}
                 </div>
@@ -585,7 +565,7 @@ export function VenueIdCard() {
                         </span>
                       </>
                     ) : (
-                      <span className="text-sm text-white/50">No friends here yet</span>
+                      <span className="text-sm text-white/60">Be the first to bring your crew 🎉</span>
                     )}
                   </div>
                   <button
@@ -620,7 +600,23 @@ export function VenueIdCard() {
                 <div className="border-t border-white/10 pt-3">
                   <CollapsibleTrigger className="w-full">
                     <div className="flex items-center justify-between py-2 text-white/60 hover:text-white/80 transition-colors">
-                      <span className="text-sm">More Info</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm">More Info</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleWishlistToggle();
+                          }}
+                          className="flex items-center gap-1 text-xs text-white/50 hover:text-[#d4ff00] transition-colors"
+                          aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                        >
+                          {isInWishlist ? (
+                            <BookmarkCheck className="w-4 h-4 text-[#d4ff00]" />
+                          ) : (
+                            <Bookmark className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                       <ChevronDown 
                         className={`w-4 h-4 transition-transform ${
                           moreInfoOpen ? 'rotate-180' : ''
