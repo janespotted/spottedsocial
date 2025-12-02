@@ -33,9 +33,9 @@ export function VenueInviteConfirmation() {
       navigate('/messages', {
         state: {
           preselectedUser: {
-            userId: firstFriend.id,
-            displayName: firstFriend.displayName,
-            avatarUrl: firstFriend.avatarUrl
+            id: firstFriend.id,
+            display_name: firstFriend.displayName,
+            avatar_url: firstFriend.avatarUrl
           }
         }
       });
@@ -80,10 +80,10 @@ export function VenueInviteConfirmation() {
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"
       onClick={handleBackdropClick}
     >
-      <div className="w-full max-w-[400px] bg-gradient-to-br from-[#a855f7]/20 to-[#d4ff00]/20 backdrop-blur-xl rounded-3xl p-6 border-2 border-[#a855f7] shadow-[0_0_40px_rgba(168,85,247,0.6)] animate-in fade-in zoom-in duration-300">
+      <div className="w-full max-w-md bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in">
         {/* Spotted Logo */}
         <div className="flex justify-center mb-4">
           <img src={spottedLogo} alt="Spotted" className="w-12 h-12" />
