@@ -711,7 +711,10 @@ export type Database = {
         Row: {
           city: string | null
           created_at: string | null
+          google_photo_refs: Json | null
           google_place_id: string | null
+          google_rating: number | null
+          google_user_ratings_total: number | null
           hours_last_updated: string | null
           id: string
           is_demo: boolean | null
@@ -728,7 +731,10 @@ export type Database = {
         Insert: {
           city?: string | null
           created_at?: string | null
+          google_photo_refs?: Json | null
           google_place_id?: string | null
+          google_rating?: number | null
+          google_user_ratings_total?: number | null
           hours_last_updated?: string | null
           id?: string
           is_demo?: boolean | null
@@ -745,7 +751,10 @@ export type Database = {
         Update: {
           city?: string | null
           created_at?: string | null
+          google_photo_refs?: Json | null
           google_place_id?: string | null
+          google_rating?: number | null
+          google_user_ratings_total?: number | null
           hours_last_updated?: string | null
           id?: string
           is_demo?: boolean | null

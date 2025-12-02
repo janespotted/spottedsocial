@@ -49,7 +49,7 @@ serve(async (req) => {
     // Fetch venue data
     const { data: venue, error: venueError } = await supabase
       .from('venues')
-      .select('id, name, lat, lng, google_place_id, operating_hours, hours_last_updated')
+      .select('id, name, lat, lng, google_place_id, operating_hours, hours_last_updated, google_rating, google_user_ratings_total, google_photo_refs')
       .eq('id', venueId)
       .single();
 
@@ -61,22 +61,25 @@ serve(async (req) => {
       );
     }
 
-    // Check if we have recent cached hours (less than 7 days old)
+    // Check if we have recent cached data (less than 7 days old)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     if (venue.operating_hours && venue.hours_last_updated && 
         new Date(venue.hours_last_updated) > sevenDaysAgo) {
-      console.log('Returning cached hours for', venue.name);
+      console.log('Returning cached data for', venue.name);
       return new Response(
         JSON.stringify({ 
           success: true, 
           operating_hours: venue.operating_hours,
+          google_rating: venue.google_rating,
+          google_user_ratings_total: venue.google_user_ratings_total,
+          google_photo_refs: venue.google_photo_refs,
           cached: true 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Fetching fresh hours for', venue.name);
+    console.log('Fetching fresh data for', venue.name);
 
     // Step 1: Get place_id if not cached
     let placeId = venue.google_place_id;
@@ -97,8 +100,8 @@ serve(async (req) => {
       placeId = findPlaceData.candidates[0].place_id;
     }
 
-    // Step 2: Get place details with opening hours
-    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=opening_hours&key=${googleApiKey}`;
+    // Step 2: Get place details with opening hours, photos, and rating
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=opening_hours,photos,rating,user_ratings_total&key=${googleApiKey}`;
     
     const detailsResponse = await fetch(detailsUrl);
     const detailsData = await detailsResponse.json();
@@ -111,11 +114,43 @@ serve(async (req) => {
       );
     }
 
-    const openingHours = detailsData.result?.opening_hours?.periods;
+    const result = detailsData.result;
+    const openingHours = result?.opening_hours?.periods;
+    const photos = result?.photos || [];
+    const rating = result?.rating;
+    const userRatingsTotal = result?.user_ratings_total;
+
+    // Build photo URLs from references (max 10)
+    const photoUrls = photos.slice(0, 10).map((photo: any) => {
+      return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photo.photo_reference}&key=${googleApiKey}`;
+    });
+
     if (!openingHours) {
       console.log('No operating hours available for', venue.name);
+      // Still update photos and rating even if no hours
+      const { error: updateError } = await supabase
+        .from('venues')
+        .update({
+          google_place_id: placeId,
+          google_rating: rating || null,
+          google_user_ratings_total: userRatingsTotal || null,
+          google_photo_refs: photoUrls.length > 0 ? photoUrls : null,
+          hours_last_updated: new Date().toISOString()
+        })
+        .eq('id', venueId);
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+      }
+
       return new Response(
-        JSON.stringify({ success: true, operating_hours: null }),
+        JSON.stringify({ 
+          success: true, 
+          operating_hours: null,
+          google_rating: rating || null,
+          google_user_ratings_total: userRatingsTotal || null,
+          google_photo_refs: photoUrls.length > 0 ? photoUrls : null
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -142,12 +177,15 @@ serve(async (req) => {
       };
     }
 
-    // Step 4: Update venue record
+    // Step 4: Update venue record with all data
     const { error: updateError } = await supabase
       .from('venues')
       .update({
         google_place_id: placeId,
         operating_hours: operatingHours,
+        google_rating: rating || null,
+        google_user_ratings_total: userRatingsTotal || null,
+        google_photo_refs: photoUrls.length > 0 ? photoUrls : null,
         hours_last_updated: new Date().toISOString()
       })
       .eq('id', venueId);
@@ -156,12 +194,15 @@ serve(async (req) => {
       console.error('Update error:', updateError);
     }
 
-    console.log('Successfully fetched and stored hours for', venue.name);
+    console.log('Successfully fetched and stored data for', venue.name);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         operating_hours: operatingHours,
+        google_rating: rating || null,
+        google_user_ratings_total: userRatingsTotal || null,
+        google_photo_refs: photoUrls.length > 0 ? photoUrls : null,
         cached: false 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
