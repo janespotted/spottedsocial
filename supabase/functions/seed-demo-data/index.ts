@@ -77,14 +77,8 @@ const LA_VENUES = [
   { name: "Adults Only", lat: 34.0448, lng: -118.2486, rank: 32 },
 ];
 
-// Non-promoted demo venues (only for full demo mode)
-const DEMO_VENUES = [
-  { name: 'Silo', lat: 40.7489, lng: -73.9680 },
-  { name: 'Output', lat: 40.7234, lng: -73.9567 },
-  { name: 'Marquee New York', lat: 40.7412, lng: -73.9971 },
-  { name: 'Lavo NYC', lat: 40.7584, lng: -73.9701 },
-  { name: 'Tao Downtown', lat: 40.7403, lng: -74.0068 },
-];
+// REMOVED: DEMO_VENUES - these don't exist in the database
+// All posts/stories/yaps now use only SELECTED_VENUES (real DB venues) for proper city filtering
 
 const DEMO_USERS = [
   { display_name: 'Alex Rivera', username: 'alex_spotted', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex', bio: 'NYC nightlife enthusiast 🌃' },
@@ -897,13 +891,12 @@ Deno.serve(async (req) => {
 
       await supabaseAdmin.from('checkins').insert(checkins);
 
-      // 7. Create posts with promoted venues
+      // 7. Create posts with real venues from database
       const posts = [];
       for (let i = 0; i < 60; i++) {
         const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
-        const usePromoted = Math.random() < 0.75;
-        const venuePool = usePromoted ? SELECTED_VENUES : DEMO_VENUES;
-        const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
+        // Always use SELECTED_VENUES (real DB venues) for proper city filtering
+        const venue = SELECTED_VENUES[Math.floor(Math.random() * SELECTED_VENUES.length)];
         const venueId = venueIdMap.get(venue.name);
         const caption = DEMO_CAPTIONS[Math.floor(Math.random() * DEMO_CAPTIONS.length)];
         
@@ -920,7 +913,7 @@ Deno.serve(async (req) => {
           expires_at: calculateExpiryTime(),
           created_at: getRecentTimestamp(4),
           is_demo: true,
-          is_promoted: usePromoted,
+          is_promoted: false,
         });
       }
       await supabaseAdmin.from('posts').insert(posts);
@@ -999,7 +992,7 @@ Deno.serve(async (req) => {
       }
 
       // 7. Create yap messages with scores and handles
-      const hottestVenues = getRandomItems([...SELECTED_VENUES, ...DEMO_VENUES], 10);
+      const hottestVenues = getRandomItems([...SELECTED_VENUES], 10);
       const yapMessages = [];
 
       for (let i = 0; i < 40; i++) {
@@ -1090,7 +1083,7 @@ Deno.serve(async (req) => {
       // 8. Create stories for demo users
       const storyUsers = getRandomItems(demoUserIds, 15); // 15 users with stories
       const stories = [];
-      const storyVenues = getRandomItems([...SELECTED_VENUES, ...DEMO_VENUES], 10);
+      const storyVenues = getRandomItems([...SELECTED_VENUES], 10);
       
       for (const userId of storyUsers) {
         const numStories = 1 + Math.floor(Math.random() * 3); // 1-3 stories per user
@@ -1264,7 +1257,7 @@ Deno.serve(async (req) => {
             stories: stories.length,
             yaps: yapMessages.length,
             threads: threadCount,
-            venues: SELECTED_VENUES.length + DEMO_VENUES.length,
+            venues: SELECTED_VENUES.length,
             activeUsers: nightStatuses.length,
             city: city,
           }

@@ -50,6 +50,7 @@ export interface StoryUser {
 interface UseFeedOptions {
   userId: string | undefined;
   demoEnabled: boolean;
+  city?: string; // 'nyc' | 'la' for filtering posts/stories by venue city
   onCachePosts?: (posts: Post[]) => void;
   onCacheFriends?: (friends: Friend[]) => void;
   onCacheStories?: (stories: StoryUser[]) => void;
@@ -59,7 +60,7 @@ interface UseFeedOptions {
 }
 
 export function useFeed(options: UseFeedOptions) {
-  const { userId, demoEnabled, onCachePosts, onCacheFriends, onCacheStories, getCachedPosts, getCachedFriends, getCachedStories } = options;
+  const { userId, demoEnabled, city, onCachePosts, onCacheFriends, onCacheStories, getCachedPosts, getCachedFriends, getCachedStories } = options;
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -126,6 +127,15 @@ export function useFeed(options: UseFeedOptions) {
     if (!userId) return;
 
     try {
+      // Get venues for the user's city (for filtering)
+      const { data: cityVenues } = await supabase
+        .from('venues')
+        .select('id, name')
+        .eq('city', city || 'nyc');
+      
+      const cityVenueIds = new Set(cityVenues?.map(v => v.id) || []);
+      const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
+
       const { data: friendships } = await supabase
         .from('friendships')
         .select('friend_id')
@@ -156,13 +166,22 @@ export function useFeed(options: UseFeedOptions) {
 
       const { data } = await query;
 
-      const postsList = data || [];
-      setPosts(postsList);
-      onCachePosts?.(postsList);
+      // Filter posts by city: include if venue_id matches OR venue_name matches
+      const filteredPosts = (data || []).filter(post => {
+        // If post has a venue_id that matches city venues, include it
+        if (post.venue_id && cityVenueIds.has(post.venue_id)) return true;
+        // If post has a venue_name that matches city venue names, include it
+        if (post.venue_name && cityVenueNames.has(post.venue_name.toLowerCase())) return true;
+        // Exclude posts without venue info or from other cities
+        return false;
+      });
+
+      setPosts(filteredPosts);
+      onCachePosts?.(filteredPosts);
 
       // Fetch user's likes for these posts
-      if (postsList.length > 0) {
-        const postIds = postsList.map(p => p.id);
+      if (filteredPosts.length > 0) {
+        const postIds = filteredPosts.map(p => p.id);
         const { data: likes } = await supabase
           .from('post_likes')
           .select('post_id')
@@ -177,12 +196,20 @@ export function useFeed(options: UseFeedOptions) {
       const cached = getCachedPosts?.();
       if (cached) setPosts(cached);
     }
-  }, [userId, demoEnabled, onCachePosts, getCachedPosts]);
+  }, [userId, demoEnabled, city, onCachePosts, getCachedPosts]);
 
   const fetchStories = useCallback(async () => {
     if (!userId) return;
 
     try {
+      // Get venues for the user's city (for filtering)
+      const { data: cityVenues } = await supabase
+        .from('venues')
+        .select('id, name')
+        .eq('city', city || 'nyc');
+      
+      const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
+
       const { data: friendships } = await supabase
         .from('friendships')
         .select('friend_id')
@@ -197,6 +224,7 @@ export function useFeed(options: UseFeedOptions) {
         .select(`
           id,
           user_id,
+          venue_name,
           profiles:user_id (
             display_name,
             avatar_url
@@ -217,20 +245,26 @@ export function useFeed(options: UseFeedOptions) {
         return;
       }
 
+      // Filter stories by city venue names
+      const filteredStories = stories.filter(story => {
+        if (!story.venue_name) return true; // Include stories without venue
+        return cityVenueNames.has(story.venue_name.toLowerCase());
+      });
+
       // Fetch story views for current user
-      const storyIds = stories.map(s => s.id);
-      const { data: views } = await supabase
+      const storyIds = filteredStories.map(s => s.id);
+      const { data: views } = storyIds.length > 0 ? await supabase
         .from('story_views')
         .select('story_id')
         .eq('user_id', userId)
-        .in('story_id', storyIds);
+        .in('story_id', storyIds) : { data: [] };
 
       const viewedStoryIds = new Set(views?.map(v => v.story_id) || []);
 
       // Group stories by user
       const userStoryMap = new Map<string, { profile: any; stories: any[]; hasUnviewed: boolean }>();
 
-      stories.forEach(story => {
+      filteredStories.forEach(story => {
         const storyUserId = story.user_id;
         if (!userStoryMap.has(storyUserId)) {
           userStoryMap.set(storyUserId, {
@@ -267,7 +301,7 @@ export function useFeed(options: UseFeedOptions) {
       const cached = getCachedStories?.();
       if (cached) setStoryUsers(cached);
     }
-  }, [userId, demoEnabled, onCacheStories, getCachedStories]);
+  }, [userId, demoEnabled, city, onCacheStories, getCachedStories]);
 
   const fetchComments = useCallback(async (postId: string) => {
     const { data } = await supabase
