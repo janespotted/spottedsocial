@@ -11,6 +11,7 @@ interface VenueInviteContextType {
   venueName: string | null;
   venueId: string | null;
   openInviteModal: (venueId: string, venueName: string) => void;
+  closeInviteModal: () => void;
   sendInvites: (selectedFriends: Array<{ id: string; displayName: string; avatarUrl: string | null }>) => Promise<void>;
   closeConfirmation: () => void;
 }
@@ -29,6 +30,10 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
     setVenueId(venueId);
     setVenueName(venueName);
     setShowInviteModal(true);
+  };
+
+  const closeInviteModal = () => {
+    setShowInviteModal(false);
   };
 
   const sendInvites = async (selectedFriends: Array<{ id: string; displayName: string; avatarUrl: string | null }>) => {
@@ -86,7 +91,8 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
         invitedFriends, 
         venueName,
         venueId,
-        openInviteModal, 
+        openInviteModal,
+        closeInviteModal,
         sendInvites, 
         closeConfirmation 
       }}

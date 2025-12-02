@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { X } from 'lucide-react';
 
 interface Friend {
   id: string;
@@ -16,7 +15,7 @@ interface Friend {
 }
 
 export function InviteFriendsModal() {
-  const { showInviteModal, sendInvites, venueName } = useVenueInvite();
+  const { showInviteModal, closeInviteModal, sendInvites, venueName } = useVenueInvite();
   const { user } = useAuth();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
@@ -84,21 +83,18 @@ export function InviteFriendsModal() {
   };
 
   return (
-    <Dialog open={showInviteModal} onOpenChange={() => setSelectedFriends(new Set())}>
+    <Dialog open={showInviteModal} onOpenChange={(open) => {
+      if (!open) {
+        closeInviteModal();
+        setSelectedFriends(new Set());
+      }
+    }}>
       <DialogContent className="w-[90%] max-w-[400px] max-h-[80vh] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
         <div className="p-5">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-white">Invite Friends</h2>
-              <p className="text-sm text-white/60">to {venueName}</p>
-            </div>
-            <button
-              onClick={() => setSelectedFriends(new Set())}
-              className="text-white/60 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-white">Invite Friends</h2>
+            <p className="text-sm text-white/60">to {venueName}</p>
           </div>
 
           {/* Friends List */}
