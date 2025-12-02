@@ -56,10 +56,13 @@ export function FriendIdCard() {
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
   const [statusSubtitle, setStatusSubtitle] = useState<string>('');
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [isDemoUser, setIsDemoUser] = useState(false);
 
   useEffect(() => {
     if (selectedFriend && user) {
       console.log('Friend ID Card opened for:', selectedFriend);
+      // Check if this is a demo user
+      checkIfDemoUser();
       if (demoEnabled) {
         // In demo mode, use the provided venue directly
         setStatusSubtitle(selectedFriend.venueName || '');
@@ -75,8 +78,19 @@ export function FriendIdCard() {
       setDistance(null);
       setUserStatus(null);
       setStatusSubtitle('');
+      setIsDemoUser(false);
     }
   }, [selectedFriend, demoEnabled]);
+
+  const checkIfDemoUser = async () => {
+    if (!selectedFriend) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('is_demo')
+      .eq('id', selectedFriend.userId)
+      .single();
+    setIsDemoUser(data?.is_demo || false);
+  };
 
   // Calculate distance when we have both locations
   useEffect(() => {
@@ -437,21 +451,23 @@ export function FriendIdCard() {
                   </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex items-center gap-2 flex-1">
-                  <button
-                    onClick={handleMeetUp}
-                    className="flex-1 py-2 px-5 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors"
-                  >
-                    Meet Up
-                  </button>
-                  <button
-                    onClick={handleOpenDM}
-                    className="p-2 rounded-full bg-transparent border-2 border-white/20 text-white hover:bg-white/10 transition-colors"
-                  >
-                   <MessageCircle className="h-5 w-5" />
-                  </button>
-                </div>
+                {/* Action Buttons - Hidden for demo users in bootstrap mode */}
+                {!isDemoUser && (
+                  <div className="flex items-center gap-2 flex-1">
+                    <button
+                      onClick={handleMeetUp}
+                      className="flex-1 py-2 px-5 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors"
+                    >
+                      Meet Up
+                    </button>
+                    <button
+                      onClick={handleOpenDM}
+                      className="p-2 rounded-full bg-transparent border-2 border-white/20 text-white hover:bg-white/10 transition-colors"
+                    >
+                     <MessageCircle className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

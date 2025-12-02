@@ -48,11 +48,12 @@ export function InviteFriendsModal() {
 
       const friendIds = friendships.map(f => f.friend_id);
 
-      // Fetch friend profiles
+      // Fetch friend profiles (exclude demo users in bootstrap mode)
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, display_name, avatar_url')
         .in('id', friendIds)
+        .eq('is_demo', false) // Bootstrap mode: only real users
         .order('display_name', { ascending: true });
 
       setFriends(profiles || []);

@@ -212,7 +212,8 @@ export function VenueIdCard() {
             const { data: profiles } = await supabase
               .from('profiles')
               .select('id, display_name, avatar_url')
-              .in('id', friendsAtVenueIds);
+              .in('id', friendsAtVenueIds)
+              .eq('is_demo', false); // Bootstrap mode: only real users
 
             setFriendsAtVenue(profiles || []);
           } else {

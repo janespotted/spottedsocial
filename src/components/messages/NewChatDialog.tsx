@@ -66,11 +66,12 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
 
     const friendIds = friendships.map(f => f.friend_id);
 
-    // Get friend profiles
+    // Get friend profiles (exclude demo users in bootstrap mode)
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, display_name, username, avatar_url')
-      .in('id', friendIds);
+      .in('id', friendIds)
+      .eq('is_demo', false); // Bootstrap mode: only real users
 
     if (!profiles) return;
 

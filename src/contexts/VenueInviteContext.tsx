@@ -40,6 +40,22 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
     if (!user || !venueName || selectedFriends.length === 0) return;
 
     try {
+      // Bootstrap mode protection: filter out any demo users
+      const friendIds = selectedFriends.map(f => f.id);
+      const { data: realProfiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .in('id', friendIds)
+        .eq('is_demo', false);
+
+      const realFriendIds = new Set(realProfiles?.map(p => p.id) || []);
+      const filteredFriends = selectedFriends.filter(f => realFriendIds.has(f.id));
+
+      if (filteredFriends.length === 0) {
+        toast.error('No valid recipients selected');
+        return;
+      }
+
       // Get current user's profile for first name
       const { data: profile } = await supabase
         .from('profiles')
@@ -49,8 +65,8 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
 
       const senderFirstName = profile?.display_name.split(' ')[0] || 'Someone';
 
-      // Send notification to each selected friend
-      const notifications = selectedFriends.map(friend => ({
+      // Send notification to each filtered friend (real users only)
+      const notifications = filteredFriends.map(friend => ({
         sender_id: user.id,
         receiver_id: friend.id,
         type: 'venue_invite',
@@ -65,7 +81,7 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
 
       // Close modal and show confirmation
       setShowInviteModal(false);
-      setInvitedFriends(selectedFriends);
+      setInvitedFriends(filteredFriends);
       setShowConfirmation(true);
       
       // Success haptic
