@@ -7,6 +7,7 @@ import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { useFeed } from '@/hooks/useFeed';
 import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
+import { useUserCity } from '@/hooks/useUserCity';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell } from 'lucide-react';
@@ -36,6 +37,7 @@ export default function Feed() {
   const demoEnabled = useDemoMode();
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
+  const { city } = useUserCity();
   useAutoVenueTracking();
 
   const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends, cacheStories, getCachedStories } = useOfflineCache();
@@ -61,6 +63,7 @@ export default function Feed() {
   } = useFeed({
     userId: user?.id,
     demoEnabled,
+    city,
     onCachePosts: cachePosts,
     onCacheFriends: cacheFriends,
     onCacheStories: cacheStories,
