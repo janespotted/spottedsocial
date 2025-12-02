@@ -418,7 +418,10 @@ export default function Map() {
       </div>
     `;
 
-    userMarkerRef.current = new mapboxgl.Marker(el)
+    userMarkerRef.current = new mapboxgl.Marker({ 
+      element: el, 
+      anchor: 'center' 
+    })
       .setLngLat([userLocation.lng, userLocation.lat])
       .addTo(map.current);
   }, [userLocation]);
@@ -444,7 +447,6 @@ export default function Map() {
       el.style.width = '60px';
       el.style.height = '60px';
       el.style.cursor = 'pointer';
-      el.style.position = 'relative';
       
       // Determine ring color and badge based on relationship type
       const ringColors = {
@@ -485,7 +487,10 @@ export default function Map() {
         openFriendCard(friendCardData);
       });
 
-      const marker = new mapboxgl.Marker(el)
+      const marker = new mapboxgl.Marker({ 
+        element: el, 
+        anchor: 'center' 
+      })
         .setLngLat([friend.lng, friend.lat])
         .addTo(map.current!);
 
@@ -530,7 +535,10 @@ export default function Map() {
         openVenueCard(venue.id);
       });
 
-      const marker = new mapboxgl.Marker(el)
+      const marker = new mapboxgl.Marker({ 
+        element: el, 
+        anchor: 'center' 
+      })
         .setLngLat([venue.lng, venue.lat])
         .addTo(map.current!);
 
