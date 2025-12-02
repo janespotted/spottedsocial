@@ -595,6 +595,96 @@ Deno.serve(async (req) => {
       const SELECTED_VENUES = city === 'la' ? LA_VENUES : NYC_VENUES;
       const SELECTED_REVIEWS = city === 'la' ? LA_VENUE_SPECIFIC_REVIEWS : VENUE_SPECIFIC_REVIEWS;
       
+      // Clean up existing demo data before seeding
+      console.log('Cleaning up existing demo data...');
+      const { data: existingDemoProfiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('is_demo', true);
+      const existingDemoIds = existingDemoProfiles?.map(p => p.id) || [];
+
+      if (existingDemoIds.length > 0) {
+        // Delete DM-related data first
+        const { data: demoThreads } = await supabaseAdmin
+          .from('dm_thread_members')
+          .select('thread_id')
+          .in('user_id', existingDemoIds);
+        const threadIds = [...new Set(demoThreads?.map(t => t.thread_id) || [])];
+        
+        if (threadIds.length > 0) {
+          await supabaseAdmin.from('dm_messages').delete().in('thread_id', threadIds);
+          await supabaseAdmin.from('dm_thread_members').delete().in('thread_id', threadIds);
+          await supabaseAdmin.from('dm_threads').delete().in('id', threadIds);
+        }
+
+        // Delete post-related data
+        const { data: demoPosts } = await supabaseAdmin
+          .from('posts')
+          .select('id')
+          .eq('is_demo', true);
+        const postIds = demoPosts?.map(p => p.id) || [];
+        
+        if (postIds.length > 0) {
+          await supabaseAdmin.from('post_likes').delete().in('post_id', postIds);
+          await supabaseAdmin.from('post_comments').delete().in('post_id', postIds);
+        }
+        await supabaseAdmin.from('posts').delete().eq('is_demo', true);
+
+        // Delete yap-related data
+        const { data: demoYaps } = await supabaseAdmin
+          .from('yap_messages')
+          .select('id')
+          .eq('is_demo', true);
+        const yapIds = demoYaps?.map(y => y.id) || [];
+        
+        if (yapIds.length > 0) {
+          const { data: demoYapComments } = await supabaseAdmin
+            .from('yap_comments')
+            .select('id')
+            .eq('is_demo', true);
+          const yapCommentIds = demoYapComments?.map(c => c.id) || [];
+          
+          if (yapCommentIds.length > 0) {
+            await supabaseAdmin.from('yap_comment_votes').delete().in('comment_id', yapCommentIds);
+          }
+          await supabaseAdmin.from('yap_comments').delete().eq('is_demo', true);
+          await supabaseAdmin.from('yap_votes').delete().in('yap_id', yapIds);
+        }
+        await supabaseAdmin.from('yap_messages').delete().eq('is_demo', true);
+
+        // Delete story-related data
+        await supabaseAdmin.from('story_views').delete().in('user_id', existingDemoIds);
+        await supabaseAdmin.from('stories').delete().eq('is_demo', true);
+
+        // Delete venue reviews
+        const { data: demoReviews } = await supabaseAdmin
+          .from('venue_reviews')
+          .select('id')
+          .in('user_id', existingDemoIds);
+        const reviewIds = demoReviews?.map(r => r.id) || [];
+        
+        if (reviewIds.length > 0) {
+          await supabaseAdmin.from('review_votes').delete().in('review_id', reviewIds);
+        }
+        await supabaseAdmin.from('venue_reviews').delete().in('user_id', existingDemoIds);
+
+        // Delete location-related data
+        await supabaseAdmin.from('checkins').delete().eq('is_demo', true);
+        await supabaseAdmin.from('night_statuses').delete().eq('is_demo', true);
+
+        // Delete friendships
+        await supabaseAdmin.from('close_friends').delete().in('user_id', existingDemoIds);
+        await supabaseAdmin.from('close_friends').delete().in('close_friend_id', existingDemoIds);
+        await supabaseAdmin.from('friendships').delete().in('user_id', existingDemoIds);
+        await supabaseAdmin.from('friendships').delete().in('friend_id', existingDemoIds);
+      }
+
+      // Delete demo venues and profiles last
+      await supabaseAdmin.from('venues').delete().eq('is_demo', true);
+      await supabaseAdmin.from('profiles').delete().eq('is_demo', true);
+      
+      console.log('Cleanup complete. Starting fresh seed...');
+      
       const demoUserIds: string[] = [];
       const DEMO_USER_COUNT = 50; // Create 50 users for better venue distribution
 
