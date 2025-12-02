@@ -8,6 +8,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { MapPin, Plus, Check, Star, Pencil, ChevronDown, Clock } from 'lucide-react';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
@@ -68,6 +69,9 @@ export function VenueIdCard() {
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [venueHours, setVenueHours] = useState<VenueHoursDisplay | null>(null);
   const [loadingHours, setLoadingHours] = useState(false);
+  const [googlePhotos, setGooglePhotos] = useState<string[]>([]);
+  const [googleRating, setGoogleRating] = useState<number | null>(null);
+  const [googleRatingsCount, setGoogleRatingsCount] = useState<number>(0);
 
   useEffect(() => {
     if (selectedVenueId) {
@@ -97,6 +101,25 @@ export function VenueIdCard() {
         setVenueHours(hoursDisplay);
       } else {
         setVenueHours(null);
+      }
+
+      // Set Google data
+      if (data?.google_photo_refs && Array.isArray(data.google_photo_refs)) {
+        setGooglePhotos(data.google_photo_refs);
+      } else {
+        setGooglePhotos([]);
+      }
+
+      if (data?.google_rating) {
+        setGoogleRating(data.google_rating);
+      } else {
+        setGoogleRating(null);
+      }
+
+      if (data?.google_user_ratings_total) {
+        setGoogleRatingsCount(data.google_user_ratings_total);
+      } else {
+        setGoogleRatingsCount(0);
       }
     } catch (error) {
       console.error('Error fetching venue hours:', error);
@@ -327,83 +350,112 @@ export function VenueIdCard() {
         >
           <ScrollArea className="max-h-[85vh]">
             <div className="p-5">
-              {/* Top Row: Image + Info */}
-              <div className="flex gap-4 mb-4">
-                {/* Venue Image */}
-                <div className="relative flex-shrink-0">
-                  <div className="w-24 h-24 rounded-xl overflow-hidden bg-gradient-to-br from-[#a855f7]/20 to-[#d4ff00]/20 border border-[#a855f7]/30">
-                    {/* Placeholder gradient - replace with actual venue image when available */}
-                    <div className="w-full h-full bg-gradient-to-br from-[#a855f7]/40 to-[#d4ff00]/40" />
-                  </div>
-                  {/* Wishlist toggle button */}
+              {/* Photo Carousel */}
+              {googlePhotos.length > 0 ? (
+                <div className="relative mb-4 -mx-5 -mt-5">
+                  <Carousel className="w-full">
+                    <CarouselContent>
+                      {googlePhotos.map((photoUrl, index) => (
+                        <CarouselItem key={index}>
+                          <div className="relative w-full h-56 overflow-hidden">
+                            <img
+                              src={photoUrl}
+                              alt={`${venue.name} photo ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    {googlePhotos.length > 1 && (
+                      <>
+                        <CarouselPrevious className="left-2 bg-white/90 hover:bg-white border-none" />
+                        <CarouselNext className="right-2 bg-white/90 hover:bg-white border-none" />
+                      </>
+                    )}
+                  </Carousel>
+                  {/* Wishlist toggle button overlaid on carousel */}
                   <button
                     onClick={handleWishlistToggle}
-                    className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-[#d4ff00] border-2 border-[#2d1b4e] flex items-center justify-center shadow-[0_0_15px_rgba(212,255,0,0.6)] hover:scale-110 transition-transform"
+                    className="absolute top-3 right-3 w-10 h-10 rounded-full bg-[#d4ff00] border-2 border-[#2d1b4e] flex items-center justify-center shadow-[0_0_15px_rgba(212,255,0,0.6)] hover:scale-110 transition-transform z-10"
                     aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
                   >
                     {isInWishlist ? (
-                      <Check className="w-4 h-4 text-[#2d1b4e]" />
+                      <Check className="w-5 h-5 text-[#2d1b4e]" />
                     ) : (
-                      <Plus className="w-4 h-4 text-[#2d1b4e]" />
+                      <Plus className="w-5 h-5 text-[#2d1b4e]" />
                     )}
                   </button>
                 </div>
+              ) : (
+                /* Fallback gradient if no photos */
+                <div className="relative mb-4 -mx-5 -mt-5">
+                  <div className="w-full h-56 bg-gradient-to-br from-[#a855f7]/40 to-[#d4ff00]/40" />
+                  {/* Wishlist toggle button */}
+                  <button
+                    onClick={handleWishlistToggle}
+                    className="absolute top-3 right-3 w-10 h-10 rounded-full bg-[#d4ff00] border-2 border-[#2d1b4e] flex items-center justify-center shadow-[0_0_15px_rgba(212,255,0,0.6)] hover:scale-110 transition-transform"
+                    aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                  >
+                    {isInWishlist ? (
+                      <Check className="w-5 h-5 text-[#2d1b4e]" />
+                    ) : (
+                      <Plus className="w-5 h-5 text-[#2d1b4e]" />
+                    )}
+                  </button>
+                </div>
+              )}
 
-                {/* Venue Info */}
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-2xl font-bold text-white mb-1 truncate">
+              {/* Venue Info */}
+              <div className="mb-4">
+                <div className="flex items-start justify-between mb-2">
+                  <h2 className="text-2xl font-bold text-white flex-1">
                     {venue.name}
                   </h2>
-                  <p className="text-sm text-white/60 italic">
-                    {venue.neighborhood} ({distance} miles)
-                  </p>
-                  
-                  {/* Operating Hours Status */}
-                  {venueHours && !loadingHours && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        venueHours.isOpen 
-                          ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                      }`}>
-                        {venueHours.isOpen ? 'Open' : 'Closed'}
-                      </span>
-                      <span className="text-xs text-white/50 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {venueHours.displayText}
-                      </span>
-                    </div>
-                  )}
-                  {loadingHours && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-xs text-white/40">Checking hours...</span>
-                    </div>
-                  )}
-                  {/* Average Rating */}
-                  {reviews.length > 0 && (
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-4 h-4 ${
-                              i < Math.round(averageRating)
-                                ? 'text-[#d4ff00] fill-[#d4ff00]'
-                                : 'text-white/20'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm text-white/70">
-                        {averageRating.toFixed(1)} ({reviews.length})
-                      </span>
-                    </div>
-                  )}
                 </div>
+
+                <p className="text-sm text-white/60 italic mb-2">
+                  {venue.neighborhood} ({distance} miles)
+                </p>
+
+                {/* Google Rating */}
+                {googleRating && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <Star className="w-4 h-4 text-[#d4ff00] fill-[#d4ff00]" />
+                    <span className="text-white font-medium">
+                      {googleRating.toFixed(1)}
+                    </span>
+                    <span className="text-white/50 text-sm">
+                      on Google ({googleRatingsCount.toLocaleString()})
+                    </span>
+                  </div>
+                )}
+                
+                {/* Operating Hours Status */}
+                {venueHours && !loadingHours && (
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      venueHours.isOpen 
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                        : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                    }`}>
+                      {venueHours.isOpen ? 'Open' : 'Closed'}
+                    </span>
+                    <span className="text-xs text-white/50 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {venueHours.displayText}
+                    </span>
+                  </div>
+                )}
+                {loadingHours && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-white/40">Checking hours...</span>
+                  </div>
+                )}
               </div>
 
-              {/* Bottom Row: Friends + Map Pin */}
-              <div className="flex items-center justify-between mb-4">
+              {/* Friends + Map Pin */}
+              <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#a855f7]/20">
                 {/* Friend Avatars */}
                 <div className="flex items-center gap-2">
                   {friendsAtVenue.length > 0 ? (
@@ -451,7 +503,7 @@ export function VenueIdCard() {
               </div>
 
               {/* Reviews Section */}
-              <div className="border-t border-[#a855f7]/20 pt-4">
+              <div>
                 <Collapsible open={reviewsOpen} onOpenChange={setReviewsOpen}>
                   <CollapsibleTrigger className="w-full group">
                     <div className="flex items-center justify-between p-3 rounded-lg bg-[#a855f7]/5 hover:bg-[#a855f7]/10 transition-colors">
