@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useVenueInvite } from '@/contexts/VenueInviteContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { MapPin, Plus, Check, ChevronDown } from 'lucide-react';
+import { MapPin, Plus, Check, ChevronDown, UserPlus } from 'lucide-react';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -57,6 +58,7 @@ interface UserVote {
 export function VenueIdCard() {
   const { selectedVenueId, closeVenueCard, openVenueCard } = useVenueIdCard();
   const { openFriendCard } = useFriendIdCard();
+  const { openInviteModal } = useVenueInvite();
   const { user } = useAuth();
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendAtVenue[]>([]);
@@ -500,42 +502,50 @@ export function VenueIdCard() {
               </div>
 
               {/* Friends at Venue - HERO SECTION */}
-              {friendsAtVenue.length > 0 ? (
-                <div className="mb-4 p-4 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/40">
-                  <div className="flex -space-x-2">
-                    {visibleFriends.map((friend) => (
-                      <button
-                        key={friend.id}
-                        onClick={() => openFriendCard({
-                          userId: friend.id,
-                          displayName: friend.display_name,
-                          avatarUrl: friend.avatar_url,
-                          venueName: venue.name,
-                          lat: venue.lat,
-                          lng: venue.lng,
-                        })}
-                        className="hover:scale-110 transition-transform"
-                      >
-                        <Avatar className="w-10 h-10 border-2 border-[#2d1b4e]">
-                          <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
-                          <AvatarFallback className="bg-[#a855f7] text-white">
-                            {friend.display_name[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                      </button>
-                    ))}
-                    {remainingCount > 0 && (
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#a855f7]/30 border-2 border-[#2d1b4e] text-xs text-white">
-                        +{remainingCount}
-                      </div>
-                    )}
-                  </div>
+              <div className="mb-4 p-4 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/40">
+                <div className="flex items-center gap-2">
+                  {/* Friend avatars (if any) */}
+                  {friendsAtVenue.length > 0 && (
+                    <div className="flex -space-x-2">
+                      {visibleFriends.map((friend) => (
+                        <button
+                          key={friend.id}
+                          onClick={() => openFriendCard({
+                            userId: friend.id,
+                            displayName: friend.display_name,
+                            avatarUrl: friend.avatar_url,
+                            venueName: venue.name,
+                            lat: venue.lat,
+                            lng: venue.lng,
+                          })}
+                          className="hover:scale-110 transition-transform"
+                        >
+                          <Avatar className="w-10 h-10 border-2 border-[#2d1b4e]">
+                            <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                            <AvatarFallback className="bg-[#a855f7] text-white">
+                              {friend.display_name[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                        </button>
+                      ))}
+                      {remainingCount > 0 && (
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#a855f7]/30 border-2 border-[#2d1b4e] text-xs text-white">
+                          +{remainingCount}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Invite Friends Here Button - Always visible */}
+                  <button
+                    onClick={() => openInviteModal(venue.id, venue.name)}
+                    className="h-10 px-4 rounded-full bg-[#a855f7]/20 border border-[#a855f7]/40 text-[#a855f7] text-sm font-medium hover:bg-[#a855f7]/30 transition-all flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Invite Friends Here
+                  </button>
                 </div>
-              ) : (
-                <div className="mb-4 p-3 bg-[#2d1b4e]/30 rounded-xl border border-[#a855f7]/20">
-                  <p className="text-sm text-white/50 text-center">No friends here yet</p>
-                </div>
-              )}
+              </div>
 
               {/* Tonight's Buzz Section */}
               <Collapsible open={reviewsOpen} onOpenChange={setReviewsOpen}>
