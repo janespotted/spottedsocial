@@ -546,48 +546,54 @@ export function VenueIdCard() {
                 </div>
               </div>
 
-              {/* Friends at Venue - HERO SECTION */}
-              <div className="mb-4 p-4 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/40">
-                <div className="flex items-center gap-2">
-                  {/* Friend avatars (if any) */}
-                  {friendsAtVenue.length > 0 && (
-                    <div className="flex -space-x-2">
-                      {visibleFriends.map((friend) => (
-                        <button
-                          key={friend.id}
-                          onClick={() => openFriendCard({
-                            userId: friend.id,
-                            displayName: friend.display_name,
-                            avatarUrl: friend.avatar_url,
-                            venueName: venue.name,
-                            lat: venue.lat,
-                            lng: venue.lng,
-                          })}
-                          className="hover:scale-110 transition-transform"
-                        >
-                          <Avatar className="w-10 h-10 border-2 border-[#2d1b4e]">
-                            <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
-                            <AvatarFallback className="bg-[#a855f7] text-white">
-                              {friend.display_name[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                        </button>
-                      ))}
-                      {remainingCount > 0 && (
-                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#a855f7]/30 border-2 border-[#2d1b4e] text-xs text-white">
-                          +{remainingCount}
+              {/* Friends at Venue - Clean layout */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {friendsAtVenue.length > 0 ? (
+                      <>
+                        <div className="flex -space-x-2">
+                          {visibleFriends.map((friend) => (
+                            <button
+                              key={friend.id}
+                              onClick={() => openFriendCard({
+                                userId: friend.id,
+                                displayName: friend.display_name,
+                                avatarUrl: friend.avatar_url,
+                                venueName: venue.name,
+                                lat: venue.lat,
+                                lng: venue.lng,
+                              })}
+                              className="hover:scale-110 transition-transform"
+                            >
+                              <Avatar className="w-10 h-10 border-2 border-[#0a0118]">
+                                <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                                <AvatarFallback className="bg-[#a855f7] text-white">
+                                  {friend.display_name[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                            </button>
+                          ))}
+                          {remainingCount > 0 && (
+                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#a855f7]/30 border-2 border-[#0a0118] text-xs text-white">
+                              +{remainingCount}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Invite Friends Here Button - Always visible */}
+                        <span className="text-sm text-white/60">
+                          {friendsAtVenue.length} friend{friendsAtVenue.length !== 1 ? 's' : ''} here
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-sm text-white/50">No friends here yet</span>
+                    )}
+                  </div>
                   <button
                     onClick={() => openInviteModal(venue.id, venue.name)}
-                    className="h-10 px-4 rounded-full bg-[#a855f7]/20 border border-[#a855f7]/40 text-[#a855f7] text-sm font-medium hover:bg-[#a855f7]/30 transition-all flex items-center gap-2 whitespace-nowrap"
+                    className="px-4 py-2 rounded-full bg-[#a855f7] text-white text-sm font-medium hover:bg-[#a855f7]/90 shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all flex items-center gap-2"
                   >
                     <UserPlus className="w-4 h-4" />
-                    Invite Friends Here
+                    Invite
                   </button>
                 </div>
               </div>
@@ -596,15 +602,14 @@ export function VenueIdCard() {
               <div className="flex gap-2 mb-4">
                 <Button
                   onClick={handleMapPinClick}
-                  className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white"
+                  className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)]"
                 >
                   <MapPin className="w-4 h-4 mr-2" />
                   Get Directions
                 </Button>
                 <Button
                   onClick={handleShareVenue}
-                  variant="outline"
-                  className="border-[#a855f7]/40 hover:bg-[#a855f7]/20 text-white"
+                  className="bg-[#a855f7]/20 hover:bg-[#a855f7]/30 text-white border border-[#a855f7]/40"
                 >
                   <Share2 className="w-4 h-4" />
                 </Button>
@@ -612,19 +617,18 @@ export function VenueIdCard() {
 
               {/* More Info - Single collapsible, closed by default */}
               <Collapsible open={moreInfoOpen} onOpenChange={setMoreInfoOpen}>
-                <CollapsibleTrigger className="w-full">
-                  <div className="flex items-center justify-between p-3 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/20 hover:bg-[#2d1b4e]/70 transition-colors">
-                    <div className="flex flex-col items-start">
-                      <h3 className="text-sm font-medium text-white">More Info</h3>
-                      <p className="text-xs text-white/50">Reviews, nearby spots & ratings</p>
+                <div className="border-t border-white/10 pt-3">
+                  <CollapsibleTrigger className="w-full">
+                    <div className="flex items-center justify-between py-2 text-white/60 hover:text-white/80 transition-colors">
+                      <span className="text-sm">More Info</span>
+                      <ChevronDown 
+                        className={`w-4 h-4 transition-transform ${
+                          moreInfoOpen ? 'rotate-180' : ''
+                        }`}
+                      />
                     </div>
-                    <ChevronDown 
-                      className={`w-5 h-5 text-white/60 transition-transform ${
-                        moreInfoOpen ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </div>
-                </CollapsibleTrigger>
+                  </CollapsibleTrigger>
+                </div>
                 <CollapsibleContent className="pt-3">
                   {/* Tonight's Buzz sub-section */}
                   <div className="mb-4">
