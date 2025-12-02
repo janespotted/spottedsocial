@@ -118,7 +118,8 @@ export default function Leaderboard() {
         is_promoted,
         profiles:user_id (
           display_name,
-          avatar_url
+          avatar_url,
+          is_demo
         ),
         venues!inner(popularity_rank, is_promoted, city, opened_at)
       `)
@@ -185,6 +186,7 @@ export default function Leaderboard() {
       const isNewlyOpened = openedAt 
         ? new Date(openedAt) > threeMonthsAgo 
         : false;
+      const isDemo = status.profiles?.is_demo || false;
       
       if (!venueMap.has(venueName)) {
         venueMap.set(venueName, {
@@ -202,12 +204,17 @@ export default function Leaderboard() {
       }
       
       const venue = venueMap.get(venueName)!;
-      venue.count++;
-      venue.friends.push({
-        user_id: status.user_id,
-        display_name: status.profiles?.display_name || 'User',
-        avatar_url: status.profiles?.avatar_url || null,
-      });
+      venue.count++; // Count ALL users (including demo) for energy calculation
+      
+      // In bootstrap mode, only show real user avatars
+      // Demo data still contributes to venue rankings/energy, but avatars are real only
+      if (!bootstrapEnabled || !isDemo) {
+        venue.friends.push({
+          user_id: status.user_id,
+          display_name: status.profiles?.display_name || 'User',
+          avatar_url: status.profiles?.avatar_url || null,
+        });
+      }
     });
 
     // Convert to array and separate promoted from non-promoted
@@ -355,8 +362,10 @@ export default function Leaderboard() {
                     {renderEnergyBars(venue.energyLevel)}
                   </div>
 
-                  {/* Friend Avatars */}
-                  <div className="flex-shrink-0 flex items-center">
+              {/* Friend Avatars */}
+              <div className="flex-shrink-0 flex items-center">
+                {venue.friends.length > 0 ? (
+                  <>
                     <div className="flex -space-x-2">
                       {venue.friends.slice(0, 3).map((friend, idx) => (
                         <button
@@ -383,7 +392,11 @@ export default function Leaderboard() {
                         +{venue.friends.length - 3}
                       </span>
                     )}
-                  </div>
+                  </>
+                ) : (
+                  <span className="text-white/40 text-xs">Be the first here tonight 👀</span>
+                )}
+              </div>
                 </div>
               </div>
             ))}
@@ -441,31 +454,37 @@ export default function Leaderboard() {
 
               {/* Friend Avatars */}
               <div className="flex-shrink-0 flex items-center">
-                <div className="flex -space-x-2">
-                  {venue.friends.slice(0, 3).map((friend, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => openFriendCard({
-                        userId: friend.user_id,
-                        displayName: friend.display_name,
-                        avatarUrl: friend.avatar_url,
-                        venueName: venue.venue_name,
-                      })}
-                      className="transition-transform hover:scale-110"
-                    >
-                      <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
-                        <AvatarImage src={friend.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
-                          {friend.display_name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    </button>
-                  ))}
-                </div>
-                {venue.friends.length > 3 && (
-                  <span className="ml-2 text-sm text-white font-medium">
-                    +{venue.friends.length - 3}
-                  </span>
+                {venue.friends.length > 0 ? (
+                  <>
+                    <div className="flex -space-x-2">
+                      {venue.friends.slice(0, 3).map((friend, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => openFriendCard({
+                            userId: friend.user_id,
+                            displayName: friend.display_name,
+                            avatarUrl: friend.avatar_url,
+                            venueName: venue.venue_name,
+                          })}
+                          className="transition-transform hover:scale-110"
+                        >
+                          <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
+                            <AvatarImage src={friend.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                              {friend.display_name[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                        </button>
+                      ))}
+                    </div>
+                    {venue.friends.length > 3 && (
+                      <span className="ml-2 text-sm text-white font-medium">
+                        +{venue.friends.length - 3}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-white/40 text-xs">Be the first here tonight 👀</span>
                 )}
               </div>
             </div>
@@ -506,31 +525,37 @@ export default function Leaderboard() {
 
               {/* Friend Avatars */}
               <div className="flex items-center">
-                <div className="flex -space-x-2">
-                  {biggestMover.friends.map((friend, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => openFriendCard({
-                        userId: friend.user_id,
-                        displayName: friend.display_name,
-                        avatarUrl: friend.avatar_url,
-                        venueName: biggestMover.venue_name,
-                      })}
-                      className="transition-transform hover:scale-110"
-                    >
-                      <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
-                        <AvatarImage src={friend.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
-                          {friend.display_name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    </button>
-                  ))}
-                </div>
-                {biggestMover.friends.length > 0 && (
-                  <span className="ml-3 text-sm text-white font-medium">
-                    +3
-                  </span>
+                {biggestMover.friends.length > 0 ? (
+                  <>
+                    <div className="flex -space-x-2">
+                      {biggestMover.friends.map((friend, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => openFriendCard({
+                            userId: friend.user_id,
+                            displayName: friend.display_name,
+                            avatarUrl: friend.avatar_url,
+                            venueName: biggestMover.venue_name,
+                          })}
+                          className="transition-transform hover:scale-110"
+                        >
+                          <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
+                            <AvatarImage src={friend.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                              {friend.display_name[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                        </button>
+                      ))}
+                    </div>
+                    {biggestMover.friends.length > 3 && (
+                      <span className="ml-3 text-sm text-white font-medium">
+                        +{biggestMover.friends.length - 3}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-white/40 text-xs">Be the first 👀</span>
                 )}
               </div>
             </div>

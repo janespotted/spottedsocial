@@ -48,6 +48,21 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      // Bootstrap mode protection: block sending to demo users
+      const { data: targetProfile } = await supabase
+        .from('profiles')
+        .select('is_demo')
+        .eq('id', userId)
+        .single();
+
+      if (targetProfile?.is_demo) {
+        toast({
+          title: "Can't send to this user",
+          description: "This is a demo profile",
+        });
+        return;
+      }
+
       // Capture fresh GPS coordinates at the moment of sending meet up
       // This also triggers auto-venue tracking
       let locationData = null;
