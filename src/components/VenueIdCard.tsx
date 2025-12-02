@@ -69,7 +69,7 @@ export function VenueIdCard() {
   const [averageRating, setAverageRating] = useState<number>(0);
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);
-  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [moreInfoOpen, setMoreInfoOpen] = useState(false);
   const [venueHours, setVenueHours] = useState<VenueHoursDisplay | null>(null);
   const [loadingHours, setLoadingHours] = useState(false);
   const [googlePhotos, setGooglePhotos] = useState<string[]>([]);
@@ -81,7 +81,6 @@ export function VenueIdCard() {
     neighborhood: string;
     google_rating: number | null;
   }>>([]);
-  const [similarVenuesOpen, setSimilarVenuesOpen] = useState(false);
   const [isUserAtVenue, setIsUserAtVenue] = useState(false);
 
   useEffect(() => {
@@ -565,108 +564,95 @@ export function VenueIdCard() {
                 </div>
               </div>
 
-              {/* Tonight's Buzz Section */}
-              <Collapsible open={reviewsOpen} onOpenChange={setReviewsOpen}>
-                <CollapsibleTrigger className="w-full mb-3">
-                  <div className="flex items-center justify-between p-3 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/20 hover:bg-[#2d1b4e]/70 transition-colors">
-                    <div className="flex flex-col items-start">
-                      <h3 className="text-lg font-semibold text-white">Tonight's Buzz ({reviews.length})</h3>
-                      <p className="text-xs text-white/50">What people are saying</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!hasUserReviewed && isUserAtVenue && (
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowWriteReview(true);
-                          }}
-                          size="sm"
-                          className="bg-[#d4ff00] text-[#2d1b4e] hover:bg-[#d4ff00]/90 font-semibold"
-                        >
-                          Drop a Vibe ✨
-                        </Button>
-                      )}
-                      <ChevronDown 
-                        className={`w-5 h-5 text-white/60 transition-transform ${
-                          reviewsOpen ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </div>
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="space-y-3 mb-3">
-                    {reviews.length > 0 ? (
-                      reviews.map((review) => (
-                        <ReviewCard
-                          key={review.id}
-                          review={review}
-                          currentUserVote={getUserVote(review.id)}
-                          onVoteChange={fetchReviews}
-                        />
-                      ))
-                    ) : (
-                      <p className="text-center text-white/50 py-4">No vibes yet. Drop yours! ✨</p>
-                    )}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Trending Nearby Section */}
-              {similarVenues.length > 0 && (
-                <Collapsible open={similarVenuesOpen} onOpenChange={setSimilarVenuesOpen}>
-                  <CollapsibleTrigger className="w-full mb-3">
-                    <div className="flex items-center justify-between p-3 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/20 hover:bg-[#2d1b4e]/70 transition-colors">
-                      <div className="flex flex-col items-start">
-                        <h3 className="text-lg font-semibold text-white">Trending Nearby</h3>
-                        <p className="text-xs text-white/50">Check out these spots</p>
-                      </div>
-                      <ChevronDown 
-                        className={`w-5 h-5 text-white/60 transition-transform ${
-                          similarVenuesOpen ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </div>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="space-y-2 mb-3">
-                      {similarVenues.map((similarVenue) => (
-                        <button
-                          key={similarVenue.id}
-                          onClick={() => {
-                            closeVenueCard();
-                            setTimeout(() => openVenueCard(similarVenue.id), 100);
-                          }}
-                          className="w-full p-3 bg-[#2d1b4e]/30 rounded-lg border border-[#a855f7]/10 hover:bg-[#2d1b4e]/50 hover:border-[#a855f7]/30 transition-all text-left"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-white font-medium">{similarVenue.name}</p>
-                              <p className="text-xs text-white/50">{similarVenue.neighborhood}</p>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-
-              {/* Google Info - Small at bottom */}
-              {googleRating && (
-                <div className="text-center text-xs text-white/40 mb-3">
-                  {googleRating.toFixed(1)} ⭐ on Google ({googleRatingsCount.toLocaleString()})
-                </div>
-              )}
-
-              {/* Directions Button */}
+              {/* Get Directions Button - Moved up for social-first layout */}
               <Button
                 onClick={handleMapPinClick}
-                className="w-full bg-[#a855f7] hover:bg-[#a855f7]/90 text-white"
+                className="w-full mb-4 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white"
               >
                 <MapPin className="w-4 h-4 mr-2" />
                 Get Directions
               </Button>
+
+              {/* More Info - Single collapsible, closed by default */}
+              <Collapsible open={moreInfoOpen} onOpenChange={setMoreInfoOpen}>
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between p-3 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/20 hover:bg-[#2d1b4e]/70 transition-colors">
+                    <div className="flex flex-col items-start">
+                      <h3 className="text-sm font-medium text-white">More Info</h3>
+                      <p className="text-xs text-white/50">Reviews, nearby spots & ratings</p>
+                    </div>
+                    <ChevronDown 
+                      className={`w-5 h-5 text-white/60 transition-transform ${
+                        moreInfoOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3">
+                  {/* Tonight's Buzz sub-section */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-white">Tonight's Buzz ({reviews.length})</h4>
+                      {!hasUserReviewed && isUserAtVenue && (
+                        <Button
+                          onClick={() => setShowWriteReview(true)}
+                          size="sm"
+                          className="bg-[#d4ff00] text-[#2d1b4e] hover:bg-[#d4ff00]/90 font-semibold text-xs h-7"
+                        >
+                          Drop a Vibe ✨
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-3">
+                      {reviews.length > 0 ? (
+                        reviews.map((review) => (
+                          <ReviewCard
+                            key={review.id}
+                            review={review}
+                            currentUserVote={getUserVote(review.id)}
+                            onVoteChange={fetchReviews}
+                          />
+                        ))
+                      ) : (
+                        <p className="text-center text-white/50 py-3 text-sm">No vibes yet. Drop yours! ✨</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Trending Nearby sub-section */}
+                  {similarVenues.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-semibold text-white mb-2">Trending Nearby</h4>
+                      <div className="space-y-2">
+                        {similarVenues.map((similarVenue) => (
+                          <button
+                            key={similarVenue.id}
+                            onClick={() => {
+                              closeVenueCard();
+                              setTimeout(() => openVenueCard(similarVenue.id), 100);
+                            }}
+                            className="w-full p-3 bg-[#2d1b4e]/30 rounded-lg border border-[#a855f7]/10 hover:bg-[#2d1b4e]/50 hover:border-[#a855f7]/30 transition-all text-left"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-white font-medium text-sm">{similarVenue.name}</p>
+                                <p className="text-xs text-white/50">{similarVenue.neighborhood}</p>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Google rating sub-section */}
+                  {googleRating && (
+                    <div className="text-center text-xs text-white/40 pb-2">
+                      {googleRating.toFixed(1)} ⭐ on Google ({googleRatingsCount.toLocaleString()})
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
                 </div>
               </ScrollArea>
             </div>
