@@ -461,7 +461,7 @@ export function VenueIdCard() {
                   <CloseIcon className="h-4 w-4 text-white" />
                   <span className="sr-only">Close</span>
                 </button>
-                <ScrollArea className="flex-1 min-h-0 overflow-hidden">
+                <div className="flex-1 min-h-0 overflow-y-auto">
                   <div className="p-5">
               {/* Photo Carousel */}
               {googlePhotos.length > 0 ? (
@@ -688,7 +688,7 @@ export function VenueIdCard() {
                 </CollapsibleContent>
               </Collapsible>
                 </div>
-              </ScrollArea>
+              </div>
             </div>
           </div>
         </>
