@@ -51,24 +51,29 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (data) {
-        // Fetch sender profiles
-        const notificationsWithProfiles = await Promise.all(
-          data.map(async (notification) => {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('display_name, avatar_url')
-              .eq('id', notification.sender_id)
-              .single();
+      if (data && data.length > 0) {
+        // Batch fetch all sender profiles in ONE query (fixes N+1)
+        const senderIds = [...new Set(data.map(n => n.sender_id).filter(Boolean))];
+        
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', senderIds);
 
-            return {
-              ...notification,
-              sender_profile: profile || undefined
-            };
-          })
+        // Create lookup map for O(1) access
+        const profileMap = new Map(
+          profiles?.map(p => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url }]) || []
         );
 
+        // Attach profiles without additional queries
+        const notificationsWithProfiles = data.map(notification => ({
+          ...notification,
+          sender_profile: profileMap.get(notification.sender_id) || undefined
+        }));
+
         setNotifications(notificationsWithProfiles);
+      } else if (data) {
+        setNotifications([]);
       }
     };
 
