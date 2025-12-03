@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -30,6 +31,7 @@ interface NewChatDialogProps {
 export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDialogProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const demoEnabled = useDemoMode();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [search, setSearch] = useState('');
 
@@ -75,12 +77,18 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
       return;
     }
 
-    // Get friend profiles (exclude demo users in bootstrap mode)
-    const { data: profiles } = await supabase
+    // Get friend profiles (conditionally filter demo users)
+    let profileQuery = supabase
       .from('profiles')
       .select('id, display_name, username, avatar_url')
-      .in('id', friendIds)
-      .eq('is_demo', false); // Bootstrap mode: only real users
+      .in('id', friendIds);
+    
+    // Only filter out demo users when demo mode is OFF (bootstrap mode)
+    if (!demoEnabled) {
+      profileQuery = profileQuery.eq('is_demo', false);
+    }
+    
+    const { data: profiles } = await profileQuery;
 
     if (!profiles) return;
 
