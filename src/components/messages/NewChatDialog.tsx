@@ -197,7 +197,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white">
-        {isCreatingThread ? (
+        {(isCreatingThread || preselectedUser) ? (
           <div className="py-12 text-center">
             <div className="animate-pulse text-white/60">
               Opening chat with {preselectedUser?.display_name}...
