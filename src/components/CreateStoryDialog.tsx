@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
-import { Loader2, Upload, Camera, Image } from 'lucide-react';
+import { Loader2, Camera, Image } from 'lucide-react';
 
 interface CreateStoryDialogProps {
   open: boolean;
@@ -160,23 +160,6 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
         </DialogHeader>
 
         <div className="space-y-4">
-          {preview ? (
-            <div className="relative aspect-[9/16] bg-black rounded-lg overflow-hidden max-h-[250px]">
-              {file?.type.startsWith('image/') ? (
-                <img src={preview} alt="Preview" className="w-full h-full object-contain" />
-              ) : (
-                <video src={preview} className="w-full h-full object-contain" controls />
-              )}
-            </div>
-          ) : (
-            <div className="aspect-[9/16] max-h-[200px] border-2 border-dashed border-[#a855f7]/40 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <Upload className="h-12 w-12 text-[#a855f7] mx-auto mb-2" />
-                <p className="text-white/60">Upload a photo or video</p>
-              </div>
-            </div>
-          )}
-
           <input
             type="file"
             ref={cameraInputRef}
@@ -192,30 +175,67 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
             onChange={handleFileChange}
             className="hidden"
           />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="w-full bg-[#2d1b4e] border border-[#a855f7]/40 text-white hover:bg-[#3d2b5e]">
-                <Camera className="mr-2 h-4 w-4" />
-                Add Photo or Video
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40 w-[var(--radix-dropdown-menu-trigger-width)]">
-              <DropdownMenuItem 
-                onClick={() => cameraInputRef.current?.click()}
-                className="text-white hover:bg-[#2d1b4e] cursor-pointer"
-              >
-                <Camera className="mr-2 h-4 w-4" />
-                Camera
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => galleryInputRef.current?.click()}
-                className="text-white hover:bg-[#2d1b4e] cursor-pointer"
-              >
-                <Image className="mr-2 h-4 w-4" />
-                Upload from camera roll
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+
+          {preview ? (
+            <div className="relative aspect-[9/16] bg-black rounded-lg overflow-hidden max-h-[250px]">
+              {file?.type.startsWith('image/') ? (
+                <img src={preview} alt="Preview" className="w-full h-full object-contain" />
+              ) : (
+                <video src={preview} className="w-full h-full object-contain" controls />
+              )}
+              {/* Change button overlay */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="absolute bottom-3 right-3 p-2 bg-[#1a0f2e]/80 border border-[#a855f7]/40 rounded-full hover:bg-[#2d1b4e] transition-colors">
+                    <Camera className="h-5 w-5 text-white" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40">
+                  <DropdownMenuItem 
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    Camera
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+                  >
+                    <Image className="mr-2 h-4 w-4" />
+                    Upload from camera roll
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="aspect-[9/16] max-h-[200px] border-2 border-dashed border-[#a855f7]/40 rounded-lg flex items-center justify-center cursor-pointer hover:border-[#a855f7] hover:bg-[#a855f7]/5 transition-colors">
+                  <div className="text-center">
+                    <Camera className="h-12 w-12 text-[#a855f7] mx-auto mb-2" />
+                    <p className="text-white/60">Tap to add photo or video</p>
+                  </div>
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40">
+                <DropdownMenuItem 
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+                >
+                  <Camera className="mr-2 h-4 w-4" />
+                  Camera
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+                >
+                  <Image className="mr-2 h-4 w-4" />
+                  Upload from camera roll
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {/* Audience Selector - only show when at a venue */}
           {showAudienceSelector && (
