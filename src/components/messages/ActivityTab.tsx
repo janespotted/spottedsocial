@@ -78,6 +78,48 @@ const generateDemoActivities = (city: SupportedCity): Activity[] => {
   ];
 };
 
+// Helper to get card styling based on activity type
+const getCardStyle = (type: Activity['type']) => {
+  switch (type) {
+    case 'meet_up':
+      return 'bg-gradient-to-r from-[#3d1b5e]/60 to-[#2d1b4e]/60 border border-[#ec4899]/30';
+    case 'venue_invite':
+      return 'bg-gradient-to-r from-[#2d2b1e]/50 to-[#2d1b4e]/60 border border-[#d4ff00]/20';
+    case 'trending':
+      return 'bg-gradient-to-r from-[#3d3b00]/30 to-[#2d1b4e]/60 border border-[#d4ff00]/40 shadow-[0_0_20px_rgba(212,255,0,0.15)]';
+    case 'check_in':
+    default:
+      return 'bg-[#2d1b4e]/60 border border-[#a855f7]/20';
+  }
+};
+
+// Helper to get avatar ring color based on activity type
+const getAvatarRingColor = (type: Activity['type']) => {
+  switch (type) {
+    case 'meet_up':
+      return 'border-[#ec4899]';
+    case 'venue_invite':
+      return 'border-[#d4ff00]';
+    case 'check_in':
+    default:
+      return 'border-[#a855f7]';
+  }
+};
+
+// Helper to get activity indicator emoji
+const getActivityIndicator = (type: Activity['type']) => {
+  switch (type) {
+    case 'meet_up':
+      return '🤝';
+    case 'venue_invite':
+      return '📍';
+    case 'check_in':
+      return '✨';
+    default:
+      return null;
+  }
+};
+
 export function ActivityTab() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -189,13 +231,13 @@ export function ActivityTab() {
   const getActivityIcon = (type: Activity['type']) => {
     switch (type) {
       case 'trending':
-        return <Zap className="h-8 w-8 text-[#d4ff00]" />;
+        return <Zap className="h-5 w-5 text-[#d4ff00] animate-pulse" />;
       case 'friend_request':
-        return <UserPlus className="h-6 w-6 text-[#d4ff00]" />;
+        return <UserPlus className="h-5 w-5 text-[#d4ff00]" />;
       case 'meet_up':
-        return <Users className="h-6 w-6 text-[#a855f7]" />;
+        return <Users className="h-5 w-5 text-[#ec4899]" />;
       case 'venue_invite':
-        return <MapPin className="h-6 w-6 text-[#a855f7]" />;
+        return <MapPin className="h-5 w-5 text-[#d4ff00]" />;
       default:
         return null;
     }
@@ -297,10 +339,10 @@ export function ActivityTab() {
       {/* Friend Requests */}
       <div
         onClick={() => navigate('/friend-requests')}
-        className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-[#2d1b4e]/80 transition-colors"
+        className="bg-gradient-to-r from-[#2d1b4e]/80 to-[#3d1b5e]/60 border border-[#a855f7]/30 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-[#2d1b4e]/80 transition-all hover:border-[#a855f7]/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
       >
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] flex items-center justify-center shadow-[0_0_12px_rgba(168,85,247,0.4)]">
             <UserPlus className="h-6 w-6 text-[#d4ff00]" />
           </div>
           <div>
@@ -311,7 +353,7 @@ export function ActivityTab() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {friendRequestCount > 0 && <div className="bg-[#a855f7] rounded-full w-2 h-2" />}
+          {friendRequestCount > 0 && <div className="bg-[#a855f7] rounded-full w-2.5 h-2.5 animate-pulse" />}
           <ChevronRight className="h-5 w-5 text-white/40" />
         </div>
       </div>
@@ -324,12 +366,16 @@ export function ActivityTab() {
         {activities.map((activity) => (
           <div
             key={activity.id}
-            className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-3"
+            className={`rounded-2xl p-4 transition-all hover:scale-[1.01] ${getCardStyle(activity.type)}`}
           >
             <div className="flex items-center gap-3">
               {/* Icon/Avatar */}
               <div className="flex-shrink-0">
-                {activity.avatar_url !== undefined ? (
+                {activity.type === 'trending' ? (
+                  <div className="w-11 h-11 rounded-full bg-[#d4ff00]/20 border-2 border-[#d4ff00]/60 flex items-center justify-center shadow-[0_0_16px_rgba(212,255,0,0.4)]">
+                    {getActivityIcon(activity.type)}
+                  </div>
+                ) : activity.avatar_url !== undefined ? (
                   <button
                     onClick={() => activity.user_id && openFriendCard({
                       userId: activity.user_id,
@@ -339,7 +385,7 @@ export function ActivityTab() {
                     })}
                     className="hover:opacity-80 transition-opacity"
                   >
-                    <Avatar className="h-10 w-10 border-2 border-[#a855f7] cursor-pointer">
+                    <Avatar className={`h-11 w-11 border-2 ${getAvatarRingColor(activity.type)} cursor-pointer shadow-[0_0_10px_rgba(168,85,247,0.3)]`}>
                       <AvatarImage src={activity.avatar_url || undefined} />
                       <AvatarFallback className="bg-[#1a0f2e] text-white text-sm">
                         {activity.display_name?.[0] || activity.title[0]}
@@ -347,7 +393,7 @@ export function ActivityTab() {
                     </Avatar>
                   </button>
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] flex items-center justify-center">
+                  <div className={`w-11 h-11 rounded-full bg-[#1a0f2e] border-2 ${getAvatarRingColor(activity.type)} flex items-center justify-center`}>
                     {getActivityIcon(activity.type)}
                   </div>
                 )}
@@ -357,28 +403,32 @@ export function ActivityTab() {
               <div className="flex-1 min-w-0">
                 {activity.type === 'meet_up' && (
                   <p className="text-white text-sm">
+                    <span className="text-white/50 mr-1">{getActivityIndicator(activity.type)}</span>
                     <span className="font-semibold">{activity.display_name}</span>
-                    <span className="text-white/80"> wants to meet up</span>
+                    <span className="text-white/70"> wants to meet up</span>
                   </p>
                 )}
                 {activity.type === 'venue_invite' && (
                   <p className="text-white text-sm">
+                    <span className="text-white/50 mr-1">{getActivityIndicator(activity.type)}</span>
                     <span className="font-semibold">{activity.display_name}</span>
-                    <span className="text-white/80"> invited you to </span>
+                    <span className="text-white/70"> invited you to </span>
                     <span className="font-semibold text-[#d4ff00]">{activity.subtitle}</span>
                   </p>
                 )}
                 {activity.type === 'check_in' && (
                   <p className="text-white text-sm">
+                    <span className="text-white/50 mr-1">{getActivityIndicator(activity.type)}</span>
                     <span className="font-semibold">{activity.display_name}</span>
-                    <span className="text-white/80"> is at </span>
+                    <span className="text-white/70"> is at </span>
                     <span className="font-semibold text-[#d4ff00]">{activity.subtitle}</span>
                   </p>
                 )}
                 {activity.type === 'trending' && (
                   <p className="text-white text-sm">
+                    <span className="mr-1">⚡</span>
                     <span className="font-semibold text-[#d4ff00]">{activity.title.replace(' is trending', '')}</span>
-                    <span className="text-white/80"> is trending · {activity.subtitle}</span>
+                    <span className="text-white/70"> is trending · {activity.subtitle}</span>
                   </p>
                 )}
               </div>
@@ -389,7 +439,7 @@ export function ActivityTab() {
                   <Button
                     onClick={() => handleAcceptMeetUp(activity)}
                     size="sm"
-                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                    className="h-8 bg-[#ec4899] hover:bg-[#ec4899]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(236,72,153,0.5)] hover:shadow-[0_0_16px_rgba(236,72,153,0.7)] transition-all"
                   >
                     I'm down! 🎉
                   </Button>
@@ -418,14 +468,13 @@ export function ActivityTab() {
                 {activity.type === 'trending' && (
                   <Button
                     size="sm"
-                    variant="ghost"
-                    className="h-7 text-[#a855f7] hover:text-[#a855f7] hover:bg-[#a855f7]/20 rounded-full px-3 text-xs"
+                    className="h-8 bg-[#d4ff00]/20 hover:bg-[#d4ff00]/30 text-[#d4ff00] rounded-full px-4 text-xs font-medium border border-[#d4ff00]/40 transition-all"
                   >
                     View
                   </Button>
                 )}
 
-                <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                <span className="bg-white/10 text-white/60 text-xs px-2 py-1 rounded-full">{getTimeAgo(activity.timestamp)}</span>
               </div>
             </div>
           </div>
