@@ -34,6 +34,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   const demoEnabled = useDemoMode();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [search, setSearch] = useState('');
+  const [isCreatingThread, setIsCreatingThread] = useState(false);
 
   useEffect(() => {
     if (open && user) {
@@ -44,9 +45,16 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   useEffect(() => {
     // If we have a preselected user, automatically create thread
     if (open && preselectedUser && user) {
+      setIsCreatingThread(true);
       createThreadWithPreselectedUser();
     }
   }, [open, preselectedUser, user]);
+
+  useEffect(() => {
+    if (!open) {
+      setIsCreatingThread(false);
+    }
+  }, [open]);
 
   const createThreadWithPreselectedUser = async () => {
     if (!preselectedUser || !user) return;
@@ -175,62 +183,72 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">New Message</DialogTitle>
-        </DialogHeader>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search friends..."
-            className="bg-[#0a0118] border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full pl-12"
-          />
-        </div>
-
-        {/* Friends List */}
-        <div className="max-h-[60vh] overflow-y-auto space-y-2">
-          {filteredFriends.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-white/60">No friends found</p>
-              <p className="text-white/40 text-sm mt-2">
-                Add friends to start messaging
-              </p>
+        {isCreatingThread ? (
+          <div className="py-12 text-center">
+            <div className="animate-pulse text-white/60">
+              Opening chat with {preselectedUser?.display_name}...
             </div>
-          ) : (
-            filteredFriends.map((friend) => (
-              <button
-                key={friend.id}
-                onClick={() => createThread(friend.id)}
-                className="w-full bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-xl p-4 hover:bg-[#2d1b4e]/80 transition-colors flex items-center gap-3"
-              >
-                <Avatar className="h-12 w-12 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
-                  <AvatarImage src={friend.avatar_url || undefined} />
-                  <AvatarFallback className="bg-[#1a0f2e] text-white">
-                    {friend.display_name[0]}
-                  </AvatarFallback>
-                </Avatar>
+          </div>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold">New Message</DialogTitle>
+            </DialogHeader>
 
-                <div className="flex-1 text-left min-w-0">
-                  <h3 className="font-semibold text-white truncate">
-                    {friend.display_name}
-                  </h3>
-                  <p className="text-white/60 text-sm truncate">
-                    @{friend.username}
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search friends..."
+                className="bg-[#0a0118] border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full pl-12"
+              />
+            </div>
+
+            {/* Friends List */}
+            <div className="max-h-[60vh] overflow-y-auto space-y-2">
+              {filteredFriends.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-white/60">No friends found</p>
+                  <p className="text-white/40 text-sm mt-2">
+                    Add friends to start messaging
                   </p>
                 </div>
+              ) : (
+                filteredFriends.map((friend) => (
+                  <button
+                    key={friend.id}
+                    onClick={() => createThread(friend.id)}
+                    className="w-full bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-xl p-4 hover:bg-[#2d1b4e]/80 transition-colors flex items-center gap-3"
+                  >
+                    <Avatar className="h-12 w-12 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
+                      <AvatarImage src={friend.avatar_url || undefined} />
+                      <AvatarFallback className="bg-[#1a0f2e] text-white">
+                        {friend.display_name[0]}
+                      </AvatarFallback>
+                    </Avatar>
 
-                {friend.venue_name && (
-                  <div className="text-[#d4ff00] text-sm font-medium">
-                    @{friend.venue_name}
-                  </div>
-                )}
-              </button>
-            ))
-          )}
-        </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <h3 className="font-semibold text-white truncate">
+                        {friend.display_name}
+                      </h3>
+                      <p className="text-white/60 text-sm truncate">
+                        @{friend.username}
+                      </p>
+                    </div>
+
+                    {friend.venue_name && (
+                      <div className="text-[#d4ff00] text-sm font-medium">
+                        @{friend.venue_name}
+                      </div>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
