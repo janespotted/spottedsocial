@@ -203,14 +203,18 @@ export default function Map() {
 
         if (friendIds.length > 0) {
           // Get friends' profiles with location data
-          const friendQuery = supabase
+          let friendQuery = supabase
             .from('profiles')
             .select('id, display_name, avatar_url, is_out, last_known_lat, last_known_lng, location_sharing_level')
             .in('id', friendIds)
             .eq('is_out', true)
-            .eq('is_demo', false)
             .not('last_known_lat', 'is', null)
             .not('last_known_lng', 'is', null);
+          
+          // Only filter out demo users when demo mode is OFF (bootstrap mode)
+          if (!demoEnabled) {
+            friendQuery = friendQuery.eq('is_demo', false);
+          }
 
           const { data: friendProfiles } = await friendQuery;
 

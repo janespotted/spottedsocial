@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useVenueInvite } from '@/contexts/VenueInviteContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ interface Friend {
 export function InviteFriendsModal() {
   const { showInviteModal, closeInviteModal, sendInvites, venueName } = useVenueInvite();
   const { user } = useAuth();
+  const demoEnabled = useDemoMode();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -57,13 +59,18 @@ export function InviteFriendsModal() {
         return;
       }
 
-      // Fetch friend profiles (exclude demo users in bootstrap mode)
-      const { data: profiles } = await supabase
+      // Fetch friend profiles (conditionally filter demo users)
+      let profileQuery = supabase
         .from('profiles')
         .select('id, display_name, avatar_url')
-        .in('id', friendIds)
-        .eq('is_demo', false) // Bootstrap mode: only real users
-        .order('display_name', { ascending: true });
+        .in('id', friendIds);
+      
+      // Only filter out demo users when demo mode is OFF (bootstrap mode)
+      if (!demoEnabled) {
+        profileQuery = profileQuery.eq('is_demo', false);
+      }
+      
+      const { data: profiles } = await profileQuery.order('display_name', { ascending: true });
 
       setFriends(profiles || []);
     } catch (error) {

@@ -3,6 +3,7 @@ import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueInvite } from '@/contexts/VenueInviteContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Bookmark, BookmarkCheck } from 'lucide-react';
@@ -55,6 +56,7 @@ export function VenueIdCard() {
   const { openFriendCard } = useFriendIdCard();
   const { openInviteModal } = useVenueInvite();
   const { user } = useAuth();
+  const demoEnabled = useDemoMode();
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendAtVenue[]>([]);
   const [distance, setDistance] = useState<string>('--');
@@ -213,11 +215,17 @@ export function VenueIdCard() {
           const friendsAtVenueIds = userIds.filter(id => friendIds.includes(id));
 
           if (friendsAtVenueIds.length > 0) {
-            const { data: profiles } = await supabase
+            let profileQuery = supabase
               .from('profiles')
               .select('id, display_name, avatar_url')
-              .in('id', friendsAtVenueIds)
-              .eq('is_demo', false); // Bootstrap mode: only real users
+              .in('id', friendsAtVenueIds);
+            
+            // Only filter out demo users when demo mode is OFF (bootstrap mode)
+            if (!demoEnabled) {
+              profileQuery = profileQuery.eq('is_demo', false);
+            }
+            
+            const { data: profiles } = await profileQuery;
 
             setFriendsAtVenue(profiles || []);
           } else {

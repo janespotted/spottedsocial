@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
 
@@ -20,6 +21,7 @@ const VenueInviteContext = createContext<VenueInviteContextType | undefined>(und
 
 export function VenueInviteProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const demoEnabled = useDemoMode();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [invitedFriends, setInvitedFriends] = useState<Array<{ id: string; displayName: string; avatarUrl: string | null }>>([]);
@@ -40,16 +42,20 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
     if (!user || !venueName || selectedFriends.length === 0) return;
 
     try {
-      // Bootstrap mode protection: filter out any demo users
-      const friendIds = selectedFriends.map(f => f.id);
-      const { data: realProfiles } = await supabase
-        .from('profiles')
-        .select('id')
-        .in('id', friendIds)
-        .eq('is_demo', false);
+      // Conditionally filter out demo users (only in bootstrap mode when demo is OFF)
+      let filteredFriends = selectedFriends;
+      
+      if (!demoEnabled) {
+        const friendIds = selectedFriends.map(f => f.id);
+        const { data: realProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .in('id', friendIds)
+          .eq('is_demo', false);
 
-      const realFriendIds = new Set(realProfiles?.map(p => p.id) || []);
-      const filteredFriends = selectedFriends.filter(f => realFriendIds.has(f.id));
+        const realFriendIds = new Set(realProfiles?.map(p => p.id) || []);
+        filteredFriends = selectedFriends.filter(f => realFriendIds.has(f.id));
+      }
 
       if (filteredFriends.length === 0) {
         toast.error('No valid recipients selected');
