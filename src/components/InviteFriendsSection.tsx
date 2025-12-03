@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Link2, Copy, Share2, RefreshCw, Users } from 'lucide-react';
+import { Link2, Copy, Share2, RefreshCw, Users, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export function InviteFriendsSection() {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ export function InviteFriendsSection() {
   const [usesCount, setUsesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -132,59 +134,69 @@ export function InviteFriendsSection() {
   }
 
   return (
-    <div className="bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full bg-[#a855f7] flex items-center justify-center">
-          <Link2 className="h-6 w-6 text-white" />
-        </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-white">Invite Friends</h3>
-          <p className="text-white/60 text-sm">Share your link to add friends instantly</p>
-        </div>
-      </div>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4">
+        {/* Header - Clickable Trigger */}
+        <CollapsibleTrigger className="w-full">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-[#a855f7] flex items-center justify-center">
+              <Link2 className="h-6 w-6 text-white" />
+            </div>
+            <div className="flex-1 text-left">
+              <h3 className="font-semibold text-white">Invite Friends</h3>
+              <p className="text-white/60 text-sm">Share your link to add friends instantly</p>
+            </div>
+            <ChevronDown 
+              className={`h-5 w-5 text-white/60 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+            />
+          </div>
+        </CollapsibleTrigger>
 
-      {/* Link Display */}
-      <div className="flex items-center gap-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl p-3">
-        <span className="text-white/80 text-sm truncate flex-1 font-mono">
-          {getInviteUrl()}
-        </span>
-        <Button
-          onClick={handleCopyLink}
-          variant="ghost"
-          size="icon"
-          className="text-[#a855f7] hover:bg-[#a855f7]/20 shrink-0"
-        >
-          <Copy className="h-4 w-4" />
-        </Button>
-      </div>
+        {/* Collapsible Content */}
+        <CollapsibleContent className="space-y-4 pt-4">
+          {/* Link Display */}
+          <div className="flex items-center gap-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl p-3">
+            <span className="text-white/80 text-sm truncate flex-1 font-mono">
+              {getInviteUrl()}
+            </span>
+            <Button
+              onClick={handleCopyLink}
+              variant="ghost"
+              size="icon"
+              className="text-[#a855f7] hover:bg-[#a855f7]/20 shrink-0"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
 
-      {/* Action Buttons */}
-      <div className="flex gap-2">
-        <Button
-          onClick={handleShare}
-          className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 shadow-[0_0_15px_rgba(168,85,247,0.4)] text-white"
-        >
-          <Share2 className="h-4 w-4 mr-2" />
-          Share Link
-        </Button>
-        <Button
-          onClick={generateNewCode}
-          variant="outline"
-          className="border-[#a855f7]/40 text-white hover:bg-[#a855f7]/20"
-          disabled={generating}
-        >
-          <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
-        </Button>
-      </div>
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button
+              onClick={handleShare}
+              className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 shadow-[0_0_15px_rgba(168,85,247,0.4)] text-white"
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Share Link
+            </Button>
+            <Button
+              onClick={generateNewCode}
+              variant="outline"
+              className="border-[#a855f7]/40 text-white hover:bg-[#a855f7]/20"
+              disabled={generating}
+            >
+              <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
 
-      {/* Stats */}
-      {usesCount > 0 && (
-        <div className="flex items-center justify-center gap-2 text-white/60 text-sm">
-          <Users className="h-4 w-4" />
-          <span>{usesCount} friend{usesCount !== 1 ? 's' : ''} joined via your link</span>
-        </div>
-      )}
-    </div>
+          {/* Stats */}
+          {usesCount > 0 && (
+            <div className="flex items-center justify-center gap-2 text-white/60 text-sm">
+              <Users className="h-4 w-4" />
+              <span>{usesCount} friend{usesCount !== 1 ? 's' : ''} joined via your link</span>
+            </div>
+          )}
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
   );
 }

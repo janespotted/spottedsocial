@@ -289,9 +289,6 @@ export default function Profile() {
           </Button>
         </div>
 
-        {/* Invite Friends Section */}
-        <InviteFriendsSection />
-
         {/* Location Sharing Card */}
         <div className="bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4">
           <div className="flex items-center justify-between">
@@ -326,6 +323,9 @@ export default function Profile() {
             </Select>
           </div>
         </div>
+
+        {/* Invite Friends Section */}
+        <InviteFriendsSection />
 
         {/* Wishlist Section */}
         <div>
