@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateExpiryTime } from '@/lib/time-utils';
@@ -8,13 +8,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload, Camera, Image } from 'lucide-react';
 
 interface CreateStoryDialogProps {
   open: boolean;
@@ -32,6 +37,8 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
   const [venueId, setVenueId] = useState<string | null>(null);
   const [audience, setAudience] = useState<AudienceOption>('friends');
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch current venue when dialog opens
   useEffect(() => {
@@ -170,12 +177,45 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
             </div>
           )}
 
-          <Input
+          <input
             type="file"
+            ref={cameraInputRef}
+            accept="image/*,video/*"
+            capture="environment"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={galleryInputRef}
             accept="image/*,video/*"
             onChange={handleFileChange}
-            className="bg-[#0a0118] border-[#a855f7]/40 text-white"
+            className="hidden"
           />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="w-full bg-[#2d1b4e] border border-[#a855f7]/40 text-white hover:bg-[#3d2b5e]">
+                <Camera className="mr-2 h-4 w-4" />
+                Add Photo or Video
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40 w-[var(--radix-dropdown-menu-trigger-width)]">
+              <DropdownMenuItem 
+                onClick={() => cameraInputRef.current?.click()}
+                className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                Camera
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => galleryInputRef.current?.click()}
+                className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+              >
+                <Image className="mr-2 h-4 w-4" />
+                Upload from camera roll
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Audience Selector - only show when at a venue */}
           {showAudienceSelector && (

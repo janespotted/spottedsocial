@@ -8,7 +8,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Camera, Mic, Send } from 'lucide-react';
+import { ChevronLeft, Camera, Mic, Send, Image } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import spottedLogo from '@/assets/spotted-s-logo.png';
@@ -42,11 +48,8 @@ export default function Thread() {
   const [newMessage, setNewMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleCameraClick = () => {
-    fileInputRef.current?.click();
-  };
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const handleMicClick = () => {
     toast.info('Voice messages coming soon! 🎤');
@@ -94,8 +97,11 @@ export default function Thread() {
       toast.error('Failed to send image');
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      if (cameraInputRef.current) {
+        cameraInputRef.current.value = '';
+      }
+      if (galleryInputRef.current) {
+        galleryInputRef.current.value = '';
       }
     }
   };
@@ -360,22 +366,49 @@ export default function Thread() {
       <div className="sticky bottom-0 bg-[#1a0f2e]/95 backdrop-blur border-t border-[#a855f7]/20 p-4">
         <input
           type="file"
-          ref={fileInputRef}
+          ref={cameraInputRef}
+          onChange={handleImageUpload}
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+        />
+        <input
+          type="file"
+          ref={galleryInputRef}
           onChange={handleImageUpload}
           accept="image/*"
           className="hidden"
         />
         <form onSubmit={sendMessage} className="flex items-center gap-3">
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            onClick={handleCameraClick}
-            disabled={isUploading}
-            className="text-white/60 hover:text-white hover:bg-[#2d1b4e]"
-          >
-            <Camera className="h-5 w-5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                disabled={isUploading}
+                className="text-white/60 hover:text-white hover:bg-[#2d1b4e]"
+              >
+                <Camera className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40">
+              <DropdownMenuItem 
+                onClick={() => cameraInputRef.current?.click()}
+                className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                Camera
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => galleryInputRef.current?.click()}
+                className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+              >
+                <Image className="mr-2 h-4 w-4" />
+                Upload from camera roll
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Input
             value={newMessage}
