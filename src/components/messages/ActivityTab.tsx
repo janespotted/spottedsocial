@@ -386,43 +386,23 @@ export function ActivityTab() {
               {/* Actions - fixed on right */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 {activity.type === 'meet_up' && (
-                  <>
-                    <Button
-                      onClick={() => handleAcceptMeetUp(activity)}
-                      size="sm"
-                      className="h-7 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs"
-                    >
-                      I'm down! 🎉
-                    </Button>
-                    <Button
-                      onClick={() => handleOpenChat(activity)}
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-[#a855f7]/20 rounded-full"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </Button>
-                  </>
+                  <Button
+                    onClick={() => handleAcceptMeetUp(activity)}
+                    size="sm"
+                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                  >
+                    I'm down! 🎉
+                  </Button>
                 )}
 
                 {activity.type === 'venue_invite' && (
-                  <>
-                    <Button
-                      onClick={() => handleAcceptVenueInvite(activity)}
-                      size="sm"
-                      className="h-7 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs"
-                    >
-                      I'm down! 🎉
-                    </Button>
-                    <Button
-                      onClick={() => handleViewVenue(activity.venue_id, activity.subtitle)}
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 text-white/60 hover:text-white hover:bg-[#a855f7]/20 rounded-full px-2 text-xs"
-                    >
-                      View
-                    </Button>
-                  </>
+                  <Button
+                    onClick={() => handleAcceptVenueInvite(activity)}
+                    size="sm"
+                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                  >
+                    I'm down! 🎉
+                  </Button>
                 )}
 
                 {activity.type === 'check_in' && (
