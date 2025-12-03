@@ -242,6 +242,68 @@ export type Database = {
           },
         ]
       }
+      invite_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          max_uses: number | null
+          user_id: string
+          uses_count: number | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          max_uses?: number | null
+          user_id: string
+          uses_count?: number | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          max_uses?: number | null
+          user_id?: string
+          uses_count?: number | null
+        }
+        Relationships: []
+      }
+      invite_uses: {
+        Row: {
+          created_at: string | null
+          id: string
+          invite_code_id: string
+          invited_user_id: string
+          inviter_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          invite_code_id: string
+          invited_user_id: string
+          inviter_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          invite_code_id?: string
+          invited_user_id?: string
+          inviter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_uses_invite_code_id_fkey"
+            columns: ["invite_code_id"]
+            isOneToOne: false
+            referencedRelation: "invite_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       night_statuses: {
         Row: {
           expires_at: string | null
@@ -1124,6 +1186,10 @@ export type Database = {
       is_mutual_friend: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
+      }
+      process_invite_code: {
+        Args: { invite_code: string; new_user_id: string }
+        Returns: Json
       }
       user_is_thread_member: { Args: { thread_uuid: string }; Returns: boolean }
     }

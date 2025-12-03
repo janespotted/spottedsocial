@@ -1,23 +1,88 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { loginSchema, signupSchema } from '@/lib/auth-validation';
 
+interface InviterInfo {
+  display_name: string;
+  avatar_url: string | null;
+}
+
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [searchParams] = useSearchParams();
+  const inviteCode = searchParams.get('invite');
+  
+  const [isLogin, setIsLogin] = useState(!inviteCode); // Default to signup if invite code present
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [inviter, setInviter] = useState<InviterInfo | null>(null);
   const navigate = useNavigate();
+
+  // Fetch inviter info if invite code exists
+  useEffect(() => {
+    if (inviteCode) {
+      fetchInviterInfo();
+    }
+  }, [inviteCode]);
+
+  const fetchInviterInfo = async () => {
+    try {
+      const { data: invite } = await supabase
+        .from('invite_codes')
+        .select('user_id')
+        .eq('code', inviteCode)
+        .maybeSingle();
+
+      if (invite) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url')
+          .eq('id', invite.user_id)
+          .single();
+
+        if (profile) {
+          setInviter(profile);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching inviter:', error);
+    }
+  };
+
+  const processInviteCode = async (newUserId: string) => {
+    if (!inviteCode) return;
+
+    try {
+      const { data, error } = await supabase.rpc('process_invite_code', {
+        invite_code: inviteCode,
+        new_user_id: newUserId,
+      });
+
+      if (error) {
+        console.error('Error processing invite:', error);
+        return;
+      }
+
+      // Type assertion since RPC returns Json type
+      const result = data as { success: boolean; inviter_name?: string } | null;
+      if (result?.success && result.inviter_name) {
+        toast.success(`You're now friends with ${result.inviter_name}! 🎉`);
+      }
+    } catch (error) {
+      console.error('Error processing invite code:', error);
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +137,11 @@ export default function Auth() {
           throw error;
         }
 
+        // Process invite code if signup was successful and we have a session
+        if (data?.user && data.session && inviteCode) {
+          await processInviteCode(data.user.id);
+        }
+
         // Check if email confirmation is required
         if (data?.user && !data.session) {
           toast.success('Account created! Please check your email to confirm.');
@@ -100,8 +170,29 @@ export default function Auth() {
           <CardTitle className="text-5xl font-light tracking-[0.3em] text-white">
             Spotted
           </CardTitle>
+          
+          {/* Inviter Badge */}
+          {inviter && !isLogin && (
+            <div className="flex items-center justify-center gap-2 bg-[#a855f7]/20 border border-[#a855f7]/40 rounded-full px-4 py-2 mx-auto">
+              <Avatar className="h-6 w-6 border border-[#a855f7]/60">
+                <AvatarImage src={inviter.avatar_url || undefined} />
+                <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                  {inviter.display_name?.[0] || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-white/80 text-sm">
+                Invited by {inviter.display_name}
+              </span>
+            </div>
+          )}
+          
           <CardDescription className="text-base text-white/60">
-            {isLogin ? 'Welcome back! Sign in to see who\'s out tonight.' : 'Join Spotted to see where your friends are tonight.'}
+            {isLogin 
+              ? 'Welcome back! Sign in to see who\'s out tonight.' 
+              : inviteCode 
+                ? 'Sign up to connect with your friend!'
+                : 'Join Spotted to see where your friends are tonight.'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>

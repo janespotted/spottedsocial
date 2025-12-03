@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { MapPin, Users, ChevronDown, Share2, Settings, LogOut, Bookmark, Bell } from 'lucide-react';
+import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
@@ -287,6 +288,9 @@ export default function Profile() {
             Share Profile
           </Button>
         </div>
+
+        {/* Invite Friends Section */}
+        <InviteFriendsSection />
 
         {/* Location Sharing Card */}
         <div className="bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4">
