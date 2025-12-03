@@ -48,18 +48,34 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Bootstrap mode protection: block sending to demo users
-      const { data: targetProfile } = await supabase
-        .from('profiles')
-        .select('is_demo')
-        .eq('id', userId)
-        .single();
+      // Check demo mode FIRST
+      const demoMode = getDemoMode();
+      
+      // Only block demo users when demo mode is OFF (bootstrap mode)
+      if (!demoMode.enabled) {
+        const { data: targetProfile } = await supabase
+          .from('profiles')
+          .select('is_demo')
+          .eq('id', userId)
+          .single();
 
-      if (targetProfile?.is_demo) {
-        toast({
-          title: "Can't send to this user",
-          description: "This is a demo profile",
-        });
+        if (targetProfile?.is_demo) {
+          toast({
+            title: "Can't send to this user",
+            description: "This is a demo profile",
+          });
+          return;
+        }
+      }
+
+      // In demo mode, skip database operations and just show confirmation
+      if (demoMode.enabled) {
+        console.log('Demo mode: Skipping notification insert, showing confirmation card');
+        setRecipientUserId(userId);
+        setRecipientDisplayName(displayName);
+        setRecipientAvatarUrl(avatarUrl);
+        setShowConfirmation(true);
+        haptic.success();
         return;
       }
 
@@ -83,18 +99,6 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
           .eq('id', user.id);
       } catch (locError) {
         console.warn('Could not capture location for meet up, continuing anyway:', locError);
-      }
-
-      const demoMode = getDemoMode();
-      
-      // In demo mode, skip database operations and just show confirmation
-      if (demoMode.enabled) {
-        console.log('Demo mode: Skipping notification insert, showing confirmation card');
-        setRecipientUserId(userId);
-        setRecipientDisplayName(displayName);
-        setRecipientAvatarUrl(avatarUrl);
-        setShowConfirmation(true);
-        return;
       }
 
       // Check for recent notifications to prevent spam
