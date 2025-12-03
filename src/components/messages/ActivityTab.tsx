@@ -4,7 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
+import { useImDown } from '@/contexts/ImDownContext';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users } from 'lucide-react';
@@ -12,7 +14,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useUserCity } from '@/hooks/useUserCity';
 import { getDemoUsersForCity, getPromotedVenuesForCity } from '@/lib/demo-data';
-import { toast } from '@/hooks/use-toast';
 import type { SupportedCity } from '@/lib/city-detection';
 
 interface Activity {
@@ -89,6 +90,7 @@ export function ActivityTab() {
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
   const { sendMeetUpNotification } = useMeetUp();
+  const { triggerConfirmation } = useImDown();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
   const demoEnabled = useDemoMode();
@@ -217,7 +219,7 @@ export function ActivityTab() {
   };
 
   const handleAcceptMeetUp = async (activity: Activity) => {
-    if (!user || !activity.user_id) return;
+    if (!user || !activity.user_id || !activity.display_name) return;
 
     // Get current user's display name
     const { data: profile } = await supabase
@@ -238,14 +240,17 @@ export function ActivityTab() {
       });
     }
 
-    toast({
-      title: "You're in! 🎉",
-      description: `Let ${activity.display_name?.split(' ')[0]} know you're down`,
-    });
+    // Show confirmation card
+    triggerConfirmation(
+      activity.user_id,
+      activity.display_name,
+      activity.avatar_url || null,
+      'meet_up'
+    );
   };
 
   const handleAcceptVenueInvite = async (activity: Activity) => {
-    if (!user || !activity.user_id) return;
+    if (!user || !activity.user_id || !activity.display_name) return;
 
     // Get current user's display name
     const { data: profile } = await supabase
@@ -266,10 +271,14 @@ export function ActivityTab() {
       });
     }
 
-    toast({
-      title: "You're in! 🎉",
-      description: `Let ${activity.display_name?.split(' ')[0]} know you're down for ${activity.subtitle}`,
-    });
+    // Show confirmation card
+    triggerConfirmation(
+      activity.user_id,
+      activity.display_name,
+      activity.avatar_url || null,
+      'venue_invite',
+      activity.subtitle
+    );
   };
 
   const handleOpenChat = (activity: Activity) => {
