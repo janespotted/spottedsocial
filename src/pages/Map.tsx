@@ -58,7 +58,8 @@ export default function Map() {
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  // Use Map object keyed by user_id to prevent duplicate markers
+  const friendMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
   const venueMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -111,9 +112,28 @@ export default function Map() {
       )
       .subscribe();
 
+    // Subscribe to checkins table for real-time location updates
+    const checkinsChannel = supabase
+      .channel('checkins-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'checkins',
+        },
+        (payload) => {
+          console.log('Checkin updated:', payload);
+          // Refresh friends locations when checkins change
+          fetchFriendsLocations();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(profileChannel);
       supabase.removeChannel(statusChannel);
+      supabase.removeChannel(checkinsChannel);
     };
   }, [user, demoEnabled]);
 
@@ -387,7 +407,9 @@ export default function Map() {
 
     return () => {
       window.removeEventListener('centerMapOnVenue', handleCenterMapOnVenue);
-      markersRef.current.forEach(marker => marker.remove());
+      // Clean up all friend markers using Map
+      friendMarkersRef.current.forEach(marker => marker.remove());
+      friendMarkersRef.current.clear();
       venueMarkersRef.current.forEach(marker => marker.remove());
       userMarkerRef.current?.remove();
       map.current?.remove();
@@ -439,75 +461,87 @@ export default function Map() {
       .addTo(map.current);
   }, [userLocation]);
 
+  // Smart marker diffing - only add/update/remove markers that changed
   useEffect(() => {
     if (!map.current) return;
 
-    // Only clear markers if we have friends data to replace them with
-    // This prevents markers from disappearing during state updates
-    if (friends.length === 0 && markersRef.current.length > 0) {
-      // Don't remove markers if friends is empty - might be a temporary state
-      return;
-    }
+    // Get current friend user_ids from the new friends array
+    const currentFriendIds = new Set(friends.map(f => f.user_id));
+    
+    // Remove markers for friends no longer in the list (handles logout/offline)
+    friendMarkersRef.current.forEach((marker, userId) => {
+      if (!currentFriendIds.has(userId)) {
+        console.log('Removing marker for user:', userId);
+        marker.remove();
+        friendMarkersRef.current.delete(userId);
+      }
+    });
 
-    // Clear existing friend markers
-    markersRef.current.forEach(marker => marker.remove());
-    markersRef.current = [];
-
-    // Add markers for each friend
+    // Add or update markers for current friends
     friends.forEach((friend) => {
-      const el = document.createElement('div');
-      el.className = 'friend-marker';
-      el.style.width = '60px';
-      el.style.height = '60px';
-      el.style.cursor = 'pointer';
+      const existingMarker = friendMarkersRef.current.get(friend.user_id);
       
-      // Determine ring color and badge based on relationship type
-      const ringColors = {
-        close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.8)', badge: '💛' },
-        direct: { border: '#a855f7', shadow: 'rgba(168, 85, 247, 0.8)', badge: '' },
-        mutual: { border: '#6366f1', shadow: 'rgba(99, 102, 241, 0.8)', badge: '🔗' },
-      };
-      
-      const colors = ringColors[friend.relationshipType || 'direct'];
-      
-      // Create avatar with colored ring
-      el.innerHTML = `
-        <div style="position: relative; width: 100%; height: 100%;">
-          <div style="position: absolute; inset: 0; border-radius: 50%; border: 3px solid ${colors.border}; box-shadow: 0 0 20px ${colors.shadow}, inset 0 0 20px ${colors.shadow.replace('0.8', '0.3')}"></div>
-          <img 
-            src="${friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`}" 
-            style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; padding: 4px;"
-            alt="${friend.profiles?.display_name}"
-          />
-          ${colors.badge ? `
-            <div style="position: absolute; bottom: -2px; right: -2px; width: 20px; height: 20px; background: #1a0f2e; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid ${colors.border}; font-size: 12px;">
-              ${colors.badge}
-            </div>
-          ` : ''}
-        </div>
-      `;
-
-      el.addEventListener('click', () => {
-        const friendCardData: FriendCardData = {
-          userId: friend.user_id,
-          displayName: friend.profiles?.display_name || 'Friend',
-          avatarUrl: friend.profiles?.avatar_url || null,
-          venueName: friend.venue_name,
-          lat: friend.lat,
-          lng: friend.lng,
-          relationshipType: friend.relationshipType,
+      if (existingMarker) {
+        // Update existing marker position (no duplicate created)
+        existingMarker.setLngLat([friend.lng, friend.lat]);
+      } else {
+        // Create new marker only if doesn't exist
+        const el = document.createElement('div');
+        el.className = 'friend-marker';
+        el.style.width = '60px';
+        el.style.height = '60px';
+        el.style.cursor = 'pointer';
+        
+        // Determine ring color and badge based on relationship type
+        const ringColors = {
+          close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.8)', badge: '💛' },
+          direct: { border: '#a855f7', shadow: 'rgba(168, 85, 247, 0.8)', badge: '' },
+          mutual: { border: '#6366f1', shadow: 'rgba(99, 102, 241, 0.8)', badge: '🔗' },
         };
-        openFriendCard(friendCardData);
-      });
+        
+        const colors = ringColors[friend.relationshipType || 'direct'];
+        
+        // Create avatar with colored ring
+        el.innerHTML = `
+          <div style="position: relative; width: 100%; height: 100%;">
+            <div style="position: absolute; inset: 0; border-radius: 50%; border: 3px solid ${colors.border}; box-shadow: 0 0 20px ${colors.shadow}, inset 0 0 20px ${colors.shadow.replace('0.8', '0.3')}"></div>
+            <img 
+              src="${friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`}" 
+              style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; padding: 4px;"
+              alt="${friend.profiles?.display_name}"
+            />
+            ${colors.badge ? `
+              <div style="position: absolute; bottom: -2px; right: -2px; width: 20px; height: 20px; background: #1a0f2e; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid ${colors.border}; font-size: 12px;">
+                ${colors.badge}
+              </div>
+            ` : ''}
+          </div>
+        `;
 
-      const marker = new mapboxgl.Marker({ 
-        element: el, 
-        anchor: 'center' 
-      })
-        .setLngLat([friend.lng, friend.lat])
-        .addTo(map.current!);
+        el.addEventListener('click', () => {
+          const friendCardData: FriendCardData = {
+            userId: friend.user_id,
+            displayName: friend.profiles?.display_name || 'Friend',
+            avatarUrl: friend.profiles?.avatar_url || null,
+            venueName: friend.venue_name,
+            lat: friend.lat,
+            lng: friend.lng,
+            relationshipType: friend.relationshipType,
+          };
+          openFriendCard(friendCardData);
+        });
 
-      markersRef.current.push(marker);
+        const marker = new mapboxgl.Marker({ 
+          element: el, 
+          anchor: 'center' 
+        })
+          .setLngLat([friend.lng, friend.lat])
+          .addTo(map.current!);
+
+        // Store marker by user_id (prevents duplicates)
+        friendMarkersRef.current.set(friend.user_id, marker);
+        console.log('Added marker for user:', friend.user_id);
+      }
     });
   }, [friends]);
 
