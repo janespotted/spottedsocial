@@ -6,12 +6,16 @@ import { useMeetUp } from '@/contexts/MeetUpContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MapPin, Zap, UserPlus, MessageSquare, ChevronRight } from 'lucide-react';
+import { MapPin, Zap, UserPlus, MessageSquare, ChevronRight, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useDemoMode } from '@/hooks/useDemoMode';
+import { useUserCity } from '@/hooks/useUserCity';
+import { getDemoUsersForCity, getPromotedVenuesForCity } from '@/lib/demo-data';
+import type { SupportedCity } from '@/lib/city-detection';
 
 interface Activity {
   id: string;
-  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite';
+  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite';
   title: string;
   subtitle?: string;
   timestamp: string;
@@ -21,6 +25,60 @@ interface Activity {
   action?: 'meet_up' | 'view' | 'accept_decline' | 'message';
 }
 
+const generateDemoActivities = (city: SupportedCity): Activity[] => {
+  const demoUsers = getDemoUsersForCity(city);
+  const venues = getPromotedVenuesForCity(city);
+  
+  if (demoUsers.length < 4 || venues.length < 2) return [];
+  
+  return [
+    {
+      id: 'demo-meetup-1',
+      type: 'meet_up',
+      title: `${demoUsers[0].display_name} asked to`,
+      subtitle: 'Meet Up',
+      timestamp: new Date(Date.now() - 15 * 60000).toISOString(),
+      avatar_url: demoUsers[0].avatar_url,
+      user_id: `demo-user-${demoUsers[0].username}`,
+      display_name: demoUsers[0].display_name,
+      action: 'message',
+    },
+    {
+      id: 'demo-invite-1',
+      type: 'venue_invite',
+      title: `${demoUsers[1].display_name} invited you to`,
+      subtitle: venues[0].name,
+      timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
+      avatar_url: demoUsers[1].avatar_url,
+      user_id: `demo-user-${demoUsers[1].username}`,
+      display_name: demoUsers[1].display_name,
+      action: 'view',
+    },
+    {
+      id: 'demo-meetup-2',
+      type: 'meet_up',
+      title: `${demoUsers[2].display_name} asked to`,
+      subtitle: 'Meet Up',
+      timestamp: new Date(Date.now() - 45 * 60000).toISOString(),
+      avatar_url: demoUsers[2].avatar_url,
+      user_id: `demo-user-${demoUsers[2].username}`,
+      display_name: demoUsers[2].display_name,
+      action: 'message',
+    },
+    {
+      id: 'demo-invite-2',
+      type: 'venue_invite',
+      title: `${demoUsers[3].display_name} invited you to`,
+      subtitle: venues[1].name,
+      timestamp: new Date(Date.now() - 60 * 60000).toISOString(),
+      avatar_url: demoUsers[3].avatar_url,
+      user_id: `demo-user-${demoUsers[3].username}`,
+      display_name: demoUsers[3].display_name,
+      action: 'view',
+    },
+  ];
+};
+
 export function ActivityTab() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -28,13 +86,15 @@ export function ActivityTab() {
   const { sendMeetUpNotification } = useMeetUp();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
+  const demoEnabled = useDemoMode();
+  const { city } = useUserCity();
 
   useEffect(() => {
     if (user) {
       fetchActivities();
       fetchFriendRequests();
     }
-  }, [user]);
+  }, [user, demoEnabled, city]);
 
   const fetchFriendRequests = async () => {
     const { data } = await supabase
@@ -65,8 +125,9 @@ export function ActivityTab() {
       ...(receivedFriendships?.map(f => f.user_id) || [])
     ];
 
-    if (friendIds.length > 0) {
+    const activityList: Activity[] = [];
 
+    if (friendIds.length > 0) {
       // Get recent check-ins
       const { data: checkIns } = await supabase
         .from('checkins')
@@ -80,8 +141,6 @@ export function ActivityTab() {
         .in('user_id', friendIds)
         .order('created_at', { ascending: false })
         .limit(10);
-
-      const activityList: Activity[] = [];
 
       if (checkIns) {
         checkIns.forEach(checkIn => {
@@ -98,21 +157,27 @@ export function ActivityTab() {
           });
         });
       }
-
-      // Add mock activities
-      activityList.push({
-        id: 'trending-1',
-        type: 'trending',
-        title: 'The Box is trending',
-        subtitle: '12+ here now',
-        timestamp: new Date(Date.now() - 300000).toISOString(),
-        action: 'view',
-      });
-
-      setActivities(activityList.sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      ));
     }
+
+    // Add demo activities when demo mode is enabled
+    if (demoEnabled) {
+      const demoActivities = generateDemoActivities(city);
+      activityList.push(...demoActivities);
+    }
+
+    // Add mock trending activity
+    activityList.push({
+      id: 'trending-1',
+      type: 'trending',
+      title: 'The Box is trending',
+      subtitle: '12+ here now',
+      timestamp: new Date(Date.now() - 300000).toISOString(),
+      action: 'view',
+    });
+
+    setActivities(activityList.sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    ));
   };
 
   const getTimeAgo = (date: string) => {
@@ -127,6 +192,10 @@ export function ActivityTab() {
         return <Zap className="h-8 w-8 text-[#d4ff00]" />;
       case 'friend_request':
         return <UserPlus className="h-6 w-6 text-[#d4ff00]" />;
+      case 'meet_up':
+        return <Users className="h-6 w-6 text-[#a855f7]" />;
+      case 'venue_invite':
+        return <MapPin className="h-6 w-6 text-[#a855f7]" />;
       default:
         return null;
     }
@@ -183,7 +252,7 @@ export function ActivityTab() {
                   <button
                     onClick={() => activity.user_id && openFriendCard({
                       userId: activity.user_id,
-                      displayName: activity.title,
+                      displayName: activity.display_name || activity.title,
                       avatarUrl: activity.avatar_url || null,
                       venueName: activity.type === 'check_in' ? activity.subtitle : undefined,
                     })}
@@ -192,7 +261,7 @@ export function ActivityTab() {
                     <Avatar className="h-12 w-12 border-2 border-[#a855f7] cursor-pointer">
                       <AvatarImage src={activity.avatar_url || undefined} />
                       <AvatarFallback className="bg-[#1a0f2e] text-white">
-                        {activity.title[0]}
+                        {activity.display_name?.[0] || activity.title[0]}
                       </AvatarFallback>
                     </Avatar>
                   </button>
