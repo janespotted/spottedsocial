@@ -130,48 +130,62 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   };
 
   const createThread = async (friendId: string) => {
-    // Check if thread already exists
-    const { data: existingThreads } = await supabase
-      .from('dm_thread_members')
-      .select('thread_id')
-      .eq('user_id', user?.id);
+    try {
+      // Step 1: Get all thread IDs where current user is a member
+      const { data: myThreads } = await supabase
+        .from('dm_thread_members')
+        .select('thread_id')
+        .eq('user_id', user?.id);
 
-    if (existingThreads) {
-      for (const { thread_id } of existingThreads) {
-        const { data: members } = await supabase
+      if (myThreads && myThreads.length > 0) {
+        const myThreadIds = myThreads.map(t => t.thread_id);
+
+        // Step 2: Single query - find if friend is in any of my threads
+        const { data: friendInThread } = await supabase
           .from('dm_thread_members')
-          .select('user_id')
-          .eq('thread_id', thread_id);
+          .select('thread_id')
+          .eq('user_id', friendId)
+          .in('thread_id', myThreadIds)
+          .limit(1)
+          .maybeSingle();
 
-        if (members && members.length === 2) {
-          const memberIds = members.map(m => m.user_id);
-          if (memberIds.includes(friendId) && memberIds.includes(user!.id)) {
-            // Thread exists, navigate to it
-            onOpenChange(false);
-            navigate(`/messages/${thread_id}`);
-            return;
-          }
+        if (friendInThread) {
+          // Thread exists, navigate to it
+          onOpenChange(false);
+          navigate(`/messages/${friendInThread.thread_id}`);
+          return;
         }
       }
+
+      // Step 3: No existing thread found, create new one
+      const { data: newThread, error: threadError } = await supabase
+        .from('dm_threads')
+        .insert({})
+        .select()
+        .single();
+
+      if (threadError || !newThread) {
+        throw new Error('Failed to create thread');
+      }
+
+      // Step 4: Add both users as members
+      const { error: membersError } = await supabase
+        .from('dm_thread_members')
+        .insert([
+          { thread_id: newThread.id, user_id: user!.id },
+          { thread_id: newThread.id, user_id: friendId },
+        ]);
+
+      if (membersError) {
+        throw new Error('Failed to add members to thread');
+      }
+
+      onOpenChange(false);
+      navigate(`/messages/${newThread.id}`);
+    } catch (error) {
+      console.error('Error in createThread:', error);
+      setIsCreatingThread(false);
     }
-
-    // Create new thread
-    const { data: newThread } = await supabase
-      .from('dm_threads')
-      .insert({})
-      .select()
-      .single();
-
-    if (!newThread) return;
-
-    // Add both users as members
-    await supabase.from('dm_thread_members').insert([
-      { thread_id: newThread.id, user_id: user!.id },
-      { thread_id: newThread.id, user_id: friendId },
-    ]);
-
-    onOpenChange(false);
-    navigate(`/messages/${newThread.id}`);
   };
 
   const filteredFriends = friends.filter(
