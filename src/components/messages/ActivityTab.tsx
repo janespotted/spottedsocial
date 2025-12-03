@@ -180,6 +180,7 @@ export function ActivityTab() {
       subtitle: '12+ here now',
       timestamp: new Date(Date.now() - 300000).toISOString(),
       action: 'view',
+      venue_id: 'eb5df239-48cf-4cae-8b18-d69a6f395a21',
     });
 
     setActivities(activityList.sort((a, b) => 
@@ -441,6 +442,7 @@ export function ActivityTab() {
 
                 {activity.type === 'trending' && (
                   <Button
+                    onClick={() => handleViewVenue(activity.venue_id, activity.title.replace(' is trending', ''))}
                     size="sm"
                     className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
                   >
