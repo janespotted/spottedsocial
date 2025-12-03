@@ -18,6 +18,7 @@ import { getDemoMode } from '@/lib/demo-data';
 import { captureLocationWithVenue } from '@/lib/location-service';
 import { autoTrackVenue } from '@/lib/auto-venue-tracker';
 import { haptic } from '@/lib/haptics';
+import { logEvent } from '@/lib/event-logger';
 
 interface MeetUpContextType {
   recipientUserId: string | null;
@@ -158,6 +159,13 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
       if (insertError) throw insertError;
 
       console.log('Meet up notification created successfully:', insertedNotification);
+
+      // Log invite sent
+      logEvent('invite_sent', {
+        type: 'meetup_request',
+        recipient_id: userId,
+        recipient_name: displayName,
+      });
 
       // Show confirmation card
       setRecipientUserId(userId);

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
+import { logEvent } from '@/lib/event-logger';
 
 interface Notification {
   id: string;
@@ -102,6 +103,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           } as Notification;
 
           console.log('Setting latest notification:', newNotification);
+
+          // Log invite received for relevant types
+          if (['meetup_request', 'venue_invite'].includes(newNotification.type)) {
+            logEvent('invite_received', {
+              type: newNotification.type,
+              sender_id: newNotification.sender_id,
+              sender_name: profile?.display_name,
+            });
+          }
 
           setNotifications(prev => [newNotification, ...prev]);
           setLatestNotification(newNotification);

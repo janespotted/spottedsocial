@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { captureLocationWithVenue, calculateDistance, findNearestVenue, type LocationData } from './location-service';
+import { logEvent } from './event-logger';
 
 interface LastCheckin {
   id: string;
@@ -305,6 +306,16 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
     console.log('✨ Auto-updating venue from', lastCheckin.venue_name, 'to', nearestVenue.name);
     
     await createCheckin(userId, locationData, nearestVenue.id, nearestVenue.name);
+    
+    // Log location update
+    logEvent('location_update', {
+      venue_id: nearestVenue.id,
+      venue_name: nearestVenue.name,
+      lat: locationData.lat,
+      lng: locationData.lng,
+      previous_venue: lastCheckin.venue_name,
+      source: 'auto_track',
+    });
 
     // Update tracking state
     trackingState.lastGPS = {

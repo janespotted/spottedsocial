@@ -7,6 +7,7 @@ import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useImDown } from '@/contexts/ImDownContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { logEvent } from '@/lib/event-logger';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users } from 'lucide-react';
@@ -239,6 +240,13 @@ export function ActivityTab() {
         type: 'meetup_accepted',
         message: `${myName} is down to meet up! 🎉`,
       });
+      
+      // Log invite accepted
+      logEvent('invite_accepted', {
+        type: 'meetup_request',
+        sender_id: activity.user_id,
+        sender_name: activity.display_name,
+      });
     }
 
     // Show confirmation card
@@ -269,6 +277,14 @@ export function ActivityTab() {
         receiver_id: activity.user_id,
         type: 'venue_invite_accepted',
         message: `${myName} is down for ${activity.subtitle}! 🎉`,
+      });
+      
+      // Log invite accepted
+      logEvent('invite_accepted', {
+        type: 'venue_invite',
+        sender_id: activity.user_id,
+        sender_name: activity.display_name,
+        venue_name: activity.subtitle,
       });
     }
 

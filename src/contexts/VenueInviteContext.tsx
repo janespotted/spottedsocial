@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
+import { logEvent } from '@/lib/event-logger';
 
 interface VenueInviteContextType {
   showInviteModal: boolean;
@@ -84,6 +85,15 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
         .insert(notifications);
 
       if (error) throw error;
+
+      // Log invite sent
+      logEvent('invite_sent', {
+        type: 'venue_invite',
+        venue_id: venueId,
+        venue_name: venueName,
+        recipient_count: filteredFriends.length,
+        recipient_ids: filteredFriends.map(f => f.id),
+      });
 
       // Close modal and show confirmation
       setShowInviteModal(false);
