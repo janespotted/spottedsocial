@@ -324,9 +324,14 @@ export function ActivityTab() {
       {/* Activity Header */}
       <h2 className="text-2xl font-bold text-white">Activity</h2>
 
-      {/* Activity List */}
-      <div className="space-y-3">
-        {activities.map((activity) => (
+      {/* Sectioned Activity List */}
+      {(() => {
+        // Group activities by section
+        const invites = activities.filter(a => a.type === 'meet_up' || a.type === 'venue_invite');
+        const friendsOut = activities.filter(a => a.type === 'check_in');
+        const trending = activities.filter(a => a.type === 'trending');
+
+        const renderActivityCard = (activity: Activity) => (
           <div
             key={activity.id}
             className={`rounded-2xl p-4 transition-all hover:scale-[1.01] ${CARD_STYLE}`}
@@ -438,16 +443,56 @@ export function ActivityTab() {
               </div>
             </div>
           </div>
-        ))}
+        );
 
-        {activities.length === 0 && (
+        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0;
+
+        return hasContent ? (
+          <div className="space-y-5">
+            {/* Section 1: Invites to You */}
+            {invites.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  Invites to You
+                </h3>
+                <div className="space-y-3">
+                  {invites.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
+
+            {/* Section 2: Friends Out Now */}
+            {friendsOut.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  Friends Out Now
+                </h3>
+                <div className="space-y-3">
+                  {friendsOut.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
+
+            {/* Section 3: Trending Now */}
+            {trending.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  Trending Now
+                </h3>
+                <div className="space-y-3">
+                  {trending.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
           <div className="text-center py-12">
             <MapPin className="h-16 w-16 mx-auto text-white/20 mb-4" />
             <p className="text-white/60">No recent activity</p>
             <p className="text-white/40 text-sm mt-2">Check in to see what your friends are up to</p>
           </div>
-        )}
-      </div>
+        );
+      })()}
     </div>
   );
 }
