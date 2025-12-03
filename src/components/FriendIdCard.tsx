@@ -369,10 +369,10 @@ export function FriendIdCard() {
                   <CloseIcon className="h-4 w-4 text-white" />
                   <span className="sr-only">Close</span>
                 </button>
-                <div className="p-5 pt-12 relative">
+                <div className="p-5 pt-8 relative">
               {/* Three-dot menu positioned below the X close button */}
               <DropdownMenu>
-                <DropdownMenuTrigger className="absolute right-0 top-8 p-1 rounded-full hover:bg-white/10 transition-colors">
+                <DropdownMenuTrigger className="absolute right-4 top-0 p-1 rounded-full hover:bg-white/10 transition-colors">
                   <MoreVertical className="h-5 w-5 text-white/60" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
