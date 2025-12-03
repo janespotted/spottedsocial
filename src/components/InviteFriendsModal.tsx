@@ -72,7 +72,17 @@ export function InviteFriendsModal() {
       
       const { data: profiles } = await profileQuery.order('display_name', { ascending: true });
 
-      setFriends(profiles || []);
+      // Deduplicate by display_name (keeps first occurrence)
+      const seenNames = new Set<string>();
+      const uniqueFriends = (profiles || []).filter(friend => {
+        if (seenNames.has(friend.display_name)) {
+          return false;
+        }
+        seenNames.add(friend.display_name);
+        return true;
+      });
+
+      setFriends(uniqueFriends);
     } catch (error) {
       console.error('Error fetching friends:', error);
     } finally {

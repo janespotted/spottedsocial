@@ -92,9 +92,19 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
 
     if (!profiles) return;
 
+    // Deduplicate by display_name (keeps first occurrence)
+    const seenNames = new Set<string>();
+    const uniqueProfiles = profiles.filter(profile => {
+      if (seenNames.has(profile.display_name)) {
+        return false;
+      }
+      seenNames.add(profile.display_name);
+      return true;
+    });
+
     // Get their current venues
     const friendsData = await Promise.all(
-      profiles.map(async (profile) => {
+      uniqueProfiles.map(async (profile) => {
         const { data: status } = await supabase
           .from('night_statuses')
           .select('venue_name')
