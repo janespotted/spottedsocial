@@ -206,7 +206,7 @@ export default function Home() {
                 <Avatar 
                   className={`h-16 w-16 border-2 ${
                     storyUser.has_unviewed 
-                      ? 'border-[#d4ff00] shadow-[0_0_20px_rgba(212,255,0,0.8)]' 
+                      ? 'border-[#d4ff00] shadow-[0_0_15px_rgba(212,255,0,0.35)]' 
                       : 'border-[#a855f7]/40'
                   }`}
                 >

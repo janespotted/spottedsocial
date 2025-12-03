@@ -196,7 +196,7 @@ export default function Feed() {
                 <Avatar 
                   className={`h-16 w-16 border-[3px] ${
                     storyUser.has_unviewed 
-                      ? 'border-[#d4ff00] ring-2 ring-[#d4ff00]/30' 
+                      ? 'border-[#d4ff00] shadow-[0_0_15px_rgba(212,255,0,0.35)]' 
                       : 'border-[#a855f7]/40'
                   }`}
                 >
