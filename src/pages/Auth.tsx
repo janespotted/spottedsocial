@@ -20,6 +20,13 @@ export default function Auth() {
   const inviteCode = searchParams.get('invite');
   
   const [isLogin, setIsLogin] = useState(!inviteCode); // Default to signup if invite code present
+
+  // Store invite code in localStorage for processing after email confirmation
+  useEffect(() => {
+    if (inviteCode) {
+      localStorage.setItem('pending_invite_code', inviteCode);
+    }
+  }, [inviteCode]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -137,15 +144,17 @@ export default function Auth() {
           throw error;
         }
 
-        // Process invite code if signup was successful and we have a session
-        if (data?.user && data.session && inviteCode) {
-          await processInviteCode(data.user.id);
-        }
-
         // Check if email confirmation is required
         if (data?.user && !data.session) {
+          // Invite code already stored in localStorage, will be processed on email confirm
           toast.success('Account created! Please check your email to confirm.');
-        } else {
+        } else if (data?.user && data.session) {
+          // Process invite code immediately if we have a session
+          const pendingInvite = localStorage.getItem('pending_invite_code');
+          if (pendingInvite) {
+            await processInviteCode(data.user.id);
+            localStorage.removeItem('pending_invite_code');
+          }
           toast.success('Welcome to Spotted!');
           navigate('/');
         }
