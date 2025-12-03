@@ -509,13 +509,7 @@ export function YapTab() {
                               >
                                 <ChevronUp className="h-4 w-4" />
                               </button>
-                              <span className={cn(
-                                'font-bold text-xs',
-                                comment.score > 10 ? 'text-[#d4ff00]' :
-                                comment.score > 0 ? 'text-white' :
-                                comment.score < 0 ? 'text-red-400' :
-                                'text-white/60'
-                              )}>
+                              <span className="font-bold text-xs text-white">
                                 {comment.score}
                               </span>
                               <button
@@ -574,13 +568,7 @@ export function YapTab() {
                     >
                       <ChevronUp className="h-5 w-5" />
                     </button>
-                    <span className={cn(
-                      'font-bold text-sm',
-                      msg.score > 50 ? 'text-[#d4ff00]' : 
-                      msg.score > 20 ? 'text-white' : 
-                      msg.score < 0 ? 'text-red-400' :
-                      'text-white/60'
-                    )}>
+                    <span className="font-bold text-sm text-white">
                       {msg.score}
                     </span>
                     <button 
