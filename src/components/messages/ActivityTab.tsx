@@ -409,7 +409,7 @@ export function ActivityTab() {
                   <Button
                     onClick={() => handleMeetUp(activity)}
                     size="sm"
-                    className="h-7 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs"
+                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
                   >
                     Meet Up
                   </Button>
