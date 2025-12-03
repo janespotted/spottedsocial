@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { logEvent } from '@/lib/event-logger';
 
 interface AuthContextType {
   user: User | null;
@@ -60,6 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Process pending invite on sign in (covers email confirmation and login)
         if (event === 'SIGNED_IN' && session?.user) {
+          // Log user login event
+          logEvent('user_login', { method: 'auth_state_change' });
+          
           // Defer to avoid Supabase deadlock
           setTimeout(() => {
             processPendingInvite(session.user.id);

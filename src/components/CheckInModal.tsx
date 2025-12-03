@@ -13,6 +13,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
 import { haptic } from '@/lib/haptics';
 import { requestNotificationPermission } from '@/lib/notifications';
+import { logEvent } from '@/lib/event-logger';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -387,6 +388,16 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           lng,
           started_at: new Date().toISOString(),
           last_updated_at: new Date().toISOString(),
+        });
+        
+        // Log location update
+        logEvent('location_update', {
+          venue_id: venueId,
+          venue_name: venue,
+          lat,
+          lng,
+          source: 'manual_checkin',
+          status,
         });
       } else if (status === 'home') {
         // End all active check-ins when going home
