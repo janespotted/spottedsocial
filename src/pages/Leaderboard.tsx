@@ -271,7 +271,7 @@ export default function Leaderboard() {
 
   const renderEnergyBars = (level: number) => {
     return (
-      <div className="flex gap-1">
+      <div className="flex gap-1 items-end">
         {[1, 2, 3].map((bar) => (
           <div
             key={bar}
