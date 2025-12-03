@@ -369,31 +369,32 @@ export function FriendIdCard() {
                   <CloseIcon className="h-4 w-4 text-white" />
                   <span className="sr-only">Close</span>
                 </button>
-                <div className="p-5 pt-8 relative">
-              {/* Three-dot menu positioned below the X close button */}
-              <DropdownMenu>
-                <DropdownMenuTrigger className="absolute right-4 top-8 p-1 rounded-full hover:bg-white/10 transition-colors">
-                  <MoreVertical className="h-5 w-5 text-white/60" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
-                  <DropdownMenuItem 
-                    onClick={() => setShowReportDialog(true)}
-                    className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
-                  >
-                    <Flag className="h-4 w-4 mr-2" />
-                    Report User
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={handleBlockUser}
-                    className="text-red-400 hover:bg-red-500/20 cursor-pointer"
-                  >
-                    <Ban className="h-4 w-4 mr-2" />
-                    Block User
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                
+                {/* Three-dot menu positioned below the X close button */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="absolute right-4 top-10 z-20 p-1 rounded-full hover:bg-white/10 transition-colors">
+                    <MoreVertical className="h-5 w-5 text-white/60" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
+                    <DropdownMenuItem 
+                      onClick={() => setShowReportDialog(true)}
+                      className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
+                    >
+                      <Flag className="h-4 w-4 mr-2" />
+                      Report User
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={handleBlockUser}
+                      className="text-red-400 hover:bg-red-500/20 cursor-pointer"
+                    >
+                      <Ban className="h-4 w-4 mr-2" />
+                      Block User
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
-              <div className="flex items-start gap-4 mb-4">
+                <div className="p-5 pt-8 relative">
+                <div className="flex items-start gap-4 mb-4">
                 {/* Large Avatar */}
                 <Avatar className="h-20 w-20 border-[3px] border-[#a855f7] flex-shrink-0">
                   <AvatarImage src={selectedFriend.avatarUrl || undefined} />
