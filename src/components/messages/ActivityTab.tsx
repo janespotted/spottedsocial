@@ -3,14 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
+import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MapPin, Zap, UserPlus, MessageSquare, ChevronRight, Users } from 'lucide-react';
+import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useUserCity } from '@/hooks/useUserCity';
 import { getDemoUsersForCity, getPromotedVenuesForCity } from '@/lib/demo-data';
+import { toast } from '@/hooks/use-toast';
 import type { SupportedCity } from '@/lib/city-detection';
 
 interface Activity {
@@ -22,6 +24,7 @@ interface Activity {
   avatar_url?: string | null;
   user_id?: string;
   display_name?: string;
+  venue_id?: string;
   action?: 'meet_up' | 'view' | 'accept_decline' | 'message';
 }
 
@@ -41,7 +44,6 @@ const generateDemoActivities = (city: SupportedCity): Activity[] => {
       avatar_url: demoUsers[0].avatar_url,
       user_id: `demo-user-${demoUsers[0].username}`,
       display_name: demoUsers[0].display_name,
-      action: 'message',
     },
     {
       id: 'demo-invite-1',
@@ -52,7 +54,6 @@ const generateDemoActivities = (city: SupportedCity): Activity[] => {
       avatar_url: demoUsers[1].avatar_url,
       user_id: `demo-user-${demoUsers[1].username}`,
       display_name: demoUsers[1].display_name,
-      action: 'view',
     },
     {
       id: 'demo-meetup-2',
@@ -63,7 +64,6 @@ const generateDemoActivities = (city: SupportedCity): Activity[] => {
       avatar_url: demoUsers[2].avatar_url,
       user_id: `demo-user-${demoUsers[2].username}`,
       display_name: demoUsers[2].display_name,
-      action: 'message',
     },
     {
       id: 'demo-invite-2',
@@ -74,7 +74,6 @@ const generateDemoActivities = (city: SupportedCity): Activity[] => {
       avatar_url: demoUsers[3].avatar_url,
       user_id: `demo-user-${demoUsers[3].username}`,
       display_name: demoUsers[3].display_name,
-      action: 'view',
     },
   ];
 };
@@ -83,6 +82,7 @@ export function ActivityTab() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { openFriendCard } = useFriendIdCard();
+  const { openVenueCard } = useVenueIdCard();
   const { sendMeetUpNotification } = useMeetUp();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
@@ -211,6 +211,87 @@ export function ActivityTab() {
     );
   };
 
+  const handleAcceptMeetUp = async (activity: Activity) => {
+    if (!user || !activity.user_id) return;
+
+    // Get current user's display name
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .single();
+
+    const myName = profile?.display_name?.split(' ')[0] || 'Someone';
+
+    // Send acceptance notification back
+    if (!activity.user_id.startsWith('demo-')) {
+      await supabase.from('notifications').insert({
+        sender_id: user.id,
+        receiver_id: activity.user_id,
+        type: 'meetup_accepted',
+        message: `${myName} is down to meet up! 🎉`,
+      });
+    }
+
+    toast({
+      title: "You're in! 🎉",
+      description: `Let ${activity.display_name?.split(' ')[0]} know you're down`,
+    });
+  };
+
+  const handleAcceptVenueInvite = async (activity: Activity) => {
+    if (!user || !activity.user_id) return;
+
+    // Get current user's display name
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .single();
+
+    const myName = profile?.display_name?.split(' ')[0] || 'Someone';
+
+    // Send acceptance notification back
+    if (!activity.user_id.startsWith('demo-')) {
+      await supabase.from('notifications').insert({
+        sender_id: user.id,
+        receiver_id: activity.user_id,
+        type: 'venue_invite_accepted',
+        message: `${myName} is down for ${activity.subtitle}! 🎉`,
+      });
+    }
+
+    toast({
+      title: "You're in! 🎉",
+      description: `Let ${activity.display_name?.split(' ')[0]} know you're down for ${activity.subtitle}`,
+    });
+  };
+
+  const handleOpenChat = (activity: Activity) => {
+    if (!activity.user_id || !activity.display_name) return;
+    
+    navigate('/messages', {
+      state: {
+        preselectedUser: {
+          userId: activity.user_id,
+          displayName: activity.display_name,
+          avatarUrl: activity.avatar_url || null,
+        }
+      }
+    });
+  };
+
+  const handleViewVenue = (venueId?: string, venueName?: string) => {
+    if (venueId) {
+      openVenueCard(venueId);
+    } else if (venueName) {
+      toast({
+        title: venueName,
+        description: "Venue details coming soon!",
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Friend Requests */}
@@ -283,8 +364,48 @@ export function ActivityTab() {
                 <p className="text-white/60 text-sm mt-0.5">{getTimeAgo(activity.timestamp)} ago</p>
               </div>
 
-              {/* Action */}
-              {activity.action === 'meet_up' && (
+              {/* Actions */}
+              {activity.type === 'meet_up' && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => handleAcceptMeetUp(activity)}
+                    size="sm"
+                    className="bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs"
+                  >
+                    I'm down! 🎉
+                  </Button>
+                  <Button
+                    onClick={() => handleOpenChat(activity)}
+                    size="sm"
+                    variant="ghost"
+                    className="text-white/60 hover:text-white hover:bg-[#a855f7]/20 rounded-full p-2"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              {activity.type === 'venue_invite' && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => handleAcceptVenueInvite(activity)}
+                    size="sm"
+                    className="bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs"
+                  >
+                    I'm down! 🎉
+                  </Button>
+                  <Button
+                    onClick={() => handleViewVenue(activity.venue_id, activity.subtitle)}
+                    size="sm"
+                    variant="ghost"
+                    className="text-white/60 hover:text-white hover:bg-[#a855f7]/20 rounded-full px-3 text-xs"
+                  >
+                    View
+                  </Button>
+                </div>
+              )}
+
+              {activity.action === 'meet_up' && activity.type === 'check_in' && (
                 <Button
                   onClick={() => handleMeetUp(activity)}
                   variant="outline"
@@ -293,34 +414,14 @@ export function ActivityTab() {
                   Meet Up
                 </Button>
               )}
-              {activity.action === 'view' && (
+
+              {activity.action === 'view' && activity.type === 'trending' && (
                 <Button
                   variant="outline"
                   className="border-2 border-[#a855f7] bg-transparent text-[#a855f7] hover:bg-[#a855f7]/10 hover:text-[#a855f7] rounded-full px-4 py-1"
                 >
                   View
                 </Button>
-              )}
-              {activity.action === 'message' && (
-                <button className="text-white hover:text-[#d4ff00] transition-colors">
-                  <MessageSquare className="h-6 w-6" />
-                </button>
-              )}
-              {activity.action === 'accept_decline' && (
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 hover:text-[#d4ff00] rounded-full px-4 py-1"
-                  >
-                    Accept
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-2 border-white/20 bg-transparent text-white/60 hover:bg-white/10 hover:text-white rounded-full px-4 py-1"
-                  >
-                    Decline
-                  </Button>
-                </div>
               )}
             </div>
           </div>
