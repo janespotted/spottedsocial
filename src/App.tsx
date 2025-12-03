@@ -11,6 +11,7 @@ import { VenueIdCardProvider } from "./contexts/VenueIdCardContext";
 import { MeetUpProvider } from "./contexts/MeetUpContext";
 import { VenueInviteProvider } from "./contexts/VenueInviteContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
+import { ImDownProvider } from "./contexts/ImDownContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { FriendIdCard } from "./components/FriendIdCard";
@@ -18,6 +19,7 @@ import { VenueIdCard } from "./components/VenueIdCard";
 import { MeetUpConfirmation } from "./components/MeetUpConfirmation";
 import { InviteFriendsModal } from "./components/InviteFriendsModal";
 import { VenueInviteConfirmation } from "./components/VenueInviteConfirmation";
+import { ImDownConfirmation } from "./components/ImDownConfirmation";
 import { NotificationBanner } from "./components/NotificationBanner";
 import { useAuth } from "./contexts/AuthContext";
 import { autoTrackVenue } from "./lib/auto-venue-tracker";
@@ -70,13 +72,15 @@ const App = () => (
                 <MeetUpProvider>
                   <VenueInviteProvider>
                     <NotificationsProvider>
-                      <AutoTracker />
-                      <FriendIdCard />
-                      <VenueIdCard />
-                      <MeetUpConfirmation />
-                      <InviteFriendsModal />
-                      <VenueInviteConfirmation />
-                      <NotificationBanner />
+                      <ImDownProvider>
+                        <AutoTracker />
+                        <FriendIdCard />
+                        <VenueIdCard />
+                        <MeetUpConfirmation />
+                        <InviteFriendsModal />
+                        <VenueInviteConfirmation />
+                        <ImDownConfirmation />
+                        <NotificationBanner />
                     <Routes>
                   {/* Public routes */}
                   <Route path="/auth" element={<Auth />} />
@@ -205,6 +209,7 @@ const App = () => (
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
+                      </ImDownProvider>
                     </NotificationsProvider>
                   </VenueInviteProvider>
                 </MeetUpProvider>
