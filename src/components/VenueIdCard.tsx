@@ -11,7 +11,13 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { MapPin, ChevronDown, UserPlus, X as CloseIcon, Share2 } from 'lucide-react';
+import { MapPin, ChevronDown, UserPlus, X as CloseIcon, Share2, MoreVertical, Flag } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -488,6 +494,22 @@ export function VenueIdCard() {
                   <CloseIcon className="h-4 w-4 text-white" />
                   <span className="sr-only">Close</span>
                 </button>
+
+                {/* Three-dot menu positioned below the X close button */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="absolute right-4 top-10 z-20 p-1 rounded-full hover:bg-white/10 transition-colors">
+                    <MoreVertical className="h-5 w-5 text-white/60" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
+                    <DropdownMenuItem 
+                      onClick={() => toast.info('Report venue feature coming soon')}
+                      className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
+                    >
+                      <Flag className="h-4 w-4 mr-2" />
+                      Report Venue
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <div className="flex-1 min-h-0 overflow-y-auto">
                   <div className="p-5">
               {/* Photo Carousel */}
