@@ -356,27 +356,27 @@ export function ActivityTab() {
               {/* Content - takes available space */}
               <div className="flex-1 min-w-0">
                 {activity.type === 'meet_up' && (
-                  <p className="text-white text-sm truncate">
+                  <p className="text-white text-sm">
                     <span className="font-semibold">{activity.display_name}</span>
                     <span className="text-white/80"> wants to meet up</span>
                   </p>
                 )}
                 {activity.type === 'venue_invite' && (
-                  <p className="text-white text-sm truncate">
+                  <p className="text-white text-sm">
                     <span className="font-semibold">{activity.display_name}</span>
                     <span className="text-white/80"> invited you to </span>
                     <span className="font-semibold text-[#d4ff00]">{activity.subtitle}</span>
                   </p>
                 )}
                 {activity.type === 'check_in' && (
-                  <p className="text-white text-sm truncate">
+                  <p className="text-white text-sm">
                     <span className="font-semibold">{activity.display_name}</span>
                     <span className="text-white/80"> is at </span>
                     <span className="font-semibold text-[#d4ff00]">{activity.subtitle}</span>
                   </p>
                 )}
                 {activity.type === 'trending' && (
-                  <p className="text-white text-sm truncate">
+                  <p className="text-white text-sm">
                     <span className="font-semibold text-[#d4ff00]">{activity.title.replace(' is trending', '')}</span>
                     <span className="text-white/80"> is trending · {activity.subtitle}</span>
                   </p>
