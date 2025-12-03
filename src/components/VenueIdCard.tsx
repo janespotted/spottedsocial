@@ -497,7 +497,7 @@ export function VenueIdCard() {
 
                 {/* Three-dot menu positioned below the X close button */}
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="absolute right-4 top-10 z-20 p-1 rounded-full hover:bg-white/10 transition-colors">
+                  <DropdownMenuTrigger className="absolute right-4 top-12 z-20 p-1 rounded-full hover:bg-white/10 transition-colors">
                     <MoreVertical className="h-5 w-5 text-white/60" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
