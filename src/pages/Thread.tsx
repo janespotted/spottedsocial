@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, Camera, Mic, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 
 interface Message {
@@ -17,6 +18,7 @@ interface Message {
   text: string;
   sender_id: string;
   created_at: string;
+  image_url?: string | null;
 }
 
 interface ThreadMember {
@@ -38,7 +40,65 @@ export default function Thread() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherMember, setOtherMember] = useState<ThreadMember | null>(null);
   const [newMessage, setNewMessage] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCameraClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleMicClick = () => {
+    toast.info('Voice messages coming soon! 🎤');
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !threadId) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('dm-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('dm-images')
+        .getPublicUrl(fileName);
+
+      await supabase.from('dm_messages').insert({
+        thread_id: threadId,
+        sender_id: user.id,
+        text: '',
+        image_url: publicUrl,
+      });
+
+      toast.success('Image sent!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to send image');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   const handleVenueClick = async (venueName: string, venueId?: string | null) => {
     if (venueId) {
@@ -271,13 +331,22 @@ export default function Thread() {
                   )}
 
                   <div
-                    className={`max-w-[75%] px-4 py-2.5 rounded-2xl ${
+                    className={`max-w-[75%] rounded-2xl overflow-hidden ${
                       isCurrentUser
                         ? 'bg-[#4c2f6e] text-white rounded-br-sm'
                         : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
                     }`}
                   >
-                    <p className="text-sm leading-relaxed">{message.text}</p>
+                    {message.image_url && (
+                      <img 
+                        src={message.image_url} 
+                        alt="Shared image" 
+                        className="w-full max-w-[250px] rounded-t-2xl"
+                      />
+                    )}
+                    {message.text && (
+                      <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
+                    )}
                   </div>
                 </div>
               );
@@ -289,11 +358,20 @@ export default function Thread() {
 
       {/* Input */}
       <div className="sticky bottom-0 bg-[#1a0f2e]/95 backdrop-blur border-t border-[#a855f7]/20 p-4">
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImageUpload}
+          accept="image/*"
+          className="hidden"
+        />
         <form onSubmit={sendMessage} className="flex items-center gap-3">
           <Button
             type="button"
             size="icon"
             variant="ghost"
+            onClick={handleCameraClick}
+            disabled={isUploading}
             className="text-white/60 hover:text-white hover:bg-[#2d1b4e]"
           >
             <Camera className="h-5 w-5" />
@@ -319,6 +397,7 @@ export default function Thread() {
                 type="button"
                 size="icon"
                 variant="ghost"
+                onClick={handleMicClick}
                 className="text-white/60 hover:text-white hover:bg-[#2d1b4e]"
               >
                 <Mic className="h-5 w-5" />
