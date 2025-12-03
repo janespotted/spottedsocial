@@ -460,8 +460,8 @@ export function FriendIdCard() {
                   </div>
                 )}
 
-                {/* Action Buttons - Hidden for demo users in bootstrap mode */}
-                {!isDemoUser && (
+                {/* Action Buttons - Hidden for demo users only when demo mode is OFF (bootstrap/production) */}
+                {(!isDemoUser || demoEnabled) && (
                   <div className="flex items-center gap-2 flex-1">
                     <button
                       onClick={handleMeetUp}
