@@ -99,7 +99,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       clearInterval(locationIntervalRef.current);
     }
 
-    // Update location every 15 seconds
+    // Update location every 60 seconds (reduced from 15s to lower DB load)
     locationIntervalRef.current = window.setInterval(() => {
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
@@ -121,7 +121,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           }
         );
       }
-    }, 15000); // 15 seconds
+    }, 60000); // 60 seconds
   };
 
   const stopLocationTracking = async () => {

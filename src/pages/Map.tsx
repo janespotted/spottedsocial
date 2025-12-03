@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard, FriendCardData } from '@/contexts/FriendIdCardContext';
@@ -72,6 +72,17 @@ export default function Map() {
     }
   }, [user, demoEnabled]);
 
+  // Debounced fetch to prevent thundering herd on realtime events
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debouncedFetchFriendsLocations = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      fetchFriendsLocations();
+    }, 500); // 500ms debounce
+  }, [user, demoEnabled, city]);
+
   // Real-time subscription for location updates
   useEffect(() => {
     if (!user) return;
@@ -88,8 +99,8 @@ export default function Map() {
         },
         (payload) => {
           console.log('Profile location updated:', payload);
-          // Refresh friends locations when any profile updates
-          fetchFriendsLocations();
+          // Debounced refresh to prevent thundering herd
+          debouncedFetchFriendsLocations();
         }
       )
       .subscribe();
@@ -106,8 +117,8 @@ export default function Map() {
         },
         (payload) => {
           console.log('Night status updated:', payload);
-          // Refresh friends locations when statuses change
-          fetchFriendsLocations();
+          // Debounced refresh
+          debouncedFetchFriendsLocations();
         }
       )
       .subscribe();
@@ -124,18 +135,21 @@ export default function Map() {
         },
         (payload) => {
           console.log('Checkin updated:', payload);
-          // Refresh friends locations when checkins change
-          fetchFriendsLocations();
+          // Debounced refresh
+          debouncedFetchFriendsLocations();
         }
       )
       .subscribe();
 
     return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
       supabase.removeChannel(profileChannel);
       supabase.removeChannel(statusChannel);
       supabase.removeChannel(checkinsChannel);
     };
-  }, [user, demoEnabled]);
+  }, [user, demoEnabled, debouncedFetchFriendsLocations]);
 
   const fetchFriendsLocations = async () => {
     if (!user) return;
@@ -251,7 +265,7 @@ export default function Map() {
             venueMap[s.user_id] = s.venue_name;
           });
 
-          // Get relationship types (close friends, mutual friends)
+          // Get relationship types (close friends, mutual friends) - BATCHED QUERY
           const { data: closeFriends } = await supabase
             .from('close_friends')
             .select('close_friend_id')
@@ -259,23 +273,34 @@ export default function Map() {
 
           const closeFriendIds = new Set(closeFriends?.map(cf => cf.close_friend_id) || []);
 
-          // Determine relationship type for each friend
+          // Batch query: Get all friendships for all friends in one query
+          const { data: allFriendships } = await supabase
+            .from('friendships')
+            .select('user_id, friend_id')
+            .eq('status', 'accepted')
+            .in('user_id', friendIds);
+
+          // Build a map of each friend's connections
+          const friendConnections: Record<string, Set<string>> = {};
+          allFriendships?.forEach(f => {
+            if (!friendConnections[f.user_id]) {
+              friendConnections[f.user_id] = new Set();
+            }
+            friendConnections[f.user_id].add(f.friend_id);
+          });
+
+          // Determine relationship type for each friend in-memory (no N+1)
           const relationshipTypes: Record<string, 'close' | 'direct' | 'mutual'> = {};
+          const friendIdSet = new Set(friendIds);
           
           for (const friendId of friendIds) {
             if (closeFriendIds.has(friendId)) {
               relationshipTypes[friendId] = 'close';
             } else {
-              // Check if mutual friend (friends-of-friends)
-              const { data: commonFriends } = await supabase
-                .from('friendships')
-                .select('friend_id')
-                .eq('user_id', friendId)
-                .eq('status', 'accepted')
-                .in('friend_id', friendIds);
-
-              const isMutual = commonFriends && commonFriends.length > 0;
-              relationshipTypes[friendId] = isMutual ? 'mutual' : 'direct';
+              // Check if mutual friend: does this friend have connections to other friends?
+              const connections = friendConnections[friendId] || new Set();
+              const hasCommonFriend = [...connections].some(connId => friendIdSet.has(connId) && connId !== friendId);
+              relationshipTypes[friendId] = hasCommonFriend ? 'mutual' : 'direct';
             }
           }
 
@@ -303,47 +328,33 @@ export default function Map() {
     }
   };
 
+  // Simplified heat score calculation using popularity_rank instead of expensive queries
   const fetchVenuesWithHeatScores = async (friendIds: string[]) => {
     try {
-      // Fetch all venues
+      // Fetch all venues (single query)
       const { data: venuesData } = await supabase
         .from('venues')
         .select('*');
 
       if (!venuesData) return;
 
-      // Calculate heat score for each venue
-      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      // Use popularity_rank as heat score (inverted: lower rank = higher heat)
+      // This eliminates N+1 queries for posts/yaps per venue
+      const venuesWithHeat = venuesData.map((venue) => {
+        // Count friends at this venue (from already-loaded friends state)
+        const friendsAtVenue = friends.filter(
+          (f) => f.venue_name.toLowerCase() === venue.name.toLowerCase()
+        ).length;
 
-      const venuesWithHeat = await Promise.all(
-        venuesData.map(async (venue) => {
-          // Count friends at this venue
-          const friendsAtVenue = friends.filter(
-            (f) => f.venue_name.toLowerCase() === venue.name.toLowerCase()
-          ).length;
+        // Heat score = friends present + popularity (100 - rank to invert)
+        const popularityScore = 100 - (venue.popularity_rank || 50);
+        const heatScore = (friendsAtVenue * 10) + popularityScore;
 
-          // Count recent posts at this venue
-          const { data: recentPosts } = await supabase
-            .from('posts')
-            .select('id')
-            .eq('venue_name', venue.name)
-            .gte('created_at', twoHoursAgo);
-
-          // Count recent yaps at this venue
-          const { data: recentYaps } = await supabase
-            .from('yap_messages')
-            .select('id')
-            .eq('venue_name', venue.name)
-            .gte('created_at', twoHoursAgo);
-
-          const heatScore = friendsAtVenue + (recentPosts?.length || 0) + (recentYaps?.length || 0);
-
-          return {
-            ...venue,
-            heatScore,
-          };
-        })
-      );
+        return {
+          ...venue,
+          heatScore,
+        };
+      });
 
       // Filter venues within radius if user has location
       let filteredVenues = venuesWithHeat;
@@ -360,7 +371,7 @@ export default function Map() {
         });
       }
 
-      // Sort by heat score
+      // Sort by heat score (descending)
       filteredVenues.sort((a, b) => b.heatScore - a.heatScore);
 
       setVenues(filteredVenues);
