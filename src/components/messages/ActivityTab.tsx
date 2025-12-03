@@ -324,9 +324,10 @@ export function ActivityTab() {
         {activities.map((activity) => (
           <div
             key={activity.id}
-            className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4"
+            className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-3"
           >
-            <div className="flex items-center gap-3">
+            {/* Row 1: Avatar + Text + Timestamp */}
+            <div className="flex items-start gap-3">
               {/* Icon/Avatar */}
               <div className="flex-shrink-0">
                 {activity.avatar_url !== undefined ? (
@@ -339,15 +340,15 @@ export function ActivityTab() {
                     })}
                     className="hover:opacity-80 transition-opacity"
                   >
-                    <Avatar className="h-12 w-12 border-2 border-[#a855f7] cursor-pointer">
+                    <Avatar className="h-10 w-10 border-2 border-[#a855f7] cursor-pointer">
                       <AvatarImage src={activity.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white">
+                      <AvatarFallback className="bg-[#1a0f2e] text-white text-sm">
                         {activity.display_name?.[0] || activity.title[0]}
                       </AvatarFallback>
                     </Avatar>
                   </button>
                 ) : (
-                  <div className="w-12 h-12 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] flex items-center justify-center">
                     {getActivityIcon(activity.type)}
                   </div>
                 )}
@@ -355,74 +356,100 @@ export function ActivityTab() {
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <p className="text-white">
-                  {activity.title}
-                  {activity.subtitle && (
-                    <span className="font-bold text-white"> {activity.subtitle}</span>
+                {/* Activity Text */}
+                {activity.type === 'meet_up' && (
+                  <p className="text-white text-sm">
+                    <span className="font-semibold">{activity.display_name}</span>
+                    <span className="text-white/80"> wants to meet up</span>
+                  </p>
+                )}
+                {activity.type === 'venue_invite' && (
+                  <p className="text-white text-sm">
+                    <span className="font-semibold">{activity.display_name}</span>
+                    <span className="text-white/80"> invited you to </span>
+                    <span className="font-semibold text-[#d4ff00]">{activity.subtitle}</span>
+                  </p>
+                )}
+                {activity.type === 'check_in' && (
+                  <p className="text-white text-sm">
+                    <span className="font-semibold">{activity.display_name}</span>
+                    <span className="text-white/80"> is at </span>
+                    <span className="font-semibold text-[#d4ff00]">{activity.subtitle}</span>
+                  </p>
+                )}
+                {activity.type === 'trending' && (
+                  <p className="text-white text-sm">
+                    <span className="font-semibold text-[#d4ff00]">{activity.title.replace(' is trending', '')}</span>
+                    <span className="text-white/80"> is trending · {activity.subtitle}</span>
+                  </p>
+                )}
+
+                {/* Row 2: Buttons */}
+                <div className="flex items-center gap-2 mt-2">
+                  {activity.type === 'meet_up' && (
+                    <>
+                      <Button
+                        onClick={() => handleAcceptMeetUp(activity)}
+                        size="sm"
+                        className="h-7 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs"
+                      >
+                        I'm down! 🎉
+                      </Button>
+                      <Button
+                        onClick={() => handleOpenChat(activity)}
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-white/60 hover:text-white hover:bg-[#a855f7]/20 rounded-full px-2"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                    </>
                   )}
-                </p>
-                <p className="text-white/60 text-sm mt-0.5">{getTimeAgo(activity.timestamp)} ago</p>
+
+                  {activity.type === 'venue_invite' && (
+                    <>
+                      <Button
+                        onClick={() => handleAcceptVenueInvite(activity)}
+                        size="sm"
+                        className="h-7 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs"
+                      >
+                        I'm down! 🎉
+                      </Button>
+                      <Button
+                        onClick={() => handleViewVenue(activity.venue_id, activity.subtitle)}
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-white/60 hover:text-white hover:bg-[#a855f7]/20 rounded-full px-3 text-xs"
+                      >
+                        View
+                      </Button>
+                    </>
+                  )}
+
+                  {activity.type === 'check_in' && (
+                    <Button
+                      onClick={() => handleMeetUp(activity)}
+                      size="sm"
+                      className="h-7 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs"
+                    >
+                      Meet Up
+                    </Button>
+                  )}
+
+                  {activity.type === 'trending' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-[#a855f7] hover:text-[#a855f7] hover:bg-[#a855f7]/20 rounded-full px-3 text-xs"
+                    >
+                      View
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              {/* Actions */}
-              {activity.type === 'meet_up' && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => handleAcceptMeetUp(activity)}
-                    size="sm"
-                    className="bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs"
-                  >
-                    I'm down! 🎉
-                  </Button>
-                  <Button
-                    onClick={() => handleOpenChat(activity)}
-                    size="sm"
-                    variant="ghost"
-                    className="text-white/60 hover:text-white hover:bg-[#a855f7]/20 rounded-full p-2"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-
-              {activity.type === 'venue_invite' && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => handleAcceptVenueInvite(activity)}
-                    size="sm"
-                    className="bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs"
-                  >
-                    I'm down! 🎉
-                  </Button>
-                  <Button
-                    onClick={() => handleViewVenue(activity.venue_id, activity.subtitle)}
-                    size="sm"
-                    variant="ghost"
-                    className="text-white/60 hover:text-white hover:bg-[#a855f7]/20 rounded-full px-3 text-xs"
-                  >
-                    View
-                  </Button>
-                </div>
-              )}
-
-              {activity.action === 'meet_up' && activity.type === 'check_in' && (
-                <Button
-                  onClick={() => handleMeetUp(activity)}
-                  variant="outline"
-                  className="border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 hover:text-[#d4ff00] rounded-full px-4 py-1"
-                >
-                  Meet Up
-                </Button>
-              )}
-
-              {activity.action === 'view' && activity.type === 'trending' && (
-                <Button
-                  variant="outline"
-                  className="border-2 border-[#a855f7] bg-transparent text-[#a855f7] hover:bg-[#a855f7]/10 hover:text-[#a855f7] rounded-full px-4 py-1"
-                >
-                  View
-                </Button>
-              )}
+              {/* Timestamp */}
+              <span className="text-white/40 text-xs flex-shrink-0">{getTimeAgo(activity.timestamp)}</span>
             </div>
           </div>
         ))}
