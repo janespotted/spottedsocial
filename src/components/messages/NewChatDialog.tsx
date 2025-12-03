@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
@@ -35,6 +35,19 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   const [friends, setFriends] = useState<Friend[]>([]);
   const [search, setSearch] = useState('');
   const [isCreatingThread, setIsCreatingThread] = useState(false);
+  const isCreatingRef = useRef(false);
+
+  // Wait for Supabase auth session to be ready
+  const waitForAuthSession = async (maxRetries = 10): Promise<boolean> => {
+    for (let i = 0; i < maxRetries; i++) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        return true;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return false;
+  };
 
   useEffect(() => {
     if (open && user) {
@@ -44,15 +57,22 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
 
   useEffect(() => {
     // If we have a preselected user, automatically create thread
-    if (open && preselectedUser && user) {
+    if (open && preselectedUser && user && !isCreatingRef.current) {
+      isCreatingRef.current = true;
       setIsCreatingThread(true);
-      createThreadWithPreselectedUser();
+      createThreadWithPreselectedUser().finally(() => {
+        // Only reset if dialog is still open (prevents race conditions)
+        if (!open) {
+          isCreatingRef.current = false;
+        }
+      });
     }
   }, [open, preselectedUser, user]);
 
   useEffect(() => {
     if (!open) {
       setIsCreatingThread(false);
+      isCreatingRef.current = false;
     }
   }, [open]);
 
@@ -131,23 +151,40 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
 
   const createThread = async (friendId: string) => {
     try {
+      // Wait for auth session to be fully ready
+      const isAuthenticated = await waitForAuthSession();
+      if (!isAuthenticated) {
+        console.error('Auth session not ready after retries');
+        setIsCreatingThread(false);
+        isCreatingRef.current = false;
+        return;
+      }
+
       // Step 1: Get all thread IDs where current user is a member
-      const { data: myThreads } = await supabase
+      const { data: myThreads, error: myThreadsError } = await supabase
         .from('dm_thread_members')
         .select('thread_id')
         .eq('user_id', user?.id);
+
+      if (myThreadsError) {
+        console.error('Error fetching threads:', myThreadsError);
+      }
 
       if (myThreads && myThreads.length > 0) {
         const myThreadIds = myThreads.map(t => t.thread_id);
 
         // Step 2: Single query - find if friend is in any of my threads
-        const { data: friendInThread } = await supabase
+        const { data: friendInThread, error: friendThreadError } = await supabase
           .from('dm_thread_members')
           .select('thread_id')
           .eq('user_id', friendId)
           .in('thread_id', myThreadIds)
           .limit(1)
           .maybeSingle();
+
+        if (friendThreadError) {
+          console.error('Error checking friend threads:', friendThreadError);
+        }
 
         if (friendInThread) {
           // Thread exists, navigate to it
@@ -164,8 +201,13 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
         .select()
         .single();
 
-      if (threadError || !newThread) {
-        throw new Error('Failed to create thread');
+      if (threadError) {
+        console.error('Thread creation error:', threadError);
+        throw threadError;
+      }
+
+      if (!newThread) {
+        throw new Error('No thread returned from insert');
       }
 
       // Step 4: Add both users as members
@@ -177,7 +219,8 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
         ]);
 
       if (membersError) {
-        throw new Error('Failed to add members to thread');
+        console.error('Members insert error:', membersError);
+        throw membersError;
       }
 
       onOpenChange(false);
@@ -185,6 +228,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
     } catch (error) {
       console.error('Error in createThread:', error);
       setIsCreatingThread(false);
+      isCreatingRef.current = false;
     }
   };
 
