@@ -85,19 +85,34 @@ export function useFeed(options: UseFeedOptions) {
     if (!userId) return;
 
     try {
-      const { data: friendships } = await supabase
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', userId)
-        .eq('status', 'accepted');
+      // Query both directions of friendships
+      const [sentFriendships, receivedFriendships] = await Promise.all([
+        supabase
+          .from('friendships')
+          .select('friend_id')
+          .eq('user_id', userId)
+          .eq('status', 'accepted'),
+        supabase
+          .from('friendships')
+          .select('user_id')
+          .eq('friend_id', userId)
+          .eq('status', 'accepted'),
+      ]);
 
-      if (friendships && friendships.length > 0) {
-        const friendIds = friendships.map(f => f.friend_id);
-        
+      // Combine friend IDs from both directions
+      const friendIds = [
+        ...(sentFriendships.data?.map(f => f.friend_id) || []),
+        ...(receivedFriendships.data?.map(f => f.user_id) || []),
+      ];
+
+      // Remove duplicates
+      const uniqueFriendIds = [...new Set(friendIds)];
+
+      if (uniqueFriendIds.length > 0) {
         let profileQuery = supabase
           .from('profiles')
           .select('id, display_name, avatar_url')
-          .in('id', friendIds);
+          .in('id', uniqueFriendIds);
 
         if (!demoEnabled) {
           profileQuery = profileQuery.eq('is_demo', false);
@@ -136,14 +151,27 @@ export function useFeed(options: UseFeedOptions) {
       const cityVenueIds = new Set(cityVenues?.map(v => v.id) || []);
       const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
 
-      const { data: friendships } = await supabase
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', userId)
-        .eq('status', 'accepted');
+      // Query both directions of friendships
+      const [sentFriendships, receivedFriendships] = await Promise.all([
+        supabase
+          .from('friendships')
+          .select('friend_id')
+          .eq('user_id', userId)
+          .eq('status', 'accepted'),
+        supabase
+          .from('friendships')
+          .select('user_id')
+          .eq('friend_id', userId)
+          .eq('status', 'accepted'),
+      ]);
 
-      const friendIds = friendships?.map(f => f.friend_id) || [];
-      const userIds = [userId, ...friendIds];
+      // Combine friend IDs from both directions
+      const friendIds = [
+        ...(sentFriendships.data?.map(f => f.friend_id) || []),
+        ...(receivedFriendships.data?.map(f => f.user_id) || []),
+      ];
+      const uniqueFriendIds = [...new Set(friendIds)];
+      const userIds = [userId, ...uniqueFriendIds];
 
       let query = supabase
         .from('posts')
@@ -166,13 +194,15 @@ export function useFeed(options: UseFeedOptions) {
 
       const { data } = await query;
 
-      // Filter posts by city: include if venue_id matches OR venue_name matches
+      // Filter posts by city: include if venue matches OR no venue (general posts allowed)
       const filteredPosts = (data || []).filter(post => {
+        // Include posts without venue info (general posts)
+        if (!post.venue_id && !post.venue_name) return true;
         // If post has a venue_id that matches city venues, include it
         if (post.venue_id && cityVenueIds.has(post.venue_id)) return true;
         // If post has a venue_name that matches city venue names, include it
         if (post.venue_name && cityVenueNames.has(post.venue_name.toLowerCase())) return true;
-        // Exclude posts without venue info or from other cities
+        // Exclude posts from other cities
         return false;
       });
 
@@ -210,14 +240,27 @@ export function useFeed(options: UseFeedOptions) {
       
       const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
 
-      const { data: friendships } = await supabase
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', userId)
-        .eq('status', 'accepted');
+      // Query both directions of friendships
+      const [sentFriendships, receivedFriendships] = await Promise.all([
+        supabase
+          .from('friendships')
+          .select('friend_id')
+          .eq('user_id', userId)
+          .eq('status', 'accepted'),
+        supabase
+          .from('friendships')
+          .select('user_id')
+          .eq('friend_id', userId)
+          .eq('status', 'accepted'),
+      ]);
 
-      const friendIds = friendships?.map(f => f.friend_id) || [];
-      const userIds = [userId, ...friendIds];
+      // Combine friend IDs from both directions
+      const friendIds = [
+        ...(sentFriendships.data?.map(f => f.friend_id) || []),
+        ...(receivedFriendships.data?.map(f => f.user_id) || []),
+      ];
+      const uniqueFriendIds = [...new Set(friendIds)];
+      const userIds = [userId, ...uniqueFriendIds];
 
       let query = supabase
         .from('stories')

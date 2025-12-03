@@ -62,7 +62,8 @@ export default function Thread() {
     if (threadId && user) {
       fetchThreadData();
       fetchMessages();
-      subscribeToMessages();
+      const cleanup = subscribeToMessages();
+      return cleanup;
     }
   }, [threadId, user]);
 

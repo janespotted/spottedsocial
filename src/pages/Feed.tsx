@@ -343,21 +343,23 @@ export default function Feed() {
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="flex -space-x-2">
-                    {friends.slice(0, 3).map((friend, idx) => (
-                      <Avatar key={idx} className="h-6 w-6 border-2 border-[#1a0f2e]">
-                        <AvatarImage src={friend.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                          {friend.display_name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    ))}
+                {(post.likes_count || 0) > 0 && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex -space-x-2">
+                      {friends.slice(0, 3).map((friend, idx) => (
+                        <Avatar key={idx} className="h-6 w-6 border-2 border-[#1a0f2e]">
+                          <AvatarImage src={friend.avatar_url || undefined} />
+                          <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                            {friend.display_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                      ))}
+                    </div>
+                    <p className="text-white text-sm">
+                      Liked by <span className="font-semibold">{post.likes_count === 1 ? 'a friend' : `${post.likes_count} friends`}</span>
+                    </p>
                   </div>
-                  <p className="text-white text-sm">
-                    Liked by <span className="font-semibold">janelovespotted</span> and others
-                  </p>
-                </div>
+                )}
 
                 <div className="text-white/90 text-sm leading-relaxed">
                   <button 
