@@ -338,7 +338,29 @@ export default function Feed() {
                     <MessageCircle className="h-7 w-7" />
                     <span className="font-semibold text-base">{post.comments_count || 0}</span>
                   </button>
-                  <button className="text-white hover:text-[#d4ff00] transition-colors ml-auto">
+                  <button 
+                    onClick={async () => {
+                      const shareData = {
+                        title: `${post.profiles?.display_name} on Spotted`,
+                        text: `${post.text}${post.venue_name ? ` @ ${post.venue_name}` : ''}`,
+                        url: window.location.origin,
+                      };
+                      if (navigator.share) {
+                        try {
+                          await navigator.share(shareData);
+                        } catch (err) {
+                          if ((err as Error).name !== 'AbortError') {
+                            await navigator.clipboard.writeText(`${shareData.text} - ${shareData.url}`);
+                            toast.success('Link copied to clipboard!');
+                          }
+                        }
+                      } else {
+                        await navigator.clipboard.writeText(`${shareData.text} - ${shareData.url}`);
+                        toast.success('Link copied to clipboard!');
+                      }
+                    }}
+                    className="text-white hover:text-[#d4ff00] transition-colors ml-auto"
+                  >
                     <Send className="h-7 w-7" />
                   </button>
                 </div>

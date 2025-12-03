@@ -340,26 +340,38 @@ export default function Home() {
                     <MessageCircle className="h-6 w-6" />
                     <span className="font-semibold">{post.comments_count || 0}</span>
                   </button>
-                  <button className="text-white hover:text-[#d4ff00] transition-colors ml-auto">
+                  <button 
+                    onClick={async () => {
+                      const shareData = {
+                        title: `${post.profiles?.display_name} on Spotted`,
+                        text: `${post.text}${post.venue_name ? ` @ ${post.venue_name}` : ''}`,
+                        url: window.location.origin,
+                      };
+                      if (navigator.share) {
+                        try {
+                          await navigator.share(shareData);
+                        } catch (err) {
+                          if ((err as Error).name !== 'AbortError') {
+                            await navigator.clipboard.writeText(`${shareData.text} - ${shareData.url}`);
+                            toast.success('Link copied to clipboard!');
+                          }
+                        }
+                      } else {
+                        await navigator.clipboard.writeText(`${shareData.text} - ${shareData.url}`);
+                        toast.success('Link copied to clipboard!');
+                      }
+                    }}
+                    className="text-white hover:text-[#d4ff00] transition-colors ml-auto"
+                  >
                     <Send className="h-6 w-6" />
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="flex -space-x-2">
-                    {friends.slice(0, 3).map((friend, idx) => (
-                      <Avatar key={idx} className="h-6 w-6 border-2 border-[#0a0118]">
-                        <AvatarImage src={friend.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
-                          {friend.display_name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    ))}
-                  </div>
+                {(post.likes_count || 0) > 0 && (
                   <p className="text-white/80 text-sm">
-                    Liked by <span className="font-semibold">janelovespotted</span> and others
+                    {post.likes_count} {post.likes_count === 1 ? 'like' : 'likes'}
                   </p>
-                </div>
+                )}
 
                 <div className="text-white/90 text-sm">
                   <button
