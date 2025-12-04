@@ -259,7 +259,6 @@ export default function FriendRequests() {
 
           <div className="flex-1 text-center">
             <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-            <p className="text-white/60 text-sm">Everything disappears by 5am</p>
           </div>
 
           <button 
