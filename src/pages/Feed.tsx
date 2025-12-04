@@ -47,6 +47,7 @@ export default function Feed() {
     friends,
     storyUsers,
     likedPosts,
+    likedComments,
     expandedPostId,
     comments,
     newComment,
@@ -59,6 +60,7 @@ export default function Feed() {
     handleToggleComments,
     handlePostComment,
     handleLikePost,
+    handleLikeComment,
     handleDeletePost,
   } = useFeed({
     userId: user?.id,
@@ -415,9 +417,23 @@ export default function Feed() {
                             </p>
                             <p className="text-white/80 text-sm break-words">{comment.text}</p>
                           </div>
-                          <p className="text-white/40 text-xs mt-1 ml-1">
-                            {getTimeAgo(comment.created_at)}
-                          </p>
+                          <div className="flex items-center gap-3 mt-1 ml-1">
+                            <span className="text-white/40 text-xs">{getTimeAgo(comment.created_at)}</span>
+                            <button 
+                              onClick={() => handleLikeComment(comment.id, post.id)}
+                              className={`flex items-center gap-1 transition-colors ${
+                                likedComments.has(comment.id) ? 'text-[#d4ff00]' : 'text-white/50 hover:text-[#d4ff00]'
+                              }`}
+                            >
+                              <Heart 
+                                className="h-3.5 w-3.5"
+                                fill={likedComments.has(comment.id) ? 'currentColor' : 'none'}
+                              />
+                              {(comment.likes_count || 0) > 0 && (
+                                <span className="text-xs">{comment.likes_count}</span>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
