@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -46,6 +47,7 @@ interface UserStatus {
 
 export function FriendIdCard() {
   const { selectedFriend, closeFriendCard } = useFriendIdCard();
+  const { openVenueCard } = useVenueIdCard();
   const { sendMeetUpNotification } = useMeetUp();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -313,6 +315,20 @@ export function FriendIdCard() {
     closeFriendCard();
   };
 
+  const handleVenueClick = async (venueName: string) => {
+    closeFriendCard();
+    
+    const { data } = await supabase
+      .from('venues')
+      .select('id')
+      .eq('name', venueName)
+      .maybeSingle();
+      
+    if (data?.id) {
+      openVenueCard(data.id);
+    }
+  };
+
   const handleBlockUser = async () => {
     if (!selectedFriend || !user) return;
 
@@ -411,9 +427,12 @@ export function FriendIdCard() {
                   {demoEnabled ? (
                     <>
                       {selectedFriend.venueName && (
-                        <p className="text-[#d4ff00] text-base font-medium leading-tight mb-1">
+                        <button
+                          onClick={() => handleVenueClick(selectedFriend.venueName!)}
+                          className="text-[#d4ff00] text-base font-medium leading-tight mb-1 hover:underline text-left"
+                        >
                           @ {selectedFriend.venueName}
-                        </p>
+                        </button>
                       )}
                       {distance !== null && (
                         <p className="text-white/50 text-sm leading-tight">
@@ -423,10 +442,15 @@ export function FriendIdCard() {
                     </>
                   ) : (
                     <>
-                      {statusSubtitle && (
-                        <p className={`text-base font-medium leading-tight mb-1 ${
-                          userStatus?.isOut ? 'text-[#d4ff00]' : 'text-white/70'
-                        }`}>
+                      {userStatus?.isOut && userStatus.currentVenue ? (
+                        <button
+                          onClick={() => handleVenueClick(userStatus.currentVenue!)}
+                          className="text-[#d4ff00] text-base font-medium leading-tight mb-1 hover:underline text-left"
+                        >
+                          {statusSubtitle}
+                        </button>
+                      ) : statusSubtitle && (
+                        <p className="text-white/70 text-base font-medium leading-tight mb-1">
                           {statusSubtitle}
                         </p>
                       )}
