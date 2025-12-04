@@ -412,8 +412,8 @@ export default function DemoSettings() {
               <TrendingUp className="h-5 w-5" />
               Bootstrap Mode
             </CardTitle>
-            <CardDescription className="text-white/60">
-              Show curated {cityLabel} venues alongside real data (only active when demo mode is OFF)
+          <CardDescription className="text-white/60">
+              For V1 launch: curated venue rankings, but only real user avatars appear
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -425,17 +425,16 @@ export default function DemoSettings() {
                 id="bootstrap-mode"
                 checked={bootstrapEnabled}
                 onCheckedChange={handleToggleBootstrap}
-                disabled={demoEnabled}
               />
             </div>
             
-            {demoEnabled && (
+            {demoEnabled && bootstrapEnabled && (
               <p className="text-sm text-white/50 italic">
-                Bootstrap mode is disabled while demo mode is ON
+                Both modes ON: Demo content visible, but bootstrap venue rankings active
               </p>
             )}
             
-            {!demoEnabled && bootstrapEnabled && (
+            {bootstrapEnabled && (
               <div className="pt-4 border-t border-[#a855f7]/20">
                 <p className="text-sm text-white/70">
                   <strong className="text-[#d4ff00]">Active:</strong> Leaderboard shows real data + 20 top-ranked {cityLabel} venues
