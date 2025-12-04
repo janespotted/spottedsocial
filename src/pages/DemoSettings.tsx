@@ -115,6 +115,12 @@ export default function DemoSettings() {
       
       if (data.success && data.stats) {
         setSeeded(true);
+        
+        // Update city to match the seeded data so venue dropdown refreshes
+        if (targetCity) {
+          cacheCity(targetCity);
+        }
+        
         toast.success(
           `${seedCityLabel} demo environment created!\n` +
           `${data.stats.users} users • ${data.stats.posts} posts • ` +
