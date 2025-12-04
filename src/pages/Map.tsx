@@ -696,9 +696,9 @@ export default function Map() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/notifications')}
+            onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
             className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
-            aria-label="View notifications"
+            aria-label="View activity"
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
