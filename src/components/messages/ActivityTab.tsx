@@ -28,9 +28,10 @@ interface Activity {
   display_name?: string;
   venue_id?: string;
   action?: 'meet_up' | 'view' | 'accept_decline' | 'message';
+  isAtVenue?: boolean;
 }
 
-const generateDemoActivities = (city: SupportedCity): Activity[] => {
+const generateDemoActivities = (city: SupportedCity, userCurrentVenue: string | null): Activity[] => {
   const demoUsers = getDemoUsersForCity(city);
   const venues = getPromotedVenuesForCity(city);
   
@@ -56,6 +57,7 @@ const generateDemoActivities = (city: SupportedCity): Activity[] => {
       avatar_url: demoUsers[1].avatar_url,
       user_id: `demo-user-${demoUsers[1].username}`,
       display_name: demoUsers[1].display_name,
+      isAtVenue: userCurrentVenue ? venues[0].name.toLowerCase() === userCurrentVenue : false,
     },
     {
       id: 'demo-meetup-2',
@@ -76,6 +78,7 @@ const generateDemoActivities = (city: SupportedCity): Activity[] => {
       avatar_url: demoUsers[3].avatar_url,
       user_id: `demo-user-${demoUsers[3].username}`,
       display_name: demoUsers[3].display_name,
+      isAtVenue: userCurrentVenue ? venues[1].name.toLowerCase() === userCurrentVenue : false,
     },
   ];
 };
@@ -115,6 +118,16 @@ export function ActivityTab() {
   };
 
   const fetchActivities = async () => {
+    // Get user's current venue (if checked in)
+    const { data: currentStatus } = await supabase
+      .from('night_statuses')
+      .select('venue_name')
+      .eq('user_id', user?.id)
+      .eq('status', 'out')
+      .maybeSingle();
+
+    const userCurrentVenue = currentStatus?.venue_name?.toLowerCase() || null;
+
     // Fetch recent check-ins from friends (both directions)
     const { data: sentFriendships } = await supabase
       .from('friendships')
@@ -169,7 +182,7 @@ export function ActivityTab() {
 
     // Add demo activities when demo mode is enabled
     if (demoEnabled) {
-      const demoActivities = generateDemoActivities(city);
+      const demoActivities = generateDemoActivities(city, userCurrentVenue);
       activityList.push(...demoActivities);
     }
 
@@ -406,6 +419,9 @@ export function ActivityTab() {
                     <span className="font-semibold">{activity.display_name}</span>
                     <span className="text-white/70"> invited you to </span>
                     <span className="font-semibold text-[#d4ff00]">{activity.subtitle}</span>
+                    {activity.isAtVenue && (
+                      <span className="text-white/70"> - You're here! 👋</span>
+                    )}
                   </p>
                 )}
                 {activity.type === 'check_in' && (
@@ -437,13 +453,23 @@ export function ActivityTab() {
                 )}
 
                 {activity.type === 'venue_invite' && (
-                  <Button
-                    onClick={() => handleAcceptVenueInvite(activity)}
-                    size="sm"
-                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
-                  >
-                    I'm down! 🎉
-                  </Button>
+                  activity.isAtVenue ? (
+                    <Button
+                      onClick={() => handleOpenChat(activity)}
+                      size="sm"
+                      className="h-8 bg-[#d4ff00] hover:bg-[#d4ff00]/80 text-[#1a0f2e] rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(212,255,0,0.5)] hover:shadow-[0_0_16px_rgba(212,255,0,0.7)] transition-all"
+                    >
+                      Let them know! 💬
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => handleAcceptVenueInvite(activity)}
+                      size="sm"
+                      className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                    >
+                      I'm down! 🎉
+                    </Button>
+                  )
                 )}
 
                 {activity.type === 'check_in' && (
