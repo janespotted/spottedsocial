@@ -88,18 +88,16 @@ export default function FriendRequests() {
   };
 
   const fetchSuggested = async () => {
-    // Get current friends (both directions)
+    // Get ALL existing friendships (any status - pending, accepted, blocked)
     const { data: sentFriendships } = await supabase
       .from('friendships')
       .select('friend_id')
-      .eq('user_id', user?.id)
-      .eq('status', 'accepted');
+      .eq('user_id', user?.id);
 
     const { data: receivedFriendships } = await supabase
       .from('friendships')
       .select('user_id')
-      .eq('friend_id', user?.id)
-      .eq('status', 'accepted');
+      .eq('friend_id', user?.id);
 
     const friendIds = [
       ...(sentFriendships?.map(f => f.friend_id) || []),
@@ -221,7 +219,11 @@ export default function FriendRequests() {
       });
 
     if (error) {
-      toast.error('Failed to send request');
+      if (error.code === '23505') {
+        toast.error('You already sent a request to this person');
+      } else {
+        toast.error('Failed to send request');
+      }
       return;
     }
 
