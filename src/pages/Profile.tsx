@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CityBadge } from '@/components/CityBadge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 
 interface WishlistPlace {
   id: string;
@@ -40,6 +42,8 @@ export default function Profile() {
   const [locationSharingLevel, setLocationSharingLevel] = useState('all_friends');
   const [wishlistPlaces, setWishlistPlaces] = useState<WishlistPlace[]>([]);
   const [recentSpots, setRecentSpots] = useState<RecentSpot[]>([]);
+  const [recentSpotsOpen, setRecentSpotsOpen] = useState(true);
+  const [wishlistOpen, setWishlistOpen] = useState(true);
   
   // Triple-tap secret access to demo settings
   const tapCountRef = useRef(0);
@@ -371,99 +375,107 @@ export default function Profile() {
         </div>
 
         {/* Recent Spots Section */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-xl font-bold text-white">Recent Spots</h3>
-                <ChevronDown className="h-4 w-4 text-white/60" />
-              </div>
-              <p className="text-white/60 text-sm">Only you can see</p>
-            </div>
-          </div>
-
-          {/* Recent Spots Grid */}
-          {recentSpots.length > 0 ? (
-            <div className="grid grid-cols-3 gap-3">
-              {recentSpots.map((spot, idx) => (
-                <div key={spot.venue_id} className="space-y-2">
-                  <div 
-                    className="aspect-square rounded-xl overflow-hidden bg-[#2d1b4e] border border-[#a855f7]/20"
-                    style={{
-                      backgroundImage: `url(${spot.venue_image_url || mockVenueImages[idx % mockVenueImages.length]})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                    }}
-                  />
-                  <p className="text-white text-sm font-medium text-center truncate">
-                    {spot.venue_name}
-                  </p>
+        <Collapsible open={recentSpotsOpen} onOpenChange={setRecentSpotsOpen}>
+          <CollapsibleTrigger className="w-full cursor-pointer mb-4">
+            <div className="flex items-center justify-between">
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-white">Recent Spots</h3>
+                  <ChevronDown className={cn("h-4 w-4 text-white/60 transition-transform", !recentSpotsOpen && "-rotate-90")} />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-[#2d1b4e]/30 rounded-2xl border border-[#a855f7]/10">
-              <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
-                <MapPin className="h-8 w-8 text-[#a855f7]/60" />
+                <p className="text-white/60 text-sm">Only you can see</p>
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                No recent spots yet
-              </h3>
-              <p className="text-white/50 text-sm max-w-xs">
-                Check in at venues and they'll appear here
-              </p>
             </div>
-          )}
-        </div>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            {/* Recent Spots Grid */}
+            {recentSpots.length > 0 ? (
+              <div className="grid grid-cols-3 gap-3">
+                {recentSpots.map((spot, idx) => (
+                  <div key={spot.venue_id} className="space-y-2">
+                    <div 
+                      className="aspect-square rounded-xl overflow-hidden bg-[#2d1b4e] border border-[#a855f7]/20"
+                      style={{
+                        backgroundImage: `url(${spot.venue_image_url || mockVenueImages[idx % mockVenueImages.length]})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}
+                    />
+                    <p className="text-white text-sm font-medium text-center truncate">
+                      {spot.venue_name}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-[#2d1b4e]/30 rounded-2xl border border-[#a855f7]/10">
+                <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+                  <MapPin className="h-8 w-8 text-[#a855f7]/60" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  No recent spots yet
+                </h3>
+                <p className="text-white/50 text-sm max-w-xs">
+                  Check in at venues and they'll appear here
+                </p>
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Invite Friends Section */}
         <InviteFriendsSection />
 
         {/* Wishlist Section */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-xl font-bold text-white">Wishlist</h3>
-                <ChevronDown className="h-4 w-4 text-white/60" />
-              </div>
-              <p className="text-white/60 text-sm">Only you can see</p>
-            </div>
-          </div>
-
-          {/* Wishlist Grid */}
-          {wishlistPlaces.length > 0 ? (
-            <div className="grid grid-cols-3 gap-3">
-              {wishlistPlaces.map((place, idx) => (
-                <div key={place.id} className="space-y-2">
-                  <div 
-                    className="aspect-square rounded-xl overflow-hidden bg-[#2d1b4e] border border-[#a855f7]/20"
-                    style={{
-                      backgroundImage: `url(${place.venue_image_url || mockVenueImages[idx % mockVenueImages.length]})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                    }}
-                  />
-                  <p className="text-white text-sm font-medium text-center truncate">
-                    {place.venue_name}
-                  </p>
+        <Collapsible open={wishlistOpen} onOpenChange={setWishlistOpen}>
+          <CollapsibleTrigger className="w-full cursor-pointer mb-4">
+            <div className="flex items-center justify-between">
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-white">Wishlist</h3>
+                  <ChevronDown className={cn("h-4 w-4 text-white/60 transition-transform", !wishlistOpen && "-rotate-90")} />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-[#2d1b4e]/30 rounded-2xl border border-[#a855f7]/10">
-              <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
-                <Bookmark className="h-8 w-8 text-[#a855f7]/60" />
+                <p className="text-white/60 text-sm">Only you can see</p>
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                No saved places yet
-              </h3>
-              <p className="text-white/50 text-sm max-w-xs">
-                Tap the + on venues you want to visit and they'll appear here
-              </p>
             </div>
-          )}
-        </div>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            {/* Wishlist Grid */}
+            {wishlistPlaces.length > 0 ? (
+              <div className="grid grid-cols-3 gap-3">
+                {wishlistPlaces.map((place, idx) => (
+                  <div key={place.id} className="space-y-2">
+                    <div 
+                      className="aspect-square rounded-xl overflow-hidden bg-[#2d1b4e] border border-[#a855f7]/20"
+                      style={{
+                        backgroundImage: `url(${place.venue_image_url || mockVenueImages[idx % mockVenueImages.length]})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}
+                    />
+                    <p className="text-white text-sm font-medium text-center truncate">
+                      {place.venue_name}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-[#2d1b4e]/30 rounded-2xl border border-[#a855f7]/10">
+                <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+                  <Bookmark className="h-8 w-8 text-[#a855f7]/60" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  No saved places yet
+                </h3>
+                <p className="text-white/50 text-sm max-w-xs">
+                  Tap the + on venues you want to visit and they'll appear here
+                </p>
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Logout Button at Bottom */}
         <Button
