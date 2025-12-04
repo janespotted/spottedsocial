@@ -59,12 +59,17 @@ export function FriendIdCard() {
   const [statusSubtitle, setStatusSubtitle] = useState<string>('');
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isDemoUser, setIsDemoUser] = useState(false);
+  const [venueCoords, setVenueCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     if (selectedFriend && user) {
       console.log('Friend ID Card opened for:', selectedFriend);
       // Check if this is a demo user
       checkIfDemoUser();
+      // Fetch venue coordinates for distance calculation
+      if (selectedFriend.venueName) {
+        fetchVenueCoordinates(selectedFriend.venueName);
+      }
       if (demoEnabled) {
         // In demo mode, use the provided venue directly
         setStatusSubtitle(selectedFriend.venueName || '');
@@ -81,8 +86,21 @@ export function FriendIdCard() {
       setUserStatus(null);
       setStatusSubtitle('');
       setIsDemoUser(false);
+      setVenueCoords(null);
     }
   }, [selectedFriend, demoEnabled]);
+
+  const fetchVenueCoordinates = async (venueName: string) => {
+    const { data } = await supabase
+      .from('venues')
+      .select('lat, lng')
+      .eq('name', venueName)
+      .maybeSingle();
+    
+    if (data?.lat && data?.lng) {
+      setVenueCoords({ lat: data.lat, lng: data.lng });
+    }
+  };
 
   const checkIfDemoUser = async () => {
     if (!selectedFriend) return;
@@ -96,26 +114,22 @@ export function FriendIdCard() {
 
   // Calculate distance when we have both locations
   useEffect(() => {
-    if (demoEnabled && selectedFriend && selectedFriend.lat && selectedFriend.lng && userLocation) {
+    // Get friend's coordinates from multiple sources (with fallback to venue coords)
+    const friendLat = selectedFriend?.lat || userStatus?.lat || venueCoords?.lat;
+    const friendLng = selectedFriend?.lng || userStatus?.lng || venueCoords?.lng;
+
+    if (userLocation && friendLat && friendLng) {
       const dist = calculateDistance(
         userLocation.lat,
         userLocation.lng,
-        selectedFriend.lat,
-        selectedFriend.lng
-      );
-      setDistance(dist);
-    } else if (!demoEnabled && userStatus && userStatus.lat && userStatus.lng && userLocation) {
-      const dist = calculateDistance(
-        userLocation.lat,
-        userLocation.lng,
-        userStatus.lat,
-        userStatus.lng
+        friendLat,
+        friendLng
       );
       setDistance(dist);
     } else {
       setDistance(null);
     }
-  }, [selectedFriend, userLocation, userStatus, demoEnabled]);
+  }, [selectedFriend, userLocation, userStatus, venueCoords]);
 
   const fetchUserStatus = async () => {
     if (!selectedFriend || !user) return;
