@@ -34,6 +34,10 @@ export default function Messages() {
       setPreselectedUser(location.state.preselectedUser);
       setActiveTab('messages');
     }
+    // Check if we should open a specific tab (e.g., from bell icon)
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
   }, [location.state]);
 
   return (
@@ -50,9 +54,9 @@ export default function Messages() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/notifications')}
+              onClick={() => setActiveTab('activity')}
               className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
-              aria-label="View notifications"
+              aria-label="View activity"
             >
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && (

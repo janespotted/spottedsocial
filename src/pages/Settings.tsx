@@ -44,7 +44,7 @@ export default function Settings() {
         {/* Notifications Section */}
         <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
           <button
-            onClick={() => navigate('/notifications')}
+            onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
             className="w-full flex items-center justify-between p-4 hover:bg-[#a855f7]/10 transition-colors"
           >
             <div className="flex items-center gap-3">
