@@ -465,6 +465,30 @@ export function VenueIdCard() {
     threshold: 50
   });
 
+  const calculateEnergyLevel = (checkIns: number): number => {
+    if (checkIns >= 16) return 3;
+    if (checkIns >= 6) return 2;
+    if (checkIns > 0) return 1;
+    return 0;
+  };
+
+  const renderEnergyBars = (level: number) => {
+    const barHeights = ['h-2', 'h-3', 'h-4'];
+    
+    return (
+      <div className="flex gap-0.5 items-end">
+        {[1, 2, 3].map((bar, index) => (
+          <div
+            key={bar}
+            className={`w-1.5 rounded-sm transition-all ${barHeights[index]} ${
+              bar <= level ? 'bg-[#d4ff00]' : 'bg-white/20'
+            }`}
+          />
+        ))}
+      </div>
+    );
+  };
+
   if (!selectedVenueId || !venue) return null;
 
   const visibleFriends = friendsAtVenue.slice(0, 4);
@@ -566,13 +590,12 @@ export function VenueIdCard() {
                       {venueHours.isOpen ? '○ Open' : '● Closed'}
                     </span>
                   )}
-                  {/* Energy Level - Based on total check-ins, only show when venue is open */}
+                  {/* Energy Level Bars - Based on total check-ins, only show when venue is open */}
                   {venueHours?.isOpen && totalCheckIns > 0 && (
-                    <span className="px-2 py-0.5 rounded-full text-xs bg-[#d4ff00]/20 text-[#d4ff00] border border-[#d4ff00]/30">
-                      {totalCheckIns <= 5 && '🌙 Chill'}
-                      {totalCheckIns > 5 && totalCheckIns <= 15 && '🔥 Buzzing'}
-                      {totalCheckIns > 15 && '🚀 Packed'}
-                    </span>
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#d4ff00]/10 border border-[#d4ff00]/30">
+                      {renderEnergyBars(calculateEnergyLevel(totalCheckIns))}
+                      <span className="text-xs text-[#d4ff00]/80">{totalCheckIns}</span>
+                    </div>
                   )}
                 </div>
               </div>
