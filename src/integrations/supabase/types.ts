@@ -194,17 +194,28 @@ export type Database = {
       dm_threads: {
         Row: {
           created_at: string | null
+          created_by: string | null
           id: string
         }
         Insert: {
           created_at?: string | null
+          created_by?: string | null
           id?: string
         }
         Update: {
           created_at?: string | null
+          created_by?: string | null
           id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "dm_threads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       event_logs: {
         Row: {

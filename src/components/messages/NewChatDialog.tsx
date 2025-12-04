@@ -197,7 +197,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
       // Step 3: No existing thread found, create new one
       const { data: newThread, error: threadError } = await supabase
         .from('dm_threads')
-        .insert({})
+        .insert({ created_by: user!.id })
         .select()
         .single();
 
