@@ -6,15 +6,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { MapPin, Users, ChevronDown, Share2, Settings, LogOut, Bookmark, Bell } from 'lucide-react';
+import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell } from 'lucide-react';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CityBadge } from '@/components/CityBadge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cn } from '@/lib/utils';
 
 interface WishlistPlace {
   id: string;
@@ -42,8 +40,7 @@ export default function Profile() {
   const [locationSharingLevel, setLocationSharingLevel] = useState('all_friends');
   const [wishlistPlaces, setWishlistPlaces] = useState<WishlistPlace[]>([]);
   const [recentSpots, setRecentSpots] = useState<RecentSpot[]>([]);
-  const [recentSpotsOpen, setRecentSpotsOpen] = useState(true);
-  const [wishlistOpen, setWishlistOpen] = useState(true);
+  const [spotsView, setSpotsView] = useState<'recent' | 'wishlist'>('recent');
   
   // Triple-tap secret access to demo settings
   const tapCountRef = useRef(0);
@@ -374,23 +371,30 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Recent Spots Section */}
-        <Collapsible open={recentSpotsOpen} onOpenChange={setRecentSpotsOpen}>
-          <CollapsibleTrigger className="w-full cursor-pointer mb-4">
-            <div className="flex items-center justify-between">
-              <div className="text-left">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-bold text-white">Recent Spots</h3>
-                  <ChevronDown className={cn("h-4 w-4 text-white/60 transition-transform", !recentSpotsOpen && "-rotate-90")} />
-                </div>
-                <p className="text-white/60 text-sm">Only you can see</p>
-              </div>
+        {/* Spots Section with Dropdown */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <Select value={spotsView} onValueChange={(v) => setSpotsView(v as 'recent' | 'wishlist')}>
+                <SelectTrigger className="border-none bg-transparent p-0 h-auto text-xl font-bold text-white gap-2 focus:ring-0 focus:ring-offset-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white">
+                  <SelectItem value="recent" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
+                    Recent Spots
+                  </SelectItem>
+                  <SelectItem value="wishlist" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
+                    Wishlist
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-white/60 text-sm">Only you can see</p>
             </div>
-          </CollapsibleTrigger>
+          </div>
 
-          <CollapsibleContent>
-            {/* Recent Spots Grid */}
-            {recentSpots.length > 0 ? (
+          {/* Content based on dropdown selection */}
+          {spotsView === 'recent' ? (
+            recentSpots.length > 0 ? (
               <div className="grid grid-cols-3 gap-3">
                 {recentSpots.map((spot, idx) => (
                   <div key={spot.venue_id} className="space-y-2">
@@ -420,30 +424,9 @@ export default function Profile() {
                   Check in at venues and they'll appear here
                 </p>
               </div>
-            )}
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Invite Friends Section */}
-        <InviteFriendsSection />
-
-        {/* Wishlist Section */}
-        <Collapsible open={wishlistOpen} onOpenChange={setWishlistOpen}>
-          <CollapsibleTrigger className="w-full cursor-pointer mb-4">
-            <div className="flex items-center justify-between">
-              <div className="text-left">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-bold text-white">Wishlist</h3>
-                  <ChevronDown className={cn("h-4 w-4 text-white/60 transition-transform", !wishlistOpen && "-rotate-90")} />
-                </div>
-                <p className="text-white/60 text-sm">Only you can see</p>
-              </div>
-            </div>
-          </CollapsibleTrigger>
-
-          <CollapsibleContent>
-            {/* Wishlist Grid */}
-            {wishlistPlaces.length > 0 ? (
+            )
+          ) : (
+            wishlistPlaces.length > 0 ? (
               <div className="grid grid-cols-3 gap-3">
                 {wishlistPlaces.map((place, idx) => (
                   <div key={place.id} className="space-y-2">
@@ -473,9 +456,12 @@ export default function Profile() {
                   Tap the + on venues you want to visit and they'll appear here
                 </p>
               </div>
-            )}
-          </CollapsibleContent>
-        </Collapsible>
+            )
+          )}
+        </div>
+
+        {/* Invite Friends Section */}
+        <InviteFriendsSection />
 
         {/* Logout Button at Bottom */}
         <Button
