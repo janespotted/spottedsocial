@@ -206,9 +206,9 @@ export default function Leaderboard() {
       const venue = venueMap.get(venueName)!;
       venue.count++; // Count ALL users (including demo) for energy calculation
       
-      // In bootstrap mode, only show real user avatars
-      // Demo data still contributes to venue rankings/energy, but avatars are real only
-      if (!bootstrapEnabled || !isDemo) {
+      // In demo mode, show all avatars; in bootstrap mode, only show real user avatars
+      // Demo data still contributes to venue rankings/energy
+      if (demoEnabled || !bootstrapEnabled || !isDemo) {
         venue.friends.push({
           user_id: status.user_id,
           display_name: status.profiles?.display_name || 'User',
