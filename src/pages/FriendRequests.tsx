@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, Search, X, UserPlus, Heart } from 'lucide-react';
 import { toast } from 'sonner';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 
 interface FriendRequest {
   id: string;
@@ -251,7 +252,13 @@ export default function FriendRequests() {
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-center justify-between p-6">
           <button 
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate('/profile');
+              }
+            }}
             className="text-white/60 hover:text-white transition-colors"
           >
             <ChevronLeft className="h-6 w-6" />
@@ -263,9 +270,9 @@ export default function FriendRequests() {
 
           <button 
             onClick={openCheckIn}
-            className="text-2xl font-bold text-[#d4ff00] hover:scale-110 transition-transform"
+            className="hover:scale-110 transition-transform"
           >
-            S
+            <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
           </button>
         </div>
       </div>
