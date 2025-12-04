@@ -160,71 +160,17 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
         return;
       }
 
-      // Step 1: Get all thread IDs where current user is a member
-      const { data: myThreads, error: myThreadsError } = await supabase
-        .from('dm_thread_members')
-        .select('thread_id')
-        .eq('user_id', user?.id);
+      // Use SECURITY DEFINER function to create/find thread
+      const { data: threadId, error } = await supabase
+        .rpc('create_dm_thread', { friend_id: friendId });
 
-      if (myThreadsError) {
-        console.error('Error fetching threads:', myThreadsError);
-      }
-
-      if (myThreads && myThreads.length > 0) {
-        const myThreadIds = myThreads.map(t => t.thread_id);
-
-        // Step 2: Single query - find if friend is in any of my threads
-        const { data: friendInThread, error: friendThreadError } = await supabase
-          .from('dm_thread_members')
-          .select('thread_id')
-          .eq('user_id', friendId)
-          .in('thread_id', myThreadIds)
-          .limit(1)
-          .maybeSingle();
-
-        if (friendThreadError) {
-          console.error('Error checking friend threads:', friendThreadError);
-        }
-
-        if (friendInThread) {
-          // Thread exists, navigate to it
-          onOpenChange(false);
-          navigate(`/messages/${friendInThread.thread_id}`);
-          return;
-        }
-      }
-
-      // Step 3: No existing thread found, create new one
-      const { data: newThread, error: threadError } = await supabase
-        .from('dm_threads')
-        .insert({ created_by: user!.id })
-        .select()
-        .single();
-
-      if (threadError) {
-        console.error('Thread creation error:', threadError);
-        throw threadError;
-      }
-
-      if (!newThread) {
-        throw new Error('No thread returned from insert');
-      }
-
-      // Step 4: Add both users as members
-      const { error: membersError } = await supabase
-        .from('dm_thread_members')
-        .insert([
-          { thread_id: newThread.id, user_id: user!.id },
-          { thread_id: newThread.id, user_id: friendId },
-        ]);
-
-      if (membersError) {
-        console.error('Members insert error:', membersError);
-        throw membersError;
+      if (error) {
+        console.error('Thread creation error:', error);
+        throw error;
       }
 
       onOpenChange(false);
-      navigate(`/messages/${newThread.id}`);
+      navigate(`/messages/${threadId}`);
     } catch (error) {
       console.error('Error in createThread:', error);
       setIsCreatingThread(false);
