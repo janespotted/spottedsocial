@@ -142,7 +142,7 @@ export function VenueInviteConfirmation() {
           {invitedFriends.length > 0 && (
             <button
               onClick={(e) => handleAvatarClick(e, invitedFriends[0])}
-              className="absolute -top-4 -left-4 cursor-pointer hover:scale-110 transition-transform"
+              className="absolute top-4 left-4 cursor-pointer hover:scale-110 transition-transform"
             >
               <Avatar className="w-12 h-12 border-2 border-[#2d1b4e] shadow-lg">
                 <AvatarImage src={invitedFriends[0].avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${invitedFriends[0].displayName}`} />
@@ -157,7 +157,7 @@ export function VenueInviteConfirmation() {
           <img 
             src={spottedLogo} 
             alt="Spotted" 
-            className="absolute -top-4 -right-4 w-12 h-12"
+            className="absolute top-4 right-4 w-12 h-12"
           />
 
           {/* Main Content */}
