@@ -20,6 +20,13 @@ interface WishlistPlace {
   venue_image_url: string | null;
 }
 
+interface RecentSpot {
+  venue_id: string;
+  venue_name: string;
+  venue_image_url: string | null;
+  visited_at: string;
+}
+
 export default function Profile() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
@@ -32,6 +39,7 @@ export default function Profile() {
   const [isLocationSharing, setIsLocationSharing] = useState(false);
   const [locationSharingLevel, setLocationSharingLevel] = useState('all_friends');
   const [wishlistPlaces, setWishlistPlaces] = useState<WishlistPlace[]>([]);
+  const [recentSpots, setRecentSpots] = useState<RecentSpot[]>([]);
   
   // Triple-tap secret access to demo settings
   const tapCountRef = useRef(0);
@@ -121,6 +129,44 @@ export default function Profile() {
       .order('created_at', { ascending: false });
 
     setWishlistPlaces(wishlist || []);
+
+    // Get recent spots (unique venues from check-ins, most recent first)
+    const { data: recentCheckins } = await supabase
+      .from('checkins')
+      .select('venue_id, venue_name, created_at')
+      .eq('user_id', user?.id)
+      .order('created_at', { ascending: false });
+
+    // Get unique venues (keep first occurrence = most recent)
+    const seenVenues = new Set<string>();
+    const uniqueRecentSpots: RecentSpot[] = [];
+
+    for (const checkin of recentCheckins || []) {
+      if (checkin.venue_id && !seenVenues.has(checkin.venue_id)) {
+        seenVenues.add(checkin.venue_id);
+        
+        // Fetch venue image
+        const { data: venue } = await supabase
+          .from('venues')
+          .select('google_photo_refs')
+          .eq('id', checkin.venue_id)
+          .maybeSingle();
+        
+        const photoRefs = venue?.google_photo_refs as string[] | null;
+        const imageUrl = photoRefs?.[0] || null;
+        
+        uniqueRecentSpots.push({
+          venue_id: checkin.venue_id,
+          venue_name: checkin.venue_name,
+          venue_image_url: imageUrl,
+          visited_at: checkin.created_at || ''
+        });
+        
+        if (uniqueRecentSpots.length >= 6) break; // Limit to 6 recent spots
+      }
+    }
+
+    setRecentSpots(uniqueRecentSpots);
   };
 
   const handleLocationSharingChange = async (value: string) => {
@@ -322,6 +368,52 @@ export default function Profile() {
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        {/* Recent Spots Section */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-bold text-white">Recent Spots</h3>
+                <ChevronDown className="h-4 w-4 text-white/60" />
+              </div>
+              <p className="text-white/60 text-sm">Only you can see</p>
+            </div>
+          </div>
+
+          {/* Recent Spots Grid */}
+          {recentSpots.length > 0 ? (
+            <div className="grid grid-cols-3 gap-3">
+              {recentSpots.map((spot, idx) => (
+                <div key={spot.venue_id} className="space-y-2">
+                  <div 
+                    className="aspect-square rounded-xl overflow-hidden bg-[#2d1b4e] border border-[#a855f7]/20"
+                    style={{
+                      backgroundImage: `url(${spot.venue_image_url || mockVenueImages[idx % mockVenueImages.length]})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
+                  />
+                  <p className="text-white text-sm font-medium text-center truncate">
+                    {spot.venue_name}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-[#2d1b4e]/30 rounded-2xl border border-[#a855f7]/10">
+              <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+                <MapPin className="h-8 w-8 text-[#a855f7]/60" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">
+                No recent spots yet
+              </h3>
+              <p className="text-white/50 text-sm max-w-xs">
+                Check in at venues and they'll appear here
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Invite Friends Section */}
