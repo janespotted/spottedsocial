@@ -7,6 +7,8 @@ import { ArrowLeft, MessageCircle } from 'lucide-react';
 import { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import spottedLogo from '@/assets/spotted-s-logo.png';
+import { toast } from '@/hooks/use-toast';
+import { haptic } from '@/lib/haptics';
 
 export function MeetUpConfirmation() {
   const { recipientUserId, recipientDisplayName, recipientAvatarUrl, showConfirmation, closeConfirmation } = useMeetUp();
@@ -74,27 +76,51 @@ export function MeetUpConfirmation() {
     
     if (!user || !recipientUserId) {
       closeConfirmation();
-      navigate(-1);
       return;
     }
 
     try {
-      // Delete the most recent unread meetup notification to this recipient
-      await supabase
+      // First, find the most recent unread meetup notification to this recipient
+      const { data: notification, error: findError } = await supabase
         .from('notifications')
-        .delete()
+        .select('id')
         .eq('sender_id', user.id)
         .eq('receiver_id', recipientUserId)
         .eq('type', 'meetup_request')
         .eq('is_read', false)
         .order('created_at', { ascending: false })
-        .limit(1);
+        .limit(1)
+        .maybeSingle();
+
+      if (findError) throw findError;
+
+      if (notification) {
+        // Delete the found notification
+        const { error: deleteError } = await supabase
+          .from('notifications')
+          .delete()
+          .eq('id', notification.id);
+
+        if (deleteError) throw deleteError;
+      }
+
+      toast({
+        title: "Undo successful",
+        description: `Meet Up notification to ${recipientDisplayName} was canceled.`,
+      });
+      
+      haptic.light();
+      
     } catch (error) {
       console.error('Error canceling Meet Up:', error);
+      toast({
+        title: "Error",
+        description: "Couldn't undo the notification. Try again.",
+        variant: "destructive"
+      });
     }
 
     closeConfirmation();
-    navigate(-1);
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
