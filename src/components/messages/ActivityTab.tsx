@@ -419,9 +419,6 @@ export function ActivityTab() {
                     <span className="font-semibold">{activity.display_name}</span>
                     <span className="text-white/70"> invited you to </span>
                     <span className="font-semibold text-[#d4ff00]">{activity.subtitle}</span>
-                    {activity.isAtVenue && (
-                      <span className="text-white/70"> - You're here! 👋</span>
-                    )}
                   </p>
                 )}
                 {activity.type === 'check_in' && (
@@ -459,7 +456,7 @@ export function ActivityTab() {
                       size="sm"
                       className="h-8 bg-[#d4ff00] hover:bg-[#d4ff00]/80 text-[#1a0f2e] rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(212,255,0,0.5)] hover:shadow-[0_0_16px_rgba(212,255,0,0.7)] transition-all"
                     >
-                      Let them know! 💬
+                      Say hi! 👋
                     </Button>
                   ) : (
                     <Button
