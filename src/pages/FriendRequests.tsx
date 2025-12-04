@@ -252,13 +252,7 @@ export default function FriendRequests() {
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-center justify-between p-6">
           <button 
-            onClick={() => {
-              if (window.history.length > 1) {
-                navigate(-1);
-              } else {
-                navigate('/profile');
-              }
-            }}
+            onClick={() => navigate('/profile')}
             className="text-white/60 hover:text-white transition-colors"
           >
             <ChevronLeft className="h-6 w-6" />
