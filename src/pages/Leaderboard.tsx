@@ -357,44 +357,44 @@ export default function Leaderboard() {
                     </div>
                   </div>
 
+                  {/* Friend Avatars */}
+                  <div className="flex-shrink-0 flex items-center">
+                    {venue.friends.length > 0 ? (
+                      <>
+                        <div className="flex -space-x-1.5">
+                          {venue.friends.slice(0, 2).map((friend, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => openFriendCard({
+                                userId: friend.user_id,
+                                displayName: friend.display_name,
+                                avatarUrl: friend.avatar_url,
+                                venueName: venue.venue_name,
+                              })}
+                              className="transition-transform hover:scale-110"
+                            >
+                              <Avatar className="h-5 w-5 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                                <AvatarImage src={friend.avatar_url || undefined} />
+                                <AvatarFallback className="bg-[#1a0f2e] text-white text-[8px]">
+                                  {friend.display_name[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                            </button>
+                          ))}
+                        </div>
+                        {venue.friends.length > 2 && (
+                          <span className="ml-1 text-xs text-white/70 font-medium">
+                            +{venue.friends.length - 2}
+                          </span>
+                        )}
+                      </>
+                    ) : null}
+                  </div>
+
                   {/* Energy Bars */}
                   <div className="flex-shrink-0">
                     {renderEnergyBars(venue.energyLevel)}
                   </div>
-
-              {/* Friend Avatars */}
-              <div className="flex-shrink-0 flex items-center">
-                {venue.friends.length > 0 ? (
-                  <>
-                    <div className="flex -space-x-2">
-                      {venue.friends.slice(0, 3).map((friend, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => openFriendCard({
-                            userId: friend.user_id,
-                            displayName: friend.display_name,
-                            avatarUrl: friend.avatar_url,
-                            venueName: venue.venue_name,
-                          })}
-                          className="transition-transform hover:scale-110"
-                        >
-                          <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
-                            <AvatarImage src={friend.avatar_url || undefined} />
-                            <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
-                              {friend.display_name[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                        </button>
-                      ))}
-                    </div>
-                    {venue.friends.length > 3 && (
-                      <span className="ml-2 text-sm text-white font-medium">
-                        +{venue.friends.length - 3}
-                      </span>
-                    )}
-                  </>
-                ) : null}
-              </div>
                 </div>
               </div>
             ))}
@@ -445,17 +445,12 @@ export default function Leaderboard() {
                 </div>
               </div>
 
-              {/* Energy Bars */}
-              <div className="flex-shrink-0">
-                {renderEnergyBars(venue.energyLevel)}
-              </div>
-
               {/* Friend Avatars */}
               <div className="flex-shrink-0 flex items-center">
                 {venue.friends.length > 0 ? (
                   <>
-                    <div className="flex -space-x-2">
-                      {venue.friends.slice(0, 3).map((friend, idx) => (
+                    <div className="flex -space-x-1.5">
+                      {venue.friends.slice(0, 2).map((friend, idx) => (
                         <button
                           key={idx}
                           onClick={() => openFriendCard({
@@ -466,22 +461,27 @@ export default function Leaderboard() {
                           })}
                           className="transition-transform hover:scale-110"
                         >
-                          <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
+                          <Avatar className="h-5 w-5 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
                             <AvatarImage src={friend.avatar_url || undefined} />
-                            <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                            <AvatarFallback className="bg-[#1a0f2e] text-white text-[8px]">
                               {friend.display_name[0]}
                             </AvatarFallback>
                           </Avatar>
                         </button>
                       ))}
                     </div>
-                    {venue.friends.length > 3 && (
-                      <span className="ml-2 text-sm text-white font-medium">
-                        +{venue.friends.length - 3}
+                    {venue.friends.length > 2 && (
+                      <span className="ml-1 text-xs text-white/70 font-medium">
+                        +{venue.friends.length - 2}
                       </span>
                     )}
                   </>
                 ) : null}
+              </div>
+
+              {/* Energy Bars */}
+              <div className="flex-shrink-0">
+                {renderEnergyBars(venue.energyLevel)}
               </div>
             </div>
           </div>
