@@ -26,6 +26,7 @@ export interface PostComment {
   user_id: string;
   text: string;
   created_at: string;
+  likes_count: number;
   profiles: {
     display_name: string;
     username: string;
@@ -70,6 +71,7 @@ export function useFeed(options: UseFeedOptions) {
   const [comments, setComments] = useState<{ [key: string]: PostComment[] }>({});
   const [newComment, setNewComment] = useState<{ [key: string]: string }>({});
   const [animatingLike, setAnimatingLike] = useState<string | null>(null);
+  const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
 
   const getTimeAgo = useCallback((date: string) => {
     const distance = formatDistanceToNow(new Date(date), { addSuffix: false });
@@ -362,8 +364,26 @@ export function useFeed(options: UseFeedOptions) {
 
     if (data) {
       setComments(prev => ({ ...prev, [postId]: data }));
+      
+      // Fetch user's comment likes for these comments
+      if (userId && data.length > 0) {
+        const commentIds = data.map(c => c.id);
+        const { data: commentLikes } = await supabase
+          .from('post_comment_likes')
+          .select('comment_id')
+          .eq('user_id', userId)
+          .in('comment_id', commentIds);
+        
+        if (commentLikes) {
+          setLikedComments(prev => {
+            const newSet = new Set(prev);
+            commentLikes.forEach(l => newSet.add(l.comment_id));
+            return newSet;
+          });
+        }
+      }
     }
-  }, []);
+  }, [userId]);
 
   const handleToggleComments = useCallback(async (postId: string) => {
     if (expandedPostId === postId) {
@@ -472,12 +492,82 @@ export function useFeed(options: UseFeedOptions) {
     }
   }, [userId]);
 
+  const handleLikeComment = useCallback(async (commentId: string, postId: string) => {
+    if (!userId) return;
+
+    const isLiked = likedComments.has(commentId);
+    
+    // Haptic feedback on like
+    if (!isLiked) {
+      haptic.light();
+    }
+
+    // Optimistic UI update
+    setComments(prev => ({
+      ...prev,
+      [postId]: prev[postId]?.map(c => {
+        if (c.id === commentId) {
+          return {
+            ...c,
+            likes_count: isLiked ? Math.max((c.likes_count || 0) - 1, 0) : (c.likes_count || 0) + 1
+          };
+        }
+        return c;
+      }) || []
+    }));
+
+    if (isLiked) {
+      setLikedComments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(commentId);
+        return newSet;
+      });
+
+      const { error } = await supabase
+        .from('post_comment_likes')
+        .delete()
+        .eq('comment_id', commentId)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error unliking comment:', error);
+        // Revert
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId]?.map(c => c.id === commentId ? { ...c, likes_count: (c.likes_count || 0) + 1 } : c) || []
+        }));
+        setLikedComments(prev => new Set(prev).add(commentId));
+      }
+    } else {
+      setLikedComments(prev => new Set(prev).add(commentId));
+
+      const { error } = await supabase
+        .from('post_comment_likes')
+        .insert({ comment_id: commentId, user_id: userId });
+
+      if (error) {
+        console.error('Error liking comment:', error);
+        // Revert
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId]?.map(c => c.id === commentId ? { ...c, likes_count: Math.max((c.likes_count || 0) - 1, 0) } : c) || []
+        }));
+        setLikedComments(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(commentId);
+          return newSet;
+        });
+      }
+    }
+  }, [userId, likedComments]);
+
   return {
     posts,
     setPosts,
     friends,
     storyUsers,
     likedPosts,
+    likedComments,
     expandedPostId,
     comments,
     newComment,
@@ -491,6 +581,7 @@ export function useFeed(options: UseFeedOptions) {
     handleToggleComments,
     handlePostComment,
     handleLikePost,
+    handleLikeComment,
     handleDeletePost,
   };
 }
