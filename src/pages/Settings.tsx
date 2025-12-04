@@ -7,9 +7,10 @@ export default function Settings() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
+    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
+      <div className="max-w-[430px] mx-auto pb-24">
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-center gap-4 px-4 py-6">
           <button
             onClick={() => navigate('/profile')}
@@ -116,6 +117,7 @@ export default function Settings() {
         <div className="text-center pt-6">
           <p className="text-white/40 text-sm">Spotted v1.0.0</p>
         </div>
+      </div>
       </div>
     </div>
   );
