@@ -270,15 +270,15 @@ export default function Leaderboard() {
   };
 
   const renderEnergyBars = (level: number) => {
+    const barHeights = ['h-2', 'h-3', 'h-4']; // Progressive: 8px, 12px, 16px
+    
     return (
-      <div className="flex gap-1 items-end">
-        {[1, 2, 3].map((bar) => (
+      <div className="flex gap-0.5 items-end">
+        {[1, 2, 3].map((bar, index) => (
           <div
             key={bar}
-            className={`w-1 rounded-full transition-all ${
-              bar <= level
-                ? 'h-4 bg-white'
-                : 'h-2 bg-white/20'
+            className={`w-1.5 rounded-sm transition-all ${barHeights[index]} ${
+              bar <= level ? 'bg-white' : 'bg-white/20'
             }`}
           />
         ))}
