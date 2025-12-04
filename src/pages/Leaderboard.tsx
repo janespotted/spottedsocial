@@ -57,29 +57,21 @@ export default function Leaderboard() {
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
 
   const calculateEnergyLevel = (
+    rank: number, 
     userCount: number, 
-    popularityRank: number, 
     isBootstrapMode: boolean
   ): number => {
     if (!isBootstrapMode) {
-      // Production mode: 100% user data
-      return Math.min(userCount, 3) || 1;
+      // Production mode: Based on actual check-in counts
+      if (userCount >= 10) return 3;
+      if (userCount >= 5) return 2;
+      return userCount > 0 ? 1 : 0;
     }
     
-    // Bootstrap/Hybrid mode: 75% reputation + 25% user data
-    let reputationScore: number;
-    if (popularityRank <= 7) {
-      reputationScore = 3; // Top tier venues
-    } else if (popularityRank <= 15) {
-      reputationScore = 2; // Mid tier venues
-    } else {
-      reputationScore = 1; // Lower tier venues
-    }
-    
-    const userScore = Math.min(userCount, 3) || 1;
-    const weightedScore = (0.75 * reputationScore) + (0.25 * userScore);
-    
-    return Math.round(weightedScore);
+    // Bootstrap mode: Based on leaderboard ranking position
+    if (rank <= 7) return 3;   // Top tier (ranks 1-7)
+    if (rank <= 14) return 2;  // Mid tier (ranks 8-14)
+    return 1;                  // Lower tier (ranks 15+)
   };
 
   const handleVenueClick = async (venueName: string, venueId?: string | null) => {
@@ -238,19 +230,22 @@ export default function Leaderboard() {
     });
     
     // Take top 20 non-promoted venues for ranking (user requested top 20)
-    const rankedVenues = nonPromotedVenues.slice(0, 20).map((venue, index) => ({
-      ...venue,
-      rank: index + 1,
-      movement: Math.random() > 0.5 ? 'up' : (Math.random() > 0.5 ? 'down' : 'same') as 'up' | 'down' | 'same',
-      energyLevel: calculateEnergyLevel(venue.count, venue.popularity_rank, bootstrapEnabled),
-    }));
+    const rankedVenues = nonPromotedVenues.slice(0, 20).map((venue, index) => {
+      const rank = index + 1;
+      return {
+        ...venue,
+        rank,
+        movement: Math.random() > 0.5 ? 'up' : (Math.random() > 0.5 ? 'down' : 'same') as 'up' | 'down' | 'same',
+        energyLevel: calculateEnergyLevel(rank, venue.count, bootstrapEnabled),
+      };
+    });
 
-    // Assign properties to promoted venues (no rank)
+    // Assign properties to promoted venues (no rank, treat as top tier for energy)
     const promotedWithProps = topPromotedVenues.map(venue => ({
       ...venue,
       rank: 0, // No rank for promoted
       movement: 'same' as const,
-      energyLevel: calculateEnergyLevel(venue.count, venue.popularity_rank, bootstrapEnabled),
+      energyLevel: calculateEnergyLevel(1, venue.count, bootstrapEnabled), // Treat as rank 1 for energy
     }));
 
     // Combine: promoted first, then ranked
