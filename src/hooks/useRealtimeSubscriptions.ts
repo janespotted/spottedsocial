@@ -9,54 +9,53 @@ interface SubscriptionConfig {
 
 export function useRealtimeSubscriptions(config: SubscriptionConfig) {
   const { onPostsChange, onStoriesChange, onLikesChange } = config;
-  const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const cleanup = useCallback(() => {
-    channelsRef.current.forEach(channel => {
-      supabase.removeChannel(channel);
-    });
-    channelsRef.current = [];
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
-    // Clean up any existing channels first
+    // Clean up any existing channel first
     cleanup();
 
+    // Only create channel if at least one callback is provided
+    if (!onPostsChange && !onStoriesChange && !onLikesChange) {
+      return;
+    }
+
+    // Single unified channel for all feed-related realtime updates
+    const feedRealtimeChannel = supabase.channel('feed-realtime');
+
     if (onPostsChange) {
-      const postsChannel = supabase
-        .channel('realtime_posts')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'posts' },
-          onPostsChange
-        )
-        .subscribe();
-      channelsRef.current.push(postsChannel);
+      feedRealtimeChannel.on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'posts' },
+        onPostsChange
+      );
     }
 
     if (onStoriesChange) {
-      const storiesChannel = supabase
-        .channel('realtime_stories')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'stories' },
-          onStoriesChange
-        )
-        .subscribe();
-      channelsRef.current.push(storiesChannel);
+      feedRealtimeChannel.on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'stories' },
+        onStoriesChange
+      );
     }
 
     if (onLikesChange) {
-      const likesChannel = supabase
-        .channel('realtime_likes')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'post_likes' },
-          onLikesChange
-        )
-        .subscribe();
-      channelsRef.current.push(likesChannel);
+      feedRealtimeChannel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'post_likes' },
+        onLikesChange
+      );
     }
+
+    feedRealtimeChannel.subscribe();
+    channelRef.current = feedRealtimeChannel;
 
     return cleanup;
   }, [onPostsChange, onStoriesChange, onLikesChange, cleanup]);

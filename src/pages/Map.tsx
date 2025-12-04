@@ -83,59 +83,34 @@ export default function Map() {
     }, 500); // 500ms debounce
   }, [user, demoEnabled, city]);
 
-  // Real-time subscription for location updates
+  // Real-time subscription for location updates - CONSOLIDATED into 1 channel
   useEffect(() => {
     if (!user) return;
 
-    // Subscribe to profile changes (location updates)
-    const profileChannel = supabase
-      .channel('profile-location-changes')
+    // Single unified channel for all map-related realtime updates
+    const mapRealtimeChannel = supabase
+      .channel('map-realtime')
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-        },
+        { event: 'UPDATE', schema: 'public', table: 'profiles' },
         (payload) => {
           console.log('Profile location updated:', payload);
-          // Debounced refresh to prevent thundering herd
           debouncedFetchFriendsLocations();
         }
       )
-      .subscribe();
-
-    // Subscribe to night status changes (venue updates)
-    const statusChannel = supabase
-      .channel('night-status-changes')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'night_statuses',
-        },
+        { event: '*', schema: 'public', table: 'night_statuses' },
         (payload) => {
           console.log('Night status updated:', payload);
-          // Debounced refresh
           debouncedFetchFriendsLocations();
         }
       )
-      .subscribe();
-
-    // Subscribe to checkins table for real-time location updates
-    const checkinsChannel = supabase
-      .channel('checkins-realtime')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'checkins',
-        },
+        { event: '*', schema: 'public', table: 'checkins' },
         (payload) => {
           console.log('Checkin updated:', payload);
-          // Debounced refresh
           debouncedFetchFriendsLocations();
         }
       )
@@ -145,9 +120,7 @@ export default function Map() {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
-      supabase.removeChannel(profileChannel);
-      supabase.removeChannel(statusChannel);
-      supabase.removeChannel(checkinsChannel);
+      supabase.removeChannel(mapRealtimeChannel);
     };
   }, [user, demoEnabled, debouncedFetchFriendsLocations]);
 
