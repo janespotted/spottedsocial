@@ -361,7 +361,7 @@ export default function Leaderboard() {
                   <div className="flex-shrink-0 flex items-center">
                     {venue.friends.length > 0 ? (
                       <>
-                        <div className="flex -space-x-1.5">
+                    <div className="flex -space-x-2">
                           {venue.friends.slice(0, 2).map((friend, idx) => (
                             <button
                               key={idx}
@@ -373,9 +373,9 @@ export default function Leaderboard() {
                               })}
                               className="transition-transform hover:scale-110"
                             >
-                              <Avatar className="h-5 w-5 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                              <Avatar className="h-6 w-6 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
                                 <AvatarImage src={friend.avatar_url || undefined} />
-                                <AvatarFallback className="bg-[#1a0f2e] text-white text-[8px]">
+                                <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
                                   {friend.display_name[0]}
                                 </AvatarFallback>
                               </Avatar>
@@ -449,7 +449,7 @@ export default function Leaderboard() {
               <div className="flex-shrink-0 flex items-center">
                 {venue.friends.length > 0 ? (
                   <>
-                    <div className="flex -space-x-1.5">
+                <div className="flex -space-x-2">
                       {venue.friends.slice(0, 2).map((friend, idx) => (
                         <button
                           key={idx}
@@ -461,9 +461,9 @@ export default function Leaderboard() {
                           })}
                           className="transition-transform hover:scale-110"
                         >
-                          <Avatar className="h-5 w-5 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                          <Avatar className="h-6 w-6 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
                             <AvatarImage src={friend.avatar_url || undefined} />
-                            <AvatarFallback className="bg-[#1a0f2e] text-white text-[8px]">
+                            <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
                               {friend.display_name[0]}
                             </AvatarFallback>
                           </Avatar>
