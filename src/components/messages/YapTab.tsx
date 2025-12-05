@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { YapSkeleton } from './MessagesSkeleton';
 
 interface YapMessage {
   id: string;
@@ -52,6 +53,7 @@ export function YapTab() {
   const [expandedYapId, setExpandedYapId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, YapComment[]>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -83,58 +85,71 @@ export function YapTab() {
   const fetchYapMessages = async () => {
     if (!user) return;
 
-    // Fetch yap messages with vote information
-    let query = supabase
-      .from('yap_messages')
-      .select(`
-        *,
-        profiles:user_id (
-          display_name,
-          avatar_url
-        )
-      `)
-      .gt('expires_at', new Date().toISOString());
+    setIsLoading(true);
+    try {
+      // Fetch yap messages with vote information
+      let query = supabase
+        .from('yap_messages')
+        .select(`
+          *,
+          profiles:user_id (
+            display_name,
+            avatar_url
+          )
+        `)
+        .gt('expires_at', new Date().toISOString());
 
-    // In demo mode, show all demo yaps OR yaps for current venue
-    // In normal mode, only show yaps for current venue (non-demo)
-    if (demoMode) {
-      query = query.or(`venue_name.eq.${selectedVenue},is_demo.eq.true`);
-    } else {
-      query = query.eq('venue_name', selectedVenue).eq('is_demo', false);
-    }
+      // In demo mode, show all demo yaps OR yaps for current venue
+      // In normal mode, only show yaps for current venue (non-demo)
+      if (demoMode) {
+        query = query.or(`venue_name.eq.${selectedVenue},is_demo.eq.true`);
+      } else {
+        query = query.eq('venue_name', selectedVenue).eq('is_demo', false);
+      }
 
-    const { data: yaps } = await query;
+      const { data: yaps } = await query;
 
-    if (!yaps) return;
+      if (!yaps) {
+        setMessages([]);
+        return;
+      }
 
-    // Fetch user's votes for these yaps
-    const yapIds = yaps.map(y => y.id);
-    const { data: votes } = await supabase
-      .from('yap_votes')
-      .select('yap_id, vote_type')
-      .eq('user_id', user.id)
-      .in('yap_id', yapIds);
+      // Fetch user's votes for these yaps in parallel
+      const yapIds = yaps.map(y => y.id);
+      const { data: votes } = yapIds.length > 0 
+        ? await supabase
+            .from('yap_votes')
+            .select('yap_id, vote_type')
+            .eq('user_id', user.id)
+            .in('yap_id', yapIds)
+        : { data: [] };
 
-    const voteMap = new Map(votes?.map(v => [v.yap_id, v.vote_type as 'up' | 'down']) || []);
-
-    const messagesWithVotes = yaps.map(msg => ({
-      ...msg,
-      user_vote: voteMap.get(msg.id) || null,
-    }));
-
-    // Sort based on selected tab
-    if (sortBy === 'hot') {
-      messagesWithVotes.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      const voteMap = new Map<string, 'up' | 'down'>();
+      votes?.forEach(v => {
+        voteMap.set(v.yap_id, v.vote_type as 'up' | 'down');
       });
-    } else {
-      messagesWithVotes.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    }
 
-    setMessages(messagesWithVotes);
+      const messagesWithVotes: YapMessage[] = yaps.map(msg => ({
+        ...msg,
+        user_vote: voteMap.get(msg.id) || null,
+      }));
+
+      // Sort based on selected tab
+      if (sortBy === 'hot') {
+        messagesWithVotes.sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+      } else {
+        messagesWithVotes.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      }
+
+      setMessages(messagesWithVotes);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const subscribeToYaps = () => {
@@ -393,6 +408,10 @@ export function YapTab() {
     return distance.replace('about ', '').replace(' minutes', 'm').replace(' minute', 'm')
       .replace(' hours', 'h').replace(' hour', 'h');
   };
+
+  if (isLoading && !selectedVenue) {
+    return <YapSkeleton />;
+  }
 
   return (
     <div className="space-y-4 pb-24">
