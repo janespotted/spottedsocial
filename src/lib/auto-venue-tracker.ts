@@ -17,11 +17,16 @@ interface LastCheckin {
 interface TrackingState {
   lastGPS: { lat: number; lng: number; timestamp: string } | null;
   wasInBackground: boolean;
+  lastTrackTime: number;
 }
+
+// Global debounce: 30 seconds between tracking calls
+const TRACK_DEBOUNCE_MS = 30000;
 
 const trackingState: TrackingState = {
   lastGPS: null,
   wasInBackground: false,
+  lastTrackTime: 0,
 };
 
 // Detect if app was in background
@@ -180,6 +185,14 @@ const createCheckin = async (
  */
 export const autoTrackVenue = async (userId: string): Promise<void> => {
   try {
+    // Debounce: skip if called within 30 seconds
+    const currentTime = Date.now();
+    if (currentTime - trackingState.lastTrackTime < TRACK_DEBOUNCE_MS) {
+      console.log('🔵 Auto-tracking debounced (within 30s cooldown)');
+      return;
+    }
+    trackingState.lastTrackTime = currentTime;
+
     // Check if user is marked as "Out"
     const isOut = await isUserOut(userId);
     if (!isOut) {

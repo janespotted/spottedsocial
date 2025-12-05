@@ -144,28 +144,16 @@ export function useFeed(options: UseFeedOptions) {
     if (!userId) return;
 
     try {
-      // Get venues for the user's city (for filtering)
-      const { data: cityVenues } = await supabase
-        .from('venues')
-        .select('id, name')
-        .eq('city', city || 'nyc');
+      // Parallelize: Get venues AND friendships at the same time
+      const [cityVenuesResult, sentFriendships, receivedFriendships] = await Promise.all([
+        supabase.from('venues').select('id, name').eq('city', city || 'nyc'),
+        supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('status', 'accepted'),
+        supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('status', 'accepted'),
+      ]);
       
+      const cityVenues = cityVenuesResult.data;
       const cityVenueIds = new Set(cityVenues?.map(v => v.id) || []);
       const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
-
-      // Query both directions of friendships
-      const [sentFriendships, receivedFriendships] = await Promise.all([
-        supabase
-          .from('friendships')
-          .select('friend_id')
-          .eq('user_id', userId)
-          .eq('status', 'accepted'),
-        supabase
-          .from('friendships')
-          .select('user_id')
-          .eq('friend_id', userId)
-          .eq('status', 'accepted'),
-      ]);
 
       // Combine friend IDs from both directions
       const friendIds = [
@@ -234,27 +222,15 @@ export function useFeed(options: UseFeedOptions) {
     if (!userId) return;
 
     try {
-      // Get venues for the user's city (for filtering)
-      const { data: cityVenues } = await supabase
-        .from('venues')
-        .select('id, name')
-        .eq('city', city || 'nyc');
-      
-      const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
-
-      // Query both directions of friendships
-      const [sentFriendships, receivedFriendships] = await Promise.all([
-        supabase
-          .from('friendships')
-          .select('friend_id')
-          .eq('user_id', userId)
-          .eq('status', 'accepted'),
-        supabase
-          .from('friendships')
-          .select('user_id')
-          .eq('friend_id', userId)
-          .eq('status', 'accepted'),
+      // Parallelize: Get venues AND friendships at the same time
+      const [cityVenuesResult, sentFriendships, receivedFriendships] = await Promise.all([
+        supabase.from('venues').select('id, name').eq('city', city || 'nyc'),
+        supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('status', 'accepted'),
+        supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('status', 'accepted'),
       ]);
+      
+      const cityVenues = cityVenuesResult.data;
+      const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
 
       // Combine friend IDs from both directions
       const friendIds = [

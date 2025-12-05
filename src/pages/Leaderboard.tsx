@@ -11,10 +11,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { ChevronUp, ChevronDown, BarChart3, Bell } from 'lucide-react';
+import { ChevronUp, ChevronDown, Bell, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { CityBadge } from '@/components/CityBadge';
+import { LeaderboardSkeleton } from '@/components/LeaderboardSkeleton';
 
 interface VenueStats {
   venue_name: string;
@@ -55,6 +56,7 @@ export default function Leaderboard() {
   useAutoVenueTracking(); // Trigger auto-venue tracking on leaderboard view
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const calculateEnergyLevel = (
     rank: number, 
@@ -99,47 +101,49 @@ export default function Leaderboard() {
   }, [user, demoEnabled, bootstrapEnabled, city]);
 
   const fetchLeaderboard = async () => {
-    // Build query for night statuses with venue popularity_rank, filtered by city
-    let query = supabase
-      .from('night_statuses')
-      .select(`
-        venue_name,
-        venue_id,
-        user_id,
-        updated_at,
-        is_promoted,
-        profiles:user_id (
-          display_name,
-          avatar_url,
-          is_demo
-        ),
-        venues!inner(popularity_rank, is_promoted, city, opened_at)
-      `)
-      .eq('venues.city', city)
-      .not('venue_name', 'is', null)
-      .not('lat', 'is', null)
-      .not('lng', 'is', null)
-      .not('expires_at', 'is', null)
-      .gt('expires_at', new Date().toISOString());
+    setIsLoading(true);
+    try {
+      // Build query for night statuses with venue popularity_rank, filtered by city
+      let query = supabase
+        .from('night_statuses')
+        .select(`
+          venue_name,
+          venue_id,
+          user_id,
+          updated_at,
+          is_promoted,
+          profiles:user_id (
+            display_name,
+            avatar_url,
+            is_demo
+          ),
+          venues!inner(popularity_rank, is_promoted, city, opened_at)
+        `)
+        .eq('venues.city', city)
+        .not('venue_name', 'is', null)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .not('expires_at', 'is', null)
+        .gt('expires_at', new Date().toISOString());
 
-    // Hybrid mode: show real data + ALL demo data to populate leaderboard
-    if (bootstrapEnabled && !demoEnabled) {
-      // Show everything (both real and demo) to ensure leaderboard is populated
-      // No filter needed - promoted venues handled separately
-    } else if (!demoEnabled) {
-      // Pure real mode (only real data when bootstrap is off)
-      query = query.eq('is_demo', false);
-    }
-    // If demoEnabled is true, show everything (no filter)
+      // Hybrid mode: show real data + ALL demo data to populate leaderboard
+      if (bootstrapEnabled && !demoEnabled) {
+        // Show everything (both real and demo) to ensure leaderboard is populated
+        // No filter needed - promoted venues handled separately
+      } else if (!demoEnabled) {
+        // Pure real mode (only real data when bootstrap is off)
+        query = query.eq('is_demo', false);
+      }
+      // If demoEnabled is true, show everything (no filter)
 
-    // Also fetch promoted venues directly to ensure they always appear, filtered by city
-    const { data: promotedVenues } = await supabase
-      .from('venues')
-      .select('id, name, popularity_rank, is_promoted, opened_at')
-      .eq('is_promoted', true)
-      .eq('city', city);
+      // Parallelize: fetch promoted venues AND night statuses at the same time
+      const [promotedVenuesResult, statusesResult] = await Promise.all([
+        supabase.from('venues').select('id, name, popularity_rank, is_promoted, opened_at').eq('is_promoted', true).eq('city', city),
+        query,
+      ]);
 
-    const { data: statuses } = await query;
+      const promotedVenues = promotedVenuesResult.data;
+      const statuses = statusesResult.data;
 
     // Calculate if venue is newly opened (within last 3 months)
     const threeMonthsAgo = new Date();
@@ -253,14 +257,17 @@ export default function Leaderboard() {
 
     setVenues(finalVenues);
 
-    // Set biggest mover (from non-promoted venues only)
-    if (nonPromotedVenues.length > 0) {
-      const moverVenue = nonPromotedVenues[Math.floor(Math.random() * Math.min(5, nonPromotedVenues.length))];
-      setBiggestMover({
-        venue_name: moverVenue.venue_name,
-        venue_id: moverVenue.venue_id,
-        friends: moverVenue.friends.slice(0, 3),
-      });
+      // Set biggest mover (from non-promoted venues only)
+      if (nonPromotedVenues.length > 0) {
+        const moverVenue = nonPromotedVenues[Math.floor(Math.random() * Math.min(5, nonPromotedVenues.length))];
+        setBiggestMover({
+          venue_name: moverVenue.venue_name,
+          venue_id: moverVenue.venue_id,
+          friends: moverVenue.friends.slice(0, 3),
+        });
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -320,6 +327,10 @@ export default function Leaderboard() {
       {/* Leaderboard List */}
       <PullToRefresh onRefresh={fetchLeaderboard}>
         <div className="px-4 py-6 space-y-3">
+        {isLoading ? (
+          <LeaderboardSkeleton />
+        ) : (
+          <>
         {/* Promoted Section */}
         {venues.filter(v => v.isPromoted).length > 0 && (
           <>
@@ -485,7 +496,7 @@ export default function Leaderboard() {
         {venues.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
             <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
-              <BarChart3 className="h-10 w-10 text-[#a855f7]/60" />
+              <ChevronUp className="h-10 w-10 text-[#a855f7]/60" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">
               No venues trending yet
@@ -494,6 +505,8 @@ export default function Leaderboard() {
               Check in to be the first! Venues appear here when friends are out.
             </p>
           </div>
+        )}
+          </>
         )}
         </div>
       </PullToRefresh>
