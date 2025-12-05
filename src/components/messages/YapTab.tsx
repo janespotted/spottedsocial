@@ -70,6 +70,7 @@ export function YapTab() {
   }, [selectedVenue, sortBy, demoMode]);
 
   const fetchUserVenue = async () => {
+    setIsLoading(true);
     const { data } = await supabase
       .from('night_statuses')
       .select('venue_name')
@@ -79,6 +80,8 @@ export function YapTab() {
 
     if (data?.venue_name) {
       setSelectedVenue(data.venue_name);
+    } else {
+      setIsLoading(false);
     }
   };
 
@@ -109,45 +112,51 @@ export function YapTab() {
 
       const { data: yaps } = await query;
 
-      if (!yaps) {
+      if (!yaps?.length) {
         setMessages([]);
+        setIsLoading(false);
         return;
       }
 
-      // Fetch user's votes for these yaps in parallel
-      const yapIds = yaps.map(y => y.id);
-      const { data: votes } = yapIds.length > 0 
-        ? await supabase
-            .from('yap_votes')
-            .select('yap_id, vote_type')
-            .eq('user_id', user.id)
-            .in('yap_id', yapIds)
-        : { data: [] };
-
-      const voteMap = new Map<string, 'up' | 'down'>();
-      votes?.forEach(v => {
-        voteMap.set(v.yap_id, v.vote_type as 'up' | 'down');
-      });
-
-      const messagesWithVotes: YapMessage[] = yaps.map(msg => ({
+      // Set messages immediately with null votes (fast initial render)
+      const initialMessages: YapMessage[] = yaps.map(msg => ({
         ...msg,
-        user_vote: voteMap.get(msg.id) || null,
+        user_vote: null,
       }));
 
       // Sort based on selected tab
       if (sortBy === 'hot') {
-        messagesWithVotes.sort((a, b) => {
+        initialMessages.sort((a, b) => {
           if (b.score !== a.score) return b.score - a.score;
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
       } else {
-        messagesWithVotes.sort((a, b) => 
+        initialMessages.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
       }
 
-      setMessages(messagesWithVotes);
-    } finally {
+      setMessages(initialMessages);
+      setIsLoading(false);
+
+      // Then fetch votes in background (progressive enhancement)
+      const yapIds = yaps.map(y => y.id);
+      const { data: votes } = await supabase
+        .from('yap_votes')
+        .select('yap_id, vote_type')
+        .eq('user_id', user.id)
+        .in('yap_id', yapIds);
+
+      if (votes?.length) {
+        const voteMap = new Map<string, 'up' | 'down'>();
+        votes.forEach(v => voteMap.set(v.yap_id, v.vote_type as 'up' | 'down'));
+        setMessages(prev => prev.map(msg => ({
+          ...msg,
+          user_vote: voteMap.get(msg.id) || null,
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching yaps:', error);
       setIsLoading(false);
     }
   };
@@ -285,24 +294,37 @@ export function YapTab() {
       .eq('yap_id', yapId)
       .order('created_at', { ascending: true });
 
-    if (data) {
-      // Fetch user's votes for these comments
-      const commentIds = data.map(c => c.id);
-      const { data: votes } = await supabase
-        .from('yap_comment_votes')
-        .select('comment_id, vote_type')
-        .eq('user_id', user.id)
-        .in('comment_id', commentIds);
+    if (!data?.length) {
+      setComments(prev => ({ ...prev, [yapId]: [] }));
+      return;
+    }
 
-      const voteMap = new Map(votes?.map(v => [v.comment_id, v.vote_type as 'up' | 'down']) || []);
+    // Set comments immediately with null votes (fast initial render)
+    const initialComments: YapComment[] = data.map(comment => ({
+      ...comment,
+      score: comment.score || 0,
+      user_vote: null,
+    }));
+    setComments(prev => ({ ...prev, [yapId]: initialComments }));
 
-      const commentsWithVotes = data.map(comment => ({
-        ...comment,
-        score: comment.score || 0,
-        user_vote: voteMap.get(comment.id) || null,
+    // Fetch votes in background (progressive enhancement)
+    const commentIds = data.map(c => c.id);
+    const { data: votes } = await supabase
+      .from('yap_comment_votes')
+      .select('comment_id, vote_type')
+      .eq('user_id', user.id)
+      .in('comment_id', commentIds);
+
+    if (votes?.length) {
+      const voteMap = new Map<string, 'up' | 'down'>();
+      votes.forEach(v => voteMap.set(v.comment_id, v.vote_type as 'up' | 'down'));
+      setComments(prev => ({
+        ...prev,
+        [yapId]: prev[yapId]?.map(c => ({
+          ...c,
+          user_vote: voteMap.get(c.id) || null,
+        })) || [],
       }));
-
-      setComments(prev => ({ ...prev, [yapId]: commentsWithVotes }));
     }
   };
 
@@ -409,7 +431,7 @@ export function YapTab() {
       .replace(' hours', 'h').replace(' hour', 'h');
   };
 
-  if (isLoading && !selectedVenue) {
+  if (isLoading) {
     return <YapSkeleton />;
   }
 

@@ -130,26 +130,12 @@ export function ActivityTab() {
   const fetchActivities = async () => {
     // Parallelize initial queries
     const [currentStatusResult, sentFriendshipsResult, receivedFriendshipsResult] = await Promise.all([
-      supabase
-        .from('night_statuses')
-        .select('venue_name')
-        .eq('user_id', user?.id)
-        .eq('status', 'out')
-        .maybeSingle(),
-      supabase
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', user?.id)
-        .eq('status', 'accepted'),
-      supabase
-        .from('friendships')
-        .select('user_id')
-        .eq('friend_id', user?.id)
-        .eq('status', 'accepted'),
+      supabase.from('night_statuses').select('venue_name').eq('user_id', user?.id).eq('status', 'out').maybeSingle(),
+      supabase.from('friendships').select('friend_id').eq('user_id', user?.id).eq('status', 'accepted'),
+      supabase.from('friendships').select('user_id').eq('friend_id', user?.id).eq('status', 'accepted'),
     ]);
 
     const userCurrentVenue = currentStatusResult.data?.venue_name?.toLowerCase() || null;
-
     const friendIds = [
       ...(sentFriendshipsResult.data?.map(f => f.friend_id) || []),
       ...(receivedFriendshipsResult.data?.map(f => f.user_id) || [])
@@ -157,8 +143,28 @@ export function ActivityTab() {
 
     const activityList: Activity[] = [];
 
+    // Add demo activities if enabled
+    if (demoEnabled) {
+      const demoActivities = generateDemoActivities(city, userCurrentVenue);
+      activityList.push(...demoActivities);
+    }
+
+    // Add trending venue immediately
+    activityList.push({
+      id: 'trending-1',
+      type: 'trending',
+      title: 'The Box is trending',
+      subtitle: '12+ here now',
+      timestamp: new Date(Date.now() - 300000).toISOString(),
+      action: 'view',
+      venue_id: 'eb5df239-48cf-4cae-8b18-d69a6f395a21',
+    });
+
+    // Set initial activities immediately (fast render with demo/trending)
+    setActivities(activityList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+
+    // Fetch check-ins from friends in background (progressive enhancement)
     if (friendIds.length > 0) {
-      // Get recent check-ins
       const { data: checkIns } = await supabase
         .from('checkins')
         .select(`
@@ -172,43 +178,26 @@ export function ActivityTab() {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (checkIns) {
-        checkIns.forEach(checkIn => {
-          activityList.push({
-            id: checkIn.id,
-            type: 'check_in',
-            title: `${checkIn.profiles?.display_name} arrived at the`,
-            subtitle: checkIn.venue_name,
-            timestamp: checkIn.created_at,
-            avatar_url: checkIn.profiles?.avatar_url,
-            user_id: checkIn.user_id,
-            display_name: checkIn.profiles?.display_name,
-            action: 'meet_up',
-          });
+      if (checkIns?.length) {
+        const checkInActivities: Activity[] = checkIns.map(checkIn => ({
+          id: checkIn.id,
+          type: 'check_in' as const,
+          title: `${checkIn.profiles?.display_name} arrived at the`,
+          subtitle: checkIn.venue_name,
+          timestamp: checkIn.created_at || new Date().toISOString(),
+          avatar_url: checkIn.profiles?.avatar_url,
+          user_id: checkIn.user_id,
+          display_name: checkIn.profiles?.display_name,
+          action: 'meet_up' as const,
+        }));
+        
+        // Merge check-ins with existing activities
+        setActivities(prev => {
+          const merged = [...prev, ...checkInActivities];
+          return merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         });
       }
     }
-
-    // Add demo activities when demo mode is enabled
-    if (demoEnabled) {
-      const demoActivities = generateDemoActivities(city, userCurrentVenue);
-      activityList.push(...demoActivities);
-    }
-
-    // Add mock trending activity
-    activityList.push({
-      id: 'trending-1',
-      type: 'trending',
-      title: 'The Box is trending',
-      subtitle: '12+ here now',
-      timestamp: new Date(Date.now() - 300000).toISOString(),
-      action: 'view',
-      venue_id: 'eb5df239-48cf-4cae-8b18-d69a6f395a21',
-    });
-
-    setActivities(activityList.sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    ));
   };
 
   const getTimeAgo = (date: string) => {
