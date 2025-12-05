@@ -68,7 +68,8 @@ export default function Thread() {
     setIsUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      // Store images in thread folder for RLS policy matching
+      const fileName = `${threadId}/${Date.now()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('dm-images')
@@ -76,15 +77,12 @@ export default function Thread() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('dm-images')
-        .getPublicUrl(fileName);
-
+      // Store the file path (not public URL) since bucket is now private
       await supabase.from('dm_messages').insert({
         thread_id: threadId,
         sender_id: user.id,
         text: '',
-        image_url: publicUrl,
+        image_url: fileName, // Store path for signed URL generation
       });
 
       toast.success('Image sent!');
@@ -175,7 +173,20 @@ export default function Thread() {
       .order('created_at', { ascending: true });
 
     if (data) {
-      setMessages(data);
+      // Generate signed URLs for messages with images
+      const messagesWithSignedUrls = await Promise.all(
+        data.map(async (msg) => {
+          if (msg.image_url && !msg.image_url.startsWith('http')) {
+            // It's a file path, generate signed URL
+            const { data: signedData } = await supabase.storage
+              .from('dm-images')
+              .createSignedUrl(msg.image_url, 3600); // 1 hour expiry
+            return { ...msg, image_url: signedData?.signedUrl || null };
+          }
+          return msg;
+        })
+      );
+      setMessages(messagesWithSignedUrls);
     }
   };
 
@@ -190,8 +201,16 @@ export default function Thread() {
           table: 'dm_messages',
           filter: `thread_id=eq.${threadId}`,
         },
-        (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message]);
+        async (payload) => {
+          const newMsg = payload.new as Message;
+          // Generate signed URL for new image messages
+          if (newMsg.image_url && !newMsg.image_url.startsWith('http')) {
+            const { data: signedData } = await supabase.storage
+              .from('dm-images')
+              .createSignedUrl(newMsg.image_url, 3600);
+            newMsg.image_url = signedData?.signedUrl || null;
+          }
+          setMessages((prev) => [...prev, newMsg]);
         }
       )
       .subscribe();
