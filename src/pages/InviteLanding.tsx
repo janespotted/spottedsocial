@@ -12,6 +12,14 @@ interface InviterInfo {
   username: string;
 }
 
+interface ValidationResult {
+  valid: boolean;
+  reason?: string;
+  inviter_display_name?: string;
+  inviter_avatar_url?: string | null;
+  inviter_username?: string;
+}
+
 export default function InviteLanding() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
@@ -27,49 +35,43 @@ export default function InviteLanding() {
 
   const fetchInviteInfo = async () => {
     try {
-      // Get the invite code and inviter info
-      const { data: inviteCode, error: inviteError } = await supabase
-        .from('invite_codes')
-        .select('user_id, expires_at, max_uses, uses_count')
-        .eq('code', code)
-        .maybeSingle();
+      // Use the secure validation function instead of direct table queries
+      const { data, error: rpcError } = await supabase
+        .rpc('validate_invite_code', { code_to_check: code });
 
-      if (inviteError || !inviteCode) {
-        setError('This invite link is invalid or has expired.');
+      if (rpcError) {
+        console.error('Validation error:', rpcError);
+        setError('Something went wrong. Please try again.');
         setLoading(false);
         return;
       }
 
-      // Check if expired
-      if (inviteCode.expires_at && new Date(inviteCode.expires_at) < new Date()) {
-        setError('This invite link has expired.');
+      const result = data as unknown as ValidationResult;
+
+      if (!result || !result.valid) {
+        // Map reason to user-friendly message
+        let errorMessage = 'This invite link is invalid or has expired.';
+        if (result.reason === 'Code expired') {
+          errorMessage = 'This invite link has expired.';
+        } else if (result.reason === 'Code fully used') {
+          errorMessage = 'This invite link has reached its maximum uses.';
+        } else if (result.reason === 'Inviter not found') {
+          errorMessage = 'Could not find the inviter.';
+        }
+        setError(errorMessage);
         setLoading(false);
         return;
       }
 
-      // Check if max uses reached
-      if (inviteCode.max_uses && inviteCode.uses_count >= inviteCode.max_uses) {
-        setError('This invite link has reached its maximum uses.');
-        setLoading(false);
-        return;
-      }
-
-      // Get inviter profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('display_name, avatar_url, username')
-        .eq('id', inviteCode.user_id)
-        .single();
-
-      if (profileError || !profile) {
-        setError('Could not find the inviter.');
-        setLoading(false);
-        return;
-      }
-
-      setInviter(profile);
+      // Set inviter info from the secure function response
+      setInviter({
+        display_name: result.inviter_display_name || 'Someone',
+        avatar_url: result.inviter_avatar_url || null,
+        username: result.inviter_username || ''
+      });
       setLoading(false);
     } catch (err) {
+      console.error('Unexpected error:', err);
       setError('Something went wrong. Please try again.');
       setLoading(false);
     }

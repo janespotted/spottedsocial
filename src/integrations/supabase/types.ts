@@ -1277,6 +1277,7 @@ export type Database = {
         Returns: Json
       }
       user_is_thread_member: { Args: { thread_uuid: string }; Returns: boolean }
+      validate_invite_code: { Args: { code_to_check: string }; Returns: Json }
     }
     Enums: {
       friendship_status_enum: "pending" | "accepted" | "blocked"
