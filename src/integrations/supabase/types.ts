@@ -676,6 +676,7 @@ export type Database = {
           reason: string
           reported_post_id: string | null
           reported_user_id: string | null
+          reported_venue_id: string | null
           reported_yap_id: string | null
           reporter_id: string
           status: string | null
@@ -687,6 +688,7 @@ export type Database = {
           reason: string
           reported_post_id?: string | null
           reported_user_id?: string | null
+          reported_venue_id?: string | null
           reported_yap_id?: string | null
           reporter_id: string
           status?: string | null
@@ -698,11 +700,20 @@ export type Database = {
           reason?: string
           reported_post_id?: string | null
           reported_user_id?: string | null
+          reported_venue_id?: string | null
           reported_yap_id?: string | null
           reporter_id?: string
           status?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reports_reported_venue_id_fkey"
+            columns: ["reported_venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       review_votes: {
         Row: {

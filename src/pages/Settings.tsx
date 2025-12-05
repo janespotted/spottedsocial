@@ -81,6 +81,7 @@ export default function Settings() {
         {/* Help Section */}
         <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
           <button
+            onClick={() => window.open('mailto:support@spotted.app?subject=Help%20Request%20-%20Spotted%20App', '_blank')}
             className="w-full flex items-center justify-between p-4 hover:bg-[#a855f7]/10 transition-colors"
           >
             <div className="flex items-center gap-3">
