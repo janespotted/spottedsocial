@@ -8,6 +8,7 @@ import { Search, Plus, MessageSquare } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { NewChatDialog } from './NewChatDialog';
 import { PullToRefresh } from '@/components/PullToRefresh';
+import { MessagesSkeleton } from './MessagesSkeleton';
 
 interface Thread {
   id: string;
@@ -42,6 +43,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
   const [threads, setThreads] = useState<Thread[]>([]);
   const [search, setSearch] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -57,94 +59,139 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
   }, [preselectedUser]);
 
   const fetchThreads = async () => {
-    console.log('📨 Fetching message threads...');
+    if (!user?.id) return;
     
-    // Get user's thread memberships
-    const { data: threadMemberships, error: membershipsError } = await supabase
-      .from('dm_thread_members')
-      .select('thread_id')
-      .eq('user_id', user?.id);
-
-    console.log('Thread memberships:', threadMemberships?.length || 0, 'threads');
+    setIsLoading(true);
+    console.log('📨 Fetching message threads (optimized)...');
     
-    if (membershipsError) {
-      console.error('Error fetching thread memberships:', membershipsError);
-      return;
-    }
+    try {
+      // Step 1: Get user's thread IDs (1 query)
+      const { data: threadMemberships, error: membershipsError } = await supabase
+        .from('dm_thread_members')
+        .select('thread_id')
+        .eq('user_id', user.id);
 
-    if (!threadMemberships || threadMemberships.length === 0) {
-      console.log('No thread memberships found');
-      return;
-    }
+      if (membershipsError) {
+        console.error('Error fetching thread memberships:', membershipsError);
+        return;
+      }
 
-    // For each thread, get the other member and latest message
-    const threadsData = await Promise.all(
-      threadMemberships.map(async ({ thread_id }) => {
-        // Get ALL members of this thread
-        const { data: allMembers } = await supabase
+      if (!threadMemberships || threadMemberships.length === 0) {
+        console.log('No thread memberships found');
+        setThreads([]);
+        return;
+      }
+
+      const threadIds = threadMemberships.map(t => t.thread_id);
+      console.log('Found', threadIds.length, 'threads');
+
+      // Step 2: Batch fetch ALL data in parallel (3 queries instead of 4 per thread)
+      const [allMembersResult, allMessagesResult] = await Promise.all([
+        // Get ALL members for all threads at once
+        supabase
           .from('dm_thread_members')
-          .select('user_id')
-          .eq('thread_id', thread_id);
-
-        // Find the other user (not current user)
-        const otherUserId = allMembers?.find(m => m.user_id !== user?.id)?.user_id;
+          .select('thread_id, user_id')
+          .in('thread_id', threadIds)
+          .neq('user_id', user.id),
         
-        if (!otherUserId) {
-          console.log('No other user found for thread:', thread_id);
-          return null;
-        }
-
-        // Get other user's profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('display_name, avatar_url')
-          .eq('id', otherUserId)
-          .single();
-
-        if (!profile) {
-          console.log('Profile not found for user:', otherUserId);
-          return null;
-        }
-
-        // Get latest message with sender info
-        const { data: latestMessage } = await supabase
+        // Get ALL messages for all threads at once (we'll pick latest per thread)
+        supabase
           .from('dm_messages')
-          .select('text, created_at, sender_id')
-          .eq('thread_id', thread_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .select('thread_id, text, created_at, sender_id')
+          .in('thread_id', threadIds)
+          .order('created_at', { ascending: false }),
+      ]);
 
-        // Get other user's current venue
-        const { data: status } = await supabase
+      const allMembers = allMembersResult.data || [];
+      const allMessages = allMessagesResult.data || [];
+
+      // Get unique other user IDs
+      const otherUserIds = [...new Set(allMembers.map(m => m.user_id))];
+
+      // Step 3: Batch fetch profiles and statuses for all other users
+      const [profilesResult, statusesResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', otherUserIds),
+        
+        supabase
           .from('night_statuses')
-          .select('venue_name')
-          .eq('user_id', otherUserId)
-          .maybeSingle();
+          .select('user_id, venue_name')
+          .in('user_id', otherUserIds),
+      ]);
 
-        // Calculate unread: if last message is from other user and within 30 min, show unread
-        const isUnread = latestMessage?.sender_id === otherUserId && 
+      const profiles = profilesResult.data || [];
+      const statuses = statusesResult.data || [];
+
+      // Create lookup maps for O(1) access
+      const profileMap = new Map(profiles.map(p => [p.id, p]));
+      const statusMap = new Map(statuses.map(s => [s.user_id, s.venue_name]));
+      
+      // Group messages by thread and get latest
+      const latestMessageByThread = new Map<string, typeof allMessages[0]>();
+      for (const msg of allMessages) {
+        if (!latestMessageByThread.has(msg.thread_id)) {
+          latestMessageByThread.set(msg.thread_id, msg);
+        }
+      }
+
+      // Build threads data in JavaScript (no more queries!)
+      const threadsData: Thread[] = [];
+      
+      for (const { thread_id } of threadMemberships) {
+        const otherMember = allMembers.find(m => m.thread_id === thread_id);
+        if (!otherMember) continue;
+
+        const profile = profileMap.get(otherMember.user_id);
+        if (!profile) continue;
+
+        const latestMessage = latestMessageByThread.get(thread_id);
+        const venueName = statusMap.get(otherMember.user_id) || null;
+
+        // Calculate unread: if last message is from other user and within 30 min
+        const isUnread = latestMessage?.sender_id === otherMember.user_id && 
+                        latestMessage && 
                         (Date.now() - new Date(latestMessage.created_at).getTime() < 30 * 60000);
 
-        return {
+        threadsData.push({
           id: thread_id,
-          user_id: otherUserId,
-          profiles: profile,
-          venue_name: status?.venue_name || null,
-          last_message: latestMessage,
+          user_id: otherMember.user_id,
+          profiles: {
+            display_name: profile.display_name,
+            avatar_url: profile.avatar_url,
+          },
+          venue_name: venueName,
+          last_message: latestMessage ? {
+            text: latestMessage.text,
+            created_at: latestMessage.created_at,
+          } : null,
           unread_count: isUnread ? 1 : 0,
-        };
-      })
-    );
+        });
+      }
 
-    const validThreads = threadsData.filter(t => t !== null);
-    console.log('Valid threads:', validThreads.length);
-    setThreads(validThreads);
+      // Sort by latest message
+      threadsData.sort((a, b) => {
+        if (!a.last_message && !b.last_message) return 0;
+        if (!a.last_message) return 1;
+        if (!b.last_message) return -1;
+        return new Date(b.last_message.created_at).getTime() - new Date(a.last_message.created_at).getTime();
+      });
+
+      console.log('✅ Optimized fetch complete:', threadsData.length, 'threads');
+      setThreads(threadsData);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getTimeAgo = (date: string) => {
     return formatDistanceToNow(new Date(date), { addSuffix: true });
   };
+
+  const filteredThreads = threads.filter(t => 
+    t.profiles?.display_name?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <PullToRefresh onRefresh={fetchThreads}>
@@ -186,7 +233,9 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
 
         {/* Messages List */}
         <div className="space-y-3">
-          {threads.length === 0 ? (
+          {isLoading ? (
+            <MessagesSkeleton />
+          ) : filteredThreads.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
               <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
                 <MessageSquare className="h-10 w-10 text-[#a855f7]/60" />
@@ -204,14 +253,14 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
                 Start a Chat
               </button>
             </div>
-        ) : (
-          threads.map((thread) => (
-            <div
-              key={thread.id}
-              onClick={() => navigate(`/messages/${thread.id}`)}
-              className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 hover:bg-[#2d1b4e]/80 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
+          ) : (
+            filteredThreads.map((thread) => (
+              <div
+                key={thread.id}
+                onClick={() => navigate(`/messages/${thread.id}`)}
+                className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 hover:bg-[#2d1b4e]/80 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -224,44 +273,44 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
                     }}
                     className="hover:opacity-80 transition-opacity"
                   >
-                  <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
-                    <AvatarImage src={thread.profiles?.avatar_url || undefined} />
-                    <AvatarFallback className="bg-[#1a0f2e] text-white">
-                      {thread.profiles?.display_name?.[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
+                    <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
+                      <AvatarImage src={thread.profiles?.avatar_url || undefined} />
+                      <AvatarFallback className="bg-[#1a0f2e] text-white">
+                        {thread.profiles?.display_name?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
 
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-white truncate">
-                    {thread.profiles?.display_name}
-                  </h3>
-                  {thread.venue_name && (
-                    <p className="text-[#d4ff00] text-sm font-medium">@{thread.venue_name}</p>
-                  )}
-                  {thread.last_message && (
-                    <p className="text-white/60 text-sm truncate mt-0.5">
-                      {thread.last_message.text}
-                    </p>
-                  )}
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-white truncate">
+                      {thread.profiles?.display_name}
+                    </h3>
+                    {thread.venue_name && (
+                      <p className="text-[#d4ff00] text-sm font-medium">@{thread.venue_name}</p>
+                    )}
+                    {thread.last_message && (
+                      <p className="text-white/60 text-sm truncate mt-0.5">
+                        {thread.last_message.text}
+                      </p>
+                    )}
+                  </div>
 
-                <div className="flex flex-col items-end gap-2">
-                  {thread.last_message && (
-                    <span className="text-white/40 text-xs">
-                      {getTimeAgo(thread.last_message.created_at).replace('about ', '')}
-                    </span>
-                  )}
-                  {thread.unread_count > 0 && (
-                    <div className="bg-[#a855f7] rounded-full w-2 h-2" />
-                  )}
+                  <div className="flex flex-col items-end gap-2">
+                    {thread.last_message && (
+                      <span className="text-white/40 text-xs">
+                        {getTimeAgo(thread.last_message.created_at).replace('about ', '')}
+                      </span>
+                    )}
+                    {thread.unread_count > 0 && (
+                      <div className="bg-[#a855f7] rounded-full w-2 h-2" />
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
-    </div>
     </PullToRefresh>
   );
 }

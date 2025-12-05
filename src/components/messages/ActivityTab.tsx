@@ -16,6 +16,7 @@ import { useDemoMode } from '@/hooks/useDemoMode';
 import { useUserCity } from '@/hooks/useUserCity';
 import { getDemoUsersForCity, getPromotedVenuesForCity } from '@/lib/demo-data';
 import type { SupportedCity } from '@/lib/city-detection';
+import { ActivitySkeleton } from './MessagesSkeleton';
 
 interface Activity {
   id: string;
@@ -97,15 +98,24 @@ export function ActivityTab() {
   const { triggerConfirmation } = useImDown();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
   const demoEnabled = useDemoMode();
   const { city } = useUserCity();
 
   useEffect(() => {
     if (user) {
-      fetchActivities();
-      fetchFriendRequests();
+      fetchAll();
     }
   }, [user, demoEnabled, city]);
+
+  const fetchAll = async () => {
+    setIsLoading(true);
+    try {
+      await Promise.all([fetchActivities(), fetchFriendRequests()]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const fetchFriendRequests = async () => {
     const { data } = await supabase
@@ -118,32 +128,31 @@ export function ActivityTab() {
   };
 
   const fetchActivities = async () => {
-    // Get user's current venue (if checked in)
-    const { data: currentStatus } = await supabase
-      .from('night_statuses')
-      .select('venue_name')
-      .eq('user_id', user?.id)
-      .eq('status', 'out')
-      .maybeSingle();
+    // Parallelize initial queries
+    const [currentStatusResult, sentFriendshipsResult, receivedFriendshipsResult] = await Promise.all([
+      supabase
+        .from('night_statuses')
+        .select('venue_name')
+        .eq('user_id', user?.id)
+        .eq('status', 'out')
+        .maybeSingle(),
+      supabase
+        .from('friendships')
+        .select('friend_id')
+        .eq('user_id', user?.id)
+        .eq('status', 'accepted'),
+      supabase
+        .from('friendships')
+        .select('user_id')
+        .eq('friend_id', user?.id)
+        .eq('status', 'accepted'),
+    ]);
 
-    const userCurrentVenue = currentStatus?.venue_name?.toLowerCase() || null;
-
-    // Fetch recent check-ins from friends (both directions)
-    const { data: sentFriendships } = await supabase
-      .from('friendships')
-      .select('friend_id')
-      .eq('user_id', user?.id)
-      .eq('status', 'accepted');
-
-    const { data: receivedFriendships } = await supabase
-      .from('friendships')
-      .select('user_id')
-      .eq('friend_id', user?.id)
-      .eq('status', 'accepted');
+    const userCurrentVenue = currentStatusResult.data?.venue_name?.toLowerCase() || null;
 
     const friendIds = [
-      ...(sentFriendships?.map(f => f.friend_id) || []),
-      ...(receivedFriendships?.map(f => f.user_id) || [])
+      ...(sentFriendshipsResult.data?.map(f => f.friend_id) || []),
+      ...(receivedFriendshipsResult.data?.map(f => f.user_id) || [])
     ];
 
     const activityList: Activity[] = [];
@@ -335,6 +344,10 @@ export function ActivityTab() {
       });
     }
   };
+
+  if (isLoading) {
+    return <ActivitySkeleton />;
+  }
 
   return (
     <div className="space-y-4">
