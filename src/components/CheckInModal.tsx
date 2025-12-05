@@ -444,22 +444,22 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           Are You<br />Out?
         </h2>
 
-        <div className="w-full space-y-4">
-          {/* Yes - Primary filled button */}
+        <div className="w-full space-y-5">
+          {/* Yes - Primary 3D button with gradient */}
           <Button
             onClick={() => handleStatusUpdate('out')}
             size="lg"
-            className="w-full h-16 text-xl font-bold rounded-full bg-[#d4ff00] text-[#0a0118] hover:bg-[#d4ff00]/90 hover:scale-[1.02] shadow-[0_0_30px_rgba(212,255,0,0.5)] transition-all duration-200 disabled:opacity-50"
+            className="w-full h-16 text-xl font-bold rounded-full bg-gradient-to-b from-[#e5ff4d] to-[#d4ff00] text-[#0a0118] hover:from-[#f0ff80] hover:to-[#e5ff4d] hover:scale-105 shadow-[0_0_40px_rgba(212,255,0,0.6),0_4px_0_rgba(180,220,0,1),inset_0_2px_0_rgba(255,255,255,0.3)] active:shadow-[0_0_40px_rgba(212,255,0,0.4),0_2px_0_rgba(180,220,0,1)] active:translate-y-[2px] transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
             {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes 🎉'}
           </Button>
-          {/* No - Outlined secondary button */}
+          {/* No - Glass-morphism secondary button */}
           <Button
             onClick={() => handleStatusUpdate('home')}
             variant="outline"
             size="lg"
-            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-white/60 bg-transparent text-white hover:bg-white/10 hover:border-white hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
+            className="w-full h-16 text-xl font-semibold rounded-full border-[3px] border-white/70 bg-white/5 backdrop-blur-sm text-white hover:bg-white/15 hover:border-white hover:shadow-[0_0_20px_rgba(255,255,255,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
             No, staying in
@@ -497,7 +497,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                 <Button
                   variant="ghost"
                   size="lg"
-                  className="w-full h-14 text-lg font-medium rounded-full border border-white/30 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white hover:border-white/50 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
+                  className="w-full h-14 text-lg font-medium rounded-full border border-dashed border-[#a855f7]/50 bg-[#a855f7]/10 backdrop-blur-sm text-white/70 hover:bg-[#a855f7]/20 hover:text-white hover:border-[#a855f7]/70 hover:shadow-[0_0_15px_rgba(168,85,247,0.2)] hover:scale-[1.01] transition-all duration-200 disabled:opacity-50"
                   disabled={isDetectingLocation}
                 >
                   {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : '⏰ Still deciding...'}
