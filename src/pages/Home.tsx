@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
-import { useFeed } from '@/hooks/useFeed';
+import { useFeed, Post } from '@/hooks/useFeed';
 import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
 import { useUserCity } from '@/hooks/useUserCity';
@@ -27,6 +27,7 @@ import { CreateStoryDialog } from '@/components/CreateStoryDialog';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { CityBadge } from '@/components/CityBadge';
+import { FeedSkeleton } from '@/components/FeedSkeleton';
 
 export default function Home() {
   const { user } = useAuth();
@@ -77,6 +78,18 @@ export default function Home() {
   const [selectedStoryUser, setSelectedStoryUser] = useState<string | null>(null);
   const [createStoryOpen, setCreateStoryOpen] = useState(false);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Store fetch functions in refs to avoid dependency changes causing re-renders
+  const fetchFriendsRef = useRef(fetchFriends);
+  const fetchPostsRef = useRef(fetchPosts);
+  const fetchStoriesRef = useRef(fetchStories);
+
+  useEffect(() => {
+    fetchFriendsRef.current = fetchFriends;
+    fetchPostsRef.current = fetchPosts;
+    fetchStoriesRef.current = fetchStories;
+  });
 
   const handleVenueClick = async (venueName: string, venueId?: string | null) => {
     if (venueId) {
@@ -115,21 +128,30 @@ export default function Home() {
     }
   }, [user, openCheckIn]);
 
-  // Initial data fetch
+  // Initial data fetch - only depends on user and demoEnabled, not on callback functions
   useEffect(() => {
     if (user) {
+      setIsLoading(true);
       checkFirstLogin();
-      fetchFriends();
-      fetchPosts();
-      fetchStories();
+      Promise.all([
+        fetchFriendsRef.current(),
+        fetchPostsRef.current(),
+        fetchStoriesRef.current(),
+      ]).finally(() => setIsLoading(false));
     }
-  }, [user, demoEnabled, checkFirstLogin, fetchFriends, fetchPosts, fetchStories]);
+  }, [user, demoEnabled, city, checkFirstLogin]);
 
-  // Realtime subscriptions with proper cleanup
+  // Handle new post incrementally
+  const handleNewPost = useCallback((payload: any) => {
+    // Only add if it's from the current user or a friend (validated on next refresh)
+    console.log('📝 New post received via realtime');
+  }, []);
+
+  // Realtime subscriptions with proper cleanup - using incremental where possible
   useRealtimeSubscriptions({
-    onPostsChange: fetchPosts,
+    onPostsChange: fetchPosts, // Full refetch for new posts to ensure proper filtering
     onStoriesChange: fetchStories,
-    onLikesChange: fetchPosts,
+    // Likes are handled optimistically, no need for realtime callback
   });
 
   const handlePostDelete = async (postId: string) => {
@@ -226,7 +248,9 @@ export default function Home() {
       {/* Posts Feed */}
       <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); }}>
         <div className="px-4 py-6 space-y-6">
-        {posts.length === 0 ? (
+        {isLoading ? (
+          <FeedSkeleton />
+        ) : posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
             <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
               <MessageCircle className="h-10 w-10 text-[#a855f7]/60" />

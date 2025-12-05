@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CityBadge } from '@/components/CityBadge';
+import { FeedSkeleton } from '@/components/FeedSkeleton';
 
 export default function Feed() {
   const { user } = useAuth();
@@ -79,6 +80,18 @@ export default function Feed() {
   const [createStoryOpen, setCreateStoryOpen] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Store fetch functions in refs to avoid dependency changes causing re-renders
+  const fetchFriendsRef = useRef(fetchFriends);
+  const fetchPostsRef = useRef(fetchPosts);
+  const fetchStoriesRef = useRef(fetchStories);
+
+  useEffect(() => {
+    fetchFriendsRef.current = fetchFriends;
+    fetchPostsRef.current = fetchPosts;
+    fetchStoriesRef.current = fetchStories;
+  });
 
   const handleVenueClick = async (venueName: string, venueId?: string | null) => {
     if (venueId) {
@@ -105,21 +118,24 @@ export default function Feed() {
     setProfile(data);
   };
 
-  // Initial data fetch
+  // Initial data fetch - only depends on user and demoEnabled, not on callback functions
   useEffect(() => {
     if (user) {
+      setIsLoading(true);
       fetchProfile();
-      fetchFriends();
-      fetchPosts();
-      fetchStories();
+      Promise.all([
+        fetchFriendsRef.current(),
+        fetchPostsRef.current(),
+        fetchStoriesRef.current(),
+      ]).finally(() => setIsLoading(false));
     }
-  }, [user, demoEnabled, fetchFriends, fetchPosts, fetchStories]);
+  }, [user, demoEnabled, city]);
 
   // Realtime subscriptions with proper cleanup
   useRealtimeSubscriptions({
     onPostsChange: fetchPosts,
     onStoriesChange: fetchStories,
-    onLikesChange: fetchPosts,
+    // Likes are handled optimistically, no need for realtime callback
   });
 
   const handlePostDelete = async (postId: string) => {
@@ -216,7 +232,9 @@ export default function Feed() {
       {/* Posts Feed */}
       <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); }}>
         <div className="px-4 py-6 space-y-6">
-        {posts.length === 0 ? (
+        {isLoading ? (
+          <FeedSkeleton />
+        ) : posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
             <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
               <MessageCircle className="h-10 w-10 text-[#a855f7]/60" />
