@@ -539,17 +539,22 @@ export function ActivityTab() {
 
         return hasContent ? (
           <div className="space-y-5">
-            {/* Section 1: Invites to You */}
-            {invites.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
-                  Invites to You
-                </h3>
-                <div className="space-y-3">
-                  {invites.map(renderActivityCard)}
-                </div>
-              </div>
-            )}
+      {/* Section 1: Invites to You - Always visible */}
+      <div className="space-y-3">
+        <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+          Invites to You
+        </h3>
+        {invites.length > 0 ? (
+          <div className="space-y-3">
+            {invites.map(renderActivityCard)}
+          </div>
+        ) : (
+          <div className="bg-gradient-to-r from-[#2d1b4e]/40 to-[#3d1b5e]/30 border border-[#a855f7]/20 rounded-2xl p-4 text-center">
+            <p className="text-white/50 text-sm">No invites yet</p>
+            <p className="text-white/30 text-xs mt-1">When friends invite you out, you'll see them here</p>
+          </div>
+        )}
+      </div>
 
             {/* Section 2: Friends Out Now */}
             {friendsOut.length > 0 && (
