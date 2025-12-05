@@ -128,11 +128,17 @@ export function ActivityTab() {
   };
 
   const fetchActivities = async () => {
-    // Parallelize initial queries
-    const [currentStatusResult, sentFriendshipsResult, receivedFriendshipsResult] = await Promise.all([
+    // Parallelize initial queries including real notifications
+    const [currentStatusResult, sentFriendshipsResult, receivedFriendshipsResult, realInvitesResult] = await Promise.all([
       supabase.from('night_statuses').select('venue_name').eq('user_id', user?.id).eq('status', 'out').maybeSingle(),
       supabase.from('friendships').select('friend_id').eq('user_id', user?.id).eq('status', 'accepted'),
       supabase.from('friendships').select('user_id').eq('friend_id', user?.id).eq('status', 'accepted'),
+      supabase.from('notifications')
+        .select(`id, type, message, created_at, sender_id, is_read`)
+        .eq('receiver_id', user?.id)
+        .in('type', ['meetup_request', 'venue_invite'])
+        .order('created_at', { ascending: false })
+        .limit(20),
     ]);
 
     const userCurrentVenue = currentStatusResult.data?.venue_name?.toLowerCase() || null;
@@ -142,6 +148,38 @@ export function ActivityTab() {
     ];
 
     const activityList: Activity[] = [];
+
+    // Add real notifications/invites with sender profile lookup
+    if (realInvitesResult.data?.length) {
+      const senderIds = [...new Set(realInvitesResult.data.map(n => n.sender_id))];
+      const { data: senderProfiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', senderIds);
+      
+      const profileMap = new Map(senderProfiles?.map(p => [p.id, p]) || []);
+      
+      const realActivities: Activity[] = realInvitesResult.data.map(invite => {
+        const profile = profileMap.get(invite.sender_id);
+        const isVenueInvite = invite.type === 'venue_invite';
+        // Extract venue name from message like "X invited you to VenueName."
+        const venueMatch = invite.message.match(/invited you to (.+?)\.?\s*(?:Want to go\?)?$/i);
+        const venueName = venueMatch?.[1] || 'a venue';
+        
+        return {
+          id: invite.id,
+          type: isVenueInvite ? 'venue_invite' : 'meet_up',
+          title: profile?.display_name || 'Someone',
+          subtitle: isVenueInvite ? venueName : 'Meet Up',
+          timestamp: invite.created_at || new Date().toISOString(),
+          avatar_url: profile?.avatar_url,
+          user_id: invite.sender_id,
+          display_name: profile?.display_name,
+          isAtVenue: isVenueInvite && userCurrentVenue ? venueName.toLowerCase() === userCurrentVenue : false,
+        };
+      });
+      activityList.push(...realActivities);
+    }
 
     // Add demo activities if enabled
     if (demoEnabled) {
@@ -160,7 +198,7 @@ export function ActivityTab() {
       venue_id: 'eb5df239-48cf-4cae-8b18-d69a6f395a21',
     });
 
-    // Set initial activities immediately (fast render with demo/trending)
+    // Set initial activities immediately (fast render with real invites/demo/trending)
     setActivities(activityList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
 
     // Fetch check-ins from friends in background (progressive enhancement)
