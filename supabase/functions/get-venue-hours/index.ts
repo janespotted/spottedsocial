@@ -23,6 +23,40 @@ serve(async (req) => {
   }
 
   try {
+    // ==========================================
+    // SECURITY: Verify JWT authentication
+    // ==========================================
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('Missing authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const googleApiKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
+
+    // Verify user is authenticated using anon key + auth header
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      console.error('Authentication failed:', authError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Authenticated user:', user.id);
+    // ==========================================
+
     const { venueId } = await req.json();
     
     if (!venueId) {
@@ -32,10 +66,6 @@ serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const googleApiKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
-
     if (!googleApiKey) {
       console.error('GOOGLE_PLACES_API_KEY not configured');
       return new Response(
@@ -44,7 +74,8 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Use service role key for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Fetch venue data
     const { data: venue, error: venueError } = await supabase
