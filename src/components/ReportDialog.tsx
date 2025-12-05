@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 interface ReportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  reportType: 'user' | 'post' | 'yap';
+  reportType: 'user' | 'post' | 'yap' | 'venue';
   targetId: string;
   targetName?: string;
 }
@@ -21,6 +21,15 @@ const REPORT_REASONS = [
   { value: 'spam', label: 'Spam or misleading' },
   { value: 'inappropriate', label: 'Inappropriate content' },
   { value: 'impersonation', label: 'Impersonation' },
+  { value: 'safety', label: 'Safety concern' },
+  { value: 'other', label: 'Other' },
+];
+
+const VENUE_REPORT_REASONS = [
+  { value: 'closed', label: 'Permanently closed' },
+  { value: 'wrong_location', label: 'Wrong location' },
+  { value: 'inappropriate', label: 'Inappropriate content' },
+  { value: 'wrong_info', label: 'Incorrect information' },
   { value: 'safety', label: 'Safety concern' },
   { value: 'other', label: 'Other' },
 ];
@@ -51,6 +60,8 @@ export function ReportDialog({ open, onOpenChange, reportType, targetId, targetN
         reportData.reported_post_id = targetId;
       } else if (reportType === 'yap') {
         reportData.reported_yap_id = targetId;
+      } else if (reportType === 'venue') {
+        reportData.reported_venue_id = targetId;
       }
 
       const { error } = await supabase
@@ -79,10 +90,14 @@ export function ReportDialog({ open, onOpenChange, reportType, targetId, targetN
         return 'Report Post';
       case 'yap':
         return 'Report Yap';
+      case 'venue':
+        return `Report ${targetName || 'Venue'}`;
       default:
         return 'Report';
     }
   };
+
+  const reasons = reportType === 'venue' ? VENUE_REPORT_REASONS : REPORT_REASONS;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,7 +111,7 @@ export function ReportDialog({ open, onOpenChange, reportType, targetId, targetN
 
         <div className="space-y-4 py-4">
           <RadioGroup value={reason} onValueChange={setReason} className="space-y-3">
-            {REPORT_REASONS.map((r) => (
+            {reasons.map((r) => (
               <div key={r.value} className="flex items-center space-x-3">
                 <RadioGroupItem 
                   value={r.value} 

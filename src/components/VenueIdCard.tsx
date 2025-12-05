@@ -23,6 +23,7 @@ import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { BuzzItem } from './BuzzItem';
 import { DropVibeDialog } from './DropVibeDialog';
+import { ReportDialog } from './ReportDialog';
 import { VenueHoursDisplay, getHoursDisplayString } from '@/lib/venue-hours';
 import type { VenueHours } from '@/lib/venue-hours';
 
@@ -83,6 +84,7 @@ export function VenueIdCard() {
   }>>([]);
   const [isUserAtVenue, setIsUserAtVenue] = useState(false);
   const [totalCheckIns, setTotalCheckIns] = useState(0);
+  const [showReportDialog, setShowReportDialog] = useState(false);
 
   useEffect(() => {
     if (selectedVenueId) {
@@ -526,7 +528,7 @@ export function VenueIdCard() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
                     <DropdownMenuItem 
-                      onClick={() => toast.info('Report venue feature coming soon')}
+                      onClick={() => setShowReportDialog(true)}
                       className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
                     >
                       <Flag className="h-4 w-4 mr-2" />
@@ -772,6 +774,14 @@ export function VenueIdCard() {
         venueId={venue?.id || ''}
         venueName={venue?.name || ''}
         onVibeSubmitted={fetchBuzzItems}
+      />
+
+      <ReportDialog
+        open={showReportDialog}
+        onOpenChange={setShowReportDialog}
+        reportType="venue"
+        targetId={venue?.id || ''}
+        targetName={venue?.name}
       />
     </>
   );

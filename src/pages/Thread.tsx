@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Camera, Mic, Send, Image } from 'lucide-react';
+import { ChevronLeft, Camera, Send, Image } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,10 +50,6 @@ export default function Thread() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-
-  const handleMicClick = () => {
-    toast.info('Voice messages coming soon! 🎤');
-  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -417,25 +413,14 @@ export default function Thread() {
             className="flex-1 bg-[#2d1b4e]/60 border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full"
           />
 
-            {newMessage.trim() ? (
-              <Button
-                type="submit"
-                size="icon"
-                className="bg-[#a855f7] hover:bg-[#9333ea] text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]"
-              >
-                <Send className="h-5 w-5" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={handleMicClick}
-                className="text-white/60 hover:text-white hover:bg-[#2d1b4e]"
-              >
-                <Mic className="h-5 w-5" />
-              </Button>
-            )}
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!newMessage.trim()}
+              className="bg-[#a855f7] hover:bg-[#9333ea] text-white shadow-[0_0_10px_rgba(168,85,247,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="h-5 w-5" />
+            </Button>
         </form>
       </div>
     </div>
