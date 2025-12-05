@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
-import { Ghost, MapPin, Edit3, Clock, Bell, X, AlarmClock } from 'lucide-react';
+import { MapPin, Edit3, Clock, Bell, X, AlarmClock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -422,37 +422,47 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   };
 
   const StatusContent = () => (
-    <div className="flex flex-col items-center justify-between p-6 min-h-[600px]">
+    <div className="flex flex-col items-center justify-between p-6 min-h-[600px] animate-scale-in">
       {/* Header */}
       <div className="w-full flex items-start justify-between pt-4">
         <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-        <img src={spottedLogo} alt="Spotted" className="h-10 w-10 object-contain" />
+        <img 
+          src={spottedLogo} 
+          alt="Spotted" 
+          className="h-10 w-10 object-contain drop-shadow-[0_0_10px_rgba(212,255,0,0.6)]" 
+        />
       </div>
+
+      {/* Decorative sparkles */}
+      <div className="absolute top-20 left-8 text-[#d4ff00]/40 text-2xl animate-pulse">✦</div>
+      <div className="absolute top-32 right-12 text-[#a855f7]/50 text-xl animate-pulse" style={{ animationDelay: '0.5s' }}>✧</div>
+      <div className="absolute top-48 left-16 text-[#d4ff00]/30 text-lg animate-pulse" style={{ animationDelay: '1s' }}>✦</div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center space-y-12 w-full">
-        <h2 className="text-5xl font-bold text-[#d4ff00] text-center leading-tight">
+        <h2 className="text-5xl font-bold text-[#d4ff00] text-center leading-tight drop-shadow-[0_0_30px_rgba(212,255,0,0.5)]">
           Are You<br />Out?
         </h2>
 
         <div className="w-full space-y-4">
+          {/* Yes - Primary filled button */}
           <Button
             onClick={() => handleStatusUpdate('out')}
-            variant="outline"
             size="lg"
-            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 hover:text-[#d4ff00] shadow-[0_0_20px_rgba(212,255,0,0.3)] disabled:opacity-50"
+            className="w-full h-16 text-xl font-bold rounded-full bg-[#d4ff00] text-[#0a0118] hover:bg-[#d4ff00]/90 hover:scale-[1.02] shadow-[0_0_30px_rgba(212,255,0,0.5)] transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
-            {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes'}
+            {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes 🎉'}
           </Button>
+          {/* No - Outlined secondary button */}
           <Button
             onClick={() => handleStatusUpdate('home')}
             variant="outline"
             size="lg"
-            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-[#d4ff00] bg-transparent text-[#d4ff00] hover:bg-[#d4ff00]/10 hover:text-[#d4ff00] shadow-[0_0_20px_rgba(212,255,0,0.3)] disabled:opacity-50"
+            className="w-full h-16 text-xl font-semibold rounded-full border-2 border-white/60 bg-transparent text-white hover:bg-white/10 hover:border-white hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
-            No
+            No, staying in
           </Button>
           {showCustomReminder ? (
             <div className="space-y-3">
@@ -485,12 +495,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="lg"
-                  className="w-full h-16 text-xl font-semibold rounded-full border-2 border-white bg-transparent text-white hover:bg-white/10 hover:text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] disabled:opacity-50"
+                  className="w-full h-14 text-lg font-medium rounded-full border border-white/30 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white hover:border-white/50 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
                   disabled={isDetectingLocation}
                 >
-                  {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : 'Still Deciding...'}
+                  {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : '⏰ Still deciding...'}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent 
@@ -572,9 +582,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </div>
       </div>
 
-      {/* Ghost Icon */}
-      <div className="w-full flex justify-end">
-        <Ghost className="h-8 w-8 text-white/60" />
+      {/* Decorative bottom sparkles */}
+      <div className="w-full flex justify-between items-center opacity-40">
+        <span className="text-[#a855f7] text-lg">✧</span>
+        <span className="text-[#d4ff00] text-sm">✦</span>
+        <span className="text-white/60 text-lg">✧</span>
       </div>
     </div>
   );
@@ -715,13 +727,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       {/* Status Modal */}
       {isMobile ? (
         <Drawer open={open && !showShareModal && !showVenueConfirm} onOpenChange={onOpenChange}>
-          <DrawerContent className="bg-gradient-to-b from-[#3d2b5f] via-[#2a1f4a] to-black border-0">
+          <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-0 border-t-2 border-[#a855f7]/30 shadow-[0_-20px_60px_rgba(168,85,247,0.4)]">
             <StatusContent />
           </DrawerContent>
         </Drawer>
       ) : (
         <Dialog open={open && !showShareModal && !showVenueConfirm} onOpenChange={onOpenChange}>
-          <DialogContent className="bg-gradient-to-b from-[#3d2b5f] via-[#2a1f4a] to-black border-0 shadow-[0_0_60px_rgba(147,51,234,0.8)] max-w-md p-0 overflow-hidden">
+          <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 shadow-[0_0_80px_rgba(168,85,247,0.5),0_0_40px_rgba(139,92,246,0.4)] max-w-md p-0 overflow-hidden rounded-3xl">
             <StatusContent />
           </DialogContent>
         </Dialog>
