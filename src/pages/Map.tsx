@@ -73,22 +73,27 @@ export default function Map() {
     cityRef.current = city;
   }, [city]);
 
+  // Stable ref for the fetch function to avoid callback recreation
+  const fetchFriendsLocationsRef = useRef<() => Promise<void>>();
+  
   useEffect(() => {
     if (user) {
       fetchFriendsLocations();
     }
-  }, [user, demoEnabled, city]); // Added city as dependency
+  }, [user, demoEnabled, city]);
 
   // Debounced fetch to prevent thundering herd on realtime events
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Stable debounced function that uses ref - never recreated
   const debouncedFetchFriendsLocations = useCallback(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
     debounceTimeoutRef.current = setTimeout(() => {
-      fetchFriendsLocations();
-    }, 500); // 500ms debounce
-  }, [user, demoEnabled]); // Removed city - uses ref instead
+      fetchFriendsLocationsRef.current?.();
+    }, 500);
+  }, []); // Empty deps - truly stable
 
   // Real-time subscription for location updates - CONSOLIDATED into 1 channel
   useEffect(() => {
@@ -129,7 +134,12 @@ export default function Map() {
       }
       supabase.removeChannel(mapRealtimeChannel);
     };
-  }, [user, demoEnabled, debouncedFetchFriendsLocations]);
+  }, [user]); // Removed debouncedFetchFriendsLocations from deps - it's stable now
+  
+  // Keep the ref updated with the latest fetch function
+  useEffect(() => {
+    fetchFriendsLocationsRef.current = fetchFriendsLocations;
+  });
 
   const fetchFriendsLocations = async () => {
     if (!user) return;
