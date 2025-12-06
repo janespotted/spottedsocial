@@ -73,6 +73,12 @@ export default function Map() {
     cityRef.current = city;
   }, [city]);
 
+  // Use ref for demoEnabled to ensure fetch always has latest value
+  const demoEnabledRef = useRef(demoEnabled);
+  useEffect(() => {
+    demoEnabledRef.current = demoEnabled;
+  }, [demoEnabled]);
+
   // Stable ref for the fetch function to avoid callback recreation
   const fetchFriendsLocationsRef = useRef<() => Promise<void>>();
   
@@ -167,7 +173,7 @@ export default function Map() {
       let friendIds: string[] = [];
 
       // When demo mode is ON, use static demo friends dataset
-      if (demoEnabled) {
+      if (demoEnabledRef.current) {
         // Static demo friends for NYC
         const nycDemoFriends = [
           { name: 'Emma Davis', venue: 'The Nines', lat: 40.748817, lng: -73.985428, type: 'close' as const },
