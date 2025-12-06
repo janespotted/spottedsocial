@@ -64,13 +64,20 @@ export default function Map() {
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showFriendsList, setShowFriendsList] = useState(false);
+  const [isLoadingFriends, setIsLoadingFriends] = useState(true);
   const friendsListRef = useRef<HTMLDivElement>(null);
+  
+  // Use ref for city to prevent callback recreation
+  const cityRef = useRef(city);
+  useEffect(() => {
+    cityRef.current = city;
+  }, [city]);
 
   useEffect(() => {
     if (user) {
       fetchFriendsLocations();
     }
-  }, [user, demoEnabled]);
+  }, [user, demoEnabled, city]); // Added city as dependency
 
   // Debounced fetch to prevent thundering herd on realtime events
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -81,7 +88,7 @@ export default function Map() {
     debounceTimeoutRef.current = setTimeout(() => {
       fetchFriendsLocations();
     }, 500); // 500ms debounce
-  }, [user, demoEnabled, city]);
+  }, [user, demoEnabled]); // Removed city - uses ref instead
 
   // Real-time subscription for location updates - CONSOLIDATED into 1 channel
   useEffect(() => {
@@ -126,6 +133,8 @@ export default function Map() {
 
   const fetchFriendsLocations = async () => {
     if (!user) return;
+    
+    setIsLoadingFriends(true);
 
     try {
       // Get current user's profile to check their location
@@ -173,7 +182,7 @@ export default function Map() {
           { name: 'Drew Martinez', venue: 'Academy LA', lat: 34.0481, lng: -118.2567, type: 'direct' as const },
         ];
 
-        const staticDemoFriends = city === 'la' ? laDemoFriends : nycDemoFriends;
+        const staticDemoFriends = cityRef.current === 'la' ? laDemoFriends : nycDemoFriends;
 
         friendLocations = staticDemoFriends.map((friend, index) => ({
           user_id: `demo-${index}`,
@@ -293,11 +302,13 @@ export default function Map() {
       }
 
       setFriends(friendLocations);
+      setIsLoadingFriends(false);
 
       // Fetch venues and calculate heat scores
       await fetchVenuesWithHeatScores(friendIds);
     } catch (error) {
       console.error('Error fetching friends locations:', error);
+      setIsLoadingFriends(false);
     }
   };
 
@@ -447,7 +458,7 @@ export default function Map() {
 
   // Smart marker diffing - only add/update/remove markers that changed
   useEffect(() => {
-    if (!map.current) return;
+    if (!map.current || isLoadingFriends) return;
 
     // Get current friend user_ids from the new friends array
     const currentFriendIds = new Set(friends.map(f => f.user_id));
@@ -527,7 +538,7 @@ export default function Map() {
         console.log('Added marker for user:', friend.user_id);
       }
     });
-  }, [friends]);
+  }, [friends, isLoadingFriends]);
 
   // Render venue markers
   useEffect(() => {
