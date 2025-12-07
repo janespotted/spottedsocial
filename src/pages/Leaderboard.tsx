@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { CityBadge } from '@/components/CityBadge';
 import { LeaderboardSkeleton } from '@/components/LeaderboardSkeleton';
+import { isVenueOpen, VenueHours } from '@/lib/venue-hours';
 
 interface VenueStats {
   venue_name: string;
@@ -31,6 +32,8 @@ interface VenueStats {
   energyLevel: number;
   isPromoted?: boolean;
   isNewlyOpened?: boolean;
+  operatingHours?: VenueHours | null;
+  recentCheckinCount: number; // Check-ins in last 30 mins for velocity
 }
 
 interface BiggestMover {
@@ -117,7 +120,7 @@ export default function Leaderboard() {
             avatar_url,
             is_demo
           ),
-          venues!inner(popularity_rank, is_promoted, city, opened_at)
+          venues!inner(popularity_rank, is_promoted, city, opened_at, operating_hours)
         `)
         .eq('venues.city', city)
         .not('venue_name', 'is', null)
@@ -149,6 +152,9 @@ export default function Leaderboard() {
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
+    // Calculate 30 minutes ago for velocity tracking
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
     // Group by venue, including popularity_rank
     const venueMap = new Map<string, VenueStats & { popularity_rank: number }>();
     
@@ -169,6 +175,7 @@ export default function Leaderboard() {
         isPromoted: true,
         isNewlyOpened,
         popularity_rank: venue.popularity_rank || 999,
+        recentCheckinCount: 0,
       });
     });
     
@@ -179,10 +186,13 @@ export default function Leaderboard() {
       const isPromoted = status.venues?.is_promoted || false;
       const popularityRank = status.venues?.popularity_rank || 999;
       const openedAt = status.venues?.opened_at;
+      const operatingHours = status.venues?.operating_hours as VenueHours | null;
       const isNewlyOpened = openedAt 
         ? new Date(openedAt) > threeMonthsAgo 
         : false;
       const isDemo = status.profiles?.is_demo || false;
+      const updatedAt = status.updated_at ? new Date(status.updated_at) : null;
+      const isRecentCheckin = updatedAt && updatedAt > thirtyMinutesAgo;
       
       if (!venueMap.has(venueName)) {
         venueMap.set(venueName, {
@@ -196,11 +206,23 @@ export default function Leaderboard() {
           isPromoted,
           isNewlyOpened,
           popularity_rank: popularityRank,
+          operatingHours,
+          recentCheckinCount: 0,
         });
       }
       
       const venue = venueMap.get(venueName)!;
       venue.count++; // Count ALL users (including demo) for energy calculation
+      
+      // Track recent check-ins for velocity calculation
+      if (isRecentCheckin) {
+        venue.recentCheckinCount++;
+      }
+      
+      // Store operating hours if not already set
+      if (!venue.operatingHours && operatingHours) {
+        venue.operatingHours = operatingHours;
+      }
       
       // In demo mode, show all avatars; in bootstrap mode, only show real user avatars
       // Demo data still contributes to venue rankings/energy
@@ -257,14 +279,24 @@ export default function Leaderboard() {
 
     setVenues(finalVenues);
 
-      // Set biggest mover (from non-promoted venues only)
-      if (nonPromotedVenues.length > 0) {
-        const moverVenue = nonPromotedVenues[Math.floor(Math.random() * Math.min(5, nonPromotedVenues.length))];
+      // Set biggest mover based on check-in velocity (only from OPEN venues)
+      const openVenuesWithVelocity = nonPromotedVenues
+        .filter(venue => {
+          // Only include venues that are currently open
+          return isVenueOpen(venue.operatingHours || null);
+        })
+        .filter(v => v.recentCheckinCount > 0) // Must have recent activity
+        .sort((a, b) => b.recentCheckinCount - a.recentCheckinCount); // Sort by velocity (highest first)
+
+      if (openVenuesWithVelocity.length > 0) {
+        const moverVenue = openVenuesWithVelocity[0]; // Highest velocity
         setBiggestMover({
           venue_name: moverVenue.venue_name,
           venue_id: moverVenue.venue_id,
           friends: moverVenue.friends.slice(0, 3),
         });
+      } else {
+        setBiggestMover(null); // No open venues with recent activity
       }
     } finally {
       setIsLoading(false);
