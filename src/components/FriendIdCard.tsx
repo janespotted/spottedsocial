@@ -490,6 +490,11 @@ export function FriendIdCard() {
                       🔗
                     </div>
                   )}
+                  {selectedFriend.relationshipType === 'direct' && (
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#1a0f2e] border-2 border-[#a855f7] rounded-full flex items-center justify-center text-xs shadow-[0_0_8px_rgba(168,85,247,0.6)]">
+                      👤
+                    </div>
+                  )}
                 </div>
 
                 {/* User Info */}
@@ -506,6 +511,11 @@ export function FriendIdCard() {
                     {selectedFriend.relationshipType === 'mutual' && (
                       <span className="text-xs bg-[#6366f1]/20 text-[#6366f1] px-2 py-0.5 rounded-full whitespace-nowrap">
                         Mutual
+                      </span>
+                    )}
+                    {selectedFriend.relationshipType === 'direct' && (
+                      <span className="text-xs bg-[#a855f7]/20 text-[#a855f7] px-2 py-0.5 rounded-full whitespace-nowrap">
+                        Friend
                       </span>
                     )}
                   </div>
