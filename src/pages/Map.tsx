@@ -58,6 +58,7 @@ export default function Map() {
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
+  const [venueFilter, setVenueFilter] = useState<'all' | 'nightclub' | 'cocktail_bar' | 'bar' | 'rooftop'>('all');
   // Use Map object keyed by user_id to prevent duplicate markers
   const friendMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
   const venueMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
@@ -559,14 +560,19 @@ export default function Map() {
     });
   }, [friends, isLoadingFriends]);
 
+  // Filter venues based on selected filter
+  const filteredVenues = venueFilter === 'all' 
+    ? venues 
+    : venues.filter(v => v.type === venueFilter);
+
   // Render venue markers with smart diffing (like friend avatars)
   useEffect(() => {
     if (!map.current) return;
 
-    // Get current venue IDs from the new venues array
-    const currentVenueIds = new Set(venues.map(v => v.id));
+    // Get current venue IDs from the filtered venues array
+    const currentVenueIds = new Set(filteredVenues.map(v => v.id));
 
-    // Remove markers for venues no longer in the list
+    // Remove markers for venues no longer in the filtered list
     venueMarkersRef.current.forEach((marker, venueId) => {
       if (!currentVenueIds.has(venueId)) {
         marker.remove();
@@ -574,8 +580,8 @@ export default function Map() {
       }
     });
 
-    // Add or update markers for current venues
-    venues.forEach((venue, index) => {
+    // Add or update markers for current filtered venues
+    filteredVenues.forEach((venue, index) => {
       const existingMarker = venueMarkersRef.current.get(venue.id);
 
       if (existingMarker) {
@@ -620,7 +626,7 @@ export default function Map() {
         venueMarkersRef.current.set(venue.id, marker);
       }
     });
-  }, [venues, friends]);
+  }, [filteredVenues, friends]);
 
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
     const R = 3959; // Earth's radius in miles
@@ -758,6 +764,32 @@ export default function Map() {
           >
             <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
           </button>
+        </div>
+      </div>
+
+      {/* Venue Type Filter */}
+      <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10">
+        <div className="flex gap-2 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-full p-1.5 shadow-[0_0_20px_rgba(168,85,247,0.3)]">
+          {[
+            { key: 'all', label: 'All', icon: '🗺️' },
+            { key: 'nightclub', label: 'Clubs', icon: '🎵' },
+            { key: 'cocktail_bar', label: 'Cocktails', icon: '🍸' },
+            { key: 'bar', label: 'Bars', icon: '🍺' },
+            { key: 'rooftop', label: 'Rooftops', icon: '🌃' },
+          ].map((filter) => (
+            <button
+              key={filter.key}
+              onClick={() => setVenueFilter(filter.key as typeof venueFilter)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                venueFilter === filter.key
+                  ? 'bg-[#d4ff00] text-black shadow-[0_0_10px_rgba(212,255,0,0.5)]'
+                  : 'text-white/70 hover:bg-[#a855f7]/20 hover:text-white'
+              }`}
+            >
+              <span className="mr-1">{filter.icon}</span>
+              {filter.label}
+            </button>
+          ))}
         </div>
       </div>
 
