@@ -1,15 +1,28 @@
 import { useState, useEffect } from 'react';
-import { detectUserCity, type SupportedCity } from '@/lib/city-detection';
+import { detectUserCity, getCachedCity, type SupportedCity } from '@/lib/city-detection';
 
 export function useUserCity() {
-  const [city, setCity] = useState<SupportedCity>('nyc'); // Safe default
+  // Synchronously initialize from localStorage cache to avoid race condition
+  const [city, setCity] = useState<SupportedCity>(() => {
+    try {
+      return getCachedCity() || 'nyc';
+    } catch {
+      return 'nyc';
+    }
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    detectUserCity().then(detectedCity => {
-      setCity(detectedCity);
+    // Only detect if no cached city exists
+    const cached = getCachedCity();
+    if (!cached) {
+      detectUserCity().then(detectedCity => {
+        setCity(detectedCity);
+        setIsLoading(false);
+      });
+    } else {
       setIsLoading(false);
-    });
+    }
 
     // Listen for city changes (manual override, etc.)
     const handleCityChanged = (e: Event) => {
