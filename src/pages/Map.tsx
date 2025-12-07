@@ -60,7 +60,7 @@ export default function Map() {
   const [venues, setVenues] = useState<Venue[]>([]);
   // Use Map object keyed by user_id to prevent duplicate markers
   const friendMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
-  const venueMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const venueMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showFriendsList, setShowFriendsList] = useState(false);
@@ -406,10 +406,11 @@ export default function Map() {
 
     return () => {
       window.removeEventListener('centerMapOnVenue', handleCenterMapOnVenue);
-      // Clean up all friend markers using Map
+      // Clean up all markers using Map
       friendMarkersRef.current.forEach(marker => marker.remove());
       friendMarkersRef.current.clear();
       venueMarkersRef.current.forEach(marker => marker.remove());
+      venueMarkersRef.current.clear();
       userMarkerRef.current?.remove();
       map.current?.remove();
     };
@@ -544,52 +545,66 @@ export default function Map() {
     });
   }, [friends, isLoadingFriends]);
 
-  // Render venue markers
+  // Render venue markers with smart diffing (like friend avatars)
   useEffect(() => {
     if (!map.current) return;
 
-    // Clear existing venue markers
-    venueMarkersRef.current.forEach(marker => marker.remove());
-    venueMarkersRef.current = [];
+    // Get current venue IDs from the new venues array
+    const currentVenueIds = new Set(venues.map(v => v.id));
 
-    // Add markers for each venue
+    // Remove markers for venues no longer in the list
+    venueMarkersRef.current.forEach((marker, venueId) => {
+      if (!currentVenueIds.has(venueId)) {
+        marker.remove();
+        venueMarkersRef.current.delete(venueId);
+      }
+    });
+
+    // Add or update markers for current venues
     venues.forEach((venue, index) => {
-      const isTopHot = index < 3 && venue.heatScore > 0;
-      const containerSize = 70; // Larger container to hold glow effect
-      const pinSize = 50; // Actual pin size
-      const opacity = venue.heatScore > 0 ? 1 : 0.5;
+      const existingMarker = venueMarkersRef.current.get(venue.id);
 
-      const el = document.createElement('div');
-      el.className = 'venue-marker';
-      el.style.width = `${containerSize}px`;
-      el.style.height = `${containerSize}px`;
-      el.style.cursor = 'pointer';
-      el.style.transition = 'all 0.3s ease';
-      
-      // Create venue pin with glow for hot venues - glow fits within container
-      el.innerHTML = `
-        <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-          ${isTopHot ? `<div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.6) 0%, transparent 70%); animation: pulse 2s infinite;"></div>` : ''}
-          <div style="width: ${pinSize}px; height: ${pinSize}px; background: #a855f7; border-radius: 50%; opacity: ${opacity}; box-shadow: 0 0 ${isTopHot ? '20px' : '10px'} rgba(168, 85, 247, ${isTopHot ? '0.9' : '0.6'}); display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255, 255, 255, 0.9);">
-            <svg width="${pinSize * 0.5}" height="${pinSize * 0.5}" viewBox="0 0 24 24" fill="white">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-            </svg>
+      if (existingMarker) {
+        // Update existing marker position only (no recreation)
+        existingMarker.setLngLat([venue.lng, venue.lat]);
+      } else {
+        // Create new marker only if doesn't exist
+        const isTopHot = index < 3 && venue.heatScore > 0;
+        const containerSize = 70;
+        const pinSize = 50;
+        const opacity = venue.heatScore > 0 ? 1 : 0.5;
+
+        const el = document.createElement('div');
+        el.className = 'venue-marker';
+        el.style.width = `${containerSize}px`;
+        el.style.height = `${containerSize}px`;
+        el.style.cursor = 'pointer';
+        el.style.transition = 'all 0.3s ease';
+        
+        el.innerHTML = `
+          <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+            ${isTopHot ? `<div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.6) 0%, transparent 70%); animation: pulse 2s infinite;"></div>` : ''}
+            <div style="width: ${pinSize}px; height: ${pinSize}px; background: #a855f7; border-radius: 50%; opacity: ${opacity}; box-shadow: 0 0 ${isTopHot ? '20px' : '10px'} rgba(168, 85, 247, ${isTopHot ? '0.9' : '0.6'}); display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255, 255, 255, 0.9);">
+              <svg width="${pinSize * 0.5}" height="${pinSize * 0.5}" viewBox="0 0 24 24" fill="white">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+            </div>
           </div>
-        </div>
-      `;
+        `;
 
-      el.addEventListener('click', () => {
-        openVenueCard(venue.id);
-      });
+        el.addEventListener('click', () => {
+          openVenueCard(venue.id);
+        });
 
-      const marker = new mapboxgl.Marker({ 
-        element: el, 
-        anchor: 'center' 
-      })
-        .setLngLat([venue.lng, venue.lat])
-        .addTo(map.current!);
+        const marker = new mapboxgl.Marker({ 
+          element: el, 
+          anchor: 'center' 
+        })
+          .setLngLat([venue.lng, venue.lat])
+          .addTo(map.current!);
 
-      venueMarkersRef.current.push(marker);
+        venueMarkersRef.current.set(venue.id, marker);
+      }
     });
   }, [venues, friends]);
 
