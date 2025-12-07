@@ -14,7 +14,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin, Bell } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, Bell, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { useToast } from '@/hooks/use-toast';
@@ -781,7 +781,7 @@ export default function Map() {
         {/* Collapsed Pill */}
         <button
           onClick={() => setShowVenueFilters(!showVenueFilters)}
-          className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 hover:bg-[#2d1b4e] transition-colors"
+          className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-full px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_15px_rgba(168,85,247,0.2)]"
         >
           <div className="flex items-center gap-2">
             <span className="text-sm">
@@ -790,20 +790,21 @@ export default function Map() {
                venueFilter === 'cocktail_bar' ? '🍸' :
                venueFilter === 'bar' ? '🍺' : '🌃'}
             </span>
-            <span className="text-white/80 text-sm">
-              {venueFilter === 'all' ? 'All Venues' :
+            <span className="text-white/90 text-sm font-medium">
+              {venueFilter === 'all' ? 'All' :
                venueFilter === 'nightclub' ? 'Clubs' :
                venueFilter === 'cocktail_bar' ? 'Cocktails' :
                venueFilter === 'bar' ? 'Bars' : 'Rooftops'}
             </span>
+            <ChevronDown className={`w-4 h-4 text-white/60 transition-transform duration-200 ${showVenueFilters ? 'rotate-180' : ''}`} />
           </div>
         </button>
 
         {/* Expanded Filter Options */}
         {showVenueFilters && (
-          <div className="mt-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden">
+          <div className="mt-1.5 bg-[#1a0f2e] backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_25px_rgba(168,85,247,0.4)] overflow-hidden animate-fade-in min-w-[140px]">
             {[
-              { key: 'all', label: 'All Venues', icon: '🗺️' },
+              { key: 'all', label: 'All', icon: '🗺️' },
               { key: 'nightclub', label: 'Clubs', icon: '🎵' },
               { key: 'cocktail_bar', label: 'Cocktails', icon: '🍸' },
               { key: 'bar', label: 'Bars', icon: '🍺' },
@@ -815,11 +816,13 @@ export default function Map() {
                   setVenueFilter(filter.key as typeof venueFilter);
                   setShowVenueFilters(false);
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0 ${
-                  venueFilter === filter.key ? 'bg-[#a855f7]/30' : ''
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 transition-all border-b border-[#a855f7]/10 last:border-b-0 ${
+                  venueFilter === filter.key 
+                    ? 'bg-[#a855f7]/25 shadow-[inset_0_0_10px_rgba(168,85,247,0.2)]' 
+                    : 'hover:bg-[#a855f7]/15 hover:shadow-[inset_0_0_15px_rgba(168,85,247,0.1)]'
                 }`}
               >
-                <span>{filter.icon}</span>
+                <span className="text-sm">{filter.icon}</span>
                 <span className={`text-sm ${venueFilter === filter.key ? 'text-[#d4ff00] font-semibold' : 'text-white/80'}`}>
                   {filter.label}
                 </span>
