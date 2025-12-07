@@ -505,7 +505,7 @@ export default function Map() {
         el.style.width = '60px';
         el.style.height = '60px';
         el.style.cursor = 'pointer';
-        el.style.zIndex = '100'; // Appear above venue pins
+        el.style.zIndex = '20'; // Appear above venue pins but below modals
         
         // Determine ring color and badge based on relationship type
         const ringColors = {
