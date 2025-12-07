@@ -204,41 +204,49 @@ export default function Home() {
         {/* Stories Row */}
         <div className="pb-4 overflow-hidden">
           <div className="flex gap-4 overflow-x-auto scrollbar-hide px-6">
+            {/* Your Story Button */}
             <button
               onClick={() => setCreateStoryOpen(true)}
-              className="flex-shrink-0 transition-transform hover:scale-105"
+              className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
             >
               <div className="relative">
-                <Avatar className="h-16 w-16 border-2 border-[#a855f7]/40">
-                  <AvatarImage src={user?.user_metadata?.avatar_url} />
-                  <AvatarFallback className="bg-[#1a0f2e] text-white">
-                    {user?.user_metadata?.display_name?.[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="absolute bottom-0 right-0 bg-[#a855f7] rounded-full p-1">
+                <div className="p-[2px] rounded-full bg-gradient-to-br from-[#a855f7]/60 to-[#a855f7]/20">
+                  <Avatar className="h-16 w-16 border-2 border-[#0a0118]">
+                    <AvatarImage src={user?.user_metadata?.avatar_url} />
+                    <AvatarFallback className="bg-[#1a0f2e] text-white">
+                      {user?.user_metadata?.display_name?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-[#a855f7] to-[#7c3aed] rounded-full p-1.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
                   <Plus className="h-3 w-3 text-white" />
                 </div>
               </div>
+              <span className="text-[10px] text-white/60 font-medium">Your Story</span>
             </button>
 
+            {/* Friend Stories */}
             {storyUsers.map((storyUser) => (
               <button
                 key={storyUser.user_id}
                 onClick={() => setSelectedStoryUser(storyUser.user_id)}
-                className="flex-shrink-0 transition-transform hover:scale-105"
+                className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
               >
-                <Avatar 
-                  className={`h-16 w-16 border-2 ${
-                    storyUser.has_unviewed 
-                      ? 'border-[#d4ff00] shadow-[0_0_15px_rgba(212,255,0,0.35)]' 
-                      : 'border-[#a855f7]/40'
-                  }`}
-                >
-                  <AvatarImage src={storyUser.avatar_url || undefined} />
-                  <AvatarFallback className="bg-[#1a0f2e] text-white">
-                    {storyUser.display_name[0]}
-                  </AvatarFallback>
-                </Avatar>
+                <div className={`p-[3px] rounded-full ${
+                  storyUser.has_unviewed 
+                    ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active' 
+                    : 'bg-gradient-to-br from-[#a855f7]/40 to-[#a855f7]/20'
+                }`}>
+                  <Avatar className="h-16 w-16 border-2 border-[#0a0118]">
+                    <AvatarImage src={storyUser.avatar_url || undefined} />
+                    <AvatarFallback className="bg-[#1a0f2e] text-white">
+                      {storyUser.display_name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+                <span className="text-[10px] text-white/70 font-medium max-w-[60px] truncate">
+                  {storyUser.display_name.split(' ')[0]}
+                </span>
               </button>
             ))}
           </div>
@@ -263,10 +271,11 @@ export default function Home() {
             </p>
           </div>
         ) : (
-          posts.map((post) => (
+          posts.map((post, index) => (
             <div
               key={post.id}
-              className="bg-[#0a0118] border-2 border-[#a855f7]/40 rounded-3xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.4)]"
+              className="glass-card rounded-3xl overflow-hidden post-animate-in transition-all duration-300 hover:shadow-[0_0_50px_rgba(168,85,247,0.3)]"
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               <div className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
@@ -335,8 +344,12 @@ export default function Home() {
               </div>
 
               {post.image_url && (
-                <div className="w-full aspect-square">
-                  <img src={post.image_url} alt="Post" className="w-full h-full object-cover" />
+                <div className="w-full aspect-square relative overflow-hidden group image-vignette">
+                  <img 
+                    src={post.image_url} 
+                    alt="Post" 
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                  />
                 </div>
               )}
 
@@ -344,12 +357,14 @@ export default function Home() {
                 <div className="flex items-center gap-4">
                   <button 
                     onClick={() => handleLikePost(post.id)}
-                    className={`flex items-center gap-2 transition-all ${
+                    className={`flex items-center gap-2 transition-all active:scale-90 ${
                       likedPosts.has(post.id) ? 'text-[#d4ff00]' : 'text-white hover:text-[#d4ff00]'
-                    } ${animatingLike === post.id ? 'animate-scale-in' : ''}`}
+                    }`}
                   >
                     <Heart 
-                      className={`h-6 w-6 ${animatingLike === post.id ? 'animate-scale-in' : ''}`}
+                      className={`h-6 w-6 transition-all ${
+                        animatingLike === post.id ? 'animate-scale-in' : ''
+                      } ${likedPosts.has(post.id) ? 'like-glow drop-shadow-[0_0_6px_rgba(212,255,0,0.6)]' : ''}`}
                       fill={likedPosts.has(post.id) ? 'currentColor' : 'none'}
                     />
                   </button>
