@@ -65,8 +65,10 @@ export default function Map() {
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showFriendsList, setShowFriendsList] = useState(false);
+  const [showVenueFilters, setShowVenueFilters] = useState(false);
   const [isLoadingFriends, setIsLoadingFriends] = useState(true);
   const friendsListRef = useRef<HTMLDivElement>(null);
+  const venueFilterRef = useRef<HTMLDivElement>(null);
   
   // Use ref for city to prevent callback recreation
   const cityRef = useRef(city);
@@ -694,13 +696,20 @@ export default function Map() {
       ) {
         setShowFriendsList(false);
       }
+      if (
+        venueFilterRef.current &&
+        !venueFilterRef.current.contains(event.target as Node) &&
+        showVenueFilters
+      ) {
+        setShowVenueFilters(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showFriendsList]);
+  }, [showFriendsList, showVenueFilters]);
 
   const centerOnMyLocation = () => {
     if (!map.current) return;
@@ -767,30 +776,57 @@ export default function Map() {
         </div>
       </div>
 
-      {/* Venue Type Filter */}
-      <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10">
-        <div className="flex gap-2 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-full p-1.5 shadow-[0_0_20px_rgba(168,85,247,0.3)]">
-          {[
-            { key: 'all', label: 'All', icon: '🗺️' },
-            { key: 'nightclub', label: 'Clubs', icon: '🎵' },
-            { key: 'cocktail_bar', label: 'Cocktails', icon: '🍸' },
-            { key: 'bar', label: 'Bars', icon: '🍺' },
-            { key: 'rooftop', label: 'Rooftops', icon: '🌃' },
-          ].map((filter) => (
-            <button
-              key={filter.key}
-              onClick={() => setVenueFilter(filter.key as typeof venueFilter)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                venueFilter === filter.key
-                  ? 'bg-[#d4ff00] text-black shadow-[0_0_10px_rgba(212,255,0,0.5)]'
-                  : 'text-white/70 hover:bg-[#a855f7]/20 hover:text-white'
-              }`}
-            >
-              <span className="mr-1">{filter.icon}</span>
-              {filter.label}
-            </button>
-          ))}
-        </div>
+      {/* Venue Type Filter - Collapsible in top right */}
+      <div ref={venueFilterRef} className="absolute top-20 right-4 z-10">
+        {/* Collapsed Pill */}
+        <button
+          onClick={() => setShowVenueFilters(!showVenueFilters)}
+          className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 hover:bg-[#2d1b4e] transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm">
+              {venueFilter === 'all' ? '🗺️' : 
+               venueFilter === 'nightclub' ? '🎵' :
+               venueFilter === 'cocktail_bar' ? '🍸' :
+               venueFilter === 'bar' ? '🍺' : '🌃'}
+            </span>
+            <span className="text-white/80 text-sm">
+              {venueFilter === 'all' ? 'All Venues' :
+               venueFilter === 'nightclub' ? 'Clubs' :
+               venueFilter === 'cocktail_bar' ? 'Cocktails' :
+               venueFilter === 'bar' ? 'Bars' : 'Rooftops'}
+            </span>
+          </div>
+        </button>
+
+        {/* Expanded Filter Options */}
+        {showVenueFilters && (
+          <div className="mt-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden">
+            {[
+              { key: 'all', label: 'All Venues', icon: '🗺️' },
+              { key: 'nightclub', label: 'Clubs', icon: '🎵' },
+              { key: 'cocktail_bar', label: 'Cocktails', icon: '🍸' },
+              { key: 'bar', label: 'Bars', icon: '🍺' },
+              { key: 'rooftop', label: 'Rooftops', icon: '🌃' },
+            ].map((filter) => (
+              <button
+                key={filter.key}
+                onClick={() => {
+                  setVenueFilter(filter.key as typeof venueFilter);
+                  setShowVenueFilters(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0 ${
+                  venueFilter === filter.key ? 'bg-[#a855f7]/30' : ''
+                }`}
+              >
+                <span>{filter.icon}</span>
+                <span className={`text-sm ${venueFilter === filter.key ? 'text-[#d4ff00] font-semibold' : 'text-white/80'}`}>
+                  {filter.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Friends Out Pill + List */}
