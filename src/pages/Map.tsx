@@ -175,58 +175,59 @@ export default function Map() {
       let friendLocations: FriendLocation[] = [];
       let friendIds: string[] = [];
 
-      // When demo mode is ON, use static demo friends dataset
+      // When demo mode is ON, fetch demo users from database
       if (demoEnabledRef.current) {
-        // Static demo friends for NYC
-        const nycDemoFriends = [
-          { name: 'Emma Davis', venue: 'The Nines', lat: 40.748817, lng: -73.985428, type: 'close' as const },
-          { name: 'Noah Wilson', venue: 'Blue Note', lat: 40.730610, lng: -73.935242, type: 'direct' as const },
-          { name: 'Sophia Martinez', venue: 'Spotted Lounge', lat: 40.758896, lng: -73.985130, type: 'close' as const },
-          { name: 'Liam Anderson', venue: 'The Nines', lat: 40.749000, lng: -73.986000, type: 'mutual' as const },
-          { name: 'Olivia Taylor', venue: 'Jazz Bar', lat: 40.741895, lng: -73.989308, type: 'direct' as const },
-          { name: 'James Brown', venue: 'Rooftop NYC', lat: 40.752726, lng: -73.977229, type: 'mutual' as const },
-          { name: 'Ava Johnson', venue: 'Blue Note', lat: 40.730800, lng: -73.935500, type: 'close' as const },
-          { name: 'Lucas Garcia', venue: 'The Nines', lat: 40.748500, lng: -73.985800, type: 'direct' as const },
-        ];
+        // Fetch demo users who are "out" from night_statuses joined with profiles
+        const { data: demoStatuses } = await supabase
+          .from('night_statuses')
+          .select(`
+            user_id,
+            lat,
+            lng,
+            venue_name,
+            profiles!inner(display_name, avatar_url, is_demo)
+          `)
+          .eq('status', 'out')
+          .eq('profiles.is_demo', true)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', new Date().toISOString());
 
-        // Static demo friends for LA - spread across all neighborhoods
-        const laDemoFriends = [
-          // Silver Lake
-          { name: 'Maya Rodriguez', venue: 'Tenants of the Trees', lat: 34.0826, lng: -118.269, type: 'close' as const },
-          { name: 'Alex Chen', venue: 'Akbar', lat: 34.0894, lng: -118.2714, type: 'direct' as const },
-          // Echo Park
-          { name: 'Jordan Blake', venue: 'The Short Stop', lat: 34.0782, lng: -118.2618, type: 'close' as const },
-          { name: 'Riley Park', venue: 'The Echoplex', lat: 34.0775, lng: -118.2607, type: 'mutual' as const },
-          // Hollywood
-          { name: 'Casey Williams', venue: 'Dirty Laundry', lat: 34.0992, lng: -118.3291, type: 'direct' as const },
-          // Los Feliz
-          { name: 'Morgan Davis', venue: 'The Dresden', lat: 34.1055, lng: -118.2891, type: 'mutual' as const },
-          // Highland Park
-          { name: 'Avery Thompson', venue: 'Highland Park Bowl', lat: 34.1118, lng: -118.1924, type: 'close' as const },
-          // Venice
-          { name: 'Drew Martinez', venue: 'High Rooftop Lounge', lat: 33.9913, lng: -118.466, type: 'direct' as const },
-          // Santa Monica
-          { name: 'Sam Taylor', venue: 'The Basement Tavern', lat: 34.0134, lng: -118.4917, type: 'close' as const },
-          // Downtown LA
-          { name: 'Jamie Lee', venue: 'Exchange LA', lat: 34.0441, lng: -118.2504, type: 'mutual' as const },
-          { name: 'Chris Park', venue: 'Academy LA', lat: 34.0479, lng: -118.2565, type: 'direct' as const },
-          // West Hollywood
-          { name: 'Taylor Kim', venue: 'The Roger Room', lat: 34.081, lng: -118.37, type: 'close' as const },
-        ];
+        // Fetch venues for current city to filter demo users
+        const { data: cityVenues } = await supabase
+          .from('venues')
+          .select('name')
+          .eq('city', cityRef.current);
 
-        const staticDemoFriends = cityRef.current === 'la' ? laDemoFriends : nycDemoFriends;
+        const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
 
-        friendLocations = staticDemoFriends.map((friend, index) => ({
-          user_id: `demo-${index}`,
-          lat: friend.lat,
-          lng: friend.lng,
-          venue_name: friend.venue,
-          profiles: {
-            display_name: friend.name,
-            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.name}`,
-          },
-          relationshipType: friend.type,
-        }));
+        // Filter demo users by city (matching venue name to city's venues)
+        const filteredDemoStatuses = (demoStatuses || []).filter((status: any) => 
+          status.venue_name && cityVenueNames.has(status.venue_name.toLowerCase())
+        );
+
+        // Deduplicate by display_name (keep first occurrence)
+        const seenNames = new Set<string>();
+        const relationshipTypes: ('close' | 'direct' | 'mutual')[] = ['close', 'direct', 'mutual'];
+        
+        friendLocations = filteredDemoStatuses
+          .filter((status: any) => {
+            const name = status.profiles?.display_name;
+            if (!name || seenNames.has(name)) return false;
+            seenNames.add(name);
+            return true;
+          })
+          .map((status: any, index: number) => ({
+            user_id: status.user_id,
+            lat: status.lat,
+            lng: status.lng,
+            venue_name: status.venue_name || 'Out',
+            profiles: {
+              display_name: status.profiles?.display_name || 'Unknown',
+              avatar_url: status.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${status.profiles?.display_name}`,
+            },
+            // Cycle through relationship types for visual variety
+            relationshipType: relationshipTypes[index % relationshipTypes.length],
+          }));
 
         friendIds = friendLocations.map(f => f.user_id);
       } else {
