@@ -110,8 +110,7 @@ export function FriendIdCard() {
 
   const handleViewStory = () => {
     if (hasStory && selectedFriend) {
-      closeFriendCard();
-      setShowStoryViewer(true);
+      setShowStoryViewer(true); // Don't close card - let StoryViewer overlay on top
     }
   };
 
@@ -619,7 +618,10 @@ export function FriendIdCard() {
     {showStoryViewer && selectedFriend && (
       <StoryViewer
         userId={selectedFriend.userId}
-        onClose={() => setShowStoryViewer(false)}
+        onClose={() => {
+          setShowStoryViewer(false);
+          closeFriendCard(); // Close card when done viewing stories
+        }}
         allStoryUsers={[selectedFriend.userId]}
         currentUserIndex={0}
       />
