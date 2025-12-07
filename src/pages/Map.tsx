@@ -67,6 +67,8 @@ export default function Map() {
   const [showFriendsList, setShowFriendsList] = useState(false);
   const [showVenueFilters, setShowVenueFilters] = useState(false);
   const [isLoadingFriends, setIsLoadingFriends] = useState(true);
+  const [currentZoom, setCurrentZoom] = useState(13);
+  const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set());
   const friendsListRef = useRef<HTMLDivElement>(null);
   const venueFilterRef = useRef<HTMLDivElement>(null);
   
@@ -405,7 +407,15 @@ export default function Map() {
       zoom: 13,
     });
 
-    // Map is ready - no need to modify background layer
+    // Track zoom level for clustering behavior
+    map.current.on('zoom', () => {
+      const zoom = map.current?.getZoom() || 13;
+      setCurrentZoom(zoom);
+      // Auto-collapse expanded clusters when zooming out
+      if (zoom < 18) {
+        setExpandedClusters(new Set());
+      }
+    });
 
     // Listen for custom event to center map on venue
     const handleCenterMapOnVenue = (e: Event) => {
@@ -479,22 +489,21 @@ export default function Map() {
   }, [userLocation]);
 
   // Smart marker diffing with clustering for groups
+  // ~5 meters = 0.000045 degrees (venue-level accuracy)
+  const CLUSTER_THRESHOLD = 0.000045;
+  const SPREAD_RADIUS = 0.0002; // ~20m spread when expanded
+
   useEffect(() => {
     if (!map.current || isLoadingFriends) return;
 
-    // Get current friend user_ids from the new friends array
-    const currentFriendIds = new Set(friends.map(f => f.user_id));
-    
-    // Remove markers for friends no longer in the list (handles logout/offline)
-    friendMarkersRef.current.forEach((marker, userId) => {
-      if (!currentFriendIds.has(userId)) {
-        marker.remove();
-        friendMarkersRef.current.delete(userId);
-      }
-    });
+    // Clear all markers first for clean re-render
+    friendMarkersRef.current.forEach(marker => marker.remove());
+    friendMarkersRef.current.clear();
 
-    // Group friends by location (within 0.0003 threshold = ~30m)
-    const CLUSTER_THRESHOLD = 0.0003;
+    // At high zoom (18+), don't cluster - show all individual avatars
+    const shouldCluster = currentZoom < 18;
+
+    // Group friends by location (within 5m threshold)
     const clusters: FriendLocation[][] = [];
     const assigned = new Set<string>();
 
@@ -504,148 +513,162 @@ export default function Map() {
       const cluster = [friend];
       assigned.add(friend.user_id);
       
-      friends.forEach((other) => {
-        if (assigned.has(other.user_id)) return;
-        const latDiff = Math.abs(friend.lat - other.lat);
-        const lngDiff = Math.abs(friend.lng - other.lng);
-        if (latDiff < CLUSTER_THRESHOLD && lngDiff < CLUSTER_THRESHOLD) {
-          cluster.push(other);
-          assigned.add(other.user_id);
-        }
-      });
+      if (shouldCluster) {
+        friends.forEach((other) => {
+          if (assigned.has(other.user_id)) return;
+          const latDiff = Math.abs(friend.lat - other.lat);
+          const lngDiff = Math.abs(friend.lng - other.lng);
+          if (latDiff < CLUSTER_THRESHOLD && lngDiff < CLUSTER_THRESHOLD) {
+            cluster.push(other);
+            assigned.add(other.user_id);
+          }
+        });
+      }
       
       clusters.push(cluster);
     });
 
+    // Helper to create individual avatar marker
+    const createAvatarMarker = (friend: FriendLocation, lng: number, lat: number) => {
+      const el = document.createElement('div');
+      el.className = 'friend-marker';
+      el.style.width = '52px';
+      el.style.height = '52px';
+      el.style.cursor = 'pointer';
+      el.style.zIndex = '20';
+      
+      const ringColors = {
+        close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.35)', badge: '💛' },
+        direct: { border: '#a855f7', shadow: 'rgba(168, 85, 247, 0.35)', badge: '' },
+        mutual: { border: '#6366f1', shadow: 'rgba(99, 102, 241, 0.35)', badge: '🔗' },
+      };
+      
+      const colors = ringColors[friend.relationshipType || 'direct'];
+      
+      el.innerHTML = `
+        <div style="position: relative; width: 100%; height: 100%;">
+          <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${colors.border}; box-shadow: 0 0 8px ${colors.shadow};"></div>
+          <img 
+            src="${friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`}" 
+            style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; padding: 3px;"
+            alt="${friend.profiles?.display_name}"
+          />
+          ${colors.badge ? `
+            <div style="position: absolute; bottom: -2px; right: -2px; width: 16px; height: 16px; background: #1a0f2e; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid ${colors.border}; font-size: 9px;">
+              ${colors.badge}
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      el.addEventListener('click', () => {
+        const friendCardData: FriendCardData = {
+          userId: friend.user_id,
+          displayName: friend.profiles?.display_name || 'Friend',
+          avatarUrl: friend.profiles?.avatar_url || null,
+          venueName: friend.venue_name,
+          lat: friend.lat,
+          lng: friend.lng,
+          relationshipType: friend.relationshipType,
+        };
+        openFriendCard(friendCardData);
+      });
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([lng, lat])
+        .addTo(map.current!);
+
+      friendMarkersRef.current.set(friend.user_id, marker);
+    };
+
     // Render clusters
     clusters.forEach((cluster) => {
-      if (cluster.length >= 4) {
-        // Create cluster bubble for 4+ friends
-        const clusterKey = `cluster-${cluster[0].user_id}`;
-        const existingMarker = friendMarkersRef.current.get(clusterKey);
+      const clusterKey = `cluster-${cluster.map(f => f.user_id).sort().join('-')}`;
+      const isExpanded = expandedClusters.has(clusterKey);
+      const centerLat = cluster[0].lat;
+      const centerLng = cluster[0].lng;
+
+      if (cluster.length >= 4 && shouldCluster && !isExpanded) {
+        // Create cluster bubble for 4+ friends (not expanded)
+        const el = document.createElement('div');
+        el.className = 'cluster-marker';
+        el.style.width = '70px';
+        el.style.height = '70px';
+        el.style.cursor = 'pointer';
+        el.style.zIndex = '25';
         
-        // Remove individual markers that are now in cluster
-        cluster.forEach(f => {
-          const marker = friendMarkersRef.current.get(f.user_id);
-          if (marker) {
-            marker.remove();
-            friendMarkersRef.current.delete(f.user_id);
-          }
+        const displayFriends = cluster.slice(0, 3);
+        const remainingCount = cluster.length - 3;
+        
+        el.innerHTML = `
+          <div style="position: relative; width: 100%; height: 100%;">
+            <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(45, 27, 78, 0.95); border: 2px solid rgba(168, 85, 247, 0.5); box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);"></div>
+            <img src="${displayFriends[0]?.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayFriends[0]?.profiles?.display_name}`}" 
+                 style="position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1.5px solid #a855f7;" />
+            <img src="${displayFriends[1]?.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayFriends[1]?.profiles?.display_name}`}" 
+                 style="position: absolute; bottom: 14px; left: 10px; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1.5px solid #a855f7;" />
+            <img src="${displayFriends[2]?.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayFriends[2]?.profiles?.display_name}`}" 
+                 style="position: absolute; bottom: 14px; right: 10px; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1.5px solid #a855f7;" />
+            <div style="position: absolute; bottom: -4px; right: -4px; min-width: 22px; height: 22px; background: #a855f7; border-radius: 11px; display: flex; align-items: center; justify-content: center; padding: 0 6px; font-size: 11px; font-weight: 600; color: white; border: 2px solid #1a0f2e;">
+              +${remainingCount}
+            </div>
+          </div>
+        `;
+
+        el.addEventListener('click', () => {
+          // Tap to expand cluster
+          setExpandedClusters(prev => new Set([...prev, clusterKey]));
+        });
+
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([centerLng, centerLat])
+          .addTo(map.current!);
+
+        friendMarkersRef.current.set(clusterKey, marker);
+      } else if (cluster.length >= 4 && isExpanded) {
+        // Expanded cluster - spread avatars in a circle
+        cluster.forEach((friend, idx) => {
+          const angleStep = (2 * Math.PI) / cluster.length;
+          const angle = idx * angleStep;
+          const spreadLng = centerLng + SPREAD_RADIUS * Math.cos(angle);
+          const spreadLat = centerLat + SPREAD_RADIUS * Math.sin(angle);
+          createAvatarMarker(friend, spreadLng, spreadLat);
         });
         
-        if (!existingMarker) {
-          const el = document.createElement('div');
-          el.className = 'cluster-marker';
-          el.style.width = '70px';
-          el.style.height = '70px';
-          el.style.cursor = 'pointer';
-          el.style.zIndex = '25';
-          
-          const displayFriends = cluster.slice(0, 3);
-          const remainingCount = cluster.length - 3;
-          
-          el.innerHTML = `
-            <div style="position: relative; width: 100%; height: 100%;">
-              <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(45, 27, 78, 0.95); border: 2px solid rgba(168, 85, 247, 0.5); box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);"></div>
-              <img src="${displayFriends[0]?.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayFriends[0]?.profiles?.display_name}`}" 
-                   style="position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1.5px solid #a855f7;" />
-              <img src="${displayFriends[1]?.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayFriends[1]?.profiles?.display_name}`}" 
-                   style="position: absolute; bottom: 14px; left: 10px; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1.5px solid #a855f7;" />
-              <img src="${displayFriends[2]?.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayFriends[2]?.profiles?.display_name}`}" 
-                   style="position: absolute; bottom: 14px; right: 10px; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1.5px solid #a855f7;" />
-              <div style="position: absolute; bottom: -4px; right: -4px; min-width: 22px; height: 22px; background: #a855f7; border-radius: 11px; display: flex; align-items: center; justify-content: center; padding: 0 6px; font-size: 11px; font-weight: 600; color: white; border: 2px solid #1a0f2e;">
-                +${remainingCount}
-              </div>
-            </div>
-          `;
-
-          el.addEventListener('click', () => {
-            // Open first friend's card (could expand to show list)
-            const friend = cluster[0];
-            const friendCardData: FriendCardData = {
-              userId: friend.user_id,
-              displayName: friend.profiles?.display_name || 'Friend',
-              avatarUrl: friend.profiles?.avatar_url || null,
-              venueName: friend.venue_name,
-              lat: friend.lat,
-              lng: friend.lng,
-              relationshipType: friend.relationshipType,
-            };
-            openFriendCard(friendCardData);
+        // Add a collapse button in center
+        const collapseEl = document.createElement('div');
+        collapseEl.style.width = '32px';
+        collapseEl.style.height = '32px';
+        collapseEl.style.cursor = 'pointer';
+        collapseEl.style.zIndex = '30';
+        collapseEl.innerHTML = `
+          <div style="width: 100%; height: 100%; background: rgba(45, 27, 78, 0.95); border: 2px solid rgba(168, 85, 247, 0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);">
+            <span style="color: white; font-size: 14px; font-weight: 600;">−</span>
+          </div>
+        `;
+        collapseEl.addEventListener('click', () => {
+          setExpandedClusters(prev => {
+            const next = new Set(prev);
+            next.delete(clusterKey);
+            return next;
           });
-
-          const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([cluster[0].lng, cluster[0].lat])
-            .addTo(map.current!);
-
-          friendMarkersRef.current.set(clusterKey, marker);
-        }
+        });
+        
+        const collapseMarker = new mapboxgl.Marker({ element: collapseEl, anchor: 'center' })
+          .setLngLat([centerLng, centerLat])
+          .addTo(map.current!);
+        
+        friendMarkersRef.current.set(`${clusterKey}-collapse`, collapseMarker);
       } else {
-        // Render individual markers (1-3 friends) with slight offset if overlapping
+        // 1-3 friends or high zoom - render individually with slight offset
         cluster.forEach((friend, idx) => {
-          const existingMarker = friendMarkersRef.current.get(friend.user_id);
-          
-          // Apply small offset for 2-3 friends at same spot
           const offset = cluster.length > 1 ? (idx - (cluster.length - 1) / 2) * 0.00015 : 0;
           const adjustedLng = friend.lng + offset;
-          
-          if (existingMarker) {
-            existingMarker.setLngLat([adjustedLng, friend.lat]);
-          } else {
-            const el = document.createElement('div');
-            el.className = 'friend-marker';
-            el.style.width = '52px';
-            el.style.height = '52px';
-            el.style.cursor = 'pointer';
-            el.style.zIndex = '20';
-            
-            const ringColors = {
-              close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.35)', badge: '💛' },
-              direct: { border: '#a855f7', shadow: 'rgba(168, 85, 247, 0.35)', badge: '' },
-              mutual: { border: '#6366f1', shadow: 'rgba(99, 102, 241, 0.35)', badge: '🔗' },
-            };
-            
-            const colors = ringColors[friend.relationshipType || 'direct'];
-            
-            el.innerHTML = `
-              <div style="position: relative; width: 100%; height: 100%;">
-                <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${colors.border}; box-shadow: 0 0 8px ${colors.shadow};"></div>
-                <img 
-                  src="${friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`}" 
-                  style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; padding: 3px;"
-                  alt="${friend.profiles?.display_name}"
-                />
-                ${colors.badge ? `
-                  <div style="position: absolute; bottom: -2px; right: -2px; width: 16px; height: 16px; background: #1a0f2e; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid ${colors.border}; font-size: 9px;">
-                    ${colors.badge}
-                  </div>
-                ` : ''}
-              </div>
-            `;
-
-            el.addEventListener('click', () => {
-              const friendCardData: FriendCardData = {
-                userId: friend.user_id,
-                displayName: friend.profiles?.display_name || 'Friend',
-                avatarUrl: friend.profiles?.avatar_url || null,
-                venueName: friend.venue_name,
-                lat: friend.lat,
-                lng: friend.lng,
-                relationshipType: friend.relationshipType,
-              };
-              openFriendCard(friendCardData);
-            });
-
-            const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-              .setLngLat([adjustedLng, friend.lat])
-              .addTo(map.current!);
-
-            friendMarkersRef.current.set(friend.user_id, marker);
-          }
+          createAvatarMarker(friend, adjustedLng, friend.lat);
         });
       }
     });
-  }, [friends, isLoadingFriends]);
+  }, [friends, isLoadingFriends, currentZoom, expandedClusters]);
 
   // Filter venues based on selected filter
   const filteredVenues = venueFilter === 'all' 
