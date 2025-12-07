@@ -579,7 +579,6 @@ export default function Map() {
         el.style.width = `${containerSize}px`;
         el.style.height = `${containerSize}px`;
         el.style.cursor = 'pointer';
-        el.style.transition = 'all 0.3s ease';
         
         el.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
