@@ -750,7 +750,7 @@ export default function Map() {
       <div ref={mapContainer} className="absolute inset-0" />
 
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-6 z-10">
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-6 z-20">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
           <CityBadge />
@@ -778,7 +778,7 @@ export default function Map() {
       </div>
 
       {/* Venue Type Filter - Collapsible in top right */}
-      <div ref={venueFilterRef} className="absolute top-20 right-4 z-10">
+      <div ref={venueFilterRef} className="absolute top-20 right-4 z-20">
         {/* Collapsed Pill */}
         <button
           onClick={() => setShowVenueFilters(!showVenueFilters)}
@@ -835,7 +835,7 @@ export default function Map() {
 
       {/* Friends Out Pill + List */}
       {friends.length > 0 ? (
-        <div ref={friendsListRef} className="absolute top-20 left-4 z-10 max-w-sm">
+        <div ref={friendsListRef} className="absolute top-20 left-4 z-20 max-w-sm">
           {/* Clickable Pill */}
           <button
             onClick={toggleFriendsList}
@@ -899,7 +899,7 @@ export default function Map() {
           )}
         </div>
       ) : !demoEnabled ? (
-        <div className="absolute top-20 left-4 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-10">
+        <div className="absolute top-20 left-4 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-20">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#a855f7]/30 rounded-full"></div>
             <span className="text-white/60 text-sm">No friends out</span>
@@ -910,14 +910,14 @@ export default function Map() {
       {/* My Location Button */}
       <button
         onClick={centerOnMyLocation}
-        className="absolute bottom-24 right-6 w-12 h-12 rounded-full bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/50 flex items-center justify-center z-10 hover:bg-[#2d1b4e] transition-colors shadow-[0_0_20px_rgba(168,85,247,0.4)]"
+        className="absolute bottom-24 right-6 w-12 h-12 rounded-full bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/50 flex items-center justify-center z-20 hover:bg-[#2d1b4e] transition-colors shadow-[0_0_20px_rgba(168,85,247,0.4)]"
         aria-label="Center on my location"
       >
         <Crosshair className="w-5 h-5 text-white" />
       </button>
 
       {/* Legend */}
-      <div className="absolute bottom-40 right-6 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-10 shadow-[0_0_20px_rgba(168,85,247,0.4)] max-w-[160px]">
+      <div className="absolute bottom-40 right-6 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-20 shadow-[0_0_20px_rgba(168,85,247,0.4)] max-w-[160px]">
         <p className="text-white/80 text-xs font-semibold mb-2">Relationship</p>
         <div className="space-y-2">
           <div className="flex items-center gap-2">
