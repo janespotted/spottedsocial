@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { ReportDialog } from '@/components/ReportDialog';
 import { toast } from 'sonner';
+import { StoryViewer } from '@/components/StoryViewer';
 
 interface FriendData {
   id: string;
@@ -60,12 +61,16 @@ export function FriendIdCard() {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isDemoUser, setIsDemoUser] = useState(false);
   const [venueCoords, setVenueCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [hasStory, setHasStory] = useState(false);
+  const [showStoryViewer, setShowStoryViewer] = useState(false);
 
   useEffect(() => {
     if (selectedFriend && user) {
       console.log('Friend ID Card opened for:', selectedFriend);
       // Check if this is a demo user
       checkIfDemoUser();
+      // Check if friend has active stories
+      checkForStories();
       // Fetch venue coordinates for distance calculation
       if (selectedFriend.venueName) {
         fetchVenueCoordinates(selectedFriend.venueName);
@@ -87,8 +92,28 @@ export function FriendIdCard() {
       setStatusSubtitle('');
       setIsDemoUser(false);
       setVenueCoords(null);
+      setHasStory(false);
     }
   }, [selectedFriend, demoEnabled]);
+
+  const checkForStories = async () => {
+    if (!selectedFriend) return;
+    const { data: stories } = await supabase
+      .from('stories')
+      .select('id')
+      .eq('user_id', selectedFriend.userId)
+      .gt('expires_at', new Date().toISOString())
+      .limit(1);
+    
+    setHasStory(stories && stories.length > 0);
+  };
+
+  const handleViewStory = () => {
+    if (hasStory && selectedFriend) {
+      closeFriendCard();
+      setShowStoryViewer(true);
+    }
+  };
 
   const fetchVenueCoordinates = async (venueName: string) => {
     const { data } = await supabase
@@ -423,15 +448,31 @@ export function FriendIdCard() {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <div className="p-5 pt-8 relative">
+              <div className="p-5 pt-8 relative">
                 <div className="flex items-start gap-4 mb-4">
-                {/* Large Avatar */}
-                <Avatar className="h-20 w-20 border-[3px] border-[#a855f7] flex-shrink-0">
-                  <AvatarImage src={selectedFriend.avatarUrl || undefined} />
-                  <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
-                    {selectedFriend.displayName[0]}
-                  </AvatarFallback>
-                </Avatar>
+                {/* Large Avatar - with story ring if has stories */}
+                {hasStory ? (
+                  <button 
+                    onClick={handleViewStory}
+                    className="p-[3px] rounded-full bg-gradient-to-br from-[#d4ff00] via-[#d4ff00] to-[#a855f7] story-ring flex-shrink-0"
+                  >
+                    <div className="rounded-full bg-[#0a0118] p-[2px]">
+                      <Avatar className="h-20 w-20">
+                        <AvatarImage src={selectedFriend.avatarUrl || undefined} />
+                        <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
+                          {selectedFriend.displayName[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                  </button>
+                ) : (
+                  <Avatar className="h-20 w-20 border-[3px] border-[#a855f7] flex-shrink-0">
+                    <AvatarImage src={selectedFriend.avatarUrl || undefined} />
+                    <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
+                      {selectedFriend.displayName[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
 
                 {/* User Info */}
                 <div className="flex-1 min-w-0">
@@ -531,6 +572,16 @@ export function FriendIdCard() {
         reportType="user"
         targetId={selectedFriend.userId}
         targetName={selectedFriend.displayName}
+      />
+    )}
+
+    {/* Story Viewer */}
+    {showStoryViewer && selectedFriend && (
+      <StoryViewer
+        userId={selectedFriend.userId}
+        onClose={() => setShowStoryViewer(false)}
+        allStoryUsers={[selectedFriend.userId]}
+        currentUserIndex={0}
       />
     )}
   </>
