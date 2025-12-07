@@ -210,13 +210,15 @@ export default function Home() {
               className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
             >
               <div className="relative">
-                <div className="p-[2px] rounded-full bg-gradient-to-br from-[#a855f7]/60 to-[#a855f7]/20">
-                  <Avatar className="h-16 w-16 border-2 border-[#0a0118]">
-                    <AvatarImage src={user?.user_metadata?.avatar_url} />
-                    <AvatarFallback className="bg-[#1a0f2e] text-white">
-                      {user?.user_metadata?.display_name?.[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                <div className="p-[3px] rounded-full bg-gradient-to-br from-[#a855f7]/60 to-[#a855f7]/20">
+                  <div className="rounded-full bg-[#0a0118] p-[2px]">
+                    <Avatar className="h-14 w-14">
+                      <AvatarImage src={user?.user_metadata?.avatar_url} />
+                      <AvatarFallback className="bg-[#1a0f2e] text-white">
+                        {user?.user_metadata?.display_name?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
                 </div>
                 <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-[#a855f7] to-[#7c3aed] rounded-full p-1.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
                   <Plus className="h-3 w-3 text-white" />
@@ -237,12 +239,14 @@ export default function Home() {
                     ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active' 
                     : 'bg-gradient-to-br from-[#a855f7]/40 to-[#a855f7]/20'
                 }`}>
-                  <Avatar className="h-16 w-16 border-2 border-[#0a0118]">
-                    <AvatarImage src={storyUser.avatar_url || undefined} />
-                    <AvatarFallback className="bg-[#1a0f2e] text-white">
-                      {storyUser.display_name[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="rounded-full bg-[#0a0118] p-[2px]">
+                    <Avatar className="h-14 w-14">
+                      <AvatarImage src={storyUser.avatar_url || undefined} />
+                      <AvatarFallback className="bg-[#1a0f2e] text-white">
+                        {storyUser.display_name[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
                 </div>
                 <span className="text-[10px] text-white/70 font-medium max-w-[60px] truncate">
                   {storyUser.display_name.split(' ')[0]}
