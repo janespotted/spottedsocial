@@ -167,6 +167,109 @@ All colors MUST be HSL.
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Shimmer animation for skeletons */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(270 50% 15% / 0.3) 0%,
+      hsl(270 70% 40% / 0.4) 50%,
+      hsl(270 50% 15% / 0.3) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Glassmorphism card effect */
+  .glass-card {
+    background: linear-gradient(
+      135deg,
+      hsl(265 50% 8% / 0.9) 0%,
+      hsl(265 50% 12% / 0.7) 100%
+    );
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid hsl(270 70% 50% / 0.25);
+    box-shadow: 
+      0 0 30px hsl(270 100% 65% / 0.15),
+      inset 0 1px 0 hsl(270 100% 80% / 0.1);
+  }
+
+  .glass-card:hover {
+    border-color: hsl(270 70% 50% / 0.4);
+    box-shadow: 
+      0 0 40px hsl(270 100% 65% / 0.25),
+      inset 0 1px 0 hsl(270 100% 80% / 0.15);
+  }
+
+  /* Story ring animation */
+  @keyframes story-ring-pulse {
+    0%, 100% {
+      box-shadow: 0 0 10px hsl(72 100% 50% / 0.4);
+    }
+    50% {
+      box-shadow: 0 0 20px hsl(72 100% 50% / 0.6);
+    }
+  }
+
+  .story-ring-active {
+    animation: story-ring-pulse 2s ease-in-out infinite;
+  }
+
+  /* Post fade in animation */
+  @keyframes post-fade-in {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .post-animate-in {
+    animation: post-fade-in 0.4s ease-out forwards;
+  }
+
+  /* Like glow effect */
+  @keyframes like-glow {
+    0% {
+      filter: drop-shadow(0 0 0 transparent);
+    }
+    50% {
+      filter: drop-shadow(0 0 8px hsl(72 100% 50% / 0.8));
+    }
+    100% {
+      filter: drop-shadow(0 0 4px hsl(72 100% 50% / 0.4));
+    }
+  }
+
+  .like-glow {
+    animation: like-glow 0.3s ease-out forwards;
+  }
+
+  /* Image vignette overlay */
+  .image-vignette::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 50%,
+      hsl(265 50% 8% / 0.3) 100%
+    );
+    pointer-events: none;
+  }
 }
 
 /* iOS Safe Area Insets for notched devices */
