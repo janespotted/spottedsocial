@@ -186,16 +186,29 @@ export default function Map() {
           { name: 'Lucas Garcia', venue: 'The Nines', lat: 40.748500, lng: -73.985800, type: 'direct' as const },
         ];
 
-        // Static demo friends for LA
+        // Static demo friends for LA - spread across all neighborhoods
         const laDemoFriends = [
-          { name: 'Maya Rodriguez', venue: 'Academy LA', lat: 34.0479, lng: -118.2565, type: 'close' as const },
-          { name: 'Alex Chen', venue: 'Sound Nightclub', lat: 34.0412, lng: -118.2468, type: 'direct' as const },
-          { name: 'Jordan Blake', venue: 'Exchange LA', lat: 34.0441, lng: -118.2504, type: 'close' as const },
-          { name: 'Riley Park', venue: 'Academy LA', lat: 34.0480, lng: -118.2566, type: 'mutual' as const },
-          { name: 'Casey Williams', venue: 'The Mayan', lat: 34.0493, lng: -118.2577, type: 'direct' as const },
-          { name: 'Morgan Davis', venue: 'Sound Nightclub', lat: 34.0413, lng: -118.2469, type: 'mutual' as const },
-          { name: 'Avery Thompson', venue: 'Exchange LA', lat: 34.0442, lng: -118.2505, type: 'close' as const },
-          { name: 'Drew Martinez', venue: 'Academy LA', lat: 34.0481, lng: -118.2567, type: 'direct' as const },
+          // Silver Lake
+          { name: 'Maya Rodriguez', venue: 'Tenants of the Trees', lat: 34.0826, lng: -118.269, type: 'close' as const },
+          { name: 'Alex Chen', venue: 'Akbar', lat: 34.0894, lng: -118.2714, type: 'direct' as const },
+          // Echo Park
+          { name: 'Jordan Blake', venue: 'The Short Stop', lat: 34.0782, lng: -118.2618, type: 'close' as const },
+          { name: 'Riley Park', venue: 'The Echoplex', lat: 34.0775, lng: -118.2607, type: 'mutual' as const },
+          // Hollywood
+          { name: 'Casey Williams', venue: 'Dirty Laundry', lat: 34.0992, lng: -118.3291, type: 'direct' as const },
+          // Los Feliz
+          { name: 'Morgan Davis', venue: 'The Dresden', lat: 34.1055, lng: -118.2891, type: 'mutual' as const },
+          // Highland Park
+          { name: 'Avery Thompson', venue: 'Highland Park Bowl', lat: 34.1118, lng: -118.1924, type: 'close' as const },
+          // Venice
+          { name: 'Drew Martinez', venue: 'High Rooftop Lounge', lat: 33.9913, lng: -118.466, type: 'direct' as const },
+          // Santa Monica
+          { name: 'Sam Taylor', venue: 'The Basement Tavern', lat: 34.0134, lng: -118.4917, type: 'close' as const },
+          // Downtown LA
+          { name: 'Jamie Lee', venue: 'Exchange LA', lat: 34.0441, lng: -118.2504, type: 'mutual' as const },
+          { name: 'Chris Park', venue: 'Academy LA', lat: 34.0479, lng: -118.2565, type: 'direct' as const },
+          // West Hollywood
+          { name: 'Taylor Kim', venue: 'The Roger Room', lat: 34.081, lng: -118.37, type: 'close' as const },
         ];
 
         const staticDemoFriends = cityRef.current === 'la' ? laDemoFriends : nycDemoFriends;
@@ -491,6 +504,7 @@ export default function Map() {
         el.style.width = '60px';
         el.style.height = '60px';
         el.style.cursor = 'pointer';
+        el.style.zIndex = '100'; // Appear above venue pins
         
         // Determine ring color and badge based on relationship type
         const ringColors = {
@@ -579,6 +593,7 @@ export default function Map() {
         el.style.width = `${containerSize}px`;
         el.style.height = `${containerSize}px`;
         el.style.cursor = 'pointer';
+        el.style.zIndex = '10'; // Below friend avatars
         
         el.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
