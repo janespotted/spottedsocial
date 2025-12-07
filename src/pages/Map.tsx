@@ -792,7 +792,7 @@ export default function Map() {
                venueFilter === 'bar' ? '🍺' : '🌃'}
             </span>
             <span className="text-white/90 text-sm font-medium">
-              {venueFilter === 'all' ? 'All' :
+              {venueFilter === 'all' ? 'All Venues' :
                venueFilter === 'nightclub' ? 'Clubs' :
                venueFilter === 'cocktail_bar' ? 'Cocktails' :
                venueFilter === 'bar' ? 'Bars' : 'Rooftops'}
@@ -805,7 +805,7 @@ export default function Map() {
         {showVenueFilters && (
           <div className="mt-1.5 bg-[#1a0f2e] backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_25px_rgba(168,85,247,0.4)] overflow-hidden animate-fade-in min-w-[140px]">
             {[
-              { key: 'all', label: 'All', icon: '🗺️' },
+              { key: 'all', label: 'All Venues', icon: '🗺️' },
               { key: 'nightclub', label: 'Clubs', icon: '🎵' },
               { key: 'cocktail_bar', label: 'Cocktails', icon: '🍸' },
               { key: 'bar', label: 'Bars', icon: '🍺' },
