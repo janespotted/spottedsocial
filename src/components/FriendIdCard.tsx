@@ -450,35 +450,65 @@ export function FriendIdCard() {
 
               <div className="p-5 pt-8 relative">
                 <div className="flex items-start gap-4 mb-4">
-                {/* Large Avatar - with story ring if has stories */}
-                {hasStory ? (
-                  <button 
-                    onClick={handleViewStory}
-                    className="p-[3px] rounded-full bg-gradient-to-br from-[#d4ff00] via-[#d4ff00] to-[#a855f7] story-ring flex-shrink-0"
-                  >
-                    <div className="rounded-full bg-[#0a0118] p-[2px]">
-                      <Avatar className="h-20 w-20">
-                        <AvatarImage src={selectedFriend.avatarUrl || undefined} />
-                        <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
-                          {selectedFriend.displayName[0]}
-                        </AvatarFallback>
-                      </Avatar>
+                {/* Large Avatar - with story ring if has stories, relationship-colored border */}
+                <div className="relative flex-shrink-0">
+                  {hasStory ? (
+                    <button 
+                      onClick={handleViewStory}
+                      className="p-[3px] rounded-full bg-gradient-to-br from-[#d4ff00] via-[#d4ff00] to-[#a855f7] story-ring"
+                    >
+                      <div className="rounded-full bg-[#0a0118] p-[2px]">
+                        <Avatar className="h-20 w-20">
+                          <AvatarImage src={selectedFriend.avatarUrl || undefined} />
+                          <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
+                            {selectedFriend.displayName[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                    </button>
+                  ) : (
+                    <Avatar className={`h-20 w-20 border-[3px] ${
+                      selectedFriend.relationshipType === 'close' ? 'border-[#d4ff00]' :
+                      selectedFriend.relationshipType === 'mutual' ? 'border-[#6366f1]' :
+                      'border-[#a855f7]'
+                    }`}>
+                      <AvatarImage src={selectedFriend.avatarUrl || undefined} />
+                      <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
+                        {selectedFriend.displayName[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                  
+                  {/* Relationship badge */}
+                  {selectedFriend.relationshipType === 'close' && (
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#1a0f2e] border-2 border-[#d4ff00] rounded-full flex items-center justify-center text-xs shadow-[0_0_8px_rgba(212,255,0,0.6)]">
+                      💛
                     </div>
-                  </button>
-                ) : (
-                  <Avatar className="h-20 w-20 border-[3px] border-[#a855f7] flex-shrink-0">
-                    <AvatarImage src={selectedFriend.avatarUrl || undefined} />
-                    <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
-                      {selectedFriend.displayName[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
+                  )}
+                  {selectedFriend.relationshipType === 'mutual' && (
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#1a0f2e] border-2 border-[#6366f1] rounded-full flex items-center justify-center text-xs shadow-[0_0_8px_rgba(99,102,241,0.6)]">
+                      🔗
+                    </div>
+                  )}
+                </div>
 
                 {/* User Info */}
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-xl font-bold text-white leading-tight mb-1 pr-8">
-                    {selectedFriend.displayName}
-                  </h2>
+                  <div className="flex items-center gap-2 mb-1 pr-8">
+                    <h2 className="text-xl font-bold text-white leading-tight">
+                      {selectedFriend.displayName}
+                    </h2>
+                    {selectedFriend.relationshipType === 'close' && (
+                      <span className="text-xs bg-[#d4ff00]/20 text-[#d4ff00] px-2 py-0.5 rounded-full whitespace-nowrap">
+                        Close Friend
+                      </span>
+                    )}
+                    {selectedFriend.relationshipType === 'mutual' && (
+                      <span className="text-xs bg-[#6366f1]/20 text-[#6366f1] px-2 py-0.5 rounded-full whitespace-nowrap">
+                        Mutual
+                      </span>
+                    )}
+                  </div>
                   {demoEnabled ? (
                     <>
                       {selectedFriend.venueName && (
