@@ -41,8 +41,9 @@ const NYC_VENUES = [
   { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529, rank: 34 },
 ];
 
-// LA venues - ordered by popularity (32 venues)
+// LA venues - ordered by popularity (40 venues - includes westside)
 const LA_VENUES = [
+  // Hollywood / West Hollywood / Downtown (ranks 1-20)
   { name: "Academy LA", lat: 34.0479, lng: -118.2565, rank: 1 },
   { name: "Sound Nightclub", lat: 34.0412, lng: -118.2468, rank: 2 },
   { name: "Exchange LA", lat: 34.0441, lng: -118.2504, rank: 3 },
@@ -53,27 +54,29 @@ const LA_VENUES = [
   { name: "No Vacancy", lat: 34.0989, lng: -118.3267, rank: 8 },
   { name: "EP & LP", lat: 34.0789, lng: -118.3661, rank: 9 },
   { name: "Warwick", lat: 34.1019, lng: -118.3277, rank: 10 },
+  // Santa Monica / Venice / Westside (ranks 11-18)
   { name: "The Bungalow", lat: 34.0062, lng: -118.4715, rank: 11 },
-  { name: "Nightingale Plaza", lat: 34.0789, lng: -118.3628, rank: 12 },
-  { name: "Spotlight LA", lat: 34.0478, lng: -118.2505, rank: 13 },
-  { name: "Resident", lat: 34.0488, lng: -118.2518, rank: 14 },
-  { name: "Skybar", lat: 34.0949, lng: -118.3853, rank: 15 },
-  { name: "Good Times at Davey Wayne's", lat: 34.0990, lng: -118.3855, rank: 16 },
-  { name: "The Rooftop at The Standard", lat: 34.0488, lng: -118.2504, rank: 17 },
-  { name: "The Varnish", lat: 34.0448, lng: -118.2489, rank: 18 },
-  { name: "Seven Grand", lat: 34.0465, lng: -118.2508, rank: 19 },
-  { name: "The Edison", lat: 34.0483, lng: -118.2513, rank: 20 },
-  { name: "The Roger Room", lat: 34.0810, lng: -118.3700, rank: 21 },
-  { name: "Dirty Laundry", lat: 34.0992, lng: -118.3291, rank: 22 },
-  { name: "The Flats", lat: 34.0790, lng: -118.3653, rank: 23 },
-  { name: "Clifton's Republic", lat: 34.0466, lng: -118.2507, rank: 24 },
-  { name: "The Argyle", lat: 34.0985, lng: -118.3856, rank: 25 },
-  { name: "Genghis Cohen", lat: 34.0989, lng: -118.3268, rank: 26 },
-  { name: "The Satellite", lat: 34.1076, lng: -118.2923, rank: 27 },
-  { name: "Davey Wayne's Basement", lat: 34.0991, lng: -118.3856, rank: 28 },
-  { name: "The Escondite", lat: 34.0488, lng: -118.2506, rank: 29 },
-  { name: "The Falls", lat: 34.0790, lng: -118.3655, rank: 30 },
-  { name: "Bootleg Theater", lat: 34.0782, lng: -118.2617, rank: 31 },
+  { name: "The Galley", lat: 34.0082, lng: -118.4889, rank: 12 },
+  { name: "Finn McCool's", lat: 34.0057, lng: -118.4799, rank: 13 },
+  { name: "The Basement Tavern", lat: 34.0134, lng: -118.4917, rank: 14 },
+  { name: "The Roosterfish", lat: 33.9920, lng: -118.4715, rank: 15 },
+  { name: "The Townhouse & Del Monte Speakeasy", lat: 33.9934, lng: -118.4701, rank: 16 },
+  { name: "High Rooftop Lounge", lat: 33.9913, lng: -118.4660, rank: 17 },
+  { name: "Simmzy's Manhattan Beach", lat: 33.8846, lng: -118.4094, rank: 18 },
+  // More Hollywood / DTLA (ranks 19-32)
+  { name: "Nightingale Plaza", lat: 34.0789, lng: -118.3628, rank: 19 },
+  { name: "Spotlight LA", lat: 34.0478, lng: -118.2505, rank: 20 },
+  { name: "Resident", lat: 34.0488, lng: -118.2518, rank: 21 },
+  { name: "Skybar", lat: 34.0949, lng: -118.3853, rank: 22 },
+  { name: "Good Times at Davey Wayne's", lat: 34.0990, lng: -118.3855, rank: 23 },
+  { name: "Seven Grand", lat: 34.0465, lng: -118.2508, rank: 24 },
+  { name: "The Edison", lat: 34.0483, lng: -118.2513, rank: 25 },
+  { name: "The Roger Room", lat: 34.0810, lng: -118.3700, rank: 26 },
+  { name: "Dirty Laundry", lat: 34.0992, lng: -118.3291, rank: 27 },
+  { name: "Clifton's Republic", lat: 34.0466, lng: -118.2507, rank: 28 },
+  { name: "The Argyle", lat: 34.0985, lng: -118.3856, rank: 29 },
+  { name: "Genghis Cohen", lat: 34.0989, lng: -118.3268, rank: 30 },
+  { name: "The Escondite", lat: 34.0488, lng: -118.2506, rank: 31 },
   { name: "Adults Only", lat: 34.0448, lng: -118.2486, rank: 32 },
 ];
 
