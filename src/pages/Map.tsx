@@ -356,20 +356,8 @@ export default function Map() {
         };
       });
 
-      // Filter venues within radius if user has location
-      let filteredVenues = venuesWithHeat;
-      if (userLocation) {
-        const radius = 5; // miles
-        filteredVenues = venuesWithHeat.filter((venue) => {
-          const distance = calculateDistance(
-            userLocation.lat,
-            userLocation.lng,
-            venue.lat,
-            venue.lng
-          );
-          return parseFloat(distance) <= radius;
-        });
-      }
+      // Filter venues by city (not radius) to show all venues in the user's city
+      const filteredVenues = venuesWithHeat.filter((venue) => venue.city === cityRef.current);
 
       // Sort by heat score (descending)
       filteredVenues.sort((a, b) => b.heatScore - a.heatScore);
