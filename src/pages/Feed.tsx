@@ -418,20 +418,30 @@ export default function Feed() {
                   </div>
                 )}
 
-                <div className="text-white/90 text-sm leading-relaxed">
-                  <button 
-                    onClick={() => openFriendCard({
-                      userId: post.user_id,
-                      displayName: post.profiles?.display_name || 'Friend',
-                      avatarUrl: post.profiles?.avatar_url || null,
-                      venueName: post.venue_name || undefined,
-                    })}
-                    className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
-                  >
-                    {post.profiles?.username}
-                  </button>{' '}
-                  {post.text}
-                </div>
+                {/* Image posts with captions - Instagram style */}
+                {post.image_url && post.text && (
+                  <div className="text-white/90 text-sm leading-relaxed">
+                    <button 
+                      onClick={() => openFriendCard({
+                        userId: post.user_id,
+                        displayName: post.profiles?.display_name || 'Friend',
+                        avatarUrl: post.profiles?.avatar_url || null,
+                        venueName: post.venue_name || undefined,
+                      })}
+                      className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
+                    >
+                      {post.profiles?.display_name}
+                    </button>{' '}
+                    {post.text}
+                  </div>
+                )}
+
+                {/* Text-only posts - clean display without redundant username */}
+                {!post.image_url && post.text && (
+                  <div className="text-white text-base leading-relaxed">
+                    {post.text}
+                  </div>
+                )}
 
                 {expandedPostId === post.id && (
                   <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
