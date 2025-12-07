@@ -41,43 +41,52 @@ const NYC_VENUES = [
   { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529, rank: 34 },
 ];
 
-// LA venues - ordered by popularity (40 venues - includes westside)
+// LA venues - ordered by popularity (40 venues - includes westside + eastside)
 const LA_VENUES = [
-  // Hollywood / West Hollywood / Downtown (ranks 1-20)
-  { name: "Academy LA", lat: 34.0479, lng: -118.2565, rank: 1 },
-  { name: "Sound Nightclub", lat: 34.0412, lng: -118.2468, rank: 2 },
-  { name: "Exchange LA", lat: 34.0441, lng: -118.2504, rank: 3 },
-  { name: "The Mayan", lat: 34.0493, lng: -118.2577, rank: 4 },
-  { name: "Catch One", lat: 34.0352, lng: -118.3085, rank: 5 },
-  { name: "Avalon Hollywood", lat: 34.1020, lng: -118.3268, rank: 6 },
-  { name: "Break Room 86", lat: 34.0781, lng: -118.3650, rank: 7 },
-  { name: "No Vacancy", lat: 34.0989, lng: -118.3267, rank: 8 },
-  { name: "EP & LP", lat: 34.0789, lng: -118.3661, rank: 9 },
-  { name: "Warwick", lat: 34.1019, lng: -118.3277, rank: 10 },
+  // Hollywood / West Hollywood / Downtown (ranks 1-10)
+  { name: "Academy LA", lat: 34.0479, lng: -118.2565, rank: 1, neighborhood: "Downtown LA" },
+  { name: "Sound Nightclub", lat: 34.0412, lng: -118.2468, rank: 2, neighborhood: "Hollywood" },
+  { name: "Exchange LA", lat: 34.0441, lng: -118.2504, rank: 3, neighborhood: "Downtown LA" },
+  { name: "The Mayan", lat: 34.0493, lng: -118.2577, rank: 4, neighborhood: "Downtown LA" },
+  { name: "Tenants of the Trees", lat: 34.0826, lng: -118.2690, rank: 5, neighborhood: "Silver Lake" }, // Major Silver Lake club
+  { name: "Catch One", lat: 34.0352, lng: -118.3085, rank: 6, neighborhood: "Mid-Wilshire" },
+  { name: "Avalon Hollywood", lat: 34.1020, lng: -118.3268, rank: 7, neighborhood: "Hollywood" },
+  { name: "The Echoplex", lat: 34.0775, lng: -118.2607, rank: 8, neighborhood: "Echo Park" }, // Major Echo Park venue
+  { name: "No Vacancy", lat: 34.0989, lng: -118.3267, rank: 9, neighborhood: "Hollywood" },
+  { name: "Break Room 86", lat: 34.0781, lng: -118.3650, rank: 10, neighborhood: "Koreatown" },
   // Santa Monica / Venice / Westside (ranks 11-18)
-  { name: "The Bungalow", lat: 34.0062, lng: -118.4715, rank: 11 },
-  { name: "The Galley", lat: 34.0082, lng: -118.4889, rank: 12 },
-  { name: "Finn McCool's", lat: 34.0057, lng: -118.4799, rank: 13 },
-  { name: "The Basement Tavern", lat: 34.0134, lng: -118.4917, rank: 14 },
-  { name: "The Roosterfish", lat: 33.9920, lng: -118.4715, rank: 15 },
-  { name: "The Townhouse & Del Monte Speakeasy", lat: 33.9934, lng: -118.4701, rank: 16 },
-  { name: "High Rooftop Lounge", lat: 33.9913, lng: -118.4660, rank: 17 },
-  { name: "Simmzy's Manhattan Beach", lat: 33.8846, lng: -118.4094, rank: 18 },
-  // More Hollywood / DTLA (ranks 19-32)
-  { name: "Nightingale Plaza", lat: 34.0789, lng: -118.3628, rank: 19 },
-  { name: "Spotlight LA", lat: 34.0478, lng: -118.2505, rank: 20 },
-  { name: "Resident", lat: 34.0488, lng: -118.2518, rank: 21 },
-  { name: "Skybar", lat: 34.0949, lng: -118.3853, rank: 22 },
-  { name: "Good Times at Davey Wayne's", lat: 34.0990, lng: -118.3855, rank: 23 },
-  { name: "Seven Grand", lat: 34.0465, lng: -118.2508, rank: 24 },
-  { name: "The Edison", lat: 34.0483, lng: -118.2513, rank: 25 },
-  { name: "The Roger Room", lat: 34.0810, lng: -118.3700, rank: 26 },
-  { name: "Dirty Laundry", lat: 34.0992, lng: -118.3291, rank: 27 },
-  { name: "Clifton's Republic", lat: 34.0466, lng: -118.2507, rank: 28 },
-  { name: "The Argyle", lat: 34.0985, lng: -118.3856, rank: 29 },
-  { name: "Genghis Cohen", lat: 34.0989, lng: -118.3268, rank: 30 },
-  { name: "The Escondite", lat: 34.0488, lng: -118.2506, rank: 31 },
-  { name: "Adults Only", lat: 34.0448, lng: -118.2486, rank: 32 },
+  { name: "The Bungalow", lat: 34.0062, lng: -118.4715, rank: 11, neighborhood: "Santa Monica" },
+  { name: "The Galley", lat: 34.0082, lng: -118.4889, rank: 12, neighborhood: "Santa Monica" },
+  { name: "Finn McCool's", lat: 34.0057, lng: -118.4799, rank: 13, neighborhood: "Santa Monica" },
+  { name: "The Basement Tavern", lat: 34.0134, lng: -118.4917, rank: 14, neighborhood: "Santa Monica" },
+  { name: "The Roosterfish", lat: 33.9920, lng: -118.4715, rank: 15, neighborhood: "Venice" },
+  { name: "The Townhouse & Del Monte Speakeasy", lat: 33.9934, lng: -118.4701, rank: 16, neighborhood: "Venice" },
+  { name: "High Rooftop Lounge", lat: 33.9913, lng: -118.4660, rank: 17, neighborhood: "Venice" },
+  { name: "Simmzy's Manhattan Beach", lat: 33.8846, lng: -118.4094, rank: 18, neighborhood: "Manhattan Beach" },
+  // Silver Lake / Echo Park / Los Feliz / Highland Park (ranks 19-26)
+  { name: "Akbar", lat: 34.0894, lng: -118.2714, rank: 19, neighborhood: "Silver Lake" }, // Legendary bar
+  { name: "The Short Stop", lat: 34.0782, lng: -118.2618, rank: 20, neighborhood: "Echo Park" }, // Dive bar institution
+  { name: "The Black Cat", lat: 34.0841, lng: -118.2689, rank: 21, neighborhood: "Silver Lake" }, // Historic bar
+  { name: "The Dresden", lat: 34.1055, lng: -118.2891, rank: 22, neighborhood: "Los Feliz" }, // Classic lounge
+  { name: "1642", lat: 34.0783, lng: -118.2609, rank: 23, neighborhood: "Echo Park" }, // Cocktail bar
+  { name: "Covell", lat: 34.1045, lng: -118.2859, rank: 24, neighborhood: "Los Feliz" }, // Wine bar
+  { name: "Highland Park Bowl", lat: 34.1118, lng: -118.1924, rank: 25, neighborhood: "Highland Park" }, // Bowling/bar
+  { name: "The York", lat: 34.1089, lng: -118.1916, rank: 26, neighborhood: "Highland Park" }, // Gastropub
+  // More Hollywood / DTLA / WeHo (ranks 27-40)
+  { name: "EP & LP", lat: 34.0789, lng: -118.3661, rank: 27, neighborhood: "West Hollywood" },
+  { name: "Warwick", lat: 34.1019, lng: -118.3277, rank: 28, neighborhood: "Hollywood" },
+  { name: "Nightingale Plaza", lat: 34.0789, lng: -118.3628, rank: 29, neighborhood: "West Hollywood" },
+  { name: "Spotlight LA", lat: 34.0478, lng: -118.2505, rank: 30, neighborhood: "Downtown LA" },
+  { name: "Resident", lat: 34.0488, lng: -118.2518, rank: 31, neighborhood: "Downtown LA" },
+  { name: "Skybar", lat: 34.0949, lng: -118.3853, rank: 32, neighborhood: "West Hollywood" },
+  { name: "Good Times at Davey Wayne's", lat: 34.0990, lng: -118.3855, rank: 33, neighborhood: "Hollywood" },
+  { name: "Seven Grand", lat: 34.0465, lng: -118.2508, rank: 34, neighborhood: "Downtown LA" },
+  { name: "The Edison", lat: 34.0483, lng: -118.2513, rank: 35, neighborhood: "Downtown LA" },
+  { name: "The Roger Room", lat: 34.0810, lng: -118.3700, rank: 36, neighborhood: "West Hollywood" },
+  { name: "Dirty Laundry", lat: 34.0992, lng: -118.3291, rank: 37, neighborhood: "Hollywood" },
+  { name: "Clifton's Republic", lat: 34.0466, lng: -118.2507, rank: 38, neighborhood: "Downtown LA" },
+  { name: "The Argyle", lat: 34.0985, lng: -118.3856, rank: 39, neighborhood: "West Hollywood" },
+  { name: "The Escondite", lat: 34.0488, lng: -118.2506, rank: 40, neighborhood: "Downtown LA" },
 ];
 
 // REMOVED: DEMO_VENUES - these don't exist in the database
@@ -478,7 +487,7 @@ const VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | n
   },
 };
 
-// LA venue-specific reviews (minimal set for key venues)
+// LA venue-specific reviews (including Silver Lake / Echo Park / Los Feliz / Highland Park)
 const LA_VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | null; rating: number }> }> = {
   "Academy LA": {
     reviews: [
@@ -514,6 +523,69 @@ const LA_VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string 
       { text: "Historic venue with character. Multiple levels and balconies.", rating: 4 },
       { text: null, rating: 3 },
       { text: null, rating: 4 },
+    ]
+  },
+  "Tenants of the Trees": {
+    reviews: [
+      { text: "Silver Lake's best kept secret! The outdoor patio is magical. Killer DJs every weekend.", rating: 5 },
+      { text: "Love the tiki bar vibes mixed with warehouse techno. Uniquely LA.", rating: 5 },
+      { text: "The dance floor in the trees is literally in the trees. So cool!", rating: 5 },
+      { text: "Great sound system, friendly crowd, actual dancing. Everything you want.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "The Echoplex": {
+    reviews: [
+      { text: "Best live music venue in Echo Park! The sound is incredible and the crowds know how to party.", rating: 5 },
+      { text: "Seen some legendary shows here. Intimate venue with big energy.", rating: 5 },
+      { text: "The back patio is great for between-set hangs. Real LA music scene vibes.", rating: 4 },
+      { text: "From indie to electronic, they book quality acts. Never disappointed.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Akbar": {
+    reviews: [
+      { text: "Legendary Silver Lake bar! The karaoke nights are iconic. Everyone is welcome.", rating: 5 },
+      { text: "Old school queer bar energy. No pretense, just good vibes and strong drinks.", rating: 5 },
+      { text: "Been coming here for years. It's a community institution.", rating: 5 },
+      { text: "The jukebox is fire and the bartenders know everyone. Classic dive bar.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "The Short Stop": {
+    reviews: [
+      { text: "Echo Park institution! Cheap drinks, great DJ nights, no attitude.", rating: 5 },
+      { text: "Dodgers games on the TVs, hip hop on the speakers. Perfect neighborhood bar.", rating: 4 },
+      { text: "It's a scene without being sceney. Mixed crowd of locals and industry folks.", rating: 4 },
+      { text: "The patio is clutch on hot nights. Strong drinks at fair prices.", rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "The Black Cat": {
+    reviews: [
+      { text: "Historic Silver Lake bar with great cocktails. The live music nights are excellent.", rating: 4 },
+      { text: "Beautiful space with so much history. The food is surprisingly good too.", rating: 4 },
+      { text: "Great date spot with character. The murals and decor tell LA stories.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "The Dresden": {
+    reviews: [
+      { text: "Marty and Elayne are LA legends! Classic lounge vibes from another era.", rating: 5 },
+      { text: "Go for the live music duo, stay for the martinis. Old Hollywood glamour.", rating: 5 },
+      { text: "Featured in Swingers for a reason. Timeless Los Feliz institution.", rating: 4 },
+      { text: "The cocktails are strong and the atmosphere is unmatched. True LA classic.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Highland Park Bowl": {
+    reviews: [
+      { text: "Bowling, pizza, and craft cocktails in a restored 1927 building. Perfect combo!", rating: 5 },
+      { text: "The lanes are fun but the bar is even better. Great date spot.", rating: 4 },
+      { text: "Historic space with modern touches. The ambiance is incredible.", rating: 4 },
+      { text: "Gets packed on weekends but worth the wait. Try the sourdough pizza.", rating: 4 },
+      { text: null, rating: 5 },
     ]
   },
   "EP & LP": {
@@ -791,14 +863,14 @@ Deno.serve(async (req) => {
       
       // Define promoted venues per city
       const NYC_PROMOTED_NAMES = ['Unveiled', 'Studio Maison Nur', 'Little Sister Lounge', 'Patent Pending'];
-      const LA_PROMOTED_NAMES = ['Adults Only', 'Bootleg Theater', 'The Falls', 'The Escondite'];
+      const LA_PROMOTED_NAMES = ['Highland Park Bowl', 'The York', 'The Dresden', 'Covell'];
       const PROMOTED_VENUE_NAMES = city === 'la' ? LA_PROMOTED_NAMES : NYC_PROMOTED_NAMES;
       
       const venuesToInsert = SELECTED_VENUES.map(v => ({
         name: v.name,
         lat: v.lat,
         lng: v.lng,
-        neighborhood: city === 'la' ? 'Los Angeles' : 'Manhattan', // Will be derived from coordinates in production
+        neighborhood: (v as any).neighborhood || (city === 'la' ? 'Los Angeles' : 'Manhattan'),
         type: 'nightclub',
         is_demo: true,
         is_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
