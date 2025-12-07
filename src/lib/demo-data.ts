@@ -60,6 +60,16 @@ export const LA_PROMOTED_VENUES = [
   { name: "The Highlight Room", lat: 34.0907, lng: -118.3871, neighborhood: "Hollywood", type: "lounge" },
   { name: "Create Nightclub", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "club" },
   
+  // Santa Monica / Venice / Westside (NEW - 8 venues)
+  { name: "The Bungalow", lat: 34.0062, lng: -118.4715, neighborhood: "Santa Monica", type: "bar" },
+  { name: "The Galley", lat: 34.0082, lng: -118.4889, neighborhood: "Santa Monica", type: "bar" },
+  { name: "Finn McCool's", lat: 34.0057, lng: -118.4799, neighborhood: "Santa Monica", type: "bar" },
+  { name: "The Basement Tavern", lat: 34.0134, lng: -118.4917, neighborhood: "Santa Monica", type: "bar" },
+  { name: "The Roosterfish", lat: 33.9920, lng: -118.4715, neighborhood: "Venice", type: "bar" },
+  { name: "The Townhouse & Del Monte Speakeasy", lat: 33.9934, lng: -118.4701, neighborhood: "Venice", type: "bar" },
+  { name: "High Rooftop Lounge", lat: 33.9913, lng: -118.4660, neighborhood: "Venice", type: "lounge" },
+  { name: "Simmzy's Manhattan Beach", lat: 33.8846, lng: -118.4094, neighborhood: "Manhattan Beach", type: "bar" },
+  
   // Downtown LA
   { name: "Resident DTLA", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "club" },
   { name: "No Vacancy", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
@@ -79,17 +89,8 @@ export const LA_PROMOTED_VENUES = [
   { name: "Catch LA", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
   { name: "Delilah", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
   { name: "Nightingale Plaza", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
-  { name: "The Piano Bar", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
   { name: "Seven Grand", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "bar" },
   { name: "Dirty Laundry", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
-  { name: "Hyde Sunset", lat: 34.0907, lng: -118.3871, neighborhood: "West Hollywood", type: "lounge" },
-  { name: "On The Rocks", lat: 34.0907, lng: -118.3871, neighborhood: "Sunset Strip", type: "club" },
-  { name: "Bootsy Bellows", lat: 34.0907, lng: -118.3871, neighborhood: "West Hollywood", type: "club" },
-  { name: "Poppy", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
-  
-  // Santa Monica / Westside
-  { name: "Boa Steakhouse", lat: 34.0195, lng: -118.4912, neighborhood: "Santa Monica", type: "lounge" },
-  { name: "The Bungalow", lat: 34.0195, lng: -118.4912, neighborhood: "Santa Monica", type: "bar" },
 ];
 
 // Additional non-promoted demo venues (only appear when full demo mode is ON)
