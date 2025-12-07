@@ -567,22 +567,23 @@ export default function Map() {
     // Add markers for each venue
     venues.forEach((venue, index) => {
       const isTopHot = index < 3 && venue.heatScore > 0;
-      const size = 50; // All pins same size
+      const containerSize = 70; // Larger container to hold glow effect
+      const pinSize = 50; // Actual pin size
       const opacity = venue.heatScore > 0 ? 1 : 0.5;
 
       const el = document.createElement('div');
       el.className = 'venue-marker';
-      el.style.width = `${size}px`;
-      el.style.height = `${size}px`;
+      el.style.width = `${containerSize}px`;
+      el.style.height = `${containerSize}px`;
       el.style.cursor = 'pointer';
       el.style.transition = 'all 0.3s ease';
       
-      // Create venue pin with glow for hot venues
+      // Create venue pin with glow for hot venues - glow fits within container
       el.innerHTML = `
         <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-          ${isTopHot ? `<div style="position: absolute; inset: -10px; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.6) 0%, transparent 70%); animation: pulse 2s infinite;"></div>` : ''}
-          <div style="width: 100%; height: 100%; background: #a855f7; border-radius: 50%; opacity: ${opacity}; box-shadow: 0 0 ${isTopHot ? '30px' : '15px'} rgba(168, 85, 247, ${isTopHot ? '0.9' : '0.6'}); display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255, 255, 255, 0.9);">
-            <svg width="${size * 0.5}" height="${size * 0.5}" viewBox="0 0 24 24" fill="white">
+          ${isTopHot ? `<div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.6) 0%, transparent 70%); animation: pulse 2s infinite;"></div>` : ''}
+          <div style="width: ${pinSize}px; height: ${pinSize}px; background: #a855f7; border-radius: 50%; opacity: ${opacity}; box-shadow: 0 0 ${isTopHot ? '20px' : '10px'} rgba(168, 85, 247, ${isTopHot ? '0.9' : '0.6'}); display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255, 255, 255, 0.9);">
+            <svg width="${pinSize * 0.5}" height="${pinSize * 0.5}" viewBox="0 0 24 24" fill="white">
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
             </svg>
           </div>
