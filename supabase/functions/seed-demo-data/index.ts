@@ -850,16 +850,39 @@ Deno.serve(async (req) => {
       }
       
       // Next 26 users (index 20-45): distribute biased toward top venues
+      // For LA, ensure 40% go to westside venues (ranks 11-18)
+      const LA_WESTSIDE_RANKS = [11, 12, 13, 14, 15, 16, 17, 18];
+      const isLA = city === 'la';
+      const westsideVenues = isLA ? TOP_20_VENUES.filter(v => LA_WESTSIDE_RANKS.includes(v.rank)) : [];
+      const eastsideVenues = isLA ? TOP_20_VENUES.filter(v => !LA_WESTSIDE_RANKS.includes(v.rank)) : TOP_20_VENUES;
+      
       for (let i = 20; i < promotedUserStartIndex; i++) {
         const rand = Math.random();
         let selectedVenue;
         
-        if (rand < 0.5) {
-          selectedVenue = TOP_20_VENUES[Math.floor(Math.random() * 5)];
-        } else if (rand < 0.85) {
-          selectedVenue = TOP_20_VENUES[5 + Math.floor(Math.random() * 10)];
+        if (isLA) {
+          // LA: 40% westside, 60% eastside/Hollywood
+          if (rand < 0.4 && westsideVenues.length > 0) {
+            // Pick random westside venue
+            selectedVenue = westsideVenues[Math.floor(Math.random() * westsideVenues.length)];
+          } else {
+            // Pick random eastside/Hollywood venue with bias toward top ranks
+            const eastRand = Math.random();
+            if (eastRand < 0.5) {
+              selectedVenue = eastsideVenues[Math.floor(Math.random() * Math.min(5, eastsideVenues.length))];
+            } else {
+              selectedVenue = eastsideVenues[Math.floor(Math.random() * eastsideVenues.length)];
+            }
+          }
         } else {
-          selectedVenue = TOP_20_VENUES[15 + Math.floor(Math.random() * 5)];
+          // NYC: original bias logic
+          if (rand < 0.5) {
+            selectedVenue = TOP_20_VENUES[Math.floor(Math.random() * 5)];
+          } else if (rand < 0.85) {
+            selectedVenue = TOP_20_VENUES[5 + Math.floor(Math.random() * 10)];
+          } else {
+            selectedVenue = TOP_20_VENUES[15 + Math.floor(Math.random() * 5)];
+          }
         }
         
         const venueId = venueIdMap.get(selectedVenue.name);
