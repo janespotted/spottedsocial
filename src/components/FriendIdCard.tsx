@@ -4,7 +4,8 @@ import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X } from 'lucide-react';
+import { X, ChevronRight } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MessageCircle, MoreVertical, Flag, Ban, X as CloseIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -47,7 +48,7 @@ interface UserStatus {
 }
 
 export function FriendIdCard() {
-  const { selectedFriend, closeFriendCard } = useFriendIdCard();
+  const { selectedFriend, closeFriendCard, openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
   const { sendMeetUpNotification } = useMeetUp();
   const { user } = useAuth();
@@ -560,23 +561,66 @@ export function FriendIdCard() {
 
               {/* Bottom Row: Friends + Buttons */}
               <div className="flex items-center gap-3">
-                {/* Friends at Venue */}
+              {/* Friends at Venue - Tappable with Popover */}
                 {friendsAtVenue.length > 0 && (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <div className="flex -space-x-2">
-                      {friendsAtVenue.slice(0, 2).map((friend) => (
-                        <Avatar key={friend.user_id} className="h-7 w-7 border-2 border-[#1a0f2e]">
-                          <AvatarImage src={friend.avatar_url || undefined} />
-                          <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                            {friend.display_name[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                      ))}
-                    </div>
-                    {friendsAtVenue.length > 2 && (
-                      <span className="text-white text-sm font-medium">+{friendsAtVenue.length - 2}</span>
-                    )}
-                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-1 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+                        <div className="flex -space-x-2">
+                          {friendsAtVenue.slice(0, 2).map((friend) => (
+                            <Avatar key={friend.user_id} className="h-7 w-7 border-2 border-[#1a0f2e]">
+                              <AvatarImage src={friend.avatar_url || undefined} />
+                              <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                                {friend.display_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                          ))}
+                        </div>
+                        {friendsAtVenue.length > 2 && (
+                          <span className="text-white text-sm font-medium">+{friendsAtVenue.length - 2}</span>
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent 
+                      className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl"
+                      align="start"
+                      side="top"
+                    >
+                      <p className="text-white/60 text-xs px-2 mb-2">
+                        Also here tonight
+                      </p>
+                      <div className="max-h-48 overflow-y-auto space-y-1">
+                        {friendsAtVenue.map((friend) => (
+                          <button
+                            key={friend.user_id}
+                            onClick={() => {
+                              closeFriendCard();
+                              setTimeout(() => {
+                                openFriendCard({
+                                  userId: friend.user_id,
+                                  displayName: friend.display_name,
+                                  avatarUrl: friend.avatar_url,
+                                  venueName: selectedFriend?.venueName || userStatus?.currentVenue,
+                                });
+                              }, 100);
+                            }}
+                            className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
+                          >
+                            <Avatar className="h-8 w-8 border border-[#a855f7]/40">
+                              <AvatarImage src={friend.avatar_url || undefined} />
+                              <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                                {friend.display_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-white text-sm font-medium flex-1 text-left">
+                              {friend.display_name}
+                            </span>
+                            <ChevronRight className="h-4 w-4 text-white/40" />
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 )}
 
                 {/* Action Buttons - Hidden for demo users only when demo mode is OFF (bootstrap/production) */}
