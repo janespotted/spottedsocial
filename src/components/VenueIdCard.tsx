@@ -702,19 +702,23 @@ export function VenueIdCard() {
                 Invite Friends Here
               </Button>
 
-              {/* Secondary CTAs - Icon Row */}
-              <div className="flex gap-2 mb-4 justify-center">
+              {/* Secondary CTAs - Full Width Row */}
+              <div className="flex gap-3 mb-4">
                 <Button
                   onClick={handleMapPinClick}
-                  className="bg-[#a855f7]/20 hover:bg-[#a855f7]/30 text-white border border-[#a855f7]/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all duration-300"
+                  variant="outline"
+                  className="flex-1 bg-[#a855f7]/10 hover:bg-[#a855f7]/20 text-white border border-[#a855f7]/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all duration-300"
                 >
-                  <MapPin className="w-4 h-4" />
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Directions
                 </Button>
                 <Button
                   onClick={handleShareVenue}
-                  className="bg-[#a855f7]/20 hover:bg-[#a855f7]/30 text-white border border-[#a855f7]/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all duration-300"
+                  variant="outline"
+                  className="flex-1 bg-[#a855f7]/10 hover:bg-[#a855f7]/20 text-white border border-[#a855f7]/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all duration-300"
                 >
-                  <Share2 className="w-4 h-4" />
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share
                 </Button>
               </div>
 
