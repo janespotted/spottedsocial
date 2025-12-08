@@ -415,7 +415,7 @@ export function ActivityTab() {
             key={activity.id}
             className={`rounded-2xl p-4 transition-all hover:scale-[1.01] ${CARD_STYLE}`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-start gap-3">
               {/* Icon/Avatar */}
               <div className="flex-shrink-0">
                 {activity.type === 'trending' ? (
@@ -456,13 +456,19 @@ export function ActivityTab() {
                 )}
                 {activity.type === 'venue_invite' && (
                   <div className="text-white text-sm">
-                    <span className="font-semibold">{activity.display_name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
                     <span className="text-[#d4ff00] block text-xs mt-0.5">@{activity.subtitle}</span>
                   </div>
                 )}
                 {activity.type === 'check_in' && (
                   <div className="text-white text-sm">
-                    <span className="font-semibold">{activity.display_name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
                     <span className="text-[#d4ff00] block text-xs mt-0.5">@{activity.subtitle}</span>
                   </div>
                 )}
@@ -527,7 +533,9 @@ export function ActivityTab() {
                   </Button>
                 )}
 
-                <span className="bg-white/10 text-white/60 text-xs px-2 py-1 rounded-full">{getTimeAgo(activity.timestamp)}</span>
+                {(activity.type === 'meet_up' || activity.type === 'trending') && (
+                  <span className="bg-white/10 text-white/60 text-xs px-2 py-1 rounded-full">{getTimeAgo(activity.timestamp)}</span>
+                )}
               </div>
             </div>
           </div>
