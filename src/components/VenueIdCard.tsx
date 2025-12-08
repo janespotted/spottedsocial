@@ -552,6 +552,8 @@ export function VenueIdCard() {
                               alt={`${venue.name} photo ${index + 1}`}
                               className="w-full h-full object-cover"
                             />
+                            {/* Dark gradient overlay at bottom */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
                           </div>
                         </CarouselItem>
                       ))}
