@@ -18,6 +18,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import spottedLogo from '@/assets/spotted-s-logo.png';
+import { logger } from '@/lib/logger';
 
 interface Message {
   id: string;
@@ -85,9 +86,10 @@ export default function Thread() {
         image_url: fileName, // Store path for signed URL generation
       });
 
+      logger.info('dm:image_upload', { threadId });
       toast.success('Image sent!');
     } catch (error) {
-      console.error('Upload error:', error);
+      logger.apiError('dm:image_upload', error);
       toast.error('Failed to send image');
     } finally {
       setIsUploading(false);
@@ -224,12 +226,19 @@ export default function Thread() {
     e.preventDefault();
     if (!newMessage.trim() || !user) return;
 
-    await supabase.from('dm_messages').insert({
+    const { error } = await supabase.from('dm_messages').insert({
       thread_id: threadId,
       sender_id: user.id,
       text: newMessage.trim(),
     });
 
+    if (error) {
+      logger.apiError('dm:send', error);
+      toast.error('Failed to send message');
+      return;
+    }
+
+    logger.dm(threadId!, otherMember?.user_id || 'unknown');
     setNewMessage('');
   };
 

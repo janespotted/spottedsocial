@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { useToast } from '@/hooks/use-toast';
 import { CityBadge } from '@/components/CityBadge';
+import { logger } from '@/lib/logger';
 
 interface FriendLocation {
   user_id: string;
@@ -340,11 +341,13 @@ export default function Map() {
 
       setFriends(friendLocations);
       setIsLoadingFriends(false);
+      
+      logger.mapLoad(friendLocations.length, 0); // Log successful friends fetch
 
       // Fetch venues and calculate heat scores
       await fetchVenuesWithHeatScores(friendIds);
     } catch (error) {
-      console.error('Error fetching friends locations:', error);
+      logger.apiError('map:friends_fetch', error);
       setIsLoadingFriends(false);
     }
   };
@@ -384,8 +387,9 @@ export default function Map() {
       filteredVenues.sort((a, b) => b.heatScore - a.heatScore);
 
       setVenues(filteredVenues);
+      logger.info('map:venues_load', { venueCount: filteredVenues.length, city: cityRef.current });
     } catch (error) {
-      console.error('Error fetching venues:', error);
+      logger.apiError('map:venues_fetch', error);
     }
   };
 
@@ -394,9 +398,11 @@ export default function Map() {
 
     const mapboxToken = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN;
     if (!mapboxToken) {
-      console.error('MAPBOX token missing – set VITE_MAPBOX_PUBLIC_TOKEN in environment');
+      logger.error('map:init_failed', { reason: 'MAPBOX token missing' });
       return;
     }
+    
+    logger.info('map:init', { city });
 
     mapboxgl.accessToken = mapboxToken;
     
