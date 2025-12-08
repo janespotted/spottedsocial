@@ -1,44 +1,44 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-// Real NYC top-tier venues (scraped from top rankings) - ordered by popularity
+// Real NYC top-tier venues (scraped from top rankings) - ordered by popularity with granular neighborhoods
 const NYC_VENUES = [
   // TOP 20 - Most popular venues (will be shown in leaderboard)
-  { name: "Le Bain", lat: 40.7414, lng: -74.0078, rank: 1 },
-  { name: "House of Yes", lat: 40.7089, lng: -73.9332, rank: 2 },
-  { name: "The Box", lat: 40.7216, lng: -73.9935, rank: 3 },
-  { name: "Elsewhere", lat: 40.7067, lng: -73.9278, rank: 4 },
-  { name: "TBA Brooklyn", lat: 40.7234, lng: -73.9567, rank: 5 },
-  { name: "Nowadays", lat: 40.7067, lng: -73.9278, rank: 6 },
-  { name: "Double Chicken Please", lat: 40.7195, lng: -73.9921, rank: 7 },
-  { name: "The Dead Rabbit", lat: 40.7040, lng: -74.0124, rank: 8 },
-  { name: "Dante NYC", lat: 40.7310, lng: -74.0029, rank: 9 },
-  { name: "Attaboy", lat: 40.7185, lng: -73.9885, rank: 10 },
-  { name: "PHD Rooftop", lat: 40.7614, lng: -73.9776, rank: 11 },
-  { name: "230 Fifth", lat: 40.7448, lng: -73.9873, rank: 12 },
-  { name: "Schimanski", lat: 40.7089, lng: -73.9332, rank: 13 },
-  { name: "Good Room", lat: 40.7089, lng: -73.9343, rank: 14 },
-  { name: "Superbueno", lat: 40.7249, lng: -73.9865, rank: 15 },
-  { name: "Sunken Harbor Club", lat: 40.6923, lng: -73.9872, rank: 16 },
-  { name: "schmuck.", lat: 40.7251, lng: -73.9863, rank: 17 },
-  { name: "Public Hotel Rooftop", lat: 40.7252, lng: -73.9881, rank: 18 },
-  { name: "Jean's", lat: 40.7251, lng: -73.9988, rank: 19 },
-  { name: "The Campbell", lat: 40.7527, lng: -73.9772, rank: 20 },
+  { name: "Le Bain", lat: 40.7414, lng: -74.0078, rank: 1, neighborhood: "Meatpacking" },
+  { name: "House of Yes", lat: 40.7089, lng: -73.9332, rank: 2, neighborhood: "Bushwick" },
+  { name: "The Box", lat: 40.7216, lng: -73.9935, rank: 3, neighborhood: "Lower East Side" },
+  { name: "Elsewhere", lat: 40.7067, lng: -73.9278, rank: 4, neighborhood: "Bushwick" },
+  { name: "TBA Brooklyn", lat: 40.7234, lng: -73.9567, rank: 5, neighborhood: "Williamsburg" },
+  { name: "Nowadays", lat: 40.7067, lng: -73.9278, rank: 6, neighborhood: "Ridgewood" },
+  { name: "Double Chicken Please", lat: 40.7195, lng: -73.9921, rank: 7, neighborhood: "Lower East Side" },
+  { name: "The Dead Rabbit", lat: 40.7040, lng: -74.0124, rank: 8, neighborhood: "Financial District" },
+  { name: "Dante NYC", lat: 40.7310, lng: -74.0029, rank: 9, neighborhood: "West Village" },
+  { name: "Attaboy", lat: 40.7185, lng: -73.9885, rank: 10, neighborhood: "Lower East Side" },
+  { name: "PHD Rooftop", lat: 40.7614, lng: -73.9776, rank: 11, neighborhood: "Chelsea" },
+  { name: "230 Fifth", lat: 40.7448, lng: -73.9873, rank: 12, neighborhood: "Flatiron" },
+  { name: "Schimanski", lat: 40.7089, lng: -73.9332, rank: 13, neighborhood: "Williamsburg" },
+  { name: "Good Room", lat: 40.7089, lng: -73.9343, rank: 14, neighborhood: "Greenpoint" },
+  { name: "Superbueno", lat: 40.7249, lng: -73.9865, rank: 15, neighborhood: "East Village" },
+  { name: "Sunken Harbor Club", lat: 40.6923, lng: -73.9872, rank: 16, neighborhood: "Carroll Gardens" },
+  { name: "schmuck.", lat: 40.7251, lng: -73.9863, rank: 17, neighborhood: "East Village" },
+  { name: "Public Hotel Rooftop", lat: 40.7252, lng: -73.9881, rank: 18, neighborhood: "Lower East Side" },
+  { name: "Jean's", lat: 40.7251, lng: -73.9988, rank: 19, neighborhood: "SoHo" },
+  { name: "The Campbell", lat: 40.7527, lng: -73.9772, rank: 20, neighborhood: "Midtown" },
   
   // REMAINING 19 - Less popular, may not appear in demo leaderboard
-  { name: "Bar Snack", lat: 40.7258, lng: -73.9874, rank: 21 },
-  { name: "Saint Tuesday", lat: 40.7169, lng: -73.9982, rank: 22 },
-  { name: "Sunn's", lat: 40.7161, lng: -73.9977, rank: 23 },
-  { name: "The Mulberry", lat: 40.7221, lng: -73.9951, rank: 24 },
-  { name: "Amber Room", lat: 40.7198, lng: -73.9891, rank: 25 },
-  { name: "Patent Pending", lat: 40.7234, lng: -73.9914, rank: 26 },
-  { name: "Ketchy Shuby", lat: 40.7231, lng: -73.9969, rank: 27 },
-  { name: "Gospël", lat: 40.7241, lng: -73.9977, rank: 28 },
-  { name: "Paul's Casablanca", lat: 40.7235, lng: -73.9969, rank: 29 },
-  { name: "Paul's Cocktail Lounge", lat: 40.7171, lng: -74.0089, rank: 30 },
-  { name: "The Nines", lat: 40.7268, lng: -73.9945, rank: 31 },
-  { name: "Little Sister Lounge", lat: 40.7267, lng: -73.9857, rank: 32 },
-  { name: "Unveiled", lat: 40.7106, lng: -73.9638, rank: 33 },
-  { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529, rank: 34 },
+  { name: "Bar Snack", lat: 40.7258, lng: -73.9874, rank: 21, neighborhood: "East Village" },
+  { name: "Saint Tuesday", lat: 40.7169, lng: -73.9982, rank: 22, neighborhood: "SoHo" },
+  { name: "Sunn's", lat: 40.7161, lng: -73.9977, rank: 23, neighborhood: "SoHo" },
+  { name: "The Mulberry", lat: 40.7221, lng: -73.9951, rank: 24, neighborhood: "SoHo" },
+  { name: "Amber Room", lat: 40.7198, lng: -73.9891, rank: 25, neighborhood: "Lower East Side" },
+  { name: "Patent Pending", lat: 40.7234, lng: -73.9914, rank: 26, neighborhood: "Lower East Side" },
+  { name: "Ketchy Shuby", lat: 40.7231, lng: -73.9969, rank: 27, neighborhood: "SoHo" },
+  { name: "Gospël", lat: 40.7241, lng: -73.9977, rank: 28, neighborhood: "SoHo" },
+  { name: "Paul's Casablanca", lat: 40.7235, lng: -73.9969, rank: 29, neighborhood: "SoHo" },
+  { name: "Paul's Cocktail Lounge", lat: 40.7171, lng: -74.0089, rank: 30, neighborhood: "West Village" },
+  { name: "The Nines", lat: 40.7268, lng: -73.9945, rank: 31, neighborhood: "East Village" },
+  { name: "Little Sister Lounge", lat: 40.7267, lng: -73.9857, rank: 32, neighborhood: "East Village" },
+  { name: "Unveiled", lat: 40.7106, lng: -73.9638, rank: 33, neighborhood: "Williamsburg" },
+  { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529, rank: 34, neighborhood: "Bushwick" },
 ];
 
 // LA venues - ordered by popularity (40 venues - includes westside + eastside)
@@ -870,7 +870,7 @@ Deno.serve(async (req) => {
         name: v.name,
         lat: v.lat,
         lng: v.lng,
-        neighborhood: (v as any).neighborhood || (city === 'la' ? 'Los Angeles' : 'Manhattan'),
+        neighborhood: (v as any).neighborhood || 'Unknown',
         type: 'nightclub',
         is_demo: true,
         is_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
@@ -892,85 +892,66 @@ Deno.serve(async (req) => {
       const venueIdMap = new Map(insertedVenues.map(v => [v.name, v.id]));
       console.log(`Inserted ${insertedVenues.length} venues`);
 
-      // 5. Create night statuses - popularity-based distribution
-      console.log('Creating night statuses with popularity-based distribution...');
+      // 5. Create night statuses - distributed across ALL neighborhoods
+      console.log('Creating night statuses distributed across all neighborhoods...');
       
       const nightStatuses = [];
-      const TOP_20_VENUES = SELECTED_VENUES.slice(0, 20); // Top 20 by popularity_rank
       const PROMOTED_VENUES = SELECTED_VENUES.filter(v => PROMOTED_VENUE_NAMES.includes(v.name));
       
-      // Reserve last 4 demo users for promoted venues (ensures promoted venues have activity)
-      const promotedUserStartIndex = demoUserIds.length - 4;
-      
-      // First 20 users: assign one to each top 20 venue (ensures all top 20 have at least 1 user)
-      for (let i = 0; i < 20; i++) {
-        const venue = TOP_20_VENUES[i];
-        const venueId = venueIdMap.get(venue.name);
-        
-        nightStatuses.push({
-          user_id: demoUserIds[i],
-          status: 'out',
-          venue_id: venueId,
-          venue_name: venue.name,
-          lat: venue.lat,
-          lng: venue.lng,
-          expires_at: calculateExpiryTime(),
-          updated_at: getRecentTimestamp(),
-          is_demo: true,
-          is_promoted: false,
-        });
+      // Group venues by neighborhood for even distribution
+      const venuesByNeighborhood = new Map<string, typeof SELECTED_VENUES>();
+      for (const venue of SELECTED_VENUES) {
+        const neighborhood = (venue as any).neighborhood || 'Unknown';
+        if (!venuesByNeighborhood.has(neighborhood)) {
+          venuesByNeighborhood.set(neighborhood, []);
+        }
+        venuesByNeighborhood.get(neighborhood)!.push(venue);
       }
       
-      // Next 26 users (index 20-45): distribute biased toward top venues
-      // For LA, ensure 40% go to westside venues (ranks 11-18)
-      const LA_WESTSIDE_RANKS = [11, 12, 13, 14, 15, 16, 17, 18];
-      const isLA = city === 'la';
-      const westsideVenues = isLA ? TOP_20_VENUES.filter(v => LA_WESTSIDE_RANKS.includes(v.rank)) : [];
-      const eastsideVenues = isLA ? TOP_20_VENUES.filter(v => !LA_WESTSIDE_RANKS.includes(v.rank)) : TOP_20_VENUES;
+      const neighborhoods = Array.from(venuesByNeighborhood.keys());
+      console.log(`Found ${neighborhoods.length} neighborhoods: ${neighborhoods.join(', ')}`);
       
-      for (let i = 20; i < promotedUserStartIndex; i++) {
-        const rand = Math.random();
-        let selectedVenue;
+      // Reserve last 4 demo users for promoted venues
+      const promotedUserStartIndex = demoUserIds.length - 4;
+      
+      // Distribute users across neighborhoods evenly, with bias toward top venues in each
+      let userIndex = 0;
+      const usersPerNeighborhood = Math.floor(promotedUserStartIndex / neighborhoods.length);
+      const extraUsers = promotedUserStartIndex % neighborhoods.length;
+      
+      for (let n = 0; n < neighborhoods.length; n++) {
+        const neighborhood = neighborhoods[n];
+        const neighborhoodVenues = venuesByNeighborhood.get(neighborhood)!;
+        // Sort by rank (lower rank = more popular)
+        neighborhoodVenues.sort((a, b) => a.rank - b.rank);
         
-        if (isLA) {
-          // LA: 40% westside, 60% eastside/Hollywood
-          if (rand < 0.4 && westsideVenues.length > 0) {
-            // Pick random westside venue
-            selectedVenue = westsideVenues[Math.floor(Math.random() * westsideVenues.length)];
-          } else {
-            // Pick random eastside/Hollywood venue with bias toward top ranks
-            const eastRand = Math.random();
-            if (eastRand < 0.5) {
-              selectedVenue = eastsideVenues[Math.floor(Math.random() * Math.min(5, eastsideVenues.length))];
-            } else {
-              selectedVenue = eastsideVenues[Math.floor(Math.random() * eastsideVenues.length)];
-            }
-          }
-        } else {
-          // NYC: original bias logic
-          if (rand < 0.5) {
-            selectedVenue = TOP_20_VENUES[Math.floor(Math.random() * 5)];
-          } else if (rand < 0.85) {
-            selectedVenue = TOP_20_VENUES[5 + Math.floor(Math.random() * 10)];
-          } else {
-            selectedVenue = TOP_20_VENUES[15 + Math.floor(Math.random() * 5)];
-          }
+        // Assign users to this neighborhood
+        const usersForThisNeighborhood = usersPerNeighborhood + (n < extraUsers ? 1 : 0);
+        
+        for (let i = 0; i < usersForThisNeighborhood && userIndex < promotedUserStartIndex; i++) {
+          // Bias toward top venues in neighborhood (first venue gets more users)
+          const venueIndex = Math.min(
+            Math.floor(Math.random() * Math.random() * neighborhoodVenues.length),
+            neighborhoodVenues.length - 1
+          );
+          const selectedVenue = neighborhoodVenues[venueIndex];
+          const venueId = venueIdMap.get(selectedVenue.name);
+          
+          nightStatuses.push({
+            user_id: demoUserIds[userIndex],
+            status: 'out',
+            venue_id: venueId,
+            venue_name: selectedVenue.name,
+            lat: selectedVenue.lat,
+            lng: selectedVenue.lng,
+            expires_at: calculateExpiryTime(),
+            updated_at: getRecentTimestamp(),
+            is_demo: true,
+            is_promoted: false,
+          });
+          
+          userIndex++;
         }
-        
-        const venueId = venueIdMap.get(selectedVenue.name);
-        
-        nightStatuses.push({
-          user_id: demoUserIds[i],
-          status: 'out',
-          venue_id: venueId,
-          venue_name: selectedVenue.name,
-          lat: selectedVenue.lat,
-          lng: selectedVenue.lng,
-          expires_at: calculateExpiryTime(),
-          updated_at: getRecentTimestamp(),
-          is_demo: true,
-          is_promoted: false,
-        });
       }
       
       // Last 4 users (index 46-49): assign to promoted venues (ensures they have activity)
@@ -994,6 +975,7 @@ Deno.serve(async (req) => {
         });
       }
       
+      console.log(`Created ${nightStatuses.length} night statuses across ${neighborhoods.length} neighborhoods`);
       await supabaseAdmin.from('night_statuses').insert(nightStatuses);
 
       // 6. Create check-ins matching the night statuses
