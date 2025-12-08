@@ -713,9 +713,9 @@ export default function Map() {
       } else {
         // Create new marker only if doesn't exist
         const isTopHot = index < 3 && venue.heatScore > 0;
-        // Reduced pin sizes by 40%
-        const containerSize = 42;
-        const pinSize = 30;
+        // Balanced pin sizes - visible but smaller than friends
+        const containerSize = 50;
+        const pinSize = 38;
         const opacity = venue.heatScore > 0 ? 1 : 0.5;
 
         const el = document.createElement('div');
@@ -723,7 +723,7 @@ export default function Map() {
         el.style.width = `${containerSize}px`;
         el.style.height = `${containerSize}px`;
         el.style.cursor = 'pointer';
-        el.style.zIndex = '5'; // Below friend avatars (z-index 50)
+        el.style.zIndex = '15'; // Below friend avatars (z-index 50) but visible
         
         el.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
