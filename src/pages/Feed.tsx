@@ -153,7 +153,7 @@ export default function Feed() {
       )}
 
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#2d1b4e] border-b border-[#4a3566]">
+      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-start justify-between px-6 pt-6 pb-3">
           <div>
             <div className="flex items-center gap-3 mb-1">
