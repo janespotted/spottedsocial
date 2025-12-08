@@ -360,16 +360,26 @@ export default function Leaderboard() {
         .filter(v => v.count > 0)
         .sort((a, b) => b.count - a.count);
 
+      // Priority 4: In demo/bootstrap mode with neighborhood filter, use top-ranked venue from that neighborhood
+      const topNeighborhoodVenue = (bootstrapEnabled || demoEnabled) && selectedNeighborhood && neighborhoodVenues?.[0]
+        ? {
+            venue_name: neighborhoodVenues[0].name,
+            venue_id: neighborhoodVenues[0].id,
+            friends: [] as { user_id: string; display_name: string; avatar_url: string | null }[],
+          }
+        : null;
+
       // Select mover venue with fallback chain
       const moverVenue = openVenuesWithVelocity[0] 
         || openVenuesWithActivity[0] 
-        || ((bootstrapEnabled || demoEnabled) ? anyVenueWithActivity[0] : null);
+        || ((bootstrapEnabled || demoEnabled) ? anyVenueWithActivity[0] : null)
+        || topNeighborhoodVenue;
 
       if (moverVenue) {
         setBiggestMover({
           venue_name: moverVenue.venue_name,
           venue_id: moverVenue.venue_id,
-          friends: moverVenue.friends.slice(0, 3),
+          friends: 'friends' in moverVenue ? moverVenue.friends.slice(0, 3) : [],
         });
       } else {
         setBiggestMover(null);
