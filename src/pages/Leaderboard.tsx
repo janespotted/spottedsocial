@@ -11,7 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { ChevronUp, ChevronDown, Bell, BarChart3 } from 'lucide-react';
+import { ChevronUp, ChevronDown, Bell, BarChart3, ChevronRight } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { CityBadge } from '@/components/CityBadge';
@@ -408,37 +409,59 @@ export default function Leaderboard() {
                     </div>
                   </div>
 
-                  {/* Friend Avatars */}
+                  {/* Friend Avatars with Popover */}
                   <div className="flex-shrink-0 flex items-center">
                     {venue.friends.length > 0 ? (
-                      <>
-                    <div className="flex -space-x-2">
-                          {venue.friends.slice(0, 2).map((friend, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => openFriendCard({
-                                userId: friend.user_id,
-                                displayName: friend.display_name,
-                                avatarUrl: friend.avatar_url,
-                                venueName: venue.venue_name,
-                              })}
-                              className="transition-transform hover:scale-110"
-                            >
-                              <Avatar className="h-6 w-6 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
-                                <AvatarImage src={friend.avatar_url || undefined} />
-                                <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
-                                  {friend.display_name[0]}
-                                </AvatarFallback>
-                              </Avatar>
-                            </button>
-                          ))}
-                        </div>
-                        {venue.friends.length > 2 && (
-                          <span className="ml-1 text-xs text-white/70 font-medium">
-                            +{venue.friends.length - 2}
-                          </span>
-                        )}
-                      </>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
+                            <div className="flex -space-x-2">
+                              {venue.friends.slice(0, 2).map((friend, idx) => (
+                                <Avatar key={idx} className="h-6 w-6 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                                  <AvatarImage src={friend.avatar_url || undefined} />
+                                  <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
+                                    {friend.display_name[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                              ))}
+                            </div>
+                            {venue.friends.length > 2 && (
+                              <span className="ml-1 text-xs text-white/70 font-medium">
+                                +{venue.friends.length - 2}
+                              </span>
+                            )}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl" align="end">
+                          <p className="text-white/60 text-xs px-2 mb-2">Also here tonight</p>
+                          <div className="max-h-48 overflow-y-auto space-y-1">
+                            {venue.friends.map((friend, idx) => (
+                              <button
+                                key={idx}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openFriendCard({
+                                    userId: friend.user_id,
+                                    displayName: friend.display_name,
+                                    avatarUrl: friend.avatar_url,
+                                    venueName: venue.venue_name,
+                                  });
+                                }}
+                                className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
+                              >
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={friend.avatar_url || undefined} />
+                                  <AvatarFallback className="bg-[#a855f7] text-white text-xs">
+                                    {friend.display_name[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-white text-sm flex-1 text-left">{friend.display_name}</span>
+                                <ChevronRight className="h-4 w-4 text-white/40" />
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     ) : null}
                   </div>
 
@@ -496,37 +519,59 @@ export default function Leaderboard() {
                 </div>
               </div>
 
-              {/* Friend Avatars */}
+              {/* Friend Avatars with Popover */}
               <div className="flex-shrink-0 flex items-center">
                 {venue.friends.length > 0 ? (
-                  <>
-                <div className="flex -space-x-2">
-                      {venue.friends.slice(0, 2).map((friend, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => openFriendCard({
-                            userId: friend.user_id,
-                            displayName: friend.display_name,
-                            avatarUrl: friend.avatar_url,
-                            venueName: venue.venue_name,
-                          })}
-                          className="transition-transform hover:scale-110"
-                        >
-                          <Avatar className="h-6 w-6 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
-                            <AvatarImage src={friend.avatar_url || undefined} />
-                            <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
-                              {friend.display_name[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                        </button>
-                      ))}
-                    </div>
-                    {venue.friends.length > 2 && (
-                      <span className="ml-1 text-xs text-white/70 font-medium">
-                        +{venue.friends.length - 2}
-                      </span>
-                    )}
-                  </>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
+                        <div className="flex -space-x-2">
+                          {venue.friends.slice(0, 2).map((friend, idx) => (
+                            <Avatar key={idx} className="h-6 w-6 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                              <AvatarImage src={friend.avatar_url || undefined} />
+                              <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
+                                {friend.display_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                          ))}
+                        </div>
+                        {venue.friends.length > 2 && (
+                          <span className="ml-1 text-xs text-white/70 font-medium">
+                            +{venue.friends.length - 2}
+                          </span>
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl" align="end">
+                      <p className="text-white/60 text-xs px-2 mb-2">Also here tonight</p>
+                      <div className="max-h-48 overflow-y-auto space-y-1">
+                        {venue.friends.map((friend, idx) => (
+                          <button
+                            key={idx}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openFriendCard({
+                                userId: friend.user_id,
+                                displayName: friend.display_name,
+                                avatarUrl: friend.avatar_url,
+                                venueName: venue.venue_name,
+                              });
+                            }}
+                            className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
+                          >
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={friend.avatar_url || undefined} />
+                              <AvatarFallback className="bg-[#a855f7] text-white text-xs">
+                                {friend.display_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-white text-sm flex-1 text-left">{friend.display_name}</span>
+                            <ChevronRight className="h-4 w-4 text-white/40" />
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 ) : null}
               </div>
 
@@ -572,37 +617,59 @@ export default function Leaderboard() {
                 </button>
               </div>
 
-              {/* Friend Avatars */}
+              {/* Friend Avatars with Popover */}
               <div className="flex items-center">
                 {biggestMover.friends.length > 0 ? (
-                  <>
-                    <div className="flex -space-x-2">
-                      {biggestMover.friends.map((friend, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => openFriendCard({
-                            userId: friend.user_id,
-                            displayName: friend.display_name,
-                            avatarUrl: friend.avatar_url,
-                            venueName: biggestMover.venue_name,
-                          })}
-                          className="transition-transform hover:scale-110"
-                        >
-                          <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
-                            <AvatarImage src={friend.avatar_url || undefined} />
-                            <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
-                              {friend.display_name[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                        </button>
-                      ))}
-                    </div>
-                    {biggestMover.friends.length > 3 && (
-                      <span className="ml-3 text-sm text-white font-medium">
-                        +{biggestMover.friends.length - 3}
-                      </span>
-                    )}
-                  </>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
+                        <div className="flex -space-x-2">
+                          {biggestMover.friends.map((friend, idx) => (
+                            <Avatar key={idx} className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
+                              <AvatarImage src={friend.avatar_url || undefined} />
+                              <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                                {friend.display_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                          ))}
+                        </div>
+                        {biggestMover.friends.length > 3 && (
+                          <span className="ml-3 text-sm text-white font-medium">
+                            +{biggestMover.friends.length - 3}
+                          </span>
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl" align="end">
+                      <p className="text-white/60 text-xs px-2 mb-2">Also here tonight</p>
+                      <div className="max-h-48 overflow-y-auto space-y-1">
+                        {biggestMover.friends.map((friend, idx) => (
+                          <button
+                            key={idx}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openFriendCard({
+                                userId: friend.user_id,
+                                displayName: friend.display_name,
+                                avatarUrl: friend.avatar_url,
+                                venueName: biggestMover.venue_name,
+                              });
+                            }}
+                            className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
+                          >
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={friend.avatar_url || undefined} />
+                              <AvatarFallback className="bg-[#a855f7] text-white text-xs">
+                                {friend.display_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-white text-sm flex-1 text-left">{friend.display_name}</span>
+                            <ChevronRight className="h-4 w-4 text-white/40" />
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 ) : (
                   <span className="text-white/40 text-xs">Be the first 👀</span>
                 )}
