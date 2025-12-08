@@ -14,6 +14,7 @@ import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { ImDownProvider } from "./contexts/ImDownContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { FriendIdCard } from "./components/FriendIdCard";
 import { VenueIdCard } from "./components/VenueIdCard";
 import { MeetUpConfirmation } from "./components/MeetUpConfirmation";
@@ -60,12 +61,13 @@ function AutoTracker() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
           <CheckInProvider>
             <FriendIdCardProvider>
               <VenueIdCardProvider>
@@ -215,11 +217,12 @@ const App = () => (
                 </MeetUpProvider>
               </VenueIdCardProvider>
             </FriendIdCardProvider>
-          </CheckInProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+            </CheckInProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
