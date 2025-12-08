@@ -697,20 +697,19 @@ export function VenueIdCard() {
               {/* Primary CTA - Invite Friends */}
               <Button
                 onClick={() => openInviteModal(venue.id, venue.name)}
-                className="w-full mb-3 bg-gradient-to-r from-[#d4ff00] to-[#e5ff4d] text-black font-semibold hover:shadow-[0_0_25px_rgba(212,255,0,0.6)] transition-all duration-300"
+                className="w-full mb-3 bg-gradient-to-r from-[#c4ee00] to-[#d4ff00] text-black font-semibold shadow-[0_2px_8px_rgba(212,255,0,0.25)] hover:shadow-[0_4px_16px_rgba(212,255,0,0.4)] transition-all duration-300"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Invite Friends Here
               </Button>
 
               {/* Secondary CTAs - Icon Row */}
-              <div className="flex gap-2 mb-4">
+              <div className="flex gap-2 mb-4 justify-center">
                 <Button
                   onClick={handleMapPinClick}
-                  className="flex-1 bg-[#a855f7]/20 hover:bg-[#a855f7]/30 text-white border border-[#a855f7]/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all duration-300"
+                  className="bg-[#a855f7]/20 hover:bg-[#a855f7]/30 text-white border border-[#a855f7]/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all duration-300"
                 >
-                  <MapPin className="w-4 h-4 mr-2" />
-                  Directions
+                  <MapPin className="w-4 h-4" />
                 </Button>
                 <Button
                   onClick={handleShareVenue}
