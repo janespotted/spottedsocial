@@ -79,12 +79,6 @@ export default function Home() {
   const [createStoryOpen, setCreateStoryOpen] = useState(false);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // TEMPORARY: Test error boundary - remove after testing
-  const [testError, setTestError] = useState(false);
-  if (testError) {
-    throw new Error('Test error to verify error boundary works!');
-  }
 
   // Store fetch functions in refs to avoid dependency changes causing re-renders
   const fetchFriendsRef = useRef(fetchFriends);
@@ -184,13 +178,6 @@ export default function Home() {
             </div>
             <h2 className="text-3xl font-bold text-white">Newsfeed</h2>
             <p className="text-white/60 text-sm mt-1">Everything disappears by 5am</p>
-            {/* TEMPORARY: Test error boundary - remove after testing */}
-            <button 
-              onClick={() => setTestError(true)}
-              className="mt-2 text-xs bg-destructive/20 text-destructive px-2 py-1 rounded"
-            >
-              🧪 Test Error Boundary
-            </button>
           </div>
           <div className="flex items-center gap-3">
             <button
