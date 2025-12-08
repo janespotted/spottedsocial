@@ -15,6 +15,7 @@ import { ImDownProvider } from "./contexts/ImDownContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { FriendIdCard } from "./components/FriendIdCard";
 import { VenueIdCard } from "./components/VenueIdCard";
 import { MeetUpConfirmation } from "./components/MeetUpConfirmation";
@@ -24,6 +25,7 @@ import { ImDownConfirmation } from "./components/ImDownConfirmation";
 import { NotificationBanner } from "./components/NotificationBanner";
 import { useAuth } from "./contexts/AuthContext";
 import { autoTrackVenue } from "./lib/auto-venue-tracker";
+import { logger } from "./lib/logger";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import InviteLanding from "./pages/InviteLanding";
@@ -52,8 +54,11 @@ function AutoTracker() {
 
   useEffect(() => {
     if (user) {
-      console.log('🔄 App opened - triggering auto venue tracking');
+      logger.debug('app:open', { userId: user.id });
+      logger.setUserId(user.id);
       autoTrackVenue(user.id);
+    } else {
+      logger.setUserId(null);
     }
   }, [user]);
 
@@ -97,7 +102,9 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <Layout>
-                          <Home />
+                          <PageErrorBoundary pageName="Home">
+                            <Home />
+                          </PageErrorBoundary>
                         </Layout>
                       </ProtectedRoute>
                     }
@@ -107,7 +114,9 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <Layout>
-                          <Map />
+                          <PageErrorBoundary pageName="Map">
+                            <Map />
+                          </PageErrorBoundary>
                         </Layout>
                       </ProtectedRoute>
                     }
@@ -117,7 +126,9 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <Layout>
-                          <Leaderboard />
+                          <PageErrorBoundary pageName="Leaderboard">
+                            <Leaderboard />
+                          </PageErrorBoundary>
                         </Layout>
                       </ProtectedRoute>
                     }
@@ -127,7 +138,9 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <Layout>
-                          <Feed />
+                          <PageErrorBoundary pageName="Feed">
+                            <Feed />
+                          </PageErrorBoundary>
                         </Layout>
                       </ProtectedRoute>
                     }
@@ -137,7 +150,9 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <Layout>
-                          <Messages />
+                          <PageErrorBoundary pageName="Messages">
+                            <Messages />
+                          </PageErrorBoundary>
                         </Layout>
                       </ProtectedRoute>
                     }
