@@ -510,7 +510,7 @@ export function VenueIdCard() {
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full z-50 flex items-center justify-center px-4 pointer-events-none">
               {/* Card */}
               <div 
-                className="relative w-full max-w-[390px] max-h-[85vh] flex flex-col bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-in fade-in-0 zoom-in-95"
+                className="relative w-full max-w-[390px] max-h-[85vh] flex flex-col bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-card-lift"
                 {...swipeHandlers}
               >
                 {/* Close button */}
@@ -597,7 +597,7 @@ export function VenueIdCard() {
                   )}
                   {/* Energy Level Bars - Based on total check-ins, only show when venue is open */}
                   {venueHours?.isOpen && totalCheckIns > 0 && (
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#d4ff00]/10 border border-[#d4ff00]/30">
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#d4ff00]/10 border border-[#d4ff00]/30 animate-glow-pulse">
                       {renderEnergyBars(calculateEnergyLevel(totalCheckIns))}
                       <span className="text-xs text-[#d4ff00]/80">{totalCheckIns}</span>
                     </div>
@@ -671,28 +671,30 @@ export function VenueIdCard() {
                       <span className="text-sm text-white/60">Be the first to bring your crew 🎉</span>
                     )}
                   </div>
-                  <button
-                    onClick={() => openInviteModal(venue.id, venue.name)}
-                    className="px-4 py-2 rounded-full bg-[#a855f7] text-white text-sm font-medium hover:bg-[#a855f7]/90 shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all flex items-center gap-2"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    Invite
-                  </button>
                 </div>
               </div>
 
-              {/* Action Buttons Row */}
+              {/* Primary CTA - Invite Friends */}
+              <Button
+                onClick={() => openInviteModal(venue.id, venue.name)}
+                className="w-full mb-3 bg-gradient-to-r from-[#d4ff00] to-[#e5ff4d] text-black font-semibold hover:shadow-[0_0_25px_rgba(212,255,0,0.6)] transition-all duration-300"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Invite Friends Here
+              </Button>
+
+              {/* Secondary CTAs - Icon Row */}
               <div className="flex gap-2 mb-4">
                 <Button
                   onClick={handleMapPinClick}
-                  className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)]"
+                  className="flex-1 bg-[#a855f7]/20 hover:bg-[#a855f7]/30 text-white border border-[#a855f7]/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all duration-300"
                 >
                   <MapPin className="w-4 h-4 mr-2" />
-                  Get Directions
+                  Directions
                 </Button>
                 <Button
                   onClick={handleShareVenue}
-                  className="bg-[#a855f7]/20 hover:bg-[#a855f7]/30 text-white border border-[#a855f7]/40"
+                  className="bg-[#a855f7]/20 hover:bg-[#a855f7]/30 text-white border border-[#a855f7]/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all duration-300"
                 >
                   <Share2 className="w-4 h-4" />
                 </Button>
