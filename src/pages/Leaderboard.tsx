@@ -158,26 +158,37 @@ export default function Leaderboard() {
         promotedQuery = promotedQuery.eq('neighborhood', selectedNeighborhood);
       }
 
-      // If neighborhood is selected in demo mode, also fetch ALL venues in that neighborhood
-      let neighborhoodVenuesQuery = null;
-      if (selectedNeighborhood && demoEnabled) {
-        neighborhoodVenuesQuery = supabase
-          .from('venues')
-          .select('id, name, neighborhood, popularity_rank, is_promoted, opened_at')
-          .eq('city', city)
-          .eq('neighborhood', selectedNeighborhood)
-          .order('popularity_rank', { ascending: true });
+      // In demo/bootstrap mode, fetch top venues to ensure leaderboard is always populated
+      let topVenuesQuery = null;
+      if (demoEnabled || bootstrapEnabled) {
+        if (selectedNeighborhood) {
+          // Fetch ALL venues in the selected neighborhood
+          topVenuesQuery = supabase
+            .from('venues')
+            .select('id, name, neighborhood, popularity_rank, is_promoted, opened_at')
+            .eq('city', city)
+            .eq('neighborhood', selectedNeighborhood)
+            .order('popularity_rank', { ascending: true });
+        } else {
+          // Fetch top 30 venues city-wide by popularity_rank (ensures 20 always show)
+          topVenuesQuery = supabase
+            .from('venues')
+            .select('id, name, neighborhood, popularity_rank, is_promoted, opened_at')
+            .eq('city', city)
+            .order('popularity_rank', { ascending: true })
+            .limit(30);
+        }
       }
 
-      const [promotedVenuesResult, statusesResult, neighborhoodVenuesResult] = await Promise.all([
+      const [promotedVenuesResult, statusesResult, topVenuesResult] = await Promise.all([
         promotedQuery,
         query,
-        neighborhoodVenuesQuery,
+        topVenuesQuery,
       ]);
 
       const promotedVenues = promotedVenuesResult.data;
       const statuses = statusesResult.data;
-      const neighborhoodVenues = neighborhoodVenuesResult?.data;
+      const topVenues = topVenuesResult?.data;
 
     // Calculate if venue is newly opened (within last 3 months)
     const threeMonthsAgo = new Date();
@@ -189,25 +200,25 @@ export default function Leaderboard() {
     // Group by venue, including popularity_rank
     const venueMap = new Map<string, VenueStats & { popularity_rank: number }>();
     
-    // In demo mode with neighborhood filter, add ALL venues in that neighborhood first
-    // This ensures venues appear even with 0 check-ins, ranked by popularity_rank
-    if (selectedNeighborhood && demoEnabled && neighborhoodVenues) {
-      neighborhoodVenues.forEach((venue, index) => {
+    // In demo/bootstrap mode, pre-populate venues from the top venues query
+    // This ensures leaderboard always shows 20 venues even with 0 check-ins
+    if ((demoEnabled || bootstrapEnabled) && topVenues) {
+      topVenues.forEach((venue, index) => {
         const isNewlyOpened = venue.opened_at 
           ? new Date(venue.opened_at) > threeMonthsAgo 
           : false;
         
-        // Calculate energy level based on popularity_rank within neighborhood
-        const neighborhoodRank = index + 1;
+        // Calculate energy level based on ranking position
+        const rank = index + 1;
         let energyLevel = 1;
-        if (neighborhoodRank <= 3) energyLevel = 3;
-        else if (neighborhoodRank <= 6) energyLevel = 2;
+        if (rank <= 7) energyLevel = 3;
+        else if (rank <= 14) energyLevel = 2;
         
         venueMap.set(venue.name, {
           venue_name: venue.name,
           venue_id: venue.id,
           count: 0,
-          rank: neighborhoodRank,
+          rank,
           movement: 'same',
           friends: [],
           energyLevel,
@@ -360,11 +371,11 @@ export default function Leaderboard() {
         .filter(v => v.count > 0)
         .sort((a, b) => b.count - a.count);
 
-      // Priority 4: In demo/bootstrap mode with neighborhood filter, use top-ranked venue from that neighborhood
-      const topNeighborhoodVenue = (bootstrapEnabled || demoEnabled) && selectedNeighborhood && neighborhoodVenues?.[0]
+      // Priority 4: In demo/bootstrap mode, use top-ranked venue from pre-populated list
+      const topNeighborhoodVenue = (bootstrapEnabled || demoEnabled) && topVenues?.[0]
         ? {
-            venue_name: neighborhoodVenues[0].name,
-            venue_id: neighborhoodVenues[0].id,
+            venue_name: topVenues[0].name,
+            venue_id: topVenues[0].id,
             friends: [] as { user_id: string; display_name: string; avatar_url: string | null }[],
           }
         : null;
