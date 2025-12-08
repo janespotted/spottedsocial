@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { haptic } from '@/lib/haptics';
+import { withRetry } from '@/lib/retry';
+import { logger } from '@/lib/logger';
 
 export interface Post {
   id: string;
@@ -87,19 +89,22 @@ export function useFeed(options: UseFeedOptions) {
     if (!userId) return;
 
     try {
-      // Query both directions of friendships
-      const [sentFriendships, receivedFriendships] = await Promise.all([
-        supabase
-          .from('friendships')
-          .select('friend_id')
-          .eq('user_id', userId)
-          .eq('status', 'accepted'),
-        supabase
-          .from('friendships')
-          .select('user_id')
-          .eq('friend_id', userId)
-          .eq('status', 'accepted'),
-      ]);
+      // Query both directions of friendships with retry
+      const [sentFriendships, receivedFriendships] = await withRetry(
+        () => Promise.all([
+          supabase
+            .from('friendships')
+            .select('friend_id')
+            .eq('user_id', userId)
+            .eq('status', 'accepted'),
+          supabase
+            .from('friendships')
+            .select('user_id')
+            .eq('friend_id', userId)
+            .eq('status', 'accepted'),
+        ]),
+        { maxAttempts: 3, onRetry: (attempt) => logger.warn('feed:friends_retry', { attempt }) }
+      );
 
       // Combine friend IDs from both directions
       const friendIds = [
@@ -133,7 +138,7 @@ export function useFeed(options: UseFeedOptions) {
         }
       }
     } catch (error) {
-      console.error('Error fetching friends:', error);
+      logger.apiError('fetchFriends', error);
       // Try cache on error
       const cached = getCachedFriends?.();
       if (cached) setFriends(cached);
@@ -144,12 +149,15 @@ export function useFeed(options: UseFeedOptions) {
     if (!userId) return;
 
     try {
-      // Parallelize: Get venues AND friendships at the same time
-      const [cityVenuesResult, sentFriendships, receivedFriendships] = await Promise.all([
-        supabase.from('venues').select('id, name').eq('city', city || 'nyc'),
-        supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('status', 'accepted'),
-        supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('status', 'accepted'),
-      ]);
+      // Parallelize: Get venues AND friendships at the same time with retry
+      const [cityVenuesResult, sentFriendships, receivedFriendships] = await withRetry(
+        () => Promise.all([
+          supabase.from('venues').select('id, name').eq('city', city || 'nyc'),
+          supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('status', 'accepted'),
+          supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('status', 'accepted'),
+        ]),
+        { maxAttempts: 3, onRetry: (attempt) => logger.warn('feed:posts_retry', { attempt }) }
+      );
       
       const cityVenues = cityVenuesResult.data;
       const cityVenueIds = new Set(cityVenues?.map(v => v.id) || []);
@@ -211,7 +219,7 @@ export function useFeed(options: UseFeedOptions) {
         setLikedPosts(new Set(likes?.map(l => l.post_id) || []));
       }
     } catch (error) {
-      console.error('Error fetching posts:', error);
+      logger.apiError('fetchPosts', error);
       // Try cache on error
       const cached = getCachedPosts?.();
       if (cached) setPosts(cached);
@@ -317,7 +325,7 @@ export function useFeed(options: UseFeedOptions) {
       setStoryUsers(storyUsersList);
       onCacheStories?.(storyUsersList);
     } catch (error) {
-      console.error('Error fetching stories:', error);
+      logger.apiError('fetchStories', error);
       // Try cache on error
       const cached = getCachedStories?.();
       if (cached) setStoryUsers(cached);
