@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CityBadge } from '@/components/CityBadge';
+import { ProfileSkeleton } from '@/components/ProfileSkeleton';
 
 interface WishlistPlace {
   id: string;
@@ -34,6 +35,7 @@ export default function Profile() {
   useAutoVenueTracking(); // Trigger auto-venue tracking on profile view
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [friendsCount, setFriendsCount] = useState(0);
   const [placesCount, setPlacesCount] = useState(0);
   const [isLocationSharing, setIsLocationSharing] = useState(false);
@@ -74,7 +76,7 @@ export default function Profile() {
   }, [user]);
 
   const fetchProfileData = async () => {
-    // Fetch profile
+    setLoading(true);
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
@@ -168,6 +170,7 @@ export default function Profile() {
     }
 
     setRecentSpots(uniqueRecentSpots);
+    setLoading(false);
   };
 
   const handleLocationSharingChange = async (value: string) => {
@@ -230,6 +233,10 @@ export default function Profile() {
     'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=400',
     'https://images.unsplash.com/photo-1569949381669-ecf31ae8e613?w=400',
   ];
+
+  if (loading) {
+    return <ProfileSkeleton />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">

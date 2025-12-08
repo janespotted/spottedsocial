@@ -2,6 +2,7 @@ import { ReactNode, useEffect } from 'react';
 import { BottomNav } from './BottomNav';
 import { CheckInModal } from './CheckInModal';
 import { OnboardingCarousel } from './OnboardingCarousel';
+import { OfflineBanner } from './OfflineBanner';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
@@ -52,6 +53,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background pb-16">
+      <OfflineBanner />
       <main className="max-w-[430px] mx-auto">
         {children}
       </main>
