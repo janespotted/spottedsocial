@@ -158,13 +158,26 @@ export default function Leaderboard() {
         promotedQuery = promotedQuery.eq('neighborhood', selectedNeighborhood);
       }
 
-      const [promotedVenuesResult, statusesResult] = await Promise.all([
+      // If neighborhood is selected in demo mode, also fetch ALL venues in that neighborhood
+      let neighborhoodVenuesQuery = null;
+      if (selectedNeighborhood && demoEnabled) {
+        neighborhoodVenuesQuery = supabase
+          .from('venues')
+          .select('id, name, neighborhood, popularity_rank, is_promoted, opened_at')
+          .eq('city', city)
+          .eq('neighborhood', selectedNeighborhood)
+          .order('popularity_rank', { ascending: true });
+      }
+
+      const [promotedVenuesResult, statusesResult, neighborhoodVenuesResult] = await Promise.all([
         promotedQuery,
         query,
+        neighborhoodVenuesQuery,
       ]);
 
       const promotedVenues = promotedVenuesResult.data;
       const statuses = statusesResult.data;
+      const neighborhoodVenues = neighborhoodVenuesResult?.data;
 
     // Calculate if venue is newly opened (within last 3 months)
     const threeMonthsAgo = new Date();
@@ -176,8 +189,40 @@ export default function Leaderboard() {
     // Group by venue, including popularity_rank
     const venueMap = new Map<string, VenueStats & { popularity_rank: number }>();
     
-    // First, add promoted venues to ensure they always appear (even with 0 check-ins)
+    // In demo mode with neighborhood filter, add ALL venues in that neighborhood first
+    // This ensures venues appear even with 0 check-ins, ranked by popularity_rank
+    if (selectedNeighborhood && demoEnabled && neighborhoodVenues) {
+      neighborhoodVenues.forEach((venue, index) => {
+        const isNewlyOpened = venue.opened_at 
+          ? new Date(venue.opened_at) > threeMonthsAgo 
+          : false;
+        
+        // Calculate energy level based on popularity_rank within neighborhood
+        const neighborhoodRank = index + 1;
+        let energyLevel = 1;
+        if (neighborhoodRank <= 3) energyLevel = 3;
+        else if (neighborhoodRank <= 6) energyLevel = 2;
+        
+        venueMap.set(venue.name, {
+          venue_name: venue.name,
+          venue_id: venue.id,
+          count: 0,
+          rank: neighborhoodRank,
+          movement: 'same',
+          friends: [],
+          energyLevel,
+          isPromoted: venue.is_promoted,
+          isNewlyOpened,
+          popularity_rank: venue.popularity_rank || 999,
+          recentCheckinCount: 0,
+        });
+      });
+    }
+    
+    // Add promoted venues to ensure they always appear (even with 0 check-ins)
     promotedVenues?.forEach((venue) => {
+      if (venueMap.has(venue.name)) return; // Skip if already added from neighborhood venues
+      
       const isNewlyOpened = venue.opened_at 
         ? new Date(venue.opened_at) > threeMonthsAgo 
         : false;
