@@ -535,7 +535,7 @@ export default function Map() {
       el.style.width = '52px';
       el.style.height = '52px';
       el.style.cursor = 'pointer';
-      el.style.zIndex = '20';
+      el.style.zIndex = '50'; // High z-index to stay above venue markers
       
       const ringColors = {
         close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.35)', badge: '💛' },
@@ -595,7 +595,7 @@ export default function Map() {
         el.style.width = '70px';
         el.style.height = '70px';
         el.style.cursor = 'pointer';
-        el.style.zIndex = '25';
+        el.style.zIndex = '55'; // Above individual friend avatars
         
         const displayFriends = cluster.slice(0, 3);
         const remainingCount = cluster.length - 3;
@@ -670,10 +670,22 @@ export default function Map() {
     });
   }, [friends, isLoadingFriends, currentZoom, expandedClusters]);
 
-  // Filter venues based on selected filter
-  const filteredVenues = venueFilter === 'all' 
+  // Determine how many venues to show based on zoom level
+  const getVisibleVenueCount = (zoom: number): number => {
+    if (zoom < 13) return 0;        // Only friends visible
+    if (zoom < 14) return 10;       // Top 10 hot venues
+    if (zoom < 15) return 30;       // Top 30 venues  
+    if (zoom < 16) return 75;       // Top 75 venues
+    return Infinity;                 // All venues
+  };
+
+  // Filter venues based on selected filter and zoom level
+  const typeFilteredVenues = venueFilter === 'all' 
     ? venues 
     : venues.filter(v => v.type === venueFilter);
+  
+  const visibleCount = getVisibleVenueCount(currentZoom);
+  const filteredVenues = typeFilteredVenues.slice(0, visibleCount);
 
   // Render venue markers with smart diffing (like friend avatars)
   useEffect(() => {
@@ -700,8 +712,9 @@ export default function Map() {
       } else {
         // Create new marker only if doesn't exist
         const isTopHot = index < 3 && venue.heatScore > 0;
-        const containerSize = 70;
-        const pinSize = 50;
+        // Reduced pin sizes by 40%
+        const containerSize = 42;
+        const pinSize = 30;
         const opacity = venue.heatScore > 0 ? 1 : 0.5;
 
         const el = document.createElement('div');
@@ -709,12 +722,12 @@ export default function Map() {
         el.style.width = `${containerSize}px`;
         el.style.height = `${containerSize}px`;
         el.style.cursor = 'pointer';
-        el.style.zIndex = '10'; // Below friend avatars
+        el.style.zIndex = '5'; // Below friend avatars (z-index 50)
         
         el.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
             ${isTopHot ? `<div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.3) 0%, transparent 70%); animation: pulse 2s infinite;"></div>` : ''}
-            <div style="width: ${pinSize}px; height: ${pinSize}px; background: #a855f7; border-radius: 50%; opacity: ${opacity}; box-shadow: 0 0 ${isTopHot ? '8px' : '4px'} rgba(168, 85, 247, ${isTopHot ? '0.5' : '0.3'}); display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255, 255, 255, 0.8);">
+            <div style="width: ${pinSize}px; height: ${pinSize}px; background: #a855f7; border-radius: 50%; opacity: ${opacity}; box-shadow: 0 0 ${isTopHot ? '6px' : '3px'} rgba(168, 85, 247, ${isTopHot ? '0.5' : '0.3'}); display: flex; align-items: center; justify-content: center; border: 1.5px solid rgba(255, 255, 255, 0.8);">
               <svg width="${pinSize * 0.5}" height="${pinSize * 0.5}" viewBox="0 0 24 24" fill="white">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
               </svg>
