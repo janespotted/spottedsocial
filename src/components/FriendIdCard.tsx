@@ -413,7 +413,7 @@ export function FriendIdCard() {
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full z-[60] flex items-center justify-center px-4 pointer-events-none">
               {/* Card */}
               <div 
-                className="relative w-full max-w-[390px] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-in fade-in-0 zoom-in-95"
+                className="relative w-full max-w-[390px] bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-card-lift"
                 {...swipeHandlers}
               >
                 {/* Close button */}

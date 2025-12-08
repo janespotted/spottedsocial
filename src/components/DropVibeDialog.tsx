@@ -163,7 +163,7 @@ export function DropVibeDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="bg-[#1a0f2e] border-[#a855f7]/40 text-white max-w-md">
+      <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-[#a855f7]/40 text-white max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2">
             {viewMode !== 'select' && (
