@@ -352,7 +352,11 @@ export default function Home() {
                   <img 
                     src={post.image_url} 
                     alt="Post" 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    onError={(e) => {
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) parent.style.display = 'none';
+                    }}
                   />
                 </div>
               )}
