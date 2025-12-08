@@ -1,10 +1,53 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, User, Bell, Lock, HelpCircle, Info } from 'lucide-react';
+import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { toast } from 'sonner';
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { 
+    isSupported, 
+    permission, 
+    isSubscribed, 
+    isLoading, 
+    subscribe, 
+    unsubscribe 
+  } = usePushNotifications();
+  const [isToggling, setIsToggling] = useState(false);
+
+  const handlePushToggle = async (enabled: boolean) => {
+    setIsToggling(true);
+    try {
+      if (enabled) {
+        const success = await subscribe();
+        if (success) {
+          toast.success('Push notifications enabled! 🔔');
+        } else if (permission === 'denied') {
+          toast.error('Notifications blocked. Please enable in browser settings.');
+        }
+      } else {
+        const success = await unsubscribe();
+        if (success) {
+          toast.success('Push notifications disabled');
+        }
+      }
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  const getPushStatus = () => {
+    if (!isSupported) return { label: 'Not supported', color: 'text-white/40' };
+    if (permission === 'denied') return { label: 'Blocked in browser', color: 'text-red-400' };
+    if (isSubscribed) return { label: 'Enabled', color: 'text-green-400' };
+    return { label: 'Disabled', color: 'text-white/60' };
+  };
+
+  const pushStatus = getPushStatus();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
@@ -42,7 +85,37 @@ export default function Settings() {
           </button>
         </Card>
 
-        {/* Notifications Section */}
+        {/* Push Notifications Section */}
+        <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
+                <Bell className="h-5 w-5 text-[#a855f7]" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-white">Push Notifications</h3>
+                <p className={`text-sm ${pushStatus.color}`}>
+                  {pushStatus.label}
+                </p>
+              </div>
+            </div>
+            {isSupported && permission !== 'denied' && (
+              <Switch
+                checked={isSubscribed}
+                onCheckedChange={handlePushToggle}
+                disabled={isLoading || isToggling}
+              />
+            )}
+            {permission === 'denied' && (
+              <X className="h-5 w-5 text-red-400" />
+            )}
+            {!isSupported && (
+              <span className="text-white/40 text-xs">Browser not supported</span>
+            )}
+          </div>
+        </Card>
+
+        {/* Activity Notifications Section */}
         <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
           <button
             onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
@@ -53,8 +126,8 @@ export default function Settings() {
                 <Bell className="h-5 w-5 text-[#a855f7]" />
               </div>
               <div className="text-left">
-                <h3 className="font-semibold text-white">Notifications</h3>
-                <p className="text-white/60 text-sm">Manage notification preferences</p>
+                <h3 className="font-semibold text-white">Activity</h3>
+                <p className="text-white/60 text-sm">View your notification history</p>
               </div>
             </div>
           </button>
