@@ -101,7 +101,7 @@ export function ReportDialog({ open, onOpenChange, reportType, targetId, targetN
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[90%] max-w-[400px] bg-[#1a0f2e] border-[#a855f7]/40 rounded-2xl">
+      <DialogContent className="w-[90%] max-w-[400px] bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-[#a855f7]/40 rounded-2xl">
         <DialogHeader>
           <DialogTitle className="text-white">{getTitle()}</DialogTitle>
           <DialogDescription className="text-white/60">

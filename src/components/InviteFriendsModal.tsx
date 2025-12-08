@@ -116,7 +116,7 @@ export function InviteFriendsModal() {
         setSelectedFriends(new Set());
       }
     }}>
-      <DialogContent className="w-[90%] max-w-[400px] max-h-[80vh] bg-[#1a0f2e]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
+      <DialogContent className="w-[90%] max-w-[400px] max-h-[80vh] bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
         <div className="p-5">
           {/* Header */}
           <div className="mb-4">

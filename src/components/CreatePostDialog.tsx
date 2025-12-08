@@ -199,7 +199,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#1a0f2e] border-2 border-[#a855f7]/40 text-white max-w-md">
+      <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 text-white max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-[#d4ff00]">Create Post</DialogTitle>
         </DialogHeader>
