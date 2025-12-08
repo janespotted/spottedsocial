@@ -5,6 +5,7 @@ import { useDemoMode } from '@/hooks/useDemoMode';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { logEvent } from '@/lib/event-logger';
+import { triggerPushNotification } from '@/lib/push-notifications';
 
 interface VenueInviteContextType {
   showInviteModal: boolean;
@@ -80,11 +81,23 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
         message: `${senderFirstName} invited you to ${venueName}. Want to go?`
       }));
 
-      const { error } = await supabase
+      const { data: insertedNotifications, error } = await supabase
         .from('notifications')
-        .insert(notifications);
+        .insert(notifications)
+        .select();
 
       if (error) throw error;
+
+      // Trigger push notifications for each recipient (best-effort, non-blocking)
+      insertedNotifications?.forEach((notification) => {
+        triggerPushNotification({
+          id: notification.id,
+          receiver_id: notification.receiver_id,
+          sender_id: notification.sender_id,
+          type: notification.type,
+          message: notification.message,
+        });
+      });
 
       // Log invite sent
       logEvent('invite_sent', {

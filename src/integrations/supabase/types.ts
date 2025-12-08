@@ -630,6 +630,8 @@ export type Database = {
           last_known_lng: number | null
           last_location_at: string | null
           location_sharing_level: string | null
+          push_enabled: boolean | null
+          push_subscription: Json | null
           username: string
         }
         Insert: {
@@ -647,6 +649,8 @@ export type Database = {
           last_known_lng?: number | null
           last_location_at?: string | null
           location_sharing_level?: string | null
+          push_enabled?: boolean | null
+          push_subscription?: Json | null
           username: string
         }
         Update: {
@@ -664,6 +668,8 @@ export type Database = {
           last_known_lng?: number | null
           last_location_at?: string | null
           location_sharing_level?: string | null
+          push_enabled?: boolean | null
+          push_subscription?: Json | null
           username?: string
         }
         Relationships: []
