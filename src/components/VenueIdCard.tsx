@@ -497,7 +497,7 @@ export function VenueIdCard() {
           <div
             key={bar}
             className={`w-1.5 rounded-sm transition-all ${barHeights[index]} ${
-              bar <= level ? 'bg-[#d4ff00]' : 'bg-white/20'
+              bar <= level ? 'bg-white' : 'bg-white/20'
             }`}
           />
         ))}
@@ -616,10 +616,9 @@ export function VenueIdCard() {
                     </span>
                   )}
                   {/* Energy Level Bars - Based on total check-ins, only show when venue is open */}
-                  {venueHours?.isOpen && totalCheckIns > 0 && (
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#d4ff00]/10 border border-[#d4ff00]/30 animate-glow-pulse">
+                  {venueHours?.isOpen && (
+                    <div className="flex-shrink-0">
                       {renderEnergyBars(calculateEnergyLevel(totalCheckIns))}
-                      <span className="text-xs text-[#d4ff00]/80">{totalCheckIns}</span>
                     </div>
                   )}
                 </div>
