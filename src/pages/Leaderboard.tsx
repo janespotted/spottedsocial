@@ -279,24 +279,37 @@ export default function Leaderboard() {
 
     setVenues(finalVenues);
 
-      // Set biggest mover based on check-in velocity (only from OPEN venues)
+      // Set biggest mover with fallback logic for demo/bootstrap mode
+      // Priority 1: Open venues with recent velocity (check-ins in last 30 mins)
       const openVenuesWithVelocity = nonPromotedVenues
-        .filter(venue => {
-          // Only include venues that are currently open
-          return isVenueOpen(venue.operatingHours || null);
-        })
-        .filter(v => v.recentCheckinCount > 0) // Must have recent activity
-        .sort((a, b) => b.recentCheckinCount - a.recentCheckinCount); // Sort by velocity (highest first)
+        .filter(venue => isVenueOpen(venue.operatingHours || null))
+        .filter(v => v.recentCheckinCount > 0)
+        .sort((a, b) => b.recentCheckinCount - a.recentCheckinCount);
 
-      if (openVenuesWithVelocity.length > 0) {
-        const moverVenue = openVenuesWithVelocity[0]; // Highest velocity
+      // Priority 2: Open venues with any activity
+      const openVenuesWithActivity = nonPromotedVenues
+        .filter(venue => isVenueOpen(venue.operatingHours || null))
+        .filter(v => v.count > 0)
+        .sort((a, b) => b.count - a.count);
+
+      // Priority 3: Any venue with activity (fallback for demo/bootstrap when no venues are "open")
+      const anyVenueWithActivity = nonPromotedVenues
+        .filter(v => v.count > 0)
+        .sort((a, b) => b.count - a.count);
+
+      // Select mover venue with fallback chain
+      const moverVenue = openVenuesWithVelocity[0] 
+        || openVenuesWithActivity[0] 
+        || ((bootstrapEnabled || demoEnabled) ? anyVenueWithActivity[0] : null);
+
+      if (moverVenue) {
         setBiggestMover({
           venue_name: moverVenue.venue_name,
           venue_id: moverVenue.venue_id,
           friends: moverVenue.friends.slice(0, 3),
         });
       } else {
-        setBiggestMover(null); // No open venues with recent activity
+        setBiggestMover(null);
       }
     } finally {
       setIsLoading(false);
