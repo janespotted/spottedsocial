@@ -582,7 +582,7 @@ export function FriendIdCard() {
                       </button>
                     </PopoverTrigger>
                     <PopoverContent 
-                      className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl"
+                      className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl z-[70]"
                       align="start"
                       side="top"
                     >
