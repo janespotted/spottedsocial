@@ -59,6 +59,19 @@ interface BuzzItemData {
   };
 }
 
+const getVenueTypeDisplay = (type: string) => {
+  const typeMap: Record<string, { label: string; emoji: string; color: string }> = {
+    'bar': { label: 'Bar', emoji: '🍺', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+    'cocktail_bar': { label: 'Cocktail Lounge', emoji: '🍸', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+    'nightclub': { label: 'Club', emoji: '🎉', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
+    'rooftop': { label: 'Rooftop', emoji: '🌃', color: 'bg-teal-500/20 text-teal-400 border-teal-500/30' },
+    'speakeasy': { label: 'Speakeasy', emoji: '🕵️', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+    'lounge': { label: 'Lounge', emoji: '🛋️', color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
+    'dive_bar': { label: 'Dive Bar', emoji: '🍻', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+  };
+  return typeMap[type] || { label: type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), emoji: '📍', color: 'bg-white/10 text-white/70 border-white/20' };
+};
+
 export function VenueIdCard() {
   const { selectedVenueId, closeVenueCard, openVenueCard } = useVenueIdCard();
   const { openFriendCard } = useFriendIdCard();
@@ -575,11 +588,18 @@ export function VenueIdCard() {
 
               {/* Venue Info */}
               <div className="mb-4">
-                <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start justify-between mb-1">
                   <h2 className="text-2xl font-bold text-white flex-1">
                     {venue.name}
                   </h2>
                 </div>
+
+                {/* Venue Type Badge */}
+                {venue.type && (
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border mb-2 ${getVenueTypeDisplay(venue.type).color}`}>
+                    {getVenueTypeDisplay(venue.type).emoji} {getVenueTypeDisplay(venue.type).label}
+                  </span>
+                )}
 
                 <div className="flex items-center gap-2 mb-2">
                   <p className="text-sm text-white/60 italic">
