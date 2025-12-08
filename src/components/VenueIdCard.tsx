@@ -6,11 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { MapPin, ChevronDown, UserPlus, X as CloseIcon, Share2, MoreVertical, Flag } from 'lucide-react';
 import {
   DropdownMenu,
@@ -608,34 +609,58 @@ export function VenueIdCard() {
                   <div className="flex items-center gap-3">
                     {friendsAtVenue.length > 0 ? (
                       <>
-                        <div className="flex -space-x-2">
-                          {visibleFriends.map((friend) => (
-                            <button
-                              key={friend.id}
-                              onClick={() => openFriendCard({
-                                userId: friend.id,
-                                displayName: friend.display_name,
-                                avatarUrl: friend.avatar_url,
-                                venueName: venue.name,
-                                lat: venue.lat,
-                                lng: venue.lng,
-                              })}
-                              className="hover:scale-110 transition-transform"
-                            >
-                              <Avatar className="w-10 h-10 border-2 border-[#0a0118]">
-                                <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
-                                <AvatarFallback className="bg-[#a855f7] text-white">
-                                  {friend.display_name[0]}
-                                </AvatarFallback>
-                              </Avatar>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="flex -space-x-2 cursor-pointer hover:opacity-90 transition-opacity">
+                              {visibleFriends.map((friend) => (
+                                <Avatar key={friend.id} className="w-10 h-10 border-2 border-[#0a0118]">
+                                  <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                                  <AvatarFallback className="bg-[#a855f7] text-white">
+                                    {friend.display_name[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                              ))}
+                              {remainingCount > 0 && (
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#a855f7]/30 border-2 border-[#0a0118] text-xs text-white">
+                                  +{remainingCount}
+                                </div>
+                              )}
                             </button>
-                          ))}
-                          {remainingCount > 0 && (
-                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#a855f7]/30 border-2 border-[#0a0118] text-xs text-white">
-                              +{remainingCount}
+                          </PopoverTrigger>
+                          <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl" align="start">
+                            <p className="text-white/60 text-xs px-2 mb-2">
+                              Friends at {venue.name}
+                            </p>
+                            <div className="max-h-48 overflow-y-auto space-y-1">
+                              {friendsAtVenue.map((friend) => (
+                                <button
+                                  key={friend.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openFriendCard({
+                                      userId: friend.id,
+                                      displayName: friend.display_name,
+                                      avatarUrl: friend.avatar_url,
+                                      venueName: venue.name,
+                                      lat: venue.lat,
+                                      lng: venue.lng,
+                                    });
+                                  }}
+                                  className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
+                                >
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                                    <AvatarFallback className="bg-[#a855f7] text-white text-xs">
+                                      {friend.display_name[0]}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-white text-sm flex-1 text-left">{friend.display_name}</span>
+                                  <ChevronRight className="h-4 w-4 text-white/40" />
+                                </button>
+                              ))}
                             </div>
-                          )}
-                        </div>
+                          </PopoverContent>
+                        </Popover>
                         <span className="text-sm text-white/60">
                           {friendsAtVenue.length} friend{friendsAtVenue.length !== 1 ? 's' : ''} here
                         </span>
