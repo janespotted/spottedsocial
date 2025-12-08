@@ -18,7 +18,8 @@ import { useNotifications } from '@/contexts/NotificationsContext';
 import { CityBadge } from '@/components/CityBadge';
 import { LeaderboardSkeleton } from '@/components/LeaderboardSkeleton';
 import { isVenueOpen, VenueHours } from '@/lib/venue-hours';
-
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { CITY_NEIGHBORHOODS, getCityLabel } from '@/lib/city-neighborhoods';
 interface VenueStats {
   venue_name: string;
   venue_id: string | null;
@@ -61,6 +62,12 @@ export default function Leaderboard() {
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
+
+  // Reset neighborhood filter when city changes
+  useEffect(() => {
+    setSelectedNeighborhood(null);
+  }, [city]);
 
   const calculateEnergyLevel = (
     rank: number, 
@@ -102,7 +109,7 @@ export default function Leaderboard() {
     if (user) {
       fetchLeaderboard();
     }
-  }, [user, demoEnabled, bootstrapEnabled, city]);
+  }, [user, demoEnabled, bootstrapEnabled, city, selectedNeighborhood]);
 
   const fetchLeaderboard = async () => {
     setIsLoading(true);
@@ -130,6 +137,11 @@ export default function Leaderboard() {
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString());
 
+      // Apply neighborhood filter if selected
+      if (selectedNeighborhood) {
+        query = query.eq('venues.neighborhood', selectedNeighborhood);
+      }
+
       // Hybrid mode: show real data + ALL demo data to populate leaderboard
       if (bootstrapEnabled && !demoEnabled) {
         // Show everything (both real and demo) to ensure leaderboard is populated
@@ -141,8 +153,13 @@ export default function Leaderboard() {
       // If demoEnabled is true, show everything (no filter)
 
       // Parallelize: fetch promoted venues AND night statuses at the same time
+      let promotedQuery = supabase.from('venues').select('id, name, popularity_rank, is_promoted, opened_at, neighborhood').eq('is_promoted', true).eq('city', city);
+      if (selectedNeighborhood) {
+        promotedQuery = promotedQuery.eq('neighborhood', selectedNeighborhood);
+      }
+
       const [promotedVenuesResult, statusesResult] = await Promise.all([
-        supabase.from('venues').select('id, name, popularity_rank, is_promoted, opened_at').eq('is_promoted', true).eq('city', city),
+        promotedQuery,
         query,
       ]);
 
@@ -345,7 +362,41 @@ export default function Leaderboard() {
               <CityBadge />
             </div>
             <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
-            <p className="text-white/60 text-sm mt-1">Top Places to Go Out Now</p>
+            
+            {/* Neighborhood Filter Dropdown */}
+            <div className="mt-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 px-4 py-2 bg-[#a855f7]/20 hover:bg-[#a855f7]/30 rounded-full text-white text-sm border border-[#a855f7]/40 transition-all">
+                    <span>{selectedNeighborhood || `All ${getCityLabel(city)}`}</span>
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-[#1a0f2e] border border-[#a855f7]/40 max-h-64 overflow-y-auto">
+                  <DropdownMenuItem
+                    onClick={() => setSelectedNeighborhood(null)}
+                    className="text-white hover:bg-[#a855f7]/20 focus:bg-[#a855f7]/20 cursor-pointer"
+                  >
+                    All {getCityLabel(city)}
+                  </DropdownMenuItem>
+                  {(CITY_NEIGHBORHOODS[city] || []).map((neighborhood) => (
+                    <DropdownMenuItem
+                      key={neighborhood}
+                      onClick={() => setSelectedNeighborhood(neighborhood)}
+                      className="text-white hover:bg-[#a855f7]/20 focus:bg-[#a855f7]/20 cursor-pointer"
+                    >
+                      {neighborhood}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            
+            <p className="text-white/60 text-sm mt-2">
+              {selectedNeighborhood 
+                ? `Top 20 Tonight: ${selectedNeighborhood}`
+                : 'Top Places to Go Out Now'}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <button
