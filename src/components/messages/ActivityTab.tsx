@@ -455,18 +455,16 @@ export function ActivityTab() {
                   </p>
                 )}
                 {activity.type === 'venue_invite' && (
-                  <p className="text-white text-sm">
+                  <div className="text-white text-sm">
                     <span className="font-semibold">{activity.display_name}</span>
-                    <span className="text-white/70"> invited you to </span>
-                    <span className="font-semibold text-[#d4ff00]">{activity.subtitle}</span>
-                  </p>
+                    <span className="text-[#d4ff00] block text-xs mt-0.5">@{activity.subtitle}</span>
+                  </div>
                 )}
                 {activity.type === 'check_in' && (
-                  <p className="text-white text-sm">
+                  <div className="text-white text-sm">
                     <span className="font-semibold">{activity.display_name}</span>
-                    <span className="text-white/70"> is at </span>
-                    <span className="font-semibold text-[#d4ff00]">{activity.subtitle}</span>
-                  </p>
+                    <span className="text-[#d4ff00] block text-xs mt-0.5">@{activity.subtitle}</span>
+                  </div>
                 )}
                 {activity.type === 'trending' && (
                   <p className="text-white text-sm">
