@@ -951,6 +951,7 @@ export default function Map() {
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-[#a855f7] rounded-full shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>
               <span className="text-white/80 text-sm">{friends.length} friends out</span>
+              <ChevronDown className={`w-4 h-4 text-white/60 transition-transform duration-200 ${showFriendsList ? 'rotate-180' : ''}`} />
             </div>
           </button>
 
