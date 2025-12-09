@@ -386,9 +386,9 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
       )}
 
       {/* Participants & I'm Down Section */}
-      <div className="bg-background/30 rounded-xl p-3 mb-4 border border-border/20">
+      <div className="bg-background/30 rounded-xl p-4 mb-4 border border-border/20">
         {/* Going With Section */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/10">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
               <UserPlus className="w-3.5 h-3.5" />
@@ -399,7 +399,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
                 {participants.slice(0, 5).map((participant) => (
                   <Avatar 
                     key={participant.id} 
-                    className="h-8 w-8 border-2 border-background cursor-pointer hover:scale-110 transition-transform ring-1 ring-primary/20"
+                    className="h-7 w-7 border-2 border-background cursor-pointer hover:scale-110 transition-transform ring-1 ring-primary/20"
                     onClick={() => openFriendCard({
                       userId: participant.user_id,
                       displayName: participant.display_name,
@@ -413,7 +413,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
                   </Avatar>
                 ))}
                 {participants.length > 5 && (
-                  <div className="h-8 w-8 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center">
+                  <div className="h-7 w-7 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center">
                     <span className="text-xs text-primary font-medium">+{participants.length - 5}</span>
                   </div>
                 )}
@@ -425,22 +425,22 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
         </div>
 
         {/* I'm Down Section */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 pt-1">
           <Button
             size="sm"
             onClick={handleToggleDown}
             disabled={isTogglingDown}
-            className={`rounded-full px-5 font-semibold transition-all duration-300 ${
+            className={`rounded-full px-3 text-xs font-semibold transition-all duration-300 ${
               isDown 
-                ? 'bg-[#d4ff00] text-black hover:bg-[#c4ef00] shadow-[0_0_20px_rgba(212,255,0,0.4)]' 
-                : 'bg-primary text-white hover:bg-primary/90 shadow-[0_0_15px_rgba(168,85,247,0.5)]'
+                ? 'bg-[#d4ff00] text-black hover:bg-[#c4ef00] shadow-[0_0_15px_rgba(212,255,0,0.3)]' 
+                : 'bg-primary text-white hover:bg-primary/90 shadow-[0_0_10px_rgba(168,85,247,0.4)]'
             }`}
           >
             {isDown ? (
-              <>You're down! 🎉</>
+              <>Down 🎉</>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 mr-1.5" />
+                <Sparkles className="w-3 h-3 mr-1" />
                 I'm down!
               </>
             )}
@@ -452,7 +452,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
                 {downs.slice(0, 5).map((down) => (
                   <Avatar 
                     key={down.id} 
-                    className={`h-8 w-8 border-2 cursor-pointer hover:scale-110 transition-transform ${
+                    className={`h-7 w-7 border-2 cursor-pointer hover:scale-110 transition-transform ${
                       down.user_id === currentUserId 
                         ? 'border-[#d4ff00] ring-2 ring-[#d4ff00]/50' 
                         : 'border-background ring-1 ring-primary/20'
