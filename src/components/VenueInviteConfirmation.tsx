@@ -133,7 +133,7 @@ export function VenueInviteConfirmation() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"
+      className="fixed inset-0 z-[600] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"
       onClick={handleBackdropClick}
     >
       <div className="w-[90%] max-w-md">
