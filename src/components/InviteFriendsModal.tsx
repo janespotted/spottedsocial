@@ -8,11 +8,16 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, MapPin, Target } from 'lucide-react';
 
 interface Friend {
   id: string;
   display_name: string;
   avatar_url: string | null;
+  status: 'planning' | 'out' | 'heading_out' | 'home' | null;
+  venue_name: string | null;
+  planning_neighborhood: string | null;
 }
 
 export function InviteFriendsModal() {
@@ -22,6 +27,8 @@ export function InviteFriendsModal() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [planningOpen, setPlanningOpen] = useState(true);
+  const [outOpen, setOutOpen] = useState(true);
 
   useEffect(() => {
     if (showInviteModal && user) {
@@ -59,14 +66,28 @@ export function InviteFriendsModal() {
         return;
       }
 
-      // Fetch friend profiles using safe RPC (respects location privacy)
-      const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
-      
+      // Fetch friend profiles and night statuses in parallel
+      const [profilesResult, statusesResult] = await Promise.all([
+        supabase.rpc('get_profiles_safe'),
+        supabase
+          .from('night_statuses')
+          .select('user_id, status, venue_name, planning_neighborhood')
+          .in('user_id', friendIds)
+      ]);
+
+      const allProfiles = profilesResult.data || [];
+      const nightStatuses = statusesResult.data || [];
+
+      // Create a map of user_id to night status
+      const statusMap = new Map(
+        nightStatuses.map(ns => [ns.user_id, ns])
+      );
+
       // Filter to only friends and conditionally exclude demo users
-      let profiles = (allProfiles || [])
+      let profiles = allProfiles
         .filter((p: any) => friendIds.includes(p.id))
         .sort((a: any, b: any) => a.display_name.localeCompare(b.display_name));
-      
+
       // Only filter out demo users when demo mode is OFF (bootstrap mode)
       if (!demoEnabled) {
         profiles = profiles.filter((p: any) => p.is_demo === false);
@@ -74,13 +95,22 @@ export function InviteFriendsModal() {
 
       // Deduplicate by display_name (keeps first occurrence)
       const seenNames = new Set<string>();
-      const uniqueFriends = (profiles || []).filter(friend => {
-        if (seenNames.has(friend.display_name)) {
-          return false;
-        }
-        seenNames.add(friend.display_name);
-        return true;
-      });
+      const uniqueFriends: Friend[] = [];
+
+      for (const profile of profiles) {
+        if (seenNames.has(profile.display_name)) continue;
+        seenNames.add(profile.display_name);
+
+        const nightStatus = statusMap.get(profile.id);
+        uniqueFriends.push({
+          id: profile.id,
+          display_name: profile.display_name,
+          avatar_url: profile.avatar_url,
+          status: nightStatus?.status || null,
+          venue_name: nightStatus?.venue_name || null,
+          planning_neighborhood: nightStatus?.planning_neighborhood || null,
+        });
+      }
 
       setFriends(uniqueFriends);
     } catch (error) {
@@ -109,6 +139,48 @@ export function InviteFriendsModal() {
     })));
   };
 
+  // Split friends into planning and out groups
+  const planningFriends = friends.filter(f => f.status === 'planning');
+  const outFriends = friends.filter(f => f.status === 'out' || f.status === 'heading_out');
+  const otherFriends = friends.filter(f => f.status !== 'planning' && f.status !== 'out' && f.status !== 'heading_out');
+
+  const renderFriendRow = (friend: Friend) => (
+    <button
+      key={friend.id}
+      onClick={() => handleToggleFriend(friend.id)}
+      className="w-full flex items-center gap-3 p-3 bg-[#2d1b4e]/30 rounded-xl hover:bg-[#2d1b4e]/50 transition-colors"
+    >
+      <Checkbox 
+        checked={selectedFriends.has(friend.id)}
+        onCheckedChange={() => handleToggleFriend(friend.id)}
+        className="border-[#a855f7]"
+      />
+      <Avatar className="w-10 h-10">
+        <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+        <AvatarFallback className="bg-[#a855f7] text-white">
+          {friend.display_name[0]}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 text-left">
+        <span className="text-white font-medium block">
+          {friend.display_name}
+        </span>
+        {friend.status === 'planning' && (
+          <span className="text-[#d4ff00] text-sm flex items-center gap-1">
+            <Target className="h-3 w-3" />
+            Planning{friend.planning_neighborhood ? ` (${friend.planning_neighborhood})` : ' tonight'}
+          </span>
+        )}
+        {(friend.status === 'out' || friend.status === 'heading_out') && friend.venue_name && (
+          <span className="text-[#a855f7] text-sm flex items-center gap-1">
+            <MapPin className="h-3 w-3" />
+            At {friend.venue_name}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+
   return (
     <Dialog open={showInviteModal} onOpenChange={(open) => {
       if (!open) {
@@ -131,29 +203,66 @@ export function InviteFriendsModal() {
             ) : friends.length === 0 ? (
               <div className="text-center text-white/50 py-8">No friends found</div>
             ) : (
-              <div className="space-y-2">
-                {friends.map((friend) => (
-                  <button
-                    key={friend.id}
-                    onClick={() => handleToggleFriend(friend.id)}
-                    className="w-full flex items-center gap-3 p-3 bg-[#2d1b4e]/30 rounded-xl hover:bg-[#2d1b4e]/50 transition-colors"
-                  >
-                    <Checkbox 
-                      checked={selectedFriends.has(friend.id)}
-                      onCheckedChange={() => handleToggleFriend(friend.id)}
-                      className="border-[#a855f7]"
-                    />
-                    <Avatar className="w-10 h-10">
-                      <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
-                      <AvatarFallback className="bg-[#a855f7] text-white">
-                        {friend.display_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-white font-medium flex-1 text-left">
-                      {friend.display_name}
-                    </span>
-                  </button>
-                ))}
+              <div className="space-y-4">
+                {/* Planning Friends Section */}
+                {planningFriends.length > 0 && (
+                  <Collapsible open={planningOpen} onOpenChange={setPlanningOpen}>
+                    <CollapsibleTrigger className="w-full flex items-center justify-between py-2 px-1 hover:bg-white/5 rounded-lg transition-colors">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🔥</span>
+                        <span className="font-semibold text-white">Friends Planning</span>
+                        <span className="text-lg">🎯</span>
+                        <span className="text-white/50 text-sm">({planningFriends.length})</span>
+                      </div>
+                      <ChevronDown className={`h-5 w-5 text-white/60 transition-transform duration-200 ${planningOpen ? 'rotate-180' : ''}`} />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="space-y-2">
+                        {planningFriends.map(renderFriendRow)}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {/* Divider */}
+                {planningFriends.length > 0 && outFriends.length > 0 && (
+                  <div className="border-t border-white/10 my-2" />
+                )}
+
+                {/* Out Friends Section */}
+                {outFriends.length > 0 && (
+                  <Collapsible open={outOpen} onOpenChange={setOutOpen}>
+                    <CollapsibleTrigger className="w-full flex items-center justify-between py-2 px-1 hover:bg-white/5 rounded-lg transition-colors">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🎉</span>
+                        <span className="font-semibold text-white">Friends Out</span>
+                        <span className="text-white/50 text-sm">({outFriends.length})</span>
+                      </div>
+                      <ChevronDown className={`h-5 w-5 text-white/60 transition-transform duration-200 ${outOpen ? 'rotate-180' : ''}`} />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="space-y-2">
+                        {outFriends.map(renderFriendRow)}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {/* Other Friends (home or no status) */}
+                {otherFriends.length > 0 && (
+                  <>
+                    {(planningFriends.length > 0 || outFriends.length > 0) && (
+                      <div className="border-t border-white/10 my-2" />
+                    )}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 py-2 px-1">
+                        <span className="font-semibold text-white/70">Other Friends</span>
+                        <span className="text-white/40 text-sm">({otherFriends.length})</span>
+                      </div>
+                      {otherFriends.map(renderFriendRow)}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </ScrollArea>
