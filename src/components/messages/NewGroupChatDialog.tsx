@@ -32,6 +32,7 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
   const [step, setStep] = useState<'select' | 'name'>('select');
   const [groupName, setGroupName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (open && user) {
@@ -45,47 +46,112 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
   }, [open, user]);
 
   const fetchFriends = async () => {
-    // Get accepted friendships (both directions)
-    const { data: sentFriendships } = await supabase
-      .from('friendships')
-      .select('friend_id')
-      .eq('user_id', user?.id)
-      .eq('status', 'accepted');
+    setLoading(true);
+    try {
+      // Get accepted friendships (both directions) and user's threads in parallel
+      const [sentResult, receivedResult, userThreadsResult] = await Promise.all([
+        supabase
+          .from('friendships')
+          .select('friend_id')
+          .eq('user_id', user?.id)
+          .eq('status', 'accepted'),
+        supabase
+          .from('friendships')
+          .select('user_id')
+          .eq('friend_id', user?.id)
+          .eq('status', 'accepted'),
+        supabase
+          .from('dm_thread_members')
+          .select('thread_id')
+          .eq('user_id', user?.id)
+      ]);
 
-    const { data: receivedFriendships } = await supabase
-      .from('friendships')
-      .select('user_id')
-      .eq('friend_id', user?.id)
-      .eq('status', 'accepted');
+      const friendIds = [
+        ...(sentResult.data?.map(f => f.friend_id) || []),
+        ...(receivedResult.data?.map(f => f.user_id) || [])
+      ];
 
-    const friendIds = [
-      ...(sentFriendships?.map(f => f.friend_id) || []),
-      ...(receivedFriendships?.map(f => f.user_id) || [])
-    ];
+      if (friendIds.length === 0) {
+        setFriends([]);
+        return;
+      }
 
-    if (friendIds.length === 0) {
-      setFriends([]);
-      return;
+      // Get recent messages to determine recency
+      const threadIds = userThreadsResult.data?.map(t => t.thread_id) || [];
+      const recentFriendIds: string[] = [];
+      
+      if (threadIds.length > 0) {
+        // Get recent messages ordered by time
+        const { data: recentMessages } = await supabase
+          .from('dm_messages')
+          .select('thread_id, created_at')
+          .in('thread_id', threadIds)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (recentMessages && recentMessages.length > 0) {
+          // Get unique thread IDs in order of recency
+          const recentThreadIds = [...new Set(recentMessages.map(m => m.thread_id))];
+          
+          // Get members of these threads
+          const { data: threadMembers } = await supabase
+            .from('dm_thread_members')
+            .select('thread_id, user_id')
+            .in('thread_id', recentThreadIds)
+            .neq('user_id', user?.id);
+
+          if (threadMembers) {
+            // Order by thread recency
+            for (const threadId of recentThreadIds) {
+              const members = threadMembers.filter(m => m.thread_id === threadId);
+              for (const member of members) {
+                if (!recentFriendIds.includes(member.user_id)) {
+                  recentFriendIds.push(member.user_id);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Get friend profiles using safe RPC
+      const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+      
+      let profiles = (allProfiles || []).filter((p: any) => friendIds.includes(p.id));
+      
+      if (!demoEnabled) {
+        profiles = profiles.filter((p: any) => p.is_demo === false);
+      }
+
+      // Deduplicate by display_name
+      const seenNames = new Set<string>();
+      const uniqueProfiles = profiles.filter((profile: any) => {
+        if (seenNames.has(profile.display_name)) return false;
+        seenNames.add(profile.display_name);
+        return true;
+      });
+
+      // Sort: recent conversations first, then alphabetical
+      uniqueProfiles.sort((a: any, b: any) => {
+        const aRecentIndex = recentFriendIds.indexOf(a.id);
+        const bRecentIndex = recentFriendIds.indexOf(b.id);
+        
+        // Both are recent - sort by recency
+        if (aRecentIndex !== -1 && bRecentIndex !== -1) {
+          return aRecentIndex - bRecentIndex;
+        }
+        // Only a is recent
+        if (aRecentIndex !== -1) return -1;
+        // Only b is recent
+        if (bRecentIndex !== -1) return 1;
+        // Neither recent - alphabetical
+        return a.display_name.localeCompare(b.display_name);
+      });
+
+      setFriends(uniqueProfiles);
+    } finally {
+      setLoading(false);
     }
-
-    // Get friend profiles using safe RPC
-    const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
-    
-    let profiles = (allProfiles || []).filter((p: any) => friendIds.includes(p.id));
-    
-    if (!demoEnabled) {
-      profiles = profiles.filter((p: any) => p.is_demo === false);
-    }
-
-    // Deduplicate by display_name
-    const seenNames = new Set<string>();
-    const uniqueProfiles = profiles.filter((profile: any) => {
-      if (seenNames.has(profile.display_name)) return false;
-      seenNames.add(profile.display_name);
-      return true;
-    });
-
-    setFriends(uniqueProfiles);
   };
 
   const toggleFriend = (friend: Friend) => {
@@ -217,37 +283,53 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
             </div>
 
             {/* Friends List */}
-            <div className="max-h-[40vh] overflow-y-auto px-4 pb-4 space-y-1">
-              {filteredFriends.map(friend => {
-                const isSelected = selectedFriends.some(f => f.id === friend.id);
-                return (
-                  <button
-                    key={friend.id}
-                    onClick={() => toggleFriend(friend)}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-[#2d1b4e]/60 transition-colors"
-                  >
-                    <Avatar className="h-12 w-12 border-2 border-[#a855f7]/40">
-                      <AvatarImage src={friend.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#2d1b4e] text-white">
-                        {friend.display_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 text-left">
-                      <p className="font-medium text-white">{friend.display_name}</p>
-                      <p className="text-sm text-white/50">@{friend.username}</p>
-                    </div>
-                    <div
-                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                        isSelected
-                          ? 'bg-[#a855f7] border-[#a855f7]'
-                          : 'border-white/30'
-                      }`}
-                    >
-                      {isSelected && <Check className="h-4 w-4 text-white" />}
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="max-h-[40vh] overflow-y-auto px-4 pb-4">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin h-6 w-6 border-2 border-[#a855f7] border-t-transparent rounded-full" />
+                  <span className="ml-3 text-white/60">Loading friends...</span>
+                </div>
+              ) : filteredFriends.length === 0 ? (
+                <div className="text-center py-8 text-white/50">
+                  {search ? 'No friends match your search' : 'No friends found'}
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-white/50 uppercase tracking-wide mb-2 px-1">Suggested</p>
+                  <div className="space-y-1">
+                    {filteredFriends.map(friend => {
+                      const isSelected = selectedFriends.some(f => f.id === friend.id);
+                      return (
+                        <button
+                          key={friend.id}
+                          onClick={() => toggleFriend(friend)}
+                          className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-[#2d1b4e]/60 transition-colors"
+                        >
+                          <Avatar className="h-12 w-12 border-2 border-[#a855f7]/40">
+                            <AvatarImage src={friend.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#2d1b4e] text-white">
+                              {friend.display_name[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 text-left">
+                            <p className="font-medium text-white">{friend.display_name}</p>
+                            <p className="text-sm text-white/50">@{friend.username}</p>
+                          </div>
+                          <div
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                              isSelected
+                                ? 'bg-[#a855f7] border-[#a855f7]'
+                                : 'border-white/30'
+                            }`}
+                          >
+                            {isSelected && <Check className="h-4 w-4 text-white" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </>
         ) : (
