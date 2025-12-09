@@ -734,11 +734,15 @@ export default function Leaderboard() {
                 <p className="text-[#a855f7] text-sm font-medium mb-0.5">Biggest Mover</p>
                 <button
                   onClick={() => handleVenueClick(biggestMover.venue_name, biggestMover.venue_id)}
-                  className="text-lg font-bold text-[#d4ff00] flex items-center gap-2 hover:text-[#d4ff00]/80 transition-colors max-w-[180px]"
+                  className="text-lg font-bold text-[#d4ff00] hover:text-[#d4ff00]/80 transition-colors max-w-[180px]"
                 >
                   <span className="truncate">{biggestMover.venue_name}</span>
-                  <BarChart3 className="h-4 w-4 flex-shrink-0" />
                 </button>
+              </div>
+
+              {/* Energy Bars */}
+              <div className="mx-3">
+                {renderEnergyBars(3)}
               </div>
 
               {/* Friend Avatars with Popover */}
