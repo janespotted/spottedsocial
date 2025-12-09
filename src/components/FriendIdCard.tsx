@@ -166,6 +166,29 @@ export function FriendIdCard() {
 
       const canSeeLocation = canSeeData || false;
 
+      // First check if user is in planning mode
+      const { data: nightStatus } = await supabase
+        .from('night_statuses')
+        .select('status')
+        .eq('user_id', selectedFriend.userId)
+        .not('expires_at', 'is', null)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+
+      if (nightStatus?.status === 'planning') {
+        setUserStatus({
+          isOut: false,
+          currentVenue: null,
+          lastUpdatedAt: null,
+          lastEndedAt: null,
+          lat: null,
+          lng: null,
+          canSeeLocation: true
+        });
+        setStatusSubtitle('🎯 Planning their night');
+        return;
+      }
+
       // Fetch the most recent active check-in (ended_at is null)
       const { data: activeCheckIn } = await supabase
         .from('checkins')

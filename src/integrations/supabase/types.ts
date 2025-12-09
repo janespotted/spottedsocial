@@ -1327,7 +1327,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "moderator" | "user"
       friendship_status_enum: "pending" | "accepted" | "blocked"
-      night_status_enum: "out" | "heading_out" | "home"
+      night_status_enum: "out" | "heading_out" | "home" | "planning"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1457,7 +1457,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "moderator", "user"],
       friendship_status_enum: ["pending", "accepted", "blocked"],
-      night_status_enum: ["out", "heading_out", "home"],
+      night_status_enum: ["out", "heading_out", "home", "planning"],
     },
   },
 } as const

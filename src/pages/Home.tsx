@@ -29,6 +29,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { CityBadge } from '@/components/CityBadge';
 import { FeedSkeleton } from '@/components/FeedSkeleton';
+import { FriendsPlanning } from '@/components/FriendsPlanning';
 
 export default function Home() {
   const { user } = useAuth();
@@ -82,6 +83,7 @@ export default function Home() {
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null }[]>([]);
 
   // Store fetch functions in refs to avoid dependency changes causing re-renders
   const fetchFriendsRef = useRef(fetchFriends);
@@ -131,6 +133,62 @@ export default function Home() {
     }
   }, [user, openCheckIn]);
 
+  // Fetch planning friends
+  const fetchPlanningFriends = async () => {
+    if (!user) return;
+    
+    // Get friend IDs
+    const { data: sentFriendships } = await supabase
+      .from('friendships')
+      .select('friend_id')
+      .eq('user_id', user.id)
+      .eq('status', 'accepted');
+
+    const { data: receivedFriendships } = await supabase
+      .from('friendships')
+      .select('user_id')
+      .eq('friend_id', user.id)
+      .eq('status', 'accepted');
+
+    const friendIds = [
+      ...(sentFriendships?.map(f => f.friend_id) || []),
+      ...(receivedFriendships?.map(f => f.user_id) || [])
+    ];
+
+    if (friendIds.length === 0) {
+      setPlanningFriends([]);
+      return;
+    }
+
+    // Get friends with planning status
+    const { data: planningStatuses } = await supabase
+      .from('night_statuses')
+      .select('user_id')
+      .in('user_id', friendIds)
+      .eq('status', 'planning')
+      .not('expires_at', 'is', null)
+      .gt('expires_at', new Date().toISOString());
+
+    if (!planningStatuses || planningStatuses.length === 0) {
+      setPlanningFriends([]);
+      return;
+    }
+
+    const planningUserIds = planningStatuses.map(s => s.user_id);
+
+    // Get profiles for planning friends
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .in('id', planningUserIds);
+
+    setPlanningFriends((profiles || []).map(p => ({
+      user_id: p.id,
+      display_name: p.display_name,
+      avatar_url: p.avatar_url,
+    })));
+  };
+
   // Initial data fetch - only depends on user and demoEnabled, not on callback functions
   useEffect(() => {
     if (user) {
@@ -140,6 +198,7 @@ export default function Home() {
         fetchFriendsRef.current(),
         fetchPostsRef.current(),
         fetchStoriesRef.current(),
+        fetchPlanningFriends(),
       ]).finally(() => setIsLoading(false));
     }
   }, [user, demoEnabled, city, checkFirstLogin]);
@@ -272,8 +331,14 @@ export default function Home() {
       </div>
 
       {/* Posts Feed */}
-      <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); }}>
+      <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); await fetchPlanningFriends(); }}>
         <div className="px-4 py-6 space-y-6">
+        
+        {/* Friends Planning Card */}
+        {planningFriends.length > 0 && !isLoading && (
+          <FriendsPlanning friends={planningFriends} variant="card" />
+        )}
+        
         {isLoading ? (
           <FeedSkeleton />
         ) : posts.length === 0 ? (
