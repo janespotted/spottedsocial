@@ -514,11 +514,11 @@ export function VenueIdCard() {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 z-50 bg-black/80 animate-in fade-in-0"
+            className="fixed inset-0 z-[300] bg-black/80 animate-in fade-in-0"
             onClick={closeVenueCard}
           />
       {/* Mobile frame constrained container */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full z-50 flex items-center justify-center px-4 pointer-events-none">
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full z-[300] flex items-center justify-center px-4 pointer-events-none">
               {/* Card */}
               <div 
                 className="relative w-full max-w-[390px] max-h-[85vh] flex flex-col bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-card-lift"
