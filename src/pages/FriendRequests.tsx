@@ -64,12 +64,10 @@ export default function FriendRequests() {
 
     const requestsWithMutuals = await Promise.all(
       friendRequests.map(async (req) => {
-        // Get the user's profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id, display_name, username, avatar_url')
-          .eq('id', req.user_id)
-          .single();
+      // Get the user's profile using safe RPC
+        const { data: profiles } = await supabase
+          .rpc('get_profile_safe', { target_user_id: req.user_id });
+        const profile = profiles?.[0];
 
         if (!profile) return null;
 
@@ -105,12 +103,11 @@ export default function FriendRequests() {
       ...(receivedFriendships?.map(f => f.user_id) || [])
     ];
 
-    // Get all users except me and my friends
-    const { data: allUsers } = await supabase
-      .from('profiles')
-      .select('id, display_name, username, avatar_url')
-      .neq('id', user?.id)
-      .not('id', 'in', `(${friendIds.join(',') || 'null'})`);
+    // Get all users except me and my friends using safe RPC
+    const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+    const allUsers = (allProfiles || []).filter((p: any) => 
+      p.id !== user?.id && !friendIds.includes(p.id)
+    );
 
     if (!allUsers) return;
 
@@ -171,12 +168,11 @@ export default function FriendRequests() {
 
     if (mutualIds.length === 0) return [];
 
-    // Get profiles
-    const { data: mutualProfiles } = await supabase
-      .from('profiles')
-      .select('display_name, avatar_url')
-      .in('id', mutualIds)
-      .limit(5);
+    // Get profiles using safe RPC
+    const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+    const mutualProfiles = (allProfiles || [])
+      .filter((p: any) => mutualIds.includes(p.id))
+      .slice(0, 5);
 
     return mutualProfiles || [];
   };

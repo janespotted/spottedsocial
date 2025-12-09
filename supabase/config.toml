@@ -4,10 +4,10 @@ project_id = "nkjdthjpqomfsqyzfwbj"
 verify_jwt = true
 
 [functions.get-venue-hours]
-verify_jwt = false
+verify_jwt = true
 
 [functions.seed-demo-data]
 verify_jwt = true
 
 [functions.send-push]
-verify_jwt = false
+verify_jwt = true

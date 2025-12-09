@@ -105,18 +105,16 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
       return;
     }
 
-    // Get friend profiles (conditionally filter demo users)
-    let profileQuery = supabase
-      .from('profiles')
-      .select('id, display_name, username, avatar_url')
-      .in('id', friendIds);
+    // Get friend profiles using safe RPC (respects location privacy)
+    const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+    
+    // Filter to only friends and conditionally exclude demo users
+    let profiles = (allProfiles || []).filter((p: any) => friendIds.includes(p.id));
     
     // Only filter out demo users when demo mode is OFF (bootstrap mode)
     if (!demoEnabled) {
-      profileQuery = profileQuery.eq('is_demo', false);
+      profiles = profiles.filter((p: any) => p.is_demo === false);
     }
-    
-    const { data: profiles } = await profileQuery;
 
     if (!profiles) return;
 

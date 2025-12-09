@@ -59,18 +59,18 @@ export function InviteFriendsModal() {
         return;
       }
 
-      // Fetch friend profiles (conditionally filter demo users)
-      let profileQuery = supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url')
-        .in('id', friendIds);
+      // Fetch friend profiles using safe RPC (respects location privacy)
+      const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+      
+      // Filter to only friends and conditionally exclude demo users
+      let profiles = (allProfiles || [])
+        .filter((p: any) => friendIds.includes(p.id))
+        .sort((a: any, b: any) => a.display_name.localeCompare(b.display_name));
       
       // Only filter out demo users when demo mode is OFF (bootstrap mode)
       if (!demoEnabled) {
-        profileQuery = profileQuery.eq('is_demo', false);
+        profiles = profiles.filter((p: any) => p.is_demo === false);
       }
-      
-      const { data: profiles } = await profileQuery.order('display_name', { ascending: true });
 
       // Deduplicate by display_name (keeps first occurrence)
       const seenNames = new Set<string>();
