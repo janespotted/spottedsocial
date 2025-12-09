@@ -5,6 +5,7 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
+import { usePlanningVenueDetection } from '@/hooks/usePlanningVenueDetection';
 import { useFeed, Post } from '@/hooks/useFeed';
 import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
@@ -41,6 +42,7 @@ export default function Home() {
   const { unreadCount } = useNotifications();
   const { city } = useUserCity();
   useAutoVenueTracking();
+  usePlanningVenueDetection();
 
   const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends, cacheStories, getCachedStories } = useOfflineCache();
 

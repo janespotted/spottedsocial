@@ -6,6 +6,7 @@ import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useUserCity } from '@/hooks/useUserCity';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
+import { usePlanningVenueDetection } from '@/hooks/usePlanningVenueDetection';
 import { CITY_CENTERS } from '@/lib/city-detection';
 import { supabase } from '@/integrations/supabase/client';
 import mapboxgl from 'mapbox-gl';
@@ -56,6 +57,7 @@ export default function Map() {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
   useAutoVenueTracking(); // Trigger auto-venue tracking on map view
+  usePlanningVenueDetection(); // Detect nearby venues for planning users
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
