@@ -480,6 +480,7 @@ export default function Map() {
     el.style.width = '70px';
     el.style.height = '70px';
     el.style.cursor = 'pointer';
+    el.style.zIndex = '10';
     
     el.innerHTML = `
       <div style="position: relative; width: 100%; height: 100%;">
@@ -543,7 +544,7 @@ export default function Map() {
       el.style.width = '52px';
       el.style.height = '52px';
       el.style.cursor = 'pointer';
-      el.style.zIndex = '50'; // High z-index to stay above venue markers
+      el.style.zIndex = '10';
       
       const ringColors = {
         close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.35)', badge: '💛' },
@@ -603,7 +604,7 @@ export default function Map() {
         el.style.width = '70px';
         el.style.height = '70px';
         el.style.cursor = 'pointer';
-        el.style.zIndex = '55'; // Above individual friend avatars
+        el.style.zIndex = '10';
         
         const displayFriends = cluster.slice(0, 3);
         const remainingCount = cluster.length - 3;
@@ -648,7 +649,7 @@ export default function Map() {
         collapseEl.style.width = '32px';
         collapseEl.style.height = '32px';
         collapseEl.style.cursor = 'pointer';
-        collapseEl.style.zIndex = '30';
+        collapseEl.style.zIndex = '10';
         collapseEl.innerHTML = `
           <div style="width: 100%; height: 100%; background: rgba(45, 27, 78, 0.95); border: 2px solid rgba(168, 85, 247, 0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);">
             <span style="color: white; font-size: 14px; font-weight: 600;">−</span>
@@ -731,7 +732,7 @@ export default function Map() {
         el.style.width = `${containerSize}px`;
         el.style.height = `${containerSize}px`;
         el.style.cursor = 'pointer';
-        el.style.zIndex = '15'; // Below friend avatars (z-index 50) but visible
+        el.style.zIndex = '5';
         
         el.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
@@ -907,7 +908,7 @@ export default function Map() {
       </div>
 
       {/* Venue Type Filter - Collapsible in top right */}
-      <div ref={venueFilterRef} className="absolute top-20 right-4 z-50">
+      <div ref={venueFilterRef} className="absolute top-20 right-4 z-[200]">
         {/* Collapsed Pill */}
         <button
           onClick={() => setShowVenueFilters(!showVenueFilters)}
@@ -932,7 +933,7 @@ export default function Map() {
 
         {/* Expanded Filter Options */}
         {showVenueFilters && (
-          <div className="mt-1.5 bg-[#1a0f2e] backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_25px_rgba(168,85,247,0.4)] overflow-hidden animate-fade-in min-w-[140px] relative z-[100]">
+          <div className="mt-1.5 bg-[#1a0f2e] backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_25px_rgba(168,85,247,0.4)] overflow-hidden animate-fade-in min-w-[140px] relative z-[200]">
             {[
               { key: 'all', label: 'All Venues', icon: '🗺️' },
               { key: 'nightclub', label: 'Clubs', icon: '🎵' },
@@ -964,7 +965,7 @@ export default function Map() {
 
       {/* Friends Out Pill + List */}
       {friends.length > 0 ? (
-        <div ref={friendsListRef} className="absolute top-20 left-4 z-50 max-w-sm">
+        <div ref={friendsListRef} className="absolute top-20 left-4 z-[200] max-w-sm">
           {/* Clickable Pill */}
           <button
             onClick={toggleFriendsList}
@@ -979,7 +980,7 @@ export default function Map() {
 
           {/* Expanded Friends List */}
           {showFriendsList && (
-            <div className="mt-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] max-h-96 overflow-y-auto relative z-[100]">
+            <div className="mt-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] max-h-96 overflow-y-auto relative z-[200]">
               {friendsWithDistances.map((friend) => (
                 <button
                   key={friend.user_id}
