@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Calendar, Clock, Users, Lock, Search, Plus, X } from 'lucide-react';
+import { MapPin, Search, Plus, X, ChevronDown, Calendar, Clock, Users, Lock } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserCity } from '@/hooks/useUserCity';
 import { useDemoMode } from '@/hooks/useDemoMode';
@@ -47,7 +47,6 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
   const [visibility, setVisibility] = useState<'friends' | 'close_friends'>('friends');
   const [venueSearch, setVenueSearch] = useState('');
   const [venues, setVenues] = useState<Venue[]>([]);
-  const [showVenueList, setShowVenueList] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { city } = useUserCity();
   const demoEnabled = useDemoMode();
@@ -57,6 +56,9 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
   const [selectedFriends, setSelectedFriends] = useState<Friend[]>([]);
   const [showFriendPicker, setShowFriendPicker] = useState(false);
   const [friendSearch, setFriendSearch] = useState('');
+  
+  // More options collapsed by default
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   useEffect(() => {
     if (open && city) {
@@ -78,14 +80,12 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
   };
 
   const fetchFriends = async () => {
-    // Fetch friends where user is user_id
     const { data: friends1 } = await supabase
       .from('friendships')
       .select('friend_id')
       .eq('user_id', userId)
       .eq('status', 'accepted');
 
-    // Fetch friends where user is friend_id
     const { data: friends2 } = await supabase
       .from('friendships')
       .select('user_id')
@@ -108,7 +108,6 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
       .in('id', friendIds)
       .order('display_name');
 
-    // Filter demo users in bootstrap mode
     if (!demoEnabled) {
       query = query.eq('is_demo', false);
     }
@@ -161,7 +160,6 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
 
       if (error) throw error;
 
-      // Add selected friends as participants
       if (selectedFriends.length > 0 && plan) {
         const participants = selectedFriends.map(friend => ({
           plan_id: plan.id,
@@ -177,7 +175,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
         }
       }
 
-      toast.success('Plan shared! 🎉');
+      toast.success('Plan posted! 🎉');
       resetForm();
       onPlanCreated();
     } catch (error) {
@@ -195,13 +193,12 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
     setPlanTime('21:00');
     setVisibility('friends');
     setVenueSearch('');
-    setShowVenueList(false);
     setSelectedFriends([]);
     setShowFriendPicker(false);
     setFriendSearch('');
+    setShowMoreOptions(false);
   };
 
-  // Generate next 7 days for date picker
   const dateOptions = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(new Date(), i);
     return {
@@ -211,237 +208,226 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[400px] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] border-primary/30">
-        <DialogHeader>
-          <DialogTitle className="text-foreground">Share Your Plans</DialogTitle>
-        </DialogHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] border-primary/30 max-h-[60vh]">
+        <DrawerHeader className="pb-2">
+          <DrawerTitle className="text-foreground text-center">Share Your Plans</DrawerTitle>
+        </DrawerHeader>
 
-        <ScrollArea className="max-h-[70vh]">
-          <div className="space-y-4 pr-2">
-            {/* Venue Selection */}
-            <div className="space-y-2">
-              <Label className="text-muted-foreground flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                Where are you going?
-              </Label>
-              {selectedVenue ? (
-                <div 
-                  className="flex items-center justify-between p-3 bg-card/50 rounded-lg border border-primary/30 cursor-pointer"
-                  onClick={() => {
-                    setSelectedVenue(null);
-                    setShowVenueList(true);
-                  }}
-                >
-                  <div>
-                    <p className="font-medium text-[#d4ff00]">{selectedVenue.name}</p>
-                    <p className="text-xs text-muted-foreground">{selectedVenue.neighborhood}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Change</span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search venues..."
-                      value={venueSearch}
-                      onChange={(e) => {
-                        setVenueSearch(e.target.value);
-                        setShowVenueList(true);
-                      }}
-                      onFocus={() => setShowVenueList(true)}
-                      className="pl-10 bg-card/50 border-border/50"
-                    />
-                  </div>
-                  {showVenueList && (
-                    <ScrollArea className="h-[150px] rounded-lg border border-border/30 bg-card/50">
-                      {filteredVenues.map(venue => (
-                        <div
-                          key={venue.id}
-                          className="p-3 hover:bg-primary/10 cursor-pointer border-b border-border/20 last:border-0"
-                          onClick={() => {
-                            setSelectedVenue(venue);
-                            setShowVenueList(false);
-                            setVenueSearch('');
-                          }}
-                        >
-                          <p className="font-medium text-foreground">{venue.name}</p>
-                          <p className="text-xs text-muted-foreground">{venue.neighborhood}</p>
-                        </div>
-                      ))}
-                    </ScrollArea>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Date & Time */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="text-muted-foreground flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Date
-                </Label>
-                <select
-                  value={planDate}
-                  onChange={(e) => setPlanDate(e.target.value)}
-                  className="w-full h-10 px-3 rounded-md bg-card/50 border border-border/50 text-foreground"
-                >
-                  {dateOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+        <div className="px-4 pb-6 flex flex-col h-full overflow-hidden">
+          {/* Venue Search - Always Visible */}
+          {selectedVenue ? (
+            <div 
+              className="flex items-center gap-3 py-2 cursor-pointer group"
+              onClick={() => setSelectedVenue(null)}
+            >
+              <MapPin className="w-5 h-5 text-[#d4ff00]" />
+              <div className="flex-1">
+                <p className="font-medium text-[#d4ff00]">{selectedVenue.name}</p>
+                <p className="text-xs text-muted-foreground">{selectedVenue.neighborhood}</p>
               </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  Time
-                </Label>
-                <Input
-                  type="time"
-                  value={planTime}
-                  onChange={(e) => setPlanTime(e.target.value)}
-                  className="bg-card/50 border-border/50"
-                />
-              </div>
+              <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
             </div>
+          ) : (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Where are you going?"
+                value={venueSearch}
+                onChange={(e) => setVenueSearch(e.target.value)}
+                className="pl-10 bg-background/30 border-border/30 h-11"
+                autoFocus
+              />
+            </div>
+          )}
 
-            {/* Friends Going With You */}
-            <div className="space-y-2">
-              <Label className="text-muted-foreground flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Who's going with you?
-              </Label>
-              
-              <div className="flex items-center gap-2 flex-wrap">
-                {selectedFriends.map(friend => (
-                  <div 
-                    key={friend.id} 
-                    className="relative group"
-                    onClick={() => toggleFriend(friend)}
+          {/* Venue List - Shows when no venue selected */}
+          {!selectedVenue && (
+            <ScrollArea className="flex-1 mt-3 -mx-4 px-4">
+              <div className="space-y-0.5">
+                {filteredVenues.map(venue => (
+                  <div
+                    key={venue.id}
+                    className="py-2.5 px-2 -mx-2 hover:bg-primary/10 cursor-pointer rounded-lg transition-colors"
+                    onClick={() => {
+                      setSelectedVenue(venue);
+                      setVenueSearch('');
+                    }}
                   >
-                    <Avatar className="h-10 w-10 border-2 border-primary cursor-pointer">
-                      <AvatarImage src={friend.avatar_url || undefined} />
-                      <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                        {friend.display_name.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="absolute -top-1 -right-1 bg-destructive rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                      <X className="w-3 h-3 text-white" />
-                    </div>
+                    <p className="font-medium text-foreground">{venue.name}</p>
+                    <p className="text-xs text-muted-foreground">{venue.neighborhood}</p>
                   </div>
                 ))}
+              </div>
+            </ScrollArea>
+          )}
+
+          {/* Show more options and button only when venue is selected */}
+          {selectedVenue && (
+            <>
+              {/* More Options - Collapsed by Default */}
+              <Collapsible open={showMoreOptions} onOpenChange={setShowMoreOptions} className="mt-3">
+                <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full py-2">
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showMoreOptions ? 'rotate-180' : ''}`} />
+                  More Options
+                  {(selectedFriends.length > 0 || description) && (
+                    <span className="text-xs text-primary ml-auto">
+                      {selectedFriends.length > 0 && `${selectedFriends.length} friends`}
+                      {selectedFriends.length > 0 && description && ' • '}
+                      {description && 'note added'}
+                    </span>
+                  )}
+                </CollapsibleTrigger>
                 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFriendPicker(!showFriendPicker)}
-                  className="border-primary/50 text-primary hover:bg-primary/10 gap-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Friends
-                </Button>
-              </div>
+                <CollapsibleContent className="space-y-4 pt-3">
+                  {/* Date & Time - Inline */}
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                        <Calendar className="w-3 h-3" />
+                        Date
+                      </div>
+                      <select
+                        value={planDate}
+                        onChange={(e) => setPlanDate(e.target.value)}
+                        className="w-full h-9 px-2 rounded-md bg-background/30 border border-border/30 text-foreground text-sm"
+                      >
+                        {dateOptions.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-24">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                        <Clock className="w-3 h-3" />
+                        Time
+                      </div>
+                      <Input
+                        type="time"
+                        value={planTime}
+                        onChange={(e) => setPlanTime(e.target.value)}
+                        className="bg-background/30 border-border/30 h-9 text-sm"
+                      />
+                    </div>
+                  </div>
 
-              {showFriendPicker && (
-                <div className="space-y-2 p-3 bg-card/50 rounded-lg border border-border/30">
-                  <Input
-                    placeholder="Search friends..."
-                    value={friendSearch}
-                    onChange={(e) => setFriendSearch(e.target.value)}
-                    className="bg-background/50 border-border/50"
-                  />
-                  <ScrollArea className="h-[150px]">
-                    {filteredFriends.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-4 text-sm">No friends found</p>
-                    ) : (
-                      filteredFriends.map(friend => {
-                        const isSelected = selectedFriends.some(f => f.id === friend.id);
-                        return (
-                          <div
-                            key={friend.id}
-                            className="flex items-center gap-3 p-2 hover:bg-primary/10 rounded-lg cursor-pointer"
-                            onClick={() => toggleFriend(friend)}
-                          >
-                            <Checkbox checked={isSelected} className="border-primary" />
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={friend.avatar_url || undefined} />
-                              <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                                {friend.display_name.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-foreground text-sm truncate">
-                                {friend.display_name}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                @{friend.username}
-                              </p>
-                            </div>
+                  {/* Friends */}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {selectedFriends.map(friend => (
+                        <div 
+                          key={friend.id} 
+                          className="relative group"
+                          onClick={() => toggleFriend(friend)}
+                        >
+                          <Avatar className="h-8 w-8 border-2 border-primary cursor-pointer">
+                            <AvatarImage src={friend.avatar_url || undefined} />
+                            <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                              {friend.display_name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="absolute -top-1 -right-1 bg-destructive rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                            <X className="w-2.5 h-2.5 text-white" />
                           </div>
-                        );
-                      })
+                        </div>
+                      ))}
+                      
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowFriendPicker(!showFriendPicker)}
+                        className="text-muted-foreground hover:text-foreground gap-1 h-8 px-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {selectedFriends.length === 0 ? 'Add Friends' : ''}
+                      </Button>
+                    </div>
+
+                    {showFriendPicker && (
+                      <div className="mt-2 space-y-2">
+                        <Input
+                          placeholder="Search friends..."
+                          value={friendSearch}
+                          onChange={(e) => setFriendSearch(e.target.value)}
+                          className="bg-background/30 border-border/30 h-9 text-sm"
+                        />
+                        <ScrollArea className="h-[120px]">
+                          {filteredFriends.length === 0 ? (
+                            <p className="text-center text-muted-foreground py-4 text-sm">No friends found</p>
+                          ) : (
+                            filteredFriends.map(friend => {
+                              const isSelected = selectedFriends.some(f => f.id === friend.id);
+                              return (
+                                <div
+                                  key={friend.id}
+                                  className="flex items-center gap-2 py-1.5 hover:bg-primary/10 rounded-lg cursor-pointer px-1"
+                                  onClick={() => toggleFriend(friend)}
+                                >
+                                  <Checkbox checked={isSelected} className="border-primary h-4 w-4" />
+                                  <Avatar className="h-6 w-6">
+                                    <AvatarImage src={friend.avatar_url || undefined} />
+                                    <AvatarFallback className="bg-primary/20 text-primary text-[10px]">
+                                      {friend.display_name.charAt(0)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-sm text-foreground truncate">{friend.display_name}</span>
+                                </div>
+                              );
+                            })
+                          )}
+                        </ScrollArea>
+                      </div>
                     )}
-                  </ScrollArea>
-                </div>
-              )}
-            </div>
+                  </div>
 
-            {/* Description - Now Optional */}
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">
-                What's the plan? <span className="text-muted-foreground/60">(optional)</span>
-              </Label>
-              <Textarea
-                placeholder="Celebrating a birthday, checking out a new DJ, just looking for company..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="bg-card/50 border-border/50 min-h-[80px] resize-none"
-                maxLength={280}
-              />
-              <p className="text-xs text-muted-foreground text-right">{description.length}/280</p>
-            </div>
+                  {/* Description */}
+                  <Textarea
+                    placeholder="Add a note... (optional)"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="bg-background/30 border-border/30 min-h-[60px] resize-none text-sm"
+                    maxLength={280}
+                  />
 
-            {/* Visibility */}
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">Who can see this?</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={visibility === 'friends' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setVisibility('friends')}
-                  className={visibility === 'friends' ? 'bg-primary' : 'border-border/50'}
-                >
-                  <Users className="w-4 h-4 mr-1" />
-                  Friends
-                </Button>
-                <Button
-                  type="button"
-                  variant={visibility === 'close_friends' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setVisibility('close_friends')}
-                  className={visibility === 'close_friends' ? 'bg-primary' : 'border-border/50'}
-                >
-                  <Lock className="w-4 h-4 mr-1" />
-                  Close Friends
-                </Button>
-              </div>
-            </div>
+                  {/* Visibility */}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={visibility === 'friends' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setVisibility('friends')}
+                      className={`h-8 text-xs ${visibility === 'friends' ? 'bg-primary' : 'text-muted-foreground'}`}
+                    >
+                      <Users className="w-3 h-3 mr-1" />
+                      Friends
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={visibility === 'close_friends' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setVisibility('close_friends')}
+                      className={`h-8 text-xs ${visibility === 'close_friends' ? 'bg-primary' : 'text-muted-foreground'}`}
+                    >
+                      <Lock className="w-3 h-3 mr-1" />
+                      Close Friends
+                    </Button>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
 
-            {/* Submit */}
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !selectedVenue}
-              className="w-full bg-primary hover:bg-primary/90"
-            >
-              {isSubmitting ? 'Sharing...' : 'Share Plan'}
-            </Button>
-          </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+              {/* Post Button - Always Visible when venue selected */}
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="w-full mt-4 bg-primary hover:bg-primary/90 shadow-[0_0_20px_rgba(168,85,247,0.4)] h-12 text-base font-semibold"
+              >
+                {isSubmitting ? 'Posting...' : 'Post Plan'}
+              </Button>
+            </>
+          )}
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
