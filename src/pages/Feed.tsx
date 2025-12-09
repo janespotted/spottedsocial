@@ -47,6 +47,7 @@ export default function Feed() {
     posts,
     friends,
     storyUsers,
+    userHasStory,
     likedPosts,
     likedComments,
     expandedPostId,
@@ -190,11 +191,21 @@ export default function Feed() {
           <div className="flex gap-4 overflow-x-auto scrollbar-hide px-6">
             {/* Your Story Button */}
             <button
-              onClick={() => setCreateStoryOpen(true)}
+              onClick={() => {
+                if (userHasStory) {
+                  setSelectedStoryUser(user?.id || null);
+                } else {
+                  setCreateStoryOpen(true);
+                }
+              }}
               className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
             >
               <div className="relative">
-                <div className="p-[3px] rounded-full bg-gradient-to-br from-[#a855f7]/60 to-[#a855f7]/20">
+                <div className={`p-[3px] rounded-full ${
+                  userHasStory
+                    ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active'
+                    : 'bg-gradient-to-br from-[#a855f7]/60 to-[#a855f7]/20'
+                }`}>
                   <div className="rounded-full bg-[#0a0118] p-[2px]">
                     <Avatar className="h-14 w-14">
                       <AvatarImage src={profile?.avatar_url || undefined} />
@@ -204,9 +215,11 @@ export default function Feed() {
                     </Avatar>
                   </div>
                 </div>
-                <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-[#a855f7] to-[#7c3aed] rounded-full p-1.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
-                  <Plus className="h-3 w-3 text-white" />
-                </div>
+                {!userHasStory && (
+                  <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-[#a855f7] to-[#7c3aed] rounded-full p-1.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+                    <Plus className="h-3 w-3 text-white" />
+                  </div>
+                )}
               </div>
               <span className="text-[10px] text-white/60 font-medium">Your Story</span>
             </button>
