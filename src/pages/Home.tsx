@@ -31,7 +31,7 @@ import { PostLikesModal } from '@/components/PostLikesModal';
 import { CityBadge } from '@/components/CityBadge';
 import { FeedSkeleton } from '@/components/FeedSkeleton';
 import { FriendsPlanning } from '@/components/FriendsPlanning';
-import { DaytimeCard } from '@/components/DaytimeCard';
+import { PlansFeed } from '@/components/PlansFeed';
 import { isNightlifeHours } from '@/lib/time-context';
 
 export default function Home() {
@@ -87,6 +87,7 @@ export default function Home() {
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
+  const [feedMode, setFeedMode] = useState<'newsfeed' | 'plans'>(() => isNightlifeHours() ? 'newsfeed' : 'plans');
 
   // Store fetch functions in refs to avoid dependency changes causing re-renders
   const fetchFriendsRef = useRef(fetchFriends);
@@ -214,14 +215,18 @@ export default function Home() {
 
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
-        <div className="flex items-start justify-between p-6">
+        <div className="flex items-start justify-between p-6 pb-3">
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
               <CityBadge />
             </div>
-            <h2 className="text-3xl font-bold text-white">Newsfeed</h2>
-            <p className="text-white/60 text-sm mt-1">Everything disappears by 5am</p>
+            <h2 className="text-3xl font-bold text-white">
+              {feedMode === 'plans' ? 'Make Plans' : 'Newsfeed'}
+            </h2>
+            <p className="text-white/60 text-sm mt-1">
+              {feedMode === 'plans' ? 'See what your friends are planning' : 'Everything disappears by 5am'}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -245,7 +250,29 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Stories Row */}
+        {/* Feed Mode Toggle */}
+        <div className="flex gap-2 px-6 pb-4">
+          <button
+            onClick={() => setFeedMode('newsfeed')}
+            className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-all ${
+              feedMode === 'newsfeed'
+                ? 'bg-primary text-primary-foreground shadow-[0_0_15px_rgba(168,85,247,0.5)]'
+                : 'bg-card/50 text-muted-foreground border border-border/30 hover:bg-card/70'
+            }`}
+          >
+            Newsfeed
+          </button>
+          <button
+            onClick={() => setFeedMode('plans')}
+            className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-all ${
+              feedMode === 'plans'
+                ? 'bg-primary text-primary-foreground shadow-[0_0_15px_rgba(168,85,247,0.5)]'
+                : 'bg-card/50 text-muted-foreground border border-border/30 hover:bg-card/70'
+            }`}
+          >
+            Plans
+          </button>
+        </div>
         <div className="pb-4 overflow-hidden">
           <div className="flex gap-4 overflow-x-auto scrollbar-hide px-6">
             {/* Your Story Button */}
@@ -312,14 +339,14 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Posts Feed */}
+      {/* Feed Content */}
+      {feedMode === 'plans' ? (
+        <div className="py-4">
+          <PlansFeed userId={user?.id || ''} />
+        </div>
+      ) : (
       <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); await fetchPlanningFriends(); }}>
         <div className="px-4 py-6 space-y-6">
-        
-        {/* Daytime Card - shown before 5pm when no nightlife activity */}
-        {!isNightlifeHours() && !isLoading && (
-          <DaytimeCard planningFriendsCount={planningFriends.length} />
-        )}
         
         {/* Friends Planning Card - shown during nightlife hours */}
         {isNightlifeHours() && planningFriends.length > 0 && !isLoading && (
@@ -590,6 +617,7 @@ export default function Home() {
         )}
         </div>
       </PullToRefresh>
+      )}
 
       {selectedStoryUser && (
         <StoryViewer
@@ -611,14 +639,16 @@ export default function Home() {
 
       <CreateStoryDialog open={createStoryOpen} onOpenChange={setCreateStoryOpen} />
 
-      {/* Create Post FAB */}
-      <button
-        onClick={() => setShowCreatePost(true)}
-        className="fixed bottom-28 right-6 z-20 w-14 h-14 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:scale-110 transition-transform"
-        aria-label="Create post"
-      >
-        <Plus className="h-7 w-7 text-white" />
-      </button>
+      {/* Create Post FAB - only show in newsfeed mode */}
+      {feedMode === 'newsfeed' && (
+        <button
+          onClick={() => setShowCreatePost(true)}
+          className="fixed bottom-28 right-6 z-20 w-14 h-14 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:scale-110 transition-transform"
+          aria-label="Create post"
+        >
+          <Plus className="h-7 w-7 text-white" />
+        </button>
+      )}
 
       <CreatePostDialog open={showCreatePost} onOpenChange={setShowCreatePost} />
 

@@ -456,6 +456,126 @@ export type Database = {
           },
         ]
       }
+      plan_comments: {
+        Row: {
+          created_at: string | null
+          id: string
+          plan_id: string
+          text: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          plan_id: string
+          text: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          plan_id?: string
+          text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_comments_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          plan_id: string
+          user_id: string
+          vote_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          plan_id: string
+          user_id: string
+          vote_type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          plan_id?: string
+          user_id?: string
+          vote_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_votes_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          comments_count: number | null
+          created_at: string | null
+          description: string
+          expires_at: string
+          id: string
+          is_demo: boolean | null
+          plan_date: string
+          plan_time: string
+          score: number | null
+          user_id: string
+          venue_id: string | null
+          venue_name: string
+          visibility: string
+        }
+        Insert: {
+          comments_count?: number | null
+          created_at?: string | null
+          description: string
+          expires_at: string
+          id?: string
+          is_demo?: boolean | null
+          plan_date: string
+          plan_time: string
+          score?: number | null
+          user_id: string
+          venue_id?: string | null
+          venue_name: string
+          visibility?: string
+        }
+        Update: {
+          comments_count?: number | null
+          created_at?: string | null
+          description?: string
+          expires_at?: string
+          id?: string
+          is_demo?: boolean | null
+          plan_date?: string
+          plan_time?: string
+          score?: number | null
+          user_id?: string
+          venue_id?: string | null
+          venue_name?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plans_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_comment_likes: {
         Row: {
           comment_id: string
