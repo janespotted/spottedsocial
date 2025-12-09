@@ -251,7 +251,7 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex, 
 
   return (
     <div 
-      className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full bg-black z-[60] flex items-center justify-center overflow-hidden"
+      className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full bg-black z-[400] flex items-center justify-center overflow-hidden"
       {...swipeHandlers}
     >
       {/* Progress bars */}
