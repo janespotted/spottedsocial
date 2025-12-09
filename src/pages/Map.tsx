@@ -889,33 +889,6 @@ export default function Map() {
           <CityBadge />
         </div>
         <div className="flex items-center gap-3">
-          {/* Search Button/Input */}
-          <div ref={searchContainerRef} className="relative">
-            {showSearch ? (
-              <div className="flex items-center gap-2 bg-[#2d1b4e]/90 backdrop-blur rounded-full border border-[#a855f7]/50 px-3 py-1.5 animate-fade-in">
-                <Search className="w-4 h-4 text-white/60" />
-                <input
-                  type="text"
-                  placeholder="Search venues..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent text-white text-sm w-28 outline-none placeholder:text-white/40"
-                  autoFocus
-                />
-                <button onClick={() => { setShowSearch(false); setSearchQuery(''); }}>
-                  <X className="w-4 h-4 text-white/60 hover:text-white transition-colors" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowSearch(true)}
-                className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
-                aria-label="Search venues"
-              >
-                <Search className="w-5 h-5" />
-              </button>
-            )}
-          </div>
           <button
             onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
             className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
@@ -937,9 +910,40 @@ export default function Map() {
         </div>
       </div>
 
+      {/* Search Button/Input - Top Left Below Header */}
+      <div ref={searchContainerRef} className="absolute top-28 left-4 z-[200]">
+        {showSearch ? (
+          <div className="flex items-center gap-2 bg-[#2d1b4e]/90 backdrop-blur rounded-full border border-[#a855f7]/50 px-3 py-2 animate-fade-in">
+            <Search className="w-4 h-4 text-white/60" />
+            <input
+              type="text"
+              placeholder="Search venues..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent text-white text-sm w-40 outline-none placeholder:text-white/40"
+              autoFocus
+            />
+            <button onClick={() => { setShowSearch(false); setSearchQuery(''); }}>
+              <X className="w-4 h-4 text-white/60 hover:text-white transition-colors" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowSearch(true)}
+            className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-full px-4 py-2.5 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all"
+            aria-label="Search venues"
+          >
+            <div className="flex items-center gap-2">
+              <Search className="w-4 h-4 text-white/80" />
+              <span className="text-white/80 text-sm">Search</span>
+            </div>
+          </button>
+        )}
+      </div>
+
       {/* Search Results Dropdown */}
       {showSearch && searchQuery.length > 0 && (
-        <div className="absolute top-28 right-4 left-4 z-[250] bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 overflow-y-auto">
+        <div className="absolute top-40 left-4 w-64 z-[250] bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 overflow-y-auto">
           {filteredSearchVenues.length > 0 ? (
             filteredSearchVenues.slice(0, 10).map((venue) => (
               <button
@@ -1018,24 +1022,12 @@ export default function Map() {
         )}
       </div>
 
-      {/* Friends Out Pill + List */}
+      {/* Friends Out Pill + List - Bottom Left */}
       {friends.length > 0 ? (
-        <div ref={friendsListRef} className="absolute top-28 left-4 z-[200] max-w-sm">
-          {/* Clickable Pill */}
-          <button
-            onClick={toggleFriendsList}
-            className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 hover:bg-[#2d1b4e] transition-colors w-full"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-[#a855f7] rounded-full shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>
-              <span className="text-white/80 text-sm">{friends.length} friends out</span>
-              <ChevronDown className={`w-4 h-4 text-white/60 transition-transform duration-200 ${showFriendsList ? 'rotate-180' : ''}`} />
-            </div>
-          </button>
-
-          {/* Expanded Friends List */}
+        <div ref={friendsListRef} className="absolute bottom-24 left-6 z-[200] max-w-sm">
+          {/* Expanded Friends List - Opens Upward */}
           {showFriendsList && (
-            <div className="mt-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] max-h-96 overflow-y-auto relative z-[200]">
+            <div className="mb-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] max-h-96 overflow-y-auto relative z-[200]">
               {friendsWithDistances.map((friend) => (
                 <button
                   key={friend.user_id}
@@ -1083,9 +1075,21 @@ export default function Map() {
               ))}
             </div>
           )}
+
+          {/* Clickable Pill */}
+          <button
+            onClick={toggleFriendsList}
+            className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 hover:bg-[#2d1b4e] transition-colors w-full"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-[#a855f7] rounded-full shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>
+              <span className="text-white/80 text-sm">{friends.length} friends out</span>
+              <ChevronDown className={`w-4 h-4 text-white/60 transition-transform duration-200 ${showFriendsList ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
         </div>
       ) : !demoEnabled ? (
-        <div className="absolute top-20 left-4 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-20">
+        <div className="absolute bottom-24 left-6 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-20">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#a855f7]/30 rounded-full"></div>
             <span className="text-white/60 text-sm">No friends out</span>
