@@ -6,7 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, Users } from 'lucide-react';
+import { NewGroupChatDialog } from './NewGroupChatDialog';
 
 interface Friend {
   id: string;
@@ -35,6 +36,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   const [friends, setFriends] = useState<Friend[]>([]);
   const [search, setSearch] = useState('');
   const [isCreatingThread, setIsCreatingThread] = useState(false);
+  const [showGroupDialog, setShowGroupDialog] = useState(false);
   const isCreatingRef = useRef(false);
 
   // Wait for Supabase auth session to be ready
@@ -176,6 +178,11 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
     }
   };
 
+  const handleCreateGroup = () => {
+    onOpenChange(false);
+    setShowGroupDialog(true);
+  };
+
   const filteredFriends = friends.filter(
     (friend) =>
       friend.display_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -183,75 +190,104 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white">
-        {(isCreatingThread || preselectedUser) ? (
-          <div className="py-12 text-center">
-            <div className="animate-pulse text-white/60">
-              Opening chat with {preselectedUser?.display_name}...
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white">
+          {(isCreatingThread || preselectedUser) ? (
+            <div className="py-12 text-center">
+              <div className="animate-pulse text-white/60">
+                Opening chat with {preselectedUser?.display_name}...
+              </div>
             </div>
-          </div>
-        ) : (
-          <>
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold">New Message</DialogTitle>
-            </DialogHeader>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold">New Message</DialogTitle>
+              </DialogHeader>
 
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search friends..."
-                className="bg-[#0a0118] border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full pl-12"
-              />
-            </div>
-
-            {/* Friends List */}
-            <div className="max-h-[60vh] overflow-y-auto space-y-2">
-              {filteredFriends.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-white/60">No friends found</p>
-                  <p className="text-white/40 text-sm mt-2">
-                    Add friends to start messaging
-                  </p>
+              {/* Create Group Button */}
+              <button
+                onClick={handleCreateGroup}
+                className="w-full flex items-center gap-3 bg-[#2d1b4e]/60 border border-[#a855f7]/30 rounded-xl p-4 hover:bg-[#2d1b4e]/80 transition-colors mb-2"
+              >
+                <div className="w-12 h-12 rounded-full bg-[#a855f7]/20 border-2 border-[#a855f7]/40 flex items-center justify-center">
+                  <Users className="h-6 w-6 text-[#a855f7]" />
                 </div>
-              ) : (
-                filteredFriends.map((friend) => (
-                  <button
-                    key={friend.id}
-                    onClick={() => createThread(friend.id)}
-                    className="w-full bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-xl p-4 hover:bg-[#2d1b4e]/80 transition-colors flex items-center gap-3"
-                  >
-                    <Avatar className="h-12 w-12 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
-                      <AvatarImage src={friend.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white">
-                        {friend.display_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                <div className="flex-1 text-left">
+                  <h3 className="font-semibold text-white">Create Group</h3>
+                  <p className="text-white/50 text-sm">Message multiple friends at once</p>
+                </div>
+              </button>
 
-                    <div className="flex-1 text-left min-w-0">
-                      <h3 className="font-semibold text-white truncate">
-                        {friend.display_name}
-                      </h3>
-                      <p className="text-white/60 text-sm truncate">
-                        @{friend.username}
-                      </p>
-                    </div>
+              {/* Divider */}
+              <div className="flex items-center gap-3 py-2">
+                <div className="flex-1 h-px bg-[#a855f7]/20" />
+                <span className="text-white/40 text-sm">or message someone</span>
+                <div className="flex-1 h-px bg-[#a855f7]/20" />
+              </div>
 
-                    {friend.venue_name && (
-                      <div className="text-[#d4ff00] text-sm font-medium">
-                        @{friend.venue_name}
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search friends..."
+                  className="bg-[#0a0118] border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full pl-12"
+                />
+              </div>
+
+              {/* Friends List */}
+              <div className="max-h-[50vh] overflow-y-auto space-y-2">
+                {filteredFriends.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-white/60">No friends found</p>
+                    <p className="text-white/40 text-sm mt-2">
+                      Add friends to start messaging
+                    </p>
+                  </div>
+                ) : (
+                  filteredFriends.map((friend) => (
+                    <button
+                      key={friend.id}
+                      onClick={() => createThread(friend.id)}
+                      className="w-full bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-xl p-4 hover:bg-[#2d1b4e]/80 transition-colors flex items-center gap-3"
+                    >
+                      <Avatar className="h-12 w-12 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
+                        <AvatarImage src={friend.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white">
+                          {friend.display_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="flex-1 text-left min-w-0">
+                        <h3 className="font-semibold text-white truncate">
+                          {friend.display_name}
+                        </h3>
+                        <p className="text-white/60 text-sm truncate">
+                          @{friend.username}
+                        </p>
                       </div>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
+
+                      {friend.venue_name && (
+                        <div className="text-[#d4ff00] text-sm font-medium">
+                          @{friend.venue_name}
+                        </div>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Group Chat Dialog */}
+      <NewGroupChatDialog
+        open={showGroupDialog}
+        onOpenChange={setShowGroupDialog}
+      />
+    </>
   );
 }

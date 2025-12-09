@@ -196,16 +196,22 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           id: string
+          is_group: boolean | null
+          name: string | null
         }
         Insert: {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          is_group?: boolean | null
+          name?: string | null
         }
         Update: {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          is_group?: boolean | null
+          name?: string | null
         }
         Relationships: [
           {
@@ -1218,6 +1224,10 @@ export type Database = {
       }
       cleanup_old_checkins: { Args: never; Returns: number }
       create_dm_thread: { Args: { friend_id: string }; Returns: string }
+      create_group_thread: {
+        Args: { group_name?: string; member_ids: string[] }
+        Returns: string
+      }
       find_nearest_venue: {
         Args: { radius_meters?: number; user_lat: number; user_lng: number }
         Returns: {

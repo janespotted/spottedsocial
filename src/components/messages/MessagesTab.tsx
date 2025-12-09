@@ -12,13 +12,17 @@ import { MessagesSkeleton } from './MessagesSkeleton';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 
+interface ThreadMember {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 interface Thread {
   id: string;
-  user_id: string;
-  profiles: {
-    display_name: string;
-    avatar_url: string | null;
-  };
+  is_group: boolean;
+  name: string | null;
+  members: ThreadMember[];
   venue_name: string | null;
   last_message: {
     text: string;
@@ -69,7 +73,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
     console.log('📨 Fetching message threads (optimized)...');
     
     try {
-      // Step 1: Get user's thread IDs (1 query)
+      // Step 1: Get user's thread IDs with thread info (1 query)
       const { data: threadMemberships, error: membershipsError } = await supabase
         .from('dm_thread_members')
         .select('thread_id')
@@ -89,15 +93,19 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
       const threadIds = threadMemberships.map(t => t.thread_id);
       console.log('Found', threadIds.length, 'threads');
 
-      // Step 2: Batch fetch ALL data in parallel (3 queries instead of 4 per thread)
-      const [allMembersResult, allMessagesResult] = await Promise.all([
+      // Step 2: Batch fetch ALL data in parallel
+      const [threadsResult, allMembersResult, allMessagesResult] = await Promise.all([
+        // Get thread info (is_group, name)
+        supabase
+          .from('dm_threads')
+          .select('id, is_group, name')
+          .in('id', threadIds),
         // Get ALL members for all threads at once
         supabase
           .from('dm_thread_members')
           .select('thread_id, user_id')
           .in('thread_id', threadIds)
           .neq('user_id', user.id),
-        
         // Get ALL messages for all threads at once (we'll pick latest per thread)
         supabase
           .from('dm_messages')
@@ -106,6 +114,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
           .order('created_at', { ascending: false }),
       ]);
 
+      const threadInfoMap = new Map((threadsResult.data || []).map(t => [t.id, t]));
       const allMembers = allMembersResult.data || [];
       const allMessages = allMessagesResult.data || [];
 
@@ -113,7 +122,6 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
       const otherUserIds = [...new Set(allMembers.map(m => m.user_id))];
 
       // Step 3: Batch fetch profiles and statuses for all other users
-      // Use safe RPC to get profiles (respects location privacy)
       const [profilesResult, statusesResult] = await Promise.all([
         supabase.rpc('get_profiles_safe'),
         supabase
@@ -122,7 +130,6 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
           .in('user_id', otherUserIds),
       ]);
 
-      // Filter profiles to only other users in threads
       const allProfiles = profilesResult.data || [];
       const profiles = allProfiles.filter((p: any) => otherUserIds.includes(p.id));
       const statuses = statusesResult.data || [];
@@ -144,31 +151,52 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
         }
       }
 
-      // Build threads data in JavaScript (no more queries!)
+      // Group members by thread
+      const membersByThread = new Map<string, typeof allMembers>();
+      for (const member of allMembers) {
+        const existing = membersByThread.get(member.thread_id) || [];
+        existing.push(member);
+        membersByThread.set(member.thread_id, existing);
+      }
+
+      // Build threads data in JavaScript
       const threadsData: Thread[] = [];
       
       for (const { thread_id } of threadMemberships) {
-        const otherMember = allMembers.find(m => m.thread_id === thread_id);
-        if (!otherMember) continue;
+        const threadInfo = threadInfoMap.get(thread_id);
+        const threadMembers = membersByThread.get(thread_id) || [];
+        
+        if (threadMembers.length === 0) continue;
 
-        const profile = profileMap.get(otherMember.user_id);
-        if (!profile) continue;
+        // Build members array with profile info
+        const members: ThreadMember[] = threadMembers
+          .map(m => {
+            const profile = profileMap.get(m.user_id);
+            if (!profile) return null;
+            return {
+              user_id: m.user_id,
+              display_name: profile.display_name,
+              avatar_url: profile.avatar_url,
+            };
+          })
+          .filter((m): m is ThreadMember => m !== null);
+
+        if (members.length === 0) continue;
 
         const latestMessage = latestMessageByThread.get(thread_id);
-        const venueName = statusMap.get(otherMember.user_id) || null;
+        // For 1:1 chats, get the venue of the other person
+        const venueName = members.length === 1 ? statusMap.get(members[0].user_id) || null : null;
 
         // Calculate unread: if last message is from other user and within 30 min
-        const isUnread = latestMessage?.sender_id === otherMember.user_id && 
-                        latestMessage && 
+        const isUnread = latestMessage && 
+                        latestMessage.sender_id !== user.id && 
                         (Date.now() - new Date(latestMessage.created_at).getTime() < 30 * 60000);
 
         threadsData.push({
           id: thread_id,
-          user_id: otherMember.user_id,
-          profiles: {
-            display_name: profile.display_name,
-            avatar_url: profile.avatar_url,
-          },
+          is_group: threadInfo?.is_group || false,
+          name: threadInfo?.name || null,
+          members,
           venue_name: venueName,
           last_message: latestMessage ? {
             text: latestMessage.text,
@@ -197,9 +225,21 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
     return formatDistanceToNow(new Date(date), { addSuffix: true });
   };
 
-  const filteredThreads = threads.filter(t => 
-    t.profiles?.display_name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const getThreadDisplayName = (thread: Thread): string => {
+    if (thread.is_group && thread.name) return thread.name;
+    if (thread.is_group) {
+      // Generate name from members
+      const names = thread.members.map(m => m.display_name.split(' ')[0]);
+      if (names.length <= 3) return names.join(', ');
+      return `${names.slice(0, 2).join(', ')} & ${names.length - 2} others`;
+    }
+    return thread.members[0]?.display_name || 'Unknown';
+  };
+
+  const filteredThreads = threads.filter(t => {
+    const displayName = getThreadDisplayName(t);
+    return displayName.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <PullToRefresh onRefresh={fetchThreads}>
@@ -269,31 +309,59 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
                 className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 hover:bg-[#2d1b4e]/80 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openFriendCard({
-                        userId: thread.user_id,
-                        displayName: thread.profiles?.display_name || 'Friend',
-                        avatarUrl: thread.profiles?.avatar_url || null,
-                        venueName: thread.venue_name || undefined,
-                      });
-                    }}
-                    className="hover:opacity-80 transition-opacity"
-                  >
-                    <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
-                      <AvatarImage src={thread.profiles?.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white">
-                        {thread.profiles?.display_name?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                  </button>
+                  {thread.is_group ? (
+                    // Group avatar - grid of member avatars
+                    <div className="w-14 h-14 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] flex items-center justify-center overflow-hidden">
+                      {thread.members.length <= 4 ? (
+                        <div className="grid grid-cols-2 gap-0.5 w-full h-full p-1">
+                          {thread.members.slice(0, 4).map((member) => (
+                            <Avatar key={member.user_id} className="w-full h-full rounded-sm">
+                              <AvatarImage src={member.avatar_url || undefined} />
+                              <AvatarFallback className="bg-[#2d1b4e] text-white text-[10px] rounded-sm">
+                                {member.display_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[#a855f7] text-lg font-bold">{thread.members.length}</span>
+                      )}
+                    </div>
+                  ) : (
+                    // Single user avatar (1:1 chat)
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (thread.members[0]) {
+                          openFriendCard({
+                            userId: thread.members[0].user_id,
+                            displayName: thread.members[0].display_name,
+                            avatarUrl: thread.members[0].avatar_url,
+                            venueName: thread.venue_name || undefined,
+                          });
+                        }
+                      }}
+                      className="hover:opacity-80 transition-opacity"
+                    >
+                      <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
+                        <AvatarImage src={thread.members[0]?.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white">
+                          {thread.members[0]?.display_name?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
+                  )}
 
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-white truncate">
-                      {thread.profiles?.display_name}
-                    </h3>
-                    {thread.venue_name && (
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-white truncate">
+                        {getThreadDisplayName(thread)}
+                      </h3>
+                      {thread.is_group && (
+                        <span className="text-white/40 text-xs">({thread.members.length + 1})</span>
+                      )}
+                    </div>
+                    {!thread.is_group && thread.venue_name && (
                       <p className="text-[#d4ff00] text-sm font-medium">@{thread.venue_name}</p>
                     )}
                     {thread.last_message && (
