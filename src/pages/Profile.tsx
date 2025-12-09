@@ -43,6 +43,9 @@ export default function Profile() {
   const [wishlistPlaces, setWishlistPlaces] = useState<WishlistPlace[]>([]);
   const [recentSpots, setRecentSpots] = useState<RecentSpot[]>([]);
   const [spotsView, setSpotsView] = useState<'recent' | 'wishlist'>('recent');
+  const [currentStatus, setCurrentStatus] = useState<'out' | 'planning' | 'home' | null>(null);
+  const [currentVenue, setCurrentVenue] = useState<string | null>(null);
+  const [planningNeighborhood, setPlanningNeighborhood] = useState<string | null>(null);
   
   // Triple-tap secret access to demo settings
   const tapCountRef = useRef(0);
@@ -88,17 +91,26 @@ export default function Profile() {
       setLocationSharingLevel(profileData.location_sharing_level || 'all_friends');
     }
 
-    // Check if user is currently sharing location
+    // Check user's current night status (out, planning, or home)
     const { data: nightStatus } = await supabase
       .from('night_statuses')
-      .select('*')
+      .select('status, venue_name, planning_neighborhood')
       .eq('user_id', user?.id)
-      .not('venue_name', 'is', null)
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString())
       .maybeSingle();
 
-    setIsLocationSharing(!!nightStatus);
+    if (nightStatus) {
+      setCurrentStatus(nightStatus.status as 'out' | 'planning' | 'home');
+      setCurrentVenue(nightStatus.venue_name);
+      setPlanningNeighborhood(nightStatus.planning_neighborhood);
+      setIsLocationSharing(nightStatus.status === 'out' && !!nightStatus.venue_name);
+    } else {
+      setCurrentStatus(null);
+      setCurrentVenue(null);
+      setPlanningNeighborhood(null);
+      setIsLocationSharing(false);
+    }
 
     // Get friends count (both directions)
     const { data: sentFriendships } = await supabase
@@ -287,11 +299,15 @@ export default function Profile() {
         <div>
           <h2 className="text-xl font-bold text-white">@{profile?.username || 'username'}</h2>
           <div className="flex items-center gap-2 mt-1">
-            {isLocationSharing ? (
+            {currentStatus === 'out' && currentVenue ? (
               <>
-                <span className="text-[#d4ff00] font-medium">Sharing Location</span>
+                <span className="text-[#d4ff00] font-medium">@ {currentVenue}</span>
                 <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
               </>
+            ) : currentStatus === 'planning' ? (
+              <span className="text-[#a855f7] font-medium">
+                🎯 Planning{planningNeighborhood ? ` (${planningNeighborhood})` : ''}
+              </span>
             ) : (
               <span className="text-white/40">Not Sharing Location</span>
             )}
@@ -344,7 +360,7 @@ export default function Profile() {
         </div>
 
         {/* Location Sharing Card */}
-        <div className="bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4">
+        <div className={`bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4 transition-opacity duration-300 ${currentStatus === 'planning' ? 'opacity-50' : ''}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-[#d4ff00] flex items-center justify-center">
