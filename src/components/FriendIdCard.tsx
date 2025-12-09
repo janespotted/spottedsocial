@@ -111,7 +111,8 @@ export function FriendIdCard() {
 
   const handleViewStory = () => {
     if (hasStory && selectedFriend) {
-      setShowStoryViewer(true); // Don't close card - let StoryViewer overlay on top
+      closeFriendCard(); // Close the card first
+      setShowStoryViewer(true); // Then show the story
     }
   };
 
