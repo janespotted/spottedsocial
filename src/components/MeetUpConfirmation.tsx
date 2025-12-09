@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, MessageCircle } from 'lucide-react';
+import { Undo2, MessageCircle } from 'lucide-react';
 import { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import spottedLogo from '@/assets/spotted-s-logo.png';
@@ -133,7 +133,7 @@ export function MeetUpConfirmation() {
 
   return (
     <div 
-      className="fixed inset-0 z-[100] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"
+      className="fixed inset-0 z-[600] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"
       onClick={handleBackdropClick}
     >
       <div className="w-[90%] max-w-md">
@@ -164,23 +164,29 @@ export function MeetUpConfirmation() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-center gap-6 mt-6">
+          <div className="flex items-center justify-center gap-8 mt-6">
             {/* Undo Button */}
             <button
               onClick={handleUndo}
-              className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-lg"
+              className="flex flex-col items-center gap-1"
               aria-label="Undo meet up"
             >
-              <ArrowLeft className="w-7 h-7 text-white" />
+              <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-lg">
+                <Undo2 className="w-7 h-7 text-white" />
+              </div>
+              <span className="text-white/90 text-xs font-medium">Undo</span>
             </button>
 
             {/* Chat Button */}
             <button
               onClick={handleOpenChat}
-              className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-lg"
+              className="flex flex-col items-center gap-1"
               aria-label="Send message"
             >
-              <MessageCircle className="w-7 h-7 text-white" />
+              <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-lg">
+                <MessageCircle className="w-7 h-7 text-white" />
+              </div>
+              <span className="text-white/90 text-xs font-medium">Chat</span>
             </button>
           </div>
         </div>
