@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import Webcam from 'react-webcam';
 import { X, Camera, Image, RotateCcw } from 'lucide-react';
 
 interface PostMediaPickerProps {
@@ -9,56 +10,14 @@ interface PostMediaPickerProps {
 export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps) {
   const [cameraActive, setCameraActive] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const webcamRef = useRef<Webcam>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef<number>(0);
 
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    setCameraActive(false);
-  }, []);
-
-  const startCamera = useCallback(async () => {
-    try {
-      // Stop any existing stream first
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode, 
-          width: { ideal: 1080 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setCameraActive(true);
-    } catch (error) {
-      console.error('Camera access denied:', error);
-    }
-  }, [facingMode]);
-
-  // Restart camera when facingMode changes
-  useEffect(() => {
-    if (cameraActive) {
-      startCamera();
-    }
-  }, [facingMode]);
-
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, [stopCamera]);
+  const videoConstraints = {
+    facingMode: facingMode,
+    aspectRatio: 1, // Square for posts
+  };
 
   const flipCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
@@ -72,32 +31,22 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
     lastTapRef.current = now;
   };
 
-  const capturePhoto = () => {
-    if (!videoRef.current) return;
+  const capturePhoto = useCallback(() => {
+    if (!webcamRef.current) return;
 
-    const canvas = document.createElement('canvas');
-    const video = videoRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
+    const imageSrc = webcamRef.current.getScreenshot();
     
-    if (ctx) {
-      // Mirror the image if using front camera
-      if (facingMode === 'user') {
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-      }
-      ctx.drawImage(video, 0, 0);
-      canvas.toBlob((blob) => {
-        if (blob) {
+    if (imageSrc) {
+      // Convert base64 to blob
+      fetch(imageSrc)
+        .then(res => res.blob())
+        .then(blob => {
           const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-          const preview = canvas.toDataURL('image/jpeg');
-          stopCamera();
-          onMediaSelect(file, preview);
-        }
-      }, 'image/jpeg', 0.9);
+          setCameraActive(false);
+          onMediaSelect(file, imageSrc);
+        });
     }
-  };
+  }, [onMediaSelect]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -117,6 +66,10 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
     fileInputRef.current?.click();
   };
 
+  const startCamera = () => {
+    setCameraActive(true);
+  };
+
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       {/* Hidden file input */}
@@ -131,10 +84,7 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
       {/* Header */}
       <div className="flex items-center justify-between p-4 z-10">
         <button
-          onClick={() => {
-            stopCamera();
-            onClose();
-          }}
+          onClick={onClose}
           className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
         >
           <X className="h-6 w-6 text-white" />
@@ -147,16 +97,20 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
       <div className="flex-1 flex flex-col items-center justify-center overflow-hidden">
         {cameraActive ? (
           <div 
-            className="w-full h-full flex items-center justify-center"
+            className="w-full h-full"
             onClick={handleDoubleTap}
           >
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+            <Webcam
+              ref={webcamRef}
+              audio={false}
+              screenshotFormat="image/jpeg"
+              videoConstraints={videoConstraints}
+              mirrored={facingMode === 'user'}
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover' 
+              }}
             />
           </div>
         ) : (
