@@ -3,8 +3,20 @@ import { getBootstrapMode } from '@/lib/bootstrap-config';
 import type { SupportedCity } from '@/lib/city-detection';
 
 export function useBootstrapMode() {
-  const [bootstrapEnabled, setBootstrapEnabled] = useState(false);
-  const [city, setCity] = useState<SupportedCity>('nyc');
+  const [bootstrapEnabled, setBootstrapEnabled] = useState(() => {
+    try {
+      return getBootstrapMode().enabled;
+    } catch {
+      return false;
+    }
+  });
+  const [city, setCity] = useState<SupportedCity>(() => {
+    try {
+      return getBootstrapMode().city;
+    } catch {
+      return 'nyc';
+    }
+  });
 
   useEffect(() => {
     const checkBootstrapMode = () => {

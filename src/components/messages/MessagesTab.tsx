@@ -53,7 +53,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
     if (user) {
       fetchThreads();
     }
-  }, [user]);
+  }, [user, bootstrapEnabled, demoEnabled]);
 
   useEffect(() => {
     // Auto-open dialog if we have a preselected user
