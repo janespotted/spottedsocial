@@ -13,6 +13,7 @@ import { VenueInviteProvider } from "./contexts/VenueInviteContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { ImDownProvider } from "./contexts/ImDownContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AdminRoute } from "./components/AdminRoute";
 import { Layout } from "./components/Layout";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
@@ -44,6 +45,7 @@ import EditProfile from "./pages/EditProfile";
 import CloseFriends from "./pages/CloseFriends";
 import DemoSettings from "./pages/DemoSettings";
 import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -220,6 +222,16 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <Notifications />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin"
+                    element={
+                      <ProtectedRoute>
+                        <AdminRoute>
+                          <Admin />
+                        </AdminRoute>
                       </ProtectedRoute>
                     }
                   />
