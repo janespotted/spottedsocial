@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useUserCity } from '@/hooks/useUserCity';
 import { getDemoUsersForCity, getPromotedVenuesForCity } from '@/lib/demo-data';
 import type { SupportedCity } from '@/lib/city-detection';
@@ -100,13 +101,14 @@ export function ActivityTab() {
   const [friendRequestCount, setFriendRequestCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const demoEnabled = useDemoMode();
+  const { bootstrapEnabled } = useBootstrapMode();
   const { city } = useUserCity();
 
   useEffect(() => {
     if (user) {
       fetchAll();
     }
-  }, [user, demoEnabled, city]);
+  }, [user, demoEnabled, bootstrapEnabled, city]);
 
   const fetchAll = async () => {
     setIsLoading(true);
@@ -154,11 +156,21 @@ export function ActivityTab() {
       const senderIds = [...new Set(realInvitesResult.data.map(n => n.sender_id))];
       // Use safe RPC to get profiles (respects location privacy)
       const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
-      const senderProfiles = (allProfiles || []).filter((p: any) => senderIds.includes(p.id));
+      let senderProfiles = (allProfiles || []).filter((p: any) => senderIds.includes(p.id));
       
-      const profileMap = new Map(senderProfiles?.map(p => [p.id, p]) || []);
+      // In bootstrap mode (not demo mode), filter out demo users
+      if (bootstrapEnabled && !demoEnabled) {
+        senderProfiles = senderProfiles.filter((p: any) => !p.is_demo);
+      }
       
-      const realActivities: Activity[] = realInvitesResult.data.map(invite => {
+      const profileMap = new Map(senderProfiles?.map((p: any) => [p.id, p]) || []);
+      
+      // Filter invites to only those from non-demo users in bootstrap mode
+      const filteredInvites = (bootstrapEnabled && !demoEnabled)
+        ? realInvitesResult.data.filter(invite => profileMap.has(invite.sender_id))
+        : realInvitesResult.data;
+      
+      const realActivities: Activity[] = filteredInvites.map(invite => {
         const profile = profileMap.get(invite.sender_id);
         const isVenueInvite = invite.type === 'venue_invite';
         // Extract venue name from message like "X invited you to VenueName."
@@ -180,7 +192,7 @@ export function ActivityTab() {
       activityList.push(...realActivities);
     }
 
-    // Add demo activities if enabled
+    // Add demo activities ONLY if demo mode is enabled (not just bootstrap mode)
     if (demoEnabled) {
       const demoActivities = generateDemoActivities(city, userCurrentVenue);
       activityList.push(...demoActivities);
@@ -216,7 +228,16 @@ export function ActivityTab() {
         .limit(10);
 
       if (checkIns?.length) {
-        const checkInActivities: Activity[] = checkIns.map(checkIn => ({
+        // In bootstrap mode (not demo mode), filter out check-ins from demo users
+        const filteredCheckIns = (bootstrapEnabled && !demoEnabled)
+          ? checkIns.filter(checkIn => {
+              // Check if user is demo - we need to look up in profiles
+              // For now, filter by checking if the user_id matches any demo pattern
+              return !checkIn.is_demo;
+            })
+          : checkIns;
+        
+        const checkInActivities: Activity[] = filteredCheckIns.map(checkIn => ({
           id: checkIn.id,
           type: 'check_in' as const,
           title: `${checkIn.profiles?.display_name} arrived at the`,
