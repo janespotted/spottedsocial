@@ -20,7 +20,6 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
 
   const videoConstraints = {
     facingMode: facingMode,
-    aspectRatio: 9 / 16,
   };
 
   const handleFlipCamera = () => {
@@ -112,7 +111,7 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
       </div>
 
       {/* Camera preview area */}
-      <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+      <div className="flex-1 relative overflow-hidden">
         {hasCamera ? (
           <div 
             className="w-full h-full"
