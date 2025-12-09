@@ -15,6 +15,10 @@ export const CITY_NEIGHBORHOODS: Record<string, string[]> = {
     'Koreatown',
     'Mid-Wilshire',
     'Manhattan Beach',
+    'Beverly Hills',
+    'Culver City',
+    'Atwater Village',
+    'Hermosa Beach',
   ],
   nyc: [
     'Lower East Side',
@@ -31,6 +35,9 @@ export const CITY_NEIGHBORHOODS: Record<string, string[]> = {
     'Carroll Gardens',
     'Ridgewood',
     'Financial District',
+    'Hell\'s Kitchen',
+    'Upper East Side',
+    'Tribeca',
   ],
 };
 
