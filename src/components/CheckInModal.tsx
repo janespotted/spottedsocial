@@ -788,7 +788,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             <SelectTrigger className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#a855f7]/50 text-white focus:ring-[#a855f7] focus:border-[#a855f7]">
               <SelectValue placeholder="Select neighborhood..." />
             </SelectTrigger>
-            <SelectContent className="bg-[#1a0f2e] border-2 border-[#a855f7]/30 max-h-60 z-[100]">
+            <SelectContent className="bg-[#1a0f2e] border-2 border-[#a855f7]/30 max-h-60 z-[600]">
               {neighborhoods.map((neighborhood) => (
                 <SelectItem 
                   key={neighborhood} 
