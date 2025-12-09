@@ -1,4 +1,5 @@
 import { ReactNode, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { BottomNav } from './BottomNav';
 import { CheckInModal } from './CheckInModal';
 import { OnboardingCarousel } from './OnboardingCarousel';
@@ -9,6 +10,7 @@ import { useOnboarding } from '@/hooks/useOnboarding';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { showBrowserNotification } from '@/lib/notifications';
+import { cn } from '@/lib/utils';
 
 interface LayoutProps {
   children: ReactNode;
@@ -19,6 +21,10 @@ export function Layout({ children }: LayoutProps) {
   const { unreadCount } = useNotifications();
   const { showOnboarding, completeOnboarding, loading: onboardingLoading } = useOnboarding();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Map page needs full width and flex layout
+  const isMapPage = location.pathname === '/map';
 
   // Check for pending check-in reminders
   useEffect(() => {
@@ -52,9 +58,15 @@ export function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-16">
+    <div className={cn(
+      "min-h-[100dvh] bg-background flex flex-col",
+      !isMapPage && "pb-[calc(4rem+env(safe-area-inset-bottom,0px))]"
+    )}>
       <OfflineBanner />
-      <main className="max-w-[430px] mx-auto">
+      <main className={cn(
+        "flex-1 flex flex-col",
+        isMapPage ? "w-full" : "max-w-[430px] mx-auto w-full"
+      )}>
         {children}
       </main>
       <BottomNav />

@@ -879,8 +879,12 @@ export default function Map() {
     setSearchQuery('');
   };
 
+  // Consistent bottom offset for all floating elements (nav height + padding + safe area)
+  const bottomOffset = 'calc(5rem + env(safe-area-inset-bottom, 0px))';
+  const legendBottomOffset = 'calc(9rem + env(safe-area-inset-bottom, 0px))';
+
   return (
-    <div className="relative h-screen w-full">
+    <div className="relative flex-1 w-full">
       {/* Map Container */}
       <div ref={mapContainer} className="absolute inset-0" />
 
@@ -1040,7 +1044,7 @@ export default function Map() {
 
       {/* Friends Out Pill + List - Bottom Left */}
       {friends.length > 0 ? (
-        <div ref={friendsListRef} className={`absolute left-6 z-[200] max-w-sm transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: 'calc(7rem + env(safe-area-inset-bottom))' }}>
+        <div ref={friendsListRef} className={`absolute left-6 z-[200] max-w-sm transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: bottomOffset }}>
           {/* Expanded Friends List - Opens Upward */}
           {showFriendsList && (
             <div className="mb-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] max-h-96 overflow-y-auto relative z-[200]">
@@ -1105,7 +1109,7 @@ export default function Map() {
           </button>
         </div>
       ) : !demoEnabled ? (
-        <div className={`absolute left-6 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-20 transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: 'calc(7rem + env(safe-area-inset-bottom))' }}>
+        <div className={`absolute left-6 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-20 transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: bottomOffset }}>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#a855f7]/30 rounded-full"></div>
             <span className="text-white/60 text-sm">No friends out</span>
@@ -1117,14 +1121,14 @@ export default function Map() {
       <button
         onClick={centerOnMyLocation}
         className={`absolute right-6 w-12 h-12 rounded-full bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/50 flex items-center justify-center z-20 hover:bg-[#2d1b4e] transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.4)] ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-        style={{ bottom: 'calc(7rem + env(safe-area-inset-bottom))' }}
+        style={{ bottom: bottomOffset }}
         aria-label="Center on my location"
       >
         <Crosshair className="w-5 h-5 text-white" />
       </button>
 
       {/* Legend */}
-      <div className={`absolute right-6 bg-[#2d1b4e]/95 backdrop-blur-sm border border-[#a855f7]/20 rounded-md p-2 z-20 shadow-[0_0_8px_rgba(168,85,247,0.2)] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: 'calc(11rem + env(safe-area-inset-bottom))' }}>
+      <div className={`absolute right-6 bg-[#2d1b4e]/95 backdrop-blur-sm border border-[#a855f7]/20 rounded-md p-2 z-20 shadow-[0_0_8px_rgba(168,85,247,0.2)] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: legendBottomOffset }}>
         <p className="text-white/70 text-[10px] font-medium mb-1.5">Relationship</p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">
