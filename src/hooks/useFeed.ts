@@ -68,6 +68,7 @@ export function useFeed(options: UseFeedOptions) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [storyUsers, setStoryUsers] = useState<StoryUser[]>([]);
+  const [userHasStory, setUserHasStory] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<{ [key: string]: PostComment[] }>({});
@@ -274,8 +275,10 @@ export function useFeed(options: UseFeedOptions) {
         return;
       }
 
-      // Filter stories by city venue names
+      // Filter stories by city venue names, but ALWAYS include current user's stories
       const filteredStories = stories.filter(story => {
+        // Always include current user's stories regardless of venue
+        if (story.user_id === userId) return true;
         if (!story.venue_name) return true; // Include stories without venue
         return cityVenueNames.has(story.venue_name.toLowerCase());
       });
@@ -308,6 +311,10 @@ export function useFeed(options: UseFeedOptions) {
           userStory.hasUnviewed = true;
         }
       });
+
+      // Check if current user has active stories
+      const currentUserHasStory = userStoryMap.has(userId);
+      setUserHasStory(currentUserHasStory);
 
       const storyUsersList: StoryUser[] = [];
       userStoryMap.forEach((data, storyUserId) => {
@@ -550,6 +557,7 @@ export function useFeed(options: UseFeedOptions) {
     setPosts,
     friends,
     storyUsers,
+    userHasStory,
     likedPosts,
     likedComments,
     expandedPostId,
