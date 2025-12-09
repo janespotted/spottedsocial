@@ -7,6 +7,7 @@ import { OfflineBanner } from './OfflineBanner';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
+import { useCheckInPrompt } from '@/hooks/useCheckInPrompt';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { showBrowserNotification } from '@/lib/notifications';
@@ -22,6 +23,9 @@ export function Layout({ children }: LayoutProps) {
   const { showOnboarding, completeOnboarding, loading: onboardingLoading } = useOnboarding();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Auto check-in prompt (runs after onboarding, during nightlife hours)
+  useCheckInPrompt();
   
   // Map page needs full width and flex layout
   const isMapPage = location.pathname === '/map';

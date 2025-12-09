@@ -31,6 +31,8 @@ import { PostLikesModal } from '@/components/PostLikesModal';
 import { CityBadge } from '@/components/CityBadge';
 import { FeedSkeleton } from '@/components/FeedSkeleton';
 import { FriendsPlanning } from '@/components/FriendsPlanning';
+import { DaytimeCard } from '@/components/DaytimeCard';
+import { isNightlifeHours } from '@/lib/time-context';
 
 export default function Home() {
   const { user } = useAuth();
@@ -79,7 +81,6 @@ export default function Home() {
     getCachedStories,
   });
 
-  const [hasCheckedToday, setHasCheckedToday] = useState(false);
   const [selectedStoryUser, setSelectedStoryUser] = useState<string | null>(null);
   const [createStoryOpen, setCreateStoryOpen] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
@@ -112,28 +113,6 @@ export default function Home() {
       openVenueCard(data.id);
     }
   };
-
-  const checkFirstLogin = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('night_statuses')
-      .select('updated_at')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!data) {
-      openCheckIn();
-      setHasCheckedToday(false);
-    } else {
-      const lastUpdate = new Date(data.updated_at);
-      const today = new Date();
-      const isToday = lastUpdate.toDateString() === today.toDateString();
-      setHasCheckedToday(isToday);
-      if (!isToday) {
-        openCheckIn();
-      }
-    }
-  }, [user, openCheckIn]);
 
   // Fetch planning friends
   const fetchPlanningFriends = async () => {
@@ -193,11 +172,10 @@ export default function Home() {
     })));
   };
 
-  // Initial data fetch - only depends on user and demoEnabled, not on callback functions
+  // Initial data fetch - check-in prompt is now handled by useCheckInPrompt in Layout
   useEffect(() => {
     if (user) {
       setIsLoading(true);
-      checkFirstLogin();
       Promise.all([
         fetchFriendsRef.current(),
         fetchPostsRef.current(),
@@ -205,7 +183,7 @@ export default function Home() {
         fetchPlanningFriends(),
       ]).finally(() => setIsLoading(false));
     }
-  }, [user, demoEnabled, city, checkFirstLogin]);
+  }, [user, demoEnabled, city]);
 
   // Handle new post incrementally
   const handleNewPost = useCallback((payload: any) => {
@@ -338,8 +316,13 @@ export default function Home() {
       <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); await fetchPlanningFriends(); }}>
         <div className="px-4 py-6 space-y-6">
         
-        {/* Friends Planning Card */}
-        {planningFriends.length > 0 && !isLoading && (
+        {/* Daytime Card - shown before 5pm when no nightlife activity */}
+        {!isNightlifeHours() && !isLoading && (
+          <DaytimeCard planningFriendsCount={planningFriends.length} />
+        )}
+        
+        {/* Friends Planning Card - shown during nightlife hours */}
+        {isNightlifeHours() && planningFriends.length > 0 && !isLoading && (
           <FriendsPlanning friends={planningFriends} variant="card" />
         )}
         
