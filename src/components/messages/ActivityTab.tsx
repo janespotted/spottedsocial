@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isVenueOpen, VenueHours } from '@/lib/venue-hours';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
@@ -198,26 +199,34 @@ export function ActivityTab() {
       activityList.push(...demoActivities);
     }
 
-    // Add trending venue from user's city
-    const { data: trendingVenue } = await supabase
+    // Add trending venue from user's city - only open venues
+    const { data: trendingVenues } = await supabase
       .from('venues')
-      .select('id, name')
+      .select('id, name, operating_hours')
       .eq('city', city)
       .order('popularity_rank', { ascending: true })
-      .limit(5);
+      .limit(15);
     
-    if (trendingVenue && trendingVenue.length > 0) {
-      // Pick a random venue from top 5
-      const randomVenue = trendingVenue[Math.floor(Math.random() * trendingVenue.length)];
-      activityList.push({
-        id: 'trending-1',
-        type: 'trending',
-        title: `${randomVenue.name} is trending`,
-        subtitle: '12+ here now',
-        timestamp: new Date(Date.now() - 300000).toISOString(),
-        action: 'view',
-        venue_id: randomVenue.id,
-      });
+    if (trendingVenues && trendingVenues.length > 0) {
+      // Filter to only open venues
+      const openVenues = trendingVenues.filter(venue => 
+        isVenueOpen(venue.operating_hours as VenueHours | null)
+      );
+      
+      if (openVenues.length > 0) {
+        // Pick a random venue from top 5 open venues
+        const topOpenVenues = openVenues.slice(0, 5);
+        const randomVenue = topOpenVenues[Math.floor(Math.random() * topOpenVenues.length)];
+        activityList.push({
+          id: 'trending-1',
+          type: 'trending',
+          title: `${randomVenue.name} is trending`,
+          subtitle: '12+ here now',
+          timestamp: new Date(Date.now() - 300000).toISOString(),
+          action: 'view',
+          venue_id: randomVenue.id,
+        });
+      }
     }
 
     // Set initial activities immediately (fast render with real invites/demo/trending)
