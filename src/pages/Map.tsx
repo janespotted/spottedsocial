@@ -885,7 +885,10 @@ export default function Map() {
       <div ref={mapContainer} className="absolute inset-0" />
 
       {/* Header */}
-      <div className="absolute top-4 left-0 right-0 flex items-center justify-between px-6 py-4 z-20">
+      <div 
+        className="absolute left-0 right-0 flex items-center justify-between px-6 py-4 z-20"
+        style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+      >
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
           <CityBadge />
@@ -913,7 +916,11 @@ export default function Map() {
       </div>
 
       {/* Search Button/Input - Top Left Below Header */}
-      <div ref={searchContainerRef} className={`absolute top-28 left-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+      <div 
+        ref={searchContainerRef} 
+        className={`absolute left-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        style={{ top: 'calc(7rem + env(safe-area-inset-top, 0px))' }}
+      >
         {showSearch ? (
           <div className="flex items-center gap-2 bg-[#2d1b4e]/90 backdrop-blur rounded-full border border-[#a855f7]/50 px-3 py-2 animate-fade-in shadow-[0_0_15px_rgba(168,85,247,0.2)]">
             <span className="text-sm">🔍</span>
@@ -945,7 +952,10 @@ export default function Map() {
 
       {/* Search Results Dropdown */}
       {showSearch && searchQuery.length > 0 && !focusMode && (
-        <div className="absolute top-40 left-4 w-64 z-[250] bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 overflow-y-auto">
+        <div 
+          className="absolute left-4 w-64 z-[250] bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 overflow-y-auto"
+          style={{ top: 'calc(10rem + env(safe-area-inset-top, 0px))' }}
+        >
           {filteredSearchVenues.length > 0 ? (
             filteredSearchVenues.slice(0, 10).map((venue) => (
               <button
@@ -969,7 +979,11 @@ export default function Map() {
       )}
 
       {/* Venue Type Filter - Collapsible in top right */}
-      <div ref={venueFilterRef} className={`absolute top-28 right-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+      <div 
+        ref={venueFilterRef} 
+        className={`absolute right-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        style={{ top: 'calc(7rem + env(safe-area-inset-top, 0px))' }}
+      >
         {/* Collapsed Pill */}
         <button
           onClick={() => setShowVenueFilters(!showVenueFilters)}
