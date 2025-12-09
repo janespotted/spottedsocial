@@ -194,25 +194,38 @@ export default function Map() {
       // When demo mode is ON, fetch demo users from database
       if (demoEnabledRef.current) {
         // Fetch demo users who are "out" from night_statuses joined with profiles
-        const { data: demoStatuses } = await supabase
-          .from('night_statuses')
-          .select(`
-            user_id,
-            lat,
-            lng,
-            venue_name,
-            profiles!inner(display_name, avatar_url, is_demo)
-          `)
-          .eq('status', 'out')
-          .eq('profiles.is_demo', true)
-          .not('expires_at', 'is', null)
-          .gt('expires_at', new Date().toISOString());
-
-        // Fetch venues for current city to filter demo users
-        const { data: cityVenues } = await supabase
-          .from('venues')
-          .select('name')
-          .eq('city', cityRef.current);
+        const [{ data: demoStatuses }, { data: planningDemoStatuses }, { data: cityVenues }] = await Promise.all([
+          supabase
+            .from('night_statuses')
+            .select(`
+              user_id,
+              lat,
+              lng,
+              venue_name,
+              profiles!inner(display_name, avatar_url, is_demo)
+            `)
+            .eq('status', 'out')
+            .eq('profiles.is_demo', true)
+            .not('expires_at', 'is', null)
+            .gt('expires_at', new Date().toISOString()),
+          // Also fetch planning demo users
+          supabase
+            .from('night_statuses')
+            .select(`
+              user_id,
+              planning_neighborhood,
+              profiles!inner(display_name, avatar_url, is_demo)
+            `)
+            .eq('status', 'planning')
+            .eq('profiles.is_demo', true)
+            .not('expires_at', 'is', null)
+            .gt('expires_at', new Date().toISOString()),
+          // Fetch venues for current city to filter demo users
+          supabase
+            .from('venues')
+            .select('name')
+            .eq('city', cityRef.current)
+        ]);
 
         const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
 
@@ -246,6 +259,15 @@ export default function Map() {
           }));
 
         friendIds = friendLocations.map(f => f.user_id);
+
+        // Set planning friends from demo data
+        const planningFriendsData = (planningDemoStatuses || []).map((status: any) => ({
+          user_id: status.user_id,
+          display_name: status.profiles?.display_name || 'Friend',
+          avatar_url: status.profiles?.avatar_url || null,
+          planning_neighborhood: status.planning_neighborhood || null,
+        }));
+        setPlanningFriends(planningFriendsData);
       } else {
         // Normal mode: show real friends only
         // Get list of accepted friends (both directions)
