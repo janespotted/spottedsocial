@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { StoryViewer } from '@/components/StoryViewer';
 import { CreateStoryDialog } from '@/components/CreateStoryDialog';
+import { CreatePostDialog } from '@/components/CreatePostDialog';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { CityBadge } from '@/components/CityBadge';
@@ -77,6 +78,7 @@ export default function Home() {
   const [hasCheckedToday, setHasCheckedToday] = useState(false);
   const [selectedStoryUser, setSelectedStoryUser] = useState<string | null>(null);
   const [createStoryOpen, setCreateStoryOpen] = useState(false);
+  const [showCreatePost, setShowCreatePost] = useState(false);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -535,6 +537,17 @@ export default function Home() {
       )}
 
       <CreateStoryDialog open={createStoryOpen} onOpenChange={setCreateStoryOpen} />
+
+      {/* Create Post FAB */}
+      <button
+        onClick={() => setShowCreatePost(true)}
+        className="fixed bottom-28 right-6 z-20 w-14 h-14 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:scale-110 transition-transform"
+        aria-label="Create post"
+      >
+        <Plus className="h-7 w-7 text-white" />
+      </button>
+
+      <CreatePostDialog open={showCreatePost} onOpenChange={setShowCreatePost} />
 
       {selectedPostForLikes && (
         <PostLikesModal
