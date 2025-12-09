@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MessageSquare, Crosshair, MapPin, Bell, ChevronDown, Search, X } from 'lucide-react';
+import { FriendsPlanning } from '@/components/FriendsPlanning';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { useToast } from '@/hooks/use-toast';
@@ -58,6 +59,7 @@ export default function Map() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
+  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null }[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [venueFilter, setVenueFilter] = useState<'all' | 'nightclub' | 'cocktail_bar' | 'bar' | 'rooftop'>('all');
   // Use Map object keyed by user_id to prevent duplicate markers
@@ -283,18 +285,34 @@ export default function Map() {
             friendProfiles = friendProfiles.filter((p: any) => p.is_demo === false);
           }
 
-          // Get friends' venue names from night_statuses
+          // Get friends' night statuses to determine status type
           const { data: statuses } = await supabase
             .from('night_statuses')
-            .select('user_id, venue_name')
+            .select('user_id, venue_name, status')
             .in('user_id', friendIds)
             .not('expires_at', 'is', null)
             .gt('expires_at', new Date().toISOString());
 
           const venueMap: Record<string, string> = {};
+          const planningFriendsData: { user_id: string; display_name: string; avatar_url: string | null }[] = [];
+          
           statuses?.forEach(s => {
-            venueMap[s.user_id] = s.venue_name;
+            if (s.status === 'planning') {
+              // Find the profile for this planning friend
+              const profile = (allProfiles || []).find((p: any) => p.id === s.user_id);
+              if (profile && friendIds.includes(s.user_id)) {
+                planningFriendsData.push({
+                  user_id: s.user_id,
+                  display_name: profile.display_name || 'Friend',
+                  avatar_url: profile.avatar_url,
+                });
+              }
+            } else if (s.venue_name) {
+              venueMap[s.user_id] = s.venue_name;
+            }
           });
+          
+          setPlanningFriends(planningFriendsData);
 
           // Get relationship types (close friends, mutual friends) - BATCHED QUERY
           const { data: closeFriends } = await supabase
@@ -1195,6 +1213,14 @@ export default function Map() {
           </div>
         </div>
       ) : null}
+
+      {/* Friends Planning Pill - Below friends out */}
+      <FriendsPlanning 
+        friends={planningFriends}
+        variant="pill"
+        className={`absolute left-6 z-[199] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        style={{ bottom: friends.length > 0 ? 'calc(8rem + env(safe-area-inset-bottom, 0px))' : bottomOffset }}
+      />
 
       {/* My Location Button */}
       <button

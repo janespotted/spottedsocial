@@ -34,7 +34,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const { isReminderTriggered } = useCheckIn();
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home'>('home');
+  const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home' | 'planning'>('home');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showVenueConfirm, setShowVenueConfirm] = useState(false);
@@ -180,13 +180,17 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     }
   };
 
-  const handleStatusUpdate = async (status: 'out' | 'heading_out' | 'home') => {
+  const handleStatusUpdate = async (status: 'out' | 'heading_out' | 'home' | 'planning') => {
     setSelectedStatus(status);
 
     if (status === 'out') {
       setShowShareModal(true);
     } else if (status === 'heading_out') {
       await captureAndDeriveVenue();
+    } else if (status === 'planning') {
+      // Planning mode: can see friends but don't share your location
+      await updateStatus('planning', null, null, null);
+      onOpenChange(false);
     } else {
       await stopLocationTracking();
       await updateStatus(status, null, null, null);
@@ -344,7 +348,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   };
 
   const updateStatus = async (
-    status: 'out' | 'heading_out' | 'home',
+    status: 'out' | 'heading_out' | 'home' | 'planning',
     lat: number | null,
     lng: number | null,
     venue: string | null,
@@ -371,7 +375,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       // Haptic feedback for successful check-in
       haptic.medium();
 
-      if (status !== 'home' && lat && lng && venue) {
+      if (status === 'out' && lat && lng && venue) {
         // End any active check-ins before creating a new one
         await supabase
           .from('checkins')
@@ -399,18 +403,32 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           source: 'manual_checkin',
           status,
         });
-      } else if (status === 'home') {
-        // End all active check-ins when going home
+      } else if (status === 'home' || status === 'planning') {
+        // End all active check-ins when going home or planning
         await supabase
           .from('checkins')
           .update({ ended_at: new Date().toISOString() })
           .eq('user_id', user?.id)
           .is('ended_at', null);
+        
+        // For planning, also update profile to not show location
+        if (status === 'planning') {
+          await supabase
+            .from('profiles')
+            .update({ is_out: false })
+            .eq('id', user?.id);
+        }
       }
+
+      const description = 
+        status === 'home' ? "You're staying in." : 
+        status === 'out' ? `You're out at ${venue}!` : 
+        status === 'planning' ? "You're in planning mode! You can see where friends are." :
+        `You're still deciding - heading to ${venue}!`;
 
       toast({
         title: 'Status updated!',
-        description: status === 'home' ? "You're staying in." : status === 'out' ? `You're out at ${venue}!` : `You're still deciding - heading to ${venue}!`,
+        description,
       });
     } catch (error: any) {
       toast({
@@ -453,6 +471,15 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             disabled={isDetectingLocation}
           >
             {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes 🎉'}
+          </Button>
+          {/* Planning / PGing - Secondary purple button */}
+          <Button
+            onClick={() => handleStatusUpdate('planning')}
+            size="lg"
+            className="w-full h-16 text-xl font-semibold rounded-full border-[3px] border-[#a855f7]/70 bg-[#a855f7]/10 backdrop-blur-sm text-white hover:bg-[#a855f7]/20 hover:border-[#a855f7] hover:shadow-[0_0_20px_rgba(168,85,247,0.3),inset_0_1px_0_rgba(168,85,247,0.1)] hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
+            disabled={isDetectingLocation}
+          >
+            Planning to / PGing 🎯
           </Button>
           {/* No - Glass-morphism secondary button */}
           <Button
