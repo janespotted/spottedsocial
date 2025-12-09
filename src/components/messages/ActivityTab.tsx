@@ -454,6 +454,28 @@ export function ActivityTab() {
 
   return (
     <div className="space-y-4">
+      {/* Friend Requests - Always at top */}
+      <div
+        onClick={() => navigate('/friend-requests')}
+        className="bg-gradient-to-r from-[#2d1b4e]/80 to-[#3d1b5e]/60 border border-[#a855f7]/30 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-[#2d1b4e]/80 transition-all hover:border-[#a855f7]/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] flex items-center justify-center shadow-[0_0_12px_rgba(168,85,247,0.4)]">
+            <UserPlus className="h-6 w-6 text-[#d4ff00]" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white">Friend Requests</h3>
+            <p className="text-white/60 text-sm">
+              {friendRequestCount > 0 ? `${friendRequestCount} pending request${friendRequestCount > 1 ? 's' : ''}` : 'Find and add friends'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {friendRequestCount > 0 && <div className="bg-[#a855f7] rounded-full w-2.5 h-2.5 animate-pulse" />}
+          <ChevronRight className="h-5 w-5 text-white/40" />
+        </div>
+      </div>
+
       {/* Friends Planning / PGing Section */}
       {planningFriends.length > 0 && (
         <div className="space-y-3">
@@ -513,28 +535,6 @@ export function ActivityTab() {
           </div>
         </div>
       )}
-
-      {/* Friend Requests */}
-      <div
-        onClick={() => navigate('/friend-requests')}
-        className="bg-gradient-to-r from-[#2d1b4e]/80 to-[#3d1b5e]/60 border border-[#a855f7]/30 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-[#2d1b4e]/80 transition-all hover:border-[#a855f7]/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] flex items-center justify-center shadow-[0_0_12px_rgba(168,85,247,0.4)]">
-            <UserPlus className="h-6 w-6 text-[#d4ff00]" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-white">Friend Requests</h3>
-            <p className="text-white/60 text-sm">
-              {friendRequestCount > 0 ? `${friendRequestCount} pending request${friendRequestCount > 1 ? 's' : ''}` : 'Find and add friends'}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {friendRequestCount > 0 && <div className="bg-[#a855f7] rounded-full w-2.5 h-2.5 animate-pulse" />}
-          <ChevronRight className="h-5 w-5 text-white/40" />
-        </div>
-      </div>
 
       {/* Activity Header */}
       <h2 className="text-2xl font-bold text-white">Activity</h2>
