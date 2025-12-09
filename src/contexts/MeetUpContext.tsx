@@ -124,14 +124,12 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Get sender's display name
-      const { data: senderProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', user.id)
-        .single();
+      // Get sender's display name using safe RPC (own profile is always visible)
+      const { data: senderProfiles, error: profileError } = await supabase
+        .rpc('get_profile_safe', { target_user_id: user.id });
 
       if (profileError) throw profileError;
+      const senderProfile = senderProfiles?.[0];
 
       // Extract first name from display name
       const fullName = senderProfile?.display_name || 'Someone';

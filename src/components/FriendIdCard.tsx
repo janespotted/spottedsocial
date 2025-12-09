@@ -129,12 +129,9 @@ export function FriendIdCard() {
 
   const checkIfDemoUser = async () => {
     if (!selectedFriend) return;
-    const { data } = await supabase
-      .from('profiles')
-      .select('is_demo')
-      .eq('id', selectedFriend.userId)
-      .single();
-    setIsDemoUser(data?.is_demo || false);
+    // Use safe RPC to check if user is demo (respects location privacy)
+    const { data } = await supabase.rpc('get_profile_safe', { target_user_id: selectedFriend.userId });
+    setIsDemoUser(data?.[0]?.is_demo || false);
   };
 
   // Calculate distance when we have both locations

@@ -149,13 +149,12 @@ export function ActivityTab() {
 
     const activityList: Activity[] = [];
 
-    // Add real notifications/invites with sender profile lookup
+    // Add real notifications/invites with sender profile lookup using safe RPC
     if (realInvitesResult.data?.length) {
       const senderIds = [...new Set(realInvitesResult.data.map(n => n.sender_id))];
-      const { data: senderProfiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url')
-        .in('id', senderIds);
+      // Use safe RPC to get profiles (respects location privacy)
+      const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+      const senderProfiles = (allProfiles || []).filter((p: any) => senderIds.includes(p.id));
       
       const profileMap = new Map(senderProfiles?.map(p => [p.id, p]) || []);
       
@@ -272,12 +271,9 @@ export function ActivityTab() {
   const handleAcceptMeetUp = async (activity: Activity) => {
     if (!user || !activity.user_id || !activity.display_name) return;
 
-    // Get current user's display name
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('display_name')
-      .eq('id', user.id)
-      .single();
+    // Get current user's display name using safe RPC (own profile is always visible)
+    const { data: profiles } = await supabase.rpc('get_profile_safe', { target_user_id: user.id });
+    const profile = profiles?.[0];
 
     const myName = profile?.display_name?.split(' ')[0] || 'Someone';
 
@@ -310,12 +306,9 @@ export function ActivityTab() {
   const handleAcceptVenueInvite = async (activity: Activity) => {
     if (!user || !activity.user_id || !activity.display_name) return;
 
-    // Get current user's display name
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('display_name')
-      .eq('id', user.id)
-      .single();
+    // Get current user's display name using safe RPC (own profile is always visible)
+    const { data: profiles } = await supabase.rpc('get_profile_safe', { target_user_id: user.id });
+    const profile = profiles?.[0];
 
     const myName = profile?.display_name?.split(' ')[0] || 'Someone';
 

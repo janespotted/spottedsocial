@@ -1216,6 +1216,7 @@ export type Database = {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
       }
+      cleanup_old_checkins: { Args: never; Returns: number }
       create_dm_thread: { Args: { friend_id: string }; Returns: string }
       find_nearest_venue: {
         Args: { radius_meters?: number; user_lat: number; user_lng: number }

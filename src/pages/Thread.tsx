@@ -17,8 +17,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { z } from 'zod';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { logger } from '@/lib/logger';
+
+// Validation schema for DM messages
+const messageSchema = z.object({
+  text: z.string().trim().min(1, 'Message cannot be empty').max(2000, 'Message is too long (max 2000 characters)')
+});
 
 interface Message {
   id: string;
@@ -226,10 +232,17 @@ export default function Thread() {
     e.preventDefault();
     if (!newMessage.trim() || !user) return;
 
+    // Validate message with Zod
+    const validation = messageSchema.safeParse({ text: newMessage });
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
     const { error } = await supabase.from('dm_messages').insert({
       thread_id: threadId,
       sender_id: user.id,
-      text: newMessage.trim(),
+      text: validation.data.text,
     });
 
     if (error) {

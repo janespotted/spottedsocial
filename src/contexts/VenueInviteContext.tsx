@@ -64,14 +64,12 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Get current user's profile for first name
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', user.id)
-        .single();
+      // Get current user's profile for first name using safe RPC (own profile is always visible)
+      const { data: profiles } = await supabase
+        .rpc('get_profile_safe', { target_user_id: user.id });
+      const profile = profiles?.[0];
 
-      const senderFirstName = profile?.display_name.split(' ')[0] || 'Someone';
+      const senderFirstName = profile?.display_name?.split(' ')[0] || 'Someone';
 
       // Send notification to each filtered friend (real users only)
       const notifications = filteredFriends.map(friend => ({

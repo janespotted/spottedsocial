@@ -237,17 +237,16 @@ export function VenueIdCard() {
           const friendsAtVenueIds = userIds.filter(id => friendIds.includes(id));
 
           if (friendsAtVenueIds.length > 0) {
-            let profileQuery = supabase
-              .from('profiles')
-              .select('id, display_name, avatar_url')
-              .in('id', friendsAtVenueIds);
+            // Use safe RPC to get profiles (respects location privacy)
+            const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+            
+            // Filter to only friends at venue and conditionally exclude demo users
+            let profiles = (allProfiles || []).filter((p: any) => friendsAtVenueIds.includes(p.id));
             
             // Only filter out demo users when demo mode is OFF (bootstrap mode)
             if (!demoEnabled) {
-              profileQuery = profileQuery.eq('is_demo', false);
+              profiles = profiles.filter((p: any) => p.is_demo === false);
             }
-            
-            const { data: profiles } = await profileQuery;
 
             // Deduplicate by display_name (keeps first occurrence)
             const seenNames = new Set<string>();
@@ -318,13 +317,12 @@ export function VenueIdCard() {
       let profilesMap: Record<string, { display_name: string; avatar_url: string | null }> = {};
 
       if (allUserIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, display_name, avatar_url')
-          .in('id', allUserIds);
+        // Use safe RPC to get profiles (respects location privacy)
+        const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+        const profiles = (allProfiles || []).filter((p: any) => allUserIds.includes(p.id));
 
         if (profiles) {
-          profilesMap = profiles.reduce((acc, p) => {
+          profilesMap = profiles.reduce((acc: typeof profilesMap, p: any) => {
             acc[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url };
             return acc;
           }, {} as typeof profilesMap);
