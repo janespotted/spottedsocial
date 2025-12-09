@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send } from 'lucide-react';
+import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, UserPlus } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,13 @@ interface DownUser {
     display_name: string;
     avatar_url: string | null;
   };
+}
+
+interface Participant {
+  id: string;
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
 }
 
 interface PlanItemProps {
@@ -70,6 +77,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
   const [downs, setDowns] = useState<DownUser[]>([]);
   const [isDown, setIsDown] = useState(false);
   const [isTogglingDown, setIsTogglingDown] = useState(false);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
 
@@ -99,8 +107,34 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
     }
   };
 
+  // Fetch participants (friends going with the plan creator)
+  const fetchParticipants = async () => {
+    const { data } = await supabase
+      .from('plan_participants')
+      .select('id, user_id')
+      .eq('plan_id', plan.id);
+
+    if (data && data.length > 0) {
+      const userIds = data.map(p => p.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', userIds);
+
+      setParticipants(profiles?.map(p => ({
+        id: p.id,
+        user_id: p.id,
+        display_name: p.display_name,
+        avatar_url: p.avatar_url
+      })) || []);
+    } else {
+      setParticipants([]);
+    }
+  };
+
   useEffect(() => {
     fetchDowns();
+    fetchParticipants();
   }, [plan.id, currentUserId]);
 
   const handleToggleDown = async () => {
@@ -317,10 +351,45 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
         </div>
       </div>
 
+      {/* Participants - Friends going with the plan creator */}
+      {participants.length > 0 && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <UserPlus className="w-3 h-3" />
+            Going with:
+          </span>
+          <div className="flex -space-x-2">
+            {participants.slice(0, 5).map((participant) => (
+              <Avatar 
+                key={participant.id} 
+                className="h-7 w-7 border-2 border-card cursor-pointer"
+                onClick={() => openFriendCard({
+                  userId: participant.user_id,
+                  displayName: participant.display_name,
+                  avatarUrl: participant.avatar_url,
+                })}
+              >
+                <AvatarImage src={participant.avatar_url || ''} />
+                <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                  {participant.display_name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+            ))}
+            {participants.length > 5 && (
+              <div className="h-7 w-7 rounded-full bg-primary/20 border-2 border-card flex items-center justify-center">
+                <span className="text-xs text-primary">+{participants.length - 5}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Description */}
-      <p className="text-foreground mb-3 whitespace-pre-wrap">
-        {plan.description}
-      </p>
+      {plan.description && (
+        <p className="text-foreground mb-3 whitespace-pre-wrap">
+          {plan.description}
+        </p>
+      )}
 
       {/* I'm Down Section */}
       <div className="flex items-center gap-3 mb-4">

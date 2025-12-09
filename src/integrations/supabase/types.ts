@@ -517,6 +517,35 @@ export type Database = {
           },
         ]
       }
+      plan_participants: {
+        Row: {
+          created_at: string | null
+          id: string
+          plan_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          plan_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          plan_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_participants_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_votes: {
         Row: {
           created_at: string | null
@@ -553,7 +582,7 @@ export type Database = {
         Row: {
           comments_count: number | null
           created_at: string | null
-          description: string
+          description: string | null
           expires_at: string
           id: string
           is_demo: boolean | null
@@ -568,7 +597,7 @@ export type Database = {
         Insert: {
           comments_count?: number | null
           created_at?: string | null
-          description: string
+          description?: string | null
           expires_at: string
           id?: string
           is_demo?: boolean | null
@@ -583,7 +612,7 @@ export type Database = {
         Update: {
           comments_count?: number | null
           created_at?: string | null
-          description?: string
+          description?: string | null
           expires_at?: string
           id?: string
           is_demo?: boolean | null
