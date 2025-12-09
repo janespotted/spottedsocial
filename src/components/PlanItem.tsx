@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, ThumbsUp } from 'lucide-react';
+import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -122,6 +122,26 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
           .insert({ plan_id: plan.id, user_id: currentUserId });
         setIsDown(true);
         toast.success("You're down! 🎉");
+        
+        // Send notification to plan creator (if not self)
+        if (plan.user_id !== currentUserId) {
+          const { data: myProfile } = await supabase
+            .from('profiles')
+            .select('display_name')
+            .eq('id', currentUserId)
+            .single();
+          
+          const firstName = myProfile?.display_name?.split(' ')[0] || 'Someone';
+          const message = `${firstName} is down for your plan at ${plan.venue_name}! 🎉`;
+          
+          await supabase.from('notifications').insert({
+            sender_id: currentUserId,
+            receiver_id: plan.user_id,
+            type: 'plan_down',
+            message: message,
+          });
+        }
+        
         await fetchDowns();
       }
     } catch (error) {
@@ -305,14 +325,12 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
       {/* I'm Down Section */}
       <div className="flex items-center gap-3 mb-4">
         <Button
-          variant={isDown ? 'default' : 'outline'}
           size="sm"
           onClick={handleToggleDown}
           disabled={isTogglingDown}
-          className={`gap-2 ${isDown ? 'bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90' : 'border-[#d4ff00]/50 text-[#d4ff00] hover:bg-[#d4ff00]/10'}`}
+          className={`rounded-full px-5 bg-[#a855f7] text-white shadow-[0_0_15px_rgba(168,85,247,0.6)] hover:bg-[#9333ea] ${isDown ? 'ring-2 ring-white/50' : ''}`}
         >
-          <ThumbsUp className="w-4 h-4" />
-          {isDown ? "I'm Down!" : "I'm Down"}
+          I'm down! ✨
         </Button>
         
         {downs.length > 0 && (
