@@ -159,7 +159,7 @@ export function MeetUpConfirmation() {
 
             {/* Text */}
             <h2 className="text-2xl font-bold text-white mb-2">
-              You sent a Meet Up Notification to {recipientDisplayName}!
+              You sent a Meet Up Request to {recipientDisplayName}!
             </h2>
           </div>
 
