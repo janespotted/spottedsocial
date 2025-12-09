@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Camera, Send, Image } from 'lucide-react';
+import { ChevronLeft, Camera, Send, Image, Users } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,12 @@ interface ThreadMember {
   venue_id: string | null;
 }
 
+interface GroupInfo {
+  is_group: boolean;
+  name: string | null;
+  members: ThreadMember[];
+}
+
 export default function Thread() {
   const { threadId } = useParams<{ threadId: string }>();
   const navigate = useNavigate();
@@ -52,11 +58,15 @@ export default function Thread() {
   const { openVenueCard } = useVenueIdCard();
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherMember, setOtherMember] = useState<ThreadMember | null>(null);
+  const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  
+  // Map sender_id to member info for group chats
+  const [memberMap, setMemberMap] = useState<Map<string, ThreadMember>>(new Map());
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -140,7 +150,16 @@ export default function Thread() {
   }, [messages]);
 
   const fetchThreadData = async () => {
-    // Get other member info
+    // Get thread info (is_group, name)
+    const { data: threadData } = await supabase
+      .from('dm_threads')
+      .select('is_group, name')
+      .eq('id', threadId)
+      .single();
+
+    const isGroup = threadData?.is_group || false;
+
+    // Get all other members info
     const { data: members } = await supabase
       .from('dm_thread_members')
       .select(`
@@ -155,21 +174,44 @@ export default function Thread() {
       .neq('user_id', user?.id);
 
     if (members && members.length > 0) {
-      const member = members[0];
-      
-      // Get their venue
-      const { data: status } = await supabase
-        .from('night_statuses')
-        .select('venue_name, venue_id')
-        .eq('user_id', member.user_id)
-        .maybeSingle();
+      // Build member map for message sender lookup
+      const newMemberMap = new Map<string, ThreadMember>();
+      const allMembers: ThreadMember[] = [];
 
-      setOtherMember({
-        user_id: member.user_id,
-        ...member.profiles,
-        venue_name: status?.venue_name || null,
-        venue_id: status?.venue_id || null,
-      });
+      for (const member of members) {
+        // Get their venue
+        const { data: status } = await supabase
+          .from('night_statuses')
+          .select('venue_name, venue_id')
+          .eq('user_id', member.user_id)
+          .maybeSingle();
+
+        const memberData: ThreadMember = {
+          user_id: member.user_id,
+          display_name: (member.profiles as any)?.display_name || 'Unknown',
+          username: (member.profiles as any)?.username || '',
+          avatar_url: (member.profiles as any)?.avatar_url || null,
+          venue_name: status?.venue_name || null,
+          venue_id: status?.venue_id || null,
+        };
+
+        newMemberMap.set(member.user_id, memberData);
+        allMembers.push(memberData);
+      }
+
+      setMemberMap(newMemberMap);
+
+      if (isGroup) {
+        setGroupInfo({
+          is_group: true,
+          name: threadData?.name || null,
+          members: allMembers,
+        });
+        setOtherMember(null);
+      } else {
+        setGroupInfo(null);
+        setOtherMember(allMembers[0]);
+      }
     }
   };
 
@@ -292,59 +334,94 @@ export default function Thread() {
     return grouped;
   };
 
+  const getGroupDisplayName = (): string => {
+    if (!groupInfo) return '';
+    if (groupInfo.name) return groupInfo.name;
+    const names = groupInfo.members.map(m => m.display_name.split(' ')[0]);
+    if (names.length <= 3) return names.join(', ');
+    return `${names.slice(0, 2).join(', ')} & ${names.length - 2} others`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
       <div className="max-w-[430px] mx-auto min-h-screen flex flex-col">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
-        <div className="flex items-center justify-between p-4">
-          <button 
-            onClick={() => navigate('/messages')}
-            className="text-white/60 hover:text-white transition-colors"
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </button>
+          <div className="flex items-center justify-between p-4">
+            <button 
+              onClick={() => navigate('/messages')}
+              className="text-white/60 hover:text-white transition-colors"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
 
-          <button 
-            onClick={() => otherMember && openFriendCard({
-              userId: otherMember.user_id,
-              displayName: otherMember.display_name,
-              avatarUrl: otherMember.avatar_url,
-              venueName: otherMember.venue_name || undefined,
-            })}
-            className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity"
-          >
-            <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
-              <AvatarImage src={otherMember?.avatar_url || undefined} />
-              <AvatarFallback className="bg-[#1a0f2e] text-white">
-                {otherMember?.display_name?.[0]}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0 text-left">
-              <h2 className="font-semibold text-white truncate">{otherMember?.display_name}</h2>
-              <p className="text-white/60 text-sm truncate">{otherMember?.username}</p>
-            </div>
-            {otherMember?.venue_name && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleVenueClick(otherMember.venue_name!, otherMember.venue_id);
-                }}
-                className="text-[#d4ff00] text-sm font-medium hover:text-[#d4ff00]/80 transition-colors"
+            {groupInfo ? (
+              // Group chat header
+              <div className="flex items-center gap-3 flex-1 mx-4">
+                <div className="w-10 h-10 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] flex items-center justify-center overflow-hidden">
+                  {groupInfo.members.length <= 4 ? (
+                    <div className="grid grid-cols-2 gap-0.5 w-full h-full p-0.5">
+                      {groupInfo.members.slice(0, 4).map((member) => (
+                        <Avatar key={member.user_id} className="w-full h-full rounded-sm">
+                          <AvatarImage src={member.avatar_url || undefined} />
+                          <AvatarFallback className="bg-[#2d1b4e] text-white text-[8px] rounded-sm">
+                            {member.display_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                      ))}
+                    </div>
+                  ) : (
+                    <Users className="h-5 w-5 text-[#a855f7]" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <h2 className="font-semibold text-white truncate">{getGroupDisplayName()}</h2>
+                  <p className="text-white/60 text-sm truncate">{groupInfo.members.length + 1} members</p>
+                </div>
+              </div>
+            ) : (
+              // 1:1 chat header
+              <button 
+                onClick={() => otherMember && openFriendCard({
+                  userId: otherMember.user_id,
+                  displayName: otherMember.display_name,
+                  avatarUrl: otherMember.avatar_url,
+                  venueName: otherMember.venue_name || undefined,
+                })}
+                className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity"
               >
-                @{otherMember.venue_name}
+                <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
+                  <AvatarImage src={otherMember?.avatar_url || undefined} />
+                  <AvatarFallback className="bg-[#1a0f2e] text-white">
+                    {otherMember?.display_name?.[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0 text-left">
+                  <h2 className="font-semibold text-white truncate">{otherMember?.display_name}</h2>
+                  <p className="text-white/60 text-sm truncate">@{otherMember?.username}</p>
+                </div>
+                {otherMember?.venue_name && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleVenueClick(otherMember.venue_name!, otherMember.venue_id);
+                    }}
+                    className="text-[#d4ff00] text-sm font-medium hover:text-[#d4ff00]/80 transition-colors"
+                  >
+                    @{otherMember.venue_name}
+                  </button>
+                )}
               </button>
             )}
-          </button>
 
-          <button 
-            onClick={openCheckIn}
-            className="hover:scale-110 transition-transform"
-          >
-            <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
-          </button>
+            <button 
+              onClick={openCheckIn}
+              className="hover:scale-110 transition-transform"
+            >
+              <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
+            </button>
+          </div>
         </div>
-      </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
@@ -358,6 +435,7 @@ export default function Thread() {
             {/* Messages in group */}
             {group.messages.map((message) => {
               const isCurrentUser = message.sender_id === user?.id;
+              const sender = !isCurrentUser ? memberMap.get(message.sender_id) : null;
               
               return (
                 <div
@@ -365,31 +443,47 @@ export default function Thread() {
                   className={`flex items-end gap-2 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                 >
                   {!isCurrentUser && (
-                    <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.4)]">
-                      <AvatarImage src={otherMember?.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white">
-                        {otherMember?.display_name?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                    <button
+                      onClick={() => sender && openFriendCard({
+                        userId: sender.user_id,
+                        displayName: sender.display_name,
+                        avatarUrl: sender.avatar_url,
+                        venueName: sender.venue_name || undefined,
+                      })}
+                      className="hover:opacity-80 transition-opacity"
+                    >
+                      <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.4)]">
+                        <AvatarImage src={sender?.avatar_url || otherMember?.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                          {sender?.display_name?.[0] || otherMember?.display_name?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
                   )}
 
-                  <div
-                    className={`max-w-[75%] rounded-2xl overflow-hidden ${
-                      isCurrentUser
-                        ? 'bg-[#4c2f6e] text-white rounded-br-sm'
-                        : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
-                    }`}
-                  >
-                    {message.image_url && (
-                      <img 
-                        src={message.image_url} 
-                        alt="Shared image" 
-                        className="w-full max-w-[250px] rounded-t-2xl"
-                      />
+                  <div className="flex flex-col max-w-[75%]">
+                    {/* Show sender name in group chats */}
+                    {groupInfo && !isCurrentUser && sender && (
+                      <span className="text-white/50 text-xs mb-1 ml-1">{sender.display_name.split(' ')[0]}</span>
                     )}
-                    {message.text && (
-                      <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
-                    )}
+                    <div
+                      className={`rounded-2xl overflow-hidden ${
+                        isCurrentUser
+                          ? 'bg-[#4c2f6e] text-white rounded-br-sm'
+                          : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
+                      }`}
+                    >
+                      {message.image_url && (
+                        <img 
+                          src={message.image_url} 
+                          alt="Shared image" 
+                          className="w-full max-w-[250px] rounded-t-2xl"
+                        />
+                      )}
+                      {message.text && (
+                        <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
