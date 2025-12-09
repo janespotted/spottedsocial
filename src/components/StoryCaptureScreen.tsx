@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import Webcam from 'react-webcam';
 import { X, Zap, ZapOff, RefreshCw, Image as ImageIcon } from 'lucide-react';
 
 interface StoryCaptureScreenProps {
@@ -8,67 +9,19 @@ interface StoryCaptureScreenProps {
 }
 
 export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: StoryCaptureScreenProps) {
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [hasCamera, setHasCamera] = useState(true);
-  const [permissionDenied, setPermissionDenied] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const webcamRef = useRef<Webcam>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef<number>(0);
 
-  const startCamera = useCallback(async () => {
-    try {
-      // Stop existing stream
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: facingMode,
-          width: { ideal: 1080 },
-          height: { ideal: 1920 },
-        },
-        audio: false,
-      };
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(mediaStream);
-      setHasCamera(true);
-      setPermissionDenied(false);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-    } catch (error: any) {
-      console.error('Camera error:', error);
-      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-        setPermissionDenied(true);
-      }
-      setHasCamera(false);
-    }
-  }, [facingMode, stream]);
-
-  useEffect(() => {
-    startCamera();
-
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
-
-  // Restart camera when facing mode changes
-  useEffect(() => {
-    if (hasCamera && !permissionDenied) {
-      startCamera();
-    }
-  }, [facingMode]);
+  const videoConstraints = {
+    facingMode: facingMode,
+    aspectRatio: 9 / 16,
+  };
 
   const handleFlipCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
@@ -82,36 +35,26 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
     lastTapRef.current = now;
   };
 
-  const handleCapture = async () => {
-    if (!videoRef.current || !canvasRef.current || isCapturing) return;
+  const handleCapture = useCallback(() => {
+    if (!webcamRef.current || isCapturing) return;
     
     setIsCapturing(true);
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) {
+    const imageSrc = webcamRef.current.getScreenshot();
+    
+    if (imageSrc) {
+      // Convert base64 to blob
+      fetch(imageSrc)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], `story-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          onCapture(file);
+        })
+        .finally(() => setIsCapturing(false));
+    } else {
       setIsCapturing(false);
-      return;
     }
-
-    // Set canvas size to video dimensions
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    // Draw video frame to canvas
-    ctx.drawImage(video, 0, 0);
-
-    // Convert to blob
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], `story-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        onCapture(file);
-      }
-      setIsCapturing(false);
-    }, 'image/jpeg', 0.92);
-  };
+  }, [isCapturing, onCapture]);
 
   const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -130,18 +73,12 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
     onGallerySelect(file);
   };
 
-  const handleClose = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-    }
-    onClose();
+  const handleUserMediaError = () => {
+    setHasCamera(false);
   };
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
-      {/* Hidden canvas for capture */}
-      <canvas ref={canvasRef} className="hidden" />
-      
       {/* Hidden gallery input */}
       <input
         type="file"
@@ -154,13 +91,13 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
       {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent">
         <button 
-          onClick={handleClose}
+          onClick={onClose}
           className="p-2 rounded-full bg-black/40 backdrop-blur-sm"
         >
           <X className="h-6 w-6 text-white" />
         </button>
         
-        {hasCamera && !permissionDenied && (
+        {hasCamera && (
           <button 
             onClick={() => setFlashEnabled(!flashEnabled)}
             className="p-2 rounded-full bg-black/40 backdrop-blur-sm"
@@ -176,25 +113,30 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
 
       {/* Camera preview area */}
       <div className="flex-1 relative flex items-center justify-center overflow-hidden">
-        {hasCamera && !permissionDenied ? (
+        {hasCamera ? (
           <div 
-            className="w-full h-full flex items-center justify-center"
+            className="w-full h-full"
             onClick={handleDoubleTap}
           >
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+            <Webcam
+              ref={webcamRef}
+              audio={false}
+              screenshotFormat="image/jpeg"
+              videoConstraints={videoConstraints}
+              onUserMediaError={handleUserMediaError}
+              mirrored={facingMode === 'user'}
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover' 
+              }}
             />
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center text-center p-8">
             <ImageIcon className="h-16 w-16 text-white/40 mb-4" />
             <p className="text-white/80 text-lg mb-2">
-              {permissionDenied ? 'Camera access denied' : 'Camera not available'}
+              Camera not available
             </p>
             <p className="text-white/50 text-sm mb-6">
               Tap below to select from your gallery
@@ -210,7 +152,7 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
       </div>
 
       {/* Bottom bar */}
-      {hasCamera && !permissionDenied && (
+      {hasCamera && (
         <div 
           className="absolute bottom-0 left-0 right-0 z-20 pt-6 bg-gradient-to-t from-black/80 to-transparent"
           style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
