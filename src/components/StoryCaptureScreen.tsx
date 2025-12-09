@@ -18,6 +18,7 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const lastTapRef = useRef<number>(0);
 
   const startCamera = useCallback(async () => {
     try {
@@ -29,8 +30,7 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: facingMode,
-          width: { ideal: 1080 },
-          height: { ideal: 1920 },
+          aspectRatio: { ideal: 9/16 },
         },
         audio: false,
       };
@@ -71,6 +71,14 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
 
   const handleFlipCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
+  };
+
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      handleFlipCamera();
+    }
+    lastTapRef.current = now;
   };
 
   const handleCapture = async () => {
@@ -129,7 +137,7 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       {/* Hidden canvas for capture */}
       <canvas ref={canvasRef} className="hidden" />
       
@@ -168,14 +176,19 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
       {/* Camera preview area */}
       <div className="flex-1 relative flex items-center justify-center overflow-hidden">
         {hasCamera && !permissionDenied ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-            style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
-          />
+          <div 
+            className="w-full h-full flex items-center justify-center"
+            onClick={handleDoubleTap}
+          >
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="h-full w-auto max-w-none object-contain"
+              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+            />
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center text-center p-8">
             <ImageIcon className="h-16 w-16 text-white/40 mb-4" />
@@ -197,7 +210,10 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
 
       {/* Bottom bar */}
       {hasCamera && !permissionDenied && (
-        <div className="absolute bottom-0 left-0 right-0 z-20 pb-10 pt-6 bg-gradient-to-t from-black/80 to-transparent">
+        <div 
+          className="absolute bottom-0 left-0 right-0 z-20 pt-6 bg-gradient-to-t from-black/80 to-transparent"
+          style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
+        >
           <div className="flex items-center justify-around px-8">
             {/* Gallery button */}
             <button
