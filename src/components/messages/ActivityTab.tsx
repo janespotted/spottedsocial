@@ -198,16 +198,27 @@ export function ActivityTab() {
       activityList.push(...demoActivities);
     }
 
-    // Add trending venue immediately
-    activityList.push({
-      id: 'trending-1',
-      type: 'trending',
-      title: 'The Box is trending',
-      subtitle: '12+ here now',
-      timestamp: new Date(Date.now() - 300000).toISOString(),
-      action: 'view',
-      venue_id: 'eb5df239-48cf-4cae-8b18-d69a6f395a21',
-    });
+    // Add trending venue from user's city
+    const { data: trendingVenue } = await supabase
+      .from('venues')
+      .select('id, name')
+      .eq('city', city)
+      .order('popularity_rank', { ascending: true })
+      .limit(5);
+    
+    if (trendingVenue && trendingVenue.length > 0) {
+      // Pick a random venue from top 5
+      const randomVenue = trendingVenue[Math.floor(Math.random() * trendingVenue.length)];
+      activityList.push({
+        id: 'trending-1',
+        type: 'trending',
+        title: `${randomVenue.name} is trending`,
+        subtitle: '12+ here now',
+        timestamp: new Date(Date.now() - 300000).toISOString(),
+        action: 'view',
+        venue_id: randomVenue.id,
+      });
+    }
 
     // Set initial activities immediately (fast render with real invites/demo/trending)
     setActivities(activityList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
