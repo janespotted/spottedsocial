@@ -10,31 +10,41 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function checkAdmin() {
+      console.log('[AdminRoute] checkAdmin called');
+      console.log('[AdminRoute] user:', user?.id, user?.email);
+      
       if (!user) {
+        console.log('[AdminRoute] No user, setting loading false');
         setLoading(false);
         return;
       }
 
       try {
+        console.log('[AdminRoute] Calling has_role RPC for user:', user.id);
         const { data, error } = await supabase.rpc('has_role', {
           _user_id: user.id,
           _role: 'admin'
         });
 
+        console.log('[AdminRoute] RPC response - data:', data, 'error:', error);
+
         if (error) {
-          console.error('Error checking admin role:', error);
+          console.error('[AdminRoute] Error checking admin role:', error);
           setIsAdmin(false);
         } else {
+          console.log('[AdminRoute] Setting isAdmin to:', data === true);
           setIsAdmin(data === true);
         }
       } catch (err) {
-        console.error('Error checking admin status:', err);
+        console.error('[AdminRoute] Exception checking admin status:', err);
         setIsAdmin(false);
       } finally {
+        console.log('[AdminRoute] Setting loading false');
         setLoading(false);
       }
     }
 
+    console.log('[AdminRoute] useEffect triggered - authLoading:', authLoading);
     if (!authLoading) {
       checkAdmin();
     }
