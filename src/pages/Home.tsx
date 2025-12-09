@@ -273,70 +273,72 @@ export default function Home() {
             Plans
           </button>
         </div>
-        <div className="pb-4 overflow-hidden">
-          <div className="flex gap-4 overflow-x-auto scrollbar-hide px-6">
-            {/* Your Story Button */}
-            <button
-              onClick={() => {
-                if (userHasStory) {
-                  setSelectedStoryUser(user?.id || null);
-                } else {
-                  setCreateStoryOpen(true);
-                }
-              }}
-              className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
-            >
-              <div className="relative">
-                <div className={`p-[3px] rounded-full ${
-                  userHasStory
-                    ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active'
-                    : 'bg-gradient-to-br from-[#a855f7]/60 to-[#a855f7]/20'
-                }`}>
-                  <div className="rounded-full bg-[#0a0118] p-[2px]">
-                    <Avatar className="h-14 w-14">
-                      <AvatarImage src={user?.user_metadata?.avatar_url} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white">
-                        {user?.user_metadata?.display_name?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </div>
-                {/* Always show + badge to indicate you can add more */}
-                <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-[#a855f7] to-[#7c3aed] rounded-full p-1.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
-                  <Plus className="h-3 w-3 text-white" />
-                </div>
-              </div>
-              <span className="text-[10px] text-white/60 font-medium">Your Story</span>
-            </button>
-
-            {/* Friend Stories */}
-            {storyUsers.map((storyUser) => (
+        {feedMode === 'newsfeed' && (
+          <div className="pb-4 overflow-hidden">
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide px-6">
+              {/* Your Story Button */}
               <button
-                key={storyUser.user_id}
-                onClick={() => setSelectedStoryUser(storyUser.user_id)}
+                onClick={() => {
+                  if (userHasStory) {
+                    setSelectedStoryUser(user?.id || null);
+                  } else {
+                    setCreateStoryOpen(true);
+                  }
+                }}
                 className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
               >
-                <div className={`p-[3px] rounded-full ${
-                  storyUser.has_unviewed 
-                    ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active' 
-                    : 'bg-gradient-to-br from-[#a855f7]/40 to-[#a855f7]/20'
-                }`}>
-                  <div className="rounded-full bg-[#0a0118] p-[2px]">
-                    <Avatar className="h-14 w-14">
-                      <AvatarImage src={storyUser.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white">
-                        {storyUser.display_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                <div className="relative">
+                  <div className={`p-[3px] rounded-full ${
+                    userHasStory
+                      ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active'
+                      : 'bg-gradient-to-br from-[#a855f7]/60 to-[#a855f7]/20'
+                  }`}>
+                    <div className="rounded-full bg-[#0a0118] p-[2px]">
+                      <Avatar className="h-14 w-14">
+                        <AvatarImage src={user?.user_metadata?.avatar_url} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white">
+                          {user?.user_metadata?.display_name?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                  </div>
+                  {/* Always show + badge to indicate you can add more */}
+                  <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-[#a855f7] to-[#7c3aed] rounded-full p-1.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+                    <Plus className="h-3 w-3 text-white" />
                   </div>
                 </div>
-                <span className="text-[10px] text-white/70 font-medium max-w-[60px] truncate">
-                  {storyUser.display_name.split(' ')[0]}
-                </span>
+                <span className="text-[10px] text-white/60 font-medium">Your Story</span>
               </button>
-            ))}
+
+              {/* Friend Stories */}
+              {storyUsers.map((storyUser) => (
+                <button
+                  key={storyUser.user_id}
+                  onClick={() => setSelectedStoryUser(storyUser.user_id)}
+                  className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
+                >
+                  <div className={`p-[3px] rounded-full ${
+                    storyUser.has_unviewed 
+                      ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active' 
+                      : 'bg-gradient-to-br from-[#a855f7]/40 to-[#a855f7]/20'
+                  }`}>
+                    <div className="rounded-full bg-[#0a0118] p-[2px]">
+                      <Avatar className="h-14 w-14">
+                        <AvatarImage src={storyUser.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white">
+                          {storyUser.display_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-white/70 font-medium max-w-[60px] truncate">
+                    {storyUser.display_name.split(' ')[0]}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Feed Content */}
@@ -360,12 +362,25 @@ export default function Home() {
             <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
               <MessageCircle className="h-10 w-10 text-[#a855f7]/60" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2">
-              Your friends are quiet tonight
-            </h3>
-            <p className="text-white/50 text-sm max-w-xs">
-              When they check in and post, their updates will appear here. Posts disappear by 5am.
-            </p>
+            {!isNightlifeHours() ? (
+              <>
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  Fresh start! 🌅
+                </h3>
+                <p className="text-white/50 text-sm max-w-xs">
+                  Luckily, your posts deleted at 5am :). Start making plans for your next night out!
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  Your friends are quiet tonight
+                </h3>
+                <p className="text-white/50 text-sm max-w-xs">
+                  When they check in and post, their updates will appear here. Posts disappear by 5am.
+                </p>
+              </>
+            )}
           </div>
         ) : (
           posts.map((post, index) => (
