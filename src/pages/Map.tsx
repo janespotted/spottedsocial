@@ -913,8 +913,8 @@ export default function Map() {
       {/* Search Button/Input - Top Left Below Header */}
       <div ref={searchContainerRef} className="absolute top-28 left-4 z-[200]">
         {showSearch ? (
-          <div className="flex items-center gap-2 bg-[#2d1b4e]/90 backdrop-blur rounded-full border border-[#a855f7]/50 px-3 py-2 animate-fade-in">
-            <Search className="w-4 h-4 text-white/60" />
+          <div className="flex items-center gap-2 bg-[#2d1b4e]/90 backdrop-blur rounded-full border border-[#a855f7]/50 px-3 py-2 animate-fade-in shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+            <span className="text-sm">🔍</span>
             <input
               type="text"
               placeholder="Search venues..."
@@ -930,12 +930,12 @@ export default function Map() {
         ) : (
           <button
             onClick={() => setShowSearch(true)}
-            className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-full px-4 py-2.5 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all"
+            className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-full px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_15px_rgba(168,85,247,0.2)]"
             aria-label="Search venues"
           >
             <div className="flex items-center gap-2">
-              <Search className="w-4 h-4 text-white/80" />
-              <span className="text-white/80 text-sm">Search</span>
+              <span className="text-sm">🔍</span>
+              <span className="text-white/90 text-sm font-medium">Search</span>
             </div>
           </button>
         )}
