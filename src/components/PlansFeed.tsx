@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Plus } from 'lucide-react';
+import { Calendar, Plus, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PlanItem } from './PlanItem';
 import { CreatePlanDialog } from './CreatePlanDialog';
@@ -98,17 +98,17 @@ export function PlansFeed({ userId }: PlansFeedProps) {
 
   if (isLoading) {
     return (
-      <div className="space-y-4 px-4">
+      <div className="space-y-5 px-4">
         {[1, 2, 3].map(i => (
-          <div key={i} className="bg-card/50 rounded-2xl p-4 border border-border/30">
+          <div key={i} className="bg-card/60 rounded-2xl p-4 border border-primary/20">
             <div className="flex items-center gap-3 mb-3">
-              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-11 w-11 rounded-full" />
               <div className="space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-3 w-20" />
               </div>
             </div>
-            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-20 w-full rounded-lg" />
           </div>
         ))}
       </div>
@@ -116,25 +116,25 @@ export function PlansFeed({ userId }: PlansFeedProps) {
   }
 
   return (
-    <div className="space-y-4 px-4 pb-24">
+    <div className="space-y-5 px-4 pb-24">
       {/* Create Plan Button */}
       <Button
         onClick={() => setShowCreateDialog(true)}
-        className="w-full bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30"
-        variant="outline"
+        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold py-6 rounded-2xl shadow-[0_0_25px_rgba(168,85,247,0.4)] hover:shadow-[0_0_30px_rgba(168,85,247,0.6)] transition-all duration-300"
       >
-        <Plus className="w-4 h-4 mr-2" />
-        Share Your Plans
+        <Sparkles className="w-5 h-5 mr-2" />
+        Share Your Plans ✨
       </Button>
 
       {plans.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-            <Calendar className="w-8 h-8 text-primary" />
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center mb-5 shadow-[0_0_30px_rgba(168,85,247,0.3)]">
+            <Calendar className="w-10 h-10 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-2">No plans yet</h3>
-          <p className="text-muted-foreground text-sm max-w-[250px]">
-            Be the first to share your weekend plans with friends!
+          <h3 className="text-xl font-semibold text-foreground mb-2">No plans yet</h3>
+          <p className="text-muted-foreground text-sm max-w-[280px] leading-relaxed">
+            Luckily, your posts deleted at 5am 😅<br/>
+            Start making plans for your next night out!
           </p>
         </div>
       ) : (

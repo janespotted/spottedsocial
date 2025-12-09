@@ -1,19 +1,30 @@
 import { useState, useEffect } from 'react';
-import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, UserPlus } from 'lucide-react';
+import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, UserPlus, Sparkles, Clock, Calendar } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
-import { format } from 'date-fns';
+import { format, isToday, isTomorrow, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
+import { haptic } from '@/lib/haptics';
+import confetti from 'canvas-confetti';
 
 const formatTimeTo12Hour = (time: string) => {
   const [hours, minutes] = time.split(':').map(Number);
   const period = hours >= 12 ? 'PM' : 'AM';
   const hour12 = hours % 12 || 12;
   return `${hour12}${minutes > 0 ? ':' + minutes.toString().padStart(2, '0') : ''}${period}`;
+};
+
+const getSmartDateLabel = (dateStr: string) => {
+  const date = new Date(dateStr);
+  if (isToday(date)) return 'Tonight';
+  if (isTomorrow(date)) return 'Tomorrow';
+  const daysAway = differenceInDays(date, new Date());
+  if (daysAway > 0 && daysAway <= 7) return `In ${daysAway} days`;
+  return format(date, 'EEE, MMM d');
 };
 
 interface DownUser {
@@ -137,9 +148,19 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
     fetchParticipants();
   }, [plan.id, currentUserId]);
 
+  const triggerConfetti = () => {
+    confetti({
+      particleCount: 80,
+      spread: 60,
+      origin: { y: 0.7 },
+      colors: ['#a855f7', '#d4ff00', '#ffffff'],
+    });
+  };
+
   const handleToggleDown = async () => {
     if (isTogglingDown) return;
     setIsTogglingDown(true);
+    haptic.medium();
 
     try {
       if (isDown) {
@@ -155,6 +176,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
           .from('plan_downs')
           .insert({ plan_id: plan.id, user_id: currentUserId });
         setIsDown(true);
+        triggerConfetti();
         toast.success("You're down! 🎉");
         
         // Send notification to plan creator (if not self)
@@ -219,6 +241,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
   const handlePostComment = async () => {
     if (!newComment.trim() || isPostingComment) return;
     setIsPostingComment(true);
+    haptic.light();
 
     const { error } = await supabase
       .from('plan_comments')
@@ -252,6 +275,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
   const handleVote = async (voteType: 'up' | 'down') => {
     if (isVoting) return;
     setIsVoting(true);
+    haptic.light();
 
     try {
       if (userVote === voteType) {
@@ -305,17 +329,17 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
   const visibilityLabel = plan.visibility === 'close_friends' ? 'Close Friends' : 'Friends';
   const visibilityIcon = plan.visibility === 'close_friends' ? <Lock className="w-3 h-3" /> : <Users className="w-3 h-3" />;
 
-  const planDate = new Date(plan.plan_date);
-  const formattedDate = format(planDate, 'EEE, MMM d');
+  const smartDateLabel = getSmartDateLabel(plan.plan_date);
   const formattedTime = formatTimeTo12Hour(plan.plan_time);
+  const isCurrentUserDown = downs.some(d => d.user_id === currentUserId);
 
   return (
-    <div className="bg-card/50 backdrop-blur-sm rounded-2xl p-4 border border-border/30">
+    <div className="bg-card/60 backdrop-blur-sm rounded-2xl p-4 border border-primary/20 shadow-[0_0_20px_rgba(168,85,247,0.1)] hover:shadow-[0_0_25px_rgba(168,85,247,0.2)] transition-all duration-300">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <Avatar 
-            className="h-10 w-10 cursor-pointer" 
+            className="h-11 w-11 cursor-pointer ring-2 ring-primary/30 hover:ring-primary/50 transition-all" 
             onClick={handleUserClick}
           >
             <AvatarImage src={plan.user?.avatar_url || ''} />
@@ -325,7 +349,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
           </Avatar>
           <div>
             <p 
-              className="font-semibold text-foreground cursor-pointer hover:underline"
+              className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
               onClick={handleUserClick}
             >
               {plan.user?.display_name}
@@ -338,97 +362,122 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
         </div>
 
         <div className="text-right">
-          <p 
-            className="text-sm font-medium text-[#d4ff00] cursor-pointer hover:underline flex items-center gap-1 justify-end"
+          <button 
+            className="text-sm font-semibold text-[#d4ff00] hover:text-[#e8ff4d] cursor-pointer flex items-center gap-1.5 justify-end transition-colors"
             onClick={handleVenueClick}
           >
-            <MapPin className="w-3 h-3" />
+            <MapPin className="w-4 h-4" />
             {plan.venue_name}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {formattedDate} • {formattedTime}
-          </p>
+          </button>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1 justify-end">
+            <Calendar className="w-3 h-3" />
+            <span className="font-medium text-foreground/80">{smartDateLabel}</span>
+            <Clock className="w-3 h-3 ml-1" />
+            <span>{formattedTime}</span>
+          </div>
         </div>
       </div>
 
-      {/* Participants - Friends going with the plan creator */}
-      {participants.length > 0 && (
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <UserPlus className="w-3 h-3" />
-            Going with:
-          </span>
-          <div className="flex -space-x-2">
-            {participants.slice(0, 5).map((participant) => (
-              <Avatar 
-                key={participant.id} 
-                className="h-7 w-7 border-2 border-card cursor-pointer"
-                onClick={() => openFriendCard({
-                  userId: participant.user_id,
-                  displayName: participant.display_name,
-                  avatarUrl: participant.avatar_url,
-                })}
-              >
-                <AvatarImage src={participant.avatar_url || ''} />
-                <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                  {participant.display_name.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-            {participants.length > 5 && (
-              <div className="h-7 w-7 rounded-full bg-primary/20 border-2 border-card flex items-center justify-center">
-                <span className="text-xs text-primary">+{participants.length - 5}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Description */}
       {plan.description && (
-        <p className="text-foreground mb-3 whitespace-pre-wrap">
+        <p className="text-foreground mb-4 whitespace-pre-wrap leading-relaxed">
           {plan.description}
         </p>
       )}
 
-      {/* I'm Down Section */}
-      <div className="flex items-center gap-3 mb-4">
-        <Button
-          size="sm"
-          onClick={handleToggleDown}
-          disabled={isTogglingDown}
-          className={`rounded-full px-5 bg-[#a855f7] text-white shadow-[0_0_15px_rgba(168,85,247,0.6)] hover:bg-[#9333ea] ${isDown ? 'ring-2 ring-white/50' : ''}`}
-        >
-          I'm down! ✨
-        </Button>
-        
-        {downs.length > 0 && (
+      {/* Participants & I'm Down Section */}
+      <div className="bg-background/30 rounded-xl p-3 mb-4 border border-border/20">
+        {/* Going With Section */}
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="flex -space-x-2">
-              {downs.slice(0, 5).map((down) => (
-                <Avatar 
-                  key={down.id} 
-                  className="h-7 w-7 border-2 border-card cursor-pointer"
-                  onClick={() => down.user && openFriendCard({
-                    userId: down.user_id,
-                    displayName: down.user.display_name,
-                    avatarUrl: down.user.avatar_url,
-                  })}
-                >
-                  <AvatarImage src={down.user?.avatar_url || ''} />
-                  <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                    {down.user?.display_name?.charAt(0) || '?'}
-                  </AvatarFallback>
-                </Avatar>
-              ))}
-            </div>
-            <span className="text-sm text-muted-foreground">
-              {downs.length === 1 
-                ? `${downs[0].user?.display_name?.split(' ')[0]} is down`
-                : `${downs.length} people are down`}
+            <span className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
+              <UserPlus className="w-3.5 h-3.5" />
+              Going with
             </span>
+            {participants.length > 0 ? (
+              <div className="flex -space-x-2">
+                {participants.slice(0, 5).map((participant) => (
+                  <Avatar 
+                    key={participant.id} 
+                    className="h-8 w-8 border-2 border-background cursor-pointer hover:scale-110 transition-transform ring-1 ring-primary/20"
+                    onClick={() => openFriendCard({
+                      userId: participant.user_id,
+                      displayName: participant.display_name,
+                      avatarUrl: participant.avatar_url,
+                    })}
+                  >
+                    <AvatarImage src={participant.avatar_url || ''} />
+                    <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                      {participant.display_name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+                {participants.length > 5 && (
+                  <div className="h-8 w-8 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center">
+                    <span className="text-xs text-primary font-medium">+{participants.length - 5}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground/60 italic">No one yet</span>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* I'm Down Section */}
+        <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            onClick={handleToggleDown}
+            disabled={isTogglingDown}
+            className={`rounded-full px-5 font-semibold transition-all duration-300 ${
+              isDown 
+                ? 'bg-[#d4ff00] text-black hover:bg-[#c4ef00] shadow-[0_0_20px_rgba(212,255,0,0.4)]' 
+                : 'bg-primary text-white hover:bg-primary/90 shadow-[0_0_15px_rgba(168,85,247,0.5)]'
+            }`}
+          >
+            {isDown ? (
+              <>You're down! 🎉</>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-1.5" />
+                I'm down!
+              </>
+            )}
+          </Button>
+          
+          {downs.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="flex -space-x-2">
+                {downs.slice(0, 5).map((down) => (
+                  <Avatar 
+                    key={down.id} 
+                    className={`h-8 w-8 border-2 cursor-pointer hover:scale-110 transition-transform ${
+                      down.user_id === currentUserId 
+                        ? 'border-[#d4ff00] ring-2 ring-[#d4ff00]/50' 
+                        : 'border-background ring-1 ring-primary/20'
+                    }`}
+                    onClick={() => down.user && openFriendCard({
+                      userId: down.user_id,
+                      displayName: down.user.display_name,
+                      avatarUrl: down.user.avatar_url,
+                    })}
+                  >
+                    <AvatarImage src={down.user?.avatar_url || ''} />
+                    <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                      {down.user?.display_name?.charAt(0) || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {downs.length === 1 
+                  ? `${downs[0].user?.display_name?.split(' ')[0]} is down`
+                  : `${downs.length} people down`}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Footer */}
@@ -436,24 +485,28 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
         <Button 
           variant="ghost" 
           size="sm" 
-          className="text-muted-foreground gap-1 h-8 px-2"
+          className="text-muted-foreground gap-1.5 h-9 px-3 hover:bg-primary/10 hover:text-primary transition-colors"
           onClick={handleToggleComments}
         >
           <MessageCircle className="w-4 h-4" />
-          <span>{plan.comments_count}</span>
+          <span>{plan.comments_count || 0}</span>
         </Button>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 bg-background/30 rounded-full px-1">
           <Button
             variant="ghost"
             size="sm"
-            className={`h-8 w-8 p-0 ${userVote === 'up' ? 'text-[#d4ff00]' : 'text-muted-foreground'}`}
+            className={`h-9 w-9 p-0 rounded-full transition-all ${
+              userVote === 'up' 
+                ? 'text-[#d4ff00] bg-[#d4ff00]/10' 
+                : 'text-muted-foreground hover:text-[#d4ff00] hover:bg-[#d4ff00]/10'
+            }`}
             onClick={() => handleVote('up')}
             disabled={isVoting}
           >
             <ChevronUp className="w-5 h-5" />
           </Button>
-          <span className={`text-sm font-medium min-w-[20px] text-center ${
+          <span className={`text-sm font-bold min-w-[24px] text-center ${
             plan.score > 0 ? 'text-[#d4ff00]' : plan.score < 0 ? 'text-destructive' : 'text-muted-foreground'
           }`}>
             {plan.score}
@@ -461,7 +514,11 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
           <Button
             variant="ghost"
             size="sm"
-            className={`h-8 w-8 p-0 ${userVote === 'down' ? 'text-destructive' : 'text-muted-foreground'}`}
+            className={`h-9 w-9 p-0 rounded-full transition-all ${
+              userVote === 'down' 
+                ? 'text-destructive bg-destructive/10' 
+                : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+            }`}
             onClick={() => handleVote('down')}
             disabled={isVoting}
           >
@@ -476,7 +533,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
           {isLoadingComments ? (
             <p className="text-muted-foreground text-sm text-center">Loading comments...</p>
           ) : comments.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center">No comments yet</p>
+            <p className="text-muted-foreground text-sm text-center py-2">No comments yet. Be the first!</p>
           ) : (
             <div className="space-y-3 max-h-48 overflow-y-auto">
               {comments.map((comment) => (
@@ -509,14 +566,14 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="Add a comment..."
-              className="flex-1 bg-background/50 border-border/30 text-sm"
+              className="flex-1 bg-background/50 border-border/30 text-sm focus:ring-primary/50"
               onKeyDown={(e) => e.key === 'Enter' && handlePostComment()}
             />
             <Button
               size="sm"
               onClick={handlePostComment}
               disabled={!newComment.trim() || isPostingComment}
-              className="h-9 px-3"
+              className="h-9 px-3 bg-primary hover:bg-primary/90"
             >
               <Send className="w-4 h-4" />
             </Button>
