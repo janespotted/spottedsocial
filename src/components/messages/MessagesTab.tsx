@@ -9,6 +9,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { NewChatDialog } from './NewChatDialog';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { MessagesSkeleton } from './MessagesSkeleton';
+import { useDemoMode } from '@/hooks/useDemoMode';
+import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 
 interface Thread {
   id: string;
@@ -44,6 +46,8 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
   const [search, setSearch] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const demoEnabled = useDemoMode();
+  const { bootstrapEnabled } = useBootstrapMode();
 
   useEffect(() => {
     if (user) {
@@ -109,23 +113,27 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
       const otherUserIds = [...new Set(allMembers.map(m => m.user_id))];
 
       // Step 3: Batch fetch profiles and statuses for all other users
+      // Use safe RPC to get profiles (respects location privacy)
       const [profilesResult, statusesResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id, display_name, avatar_url')
-          .in('id', otherUserIds),
-        
+        supabase.rpc('get_profiles_safe'),
         supabase
           .from('night_statuses')
           .select('user_id, venue_name')
           .in('user_id', otherUserIds),
       ]);
 
-      const profiles = profilesResult.data || [];
+      // Filter profiles to only other users in threads
+      const allProfiles = profilesResult.data || [];
+      const profiles = allProfiles.filter((p: any) => otherUserIds.includes(p.id));
       const statuses = statusesResult.data || [];
 
+      // In bootstrap mode (not demo mode), filter out demo users
+      const filteredProfiles = (bootstrapEnabled && !demoEnabled) 
+        ? profiles.filter((p: any) => !p.is_demo)
+        : profiles;
+
       // Create lookup maps for O(1) access
-      const profileMap = new Map(profiles.map(p => [p.id, p]));
+      const profileMap = new Map(filteredProfiles.map((p: any) => [p.id, p]));
       const statusMap = new Map(statuses.map(s => [s.user_id, s.venue_name]));
       
       // Group messages by thread and get latest
