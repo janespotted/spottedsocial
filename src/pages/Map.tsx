@@ -78,9 +78,11 @@ export default function Map() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [focusMode, setFocusMode] = useState(false);
+  const [showVenueList, setShowVenueList] = useState(false);
   const friendsListRef = useRef<HTMLDivElement>(null);
   const venueFilterRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const venueListRef = useRef<HTMLDivElement>(null);
   
   // Use ref for city to prevent callback recreation
   const cityRef = useRef(city);
@@ -435,6 +437,7 @@ export default function Map() {
     // Toggle focus mode and close cluster popover when clicking on map
     map.current.on('click', () => {
       setSelectedCluster(null);
+      setShowVenueList(false);
       setFocusMode(prev => !prev);
     });
 
@@ -819,13 +822,20 @@ export default function Map() {
       ) {
         setShowVenueFilters(false);
       }
+      if (
+        venueListRef.current &&
+        !venueListRef.current.contains(event.target as Node) &&
+        showVenueList
+      ) {
+        setShowVenueList(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showFriendsList, showVenueFilters]);
+  }, [showFriendsList, showVenueFilters, showVenueList]);
 
   const centerOnMyLocation = () => {
     if (!map.current) return;
@@ -1038,6 +1048,75 @@ export default function Map() {
                 </span>
               </button>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Explore Venues Button + List - Below Filter */}
+      <div 
+        ref={venueListRef}
+        className={`absolute right-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        style={{ top: 'calc(9.5rem + env(safe-area-inset-top, 0px))' }}
+      >
+        <button
+          onClick={() => setShowVenueList(!showVenueList)}
+          className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-full px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_15px_rgba(168,85,247,0.2)]"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm">📍</span>
+            <span className="text-white/90 text-sm font-medium">Explore</span>
+            <ChevronDown className={`w-4 h-4 text-white/60 transition-transform duration-200 ${showVenueList ? 'rotate-180' : ''}`} />
+          </div>
+        </button>
+
+        {/* Venue List Panel */}
+        {showVenueList && (
+          <div className="mt-1.5 bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 w-64 animate-fade-in">
+            {/* Header with count */}
+            <div className="sticky top-0 bg-[#1a0f2e] border-b border-[#a855f7]/30 px-3 py-2">
+              <p className="text-white/70 text-xs font-medium">
+                {typeFilteredVenues.length} venues in {city.toUpperCase()}
+              </p>
+            </div>
+            
+            {/* Scrollable Venue List */}
+            <div className="max-h-64 overflow-y-auto">
+              {typeFilteredVenues.length > 0 ? (
+                typeFilteredVenues.map((venue) => (
+                  <button
+                    key={venue.id}
+                    onClick={() => {
+                      openVenueCard(venue.id);
+                      setShowVenueList(false);
+                      if (map.current) {
+                        map.current.flyTo({
+                          center: [venue.lng, venue.lat],
+                          zoom: 15,
+                          duration: 1500,
+                        });
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#a855f7]/15 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+                  >
+                    <MapPin className="w-4 h-4 text-[#a855f7] flex-shrink-0" />
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="text-white font-medium text-sm truncate">{venue.name}</p>
+                      <p className="text-white/50 text-xs truncate">{venue.neighborhood}</p>
+                    </div>
+                    <span className="text-xs flex-shrink-0">
+                      {venue.type === 'nightclub' ? '🎵' :
+                       venue.type === 'cocktail_bar' ? '🍸' :
+                       venue.type === 'bar' ? '🍺' :
+                       venue.type === 'rooftop' ? '🌃' : '📍'}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-6 text-center text-white/50 text-sm">
+                  No venues found
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
