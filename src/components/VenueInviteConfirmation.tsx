@@ -5,7 +5,7 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { ArrowLeft, MessageCircle } from 'lucide-react';
+import { Undo2, MessageCircle } from 'lucide-react';
 import { haptic } from '@/lib/haptics';
 import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
@@ -176,21 +176,27 @@ export function VenueInviteConfirmation() {
             </p>
 
             {/* Circular Action Buttons */}
-            <div className="flex justify-center items-center gap-6">
+            <div className="flex justify-center items-center gap-8">
               {/* Undo Button */}
               <button
                 onClick={handleUndo}
-                className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-colors"
+                className="flex flex-col items-center gap-1"
               >
-                <ArrowLeft className="w-7 h-7 text-white" />
+                <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-lg">
+                  <Undo2 className="w-7 h-7 text-white" />
+                </div>
+                <span className="text-white/90 text-xs font-medium">Undo</span>
               </button>
               
               {/* Chat Button */}
               <button
                 onClick={handleOpenChat}
-                className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-colors"
+                className="flex flex-col items-center gap-1"
               >
-                <MessageCircle className="w-7 h-7 text-white" />
+                <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-lg">
+                  <MessageCircle className="w-7 h-7 text-white" />
+                </div>
+                <span className="text-white/90 text-xs font-medium">Chat</span>
               </button>
             </div>
           </div>
