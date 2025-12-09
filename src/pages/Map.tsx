@@ -899,7 +899,7 @@ export default function Map() {
                   placeholder="Search venues..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent text-white text-sm w-36 outline-none placeholder:text-white/40"
+                  className="bg-transparent text-white text-sm w-28 outline-none placeholder:text-white/40"
                   autoFocus
                 />
                 <button onClick={() => { setShowSearch(false); setSearchQuery(''); }}>
@@ -932,14 +932,14 @@ export default function Map() {
             onClick={openCheckIn} 
             className="hover:scale-110 transition-transform"
           >
-            <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
+            <img src={spottedLogo} alt="Check In" className="h-10 w-10 object-contain" />
           </button>
         </div>
       </div>
 
       {/* Search Results Dropdown */}
       {showSearch && searchQuery.length > 0 && (
-        <div className="absolute top-24 right-4 left-4 z-[250] bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 overflow-y-auto">
+        <div className="absolute top-28 right-4 left-4 z-[250] bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 overflow-y-auto">
           {filteredSearchVenues.length > 0 ? (
             filteredSearchVenues.slice(0, 10).map((venue) => (
               <button
@@ -963,7 +963,7 @@ export default function Map() {
       )}
 
       {/* Venue Type Filter - Collapsible in top right */}
-      <div ref={venueFilterRef} className="absolute top-24 right-4 z-[200]">
+      <div ref={venueFilterRef} className="absolute top-28 right-4 z-[200]">
         {/* Collapsed Pill */}
         <button
           onClick={() => setShowVenueFilters(!showVenueFilters)}
@@ -1020,7 +1020,7 @@ export default function Map() {
 
       {/* Friends Out Pill + List */}
       {friends.length > 0 ? (
-        <div ref={friendsListRef} className="absolute top-24 left-4 z-[200] max-w-sm">
+        <div ref={friendsListRef} className="absolute top-28 left-4 z-[200] max-w-sm">
           {/* Clickable Pill */}
           <button
             onClick={toggleFriendsList}
