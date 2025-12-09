@@ -30,7 +30,8 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: facingMode,
-          aspectRatio: { ideal: 9/16 },
+          width: { ideal: 1080 },
+          height: { ideal: 1920 },
         },
         audio: false,
       };
@@ -185,7 +186,7 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
               autoPlay
               playsInline
               muted
-              className="h-full w-auto max-w-none object-contain"
+              className="w-full h-full object-cover"
               style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
             />
           </div>

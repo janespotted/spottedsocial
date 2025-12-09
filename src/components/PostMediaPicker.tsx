@@ -32,7 +32,8 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode, 
-          aspectRatio: { ideal: 1 } // Square for posts
+          width: { ideal: 1080 },
+          height: { ideal: 1080 },
         },
         audio: false,
       });
@@ -154,7 +155,7 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
               autoPlay
               playsInline
               muted
-              className="h-full w-auto max-w-none object-contain"
+              className="w-full h-full object-cover"
               style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
             />
           </div>

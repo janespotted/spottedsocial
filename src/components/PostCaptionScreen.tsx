@@ -31,9 +31,44 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
   useEffect(() => {
     if (user) {
       fetchProfile();
-      captureLocation();
+      fetchActiveCheckInOrCaptureLocation();
     }
   }, [user]);
+
+  const fetchActiveCheckInOrCaptureLocation = async () => {
+    if (!user) return;
+    
+    setCapturingLocation(true);
+    try {
+      // First check if user has an active check-in
+      const { data: activeStatus } = await supabase
+        .from('night_statuses')
+        .select('venue_id, venue_name, lat, lng')
+        .eq('user_id', user.id)
+        .eq('status', 'out')
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+
+      if (activeStatus?.venue_name) {
+        // Use checked-in venue automatically
+        setLocation(activeStatus.venue_name);
+        setLocationData({
+          lat: activeStatus.lat || 0,
+          lng: activeStatus.lng || 0,
+          timestamp: new Date().toISOString(),
+          venueId: activeStatus.venue_id || undefined,
+          venueName: activeStatus.venue_name,
+        });
+        setCapturingLocation(false);
+      } else {
+        // Fall back to GPS capture
+        captureLocation();
+      }
+    } catch (error) {
+      console.error('Error checking active status:', error);
+      captureLocation();
+    }
+  };
 
   const fetchProfile = async () => {
     const { data } = await supabase
