@@ -203,7 +203,7 @@ export function StoryEditor({ imageUrl, isVideo, onSave, onCancel }: StoryEditor
   }, [imageUrl, isVideo, overlays, onSave]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+    <div className="fixed inset-0 z-[60] bg-black flex flex-col">
       {/* Hidden canvas for compositing */}
       <canvas ref={canvasRef} className="hidden" />
       
@@ -356,7 +356,7 @@ export function StoryEditor({ imageUrl, isVideo, onSave, onCancel }: StoryEditor
       )}
 
       {/* Bottom toolbar */}
-      <div className="p-4 flex justify-center gap-4 z-20 bg-gradient-to-t from-black/80 to-transparent">
+      <div className="p-4 flex justify-center gap-4 z-20 bg-gradient-to-t from-black/80 to-transparent" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
         <button
           onClick={() => setShowTextInput(true)}
           className="flex flex-col items-center gap-1 p-3 rounded-lg bg-[#2d1b4e]/80 hover:bg-[#a855f7]/30 transition-colors"
