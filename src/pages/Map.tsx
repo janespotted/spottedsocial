@@ -59,7 +59,7 @@ export default function Map() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
-  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null }[]>([]);
+  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [venueFilter, setVenueFilter] = useState<'all' | 'nightclub' | 'cocktail_bar' | 'bar' | 'rooftop'>('all');
   // Use Map object keyed by user_id to prevent duplicate markers
@@ -285,16 +285,16 @@ export default function Map() {
             friendProfiles = friendProfiles.filter((p: any) => p.is_demo === false);
           }
 
-          // Get friends' night statuses to determine status type
+          // Get friends' night statuses to determine status type (including planning_neighborhood)
           const { data: statuses } = await supabase
             .from('night_statuses')
-            .select('user_id, venue_name, status')
+            .select('user_id, venue_name, status, planning_neighborhood')
             .in('user_id', friendIds)
             .not('expires_at', 'is', null)
             .gt('expires_at', new Date().toISOString());
 
           const venueMap: Record<string, string> = {};
-          const planningFriendsData: { user_id: string; display_name: string; avatar_url: string | null }[] = [];
+          const planningFriendsData: { user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[] = [];
           
           statuses?.forEach(s => {
             if (s.status === 'planning') {
@@ -305,6 +305,7 @@ export default function Map() {
                   user_id: s.user_id,
                   display_name: profile.display_name || 'Friend',
                   avatar_url: profile.avatar_url,
+                  planning_neighborhood: s.planning_neighborhood || null,
                 });
               }
             } else if (s.venue_name) {

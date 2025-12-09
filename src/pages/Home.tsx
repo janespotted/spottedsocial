@@ -83,7 +83,7 @@ export default function Home() {
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null }[]>([]);
+  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
 
   // Store fetch functions in refs to avoid dependency changes causing re-renders
   const fetchFriendsRef = useRef(fetchFriends);
@@ -160,10 +160,10 @@ export default function Home() {
       return;
     }
 
-    // Get friends with planning status
+    // Get friends with planning status (including neighborhood)
     const { data: planningStatuses } = await supabase
       .from('night_statuses')
-      .select('user_id')
+      .select('user_id, planning_neighborhood')
       .in('user_id', friendIds)
       .eq('status', 'planning')
       .not('expires_at', 'is', null)
@@ -175,6 +175,7 @@ export default function Home() {
     }
 
     const planningUserIds = planningStatuses.map(s => s.user_id);
+    const neighborhoodMap = new Map(planningStatuses.map(s => [s.user_id, s.planning_neighborhood]));
 
     // Get profiles for planning friends
     const { data: profiles } = await supabase
@@ -186,6 +187,7 @@ export default function Home() {
       user_id: p.id,
       display_name: p.display_name,
       avatar_url: p.avatar_url,
+      planning_neighborhood: neighborhoodMap.get(p.id) || null,
     })));
   };
 

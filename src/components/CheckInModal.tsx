@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
-import { MapPin, Edit3, Clock, Bell, X, AlarmClock } from 'lucide-react';
+import { MapPin, Edit3, Clock, Bell, X, AlarmClock, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -14,6 +14,8 @@ import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/l
 import { haptic } from '@/lib/haptics';
 import { requestNotificationPermission } from '@/lib/notifications';
 import { logEvent } from '@/lib/event-logger';
+import { useUserCity } from '@/hooks/useUserCity';
+import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -22,6 +24,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast as sonnerToast } from 'sonner';
 
 interface CheckInModalProps {
@@ -34,10 +43,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const { isReminderTriggered } = useCheckIn();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { city } = useUserCity();
   const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home' | 'planning'>('home');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showVenueConfirm, setShowVenueConfirm] = useState(false);
+  const [showPlanningNeighborhood, setShowPlanningNeighborhood] = useState(false);
+  const [planningNeighborhood, setPlanningNeighborhood] = useState<string>('');
   const [shareOption, setShareOption] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('close_friends');
   const [detectedVenue, setDetectedVenue] = useState<string>('');
   const [customVenue, setCustomVenue] = useState<string>('');
@@ -188,14 +200,21 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     } else if (status === 'heading_out') {
       await captureAndDeriveVenue();
     } else if (status === 'planning') {
-      // Planning mode: can see friends but don't share your location
-      await updateStatus('planning', null, null, null);
-      onOpenChange(false);
+      // Show neighborhood selector for planning mode
+      setPlanningNeighborhood('');
+      setShowPlanningNeighborhood(true);
     } else {
       await stopLocationTracking();
       await updateStatus(status, null, null, null);
       onOpenChange(false);
     }
+  };
+
+  const handlePlanningConfirm = async (skipNeighborhood: boolean = false) => {
+    const neighborhood = skipNeighborhood ? null : (planningNeighborhood || null);
+    await updateStatus('planning', null, null, null, null, neighborhood);
+    setShowPlanningNeighborhood(false);
+    onOpenChange(false);
   };
 
   const handleSetReminder = async (minutes: number) => {
@@ -352,10 +371,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     lat: number | null,
     lng: number | null,
     venue: string | null,
-    venueId: string | null = null
+    venueId: string | null = null,
+    neighborhood: string | null = null
   ) => {
     try {
-      const statusData = {
+      const statusData: any = {
         user_id: user?.id,
         status,
         lat,
@@ -364,6 +384,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         venue_id: venueId,
         updated_at: new Date().toISOString(),
         expires_at: status === 'home' ? null : calculateExpiryTime(),
+        planning_neighborhood: status === 'planning' ? neighborhood : null,
       };
 
       const { error } = await supabase
@@ -749,17 +770,73 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     </div>
   );
 
+  const PlanningNeighborhoodContent = () => {
+    const neighborhoods = CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS['la'];
+    
+    return (
+      <div className="relative p-6 space-y-6">
+        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+        
+        <div className="space-y-2">
+          <h3 className="text-xl font-semibold text-white">Share what area you're thinking tonight?</h3>
+          <p className="text-white/60 text-sm">(optional)</p>
+          <div className="h-px bg-white/20" />
+        </div>
+
+        <div className="space-y-4">
+          <Select value={planningNeighborhood} onValueChange={setPlanningNeighborhood}>
+            <SelectTrigger className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#a855f7]/50 text-white focus:ring-[#a855f7] focus:border-[#a855f7]">
+              <SelectValue placeholder="Select neighborhood..." />
+            </SelectTrigger>
+            <SelectContent className="bg-[#1a0f2e] border-2 border-[#a855f7]/30 max-h-60 z-[100]">
+              {neighborhoods.map((neighborhood) => (
+                <SelectItem 
+                  key={neighborhood} 
+                  value={neighborhood}
+                  className="text-white hover:bg-[#a855f7]/20 focus:bg-[#a855f7]/20 cursor-pointer"
+                >
+                  {neighborhood}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            onClick={() => handlePlanningConfirm(true)}
+            variant="outline"
+            className="flex-1 h-14 text-lg font-semibold rounded-full border-2 border-white/40 bg-transparent text-white hover:bg-white/10"
+          >
+            Skip
+          </Button>
+          <Button
+            onClick={() => handlePlanningConfirm(false)}
+            disabled={!planningNeighborhood}
+            className="flex-1 h-14 text-lg font-semibold rounded-full bg-[#a855f7] text-white border-2 border-[#a855f7] hover:bg-[#a855f7]/80 shadow-[0_0_20px_rgba(168,85,247,0.4)] disabled:opacity-50"
+          >
+            Share
+          </Button>
+        </div>
+
+        <p className="text-center text-sm text-white/60 italic">
+          Friends will see you're planning tonight
+        </p>
+      </div>
+    );
+  };
+
   return (
     <>
       {/* Status Modal */}
       {isMobile ? (
-        <Drawer open={open && !showShareModal && !showVenueConfirm} onOpenChange={onOpenChange}>
+        <Drawer open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood} onOpenChange={onOpenChange}>
           <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-0 border-t-2 border-[#a855f7]/30 shadow-[0_-20px_60px_rgba(168,85,247,0.4)]">
             <StatusContent />
           </DrawerContent>
         </Drawer>
       ) : (
-        <Dialog open={open && !showShareModal && !showVenueConfirm} onOpenChange={onOpenChange}>
+        <Dialog open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood} onOpenChange={onOpenChange}>
           <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 shadow-[0_0_80px_rgba(168,85,247,0.5),0_0_40px_rgba(139,92,246,0.4)] max-w-md p-0 overflow-hidden rounded-3xl">
             <StatusContent />
           </DialogContent>
@@ -777,6 +854,21 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
           <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden">
             <ShareLocationContent />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Planning Neighborhood Modal */}
+      {isMobile ? (
+        <Drawer open={showPlanningNeighborhood} onOpenChange={setShowPlanningNeighborhood}>
+          <DrawerContent className="bg-[#2d1b4e] border-0">
+            <PlanningNeighborhoodContent />
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={showPlanningNeighborhood} onOpenChange={setShowPlanningNeighborhood}>
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden">
+            <PlanningNeighborhoodContent />
           </DialogContent>
         </Dialog>
       )}

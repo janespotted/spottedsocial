@@ -10,7 +10,7 @@ import { toast } from '@/hooks/use-toast';
 import { logEvent } from '@/lib/event-logger';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users } from 'lucide-react';
+import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
@@ -386,12 +386,134 @@ export function ActivityTab() {
     }
   };
 
+  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      fetchAll();
+      fetchPlanningFriends();
+    }
+  }, [user, demoEnabled, bootstrapEnabled, city]);
+
+  const fetchPlanningFriends = async () => {
+    if (!user) return;
+    
+    // Get friend IDs
+    const [sentResult, receivedResult] = await Promise.all([
+      supabase.from('friendships').select('friend_id').eq('user_id', user.id).eq('status', 'accepted'),
+      supabase.from('friendships').select('user_id').eq('friend_id', user.id).eq('status', 'accepted')
+    ]);
+
+    const friendIds = [
+      ...(sentResult.data?.map(f => f.friend_id) || []),
+      ...(receivedResult.data?.map(f => f.user_id) || [])
+    ];
+
+    if (friendIds.length === 0) {
+      setPlanningFriends([]);
+      return;
+    }
+
+    // Get friends with planning status (including neighborhood)
+    const { data: planningStatuses } = await supabase
+      .from('night_statuses')
+      .select('user_id, planning_neighborhood')
+      .in('user_id', friendIds)
+      .eq('status', 'planning')
+      .not('expires_at', 'is', null)
+      .gt('expires_at', new Date().toISOString());
+
+    if (!planningStatuses || planningStatuses.length === 0) {
+      setPlanningFriends([]);
+      return;
+    }
+
+    const planningUserIds = planningStatuses.map(s => s.user_id);
+    const neighborhoodMap = new Map(planningStatuses.map(s => [s.user_id, s.planning_neighborhood]));
+
+    // Get profiles for planning friends - use safe RPC
+    const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+    const profiles = (allProfiles || []).filter((p: any) => planningUserIds.includes(p.id));
+
+    // In bootstrap mode (not demo mode), filter out demo users
+    const filteredProfiles = (bootstrapEnabled && !demoEnabled)
+      ? profiles.filter((p: any) => !p.is_demo)
+      : profiles;
+
+    setPlanningFriends(filteredProfiles.map((p: any) => ({
+      user_id: p.id,
+      display_name: p.display_name,
+      avatar_url: p.avatar_url,
+      planning_neighborhood: neighborhoodMap.get(p.id) || null,
+    })));
+  };
+
   if (isLoading) {
     return <ActivitySkeleton />;
   }
 
   return (
     <div className="space-y-4">
+      {/* Friends Planning / PGing Section */}
+      {planningFriends.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🎯</span>
+            <h3 className="text-sm font-semibold text-white">Friends Planning / PGing</h3>
+            <span className="text-white/40 text-xs">{planningFriends.length} deciding</span>
+          </div>
+          <div className="space-y-2">
+            {planningFriends.map((friend) => (
+              <div
+                key={friend.user_id}
+                className={`rounded-2xl p-3 transition-all ${CARD_STYLE}`}
+              >
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => openFriendCard({
+                      userId: friend.user_id,
+                      displayName: friend.display_name,
+                      avatarUrl: friend.avatar_url,
+                    })}
+                    className="hover:opacity-80 transition-opacity"
+                  >
+                    <Avatar className={`h-10 w-10 border-2 ${AVATAR_RING_COLOR}`}>
+                      <AvatarImage src={friend.avatar_url || undefined} />
+                      <AvatarFallback className="bg-[#1a0f2e] text-white text-sm">
+                        {friend.display_name?.[0] || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
+                    <p className="text-[#a855f7] text-xs">
+                      {friend.planning_neighborhood 
+                        ? `Planning tonight (${friend.planning_neighborhood})`
+                        : 'Planning tonight'}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => navigate('/messages', {
+                      state: {
+                        preselectedUser: {
+                          id: friend.user_id,
+                          display_name: friend.display_name,
+                          avatar_url: friend.avatar_url
+                        }
+                      }
+                    })}
+                    size="sm"
+                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)]"
+                  >
+                    Make plans
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Friend Requests */}
       <div
         onClick={() => navigate('/friend-requests')}
