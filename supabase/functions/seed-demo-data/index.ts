@@ -911,13 +911,20 @@ Deno.serve(async (req) => {
       const neighborhoods = Array.from(venuesByNeighborhood.keys());
       console.log(`Found ${neighborhoods.length} neighborhoods: ${neighborhoods.join(', ')}`);
       
-      // Reserve last 4 demo users for promoted venues
+      // City-specific neighborhoods for planning users
+      const PLANNING_NEIGHBORHOODS: Record<string, string[]> = {
+        'la': ['West Hollywood', 'Hollywood', 'Venice', 'Santa Monica', 'Silver Lake', 'Downtown LA', 'Echo Park', 'Los Feliz'],
+        'nyc': ['West Village', 'Lower East Side', 'SoHo', 'Williamsburg', 'East Village', 'Bushwick', 'Greenpoint', 'Nolita']
+      };
+      
+      // Reserve last 4 demo users for promoted venues, and 6 before that for planning
       const promotedUserStartIndex = demoUserIds.length - 4;
+      const planningUserStartIndex = promotedUserStartIndex - 6;
       
       // Distribute users across neighborhoods evenly, with bias toward top venues in each
       let userIndex = 0;
-      const usersPerNeighborhood = Math.floor(promotedUserStartIndex / neighborhoods.length);
-      const extraUsers = promotedUserStartIndex % neighborhoods.length;
+      const usersPerNeighborhood = Math.floor(planningUserStartIndex / neighborhoods.length);
+      const extraUsers = planningUserStartIndex % neighborhoods.length;
       
       for (let n = 0; n < neighborhoods.length; n++) {
         const neighborhood = neighborhoods[n];
@@ -928,7 +935,7 @@ Deno.serve(async (req) => {
         // Assign users to this neighborhood
         const usersForThisNeighborhood = usersPerNeighborhood + (n < extraUsers ? 1 : 0);
         
-        for (let i = 0; i < usersForThisNeighborhood && userIndex < promotedUserStartIndex; i++) {
+        for (let i = 0; i < usersForThisNeighborhood && userIndex < planningUserStartIndex; i++) {
           // Bias toward top venues in neighborhood (first venue gets more users)
           const venueIndex = Math.min(
             Math.floor(Math.random() * Math.random() * neighborhoodVenues.length),
@@ -953,6 +960,34 @@ Deno.serve(async (req) => {
           userIndex++;
         }
       }
+      
+      // Create 6 planning users (index 40-45): set to "planning" status with varying neighborhoods
+      console.log('Creating planning mode demo users...');
+      const planningNeighborhoods = PLANNING_NEIGHBORHOODS[city] || PLANNING_NEIGHBORHOODS['la'];
+      
+      for (let i = 0; i < 6; i++) {
+        const userId = demoUserIds[planningUserStartIndex + i];
+        // 60% have a neighborhood hint, 40% don't (to show both variants)
+        const hasNeighborhood = i < 4; // First 4 have neighborhoods, last 2 don't
+        const neighborhood = hasNeighborhood 
+          ? planningNeighborhoods[i % planningNeighborhoods.length]
+          : null;
+        
+        nightStatuses.push({
+          user_id: userId,
+          status: 'planning',
+          venue_id: null,
+          venue_name: null,
+          lat: null,
+          lng: null,
+          planning_neighborhood: neighborhood,
+          expires_at: calculateExpiryTime(),
+          updated_at: getRecentTimestamp(),
+          is_demo: true,
+          is_promoted: false,
+        });
+      }
+      console.log(`Created 6 planning mode users (4 with neighborhoods, 2 without)`);
       
       // Last 4 users (index 46-49): assign to promoted venues (ensures they have activity)
       console.log('Adding demo users to promoted venues...');
