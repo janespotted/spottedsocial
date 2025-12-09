@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, ThumbsUp } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const formatTimeTo12Hour = (time: string) => {
   const [hours, minutes] = time.split(':').map(Number);
@@ -14,6 +15,15 @@ const formatTimeTo12Hour = (time: string) => {
   const hour12 = hours % 12 || 12;
   return `${hour12}${minutes > 0 ? ':' + minutes.toString().padStart(2, '0') : ''}${period}`;
 };
+
+interface DownUser {
+  id: string;
+  user_id: string;
+  user?: {
+    display_name: string;
+    avatar_url: string | null;
+  };
+}
 
 interface PlanItemProps {
   plan: {
@@ -57,8 +67,69 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
   const [newComment, setNewComment] = useState('');
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isPostingComment, setIsPostingComment] = useState(false);
+  const [downs, setDowns] = useState<DownUser[]>([]);
+  const [isDown, setIsDown] = useState(false);
+  const [isTogglingDown, setIsTogglingDown] = useState(false);
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
+
+  // Fetch "I'm Down" reactions
+  const fetchDowns = async () => {
+    const { data } = await supabase
+      .from('plan_downs')
+      .select('id, user_id')
+      .eq('plan_id', plan.id);
+
+    if (data && data.length > 0) {
+      const userIds = data.map(d => d.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      setDowns(data.map(d => ({
+        ...d,
+        user: profileMap.get(d.user_id) as { display_name: string; avatar_url: string | null } | undefined,
+      })));
+      setIsDown(data.some(d => d.user_id === currentUserId));
+    } else {
+      setDowns([]);
+      setIsDown(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDowns();
+  }, [plan.id, currentUserId]);
+
+  const handleToggleDown = async () => {
+    if (isTogglingDown) return;
+    setIsTogglingDown(true);
+
+    try {
+      if (isDown) {
+        await supabase
+          .from('plan_downs')
+          .delete()
+          .eq('plan_id', plan.id)
+          .eq('user_id', currentUserId);
+        setIsDown(false);
+        setDowns(prev => prev.filter(d => d.user_id !== currentUserId));
+      } else {
+        await supabase
+          .from('plan_downs')
+          .insert({ plan_id: plan.id, user_id: currentUserId });
+        setIsDown(true);
+        toast.success("You're down! 🎉");
+        await fetchDowns();
+      }
+    } catch (error) {
+      console.error('Error toggling down:', error);
+    } finally {
+      setIsTogglingDown(false);
+    }
+  };
 
   const fetchComments = async () => {
     setIsLoadingComments(true);
@@ -227,9 +298,51 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
       </div>
 
       {/* Description */}
-      <p className="text-foreground mb-4 whitespace-pre-wrap">
+      <p className="text-foreground mb-3 whitespace-pre-wrap">
         {plan.description}
       </p>
+
+      {/* I'm Down Section */}
+      <div className="flex items-center gap-3 mb-4">
+        <Button
+          variant={isDown ? 'default' : 'outline'}
+          size="sm"
+          onClick={handleToggleDown}
+          disabled={isTogglingDown}
+          className={`gap-2 ${isDown ? 'bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90' : 'border-[#d4ff00]/50 text-[#d4ff00] hover:bg-[#d4ff00]/10'}`}
+        >
+          <ThumbsUp className="w-4 h-4" />
+          {isDown ? "I'm Down!" : "I'm Down"}
+        </Button>
+        
+        {downs.length > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="flex -space-x-2">
+              {downs.slice(0, 5).map((down) => (
+                <Avatar 
+                  key={down.id} 
+                  className="h-7 w-7 border-2 border-card cursor-pointer"
+                  onClick={() => down.user && openFriendCard({
+                    userId: down.user_id,
+                    displayName: down.user.display_name,
+                    avatarUrl: down.user.avatar_url,
+                  })}
+                >
+                  <AvatarImage src={down.user?.avatar_url || ''} />
+                  <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                    {down.user?.display_name?.charAt(0) || '?'}
+                  </AvatarFallback>
+                </Avatar>
+              ))}
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {downs.length === 1 
+                ? `${downs[0].user?.display_name?.split(' ')[0]} is down`
+                : `${downs.length} people are down`}
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Footer */}
       <div className="flex items-center justify-between">
