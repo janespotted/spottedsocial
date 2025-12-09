@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, UserPlus, Sparkles, Clock, Calendar } from 'lucide-react';
+import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, Clock, Calendar } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -333,13 +333,16 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
   const formattedTime = formatTimeTo12Hour(plan.plan_time);
   const isCurrentUserDown = downs.some(d => d.user_id === currentUserId);
 
+  // Get current user's profile for avatar in down pill
+  const currentUserDown = downs.find(d => d.user_id === currentUserId);
+
   return (
-    <div className="bg-card/60 backdrop-blur-sm rounded-2xl p-4 border border-primary/20 shadow-[0_0_20px_rgba(168,85,247,0.1)] hover:shadow-[0_0_25px_rgba(168,85,247,0.2)] transition-all duration-300">
+    <div className="bg-card/60 backdrop-blur-sm rounded-2xl p-3 border border-primary/20 shadow-[0_0_20px_rgba(168,85,247,0.1)] hover:shadow-[0_0_25px_rgba(168,85,247,0.2)] transition-all duration-300">
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2.5">
           <Avatar 
-            className="h-11 w-11 cursor-pointer ring-2 ring-primary/30 hover:ring-primary/50 transition-all" 
+            className="h-10 w-10 cursor-pointer ring-2 ring-primary/30 hover:ring-primary/50 transition-all" 
             onClick={handleUserClick}
           >
             <AvatarImage src={plan.user?.avatar_url || ''} />
@@ -349,7 +352,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
           </Avatar>
           <div>
             <p 
-              className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
+              className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors text-sm"
               onClick={handleUserClick}
             >
               {plan.user?.display_name}
@@ -366,13 +369,13 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
             className="text-sm font-semibold text-[#d4ff00] hover:text-[#e8ff4d] cursor-pointer flex items-center gap-1.5 justify-end transition-colors"
             onClick={handleVenueClick}
           >
-            <MapPin className="w-4 h-4" />
+            <MapPin className="w-3.5 h-3.5" />
             {plan.venue_name}
           </button>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1 justify-end">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 justify-end">
             <Calendar className="w-3 h-3" />
             <span className="font-medium text-foreground/80">{smartDateLabel}</span>
-            <Clock className="w-3 h-3 ml-1" />
+            <Clock className="w-3 h-3 ml-0.5" />
             <span>{formattedTime}</span>
           </div>
         </div>
@@ -380,105 +383,87 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
 
       {/* Description */}
       {plan.description && (
-        <p className="text-foreground mb-4 whitespace-pre-wrap leading-relaxed">
+        <p className="text-foreground text-sm mb-3 whitespace-pre-wrap leading-relaxed">
           {plan.description}
         </p>
       )}
 
-      {/* Participants & I'm Down Section */}
-      <div className="bg-background/30 rounded-xl p-4 mb-4 border border-border/20">
-        {/* Going With Section */}
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/10">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
-              <UserPlus className="w-3.5 h-3.5" />
-              Going with
-            </span>
-            {participants.length > 0 ? (
-              <div className="flex -space-x-2">
-                {participants.slice(0, 5).map((participant) => (
-                  <Avatar 
-                    key={participant.id} 
-                    className="h-7 w-7 border-2 border-background cursor-pointer hover:scale-110 transition-transform ring-1 ring-primary/20"
-                    onClick={() => openFriendCard({
-                      userId: participant.user_id,
-                      displayName: participant.display_name,
-                      avatarUrl: participant.avatar_url,
-                    })}
-                  >
-                    <AvatarImage src={participant.avatar_url || ''} />
-                    <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                      {participant.display_name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
-                {participants.length > 5 && (
-                  <div className="h-7 w-7 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center">
-                    <span className="text-xs text-primary font-medium">+{participants.length - 5}</span>
-                  </div>
-                )}
+      {/* Going With - Only show if participants exist */}
+      {participants.length > 0 && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs text-muted-foreground">Going with</span>
+          <div className="flex -space-x-2">
+            {participants.slice(0, 5).map((participant) => (
+              <Avatar 
+                key={participant.id} 
+                className="h-6 w-6 border-2 border-background cursor-pointer hover:scale-110 transition-transform"
+                onClick={() => openFriendCard({
+                  userId: participant.user_id,
+                  displayName: participant.display_name,
+                  avatarUrl: participant.avatar_url,
+                })}
+              >
+                <AvatarImage src={participant.avatar_url || ''} />
+                <AvatarFallback className="bg-primary/20 text-primary text-[10px]">
+                  {participant.display_name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+            ))}
+            {participants.length > 5 && (
+              <div className="h-6 w-6 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center">
+                <span className="text-[10px] text-primary font-medium">+{participants.length - 5}</span>
               </div>
-            ) : (
-              <span className="text-xs text-muted-foreground/60 italic">No one yet</span>
             )}
           </div>
         </div>
+      )}
 
-        {/* I'm Down Section */}
-        <div className="flex items-center gap-2 pt-1">
-          <Button
-            size="sm"
-            onClick={handleToggleDown}
-            disabled={isTogglingDown}
-            className={`rounded-full px-3 text-xs font-semibold transition-all duration-300 ${
-              isDown 
-                ? 'bg-[#d4ff00] text-black hover:bg-[#c4ef00] shadow-[0_0_15px_rgba(212,255,0,0.3)]' 
-                : 'bg-primary text-white hover:bg-primary/90 shadow-[0_0_10px_rgba(168,85,247,0.4)]'
-            }`}
-          >
-            {isDown ? (
-              <>Down 🎉</>
-            ) : (
-              <>
-                <Sparkles className="w-3 h-3 mr-1" />
-                I'm down!
-              </>
-            )}
-          </Button>
-          
-          {downs.length > 0 && (
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
-                {downs.slice(0, 5).map((down) => (
-                  <Avatar 
-                    key={down.id} 
-                    className={`h-7 w-7 border-2 cursor-pointer hover:scale-110 transition-transform ${
-                      down.user_id === currentUserId 
-                        ? 'border-[#d4ff00] ring-2 ring-[#d4ff00]/50' 
-                        : 'border-background ring-1 ring-primary/20'
-                    }`}
-                    onClick={() => down.user && openFriendCard({
-                      userId: down.user_id,
-                      displayName: down.user.display_name,
-                      avatarUrl: down.user.avatar_url,
-                    })}
-                  >
-                    <AvatarImage src={down.user?.avatar_url || ''} />
-                    <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                      {down.user?.display_name?.charAt(0) || '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
-              </div>
-              <span className="text-sm text-muted-foreground">
-                {downs.length === 1 
-                  ? `${downs[0].user?.display_name?.split(' ')[0]} is down`
-                  : `${downs.length} people down`}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Empty state - subtle text when no participants AND no downs */}
+      {participants.length === 0 && downs.length === 0 && (
+        <p className="text-xs text-muted-foreground/50 mb-3">
+          Nobody's joined yet — be the first 👀
+        </p>
+      )}
+
+      {/* Single "I'm Down" Pill */}
+      <button
+        onClick={handleToggleDown}
+        disabled={isTogglingDown}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-300 mb-3 ${
+          isDown 
+            ? 'bg-[#d4ff00] text-black hover:bg-[#c4ef00] shadow-[0_0_12px_rgba(212,255,0,0.3)]' 
+            : 'bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30'
+        }`}
+      >
+        <span>🎉</span>
+        {isDown && currentUserDown?.user && (
+          <Avatar className="h-5 w-5 border border-black/20">
+            <AvatarImage src={currentUserDown.user.avatar_url || ''} />
+            <AvatarFallback className="bg-black/20 text-black text-[8px]">
+              {currentUserDown.user.display_name?.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+        )}
+        {downs.length > 1 && (
+          <div className="flex -space-x-1.5 ml-0.5">
+            {downs.filter(d => d.user_id !== currentUserId).slice(0, 3).map((down) => (
+              <Avatar key={down.id} className="h-5 w-5 border border-black/20">
+                <AvatarImage src={down.user?.avatar_url || ''} />
+                <AvatarFallback className="bg-black/20 text-black text-[8px]">
+                  {down.user?.display_name?.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+            ))}
+          </div>
+        )}
+        <span>
+          {downs.length === 0 
+            ? "I'm down!" 
+            : isDown && downs.length === 1 
+              ? "You're down!" 
+              : `${downs.length} down`}
+        </span>
+      </button>
 
       {/* Footer */}
       <div className="flex items-center justify-between">
