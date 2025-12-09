@@ -77,6 +77,7 @@ export default function Map() {
   } | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [focusMode, setFocusMode] = useState(false);
   const friendsListRef = useRef<HTMLDivElement>(null);
   const venueFilterRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -431,9 +432,10 @@ export default function Map() {
       setSelectedCluster(null);
     });
     
-    // Close cluster popover when clicking on map
+    // Toggle focus mode and close cluster popover when clicking on map
     map.current.on('click', () => {
       setSelectedCluster(null);
+      setFocusMode(prev => !prev);
     });
 
     // Listen for custom event to center map on venue
@@ -911,7 +913,7 @@ export default function Map() {
       </div>
 
       {/* Search Button/Input - Top Left Below Header */}
-      <div ref={searchContainerRef} className="absolute top-28 left-4 z-[200]">
+      <div ref={searchContainerRef} className={`absolute top-28 left-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         {showSearch ? (
           <div className="flex items-center gap-2 bg-[#2d1b4e]/90 backdrop-blur rounded-full border border-[#a855f7]/50 px-3 py-2 animate-fade-in shadow-[0_0_15px_rgba(168,85,247,0.2)]">
             <span className="text-sm">🔍</span>
@@ -942,7 +944,7 @@ export default function Map() {
       </div>
 
       {/* Search Results Dropdown */}
-      {showSearch && searchQuery.length > 0 && (
+      {showSearch && searchQuery.length > 0 && !focusMode && (
         <div className="absolute top-40 left-4 w-64 z-[250] bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 overflow-y-auto">
           {filteredSearchVenues.length > 0 ? (
             filteredSearchVenues.slice(0, 10).map((venue) => (
@@ -967,7 +969,7 @@ export default function Map() {
       )}
 
       {/* Venue Type Filter - Collapsible in top right */}
-      <div ref={venueFilterRef} className="absolute top-28 right-4 z-[200]">
+      <div ref={venueFilterRef} className={`absolute top-28 right-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         {/* Collapsed Pill */}
         <button
           onClick={() => setShowVenueFilters(!showVenueFilters)}
@@ -1024,7 +1026,7 @@ export default function Map() {
 
       {/* Friends Out Pill + List - Bottom Left */}
       {friends.length > 0 ? (
-        <div ref={friendsListRef} className="absolute bottom-24 left-6 z-[200] max-w-sm">
+        <div ref={friendsListRef} className={`absolute bottom-24 left-6 z-[200] max-w-sm transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           {/* Expanded Friends List - Opens Upward */}
           {showFriendsList && (
             <div className="mb-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] max-h-96 overflow-y-auto relative z-[200]">
@@ -1089,7 +1091,7 @@ export default function Map() {
           </button>
         </div>
       ) : !demoEnabled ? (
-        <div className="absolute bottom-24 left-6 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-20">
+        <div className={`absolute bottom-24 left-6 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-20 transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#a855f7]/30 rounded-full"></div>
             <span className="text-white/60 text-sm">No friends out</span>
@@ -1100,14 +1102,14 @@ export default function Map() {
       {/* My Location Button */}
       <button
         onClick={centerOnMyLocation}
-        className="absolute bottom-24 right-6 w-12 h-12 rounded-full bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/50 flex items-center justify-center z-20 hover:bg-[#2d1b4e] transition-colors shadow-[0_0_20px_rgba(168,85,247,0.4)]"
+        className={`absolute bottom-24 right-6 w-12 h-12 rounded-full bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/50 flex items-center justify-center z-20 hover:bg-[#2d1b4e] transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.4)] ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
         aria-label="Center on my location"
       >
         <Crosshair className="w-5 h-5 text-white" />
       </button>
 
       {/* Legend */}
-      <div className="absolute bottom-40 right-6 bg-[#2d1b4e]/95 backdrop-blur-sm border border-[#a855f7]/20 rounded-md p-2 z-20 shadow-[0_0_8px_rgba(168,85,247,0.2)]">
+      <div className={`absolute bottom-40 right-6 bg-[#2d1b4e]/95 backdrop-blur-sm border border-[#a855f7]/20 rounded-md p-2 z-20 shadow-[0_0_8px_rgba(168,85,247,0.2)] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <p className="text-white/70 text-[10px] font-medium mb-1.5">Relationship</p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">
