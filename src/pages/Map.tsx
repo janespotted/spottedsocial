@@ -1055,10 +1055,16 @@ export default function Map() {
         <div 
           className="absolute z-[300] bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden animate-fade-in"
           style={{
-            left: Math.min(selectedCluster.screenX - 120, window.innerWidth - 260),
-            top: selectedCluster.screenY + 40,
+            left: Math.min(
+              Math.max(selectedCluster.screenX - 120, 10),
+              window.innerWidth - 260
+            ),
+            top: selectedCluster.screenY + 300 > window.innerHeight 
+              ? Math.max(selectedCluster.screenY - 280, 80)
+              : selectedCluster.screenY + 40,
             minWidth: '240px',
             maxWidth: '280px',
+            maxHeight: 'calc(100vh - 160px)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
