@@ -1022,7 +1022,7 @@ export default function Map() {
 
         {/* Expanded Filter Options */}
         {showVenueFilters && (
-          <div className="mt-1.5 bg-[#1a0f2e] backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_25px_rgba(168,85,247,0.4)] overflow-hidden animate-fade-in min-w-[140px] relative z-[200]">
+          <div className="mt-1.5 bg-[#1a0f2e] backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_25px_rgba(168,85,247,0.4)] overflow-hidden animate-fade-in min-w-[140px] relative z-[300]">
             {[
               { key: 'all', label: 'All Venues', icon: '🗺️' },
               { key: 'nightclub', label: 'Clubs', icon: '🎵' },
