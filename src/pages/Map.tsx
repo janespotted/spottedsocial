@@ -1124,10 +1124,10 @@ export default function Map() {
         )}
       </div>
 
-      {/* Explore Venues Button + List - Below Filter */}
+      {/* Explore Venues Button + List - Below Search on Left */}
       <div 
         ref={venueListRef}
-        className={`absolute right-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        className={`absolute left-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
         style={{ top: 'calc(9.5rem + env(safe-area-inset-top, 0px))' }}
       >
         <button
@@ -1148,13 +1148,27 @@ export default function Map() {
             <div className="sticky top-0 bg-[#1a0f2e] border-b border-[#a855f7]/30 px-3 py-2">
               <p className="text-white/70 text-xs font-medium">
                 {typeFilteredVenues.length} venues in {city.toUpperCase()}
+                {userLocation && ' • Sorted by distance'}
               </p>
             </div>
             
-            {/* Scrollable Venue List */}
+            {/* Scrollable Venue List - Sorted by distance */}
             <div className="max-h-64 overflow-y-auto">
               {typeFilteredVenues.length > 0 ? (
-                typeFilteredVenues.map((venue) => (
+                [...typeFilteredVenues]
+                  .map(venue => ({
+                    ...venue,
+                    distanceMiles: userLocation 
+                      ? parseFloat(calculateDistance(userLocation.lat, userLocation.lng, venue.lat, venue.lng))
+                      : null
+                  }))
+                  .sort((a, b) => {
+                    if (a.distanceMiles !== null && b.distanceMiles !== null) {
+                      return a.distanceMiles - b.distanceMiles;
+                    }
+                    return a.name.localeCompare(b.name); // Fallback to alphabetical
+                  })
+                  .map((venue) => (
                   <button
                     key={venue.id}
                     onClick={() => {
@@ -1175,12 +1189,19 @@ export default function Map() {
                       <p className="text-white font-medium text-sm truncate">{venue.name}</p>
                       <p className="text-white/50 text-xs truncate">{venue.neighborhood}</p>
                     </div>
-                    <span className="text-xs flex-shrink-0">
-                      {venue.type === 'nightclub' ? '🎵' :
-                       venue.type === 'cocktail_bar' ? '🍸' :
-                       venue.type === 'bar' ? '🍺' :
-                       venue.type === 'rooftop' ? '🌃' : '📍'}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {venue.distanceMiles !== null && (
+                        <span className="text-[#a855f7] text-xs font-medium">
+                          {venue.distanceMiles < 0.1 ? '<0.1' : venue.distanceMiles} mi
+                        </span>
+                      )}
+                      <span className="text-xs">
+                        {venue.type === 'nightclub' ? '🎵' :
+                         venue.type === 'cocktail_bar' ? '🍸' :
+                         venue.type === 'bar' ? '🍺' :
+                         venue.type === 'rooftop' ? '🌃' : '📍'}
+                      </span>
+                    </div>
                   </button>
                 ))
               ) : (
