@@ -69,6 +69,7 @@ export default function Map() {
   const venueMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ avatar_url: string | null; display_name: string } | null>(null);
   const [showFriendsList, setShowFriendsList] = useState(false);
   const [showVenueFilters, setShowVenueFilters] = useState(false);
   const [isLoadingFriends, setIsLoadingFriends] = useState(true);
@@ -177,9 +178,17 @@ export default function Map() {
       // Get current user's profile to check their location
       const { data: myProfile } = await supabase
         .from('profiles')
-        .select('is_out, last_known_lat, last_known_lng, location_sharing_level')
+        .select('is_out, last_known_lat, last_known_lng, location_sharing_level, avatar_url, display_name')
         .eq('id', user.id)
         .single();
+
+      // Store user profile for avatar marker
+      if (myProfile) {
+        setUserProfile({
+          avatar_url: myProfile.avatar_url,
+          display_name: myProfile.display_name || 'Me'
+        });
+      }
 
       // Update user's location state
       if (myProfile?.is_out && myProfile.last_known_lat && myProfile.last_known_lng) {
@@ -533,18 +542,29 @@ export default function Map() {
     // Remove old marker
     userMarkerRef.current?.remove();
 
-    // Create user marker with distinct styling (yellow glow)
+    // Create user marker with personal avatar and yellow glow
     const el = document.createElement('div');
     el.className = 'user-marker';
-    el.style.width = '70px';
-    el.style.height = '70px';
+    el.style.width = '60px';
+    el.style.height = '60px';
     el.style.cursor = 'pointer';
-    el.style.zIndex = '10';
+    el.style.zIndex = '15';
+    
+    const avatarUrl = userProfile?.avatar_url || '/placeholder.svg';
+    const initials = userProfile?.display_name?.charAt(0).toUpperCase() || 'M';
     
     el.innerHTML = `
-      <div style="position: relative; width: 100%; height: 100%;">
-        <div style="position: absolute; inset: 0; border-radius: 50%; border: 3px solid #d4ff00; box-shadow: 0 0 12px rgba(212, 255, 0, 0.4);"></div>
-        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 10px; height: 10px; background: #d4ff00; border-radius: 50%; box-shadow: 0 0 6px rgba(212, 255, 0, 0.6);"></div>
+      <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+        <!-- Yellow pulsing glow to distinguish from friends -->
+        <div style="position: absolute; inset: -4px; border-radius: 50%; background: radial-gradient(circle, rgba(212, 255, 0, 0.3) 0%, transparent 70%); animation: pulse 2s infinite;"></div>
+        <!-- Avatar with yellow border (vs purple for friends) -->
+        <div style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; border: 3px solid #d4ff00; box-shadow: 0 0 12px rgba(212, 255, 0, 0.5); background: #1a0f2e;">
+          <img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" 
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+          <div style="display: none; width: 100%; height: 100%; background: #d4ff00; align-items: center; justify-content: center; font-weight: bold; color: #0a0118; font-size: 18px;">
+            ${initials}
+          </div>
+        </div>
       </div>
     `;
 
@@ -554,7 +574,7 @@ export default function Map() {
     })
       .setLngLat([userLocation.lng, userLocation.lat])
       .addTo(map.current);
-  }, [userLocation]);
+  }, [userLocation, userProfile]);
 
   // Smart marker diffing with clustering for groups
   // ~5 meters = 0.000045 degrees (venue-level accuracy)
@@ -887,6 +907,10 @@ export default function Map() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
+          
+          // Update user location state to show avatar marker
+          setUserLocation({ lat: latitude, lng: longitude });
+          
           map.current?.flyTo({
             center: [longitude, latitude],
             zoom: 14,
