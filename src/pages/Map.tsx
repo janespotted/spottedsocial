@@ -69,7 +69,12 @@ export default function Map() {
   const [showVenueFilters, setShowVenueFilters] = useState(false);
   const [isLoadingFriends, setIsLoadingFriends] = useState(true);
   const [currentZoom, setCurrentZoom] = useState(13);
-  const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set());
+  const [selectedCluster, setSelectedCluster] = useState<{
+    friends: FriendLocation[];
+    venueName: string;
+    screenX: number;
+    screenY: number;
+  } | null>(null);
   const friendsListRef = useRef<HTMLDivElement>(null);
   const venueFilterRef = useRef<HTMLDivElement>(null);
   
@@ -419,10 +424,13 @@ export default function Map() {
     map.current.on('zoom', () => {
       const zoom = map.current?.getZoom() || 13;
       setCurrentZoom(zoom);
-      // Auto-collapse expanded clusters when zooming out
-      if (zoom < 18) {
-        setExpandedClusters(new Set());
-      }
+      // Close cluster popover when zooming
+      setSelectedCluster(null);
+    });
+    
+    // Close cluster popover when clicking on map
+    map.current.on('click', () => {
+      setSelectedCluster(null);
     });
 
     // Listen for custom event to center map on venue
@@ -593,12 +601,11 @@ export default function Map() {
     // Render clusters
     clusters.forEach((cluster) => {
       const clusterKey = `cluster-${cluster.map(f => f.user_id).sort().join('-')}`;
-      const isExpanded = expandedClusters.has(clusterKey);
       const centerLat = cluster[0].lat;
       const centerLng = cluster[0].lng;
 
-      if (cluster.length >= 4 && shouldCluster && !isExpanded) {
-        // Create cluster bubble for 4+ friends (not expanded)
+      if (cluster.length >= 4 && shouldCluster) {
+        // Create cluster bubble for 4+ friends - opens popover on click
         const el = document.createElement('div');
         el.className = 'cluster-marker';
         el.style.width = '70px';
@@ -624,9 +631,16 @@ export default function Map() {
           </div>
         `;
 
-        el.addEventListener('click', () => {
-          // Tap to expand cluster
-          setExpandedClusters(prev => new Set([...prev, clusterKey]));
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Get screen position of cluster
+          const point = map.current!.project([centerLng, centerLat]);
+          setSelectedCluster({
+            friends: cluster,
+            venueName: cluster[0].venue_name,
+            screenX: point.x,
+            screenY: point.y,
+          });
         });
 
         const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
@@ -634,40 +648,6 @@ export default function Map() {
           .addTo(map.current!);
 
         friendMarkersRef.current.set(clusterKey, marker);
-      } else if (cluster.length >= 4 && isExpanded) {
-        // Expanded cluster - spread avatars in a circle
-        cluster.forEach((friend, idx) => {
-          const angleStep = (2 * Math.PI) / cluster.length;
-          const angle = idx * angleStep;
-          const spreadLng = centerLng + SPREAD_RADIUS * Math.cos(angle);
-          const spreadLat = centerLat + SPREAD_RADIUS * Math.sin(angle);
-          createAvatarMarker(friend, spreadLng, spreadLat);
-        });
-        
-        // Add a collapse button in center
-        const collapseEl = document.createElement('div');
-        collapseEl.style.width = '32px';
-        collapseEl.style.height = '32px';
-        collapseEl.style.cursor = 'pointer';
-        collapseEl.style.zIndex = '10';
-        collapseEl.innerHTML = `
-          <div style="width: 100%; height: 100%; background: rgba(45, 27, 78, 0.95); border: 2px solid rgba(168, 85, 247, 0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);">
-            <span style="color: white; font-size: 14px; font-weight: 600;">−</span>
-          </div>
-        `;
-        collapseEl.addEventListener('click', () => {
-          setExpandedClusters(prev => {
-            const next = new Set(prev);
-            next.delete(clusterKey);
-            return next;
-          });
-        });
-        
-        const collapseMarker = new mapboxgl.Marker({ element: collapseEl, anchor: 'center' })
-          .setLngLat([centerLng, centerLat])
-          .addTo(map.current!);
-        
-        friendMarkersRef.current.set(`${clusterKey}-collapse`, collapseMarker);
       } else {
         // 1-3 friends or high zoom - render individually with slight offset
         cluster.forEach((friend, idx) => {
@@ -677,7 +657,7 @@ export default function Map() {
         });
       }
     });
-  }, [friends, isLoadingFriends, currentZoom, expandedClusters]);
+  }, [friends, isLoadingFriends, currentZoom]);
 
   // Determine how many venues to show based on zoom level
   const getVisibleVenueCount = (zoom: number): number => {
@@ -1069,6 +1049,61 @@ export default function Map() {
           </div>
         </div>
       </div>
+
+      {/* Cluster Friends Popover */}
+      {selectedCluster && (
+        <div 
+          className="absolute z-[300] bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden animate-fade-in"
+          style={{
+            left: Math.min(selectedCluster.screenX - 120, window.innerWidth - 260),
+            top: selectedCluster.screenY + 40,
+            minWidth: '240px',
+            maxWidth: '280px',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-4 py-3 border-b border-[#a855f7]/20">
+            <h3 className="text-white font-medium text-sm">
+              Friends at {selectedCluster.venueName}
+            </h3>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {selectedCluster.friends.map((friend) => (
+              <button
+                key={friend.user_id}
+                onClick={() => {
+                  setSelectedCluster(null);
+                  const friendCardData: FriendCardData = {
+                    userId: friend.user_id,
+                    displayName: friend.profiles?.display_name || 'Friend',
+                    avatarUrl: friend.profiles?.avatar_url || null,
+                    venueName: friend.venue_name,
+                    lat: friend.lat,
+                    lng: friend.lng,
+                    relationshipType: friend.relationshipType,
+                  };
+                  openFriendCard(friendCardData);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#a855f7]/10 transition-colors"
+              >
+                <Avatar className="h-10 w-10 border-2 border-[#a855f7]/50">
+                  <AvatarImage 
+                    src={friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`} 
+                    alt={friend.profiles?.display_name} 
+                  />
+                  <AvatarFallback className="bg-[#a855f7]/20 text-white">
+                    {friend.profiles?.display_name?.[0]?.toUpperCase() || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-white font-medium text-sm flex-1 text-left">
+                  {friend.profiles?.display_name}
+                </span>
+                <ChevronDown className="w-4 h-4 text-white/40 -rotate-90" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
