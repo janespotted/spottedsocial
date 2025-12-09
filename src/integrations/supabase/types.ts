@@ -852,6 +852,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       venue_buzz_messages: {
         Row: {
           created_at: string | null
@@ -1277,6 +1298,13 @@ export type Database = {
           username: string
         }[]
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       is_close_friend: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
@@ -1297,6 +1325,7 @@ export type Database = {
       validate_invite_code: { Args: { code_to_check: string }; Returns: Json }
     }
     Enums: {
+      app_role: "admin" | "moderator" | "user"
       friendship_status_enum: "pending" | "accepted" | "blocked"
       night_status_enum: "out" | "heading_out" | "home"
     }
@@ -1426,6 +1455,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "moderator", "user"],
       friendship_status_enum: ["pending", "accepted", "blocked"],
       night_status_enum: ["out", "heading_out", "home"],
     },
