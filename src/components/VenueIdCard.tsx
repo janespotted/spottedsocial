@@ -646,7 +646,7 @@ export function VenueIdCard() {
                               )}
                             </button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl" align="start">
+                          <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl z-[400]" align="start">
                             <p className="text-white/60 text-xs px-2 mb-2">
                               Friends at {venue.name}
                             </p>
