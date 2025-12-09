@@ -8,13 +8,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Camera, Send, Image, Users } from 'lucide-react';
+import { ChevronLeft, Camera, Send, Image, Users, ChevronDown, UserPlus, ChevronRight } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -61,6 +62,8 @@ export default function Thread() {
   const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [showMembersPopover, setShowMembersPopover] = useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -140,10 +143,23 @@ export default function Thread() {
     if (threadId && user) {
       fetchThreadData();
       fetchMessages();
+      fetchCurrentUserProfile();
       const cleanup = subscribeToMessages();
       return cleanup;
     }
   }, [threadId, user]);
+
+  const fetchCurrentUserProfile = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('display_name, avatar_url')
+      .eq('id', user.id)
+      .single();
+    if (data) {
+      setCurrentUserProfile(data);
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -356,29 +372,108 @@ export default function Thread() {
             </button>
 
             {groupInfo ? (
-              // Group chat header
-              <div className="flex items-center gap-3 flex-1 mx-4">
-                <div className="w-10 h-10 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] flex items-center justify-center overflow-hidden">
-                  {groupInfo.members.length <= 4 ? (
-                    <div className="grid grid-cols-2 gap-0.5 w-full h-full p-0.5">
-                      {groupInfo.members.slice(0, 4).map((member) => (
-                        <Avatar key={member.user_id} className="w-full h-full rounded-sm">
+              // Group chat header with dropdown
+              <Popover open={showMembersPopover} onOpenChange={setShowMembersPopover}>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity">
+                    <div className="w-10 h-10 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] flex items-center justify-center overflow-hidden">
+                      {groupInfo.members.length <= 4 ? (
+                        <div className="grid grid-cols-2 gap-0.5 w-full h-full p-0.5">
+                          {groupInfo.members.slice(0, 4).map((member) => (
+                            <Avatar key={member.user_id} className="w-full h-full rounded-sm">
+                              <AvatarImage src={member.avatar_url || undefined} />
+                              <AvatarFallback className="bg-[#2d1b4e] text-white text-[8px] rounded-sm">
+                                {member.display_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                          ))}
+                        </div>
+                      ) : (
+                        <Users className="h-5 w-5 text-[#a855f7]" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-1">
+                        <h2 className="font-semibold text-white truncate">{getGroupDisplayName()}</h2>
+                        <ChevronDown className={`w-4 h-4 text-white/60 transition-transform ${showMembersPopover ? 'rotate-180' : ''}`} />
+                      </div>
+                      <p className="text-white/60 text-sm truncate">{groupInfo.members.length + 1} members</p>
+                    </div>
+                  </button>
+                </PopoverTrigger>
+                
+                <PopoverContent 
+                  align="start" 
+                  sideOffset={8}
+                  className="bg-[#1a0f2e] border-[#a855f7]/40 shadow-[0_0_25px_rgba(168,85,247,0.4)] p-0 w-64"
+                >
+                  {/* Header */}
+                  <div className="px-4 py-3 border-b border-[#a855f7]/20">
+                    <p className="text-white/70 text-sm font-medium">Group Members</p>
+                  </div>
+                  
+                  {/* Members List */}
+                  <div className="max-h-60 overflow-y-auto">
+                    {/* Current user (you) */}
+                    <div className="flex items-center gap-3 px-4 py-2.5">
+                      <Avatar className="h-8 w-8 border border-[#a855f7]/40">
+                        <AvatarImage src={currentUserProfile?.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
+                          {currentUserProfile?.display_name?.[0] || 'Y'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-white text-sm">You</span>
+                    </div>
+                    
+                    {/* Other members */}
+                    {groupInfo.members.map((member) => (
+                      <button
+                        key={member.user_id}
+                        onClick={() => {
+                          setShowMembersPopover(false);
+                          openFriendCard({
+                            userId: member.user_id,
+                            displayName: member.display_name,
+                            avatarUrl: member.avatar_url,
+                            venueName: member.venue_name || undefined,
+                          });
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#a855f7]/15 transition-colors"
+                      >
+                        <Avatar className="h-8 w-8 border border-[#a855f7]/40">
                           <AvatarImage src={member.avatar_url || undefined} />
-                          <AvatarFallback className="bg-[#2d1b4e] text-white text-[8px] rounded-sm">
+                          <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
                             {member.display_name[0]}
                           </AvatarFallback>
                         </Avatar>
-                      ))}
-                    </div>
-                  ) : (
-                    <Users className="h-5 w-5 text-[#a855f7]" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <h2 className="font-semibold text-white truncate">{getGroupDisplayName()}</h2>
-                  <p className="text-white/60 text-sm truncate">{groupInfo.members.length + 1} members</p>
-                </div>
-              </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <span className="text-white text-sm truncate block">{member.display_name}</span>
+                          {member.venue_name && (
+                            <span className="text-[#d4ff00] text-xs truncate block">@{member.venue_name}</span>
+                          )}
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/40" />
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* Add People Button */}
+                  <div className="border-t border-[#a855f7]/20 p-2">
+                    <button
+                      onClick={() => {
+                        setShowMembersPopover(false);
+                        toast.info('Add members feature coming soon!');
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#a855f7]/15 transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
+                        <UserPlus className="w-4 h-4 text-[#a855f7]" />
+                      </div>
+                      <span className="text-[#a855f7] text-sm font-medium">Add People</span>
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             ) : (
               // 1:1 chat header
               <button 
