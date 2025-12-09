@@ -544,6 +544,17 @@ export default function Feed() {
 
       <CreateStoryDialog open={createStoryOpen} onOpenChange={setCreateStoryOpen} />
 
+      {/* Create Post FAB */}
+      <button
+        onClick={() => setShowCreatePost(true)}
+        className="fixed bottom-28 right-6 z-20 w-14 h-14 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:scale-110 transition-transform"
+        aria-label="Create post"
+      >
+        <Plus className="h-7 w-7 text-white" />
+      </button>
+
+      <CreatePostDialog open={showCreatePost} onOpenChange={setShowCreatePost} />
+
       {selectedPostForLikes && (
         <PostLikesModal
           postId={selectedPostForLikes}

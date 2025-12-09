@@ -312,8 +312,15 @@ export default function Leaderboard() {
     // Convert to array and separate promoted from non-promoted
     const venueArray = Array.from(venueMap.values());
     
-    // Get all promoted venues and sort by count desc, then popularity_rank asc
-    const allPromotedVenues = venueArray.filter(v => v.isPromoted);
+    // Filter out closed venues - only show open venues on leaderboard
+    const openVenueArray = venueArray.filter(v => {
+      // If no operating hours data, assume open (benefit of the doubt)
+      if (!v.operatingHours) return true;
+      return isVenueOpen(v.operatingHours);
+    });
+    
+    // Get all promoted venues that are OPEN and sort by count desc, then popularity_rank asc
+    const allPromotedVenues = openVenueArray.filter(v => v.isPromoted);
     allPromotedVenues.sort((a, b) => {
       if (b.count !== a.count) return b.count - a.count;
       return a.popularity_rank - b.popularity_rank;
@@ -322,8 +329,8 @@ export default function Leaderboard() {
     // Get top 2 promoted venues only
     const topPromotedVenues = allPromotedVenues.slice(0, 2);
     
-    // Get all non-promoted venues and sort by count desc, then popularity_rank asc
-    const nonPromotedVenues = venueArray.filter(v => !v.isPromoted);
+    // Get all non-promoted venues that are OPEN and sort by count desc, then popularity_rank asc
+    const nonPromotedVenues = openVenueArray.filter(v => !v.isPromoted);
     nonPromotedVenues.sort((a, b) => {
       if (b.count !== a.count) return b.count - a.count;
       return a.popularity_rank - b.popularity_rank;
@@ -727,10 +734,10 @@ export default function Leaderboard() {
                 <p className="text-[#a855f7] text-sm font-medium mb-0.5">Biggest Mover</p>
                 <button
                   onClick={() => handleVenueClick(biggestMover.venue_name, biggestMover.venue_id)}
-                  className="text-lg font-bold text-[#d4ff00] flex items-center gap-2 hover:text-[#d4ff00]/80 transition-colors"
+                  className="text-lg font-bold text-[#d4ff00] flex items-center gap-2 hover:text-[#d4ff00]/80 transition-colors max-w-[180px]"
                 >
-                  {biggestMover.venue_name}
-                  <BarChart3 className="h-4 w-4" />
+                  <span className="truncate">{biggestMover.venue_name}</span>
+                  <BarChart3 className="h-4 w-4 flex-shrink-0" />
                 </button>
               </div>
 
