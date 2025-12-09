@@ -24,6 +24,7 @@ import { InviteFriendsModal } from "./components/InviteFriendsModal";
 import { VenueInviteConfirmation } from "./components/VenueInviteConfirmation";
 import { ImDownConfirmation } from "./components/ImDownConfirmation";
 import { NotificationBanner } from "./components/NotificationBanner";
+import { VenueArrivalPrompt } from "./components/VenueArrivalPrompt";
 import { useAuth } from "./contexts/AuthContext";
 import { autoTrackVenue } from "./lib/auto-venue-tracker";
 import { logger } from "./lib/logger";
@@ -90,6 +91,7 @@ const App = () => (
                         <VenueInviteConfirmation />
                         <ImDownConfirmation />
                         <NotificationBanner />
+                        <VenueArrivalPrompt />
                     <Routes>
                   {/* Public routes */}
                   <Route path="/auth" element={<Auth />} />
