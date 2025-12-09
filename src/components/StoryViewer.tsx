@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { X, ChevronLeft, ChevronRight, Send } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Send, Plus } from 'lucide-react';
+import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
@@ -27,9 +28,10 @@ interface StoryViewerProps {
   onClose: () => void;
   allStoryUsers: string[];
   currentUserIndex: number;
+  onAddStory?: () => void;
 }
 
-export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }: StoryViewerProps) {
+export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex, onAddStory }: StoryViewerProps) {
   const [stories, setStories] = useState<Story[]>([]);
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -39,6 +41,14 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
   const [sending, setSending] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // Swipe to dismiss
+  const swipeHandlers = useSwipeGesture({
+    onSwipeDown: onClose,
+    threshold: 80,
+  });
+
+  const isOwnStory = stories.length > 0 && stories[0]?.user_id === user?.id;
 
   useEffect(() => {
     fetchStories(allStoryUsers[userIndex]);
@@ -234,8 +244,16 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
 
   const currentStory = stories[currentStoryIndex];
 
+  const handleAddStory = () => {
+    onClose();
+    onAddStory?.();
+  };
+
   return (
-    <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full bg-black z-[60] flex items-center justify-center overflow-hidden">
+    <div 
+      className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full bg-black z-[60] flex items-center justify-center overflow-hidden"
+      {...swipeHandlers}
+    >
       {/* Progress bars */}
       <div className="absolute top-4 left-0 right-0 flex gap-1 px-4 z-10 max-w-full">
         {stories.map((_, idx) => (
@@ -269,12 +287,22 @@ export function StoryViewer({ userId, onClose, allStoryUsers, currentUserIndex }
             </p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="text-white hover:bg-white/20 p-2 rounded-full transition-colors"
-        >
-          <X className="h-6 w-6" />
-        </button>
+        <div className="flex items-center gap-2">
+          {isOwnStory && onAddStory && (
+            <button
+              onClick={handleAddStory}
+              className="text-white hover:bg-white/20 p-2 rounded-full transition-colors"
+            >
+              <Plus className="h-6 w-6" />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="text-white hover:bg-white/20 p-2 rounded-full transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
       </div>
 
       {/* Story content */}

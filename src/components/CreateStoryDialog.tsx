@@ -121,6 +121,16 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
     setUploading(true);
 
     try {
+      // Re-fetch venue to ensure we have the latest check-in data
+      const { data: venueData } = await supabase
+        .from('night_statuses')
+        .select('venue_name, venue_id, status')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const currentVenueName = venueData?.status === 'out' ? venueData.venue_name : null;
+      const currentVenueId = venueData?.status === 'out' ? venueData.venue_id : null;
+
       // Use edited blob if available, otherwise use original file
       const uploadFile = editedBlob || file!;
       const fileExt = editedBlob ? 'jpg' : file!.name.split('.').pop();
@@ -140,15 +150,15 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
       const isPublicBuzz = audience === 'buzz' || audience === 'both';
       const mediaType = editedBlob ? 'image' : (file!.type.startsWith('image/') ? 'image' : 'video');
       
-      // Create story
+      // Create story with fresh venue data
       const { error: insertError } = await supabase
         .from('stories')
         .insert({
           user_id: user.id,
           media_url: publicUrl,
           media_type: mediaType,
-          venue_name: venueName,
-          venue_id: venueId,
+          venue_name: currentVenueName,
+          venue_id: currentVenueId,
           is_public_buzz: isPublicBuzz,
           is_anonymous: isAnonymous && isPublicBuzz,
           expires_at: calculateExpiryTime(),
