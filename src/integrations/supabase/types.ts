@@ -359,6 +359,7 @@ export type Database = {
           is_promoted: boolean | null
           lat: number | null
           lng: number | null
+          planning_neighborhood: string | null
           status: Database["public"]["Enums"]["night_status_enum"]
           updated_at: string | null
           user_id: string
@@ -372,6 +373,7 @@ export type Database = {
           is_promoted?: boolean | null
           lat?: number | null
           lng?: number | null
+          planning_neighborhood?: string | null
           status?: Database["public"]["Enums"]["night_status_enum"]
           updated_at?: string | null
           user_id: string
@@ -385,6 +387,7 @@ export type Database = {
           is_promoted?: boolean | null
           lat?: number | null
           lng?: number | null
+          planning_neighborhood?: string | null
           status?: Database["public"]["Enums"]["night_status_enum"]
           updated_at?: string | null
           user_id?: string

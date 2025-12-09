@@ -169,7 +169,7 @@ export function FriendIdCard() {
       // First check if user is in planning mode
       const { data: nightStatus } = await supabase
         .from('night_statuses')
-        .select('status')
+        .select('status, planning_neighborhood')
         .eq('user_id', selectedFriend.userId)
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
@@ -185,7 +185,10 @@ export function FriendIdCard() {
           lng: null,
           canSeeLocation: true
         });
-        setStatusSubtitle('🎯 Planning their night');
+        const neighborhoodText = nightStatus.planning_neighborhood 
+          ? `🎯 Planning tonight — thinking: ${nightStatus.planning_neighborhood}`
+          : '🎯 Planning their night';
+        setStatusSubtitle(neighborhoodText);
         return;
       }
 

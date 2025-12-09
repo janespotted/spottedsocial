@@ -8,6 +8,7 @@ interface PlanningFriend {
   user_id: string;
   display_name: string;
   avatar_url: string | null;
+  planning_neighborhood?: string | null;
 }
 
 interface FriendsPlanningProps {
@@ -33,6 +34,13 @@ export function FriendsPlanning({ friends, variant = 'card', className = '', sty
     });
   };
 
+  const getPlanningText = (friend: PlanningFriend) => {
+    if (friend.planning_neighborhood) {
+      return `Planning tonight (${friend.planning_neighborhood})`;
+    }
+    return 'Planning tonight';
+  };
+
   if (friends.length === 0) return null;
 
   if (variant === 'pill') {
@@ -56,7 +64,7 @@ export function FriendsPlanning({ friends, variant = 'card', className = '', sty
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
-                  <p className="text-[#a855f7] text-xs">🎯 Deciding where to go</p>
+                  <p className="text-[#a855f7] text-xs">🎯 {getPlanningText(friend)}</p>
                 </div>
                 <Button
                   size="sm"
@@ -115,7 +123,7 @@ export function FriendsPlanning({ friends, variant = 'card', className = '', sty
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
-              <p className="text-[#a855f7] text-xs">🎯 Deciding where to go</p>
+              <p className="text-[#a855f7] text-xs">🎯 {getPlanningText(friend)}</p>
             </div>
             <Button
               size="sm"
@@ -151,7 +159,7 @@ export function FriendsPlanning({ friends, variant = 'card', className = '', sty
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
-              <p className="text-[#a855f7] text-xs">🎯 Deciding where to go</p>
+              <p className="text-[#a855f7] text-xs">🎯 {getPlanningText(friend)}</p>
             </div>
             <Button
               size="sm"
