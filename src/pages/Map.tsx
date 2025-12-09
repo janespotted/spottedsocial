@@ -568,9 +568,14 @@ export default function Map() {
       </div>
     `;
 
-    userMarkerRef.current = new mapboxgl.Marker({ 
-      element: el, 
-      anchor: 'center' 
+    // Add tap interaction to open profile page
+    el.addEventListener('click', () => {
+      navigate('/profile');
+    });
+
+    userMarkerRef.current = new mapboxgl.Marker({
+      element: el,
+      anchor: 'center'
     })
       .setLngLat([userLocation.lng, userLocation.lat])
       .addTo(map.current);
