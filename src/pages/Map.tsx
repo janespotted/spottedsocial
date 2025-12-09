@@ -14,7 +14,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin, Bell, ChevronDown } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, Bell, ChevronDown, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { useToast } from '@/hooks/use-toast';
@@ -75,8 +75,11 @@ export default function Map() {
     screenX: number;
     screenY: number;
   } | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const friendsListRef = useRef<HTMLDivElement>(null);
   const venueFilterRef = useRef<HTMLDivElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   
   // Use ref for city to prevent callback recreation
   const cityRef = useRef(city);
@@ -854,6 +857,26 @@ export default function Map() {
     }
   };
 
+  // Filtered venues for search
+  const filteredSearchVenues = venues.filter(venue =>
+    venue.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    venue.neighborhood.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Handle venue selection from search
+  const handleVenueSearchSelect = (venue: Venue) => {
+    if (map.current) {
+      map.current.flyTo({
+        center: [venue.lng, venue.lat],
+        zoom: 16,
+        duration: 1500,
+      });
+    }
+    openVenueCard(venue.id);
+    setShowSearch(false);
+    setSearchQuery('');
+  };
+
   return (
     <div className="relative h-screen w-full">
       {/* Map Container */}
@@ -866,6 +889,33 @@ export default function Map() {
           <CityBadge />
         </div>
         <div className="flex items-center gap-3">
+          {/* Search Button/Input */}
+          <div ref={searchContainerRef} className="relative">
+            {showSearch ? (
+              <div className="flex items-center gap-2 bg-[#2d1b4e]/90 backdrop-blur rounded-full border border-[#a855f7]/50 px-3 py-1.5 animate-fade-in">
+                <Search className="w-4 h-4 text-white/60" />
+                <input
+                  type="text"
+                  placeholder="Search venues..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-transparent text-white text-sm w-36 outline-none placeholder:text-white/40"
+                  autoFocus
+                />
+                <button onClick={() => { setShowSearch(false); setSearchQuery(''); }}>
+                  <X className="w-4 h-4 text-white/60 hover:text-white transition-colors" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowSearch(true)}
+                className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
+                aria-label="Search venues"
+              >
+                <Search className="w-5 h-5" />
+              </button>
+            )}
+          </div>
           <button
             onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
             className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
@@ -886,6 +936,31 @@ export default function Map() {
           </button>
         </div>
       </div>
+
+      {/* Search Results Dropdown */}
+      {showSearch && searchQuery.length > 0 && (
+        <div className="absolute top-20 right-4 left-4 z-[250] bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 overflow-y-auto">
+          {filteredSearchVenues.length > 0 ? (
+            filteredSearchVenues.slice(0, 10).map((venue) => (
+              <button
+                key={venue.id}
+                onClick={() => handleVenueSearchSelect(venue)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#a855f7]/15 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+              >
+                <MapPin className="w-5 h-5 text-[#a855f7]" />
+                <div className="flex-1 text-left">
+                  <p className="text-white font-medium text-sm">{venue.name}</p>
+                  <p className="text-white/50 text-xs">{venue.neighborhood}</p>
+                </div>
+              </button>
+            ))
+          ) : (
+            <div className="px-4 py-6 text-center text-white/50 text-sm">
+              No venues found
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Venue Type Filter - Collapsible in top right */}
       <div ref={venueFilterRef} className="absolute top-20 right-4 z-[200]">
