@@ -1146,11 +1146,12 @@ export default function Map() {
           {/* Expanded Friends List - Opens Upward */}
           {showFriendsList && (
             <div className="mb-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] max-h-96 overflow-y-auto relative z-[200]">
+              {/* Friends Out Section */}
               {friendsWithDistances.map((friend) => (
                 <button
                   key={friend.user_id}
                   onClick={() => handleFriendClick(friend)}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+                  className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10"
                 >
                   {/* Avatar */}
                   <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50 relative">
@@ -1181,7 +1182,7 @@ export default function Map() {
                       {friend.profiles?.display_name || 'Unknown'}
                     </p>
                     <p className="text-[#d4ff00] text-xs truncate">
-                      @ {friend.venue_name || 'Nearby'}
+                      📍 At {friend.venue_name || 'Nearby'}
                     </p>
                   </div>
 
@@ -1191,6 +1192,63 @@ export default function Map() {
                   </span>
                 </button>
               ))}
+
+              {/* Friends Planning Section */}
+              {planningFriends.length > 0 && (
+                <>
+                  {/* Divider with header */}
+                  <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
+                    <p className="text-white/70 text-xs font-medium flex items-center gap-1.5">
+                      🔥 Friends Planning 🎯
+                      <span className="text-white/50">({planningFriends.length})</span>
+                    </p>
+                  </div>
+
+                  {/* Planning Friends List */}
+                  {planningFriends.map((friend) => (
+                    <button
+                      key={friend.user_id}
+                      onClick={() => {
+                        const friendCardData: FriendCardData = {
+                          userId: friend.user_id,
+                          displayName: friend.display_name || 'Friend',
+                          avatarUrl: friend.avatar_url || null,
+                          venueName: null,
+                          lat: undefined,
+                          lng: undefined,
+                          relationshipType: undefined,
+                        };
+                        openFriendCard(friendCardData);
+                        setShowFriendsList(false);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+                    >
+                      {/* Avatar */}
+                      <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
+                        <AvatarImage
+                          src={
+                            friend.avatar_url ||
+                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`
+                          }
+                        />
+                        <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+                          {friend.display_name?.[0] || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      {/* Name & Planning Status */}
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className="text-white font-semibold text-sm truncate">
+                          {friend.display_name || 'Unknown'}
+                        </p>
+                        <p className="text-[#a855f7] text-xs truncate">
+                          🎯 Planning{friend.planning_neighborhood ? ` (${friend.planning_neighborhood})` : ' tonight'}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
 
@@ -1215,13 +1273,6 @@ export default function Map() {
         </div>
       ) : null}
 
-      {/* Friends Planning Pill - Below friends out */}
-      <FriendsPlanning 
-        friends={planningFriends}
-        variant="pill"
-        className={`absolute left-6 z-[199] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-        style={{ bottom: friends.length > 0 ? 'calc(8rem + env(safe-area-inset-bottom, 0px))' : bottomOffset }}
-      />
 
       {/* My Location Button */}
       <button
