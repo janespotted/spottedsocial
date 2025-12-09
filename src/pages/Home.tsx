@@ -544,8 +544,16 @@ export default function Home() {
         <StoryViewer
           userId={selectedStoryUser}
           onClose={() => setSelectedStoryUser(null)}
-          allStoryUsers={storyUsers.map(u => u.user_id)}
-          currentUserIndex={storyUsers.findIndex(u => u.user_id === selectedStoryUser)}
+          allStoryUsers={
+            selectedStoryUser === user?.id && userHasStory
+              ? [user.id, ...storyUsers.map(u => u.user_id)]
+              : storyUsers.map(u => u.user_id)
+          }
+          currentUserIndex={
+            selectedStoryUser === user?.id && userHasStory
+              ? 0
+              : storyUsers.findIndex(u => u.user_id === selectedStoryUser)
+          }
         />
       )}
 

@@ -19,7 +19,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
-import { Loader2, Camera, Image } from 'lucide-react';
+import { Loader2, Camera, Image, Pencil } from 'lucide-react';
+import { StoryEditor } from './StoryEditor';
 
 interface CreateStoryDialogProps {
   open: boolean;
@@ -37,6 +38,8 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
   const [venueId, setVenueId] = useState<string | null>(null);
   const [audience, setAudience] = useState<AudienceOption>('friends');
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
+  const [editedBlob, setEditedBlob] = useState<Blob | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
@@ -54,6 +57,8 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
       setPreview(null);
       setAudience('friends');
       setIsAnonymous(false);
+      setShowEditor(false);
+      setEditedBlob(null);
     }
   }, [open]);
 
@@ -91,20 +96,39 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
 
     setFile(selectedFile);
     setPreview(URL.createObjectURL(selectedFile));
+    setEditedBlob(null);
+    
+    // Open editor for images
+    if (selectedFile.type.startsWith('image/')) {
+      setShowEditor(true);
+    }
+  };
+
+  const handleEditorSave = (blob: Blob) => {
+    setEditedBlob(blob);
+    setShowEditor(false);
+    // Update preview with edited image
+    setPreview(URL.createObjectURL(blob));
+  };
+
+  const handleEditorCancel = () => {
+    setShowEditor(false);
   };
 
   const handleSubmit = async () => {
-    if (!file || !user) return;
+    if ((!file && !editedBlob) || !user) return;
 
     setUploading(true);
 
     try {
-      // Upload to storage
-      const fileExt = file.name.split('.').pop();
+      // Use edited blob if available, otherwise use original file
+      const uploadFile = editedBlob || file!;
+      const fileExt = editedBlob ? 'jpg' : file!.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
       const { error: uploadError } = await supabase.storage
         .from('post-images')
-        .upload(fileName, file);
+        .upload(fileName, uploadFile);
 
       if (uploadError) throw uploadError;
 
@@ -114,6 +138,7 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
 
       // Determine story settings based on audience
       const isPublicBuzz = audience === 'buzz' || audience === 'both';
+      const mediaType = editedBlob ? 'image' : (file!.type.startsWith('image/') ? 'image' : 'video');
       
       // Create story
       const { error: insertError } = await supabase
@@ -121,7 +146,7 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
         .insert({
           user_id: user.id,
           media_url: publicUrl,
-          media_type: file.type.startsWith('image/') ? 'image' : 'video',
+          media_type: mediaType,
           venue_name: venueName,
           venue_id: venueId,
           is_public_buzz: isPublicBuzz,
@@ -141,6 +166,7 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
       onOpenChange(false);
       setFile(null);
       setPreview(null);
+      setEditedBlob(null);
     } catch (error: any) {
       console.error('Error uploading story:', error);
       toast.error('Failed to post story');
@@ -178,35 +204,47 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
 
           {preview ? (
             <div className="relative aspect-[9/16] bg-black rounded-lg overflow-hidden max-h-[250px]">
-              {file?.type.startsWith('image/') ? (
+              {file?.type.startsWith('image/') || editedBlob ? (
                 <img src={preview} alt="Preview" className="w-full h-full object-contain" />
               ) : (
                 <video src={preview} className="w-full h-full object-contain" controls />
               )}
-              {/* Change button overlay */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="absolute bottom-3 right-3 p-2 bg-[#1a0f2e]/80 border border-[#a855f7]/40 rounded-full hover:bg-[#2d1b4e] transition-colors">
-                    <Camera className="h-5 w-5 text-white" />
+              {/* Button overlays */}
+              <div className="absolute bottom-3 right-3 flex gap-2">
+                {/* Edit button - only for images */}
+                {(file?.type.startsWith('image/') || editedBlob) && (
+                  <button 
+                    onClick={() => setShowEditor(true)}
+                    className="p-2 bg-[#a855f7]/80 border border-[#a855f7] rounded-full hover:bg-[#a855f7] transition-colors"
+                  >
+                    <Pencil className="h-5 w-5 text-white" />
                   </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40">
-                  <DropdownMenuItem 
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="text-white hover:bg-[#2d1b4e] cursor-pointer"
-                  >
-                    <Camera className="mr-2 h-4 w-4" />
-                    Camera
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => galleryInputRef.current?.click()}
-                    className="text-white hover:bg-[#2d1b4e] cursor-pointer"
-                  >
-                    <Image className="mr-2 h-4 w-4" />
-                    Upload from camera roll
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                )}
+                {/* Change photo button */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-2 bg-[#1a0f2e]/80 border border-[#a855f7]/40 rounded-full hover:bg-[#2d1b4e] transition-colors">
+                      <Camera className="h-5 w-5 text-white" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40">
+                    <DropdownMenuItem 
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+                    >
+                      <Camera className="mr-2 h-4 w-4" />
+                      Camera
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+                    >
+                      <Image className="mr-2 h-4 w-4" />
+                      Upload from camera roll
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           ) : (
             <DropdownMenu>
@@ -312,6 +350,16 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
           </p>
         </div>
       </DialogContent>
+
+      {/* Story Editor - full screen overlay */}
+      {showEditor && preview && file && (
+        <StoryEditor
+          imageUrl={preview}
+          isVideo={file.type.startsWith('video/')}
+          onSave={handleEditorSave}
+          onCancel={handleEditorCancel}
+        />
+      )}
     </Dialog>
   );
 }
