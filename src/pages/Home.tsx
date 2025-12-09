@@ -233,11 +233,10 @@ export default function Home() {
                     </Avatar>
                   </div>
                 </div>
-                {!userHasStory && (
-                  <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-[#a855f7] to-[#7c3aed] rounded-full p-1.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
-                    <Plus className="h-3 w-3 text-white" />
-                  </div>
-                )}
+                {/* Always show + badge to indicate you can add more */}
+                <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-[#a855f7] to-[#7c3aed] rounded-full p-1.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+                  <Plus className="h-3 w-3 text-white" />
+                </div>
               </div>
               <span className="text-[10px] text-white/60 font-medium">Your Story</span>
             </button>
@@ -554,6 +553,7 @@ export default function Home() {
               ? 0
               : storyUsers.findIndex(u => u.user_id === selectedStoryUser)
           }
+          onAddStory={() => setCreateStoryOpen(true)}
         />
       )}
 
