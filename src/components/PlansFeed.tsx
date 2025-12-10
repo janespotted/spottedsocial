@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { FriendsPlanning } from './FriendsPlanning';
+import { useToast } from '@/hooks/use-toast';
+import { haptic } from '@/lib/haptics';
 
 interface Plan {
   id: string;
@@ -37,12 +39,24 @@ export function PlansFeed({ userId }: PlansFeedProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
+  const [isUserPlanning, setIsUserPlanning] = useState(false);
   const demoEnabled = useDemoMode();
+  const { toast } = useToast();
 
   const fetchPlanningFriends = async () => {
     if (!userId) return;
     
     try {
+      // Check if current user is planning
+      const { data: userStatus } = await supabase
+        .from('night_statuses')
+        .select('status')
+        .eq('user_id', userId)
+        .gte('expires_at', new Date().toISOString())
+        .maybeSingle();
+      
+      setIsUserPlanning(userStatus?.status === 'planning');
+
       // Get user's friends
       const { data: friendships } = await supabase
         .from('friendships')
@@ -88,6 +102,45 @@ export function PlansFeed({ userId }: PlansFeedProps) {
       }
     } catch (error) {
       console.error('Error fetching planning friends:', error);
+    }
+  };
+
+  const handleJoinPlanning = async () => {
+    if (!userId) return;
+    
+    try {
+      // Calculate 5am expiry
+      const now = new Date();
+      const expiry = new Date(now);
+      if (now.getHours() >= 5) {
+        expiry.setDate(expiry.getDate() + 1);
+      }
+      expiry.setHours(5, 0, 0, 0);
+
+      const { error } = await supabase
+        .from('night_statuses')
+        .upsert({
+          user_id: userId,
+          status: 'planning',
+          updated_at: new Date().toISOString(),
+          expires_at: expiry.toISOString(),
+        }, { onConflict: 'user_id' });
+
+      if (error) throw error;
+
+      haptic.light();
+      setIsUserPlanning(true);
+      toast({
+        title: "You're thinking about going out! 🤔",
+        description: "Your friends can see you're considering plans.",
+      });
+    } catch (error) {
+      console.error('Error joining planning mode:', error);
+      toast({
+        title: "Something went wrong",
+        description: "Couldn't update your status. Try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -172,14 +225,16 @@ export function PlansFeed({ userId }: PlansFeedProps) {
 
   return (
     <div className="space-y-7 px-4 pb-24">
-      {/* Friends Thinking About Going Out Section */}
-      {planningFriends.length > 0 && (
-        <>
-          <FriendsPlanning friends={planningFriends} variant="card" />
-          {/* Subtle separator */}
-          <div className="h-px bg-white/10" />
-        </>
-      )}
+      {/* Friends Thinking About Going Out Section - always show for join option */}
+      <FriendsPlanning 
+        friends={planningFriends} 
+        variant="card" 
+        isUserPlanning={isUserPlanning}
+        onJoinPlanning={handleJoinPlanning}
+        showJoinOption={true}
+      />
+      {/* Subtle separator */}
+      <div className="h-px bg-white/10" />
 
       {/* Drop a Plan Section */}
       <div className="space-y-3">
