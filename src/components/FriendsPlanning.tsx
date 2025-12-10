@@ -1,6 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { MessageCircle, ChevronDown, ChevronUp, Plus, Check } from 'lucide-react';
 import { useState, CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,6 +16,9 @@ interface FriendsPlanningProps {
   variant?: 'card' | 'pill';
   className?: string;
   style?: CSSProperties;
+  isUserPlanning?: boolean;
+  onJoinPlanning?: () => void;
+  showJoinOption?: boolean;
 }
 
 // Shorten neighborhood names for compact display
@@ -36,7 +39,15 @@ const shortenNeighborhood = (neighborhood: string | null | undefined): string | 
   return shortNames[neighborhood] || neighborhood;
 };
 
-export function FriendsPlanning({ friends, variant = 'card', className = '', style }: FriendsPlanningProps) {
+export function FriendsPlanning({ 
+  friends, 
+  variant = 'card', 
+  className = '', 
+  style,
+  isUserPlanning = false,
+  onJoinPlanning,
+  showJoinOption = false
+}: FriendsPlanningProps) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -52,7 +63,8 @@ export function FriendsPlanning({ friends, variant = 'card', className = '', sty
     });
   };
 
-  if (friends.length === 0) return null;
+  // Show section if there are friends OR if we should show the join option
+  if (friends.length === 0 && !showJoinOption) return null;
 
   // Stacked avatar preview (max 4)
   const previewFriends = friends.slice(0, 4);
@@ -143,32 +155,61 @@ export function FriendsPlanning({ friends, variant = 'card', className = '', sty
   // Card variant for Home page
   return (
     <div className={`bg-[#1a0f2e]/80 backdrop-blur border border-[#a855f7]/20 rounded-2xl p-4 shadow-[0_0_20px_rgba(168,85,247,0.15)] ${className}`}>
-      {/* Header with stacked avatars */}
-      <div className="flex items-center gap-3 mb-4">
+      {/* Header with stacked avatars and join button */}
+      <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <span className="text-lg">🤔</span>
           <h3 className="text-white font-semibold text-sm">Thinking About Going Out</h3>
         </div>
         
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2">
           {/* Stacked avatar preview */}
-          <div className="flex -space-x-2">
-            {previewFriends.map((friend) => (
-              <Avatar key={friend.user_id} className="w-6 h-6 border-2 border-[#1a0f2e] ring-1 ring-[#a855f7]/40">
-                <AvatarImage
-                  src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
-                />
-                <AvatarFallback className="bg-[#a855f7] text-white text-[10px]">
-                  {friend.display_name?.[0] || '?'}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-          </div>
-          {remainingCount > 0 && (
-            <span className="text-white/40 text-xs">+{remainingCount}</span>
+          {friends.length > 0 && (
+            <>
+              <div className="flex -space-x-2">
+                {previewFriends.map((friend) => (
+                  <Avatar key={friend.user_id} className="w-6 h-6 border-2 border-[#1a0f2e] ring-1 ring-[#a855f7]/40">
+                    <AvatarImage
+                      src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
+                    />
+                    <AvatarFallback className="bg-[#a855f7] text-white text-[10px]">
+                      {friend.display_name?.[0] || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+              </div>
+              {remainingCount > 0 && (
+                <span className="text-white/40 text-xs">+{remainingCount}</span>
+              )}
+            </>
+          )}
+          
+          {/* Join button */}
+          {showJoinOption && (
+            isUserPlanning ? (
+              <span className="text-xs text-[#d4ff00] flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                You're in
+              </span>
+            ) : (
+              <button
+                onClick={onJoinPlanning}
+                className="text-xs text-[#a855f7] hover:text-[#d4ff00] transition-colors flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" />
+                I'm thinking too
+              </button>
+            )
           )}
         </div>
       </div>
+      
+      {/* Empty state when no friends but user can join */}
+      {friends.length === 0 && showJoinOption && (
+        <p className="text-white/40 text-xs text-center py-2">
+          No friends planning yet — be the first!
+        </p>
+      )}
       
       <div className="space-y-2">
         {friends.slice(0, 3).map((friend) => (
