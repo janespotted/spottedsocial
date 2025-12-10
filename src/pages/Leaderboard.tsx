@@ -436,11 +436,7 @@ export default function Leaderboard() {
               {/* Neighborhood Filter Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all hover:bg-white/5 ${
-                    selectedNeighborhood === null 
-                      ? 'text-[#d4ff00]' 
-                      : 'text-white/80'
-                  }`}>
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all hover:bg-white/5 text-white/80">
                     <span>{selectedNeighborhood || `All ${getCityLabel(city)}`}</span>
                     <ChevronDown className="w-4 h-4" />
                   </button>
