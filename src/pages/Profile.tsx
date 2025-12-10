@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell } from 'lucide-react';
+import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronDown, Home, Target, Navigation } from 'lucide-react';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,6 +14,9 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CityBadge } from '@/components/CityBadge';
 import { ProfileSkeleton } from '@/components/ProfileSkeleton';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
+import { useUserCity } from '@/hooks/useUserCity';
 
 interface WishlistPlace {
   id: string;
@@ -32,6 +35,7 @@ export default function Profile() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { unreadCount } = useNotifications();
+  const { city } = useUserCity();
   useAutoVenueTracking(); // Trigger auto-venue tracking on profile view
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
@@ -236,7 +240,82 @@ export default function Profile() {
     }
   };
 
-  // Mock venue images for wishlist
+  // Status change handlers
+  const handleNotGoingOut = async () => {
+    if (!user) return;
+    
+    try {
+      await supabase
+        .from('night_statuses')
+        .update({ 
+          status: 'home',
+          venue_id: null,
+          venue_name: null,
+          planning_neighborhood: null,
+          lat: null,
+          lng: null,
+          expires_at: null
+        })
+        .eq('user_id', user.id);
+      
+      setCurrentStatus('home');
+      setCurrentVenue(null);
+      setPlanningNeighborhood(null);
+      toast.success('Status updated to staying in');
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Failed to update status');
+    }
+  };
+
+  const handleChangeNeighborhood = async (neighborhood: string) => {
+    if (!user) return;
+    
+    try {
+      await supabase
+        .from('night_statuses')
+        .upsert({
+          user_id: user.id,
+          status: 'planning',
+          planning_neighborhood: neighborhood,
+          venue_id: null,
+          venue_name: null,
+          expires_at: new Date(new Date().setHours(29, 0, 0, 0)).toISOString() // 5am next day
+        });
+      
+      setPlanningNeighborhood(neighborhood);
+      setCurrentStatus('planning');
+      toast.success(`Planning in ${neighborhood}`);
+    } catch (error) {
+      console.error('Error updating neighborhood:', error);
+      toast.error('Failed to update neighborhood');
+    }
+  };
+
+  const handleStartPlanning = async () => {
+    if (!user) return;
+    
+    try {
+      await supabase
+        .from('night_statuses')
+        .upsert({
+          user_id: user.id,
+          status: 'planning',
+          planning_neighborhood: null,
+          venue_id: null,
+          venue_name: null,
+          expires_at: new Date(new Date().setHours(29, 0, 0, 0)).toISOString() // 5am next day
+        });
+      
+      setCurrentStatus('planning');
+      setPlanningNeighborhood(null);
+      toast.success('Status updated to planning');
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Failed to update status');
+    }
+  };
+
   const mockVenueImages = [
     'https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=400',
     'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=400',
@@ -298,20 +377,98 @@ export default function Profile() {
         {/* User Identity */}
         <div>
           <h2 className="text-xl font-bold text-white">@{profile?.username || 'username'}</h2>
-          <div className="flex items-center gap-2 mt-1">
-            {currentStatus === 'out' && currentVenue ? (
-              <>
-                <span className="text-[#d4ff00] font-medium">@ {currentVenue}</span>
-                <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
-              </>
-            ) : currentStatus === 'planning' ? (
-              <span className="text-[#a855f7] font-medium">
-                🎯 Planning{planningNeighborhood ? ` (${planningNeighborhood})` : ''}
-              </span>
-            ) : (
-              <span className="text-white/40">Not Sharing Location</span>
-            )}
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity outline-none">
+              {currentStatus === 'out' && currentVenue ? (
+                <>
+                  <span className="text-[#d4ff00] font-medium">@ {currentVenue}</span>
+                  <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
+                </>
+              ) : currentStatus === 'planning' ? (
+                <span className="text-[#a855f7] font-medium">
+                  🎯 Planning{planningNeighborhood ? ` (${planningNeighborhood})` : ''}
+                </span>
+              ) : (
+                <span className="text-white/40">Not Sharing Location</span>
+              )}
+              <ChevronDown className="h-4 w-4 text-white/60" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40 min-w-[200px]">
+              {/* Options based on current status */}
+              {currentStatus === 'out' && (
+                <>
+                  <DropdownMenuItem 
+                    onClick={openCheckIn}
+                    className="text-white hover:bg-white/10 cursor-pointer"
+                  >
+                    <Navigation className="h-4 w-4 mr-2" />
+                    Change venue
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleNotGoingOut}
+                    className="text-white hover:bg-white/10 cursor-pointer"
+                  >
+                    <Home className="h-4 w-4 mr-2" />
+                    Not going out anymore
+                  </DropdownMenuItem>
+                </>
+              )}
+              {currentStatus === 'planning' && (
+                <>
+                  <DropdownMenuItem 
+                    onClick={openCheckIn}
+                    className="text-[#d4ff00] hover:bg-white/10 cursor-pointer"
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Going out
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleNotGoingOut}
+                    className="text-white hover:bg-white/10 cursor-pointer"
+                  >
+                    <Home className="h-4 w-4 mr-2" />
+                    Not going out anymore
+                  </DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="text-white hover:bg-white/10 cursor-pointer">
+                      <Target className="h-4 w-4 mr-2" />
+                      Change neighborhood
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="bg-[#1a0f2e] border-[#a855f7]/40 max-h-[300px] overflow-y-auto">
+                      {(CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS.la).map((neighborhood) => (
+                        <DropdownMenuItem
+                          key={neighborhood}
+                          onClick={() => handleChangeNeighborhood(neighborhood)}
+                          className={`text-white hover:bg-white/10 cursor-pointer ${planningNeighborhood === neighborhood ? 'bg-white/10' : ''}`}
+                        >
+                          {neighborhood}
+                          {planningNeighborhood === neighborhood && <span className="ml-auto">✓</span>}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              )}
+              {(!currentStatus || currentStatus === 'home') && (
+                <>
+                  <DropdownMenuItem 
+                    onClick={openCheckIn}
+                    className="text-[#d4ff00] hover:bg-white/10 cursor-pointer"
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    I'm going out
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleStartPlanning}
+                    className="text-[#a855f7] hover:bg-white/10 cursor-pointer"
+                  >
+                    <Target className="h-4 w-4 mr-2" />
+                    I'm planning
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Avatar + Stats */}
