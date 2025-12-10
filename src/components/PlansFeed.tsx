@@ -116,7 +116,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
   }
 
   return (
-    <div className="space-y-5 px-4 pb-24">
+    <div className="space-y-7 px-4 pb-24">
       {/* Create Plan Button */}
       <button
         onClick={() => setShowCreateDialog(true)}
