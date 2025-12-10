@@ -11,6 +11,7 @@ import { useFeed, Post } from '@/hooks/useFeed';
 import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
 import { useUserCity } from '@/hooks/useUserCity';
+import { useDailyNudge } from '@/hooks/useDailyNudge';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell } from 'lucide-react';
@@ -33,6 +34,7 @@ import { CityBadge } from '@/components/CityBadge';
 import { FeedSkeleton } from '@/components/FeedSkeleton';
 import { FriendsPlanning } from '@/components/FriendsPlanning';
 import { PlansFeed } from '@/components/PlansFeed';
+import { DailyNudgeModal } from '@/components/DailyNudgeModal';
 import { isNightlifeHours } from '@/lib/time-context';
 
 export default function Home() {
@@ -45,6 +47,7 @@ export default function Home() {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
   const { city } = useUserCity();
+  const { showNudgeModal, nudgeType, closeNudgeModal } = useDailyNudge();
   useAutoVenueTracking();
   usePlanningVenueDetection();
 
@@ -677,6 +680,15 @@ export default function Home() {
           postId={selectedPostForLikes}
           isOpen={!!selectedPostForLikes}
           onClose={() => setSelectedPostForLikes(null)}
+        />
+      )}
+
+      {/* Daily Nudge Modal */}
+      {showNudgeModal && nudgeType && (
+        <DailyNudgeModal
+          open={showNudgeModal}
+          onClose={closeNudgeModal}
+          nudgeType={nudgeType}
         />
       )}
     </div>
