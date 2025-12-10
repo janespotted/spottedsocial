@@ -93,6 +93,7 @@ export function StoryEditor({ imageUrl, isVideo, onSave, onCancel }: StoryEditor
   };
 
   const handlePointerDown = (e: React.PointerEvent, overlayId: string) => {
+    e.preventDefault();
     e.stopPropagation();
     const overlay = overlays.find(o => o.id === overlayId);
     if (!overlay) return;
@@ -112,6 +113,7 @@ export function StoryEditor({ imageUrl, isVideo, onSave, onCancel }: StoryEditor
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!dragRef.current || !containerRef.current) return;
     
+    e.preventDefault();
     const container = containerRef.current.getBoundingClientRect();
     const deltaX = ((e.clientX - dragRef.current.startX) / container.width) * 100;
     const deltaY = ((e.clientY - dragRef.current.startY) / container.height) * 100;
@@ -264,6 +266,7 @@ export function StoryEditor({ imageUrl, isVideo, onSave, onCancel }: StoryEditor
               color: overlay.color,
               textShadow: overlay.type === 'text' ? '2px 2px 4px rgba(0,0,0,0.5)' : 'none',
               fontWeight: overlay.type === 'text' ? 'bold' : 'normal',
+              touchAction: 'none',
             }}
             onPointerDown={(e) => handlePointerDown(e, overlay.id)}
           >
