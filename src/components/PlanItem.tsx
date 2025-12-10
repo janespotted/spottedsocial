@@ -337,10 +337,10 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
   const currentUserDown = downs.find(d => d.user_id === currentUserId);
 
   return (
-    <div className="bg-card/60 backdrop-blur-sm rounded-2xl p-3 transition-all duration-300">
+    <div className="bg-white/[0.06] backdrop-blur-sm rounded-2xl p-3 transition-all duration-300">
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           <Avatar 
             className="h-10 w-10 cursor-pointer transition-all" 
             onClick={handleUserClick}
@@ -352,12 +352,12 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
           </Avatar>
           <div>
             <p 
-              className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors text-sm"
+              className="font-bold text-foreground cursor-pointer hover:text-primary transition-colors text-base tracking-tight"
               onClick={handleUserClick}
             >
               {plan.user?.display_name}
             </p>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1 text-xs text-white/60">
               {visibilityIcon}
               <span>{visibilityLabel}</span>
             </div>
@@ -366,16 +366,16 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
 
         <div className="text-right">
           <button 
-            className="text-sm font-semibold text-[#d4ff00] hover:text-[#e8ff4d] cursor-pointer flex items-center gap-1.5 justify-end transition-colors"
+            className="text-base font-bold text-[#d4ff00] hover:text-[#e8ff4d] cursor-pointer flex items-center gap-1.5 justify-end transition-colors"
             onClick={handleVenueClick}
           >
-            <MapPin className="w-3.5 h-3.5" />
+            <MapPin className="w-3.5 h-3.5 text-white/50" />
             {plan.venue_name}
           </button>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 justify-end">
-            <Calendar className="w-3 h-3" />
-            <span className="font-medium text-foreground/80">{smartDateLabel}</span>
-            <Clock className="w-3 h-3 ml-0.5" />
+          <div className="flex items-center gap-1.5 text-xs text-white/70 mt-0.5 justify-end">
+            <Calendar className="w-3 h-3 text-white/50" />
+            <span className="font-semibold text-white">{smartDateLabel}</span>
+            <Clock className="w-3 h-3 ml-0.5 text-white/50" />
             <span>{formattedTime}</span>
           </div>
         </div>
@@ -391,7 +391,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
       {/* Going With - Only show if participants exist */}
       {participants.length > 0 && (
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs text-muted-foreground">Going with</span>
+          <span className="text-xs text-white/40">Going with</span>
           <div className="flex -space-x-2">
             {participants.slice(0, 5).map((participant) => (
               <Avatar 
@@ -470,7 +470,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
         <Button 
           variant="ghost" 
           size="sm" 
-          className="text-muted-foreground gap-1.5 h-9 px-3 hover:bg-primary/10 hover:text-primary transition-colors"
+          className="text-muted-foreground gap-1.5 h-9 px-3 hover:bg-primary/10 hover:text-primary transition-colors opacity-60 hover:opacity-100"
           onClick={handleToggleComments}
         >
           <MessageCircle className="w-4 h-4" />
@@ -483,8 +483,8 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
             size="sm"
             className={`h-9 w-9 p-0 rounded-full transition-all ${
               userVote === 'up' 
-                ? 'text-[#d4ff00] bg-[#d4ff00]/10' 
-                : 'text-muted-foreground hover:text-[#d4ff00] hover:bg-[#d4ff00]/10'
+                ? 'text-[#d4ff00] bg-[#d4ff00]/10 opacity-100' 
+                : 'text-muted-foreground hover:text-[#d4ff00] hover:bg-[#d4ff00]/10 opacity-60 hover:opacity-100'
             }`}
             onClick={() => handleVote('up')}
             disabled={isVoting}
@@ -501,8 +501,8 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
             size="sm"
             className={`h-9 w-9 p-0 rounded-full transition-all ${
               userVote === 'down' 
-                ? 'text-destructive bg-destructive/10' 
-                : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                ? 'text-destructive bg-destructive/10 opacity-100' 
+                : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-60 hover:opacity-100'
             }`}
             onClick={() => handleVote('down')}
             disabled={isVoting}
