@@ -172,19 +172,30 @@ export function PlansFeed({ userId }: PlansFeedProps) {
 
   return (
     <div className="space-y-7 px-4 pb-24">
-      {/* Friends Planning Section */}
+      {/* Friends Thinking About Going Out Section */}
       {planningFriends.length > 0 && (
-        <FriendsPlanning friends={planningFriends} variant="card" />
+        <>
+          <FriendsPlanning friends={planningFriends} variant="card" />
+          {/* Subtle separator */}
+          <div className="h-px bg-white/10" />
+        </>
       )}
 
-      {/* Create Plan Button */}
-      <button
-        onClick={() => setShowCreateDialog(true)}
-        className="w-full flex items-center justify-center gap-2 bg-white/[0.06] backdrop-blur-sm hover:bg-white/[0.10] text-white/80 hover:text-white py-3.5 rounded-xl transition-all duration-200 shadow-sm"
-      >
-        <Plus className="w-4 h-4" strokeWidth={1.5} />
-        <span className="text-sm font-medium tracking-tight">Share a plan</span>
-      </button>
+      {/* Drop a Plan Section */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📝</span>
+          <h3 className="text-white/70 font-medium text-sm">Drop a Plan</h3>
+        </div>
+        
+        <button
+          onClick={() => setShowCreateDialog(true)}
+          className="w-full flex items-center justify-center gap-2 bg-white/[0.06] backdrop-blur-sm hover:bg-white/[0.10] text-white/80 hover:text-white py-3.5 rounded-xl transition-all duration-200 shadow-sm"
+        >
+          <Plus className="w-4 h-4" strokeWidth={1.5} />
+          <span className="text-sm font-medium tracking-tight">Share a plan</span>
+        </button>
+      </div>
 
       {plans.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
