@@ -125,7 +125,7 @@ export function FriendsPlanning({ friends, variant = 'card', className = '', sty
               ))}
             </div>
             <span className="text-white/90 text-sm font-medium">
-              {friends.length} friend{friends.length !== 1 ? 's' : ''} deciding
+              {friends.length} still deciding
             </span>
             <div className="ml-auto transition-transform group-hover:scale-110">
               {isExpanded ? (
@@ -146,8 +146,8 @@ export function FriendsPlanning({ friends, variant = 'card', className = '', sty
       {/* Header with stacked avatars */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🎯</span>
-          <h3 className="text-white font-semibold text-sm">Friends Planning</h3>
+          <span className="text-lg">🤔</span>
+          <h3 className="text-white font-semibold text-sm">Thinking About Going Out</h3>
         </div>
         
         <div className="flex items-center gap-2 ml-auto">
