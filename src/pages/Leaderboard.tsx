@@ -462,11 +462,6 @@ export default function Leaderboard() {
               </DropdownMenu>
             </div>
             
-            <p className="text-white/60 text-sm">
-              {selectedNeighborhood 
-                ? `Top 20 Tonight: ${selectedNeighborhood}`
-                : 'Top Places to Go Out Now'}
-            </p>
           </div>
           <div className="flex items-center gap-3">
             <button
