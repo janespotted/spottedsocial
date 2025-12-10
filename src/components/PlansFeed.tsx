@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Plus, Sparkles } from 'lucide-react';
+import { Calendar, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PlanItem } from './PlanItem';
 import { CreatePlanDialog } from './CreatePlanDialog';
@@ -118,13 +118,13 @@ export function PlansFeed({ userId }: PlansFeedProps) {
   return (
     <div className="space-y-5 px-4 pb-24">
       {/* Create Plan Button */}
-      <Button
+      <button
         onClick={() => setShowCreateDialog(true)}
-        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold py-6 rounded-2xl transition-all duration-300"
+        className="w-full flex items-center justify-center gap-2 bg-white/[0.06] backdrop-blur-sm hover:bg-white/[0.10] text-white/80 hover:text-white py-3.5 rounded-xl transition-all duration-200 shadow-sm"
       >
-        <Sparkles className="w-5 h-5 mr-2" />
-        Share Your Plans ✨
-      </Button>
+        <Plus className="w-4 h-4" strokeWidth={1.5} />
+        <span className="text-sm font-medium tracking-tight">Share a plan</span>
+      </button>
 
       {plans.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
