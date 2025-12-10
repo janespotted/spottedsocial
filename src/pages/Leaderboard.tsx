@@ -440,7 +440,7 @@ export default function Leaderboard() {
             <div className="mt-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 px-4 py-2 bg-[#a855f7]/20 hover:bg-[#a855f7]/30 rounded-full text-white text-sm border border-[#a855f7]/40 transition-all">
+                  <button className="flex items-center gap-2 px-4 py-2 bg-[#a855f7]/20 hover:bg-[#a855f7]/30 rounded-xl text-white text-sm border border-[#a855f7]/40 transition-all">
                     <span>{selectedNeighborhood || `All ${getCityLabel(city)}`}</span>
                     <ChevronDown className="w-4 h-4" />
                   </button>
@@ -541,7 +541,7 @@ export default function Leaderboard() {
                           <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
                             <div className="flex -space-x-2">
                               {venue.friends.slice(0, 2).map((friend, idx) => (
-                                <Avatar key={idx} className="h-6 w-6 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                            <Avatar key={idx} className="h-6 w-6 border border-[#a855f7] shadow-[0_0_4px_rgba(168,85,247,0.25)]">
                                   <AvatarImage src={friend.avatar_url || undefined} />
                                   <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
                                     {friend.display_name[0]}
@@ -608,12 +608,12 @@ export default function Leaderboard() {
         {venues.filter(v => !v.isPromoted).map((venue) => (
           <div
             key={venue.venue_name}
-            className="relative overflow-hidden rounded-2xl p-4 bg-[#2d1b4e]/80 border border-[#a855f7]/20 shadow-[0_0_20px_rgba(168,85,247,0.3)]"
+            className="relative overflow-hidden rounded-2xl p-4 bg-[#2d1b4e]/80 border border-[#a855f7]/20 shadow-[0_0_12px_rgba(168,85,247,0.15)]"
           >
             <div className="flex items-center gap-4">
               {/* Rank Number */}
               <div className="flex-shrink-0">
-                <div className="text-3xl font-bold text-[#d4ff00] w-8 text-center">
+                <div className="text-3xl font-bold text-white w-8 text-center">
                   {venue.rank}
                 </div>
               </div>
@@ -651,7 +651,7 @@ export default function Leaderboard() {
                       <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
                         <div className="flex -space-x-2">
                           {venue.friends.slice(0, 2).map((friend, idx) => (
-                            <Avatar key={idx} className="h-6 w-6 border border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.5)]">
+                            <Avatar key={idx} className="h-6 w-6 border border-[#a855f7] shadow-[0_0_4px_rgba(168,85,247,0.25)]">
                               <AvatarImage src={friend.avatar_url || undefined} />
                               <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
                                 {friend.display_name[0]}
@@ -728,13 +728,13 @@ export default function Leaderboard() {
       {/* Biggest Mover Card */}
       {biggestMover && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-20 w-full max-w-[430px] px-4">
-          <div className="bg-[#2d1b4e] border border-[#a855f7] rounded-2xl p-3 shadow-[0_0_20px_rgba(168,85,247,0.6)]">
+          <div className="bg-[#2d1b4e] border border-[#a855f7] rounded-2xl p-3 shadow-[0_0_12px_rgba(168,85,247,0.3)]">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-[#a855f7] text-sm font-medium mb-0.5">Biggest Mover</p>
                 <button
                   onClick={() => handleVenueClick(biggestMover.venue_name, biggestMover.venue_id)}
-                  className="text-lg font-bold text-[#d4ff00] hover:text-[#d4ff00]/80 transition-colors max-w-[180px]"
+                  className="text-lg font-bold text-white hover:text-white/80 transition-colors max-w-[180px]"
                 >
                   <span className="truncate">{biggestMover.venue_name}</span>
                 </button>
@@ -753,7 +753,7 @@ export default function Leaderboard() {
                       <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
                         <div className="flex -space-x-2">
                           {biggestMover.friends.map((friend, idx) => (
-                            <Avatar key={idx} className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.6)]">
+                            <Avatar key={idx} className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.3)]">
                               <AvatarImage src={friend.avatar_url || undefined} />
                               <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
                                 {friend.display_name[0]}
