@@ -337,7 +337,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
   const currentUserDown = downs.find(d => d.user_id === currentUserId);
 
   return (
-    <div className="bg-white/[0.06] backdrop-blur-sm rounded-2xl p-3 transition-all duration-300">
+    <div className="bg-white/[0.06] backdrop-blur-sm rounded-2xl p-4 transition-all duration-300">
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-3">
@@ -429,9 +429,9 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
       <button
         onClick={handleToggleDown}
         disabled={isTogglingDown}
-        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-300 mb-3 ${
+        className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-300 mb-3 ${
           isDown 
-            ? 'bg-[#d4ff00] text-black hover:bg-[#c4ef00]' 
+            ? 'bg-[#bfe600] text-black hover:bg-[#b0d600] shadow-[0_0_8px_rgba(212,255,0,0.25)]' 
             : 'bg-primary/20 text-primary hover:bg-primary/30'
         }`}
       >
@@ -477,11 +477,11 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
           <span>{plan.comments_count || 0}</span>
         </Button>
 
-        <div className="flex items-center gap-0.5 bg-background/30 rounded-full px-1">
+        <div className="flex items-center gap-0.5 bg-background/30 rounded-xl px-1">
           <Button
             variant="ghost"
             size="sm"
-            className={`h-9 w-9 p-0 rounded-full transition-all ${
+            className={`h-9 w-9 p-0 rounded-lg transition-all ${
               userVote === 'up' 
                 ? 'text-[#d4ff00] bg-[#d4ff00]/10 opacity-100' 
                 : 'text-muted-foreground hover:text-[#d4ff00] hover:bg-[#d4ff00]/10 opacity-60 hover:opacity-100'
@@ -489,7 +489,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
             onClick={() => handleVote('up')}
             disabled={isVoting}
           >
-            <ChevronUp className="w-5 h-5" />
+            <ChevronUp className="w-4 h-4" />
           </Button>
           <span className={`text-sm font-bold min-w-[24px] text-center ${
             plan.score > 0 ? 'text-[#d4ff00]' : plan.score < 0 ? 'text-destructive' : 'text-muted-foreground'
