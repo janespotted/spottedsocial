@@ -258,26 +258,28 @@ export default function Home() {
         </div>
 
         {/* Feed Mode Toggle */}
-        <div className="flex gap-2 px-6 pb-4">
+        <div className="flex items-center justify-around px-6 pb-4">
           <button
             onClick={() => setFeedMode('newsfeed')}
-            className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-all ${
-              feedMode === 'newsfeed'
-                ? 'bg-primary text-primary-foreground shadow-[0_0_15px_rgba(168,85,247,0.5)]'
-                : 'bg-card/50 text-muted-foreground border border-border/30 hover:bg-card/70'
+            className={`relative pb-2 text-lg font-medium transition-colors ${
+              feedMode === 'newsfeed' ? 'text-white' : 'text-white/60'
             }`}
           >
             Newsfeed
+            {feedMode === 'newsfeed' && (
+              <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#B14BFF]" />
+            )}
           </button>
           <button
             onClick={() => setFeedMode('plans')}
-            className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-all ${
-              feedMode === 'plans'
-                ? 'bg-primary text-primary-foreground shadow-[0_0_15px_rgba(168,85,247,0.5)]'
-                : 'bg-card/50 text-muted-foreground border border-border/30 hover:bg-card/70'
+            className={`relative pb-2 text-lg font-medium transition-colors ${
+              feedMode === 'plans' ? 'text-white' : 'text-white/60'
             }`}
           >
             Plans
+            {feedMode === 'plans' && (
+              <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#B14BFF]" />
+            )}
           </button>
         </div>
         {feedMode === 'newsfeed' && (
