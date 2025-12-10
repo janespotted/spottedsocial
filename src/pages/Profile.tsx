@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
@@ -378,7 +379,12 @@ export default function Profile() {
         <div>
           <h2 className="text-xl font-bold text-white">@{profile?.username || 'username'}</h2>
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity outline-none">
+            <DropdownMenuTrigger className={cn(
+              "flex items-center gap-1.5 cursor-pointer hover:bg-white/10 transition-all outline-none px-3 py-1.5 rounded-full border bg-white/5",
+              currentStatus === 'out' ? "border-[#d4ff00]/40" : 
+              currentStatus === 'planning' ? "border-[#a855f7]/40" : 
+              "border-white/10"
+            )}>
               {currentStatus === 'out' && currentVenue ? (
                 <>
                   <span className="text-[#d4ff00] font-medium">@ {currentVenue}</span>
