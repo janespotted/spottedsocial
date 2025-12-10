@@ -144,6 +144,36 @@ export function PlansFeed({ userId }: PlansFeedProps) {
     }
   };
 
+  const handleLeavePlanning = async () => {
+    if (!userId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('night_statuses')
+        .update({
+          status: 'off',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      haptic.light();
+      setIsUserPlanning(false);
+      toast({
+        title: "Exited planning mode",
+        description: "Your status has been updated.",
+      });
+    } catch (error) {
+      console.error('Error leaving planning mode:', error);
+      toast({
+        title: "Something went wrong",
+        description: "Couldn't update your status. Try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const fetchPlans = async () => {
     try {
       // Fetch plans that haven't expired
@@ -231,6 +261,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
         variant="card" 
         isUserPlanning={isUserPlanning}
         onJoinPlanning={handleJoinPlanning}
+        onLeavePlanning={handleLeavePlanning}
         showJoinOption={true}
       />
       {/* Subtle separator */}

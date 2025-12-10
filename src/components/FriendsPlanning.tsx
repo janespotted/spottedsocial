@@ -1,6 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, ChevronDown, ChevronUp, Plus, Check } from 'lucide-react';
+import { MessageCircle, ChevronDown, ChevronUp, Plus, Check, X } from 'lucide-react';
 import { useState, CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -18,6 +18,7 @@ interface FriendsPlanningProps {
   style?: CSSProperties;
   isUserPlanning?: boolean;
   onJoinPlanning?: () => void;
+  onLeavePlanning?: () => void;
   showJoinOption?: boolean;
 }
 
@@ -41,11 +42,12 @@ const shortenNeighborhood = (neighborhood: string | null | undefined): string | 
 
 export function FriendsPlanning({ 
   friends, 
-  variant = 'card', 
-  className = '', 
+  variant = 'card',
+  className = '',
   style,
   isUserPlanning = false,
   onJoinPlanning,
+  onLeavePlanning,
   showJoinOption = false
 }: FriendsPlanningProps) {
   const navigate = useNavigate();
@@ -286,10 +288,14 @@ export function FriendsPlanning({
       {showJoinOption && (
         <div className="mt-5 pt-4 border-t border-white/10">
           {isUserPlanning ? (
-            <div className="flex items-center justify-center gap-2 py-2 text-[#d4ff00]">
+            <button
+              onClick={onLeavePlanning}
+              className="w-full h-[38px] bg-[#d4ff00]/10 hover:bg-[#d4ff00]/20 text-[#d4ff00] text-sm font-medium rounded-xl flex items-center justify-center gap-2 border border-[#d4ff00]/30 shadow-[0_2px_6px_rgba(0,0,0,0.25)] transition-all px-3"
+            >
               <Check className="w-4 h-4" />
-              <span className="text-sm font-medium">You're in planning mode</span>
-            </div>
+              <span>You're in planning mode</span>
+              <X className="w-3 h-3 ml-1 opacity-60" />
+            </button>
           ) : (
             <button
               onClick={onJoinPlanning}
