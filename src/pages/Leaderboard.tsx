@@ -442,7 +442,7 @@ export default function Leaderboard() {
                 <DropdownMenuTrigger asChild>
                   <button className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-all ${
                     selectedNeighborhood === null 
-                      ? 'bg-[#d4ff00]/20 border border-[#d4ff00]/50 text-[#d4ff00] shadow-[0_0_10px_rgba(212,255,0,0.3)]' 
+                      ? 'bg-[#d4ff00]/15 border border-[#d4ff00]/40 text-[#d4ff00] shadow-[0_0_6px_rgba(212,255,0,0.15)]' 
                       : 'bg-[#a855f7]/20 hover:bg-[#a855f7]/30 border border-[#a855f7]/40 text-white'
                   }`}>
                     <span>{selectedNeighborhood || `All ${getCityLabel(city)}`}</span>
@@ -617,7 +617,7 @@ export default function Leaderboard() {
             <div className="flex items-center gap-4">
               {/* Rank Number */}
               <div className="flex-shrink-0">
-                <div className="text-3xl font-bold text-[#E9FF70] w-8 text-center">
+                <div className="text-3xl font-bold text-[#d4ff00] w-8 text-center">
                   {venue.rank}
                 </div>
               </div>
