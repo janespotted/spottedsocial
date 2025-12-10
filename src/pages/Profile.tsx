@@ -482,12 +482,14 @@ export default function Profile() {
 
         {/* Avatar + Stats */}
         <div className="flex items-center gap-4">
-          <Avatar className="h-20 w-20 border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)]">
-            <AvatarImage src={profile?.avatar_url || undefined} />
-            <AvatarFallback className="bg-[#1a0f2e] text-white text-2xl">
-              {profile?.display_name?.[0] || 'U'}
-            </AvatarFallback>
-          </Avatar>
+          <button onClick={() => navigate('/profile')} className="cursor-pointer">
+            <Avatar className="h-20 w-20 border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)]">
+              <AvatarImage src={profile?.avatar_url || undefined} />
+              <AvatarFallback className="bg-[#1a0f2e] text-white text-2xl">
+                {profile?.display_name?.[0] || 'U'}
+              </AvatarFallback>
+            </Avatar>
+          </button>
 
           <div className="flex-1">
             <h3 className="text-2xl font-bold text-white mb-2">
