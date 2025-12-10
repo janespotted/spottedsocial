@@ -155,57 +155,37 @@ export function FriendsPlanning({
   // Card variant for Home page
   return (
     <div className={`bg-[#1a0f2e]/80 backdrop-blur border border-[#a855f7]/20 rounded-2xl p-4 shadow-[0_0_20px_rgba(168,85,247,0.15)] ${className}`}>
-      {/* Header with stacked avatars and join button */}
+      {/* Header with stacked avatars */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <span className="text-lg">🤔</span>
           <h3 className="text-white font-semibold text-sm">Thinking About Going Out</h3>
         </div>
         
-        <div className="flex items-center gap-2">
-          {/* Stacked avatar preview */}
-          {friends.length > 0 && (
-            <>
-              <div className="flex -space-x-2">
-                {previewFriends.map((friend) => (
-                  <Avatar key={friend.user_id} className="w-6 h-6 border-2 border-[#1a0f2e] ring-1 ring-[#a855f7]/40">
-                    <AvatarImage
-                      src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
-                    />
-                    <AvatarFallback className="bg-[#a855f7] text-white text-[10px]">
-                      {friend.display_name?.[0] || '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
-              </div>
-              {remainingCount > 0 && (
-                <span className="text-white/40 text-xs">+{remainingCount}</span>
-              )}
-            </>
-          )}
-          
-          {/* Join button */}
-          {showJoinOption && (
-            isUserPlanning ? (
-              <span className="text-xs text-[#d4ff00] flex items-center gap-1">
-                <Check className="w-3 h-3" />
-                You're in
-              </span>
-            ) : (
-              <button
-                onClick={onJoinPlanning}
-                className="text-xs text-[#a855f7] hover:text-[#d4ff00] transition-colors flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" />
-                I'm thinking too
-              </button>
-            )
-          )}
-        </div>
+        {/* Stacked avatar preview */}
+        {friends.length > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="flex -space-x-2">
+              {previewFriends.map((friend) => (
+                <Avatar key={friend.user_id} className="w-6 h-6 border-2 border-[#1a0f2e] ring-1 ring-[#a855f7]/40">
+                  <AvatarImage
+                    src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
+                  />
+                  <AvatarFallback className="bg-[#a855f7] text-white text-[10px]">
+                    {friend.display_name?.[0] || '?'}
+                  </AvatarFallback>
+                </Avatar>
+              ))}
+            </div>
+            {remainingCount > 0 && (
+              <span className="text-white/40 text-xs">+{remainingCount}</span>
+            )}
+          </div>
+        )}
       </div>
       
-      {/* Empty state when no friends but user can join */}
-      {friends.length === 0 && showJoinOption && (
+      {/* Empty state when no friends */}
+      {friends.length === 0 && (
         <p className="text-white/40 text-xs text-center py-2">
           No friends planning yet — be the first!
         </p>
@@ -301,6 +281,26 @@ export function FriendsPlanning({
           </div>
         ))}
       </div>
+      
+      {/* Bottom CTA - Join Planning */}
+      {showJoinOption && (
+        <div className="mt-4 pt-4 border-t border-white/10">
+          {isUserPlanning ? (
+            <div className="flex items-center justify-center gap-2 py-2 text-[#d4ff00]">
+              <Check className="w-4 h-4" />
+              <span className="text-sm font-medium">You're in planning mode</span>
+            </div>
+          ) : (
+            <button
+              onClick={onJoinPlanning}
+              className="w-full h-11 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white font-medium rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:shadow-[0_0_20px_rgba(168,85,247,0.6)] transition-all hover:scale-[1.02]"
+            >
+              <Plus className="w-4 h-4" />
+              I'm thinking about going out too
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
