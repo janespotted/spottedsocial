@@ -100,7 +100,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
     return (
       <div className="space-y-5 px-4">
         {[1, 2, 3].map(i => (
-          <div key={i} className="bg-card/60 rounded-2xl p-4 border border-primary/20">
+          <div key={i} className="bg-card/60 rounded-2xl p-4">
             <div className="flex items-center gap-3 mb-3">
               <Skeleton className="h-11 w-11 rounded-full" />
               <div className="space-y-2">
@@ -120,7 +120,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
       {/* Create Plan Button */}
       <Button
         onClick={() => setShowCreateDialog(true)}
-        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold py-6 rounded-2xl shadow-[0_0_25px_rgba(168,85,247,0.4)] hover:shadow-[0_0_30px_rgba(168,85,247,0.6)] transition-all duration-300"
+        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold py-6 rounded-2xl transition-all duration-300"
       >
         <Sparkles className="w-5 h-5 mr-2" />
         Share Your Plans ✨
@@ -128,7 +128,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
 
       {plans.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center mb-5 shadow-[0_0_30px_rgba(168,85,247,0.3)]">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center mb-5">
             <Calendar className="w-10 h-10 text-primary" />
           </div>
           <h3 className="text-xl font-semibold text-foreground mb-2">No plans yet</h3>

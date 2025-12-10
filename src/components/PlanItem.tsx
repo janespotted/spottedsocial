@@ -337,12 +337,12 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
   const currentUserDown = downs.find(d => d.user_id === currentUserId);
 
   return (
-    <div className="bg-card/60 backdrop-blur-sm rounded-2xl p-3 border border-primary/20 shadow-[0_0_20px_rgba(168,85,247,0.1)] hover:shadow-[0_0_25px_rgba(168,85,247,0.2)] transition-all duration-300">
+    <div className="bg-card/60 backdrop-blur-sm rounded-2xl p-3 transition-all duration-300">
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2.5">
           <Avatar 
-            className="h-10 w-10 cursor-pointer ring-2 ring-primary/30 hover:ring-primary/50 transition-all" 
+            className="h-10 w-10 cursor-pointer transition-all" 
             onClick={handleUserClick}
           >
             <AvatarImage src={plan.user?.avatar_url || ''} />
@@ -431,8 +431,8 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
         disabled={isTogglingDown}
         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-300 mb-3 ${
           isDown 
-            ? 'bg-[#d4ff00] text-black hover:bg-[#c4ef00] shadow-[0_0_12px_rgba(212,255,0,0.3)]' 
-            : 'bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30'
+            ? 'bg-[#d4ff00] text-black hover:bg-[#c4ef00]' 
+            : 'bg-primary/20 text-primary hover:bg-primary/30'
         }`}
       >
         <span>🎉</span>
