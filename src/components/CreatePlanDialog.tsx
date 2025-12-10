@@ -209,7 +209,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] border-primary/30 max-h-[60vh]">
+      <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] border-transparent max-h-[60vh]">
         <DrawerHeader className="pb-2">
           <DrawerTitle className="text-foreground text-center">Share Your Plans</DrawerTitle>
         </DrawerHeader>
@@ -420,7 +420,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
               <Button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="w-full mt-4 bg-primary hover:bg-primary/90 shadow-[0_0_20px_rgba(168,85,247,0.4)] h-12 text-base font-semibold"
+                className="w-full mt-4 bg-primary hover:bg-primary/90 h-12 text-base font-semibold"
               >
                 {isSubmitting ? 'Posting...' : 'Post Plan'}
               </Button>
