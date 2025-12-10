@@ -359,10 +359,6 @@ export default function Home() {
       <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); await fetchPlanningFriends(); }}>
         <div className="px-4 py-6 space-y-6">
         
-        {/* Friends Planning Card - shown during nightlife hours */}
-        {isNightlifeHours() && planningFriends.length > 0 && !isLoading && (
-          <FriendsPlanning friends={planningFriends} variant="card" />
-        )}
         
         {isLoading ? (
           <FeedSkeleton />
