@@ -184,8 +184,8 @@ export function PlansFeed({ userId }: PlansFeedProps) {
       {/* Drop a Plan Section */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <span className="text-base">📝</span>
-          <h3 className="text-white/70 font-medium text-sm">Drop a Plan</h3>
+          <span className="text-lg">📝</span>
+          <h3 className="text-white font-semibold text-sm">Drop a Plan</h3>
         </div>
         
         <button
