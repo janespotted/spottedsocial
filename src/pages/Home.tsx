@@ -4,6 +4,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { usePlanningVenueDetection } from '@/hooks/usePlanningVenueDetection';
 import { useFeed, Post } from '@/hooks/useFeed';
@@ -40,6 +41,7 @@ export default function Home() {
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
+  const { bootstrapEnabled } = useBootstrapMode();
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
   const { city } = useUserCity();
@@ -159,13 +161,18 @@ export default function Home() {
     const planningUserIds = planningStatuses.map(s => s.user_id);
     const neighborhoodMap = new Map(planningStatuses.map(s => [s.user_id, s.planning_neighborhood]));
 
-    // Get profiles for planning friends
+    // Get profiles for planning friends (include is_demo for filtering)
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url')
+      .select('id, display_name, avatar_url, is_demo')
       .in('id', planningUserIds);
 
-    setPlanningFriends((profiles || []).map(p => ({
+    // Filter out demo users in bootstrap mode (when demo mode is OFF)
+    const filteredProfiles = (bootstrapEnabled && !demoEnabled)
+      ? (profiles || []).filter((p: any) => !p.is_demo)
+      : (profiles || []);
+
+    setPlanningFriends(filteredProfiles.map((p: any) => ({
       user_id: p.id,
       display_name: p.display_name,
       avatar_url: p.avatar_url,

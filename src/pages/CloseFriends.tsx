@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/hooks/useDemoMode';
+import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -18,6 +20,8 @@ interface Friend {
 export default function CloseFriends() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const demoEnabled = useDemoMode();
+  const { bootstrapEnabled } = useBootstrapMode();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,11 +57,16 @@ export default function CloseFriends() {
         return;
       }
 
-      // Get friend profiles
+      // Get friend profiles (include is_demo for filtering)
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, display_name, username, avatar_url')
+        .select('id, display_name, username, avatar_url, is_demo')
         .in('id', friendIds);
+
+      // Filter out demo users in bootstrap mode (when demo mode is OFF)
+      const filteredProfiles = (bootstrapEnabled && !demoEnabled)
+        ? (profiles || []).filter((p: any) => !p.is_demo)
+        : (profiles || []);
 
       // Get close friends list
       const { data: closeFriends } = await supabase
@@ -67,7 +76,7 @@ export default function CloseFriends() {
 
       const closeFriendIds = new Set(closeFriends?.map(cf => cf.close_friend_id) || []);
 
-      const friendsWithStatus: Friend[] = (profiles || []).map(p => ({
+      const friendsWithStatus: Friend[] = filteredProfiles.map((p: any) => ({
         id: p.id,
         display_name: p.display_name,
         username: p.username,
@@ -163,16 +172,16 @@ export default function CloseFriends() {
                 key={friend.id}
                 className="flex items-center justify-between p-4 bg-[#2d1b4e]/40 rounded-lg border border-[#a855f7]/20 hover:border-[#a855f7]/40 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12 border-2 border-[#a855f7]">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <Avatar className="h-12 w-12 border-2 border-[#a855f7] flex-shrink-0">
                     <AvatarImage src={friend.avatar_url || undefined} />
                     <AvatarFallback className="bg-[#1a0f2e] text-white">
                       {friend.display_name[0]}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <p className="text-white font-medium">{friend.display_name}</p>
-                    <p className="text-sm text-white/60">@{friend.username}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white font-medium truncate">{friend.display_name}</p>
+                    <p className="text-sm text-white/60 truncate">@{friend.username}</p>
                   </div>
                 </div>
                 <Button

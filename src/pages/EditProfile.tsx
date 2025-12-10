@@ -28,12 +28,29 @@ export default function EditProfile() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
+  
+  // User's current status (for fading location sharing when planning)
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchProfile();
+      fetchCurrentStatus();
     }
   }, [user]);
+  
+  const fetchCurrentStatus = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('night_statuses')
+      .select('status')
+      .eq('user_id', user.id)
+      .not('expires_at', 'is', null)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+    
+    setCurrentStatus(data?.status || null);
+  };
 
   const fetchProfile = async () => {
     const { data } = await supabase
@@ -280,11 +297,17 @@ export default function EditProfile() {
           </div>
 
           {/* Location Sharing Privacy */}
-          <div className="space-y-3">
+          <div className={`space-y-3 ${currentStatus === 'planning' ? 'opacity-50' : ''}`}>
             <Label className="text-white">Location Sharing</Label>
             <p className="text-sm text-white/60">Choose who can see your location when you're out</p>
             
-            <div className="space-y-3 bg-[#2d1b4e]/40 rounded-lg p-4 border border-[#a855f7]/20">
+            {currentStatus === 'planning' && (
+              <p className="text-sm text-[#a855f7] bg-[#a855f7]/10 p-3 rounded-lg border border-[#a855f7]/20">
+                ✨ You're planning tonight. Change to "Out" to share your location.
+              </p>
+            )}
+            
+            <div className={`space-y-3 bg-[#2d1b4e]/40 rounded-lg p-4 border border-[#a855f7]/20 ${currentStatus === 'planning' ? 'pointer-events-none' : ''}`}>
               <button
                 onClick={() => setLocationSharing('close_friends')}
                 className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#a855f7]/10 transition-colors"

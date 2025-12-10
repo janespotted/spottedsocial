@@ -4,6 +4,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard, FriendCardData } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useUserCity } from '@/hooks/useUserCity';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { usePlanningVenueDetection } from '@/hooks/usePlanningVenueDetection';
@@ -52,6 +53,7 @@ export default function Map() {
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
+  const { bootstrapEnabled } = useBootstrapMode();
   const { city } = useUserCity();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -333,7 +335,11 @@ export default function Map() {
             if (s.status === 'planning') {
               // Find the profile for this planning friend
               const profile = (allProfiles || []).find((p: any) => p.id === s.user_id);
-              if (profile && friendIds.includes(s.user_id)) {
+              // Filter out demo users in bootstrap mode (when demo mode is OFF)
+              const isDemoUser = profile?.is_demo === true;
+              const shouldExclude = bootstrapEnabled && !demoEnabled && isDemoUser;
+              
+              if (profile && friendIds.includes(s.user_id) && !shouldExclude) {
                 planningFriendsData.push({
                   user_id: s.user_id,
                   display_name: profile.display_name || 'Friend',
