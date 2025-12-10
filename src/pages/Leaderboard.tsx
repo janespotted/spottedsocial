@@ -430,15 +430,15 @@ export default function Leaderboard() {
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-start justify-between p-6">
           <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
+            <div>
+              <h2 className="text-3xl font-bold text-white mb-3">Leaderboard</h2>
               
               {/* Neighborhood Filter Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all hover:bg-white/5 text-white/80">
+                  <button className="flex items-center gap-2 px-3 py-1.5 min-w-[72px] whitespace-nowrap rounded-[14px] bg-[#1D102D]/40 border border-white/10 text-white font-medium text-sm transition-all hover:bg-[#1D102D]/60">
                     <span>{selectedNeighborhood || `All ${getCityLabel(city)}`}</span>
-                    <ChevronDown className="w-4 h-4" />
+                    <ChevronDown className="w-4 h-4 text-[#EEFF00]" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-[#1a0f2e] border border-[#a855f7]/40 max-h-64 overflow-y-auto">
