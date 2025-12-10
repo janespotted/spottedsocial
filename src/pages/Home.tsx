@@ -267,7 +267,7 @@ export default function Home() {
           >
             Newsfeed
             {feedMode === 'newsfeed' && (
-              <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#B14BFF]" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
             )}
           </button>
           <button
@@ -278,7 +278,7 @@ export default function Home() {
           >
             Plans
             {feedMode === 'plans' && (
-              <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#B14BFF]" />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
             )}
           </button>
         </div>
