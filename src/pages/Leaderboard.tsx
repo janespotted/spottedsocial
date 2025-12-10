@@ -726,9 +726,9 @@ export default function Leaderboard() {
                 <p className="text-[#a855f7] text-sm font-medium mb-0.5">Biggest Mover</p>
                 <button
                   onClick={() => handleVenueClick(biggestMover.venue_name, biggestMover.venue_id)}
-                  className="text-lg font-bold text-white hover:text-white/80 transition-colors max-w-[180px]"
+                  className="text-lg font-bold text-white hover:text-white/80 transition-colors max-w-[180px] truncate block text-left"
                 >
-                  <span className="truncate">{biggestMover.venue_name}</span>
+                  {biggestMover.venue_name}
                 </button>
               </div>
 
