@@ -284,7 +284,7 @@ export function FriendsPlanning({
       
       {/* Bottom CTA - Join Planning */}
       {showJoinOption && (
-        <div className="mt-4 pt-4 border-t border-white/10">
+        <div className="mt-5 pt-4 border-t border-white/10">
           {isUserPlanning ? (
             <div className="flex items-center justify-center gap-2 py-2 text-[#d4ff00]">
               <Check className="w-4 h-4" />
@@ -293,10 +293,10 @@ export function FriendsPlanning({
           ) : (
             <button
               onClick={onJoinPlanning}
-              className="w-full h-11 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white font-medium rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:shadow-[0_0_20px_rgba(168,85,247,0.6)] transition-all hover:scale-[1.02]"
+              className="w-full h-[38px] bg-[#a855f7]/15 hover:bg-[#a855f7]/25 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 border border-[#a855f7]/50 shadow-[0_2px_6px_rgba(0,0,0,0.25)] transition-all px-3"
             >
               <Plus className="w-4 h-4" />
-              I'm thinking about going out too
+              I'm going out too
             </button>
           )}
         </div>
