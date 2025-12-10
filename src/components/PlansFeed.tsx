@@ -6,6 +6,7 @@ import { CreatePlanDialog } from './CreatePlanDialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { FriendsPlanning } from './FriendsPlanning';
 
 interface Plan {
   id: string;
@@ -35,7 +36,60 @@ export function PlansFeed({ userId }: PlansFeedProps) {
   const [userVotes, setUserVotes] = useState<Record<string, 'up' | 'down'>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
   const demoEnabled = useDemoMode();
+
+  const fetchPlanningFriends = async () => {
+    if (!userId) return;
+    
+    try {
+      // Get user's friends
+      const { data: friendships } = await supabase
+        .from('friendships')
+        .select('friend_id, user_id')
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+        .eq('status', 'accepted');
+
+      if (!friendships || friendships.length === 0) {
+        setPlanningFriends([]);
+        return;
+      }
+
+      const friendIds = friendships.map(f => f.user_id === userId ? f.friend_id : f.user_id);
+
+      // Get friends who are planning
+      const { data: planningStatuses } = await supabase
+        .from('night_statuses')
+        .select('user_id, planning_neighborhood')
+        .in('user_id', friendIds)
+        .eq('status', 'planning')
+        .gte('expires_at', new Date().toISOString());
+
+      if (!planningStatuses || planningStatuses.length === 0) {
+        setPlanningFriends([]);
+        return;
+      }
+
+      const planningUserIds = planningStatuses.map(s => s.user_id);
+      
+      // Get profiles for planning friends
+      const { data: profiles } = await supabase
+        .rpc('get_profiles_safe')
+        .in('id', planningUserIds);
+
+      if (profiles) {
+        const friendsWithNeighborhood = profiles.map(p => ({
+          user_id: p.id,
+          display_name: p.display_name,
+          avatar_url: p.avatar_url,
+          planning_neighborhood: planningStatuses.find(s => s.user_id === p.id)?.planning_neighborhood
+        }));
+        setPlanningFriends(friendsWithNeighborhood);
+      }
+    } catch (error) {
+      console.error('Error fetching planning friends:', error);
+    }
+  };
 
   const fetchPlans = async () => {
     try {
@@ -89,6 +143,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
 
   useEffect(() => {
     fetchPlans();
+    fetchPlanningFriends();
   }, [userId, demoEnabled]);
 
   const handlePlanCreated = () => {
@@ -117,6 +172,11 @@ export function PlansFeed({ userId }: PlansFeedProps) {
 
   return (
     <div className="space-y-7 px-4 pb-24">
+      {/* Friends Planning Section */}
+      {planningFriends.length > 0 && (
+        <FriendsPlanning friends={planningFriends} variant="card" />
+      )}
+
       {/* Create Plan Button */}
       <button
         onClick={() => setShowCreateDialog(true)}
