@@ -430,20 +430,16 @@ export default function Leaderboard() {
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
         <div className="flex items-start justify-between p-6">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-              <CityBadge />
-            </div>
-            <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
-            
-            {/* Neighborhood Filter Dropdown */}
-            <div className="mt-3">
+            <div className="flex items-center gap-3 mb-1">
+              <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
+              
+              {/* Neighborhood Filter Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-all ${
+                  <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all hover:bg-white/5 ${
                     selectedNeighborhood === null 
-                      ? 'bg-[#d4ff00]/15 border border-[#d4ff00]/40 text-[#d4ff00] shadow-[0_0_6px_rgba(212,255,0,0.15)]' 
-                      : 'bg-[#a855f7]/20 hover:bg-[#a855f7]/30 border border-[#a855f7]/40 text-white'
+                      ? 'text-[#d4ff00]' 
+                      : 'text-white/80'
                   }`}>
                     <span>{selectedNeighborhood || `All ${getCityLabel(city)}`}</span>
                     <ChevronDown className="w-4 h-4" />
@@ -469,7 +465,7 @@ export default function Leaderboard() {
               </DropdownMenu>
             </div>
             
-            <p className="text-white/60 text-sm mt-2">
+            <p className="text-white/60 text-sm">
               {selectedNeighborhood 
                 ? `Top 20 Tonight: ${selectedNeighborhood}`
                 : 'Top Places to Go Out Now'}
