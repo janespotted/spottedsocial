@@ -605,10 +605,13 @@ export function ActivityTab() {
               {/* Content - takes available space */}
               <div className="flex-1 min-w-0">
                 {activity.type === 'meet_up' && (
-                  <p className="text-white text-sm">
-                    <span className="font-semibold">{activity.display_name}</span>
-                    <span className="text-white/70"> wants to meet up</span>
-                  </p>
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-white/70 block text-xs mt-0.5">wants to meet up</span>
+                  </div>
                 )}
                 {activity.type === 'venue_invite' && (
                   <div className="text-white text-sm">
@@ -629,11 +632,14 @@ export function ActivityTab() {
                   </div>
                 )}
                 {activity.type === 'trending' && (
-                  <p className="text-white text-sm">
-                    <span className="mr-1">⚡</span>
-                    <span className="font-semibold text-[#d4ff00]">{activity.title.replace(' is trending', '')}</span>
-                    <span className="text-white/70"> is trending · {activity.subtitle}</span>
-                  </p>
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="mr-1">⚡</span>
+                      <span className="font-semibold text-[#d4ff00]">{activity.title.replace(' is trending', '')}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-white/70 block text-xs mt-0.5">is trending · {activity.subtitle}</span>
+                  </div>
                 )}
               </div>
 
@@ -689,9 +695,6 @@ export function ActivityTab() {
                   </Button>
                 )}
 
-                {(activity.type === 'meet_up' || activity.type === 'trending') && (
-                  <span className="bg-white/10 text-white/60 text-xs px-2 py-1 rounded-full">{getTimeAgo(activity.timestamp)}</span>
-                )}
               </div>
             </div>
           </div>
