@@ -439,7 +439,7 @@ export default function Leaderboard() {
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 px-3 py-1.5 min-w-[72px] whitespace-nowrap rounded-[14px] bg-[#1D102D]/40 border border-[#a855f7] text-white font-medium text-sm transition-all hover:bg-[#1D102D]/60 shadow-[0_0_8px_rgba(168,85,247,0.25)]">
                     <span>{selectedNeighborhood || `All ${getCityLabel(city)}`}</span>
-                    <ChevronDown className="w-4 h-4 text-[#EEFF00]" />
+                    <ChevronDown className="w-4 h-4 text-[#a855f7]" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-[#1a0f2e] border border-[#a855f7]/40 max-h-64 overflow-y-auto">
