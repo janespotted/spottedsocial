@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CityBadge } from '@/components/CityBadge';
 import { ProfileSkeleton } from '@/components/ProfileSkeleton';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
 import { useUserCity } from '@/hooks/useUserCity';
 
@@ -393,22 +393,23 @@ export default function Profile() {
               )}
               <ChevronDown className="h-4 w-4 text-white/60" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40 min-w-[200px]">
+            <DropdownMenuContent className="bg-black/60 backdrop-blur-xl border-white/10 min-w-[220px] rounded-xl p-1.5 z-50">
               {/* Options based on current status */}
               {currentStatus === 'out' && (
                 <>
                   <DropdownMenuItem 
                     onClick={openCheckIn}
-                    className="text-white hover:bg-white/10 cursor-pointer"
+                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
                   >
-                    <Navigation className="h-4 w-4 mr-2" />
-                    Change venue
+                    <Navigation className="h-4 w-4 text-[#a855f7]" />
+                    <span className="font-medium">Change venue</span>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10 my-1" />
                   <DropdownMenuItem 
                     onClick={handleNotGoingOut}
-                    className="text-white hover:bg-white/10 cursor-pointer"
+                    className="text-white/70 hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
                   >
-                    <Home className="h-4 w-4 mr-2" />
+                    <Home className="h-4 w-4 text-white/40" />
                     Not going out anymore
                   </DropdownMenuItem>
                 </>
@@ -417,32 +418,33 @@ export default function Profile() {
                 <>
                   <DropdownMenuItem 
                     onClick={openCheckIn}
-                    className="text-[#d4ff00] hover:bg-white/10 cursor-pointer"
+                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
                   >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Going out
+                    <MapPin className="h-4 w-4 text-[#d4ff00]" />
+                    <span className="font-medium">Going out</span>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10 my-1" />
                   <DropdownMenuItem 
                     onClick={handleNotGoingOut}
-                    className="text-white hover:bg-white/10 cursor-pointer"
+                    className="text-white/70 hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
                   >
-                    <Home className="h-4 w-4 mr-2" />
+                    <Home className="h-4 w-4 text-white/40" />
                     Not going out anymore
                   </DropdownMenuItem>
                   <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="text-white hover:bg-white/10 cursor-pointer">
-                      <Target className="h-4 w-4 mr-2" />
-                      Change neighborhood
+                    <DropdownMenuSubTrigger className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5">
+                      <Target className="h-4 w-4 text-[#a855f7]" />
+                      <span className="font-medium">Change neighborhood</span>
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="bg-[#1a0f2e] border-[#a855f7]/40 max-h-[300px] overflow-y-auto">
+                    <DropdownMenuSubContent className="bg-black/60 backdrop-blur-xl border-white/10 rounded-xl p-1.5 max-h-[300px] overflow-y-auto z-50">
                       {(CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS.la).map((neighborhood) => (
                         <DropdownMenuItem
                           key={neighborhood}
                           onClick={() => handleChangeNeighborhood(neighborhood)}
-                          className={`text-white hover:bg-white/10 cursor-pointer ${planningNeighborhood === neighborhood ? 'bg-white/10' : ''}`}
+                          className={`text-white hover:bg-white/10 cursor-pointer rounded-lg py-2 px-3 ${planningNeighborhood === neighborhood ? 'bg-white/10' : ''}`}
                         >
                           {neighborhood}
-                          {planningNeighborhood === neighborhood && <span className="ml-auto">✓</span>}
+                          {planningNeighborhood === neighborhood && <span className="ml-auto text-[#a855f7]">✓</span>}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuSubContent>
@@ -453,17 +455,18 @@ export default function Profile() {
                 <>
                   <DropdownMenuItem 
                     onClick={openCheckIn}
-                    className="text-[#d4ff00] hover:bg-white/10 cursor-pointer"
+                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
                   >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    I'm going out
+                    <MapPin className="h-4 w-4 text-[#d4ff00]" />
+                    <span className="font-medium">I'm going out</span>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10 my-1" />
                   <DropdownMenuItem 
                     onClick={handleStartPlanning}
-                    className="text-[#a855f7] hover:bg-white/10 cursor-pointer"
+                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
                   >
-                    <Target className="h-4 w-4 mr-2" />
-                    I'm planning
+                    <Target className="h-4 w-4 text-[#a855f7]" />
+                    <span className="font-medium">I'm planning</span>
                   </DropdownMenuItem>
                 </>
               )}
