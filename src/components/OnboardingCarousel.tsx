@@ -10,25 +10,25 @@ const slides = [
   {
     icon: Sparkles,
     title: 'Welcome to Spotted 🎉',
-    description: 'Your nightlife companion. See where friends are going, discover trending venues, and share your night — all before 5am.',
+    description: 'See which friends are out right now, what venues they\'re at, and what looks buzzing — instantly.',
     color: '#d4ff00',
   },
   {
     icon: MapPin,
-    title: 'See Your Friends',
-    description: 'View where your friends are out tonight on the live map. Share your location only with people you trust.',
+    title: 'Share Your Location',
+    description: 'Share your live location with close friends, friends, or mutuals so they can link up with you fast — and you\'re always in control of who sees you.',
     color: '#a855f7',
   },
   {
     icon: Users,
     title: 'Send Meet Ups',
-    description: 'Tap to send a quick "Meet Up" request. Your friends get notified instantly — no planning required.',
+    description: 'Make plans in one tap. Send a meet-up request and your friends get notified instantly — no messy group chats.',
     color: '#d4ff00',
   },
   {
     icon: Camera,
     title: 'Share Your Night',
-    description: 'Post stories and updates that disappear by 5am. Capture the moment without the permanence.',
+    description: 'Post quick updates and stories that disappear by 5am — fun for the night, gone by sunrise.',
     color: '#a855f7',
   },
 ];
