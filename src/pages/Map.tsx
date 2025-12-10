@@ -1014,7 +1014,7 @@ export default function Map() {
         style={{ top: 'calc(7rem + env(safe-area-inset-top, 0px))' }}
       >
         {showSearch ? (
-          <div className="flex items-center gap-2 bg-[#2d1b4e]/90 backdrop-blur rounded-full border border-[#a855f7]/50 px-3 py-2 animate-fade-in shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+          <div className="flex items-center gap-2 bg-[#2d1b4e]/90 backdrop-blur rounded-xl border border-[#a855f7]/50 px-3 py-2 animate-fade-in shadow-[0_0_10px_rgba(168,85,247,0.1)]">
             <span className="text-sm">🔍</span>
             <input
               type="text"
@@ -1031,7 +1031,7 @@ export default function Map() {
         ) : (
           <button
             onClick={() => setShowSearch(true)}
-            className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-full px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_15px_rgba(168,85,247,0.2)]"
+            className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
             aria-label="Search venues"
           >
             <div className="flex items-center gap-2">
@@ -1079,7 +1079,7 @@ export default function Map() {
         {/* Collapsed Pill */}
         <button
           onClick={() => setShowVenueFilters(!showVenueFilters)}
-          className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-full px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_15px_rgba(168,85,247,0.2)]"
+          className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
         >
           <div className="flex items-center gap-2">
             <span className="text-sm">
@@ -1138,7 +1138,7 @@ export default function Map() {
       >
         <button
           onClick={() => setShowVenueList(!showVenueList)}
-          className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-full px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_15px_rgba(168,85,247,0.2)]"
+          className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
         >
           <div className="flex items-center gap-2">
             <span className="text-sm">📍</span>
