@@ -24,7 +24,15 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
-  const urlToOpen = event.notification.data?.url || '/';
+  const notificationType = event.notification.data?.type;
+  let urlToOpen = event.notification.data?.url || '/';
+  
+  // Handle daily nudge deep links
+  if (notificationType === 'daily_nudge_first') {
+    urlToOpen = '/?nudge=first';
+  } else if (notificationType === 'daily_nudge_second') {
+    urlToOpen = '/?nudge=second';
+  }
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })

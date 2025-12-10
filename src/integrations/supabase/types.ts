@@ -123,6 +123,39 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_nudges: {
+        Row: {
+          created_at: string | null
+          first_nudge_response: string | null
+          first_nudge_sent_at: string | null
+          id: string
+          nudge_date: string
+          second_nudge_response: string | null
+          second_nudge_sent_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          first_nudge_response?: string | null
+          first_nudge_sent_at?: string | null
+          id?: string
+          nudge_date?: string
+          second_nudge_response?: string | null
+          second_nudge_sent_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          first_nudge_response?: string | null
+          first_nudge_sent_at?: string | null
+          id?: string
+          nudge_date?: string
+          second_nudge_response?: string | null
+          second_nudge_sent_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       dm_messages: {
         Row: {
           created_at: string | null
@@ -1693,7 +1726,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "moderator" | "user"
       friendship_status_enum: "pending" | "accepted" | "blocked"
-      night_status_enum: "out" | "heading_out" | "home" | "planning"
+      night_status_enum: "out" | "heading_out" | "home" | "planning" | "off"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1823,7 +1856,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "moderator", "user"],
       friendship_status_enum: ["pending", "accepted", "blocked"],
-      night_status_enum: ["out", "heading_out", "home", "planning"],
+      night_status_enum: ["out", "heading_out", "home", "planning", "off"],
     },
   },
 } as const

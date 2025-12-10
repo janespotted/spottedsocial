@@ -15,7 +15,7 @@ interface Friend {
   id: string;
   display_name: string;
   avatar_url: string | null;
-  status: 'planning' | 'out' | 'heading_out' | 'home' | null;
+  status: 'planning' | 'out' | 'heading_out' | 'home' | 'off' | null;
   venue_name: string | null;
   planning_neighborhood: string | null;
 }
