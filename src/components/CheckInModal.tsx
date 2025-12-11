@@ -49,7 +49,9 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showVenueConfirm, setShowVenueConfirm] = useState(false);
   const [showPlanningNeighborhood, setShowPlanningNeighborhood] = useState(false);
+  const [showPlanningPrivacy, setShowPlanningPrivacy] = useState(false);
   const [planningNeighborhood, setPlanningNeighborhood] = useState<string>('');
+  const [planningVisibility, setPlanningVisibility] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('all_friends');
   const [shareOption, setShareOption] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('close_friends');
   const [detectedVenue, setDetectedVenue] = useState<string>('');
   const [customVenue, setCustomVenue] = useState<string>('');
@@ -200,9 +202,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     } else if (status === 'heading_out') {
       await captureAndDeriveVenue();
     } else if (status === 'planning') {
-      // Show neighborhood selector for planning mode
-      setPlanningNeighborhood('');
-      setShowPlanningNeighborhood(true);
+      // Show privacy selector first for planning mode
+      setShowPlanningPrivacy(true);
     } else {
       await stopLocationTracking();
       await updateStatus(status, null, null, null);
@@ -210,9 +211,16 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     }
   };
 
+  const handlePlanningPrivacyConfirm = () => {
+    setShowPlanningPrivacy(false);
+    // Show neighborhood selector after privacy is set
+    setPlanningNeighborhood('');
+    setShowPlanningNeighborhood(true);
+  };
+
   const handlePlanningConfirm = async (skipNeighborhood: boolean = false) => {
     const neighborhood = skipNeighborhood ? null : (planningNeighborhood || null);
-    await updateStatus('planning', null, null, null, null, neighborhood);
+    await updateStatus('planning', null, null, null, null, neighborhood, planningVisibility);
     setShowPlanningNeighborhood(false);
     onOpenChange(false);
   };
@@ -372,7 +380,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     lng: number | null,
     venue: string | null,
     venueId: string | null = null,
-    neighborhood: string | null = null
+    neighborhood: string | null = null,
+    visibility: 'close_friends' | 'all_friends' | 'mutual_friends' | null = null
   ) => {
     try {
       const statusData: any = {
@@ -385,6 +394,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         updated_at: new Date().toISOString(),
         expires_at: status === 'home' ? null : calculateExpiryTime(),
         planning_neighborhood: status === 'planning' ? neighborhood : null,
+        planning_visibility: status === 'planning' ? visibility : null,
       };
 
       const { error } = await supabase
@@ -442,9 +452,9 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       }
 
       const description = 
-        status === 'home' ? "You're staying in." : 
+        status === 'home' ? "You won't appear on tonight's list." : 
         status === 'out' ? `You're out at ${venue}!` : 
-        status === 'planning' ? "You're in planning mode! You can see where friends are." :
+        status === 'planning' ? "You're in planning mode — friends can see you're making plans to go out tonight." :
         `You're still deciding - heading to ${venue}!`;
 
       toast({
@@ -483,74 +493,88 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           Are You<br />Out?
         </h2>
 
-        <div className="w-full space-y-5">
+        <div className="w-full space-y-4">
           {/* Yes - Primary 3D button with gradient */}
-          <Button
-            onClick={() => handleStatusUpdate('out')}
-            size="lg"
-            className="w-full h-16 text-xl font-bold rounded-full bg-gradient-to-b from-[#e5ff4d] to-[#d4ff00] text-[#0a0118] hover:from-[#f0ff80] hover:to-[#e5ff4d] hover:scale-105 shadow-[0_0_40px_rgba(212,255,0,0.6),0_4px_0_rgba(180,220,0,1),inset_0_2px_0_rgba(255,255,255,0.3)] active:shadow-[0_0_40px_rgba(212,255,0,0.4),0_2px_0_rgba(180,220,0,1)] active:translate-y-[2px] transition-all duration-200 disabled:opacity-50"
-            disabled={isDetectingLocation}
-          >
-            {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes 🎉'}
-          </Button>
-          {/* Planning / PGing - Secondary purple button */}
-          <Button
-            onClick={() => handleStatusUpdate('planning')}
-            size="lg"
-            className="w-full h-16 text-xl font-semibold rounded-full border-[3px] border-[#a855f7]/70 bg-[#a855f7]/10 backdrop-blur-sm text-white hover:bg-[#a855f7]/20 hover:border-[#a855f7] hover:shadow-[0_0_20px_rgba(168,85,247,0.3),inset_0_1px_0_rgba(168,85,247,0.1)] hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
-            disabled={isDetectingLocation}
-          >
-            Planning to / PGing 🎯
-          </Button>
+          <div className="space-y-1">
+            <Button
+              onClick={() => handleStatusUpdate('out')}
+              size="lg"
+              className="w-full h-16 text-xl font-bold rounded-full bg-gradient-to-b from-[#e5ff4d] to-[#d4ff00] text-[#0a0118] hover:from-[#f0ff80] hover:to-[#e5ff4d] hover:scale-105 shadow-[0_0_40px_rgba(212,255,0,0.6),0_4px_0_rgba(180,220,0,1),inset_0_2px_0_rgba(255,255,255,0.3)] active:shadow-[0_0_40px_rgba(212,255,0,0.4),0_2px_0_rgba(180,220,0,1)] active:translate-y-[2px] transition-all duration-200 disabled:opacity-50"
+              disabled={isDetectingLocation}
+            >
+              {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes 🎉'}
+            </Button>
+            <p className="text-center text-sm text-white/60">Check in and show friends where you are</p>
+          </div>
+          
+          {/* Planning - Secondary purple button */}
+          <div className="space-y-1">
+            <Button
+              onClick={() => handleStatusUpdate('planning')}
+              size="lg"
+              className="w-full h-16 text-xl font-semibold rounded-full border-[3px] border-[#a855f7]/70 bg-[#a855f7]/10 backdrop-blur-sm text-white hover:bg-[#a855f7]/20 hover:border-[#a855f7] hover:shadow-[0_0_20px_rgba(168,85,247,0.3),inset_0_1px_0_rgba(168,85,247,0.1)] hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
+              disabled={isDetectingLocation}
+            >
+              Not yet, but planning on it 🎯
+            </Button>
+            <p className="text-center text-sm text-white/60">Friends will see you're going out tonight</p>
+          </div>
+          
           {/* No - Glass-morphism secondary button */}
-          <Button
-            onClick={() => handleStatusUpdate('home')}
-            variant="outline"
-            size="lg"
-            className="w-full h-16 text-xl font-semibold rounded-full border-[3px] border-white/70 bg-white/5 backdrop-blur-sm text-white hover:bg-white/15 hover:border-white hover:shadow-[0_0_20px_rgba(255,255,255,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
-            disabled={isDetectingLocation}
-          >
-            No, staying in
-          </Button>
-          {showCustomReminder ? (
-            <div className="space-y-3">
-              <Input
-                type="number"
-                value={customReminderMinutes}
-                onChange={(e) => setCustomReminderMinutes(e.target.value)}
-                placeholder="Enter minutes..."
-                className="h-14 text-lg bg-[#1a0f2e] border-2 border-white text-white placeholder:text-white/40 focus:ring-white"
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setShowCustomReminder(false)}
-                  variant="outline"
-                  className="flex-1 h-12 rounded-full border-2 border-white/40 bg-transparent text-white hover:bg-white/10"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCustomReminderSubmit}
-                  disabled={!customReminderMinutes || parseInt(customReminderMinutes, 10) <= 0}
-                  className="flex-1 h-12 rounded-full bg-[#d4ff00] text-[#2d1b4e] font-semibold hover:bg-[#d4ff00]/90"
-                >
-                  Set Reminder
-                </Button>
+          <div className="space-y-1">
+            <Button
+              onClick={() => handleStatusUpdate('home')}
+              variant="outline"
+              size="lg"
+              className="w-full h-16 text-xl font-semibold rounded-full border-[3px] border-white/70 bg-white/5 backdrop-blur-sm text-white hover:bg-white/15 hover:border-white hover:shadow-[0_0_20px_rgba(255,255,255,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
+              disabled={isDetectingLocation}
+            >
+              No, staying in 🛋️
+            </Button>
+            <p className="text-center text-sm text-white/60">You won't appear on tonight's list</p>
+          </div>
+          
+          {/* Still deciding - Reminder button */}
+          <div className="space-y-1">
+            {showCustomReminder ? (
+              <div className="space-y-3">
+                <Input
+                  type="number"
+                  value={customReminderMinutes}
+                  onChange={(e) => setCustomReminderMinutes(e.target.value)}
+                  placeholder="Enter minutes..."
+                  className="h-14 text-lg bg-[#1a0f2e] border-2 border-white text-white placeholder:text-white/40 focus:ring-white"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowCustomReminder(false)}
+                    variant="outline"
+                    className="flex-1 h-12 rounded-full border-2 border-white/40 bg-transparent text-white hover:bg-white/10"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCustomReminderSubmit}
+                    disabled={!customReminderMinutes || parseInt(customReminderMinutes, 10) <= 0}
+                    className="flex-1 h-12 rounded-full bg-[#d4ff00] text-[#2d1b4e] font-semibold hover:bg-[#d4ff00]/90"
+                  >
+                    Set Reminder
+                  </Button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className="w-full h-14 text-lg font-medium rounded-full border border-dashed border-[#a855f7]/50 bg-[#a855f7]/10 backdrop-blur-sm text-white/70 hover:bg-[#a855f7]/20 hover:text-white hover:border-[#a855f7]/70 hover:shadow-[0_0_15px_rgba(168,85,247,0.2)] hover:scale-[1.01] transition-all duration-200 disabled:opacity-50"
-                  disabled={isDetectingLocation}
-                >
-                  {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : '⏰ Still deciding...'}
-                </Button>
-              </DropdownMenuTrigger>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="lg"
+                    className="w-full h-14 text-lg font-medium rounded-full border border-dashed border-[#a855f7]/50 bg-[#a855f7]/10 backdrop-blur-sm text-white/70 hover:bg-[#a855f7]/20 hover:text-white hover:border-[#a855f7]/70 hover:shadow-[0_0_15px_rgba(168,85,247,0.2)] hover:scale-[1.01] transition-all duration-200 disabled:opacity-50"
+                    disabled={isDetectingLocation}
+                  >
+                    {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : 'Still deciding… ⏰'}
+                  </Button>
+                </DropdownMenuTrigger>
               <DropdownMenuContent 
                 className="w-72 bg-[#1a0f2e] border-2 border-white/20 rounded-xl z-[100]"
                 align="center"
@@ -598,9 +622,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                 >
                   <Edit3 className="w-4 h-4 mr-3 text-[#d4ff00]" /> Custom time...
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <p className="text-center text-sm text-white/60">We'll remind you later — nothing is shared</p>
+          </div>
 
           {/* Snooze options when reminder triggered */}
           {isReminderTriggered && (
@@ -826,17 +852,83 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     );
   };
 
+  const PlanningPrivacyContent = () => (
+    <div className="relative p-6 space-y-6">
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+      
+      <div className="space-y-2">
+        <h3 className="text-xl font-semibold text-white">Who can see you're planning to go out?</h3>
+        <div className="h-px bg-white/20" />
+      </div>
+
+      <div className="space-y-4">
+        <button
+          onClick={() => setPlanningVisibility('close_friends')}
+          className="w-full flex items-center gap-4 text-left"
+        >
+          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+            planningVisibility === 'close_friends' ? 'border-[#a855f7]' : 'border-white/40'
+          }`}>
+            {planningVisibility === 'close_friends' && (
+              <div className="w-4 h-4 rounded-full bg-[#a855f7]" />
+            )}
+          </div>
+          <span className="text-lg text-white">Close Friends 💛</span>
+        </button>
+
+        <button
+          onClick={() => setPlanningVisibility('all_friends')}
+          className="w-full flex items-center gap-4 text-left"
+        >
+          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+            planningVisibility === 'all_friends' ? 'border-[#a855f7]' : 'border-white/40'
+          }`}>
+            {planningVisibility === 'all_friends' && (
+              <div className="w-4 h-4 rounded-full bg-[#a855f7]" />
+            )}
+          </div>
+          <span className="text-lg text-white">All Friends 👫</span>
+        </button>
+
+        <button
+          onClick={() => setPlanningVisibility('mutual_friends')}
+          className="w-full flex items-center gap-4 text-left"
+        >
+          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+            planningVisibility === 'mutual_friends' ? 'border-[#a855f7]' : 'border-white/40'
+          }`}>
+            {planningVisibility === 'mutual_friends' && (
+              <div className="w-4 h-4 rounded-full bg-[#a855f7]" />
+            )}
+          </div>
+          <span className="text-lg text-white">Mutual Friends 🔗</span>
+        </button>
+      </div>
+
+      <Button
+        onClick={handlePlanningPrivacyConfirm}
+        className="w-full h-14 text-lg font-semibold rounded-full bg-[#a855f7] text-white border-2 border-[#a855f7] hover:bg-[#a855f7]/80 shadow-[0_0_20px_rgba(168,85,247,0.4)]"
+      >
+        Confirm
+      </Button>
+
+      <p className="text-center text-sm text-white/60 italic">
+        Your plan visibility resets at 5am
+      </p>
+    </div>
+  );
+
   return (
     <>
       {/* Status Modal */}
       {isMobile ? (
-        <Drawer open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood} onOpenChange={onOpenChange}>
+        <Drawer open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood && !showPlanningPrivacy} onOpenChange={onOpenChange}>
           <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-0 border-t-2 border-[#a855f7]/30 shadow-[0_-20px_60px_rgba(168,85,247,0.4)]">
             <StatusContent />
           </DrawerContent>
         </Drawer>
       ) : (
-        <Dialog open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood} onOpenChange={onOpenChange}>
+        <Dialog open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood && !showPlanningPrivacy} onOpenChange={onOpenChange}>
           <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 shadow-[0_0_80px_rgba(168,85,247,0.5),0_0_40px_rgba(139,92,246,0.4)] max-w-md p-0 overflow-hidden rounded-3xl">
             <StatusContent />
           </DialogContent>
@@ -854,6 +946,21 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
           <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden">
             <ShareLocationContent />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Planning Privacy Modal */}
+      {isMobile ? (
+        <Drawer open={showPlanningPrivacy} onOpenChange={setShowPlanningPrivacy}>
+          <DrawerContent className="bg-[#2d1b4e] border-0">
+            <PlanningPrivacyContent />
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={showPlanningPrivacy} onOpenChange={setShowPlanningPrivacy}>
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden">
+            <PlanningPrivacyContent />
           </DialogContent>
         </Dialog>
       )}

@@ -131,8 +131,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
       haptic.light();
       setIsUserPlanning(true);
       toast({
-        title: "You're thinking about going out! 🤔",
-        description: "Your friends can see you're considering plans.",
+        title: "You're in planning mode — friends can see you're making plans to go out tonight.",
       });
     } catch (error) {
       console.error('Error joining planning mode:', error);
