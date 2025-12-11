@@ -412,7 +412,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
         <div className="flex items-start gap-2">
           <div className="text-right">
             <button 
-              className="text-base font-bold text-[#d4ff00] hover:text-[#e8ff4d] cursor-pointer flex items-center gap-1.5 justify-end transition-colors"
+              className="text-base font-bold text-[#d4ff00] hover:text-[#e8ff4d] cursor-pointer flex items-center gap-1.5 justify-end transition-colors whitespace-nowrap"
               onClick={handleVenueClick}
             >
               <MapPin className="w-3.5 h-3.5 text-white/50" />
