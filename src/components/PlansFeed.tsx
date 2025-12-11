@@ -44,6 +44,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
   const [isUserPlanning, setIsUserPlanning] = useState(false);
   const [userProfile, setUserProfile] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
   const [userPlanningNeighborhood, setUserPlanningNeighborhood] = useState<string | null>(null);
+  const [userPlanningVisibility, setUserPlanningVisibility] = useState<string | null>(null);
   const demoEnabled = useDemoMode();
   const { toast } = useToast();
   const { openCheckIn } = useCheckIn();
@@ -57,7 +58,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
       const [userStatusResult, userProfileResult] = await Promise.all([
         supabase
           .from('night_statuses')
-          .select('status, planning_neighborhood')
+          .select('status, planning_neighborhood, planning_visibility')
           .eq('user_id', userId)
           .gte('expires_at', new Date().toISOString())
           .maybeSingle(),
@@ -69,6 +70,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
       const userStatus = userStatusResult.data;
       setIsUserPlanning(userStatus?.status === 'planning');
       setUserPlanningNeighborhood(userStatus?.planning_neighborhood || null);
+      setUserPlanningVisibility(userStatus?.planning_visibility || null);
       
       if (userProfileResult.data) {
         setUserProfile({
@@ -314,6 +316,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
         showJoinOption={true}
         userProfile={userProfile}
         userPlanningNeighborhood={userPlanningNeighborhood}
+        userPlanningVisibility={userPlanningVisibility}
         onChangeNeighborhood={handleChangeNeighborhood}
         onSwitchToOut={handleSwitchToOut}
         city={city || 'la'}

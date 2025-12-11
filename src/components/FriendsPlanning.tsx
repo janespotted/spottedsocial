@@ -41,10 +41,22 @@ interface FriendsPlanningProps {
   // New props for user planning row
   userProfile?: UserProfile | null;
   userPlanningNeighborhood?: string | null;
+  userPlanningVisibility?: string | null;
   onChangeNeighborhood?: (neighborhood: string) => void;
   onSwitchToOut?: () => void;
   city?: string;
 }
+
+// Helper to display user-friendly visibility labels
+const getVisibilityLabel = (visibility: string | null | undefined): string => {
+  if (!visibility) return '';
+  const labels: Record<string, string> = {
+    'close_friends': '💛 close friends',
+    'all_friends': '👫 all friends',
+    'mutual_friends': '🔗 mutual friends',
+  };
+  return labels[visibility] || visibility;
+};
 
 // Shorten neighborhood names for compact display
 const shortenNeighborhood = (neighborhood: string | null | undefined): string | null => {
@@ -75,6 +87,7 @@ export function FriendsPlanning({
   showJoinOption = false,
   userProfile,
   userPlanningNeighborhood,
+  userPlanningVisibility,
   onChangeNeighborhood,
   onSwitchToOut,
   city = 'la'
@@ -274,9 +287,15 @@ export function FriendsPlanning({
             </div>
             
             {/* "You're in planning mode — Edit" below user row */}
-            <div className="flex items-center justify-center gap-2 py-1.5">
+            <div className="flex items-center justify-center gap-2 py-1.5 flex-wrap">
               <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
               <span className="text-white/50 text-xs">You're in planning mode</span>
+              {userPlanningVisibility && (
+                <>
+                  <span className="text-white/30 text-xs">·</span>
+                  <span className="text-white/60 text-xs">{getVisibilityLabel(userPlanningVisibility)}</span>
+                </>
+              )}
               <span className="text-white/30 text-xs">—</span>
               <button
                 onClick={() => setShowEditSheet(true)}
