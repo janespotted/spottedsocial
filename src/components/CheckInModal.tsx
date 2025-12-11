@@ -556,7 +556,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               </div>
             </div>
           ) : (
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
@@ -573,10 +573,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent 
-                className="w-64 bg-[#1a0f2e]/95 backdrop-blur-xl border border-white/15 rounded-2xl z-[100] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+                className="w-64 bg-[#1a0f2e]/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
                 align="center"
-                side="top"
+                side="bottom"
                 sideOffset={8}
+                style={{ zIndex: 9999 }}
               >
                 {hasPendingReminder && (
                   <>
