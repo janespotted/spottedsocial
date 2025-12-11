@@ -386,7 +386,7 @@ export function FriendsPlanning({
             className="w-full h-[38px] bg-[#a855f7]/15 hover:bg-[#a855f7]/25 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 border border-[#a855f7]/50 shadow-[0_2px_6px_rgba(0,0,0,0.25)] transition-all px-3"
           >
             <Plus className="w-4 h-4" />
-            I'm going out too
+            I'm planning too
           </button>
         </div>
       )}
