@@ -160,8 +160,8 @@ export function FriendsPlanning({
       {/* Header with stacked avatars */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🤔</span>
-          <h3 className="text-white font-semibold text-sm">Thinking About Going Out</h3>
+          <span className="text-lg">🎯</span>
+          <h3 className="text-white font-semibold text-sm">Planning Tonight</h3>
         </div>
         
         {/* Stacked avatar preview */}
@@ -214,7 +214,7 @@ export function FriendsPlanning({
             <div className="flex-1 min-w-0">
               <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-white/50 text-xs">Planning tonight</span>
+                <span className="text-white/50 text-xs">Planning to go out</span>
                 {friend.planning_neighborhood && (
                   <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium">
                     {shortenNeighborhood(friend.planning_neighborhood)}
@@ -265,7 +265,7 @@ export function FriendsPlanning({
             <div className="flex-1 min-w-0">
               <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-white/50 text-xs">Planning tonight</span>
+                <span className="text-white/50 text-xs">Planning to go out</span>
                 {friend.planning_neighborhood && (
                   <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium">
                     {shortenNeighborhood(friend.planning_neighborhood)}
