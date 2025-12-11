@@ -1,8 +1,14 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, ChevronDown, ChevronUp, Plus, Check } from 'lucide-react';
+import { MessageCircle, ChevronDown, ChevronUp, Plus, Check, X, Pencil } from 'lucide-react';
 import { useState, CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Sheet,
   SheetContent,
@@ -222,42 +228,75 @@ export function FriendsPlanning({
       <div className="space-y-2">
         {/* User's own planning row - shown first when user is planning */}
         {isUserPlanning && userProfile && (
-          <div className="flex items-center gap-4 p-3 rounded-xl bg-white/5">
-            {/* Animated avatar with pulsing ring */}
-            <div className="relative flex-shrink-0">
-              <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
-              <Avatar className="w-10 h-10 border-2 border-[#a855f7] relative z-10">
-                <AvatarImage
-                  src={userProfile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.display_name}`}
-                />
-                <AvatarFallback className="bg-[#a855f7] text-white text-sm">
-                  {userProfile.display_name?.[0] || '?'}
-                </AvatarFallback>
-              </Avatar>
+          <>
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5">
+              {/* Animated avatar with pulsing ring */}
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
+                <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
+                  <AvatarImage
+                    src={userProfile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.display_name}`}
+                  />
+                  <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+                    {userProfile.display_name?.[0] || '?'}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-medium text-sm truncate">{userProfile.display_name}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-white/50 text-xs">Planning tonight —</span>
+                  {/* Interactive neighborhood dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 hover:bg-[#a855f7]/35 transition-colors">
+                        {shortenNeighborhood(userPlanningNeighborhood) || 'Select area'}
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      className="max-h-60 overflow-y-auto bg-[#1a0f2e] border border-[#a855f7]/30 z-50"
+                      align="start"
+                    >
+                      {neighborhoods.map((neighborhood) => (
+                        <DropdownMenuItem
+                          key={neighborhood}
+                          onClick={() => onChangeNeighborhood?.(neighborhood)}
+                          className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
+                        >
+                          {neighborhood}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-medium text-sm truncate mb-1.5">@{userProfile.display_name?.toLowerCase().replace(/\s+/g, '')}</p>
-              {/* Single tappable status pill */}
-              <button 
+            
+            {/* "You're in planning mode — Edit" below user row */}
+            <div className="flex items-center justify-center gap-2 py-1.5">
+              <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
+              <span className="text-white/50 text-xs">You're in planning mode</span>
+              <span className="text-white/30 text-xs">—</span>
+              <button
                 onClick={() => setShowEditSheet(true)}
-                className="inline-flex items-center gap-1.5 bg-[#a855f7]/15 border border-[#a855f7]/40 text-white/90 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-[#a855f7]/25 transition-colors"
+                className="text-[#a855f7] text-xs font-medium hover:text-[#c084fc] transition-colors"
               >
-                <span>🎯 Planning tonight{userPlanningNeighborhood ? ` (${shortenNeighborhood(userPlanningNeighborhood)})` : ''}</span>
-                <ChevronDown className="w-3 h-3 text-white/60" />
+                Edit
               </button>
             </div>
-          </div>
+          </>
         )}
 
         {friends.slice(0, 3).map((friend) => (
           <div
             key={friend.user_id}
-            className="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+            className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
           >
             {/* Animated avatar with pulsing ring */}
-            <div className="relative flex-shrink-0">
+            <div className="relative">
               <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
-              <Avatar className="w-10 h-10 border-2 border-[#a855f7] relative z-10">
+              <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
                 <AvatarImage
                   src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
                 />
@@ -267,10 +306,15 @@ export function FriendsPlanning({
               </Avatar>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white font-medium text-sm truncate mb-1">@{friend.display_name?.toLowerCase().replace(/\s+/g, '')}</p>
-              <span className="text-xs text-white/50">
-                🎯 Planning tonight{friend.planning_neighborhood ? ` (${shortenNeighborhood(friend.planning_neighborhood)})` : ''}
-              </span>
+              <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-white/50 text-xs">Planning to go out</span>
+                {friend.planning_neighborhood && (
+                  <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium">
+                    {shortenNeighborhood(friend.planning_neighborhood)}
+                  </span>
+                )}
+              </div>
             </div>
             <Button
               size="sm"
@@ -299,11 +343,11 @@ export function FriendsPlanning({
         {isExpanded && friends.slice(3).map((friend) => (
           <div
             key={friend.user_id}
-            className="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+            className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
           >
-            <div className="relative flex-shrink-0">
+            <div className="relative">
               <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
-              <Avatar className="w-10 h-10 border-2 border-[#a855f7] relative z-10">
+              <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
                 <AvatarImage
                   src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
                 />
@@ -313,10 +357,15 @@ export function FriendsPlanning({
               </Avatar>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white font-medium text-sm truncate mb-1">@{friend.display_name?.toLowerCase().replace(/\s+/g, '')}</p>
-              <span className="text-xs text-white/50">
-                🎯 Planning tonight{friend.planning_neighborhood ? ` (${shortenNeighborhood(friend.planning_neighborhood)})` : ''}
-              </span>
+              <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-white/50 text-xs">Planning to go out</span>
+                {friend.planning_neighborhood && (
+                  <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium">
+                    {shortenNeighborhood(friend.planning_neighborhood)}
+                  </span>
+                )}
+              </div>
             </div>
             <Button
               size="sm"
@@ -342,75 +391,31 @@ export function FriendsPlanning({
         </div>
       )}
 
-      {/* Unified Status + Neighborhood Sheet */}
+      {/* Edit Status Sheet */}
       <Sheet open={showEditSheet} onOpenChange={setShowEditSheet}>
-        <SheetContent side="bottom" className="bg-[#1a0f2e] border-t border-[#a855f7]/30 rounded-t-3xl max-h-[80vh]">
-          <SheetHeader className="pb-6">
-            <SheetTitle className="text-white text-center text-lg font-semibold">Update Status</SheetTitle>
+        <SheetContent side="bottom" className="bg-[#1a0f2e] border-t border-[#a855f7]/30 rounded-t-3xl">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="text-white text-center">Switch Status</SheetTitle>
           </SheetHeader>
-          
-          <div className="space-y-6 pb-8 overflow-y-auto">
-            {/* Night Status Section */}
-            <div className="space-y-2">
-              <p className="text-white/50 text-xs font-medium uppercase tracking-wide px-1 mb-3">Night Status</p>
-              
-              {/* Going out option */}
-              <button
-                onClick={() => {
-                  setShowEditSheet(false);
-                  onSwitchToOut?.();
-                }}
-                className="flex items-center justify-between w-full p-4 rounded-xl bg-white/5 border border-transparent hover:bg-white/10 transition-colors"
-              >
-                <span className="text-white text-sm font-medium">Going out 🎉</span>
-                <div className="w-5 h-5 rounded-full border-2 border-white/30" />
-              </button>
-              
-              {/* Planning option (selected) */}
-              <div className="flex items-center justify-between w-full p-4 rounded-xl bg-[#a855f7]/20 border border-[#a855f7]/50">
-                <span className="text-white text-sm font-medium">Planning 🎯</span>
-                <div className="w-5 h-5 rounded-full bg-[#a855f7] flex items-center justify-center">
-                  <Check className="w-3 h-3 text-white" />
-                </div>
-              </div>
-              
-              {/* Not going out option */}
-              <button
-                onClick={() => {
-                  setShowEditSheet(false);
-                  onLeavePlanning?.();
-                }}
-                className="flex items-center justify-between w-full p-4 rounded-xl bg-white/5 border border-transparent hover:bg-white/10 transition-colors"
-              >
-                <span className="text-white text-sm font-medium">Not going out anymore</span>
-                <div className="w-5 h-5 rounded-full border-2 border-white/30" />
-              </button>
-            </div>
-            
-            {/* Divider */}
-            <div className="h-px bg-white/10" />
-            
-            {/* Neighborhood Section */}
-            <div className="space-y-2">
-              <p className="text-white/50 text-xs font-medium uppercase tracking-wide px-1 mb-3">Neighborhood</p>
-              
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {neighborhoods.map((neighborhood) => (
-                  <button
-                    key={neighborhood}
-                    onClick={() => {
-                      onChangeNeighborhood?.(neighborhood);
-                    }}
-                    className="flex items-center justify-between w-full py-3 px-4 text-white/80 hover:bg-white/5 rounded-lg transition-colors"
-                  >
-                    <span className="text-sm">{neighborhood}</span>
-                    {userPlanningNeighborhood === neighborhood && (
-                      <Check className="w-4 h-4 text-[#a855f7]" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
+          <div className="space-y-3 pb-6">
+            <button
+              onClick={() => {
+                setShowEditSheet(false);
+                onSwitchToOut?.();
+              }}
+              className="w-full h-12 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all"
+            >
+              I'm out 🎉
+            </button>
+            <button
+              onClick={() => {
+                setShowEditSheet(false);
+                onLeavePlanning?.();
+              }}
+              className="w-full h-12 bg-white/5 hover:bg-white/10 text-white/80 text-sm font-medium rounded-xl flex items-center justify-center border border-white/10 transition-all"
+            >
+              No longer going out
+            </button>
           </div>
         </SheetContent>
       </Sheet>
