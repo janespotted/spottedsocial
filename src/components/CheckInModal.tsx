@@ -40,7 +40,7 @@ interface CheckInModalProps {
 
 export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const { user } = useAuth();
-  const { isReminderTriggered } = useCheckIn();
+  const { isReminderTriggered, showOutConfirmation, showPlanningConfirmation } = useCheckIn();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { city } = useUserCity();
@@ -224,6 +224,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     await updateStatus('planning', null, null, null, null, neighborhood, planningVisibility);
     setShowPlanningNeighborhood(false);
     onOpenChange(false);
+    // Show planning confirmation card
+    showPlanningConfirmation(neighborhood, planningVisibility);
   };
 
   const handleSetReminder = async (minutes: number) => {
@@ -357,10 +359,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         await updateStatus('out', locationData.lat, locationData.lng, finalVenueName, finalVenueId);
         onOpenChange(false);
 
-        toast({
-          title: 'Location sharing enabled',
-          description: `You're out at ${finalVenueName}!`,
-        });
+        // Show celebration confirmation card instead of toast
+        showOutConfirmation(finalVenueName, shareOption);
       } catch (error) {
         console.error('Error updating location sharing:', error);
         toast({
@@ -452,16 +452,17 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         }
       }
 
-      const description = 
-        status === 'home' ? "You won't appear on tonight's list." : 
-        status === 'out' ? `You're out at ${venue}!` : 
-        status === 'planning' ? "You're in planning mode — friends can see you're making plans to go out tonight." :
-        `You're still deciding - heading to ${venue}!`;
+      // Only show toast for statuses that don't have confirmation cards
+      if (status !== 'out' && status !== 'planning') {
+        const description = 
+          status === 'home' ? "You won't appear on tonight's list." : 
+          `You're still deciding - heading to ${venue}!`;
 
-      toast({
-        title: 'Status updated!',
-        description,
-      });
+        toast({
+          title: 'Status updated!',
+          description,
+        });
+      }
     } catch (error: any) {
       toast({
         variant: 'destructive',

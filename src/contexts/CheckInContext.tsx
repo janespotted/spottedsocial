@@ -19,6 +19,15 @@ interface CheckInContextType {
   showVenueArrival: () => void;
   hideVenueArrival: () => void;
   setDetectedVenue: (venue: DetectedVenue | null) => void;
+  // Check-in confirmation state
+  showCheckInConfirmation: boolean;
+  checkInConfirmationType: 'out' | 'planning' | null;
+  checkInVenueName: string | null;
+  checkInNeighborhood: string | null;
+  checkInPrivacyLevel: string | null;
+  showOutConfirmation: (venueName: string, privacyLevel: string) => void;
+  showPlanningConfirmation: (neighborhood: string | null, privacyLevel: string) => void;
+  closeCheckInConfirmation: () => void;
 }
 
 const CheckInContext = createContext<CheckInContextType | undefined>(undefined);
@@ -28,6 +37,13 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
   const [isReminderTriggered, setIsReminderTriggered] = useState(false);
   const [showVenueArrivalPrompt, setShowVenueArrivalPrompt] = useState(false);
   const [detectedVenue, setDetectedVenue] = useState<DetectedVenue | null>(null);
+  
+  // Check-in confirmation state
+  const [showCheckInConfirmation, setShowCheckInConfirmation] = useState(false);
+  const [checkInConfirmationType, setCheckInConfirmationType] = useState<'out' | 'planning' | null>(null);
+  const [checkInVenueName, setCheckInVenueName] = useState<string | null>(null);
+  const [checkInNeighborhood, setCheckInNeighborhood] = useState<string | null>(null);
+  const [checkInPrivacyLevel, setCheckInPrivacyLevel] = useState<string | null>(null);
 
   const openCheckIn = () => {
     setIsReminderTriggered(false);
@@ -50,6 +66,30 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
     setDetectedVenue(null);
   };
 
+  const showOutConfirmation = (venueName: string, privacyLevel: string) => {
+    setCheckInConfirmationType('out');
+    setCheckInVenueName(venueName);
+    setCheckInNeighborhood(null);
+    setCheckInPrivacyLevel(privacyLevel);
+    setShowCheckInConfirmation(true);
+  };
+
+  const showPlanningConfirmation = (neighborhood: string | null, privacyLevel: string) => {
+    setCheckInConfirmationType('planning');
+    setCheckInVenueName(null);
+    setCheckInNeighborhood(neighborhood);
+    setCheckInPrivacyLevel(privacyLevel);
+    setShowCheckInConfirmation(true);
+  };
+
+  const closeCheckInConfirmation = () => {
+    setShowCheckInConfirmation(false);
+    setCheckInConfirmationType(null);
+    setCheckInVenueName(null);
+    setCheckInNeighborhood(null);
+    setCheckInPrivacyLevel(null);
+  };
+
   return (
     <CheckInContext.Provider value={{ 
       showCheckIn, 
@@ -62,6 +102,14 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       showVenueArrival,
       hideVenueArrival,
       setDetectedVenue,
+      showCheckInConfirmation,
+      checkInConfirmationType,
+      checkInVenueName,
+      checkInNeighborhood,
+      checkInPrivacyLevel,
+      showOutConfirmation,
+      showPlanningConfirmation,
+      closeCheckInConfirmation,
     }}>
       {children}
     </CheckInContext.Provider>

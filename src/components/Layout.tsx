@@ -2,6 +2,7 @@ import { ReactNode, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { BottomNav } from './BottomNav';
 import { CheckInModal } from './CheckInModal';
+import { CheckInConfirmation } from './CheckInConfirmation';
 import { OnboardingCarousel } from './OnboardingCarousel';
 import { OfflineBanner } from './OfflineBanner';
 import { useCheckIn } from '@/contexts/CheckInContext';
@@ -75,6 +76,7 @@ export function Layout({ children }: LayoutProps) {
       </main>
       <BottomNav />
       <CheckInModal open={showCheckIn} onOpenChange={closeCheckIn} />
+      <CheckInConfirmation />
     </div>
   );
 }
