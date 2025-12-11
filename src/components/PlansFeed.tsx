@@ -9,6 +9,8 @@ import { useDemoMode } from '@/hooks/useDemoMode';
 import { FriendsPlanning } from './FriendsPlanning';
 import { useToast } from '@/hooks/use-toast';
 import { haptic } from '@/lib/haptics';
+import { useCheckIn } from '@/contexts/CheckInContext';
+import { useUserCity } from '@/hooks/useUserCity';
 
 interface Plan {
   id: string;
@@ -40,22 +42,40 @@ export function PlansFeed({ userId }: PlansFeedProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
   const [isUserPlanning, setIsUserPlanning] = useState(false);
+  const [userProfile, setUserProfile] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
+  const [userPlanningNeighborhood, setUserPlanningNeighborhood] = useState<string | null>(null);
   const demoEnabled = useDemoMode();
   const { toast } = useToast();
+  const { openCheckIn } = useCheckIn();
+  const { city } = useUserCity();
 
   const fetchPlanningFriends = async () => {
     if (!userId) return;
     
     try {
-      // Check if current user is planning
-      const { data: userStatus } = await supabase
-        .from('night_statuses')
-        .select('status')
-        .eq('user_id', userId)
-        .gte('expires_at', new Date().toISOString())
-        .maybeSingle();
+      // Fetch user profile and status in parallel
+      const [userStatusResult, userProfileResult] = await Promise.all([
+        supabase
+          .from('night_statuses')
+          .select('status, planning_neighborhood')
+          .eq('user_id', userId)
+          .gte('expires_at', new Date().toISOString())
+          .maybeSingle(),
+        supabase
+          .rpc('get_profile_safe', { target_user_id: userId })
+          .maybeSingle()
+      ]);
       
+      const userStatus = userStatusResult.data;
       setIsUserPlanning(userStatus?.status === 'planning');
+      setUserPlanningNeighborhood(userStatus?.planning_neighborhood || null);
+      
+      if (userProfileResult.data) {
+        setUserProfile({
+          display_name: userProfileResult.data.display_name,
+          avatar_url: userProfileResult.data.avatar_url
+        });
+      }
 
       // Get user's friends
       const { data: friendships } = await supabase
@@ -103,6 +123,36 @@ export function PlansFeed({ userId }: PlansFeedProps) {
     } catch (error) {
       console.error('Error fetching planning friends:', error);
     }
+  };
+
+  const handleChangeNeighborhood = async (neighborhood: string) => {
+    if (!userId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('night_statuses')
+        .update({
+          planning_neighborhood: neighborhood,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      haptic.light();
+      setUserPlanningNeighborhood(neighborhood);
+    } catch (error) {
+      console.error('Error changing neighborhood:', error);
+      toast({
+        title: "Something went wrong",
+        description: "Couldn't update your neighborhood. Try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSwitchToOut = () => {
+    openCheckIn();
   };
 
   const handleJoinPlanning = async () => {
@@ -262,6 +312,11 @@ export function PlansFeed({ userId }: PlansFeedProps) {
         onJoinPlanning={handleJoinPlanning}
         onLeavePlanning={handleLeavePlanning}
         showJoinOption={true}
+        userProfile={userProfile}
+        userPlanningNeighborhood={userPlanningNeighborhood}
+        onChangeNeighborhood={handleChangeNeighborhood}
+        onSwitchToOut={handleSwitchToOut}
+        city={city || 'la'}
       />
       {/* Subtle separator */}
       <div className="h-px bg-white/10" />

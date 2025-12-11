@@ -1,14 +1,32 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, ChevronDown, ChevronUp, Plus, Check, X } from 'lucide-react';
+import { MessageCircle, ChevronDown, ChevronUp, Plus, Check, X, Pencil } from 'lucide-react';
 import { useState, CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
 
 interface PlanningFriend {
   user_id: string;
   display_name: string;
   avatar_url: string | null;
   planning_neighborhood?: string | null;
+}
+
+interface UserProfile {
+  display_name: string;
+  avatar_url: string | null;
 }
 
 interface FriendsPlanningProps {
@@ -20,6 +38,12 @@ interface FriendsPlanningProps {
   onJoinPlanning?: () => void;
   onLeavePlanning?: () => void;
   showJoinOption?: boolean;
+  // New props for user planning row
+  userProfile?: UserProfile | null;
+  userPlanningNeighborhood?: string | null;
+  onChangeNeighborhood?: (neighborhood: string) => void;
+  onSwitchToOut?: () => void;
+  city?: string;
 }
 
 // Shorten neighborhood names for compact display
@@ -48,10 +72,18 @@ export function FriendsPlanning({
   isUserPlanning = false,
   onJoinPlanning,
   onLeavePlanning,
-  showJoinOption = false
+  showJoinOption = false,
+  userProfile,
+  userPlanningNeighborhood,
+  onChangeNeighborhood,
+  onSwitchToOut,
+  city = 'la'
 }: FriendsPlanningProps) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showEditSheet, setShowEditSheet] = useState(false);
+
+  const neighborhoods = CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS['la'];
 
   const handleReachOut = (friend: PlanningFriend) => {
     navigate('/messages', { 
@@ -194,6 +226,68 @@ export function FriendsPlanning({
       )}
       
       <div className="space-y-2">
+        {/* User's own planning row - shown first when user is planning */}
+        {isUserPlanning && userProfile && (
+          <>
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5">
+              {/* Animated avatar with pulsing ring */}
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
+                <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
+                  <AvatarImage
+                    src={userProfile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.display_name}`}
+                  />
+                  <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+                    {userProfile.display_name?.[0] || '?'}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-medium text-sm truncate">{userProfile.display_name}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-white/50 text-xs">Planning tonight —</span>
+                  {/* Interactive neighborhood dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 hover:bg-[#a855f7]/35 transition-colors">
+                        {shortenNeighborhood(userPlanningNeighborhood) || 'Select area'}
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      className="max-h-60 overflow-y-auto bg-[#1a0f2e] border border-[#a855f7]/30 z-50"
+                      align="start"
+                    >
+                      {neighborhoods.map((neighborhood) => (
+                        <DropdownMenuItem
+                          key={neighborhood}
+                          onClick={() => onChangeNeighborhood?.(neighborhood)}
+                          className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
+                        >
+                          {neighborhood}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </div>
+            
+            {/* "You're in planning mode — Edit" below user row */}
+            <div className="flex items-center justify-center gap-2 py-1.5">
+              <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
+              <span className="text-white/50 text-xs">You're in planning mode</span>
+              <span className="text-white/30 text-xs">—</span>
+              <button
+                onClick={() => setShowEditSheet(true)}
+                className="text-[#a855f7] text-xs font-medium hover:text-[#c084fc] transition-colors"
+              >
+                Edit
+              </button>
+            </div>
+          </>
+        )}
+
         {friends.slice(0, 3).map((friend) => (
           <div
             key={friend.user_id}
@@ -284,29 +378,47 @@ export function FriendsPlanning({
         ))}
       </div>
       
-      {/* Bottom CTA - Join Planning */}
-      {showJoinOption && (
+      {/* Bottom CTA - Join Planning (only when NOT already planning) */}
+      {showJoinOption && !isUserPlanning && (
         <div className="mt-5 pt-4 border-t border-white/10">
-          {isUserPlanning ? (
-            <button
-              onClick={onLeavePlanning}
-              className="w-full h-[38px] bg-[#d4ff00]/10 hover:bg-[#d4ff00]/20 text-[#d4ff00] text-sm font-medium rounded-xl flex items-center justify-center gap-2 border border-[#d4ff00]/30 shadow-[0_2px_6px_rgba(0,0,0,0.25)] transition-all px-3"
-            >
-              <Check className="w-4 h-4" />
-              <span>You're in planning mode</span>
-              <X className="w-3 h-3 ml-1 opacity-60" />
-            </button>
-          ) : (
-            <button
-              onClick={onJoinPlanning}
-              className="w-full h-[38px] bg-[#a855f7]/15 hover:bg-[#a855f7]/25 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 border border-[#a855f7]/50 shadow-[0_2px_6px_rgba(0,0,0,0.25)] transition-all px-3"
-            >
-              <Plus className="w-4 h-4" />
-              I'm going out too
-            </button>
-          )}
+          <button
+            onClick={onJoinPlanning}
+            className="w-full h-[38px] bg-[#a855f7]/15 hover:bg-[#a855f7]/25 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 border border-[#a855f7]/50 shadow-[0_2px_6px_rgba(0,0,0,0.25)] transition-all px-3"
+          >
+            <Plus className="w-4 h-4" />
+            I'm going out too
+          </button>
         </div>
       )}
+
+      {/* Edit Status Sheet */}
+      <Sheet open={showEditSheet} onOpenChange={setShowEditSheet}>
+        <SheetContent side="bottom" className="bg-[#1a0f2e] border-t border-[#a855f7]/30 rounded-t-3xl">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="text-white text-center">Switch Status</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-3 pb-6">
+            <button
+              onClick={() => {
+                setShowEditSheet(false);
+                onSwitchToOut?.();
+              }}
+              className="w-full h-12 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all"
+            >
+              I'm out 🎉
+            </button>
+            <button
+              onClick={() => {
+                setShowEditSheet(false);
+                onLeavePlanning?.();
+              }}
+              className="w-full h-12 bg-white/5 hover:bg-white/10 text-white/80 text-sm font-medium rounded-xl flex items-center justify-center border border-white/10 transition-all"
+            >
+              No longer going out
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
