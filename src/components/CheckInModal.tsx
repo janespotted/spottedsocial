@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
+import { getTimeGreeting } from '@/lib/time-context';
 import { haptic } from '@/lib/haptics';
 import { requestNotificationPermission } from '@/lib/notifications';
 import { logEvent } from '@/lib/event-logger';
@@ -487,7 +488,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center w-full">
         <h2 className="text-4xl font-semibold text-[#d4ff00] text-center mb-12 tracking-wide drop-shadow-[0_0_15px_rgba(212,255,0,0.3)]">
-          Are You Out?
+          {getTimeGreeting()}
         </h2>
 
         <div className="w-full space-y-6">

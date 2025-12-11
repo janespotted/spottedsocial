@@ -62,9 +62,9 @@ Deno.serve(async (req) => {
 
     const { nudge_type } = await req.json();
     
-    if (!nudge_type || !['first', 'second'].includes(nudge_type)) {
+    if (!nudge_type || !['first', 'second', 'day'].includes(nudge_type)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid nudge_type. Must be "first" or "second"' }),
+        JSON.stringify({ error: 'Invalid nudge_type. Must be "first", "second", or "day"' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -113,6 +113,12 @@ Deno.serve(async (req) => {
     for (const profile of profiles) {
       const existingNudge = nudgeMap.get(profile.id);
       
+      // Day nudge: skip if already responded to first nudge today
+      if (nudge_type === 'day' && existingNudge?.first_nudge_response) {
+        console.log(`Skipping ${profile.id} - already responded to first nudge`);
+        continue;
+      }
+      
       // First nudge: skip if already responded
       if (nudge_type === 'first' && existingNudge?.first_nudge_response) {
         console.log(`Skipping ${profile.id} - already responded to first nudge`);
@@ -135,18 +141,33 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Prepare notification payload
-      const payload = {
-        title: nudge_type === 'first' 
-          ? 'Are you going out tonight? 👀' 
-          : 'Still going out tonight? ✨',
-        body: nudge_type === 'first'
-          ? 'Let your friends know if you\'re planning something'
-          : 'Your friends are waiting to hear from you',
-        url: `/?nudge=${nudge_type}`,
-        tag: `daily-nudge-${nudge_type}-${today}`,
-        type: `daily_nudge_${nudge_type}`,
-      };
+      // Prepare notification payload based on nudge type
+      let payload;
+      if (nudge_type === 'day') {
+        payload = {
+          title: 'Anyone doing something today? 🌞',
+          body: 'It\'s a beautiful day for a day party',
+          url: `/?nudge=day`,
+          tag: `daily-nudge-day-${today}`,
+          type: 'daily_nudge_day',
+        };
+      } else if (nudge_type === 'first') {
+        payload = {
+          title: 'Are you going out tonight? 👀',
+          body: 'Let your friends know if you\'re planning something',
+          url: `/?nudge=first`,
+          tag: `daily-nudge-first-${today}`,
+          type: 'daily_nudge_first',
+        };
+      } else {
+        payload = {
+          title: 'Still going out tonight? ✨',
+          body: 'Your friends are waiting to hear from you',
+          url: `/?nudge=second`,
+          tag: `daily-nudge-second-${today}`,
+          type: 'daily_nudge_second',
+        };
+      }
 
       try {
         const subscription = profile.push_subscription as PushSubscription;
@@ -155,11 +176,11 @@ Deno.serve(async (req) => {
         if (success) {
           sentCount++;
           
-          // Record that we sent the nudge
+          // Record that we sent the nudge (day nudge counts as first nudge sent)
           await supabase.from('daily_nudges').upsert({
             user_id: profile.id,
             nudge_date: today,
-            ...(nudge_type === 'first' 
+            ...(nudge_type === 'day' || nudge_type === 'first' 
               ? { first_nudge_sent_at: new Date().toISOString() }
               : { second_nudge_sent_at: new Date().toISOString() }
             ),

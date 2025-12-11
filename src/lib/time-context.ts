@@ -1,6 +1,7 @@
 /**
  * Time context utilities for nightlife app
  * All ephemeral content expires at 5am local time
+ * Supports both nightlife and day parties (brunch, day drinking, day clubs)
  */
 
 /**
@@ -25,23 +26,24 @@ export function isFromTonight(timestamp: string | Date | null): boolean {
 }
 
 /**
- * Check if current time is during nightlife hours
- * Nightlife hours: 5pm (17:00) to 5am (05:00)
+ * Check if current time is during active hours
+ * Active hours: 11am to 5am (supports day parties + nightlife)
  */
 export function isNightlifeHours(): boolean {
   const hour = new Date().getHours();
-  return hour >= 17 || hour < 5;
+  return hour >= 11 || hour < 5; // 11am to 5am
 }
 
 /**
  * Get the current time context for the app
  */
-export function getNightContext(): 'daytime' | 'early-evening' | 'prime-time' | 'late-night' {
+export function getNightContext(): 'morning' | 'afternoon' | 'early-evening' | 'prime-time' | 'late-night' {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 17) return 'daytime';
-  if (hour >= 17 && hour < 21) return 'early-evening';
-  if (hour >= 21 || hour < 2) return 'prime-time';
-  return 'late-night'; // 2am - 5am
+  if (hour >= 5 && hour < 11) return 'morning';        // 5am-11am (not active)
+  if (hour >= 11 && hour < 15) return 'afternoon';     // 11am-3pm (day party hours)
+  if (hour >= 15 && hour < 19) return 'early-evening'; // 3pm-7pm
+  if (hour >= 19 || hour < 2) return 'prime-time';     // 7pm-2am
+  return 'late-night'; // 2am-5am
 }
 
 /**
@@ -50,12 +52,14 @@ export function getNightContext(): 'daytime' | 'early-evening' | 'prime-time' | 
 export function getTimeGreeting(): string {
   const context = getNightContext();
   switch (context) {
-    case 'daytime':
-      return 'Planning tonight?';
+    case 'morning':
+      return 'Planning to go out later?';
+    case 'afternoon':
+      return 'Going out today?';        // Day party friendly
     case 'early-evening':
-      return 'Where are you heading?';
+      return 'Heading out today?';      // Transitional
     case 'prime-time':
-      return 'Are you out?';
+      return 'Going out tonight?';      // Nightlife
     case 'late-night':
       return 'Still out?';
   }

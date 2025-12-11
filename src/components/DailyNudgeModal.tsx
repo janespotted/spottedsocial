@@ -10,7 +10,15 @@ import { haptic } from '@/lib/haptics';
 interface DailyNudgeModalProps {
   open: boolean;
   onClose: () => void;
-  nudgeType: 'first' | 'second';
+  nudgeType: 'first' | 'second' | 'day';
+}
+
+// Get time-aware title for first nudge
+function getFirstNudgeTitle(): string {
+  const hour = new Date().getHours();
+  if (hour < 15) return 'Planning to go out today?';
+  if (hour < 19) return 'Heading out today?';
+  return 'Are you going out tonight?';
 }
 
 export function DailyNudgeModal({ open, onClose, nudgeType }: DailyNudgeModalProps) {
@@ -105,18 +113,46 @@ export function DailyNudgeModal({ open, onClose, nudgeType }: DailyNudgeModalPro
           {/* Header */}
           <div className="space-y-2">
             <span className="text-4xl">
-              {nudgeType === 'first' ? '👀' : '✨'}
+              {nudgeType === 'day' ? '🌞' : nudgeType === 'first' ? '👀' : '✨'}
             </span>
             <h2 className="text-xl font-semibold text-white">
-              {nudgeType === 'first' 
-                ? 'Are you planning on going out later?' 
-                : 'Still going out tonight?'}
+              {nudgeType === 'day' 
+                ? 'Anyone doing something today?' 
+                : nudgeType === 'first' 
+                  ? getFirstNudgeTitle()
+                  : 'Still going out tonight?'}
             </h2>
           </div>
 
           {/* Buttons */}
           <div className="w-full space-y-3">
-            {nudgeType === 'first' ? (
+            {nudgeType === 'day' ? (
+              <>
+                <Button
+                  onClick={() => handleResponse('going_out')}
+                  disabled={loading}
+                  className="w-full h-14 text-lg font-semibold bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-2xl shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+                >
+                  Going out today 🌞
+                </Button>
+                <Button
+                  onClick={() => handleResponse('maybe')}
+                  disabled={loading}
+                  variant="outline"
+                  className="w-full h-14 text-lg font-semibold border-[#a855f7]/50 text-white hover:bg-[#a855f7]/20 rounded-2xl"
+                >
+                  Maybe later 🤔
+                </Button>
+                <Button
+                  onClick={() => handleResponse('staying_in')}
+                  disabled={loading}
+                  variant="ghost"
+                  className="w-full h-12 text-base text-white/60 hover:text-white hover:bg-white/5 rounded-2xl"
+                >
+                  Not today
+                </Button>
+              </>
+            ) : nudgeType === 'first' ? (
               <>
                 <Button
                   onClick={() => handleResponse('going_out')}
