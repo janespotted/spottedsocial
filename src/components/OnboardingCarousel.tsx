@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MapPin, Users, Sparkles, Camera, ChevronRight, X } from 'lucide-react';
+import { FindFriendsOnboarding } from '@/components/FindFriendsOnboarding';
 
 interface OnboardingCarouselProps {
   onComplete: () => void;
@@ -35,18 +36,35 @@ const slides = [
 
 export function OnboardingCarousel({ onComplete }: OnboardingCarouselProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [showFindFriends, setShowFindFriends] = useState(false);
 
   const handleNext = () => {
     if (currentSlide < slides.length - 1) {
       setCurrentSlide(prev => prev + 1);
     } else {
-      onComplete();
+      // Show Find Friends step after last carousel slide
+      setShowFindFriends(true);
     }
   };
 
   const handleSkip = () => {
-    onComplete();
+    // Skip to Find Friends step (or complete if already there)
+    if (!showFindFriends) {
+      setShowFindFriends(true);
+    } else {
+      onComplete();
+    }
   };
+
+  // Show Find Friends onboarding after carousel
+  if (showFindFriends) {
+    return (
+      <FindFriendsOnboarding 
+        onComplete={onComplete} 
+        onSkip={onComplete}
+      />
+    );
+  }
 
   const slide = slides[currentSlide];
   const Icon = slide.icon;

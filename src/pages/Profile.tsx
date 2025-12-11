@@ -7,8 +7,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target } from 'lucide-react';
+import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode } from 'lucide-react';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
+import { QRCodeModal } from '@/components/QRCodeModal';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
@@ -50,6 +51,8 @@ export default function Profile() {
   const [currentVenue, setCurrentVenue] = useState<string | null>(null);
   const [planningNeighborhood, setPlanningNeighborhood] = useState<string | null>(null);
   const [venueNeighborhood, setVenueNeighborhood] = useState<string | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
   
   // Triple-tap secret access to demo settings
   const tapCountRef = useRef(0);
@@ -79,8 +82,25 @@ export default function Profile() {
   useEffect(() => {
     if (user) {
       fetchProfileData();
+      fetchInviteCode();
     }
   }, [user]);
+
+  const fetchInviteCode = async () => {
+    const { data } = await supabase
+      .from('invite_codes')
+      .select('code')
+      .eq('user_id', user?.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (data) {
+      setInviteCode(data.code);
+    }
+  };
+
+  const getInviteUrl = () => `${window.location.origin}/invite/${inviteCode}`;
 
   // Realtime subscription for night_statuses changes
   useEffect(() => {
@@ -410,6 +430,25 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* Quick Action Buttons - Prominent placement */}
+        <div className="flex gap-2">
+          <Button
+            onClick={() => navigate('/friends')}
+            className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Invite Friends
+          </Button>
+          {inviteCode && (
+            <Button
+              onClick={() => setShowQRModal(true)}
+              variant="outline"
+              className="border-[#a855f7]/40 text-white hover:bg-[#a855f7]/20 rounded-full"
+            >
+              <QrCode className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
         {/* Buttons */}
         <div className="flex gap-3">
           <Button
@@ -620,6 +659,15 @@ export default function Profile() {
           Log Out
         </Button>
       </div>
+
+      {/* QR Code Modal */}
+      {inviteCode && (
+        <QRCodeModal
+          open={showQRModal}
+          onOpenChange={setShowQRModal}
+          inviteUrl={getInviteUrl()}
+        />
+      )}
     </div>
   );
 }

@@ -35,6 +35,7 @@ import { FeedSkeleton } from '@/components/FeedSkeleton';
 import { FriendsPlanning } from '@/components/FriendsPlanning';
 import { PlansFeed } from '@/components/PlansFeed';
 import { DailyNudgeModal } from '@/components/DailyNudgeModal';
+import { NoFriendsBanner } from '@/components/NoFriendsBanner';
 import { isNightlifeHours } from '@/lib/time-context';
 
 export default function Home() {
@@ -352,6 +353,9 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* No Friends Banner */}
+      <NoFriendsBanner friendsCount={friends.length} />
 
       {/* Feed Content */}
       {feedMode === 'plans' ? (
