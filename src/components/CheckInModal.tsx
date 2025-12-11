@@ -45,7 +45,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const isMobile = useIsMobile();
   const { city } = useUserCity();
   const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home' | 'planning'>('home');
-  const [tappedButton, setTappedButton] = useState<'out' | 'planning' | 'home' | 'deciding' | null>(null);
+  
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showVenueConfirm, setShowVenueConfirm] = useState(false);
@@ -485,52 +485,49 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center w-full">
-        <h2 className="text-3xl font-bold text-[#d4ff00] text-center mb-10 drop-shadow-[0_0_15px_rgba(212,255,0,0.3)]">
+        <h2 className="text-2xl font-semibold text-[#d4ff00] text-center mb-12 tracking-wide drop-shadow-[0_0_12px_rgba(212,255,0,0.25)]">
           Are You Out?
         </h2>
 
-        <div className="w-full space-y-5">
-          {/* Yes - Primary yellow button */}
+        <div className="w-full space-y-6">
+          {/* Yes - Primary yellow button with refined styling */}
           <Button
             onClick={() => {
-              setTappedButton('out');
               handleStatusUpdate('out');
             }}
             size="lg"
-            className="w-full h-14 text-lg font-bold rounded-2xl bg-gradient-to-b from-[#e5ff4d] to-[#d4ff00] text-[#0a0118] hover:from-[#f0ff80] hover:to-[#e5ff4d] shadow-[0_0_25px_rgba(212,255,0,0.4),0_3px_0_rgba(180,220,0,1)] active:translate-y-[1px] transition-all duration-200 disabled:opacity-50"
+            className="w-full h-14 text-lg font-semibold rounded-2xl bg-gradient-to-b from-[#f0ff80] via-[#e5ff4d] to-[#d4ff00] text-[#0a0118] hover:from-[#f5ffb3] hover:via-[#f0ff80] hover:to-[#e5ff4d] shadow-[0_0_20px_rgba(212,255,0,0.3)] hover:shadow-[0_0_25px_rgba(212,255,0,0.45)] transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
             {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes 🎉'}
           </Button>
           
-          {/* Planning - Secondary solid purple button */}
+          {/* Planning - Secondary purple button with gradient */}
           <Button
             onClick={() => {
-              setTappedButton('planning');
               handleStatusUpdate('planning');
             }}
             size="lg"
-            className="w-full h-14 text-lg font-medium rounded-2xl bg-[#a855f7] text-white hover:bg-[#9333ea] transition-all duration-200 disabled:opacity-50"
+            className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#a855f7] to-[#9333ea] text-white border border-[#a855f7]/40 hover:from-[#b668f8] hover:to-[#a855f7] hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
             Not yet, but planning on it 🎯
           </Button>
           
-          {/* No - Tertiary outline button */}
+          {/* No - Tertiary glass button */}
           <Button
             onClick={() => {
-              setTappedButton('home');
               handleStatusUpdate('home');
             }}
-            variant="outline"
+            variant="ghost"
             size="lg"
-            className="w-full h-14 text-lg font-medium rounded-2xl border border-white/20 bg-transparent text-white/70 hover:bg-white/5 hover:text-white transition-all duration-200 disabled:opacity-50"
+            className="w-full h-14 text-lg font-medium rounded-2xl bg-white/5 backdrop-blur-sm border border-white/15 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/25 transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
             No, staying in 🛋️
           </Button>
           
-          {/* Still deciding - Tertiary outline button with dropdown */}
+          {/* Still deciding - Glass button with dropdown */}
           {showCustomReminder ? (
             <div className="space-y-3">
               <Input
@@ -538,21 +535,21 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                 value={customReminderMinutes}
                 onChange={(e) => setCustomReminderMinutes(e.target.value)}
                 placeholder="Enter minutes..."
-                className="h-14 text-lg bg-[#1a0f2e] border border-white/20 rounded-2xl text-white placeholder:text-white/40 focus:ring-white"
+                className="h-14 text-lg bg-white/5 backdrop-blur-sm border border-white/15 rounded-2xl text-white placeholder:text-white/40 focus:ring-white/30 focus:border-white/30"
                 autoFocus
               />
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <Button
                   onClick={() => setShowCustomReminder(false)}
-                  variant="outline"
-                  className="flex-1 h-12 rounded-2xl border border-white/20 bg-transparent text-white hover:bg-white/10"
+                  variant="ghost"
+                  className="flex-1 h-12 rounded-2xl bg-white/5 border border-white/15 text-white hover:bg-white/10"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleCustomReminderSubmit}
                   disabled={!customReminderMinutes || parseInt(customReminderMinutes, 10) <= 0}
-                  className="flex-1 h-12 rounded-2xl bg-[#d4ff00] text-[#0a0118] font-semibold hover:bg-[#d4ff00]/90"
+                  className="flex-1 h-12 rounded-2xl bg-gradient-to-b from-[#f0ff80] to-[#d4ff00] text-[#0a0118] font-semibold hover:from-[#f5ffb3] hover:to-[#e5ff4d]"
                 >
                   Set Reminder
                 </Button>
@@ -562,17 +559,21 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  onClick={() => setTappedButton('deciding')}
-                  variant="outline"
+                  variant="ghost"
                   size="lg"
-                  className="w-full h-14 text-lg font-medium rounded-2xl border border-white/20 bg-transparent text-white/70 hover:bg-white/5 hover:text-white transition-all duration-200 disabled:opacity-50"
+                  className="w-full h-14 text-lg font-medium rounded-2xl bg-white/5 backdrop-blur-sm border border-white/15 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/25 transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
                   disabled={isDetectingLocation}
                 >
-                  {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : 'Still deciding… ⏰'}
+                  {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : (
+                    <>
+                      Still deciding… ⏰
+                      <ChevronDown className="w-4 h-4 opacity-60" />
+                    </>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent 
-                className="w-72 bg-[#1a0f2e] border border-white/20 rounded-xl z-[100]"
+                className="w-64 bg-[#1a0f2e]/95 backdrop-blur-xl border border-white/15 rounded-2xl z-[100] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
                 align="center"
                 side="top"
                 sideOffset={8}
@@ -581,57 +582,47 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                   <>
                     <DropdownMenuItem 
                       onClick={handleCancelReminder} 
-                      className="text-red-400 hover:bg-red-500/10 cursor-pointer py-3"
+                      className="text-red-400 hover:bg-red-500/10 cursor-pointer py-3 rounded-xl mx-1"
                     >
-                      <X className="w-4 h-4 mr-3" /> Cancel reminder ({getRemainingTime()} left)
+                      <X className="w-4 h-4 mr-3" /> Cancel ({getRemainingTime()} left)
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuSeparator className="bg-white/10 my-1" />
                   </>
                 )}
-                <DropdownMenuLabel className="text-white/60 text-center py-3">
-                  <Bell className="inline w-4 h-4 mr-2" />
-                  Remind me to share if I'm out
+                <DropdownMenuLabel className="text-white/50 text-center py-2 text-sm">
+                  Remind me in...
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuSeparator className="bg-white/10 my-1" />
                 <DropdownMenuItem 
-                  onClick={() => handleSetReminder(30)} 
-                  className="text-white hover:bg-white/10 cursor-pointer py-3"
+                  onClick={() => handleSetReminder(15)} 
+                  className="text-white hover:bg-white/10 cursor-pointer py-3 rounded-xl mx-1"
                 >
-                  <Clock className="w-4 h-4 mr-3 text-[#d4ff00]" /> In 30 minutes
+                  <Clock className="w-4 h-4 mr-3 text-white/50" /> 15 min
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={() => handleSetReminder(60)} 
-                  className="text-white hover:bg-white/10 cursor-pointer py-3"
+                  className="text-white hover:bg-white/10 cursor-pointer py-3 rounded-xl mx-1"
                 >
-                  <Clock className="w-4 h-4 mr-3 text-[#d4ff00]" /> In 1 hour
+                  <Clock className="w-4 h-4 mr-3 text-white/50" /> 1 hour
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={() => handleSetReminder(120)} 
-                  className="text-white hover:bg-white/10 cursor-pointer py-3"
+                  className="text-white hover:bg-white/10 cursor-pointer py-3 rounded-xl mx-1"
                 >
-                  <Clock className="w-4 h-4 mr-3 text-[#d4ff00]" /> In 2 hours
+                  <Clock className="w-4 h-4 mr-3 text-white/50" /> 2 hours
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuSeparator className="bg-white/10 my-1" />
                 <DropdownMenuItem 
                   onClick={() => setShowCustomReminder(true)} 
-                  className="text-white hover:bg-white/10 cursor-pointer py-3"
+                  className="text-white hover:bg-white/10 cursor-pointer py-3 rounded-xl mx-1"
                 >
-                  <Edit3 className="w-4 h-4 mr-3 text-[#d4ff00]" /> Custom time...
+                  <Edit3 className="w-4 h-4 mr-3 text-white/50" /> Custom...
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
         </div>
 
-        {/* Conditional subtext - only shows after button tap */}
-        {tappedButton && (
-          <p className="text-center text-sm text-white/50 mt-6 animate-fade-in">
-            {tappedButton === 'out' && "Check in and show friends where you are"}
-            {tappedButton === 'planning' && "Friends will see you're going out tonight"}
-            {tappedButton === 'home' && "You won't appear on tonight's list"}
-            {tappedButton === 'deciding' && "Nothing is shared"}
-          </p>
-        )}
 
         {/* Snooze options when reminder triggered */}
         {isReminderTriggered && (
