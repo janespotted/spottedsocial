@@ -1,14 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X } from 'lucide-react';
+import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { QRCodeModal } from '@/components/QRCodeModal';
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { 
     isSupported, 
     permission, 
@@ -18,6 +22,30 @@ export default function Settings() {
     unsubscribe 
   } = usePushNotifications();
   const [isToggling, setIsToggling] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      fetchInviteCode();
+    }
+  }, [user]);
+
+  const fetchInviteCode = async () => {
+    const { data } = await supabase
+      .from('invite_codes')
+      .select('code')
+      .eq('user_id', user?.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (data) {
+      setInviteCode(data.code);
+    }
+  };
+
+  const getInviteUrl = () => `${window.location.origin}/invite/${inviteCode}`;
 
   const handlePushToggle = async (enabled: boolean) => {
     setIsToggling(true);
@@ -115,6 +143,44 @@ export default function Settings() {
           </div>
         </Card>
 
+        {/* Invite Friends Section */}
+        <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
+          <button
+            onClick={() => navigate('/friends')}
+            className="w-full flex items-center justify-between p-4 hover:bg-[#a855f7]/10 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#d4ff00]/20 flex items-center justify-center">
+                <UserPlus className="h-5 w-5 text-[#d4ff00]" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-white">Invite Friends</h3>
+                <p className="text-white/60 text-sm">Share your invite link</p>
+              </div>
+            </div>
+          </button>
+        </Card>
+
+        {/* QR Code Section */}
+        {inviteCode && (
+          <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
+            <button
+              onClick={() => setShowQRModal(true)}
+              className="w-full flex items-center justify-between p-4 hover:bg-[#a855f7]/10 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
+                  <QrCode className="h-5 w-5 text-[#a855f7]" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold text-white">My QR Code</h3>
+                  <p className="text-white/60 text-sm">For adding friends in person</p>
+                </div>
+              </div>
+            </button>
+          </Card>
+        )}
+
         {/* Activity Notifications Section */}
         <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
           <button
@@ -187,11 +253,19 @@ export default function Settings() {
           </button>
         </Card>
 
-        {/* Version */}
         <div className="text-center pt-6">
           <p className="text-white/40 text-sm">Spotted v1.0.0</p>
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      {inviteCode && (
+        <QRCodeModal
+          open={showQRModal}
+          onOpenChange={setShowQRModal}
+          inviteUrl={getInviteUrl()}
+        />
+      )}
       </div>
     </div>
   );
