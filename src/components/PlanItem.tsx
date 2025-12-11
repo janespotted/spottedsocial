@@ -1,8 +1,24 @@
 import { useState, useEffect } from 'react';
-import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, Clock, Calendar } from 'lucide-react';
+import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, Clock, Calendar, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
@@ -65,6 +81,8 @@ interface PlanItemProps {
   currentUserId: string;
   userVote: 'up' | 'down' | null;
   onVoteChange: () => void;
+  onEdit?: (plan: PlanItemProps['plan']) => void;
+  onDelete?: (planId: string) => void;
 }
 
 interface Comment {
@@ -78,7 +96,7 @@ interface Comment {
   };
 }
 
-export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanItemProps) {
+export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, onDelete }: PlanItemProps) {
   const [isVoting, setIsVoting] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -89,8 +107,12 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
   const [isDown, setIsDown] = useState(false);
   const [isTogglingDown, setIsTogglingDown] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
+  
+  const isOwner = plan.user_id === currentUserId;
 
   // Fetch "I'm Down" reactions
   const fetchDowns = async () => {
@@ -326,6 +348,29 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
     }
   };
 
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('plans')
+        .delete()
+        .eq('id', plan.id)
+        .eq('user_id', currentUserId);
+      
+      if (error) throw error;
+      
+      toast.success('Plan deleted');
+      haptic.light();
+      onDelete?.(plan.id);
+    } catch (error) {
+      console.error('Error deleting plan:', error);
+      toast.error('Failed to delete plan');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
   const visibilityLabel = plan.visibility === 'close_friends' ? 'Close Friends' : 'Friends';
   const visibilityIcon = plan.visibility === 'close_friends' ? <Lock className="w-3 h-3" /> : <Users className="w-3 h-3" />;
 
@@ -364,20 +409,46 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
           </div>
         </div>
 
-        <div className="text-right">
-          <button 
-            className="text-base font-bold text-[#d4ff00] hover:text-[#e8ff4d] cursor-pointer flex items-center gap-1.5 justify-end transition-colors"
-            onClick={handleVenueClick}
-          >
-            <MapPin className="w-3.5 h-3.5 text-white/50" />
-            {plan.venue_name}
-          </button>
-          <div className="flex items-center gap-1.5 text-xs text-white/70 mt-0.5 justify-end">
-            <Calendar className="w-3 h-3 text-white/50" />
-            <span className="font-semibold text-white">{smartDateLabel}</span>
-            <Clock className="w-3 h-3 ml-0.5 text-white/50" />
-            <span>{formattedTime}</span>
+        <div className="flex items-start gap-2">
+          <div className="text-right">
+            <button 
+              className="text-base font-bold text-[#d4ff00] hover:text-[#e8ff4d] cursor-pointer flex items-center gap-1.5 justify-end transition-colors"
+              onClick={handleVenueClick}
+            >
+              <MapPin className="w-3.5 h-3.5 text-white/50" />
+              {plan.venue_name}
+            </button>
+            <div className="flex items-center gap-1.5 text-xs text-white/70 mt-0.5 justify-end">
+              <Calendar className="w-3 h-3 text-white/50" />
+              <span className="font-semibold text-white">{smartDateLabel}</span>
+              <Clock className="w-3 h-3 ml-0.5 text-white/50" />
+              <span>{formattedTime}</span>
+            </div>
           </div>
+          
+          {/* Owner actions dropdown */}
+          {isOwner && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-background border-border">
+                <DropdownMenuItem onClick={() => onEdit?.(plan)} className="gap-2 cursor-pointer">
+                  <Pencil className="w-4 h-4" />
+                  Edit Plan
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setShowDeleteDialog(true)} 
+                  className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Plan
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
@@ -565,6 +636,28 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange }: PlanIt
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="bg-background border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this plan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. Your plan will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

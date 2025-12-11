@@ -17,7 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUserCity } from '@/hooks/useUserCity';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { toast } from 'sonner';
-import { format, addDays, endOfDay } from 'date-fns';
+import { format, addDays } from 'date-fns';
 
 interface CreatePlanDialogProps {
   open: boolean;
@@ -145,7 +145,11 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
     setIsSubmitting(true);
 
     try {
-      const expiresAt = endOfDay(new Date(planDate));
+      // Expire at 5am the day AFTER the plan date (matches nightlife rollover)
+      const planDateObj = new Date(planDate);
+      planDateObj.setDate(planDateObj.getDate() + 1);
+      planDateObj.setHours(5, 0, 0, 0);
+      const expiresAt = planDateObj;
 
       const { data: plan, error } = await supabase.from('plans').insert({
         user_id: userId,
