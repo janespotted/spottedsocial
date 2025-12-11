@@ -482,60 +482,55 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         />
       </div>
 
-      {/* Decorative sparkles */}
-      <div className="absolute top-20 left-8 text-[#d4ff00]/40 text-2xl animate-pulse">✦</div>
-      <div className="absolute top-32 right-12 text-[#a855f7]/50 text-xl animate-pulse" style={{ animationDelay: '0.5s' }}>✧</div>
-      <div className="absolute top-48 left-16 text-[#d4ff00]/30 text-lg animate-pulse" style={{ animationDelay: '1s' }}>✦</div>
-
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center space-y-12 w-full">
-        <h2 className="text-5xl font-bold text-[#d4ff00] text-center leading-tight drop-shadow-[0_0_30px_rgba(212,255,0,0.5)]">
-          Are You<br />Out?
+      <div className="flex-1 flex flex-col items-center justify-center space-y-10 w-full">
+        <h2 className="text-4xl font-bold text-[#d4ff00] text-center leading-tight drop-shadow-[0_0_20px_rgba(212,255,0,0.4)]">
+          Are You Out?
         </h2>
 
-        <div className="w-full space-y-4">
-          {/* Yes - Primary 3D button with gradient */}
-          <div className="space-y-1">
+        <div className="w-full space-y-3">
+          {/* Yes - Primary button */}
+          <div className="space-y-1.5">
             <Button
               onClick={() => handleStatusUpdate('out')}
               size="lg"
-              className="w-full h-16 text-xl font-bold rounded-full bg-gradient-to-b from-[#e5ff4d] to-[#d4ff00] text-[#0a0118] hover:from-[#f0ff80] hover:to-[#e5ff4d] hover:scale-105 shadow-[0_0_40px_rgba(212,255,0,0.6),0_4px_0_rgba(180,220,0,1),inset_0_2px_0_rgba(255,255,255,0.3)] active:shadow-[0_0_40px_rgba(212,255,0,0.4),0_2px_0_rgba(180,220,0,1)] active:translate-y-[2px] transition-all duration-200 disabled:opacity-50"
+              className="w-full h-14 text-lg font-bold rounded-2xl bg-gradient-to-b from-[#e5ff4d] to-[#d4ff00] text-[#0a0118] hover:from-[#f0ff80] hover:to-[#e5ff4d] shadow-[0_0_25px_rgba(212,255,0,0.4),0_3px_0_rgba(180,220,0,1)] active:translate-y-[1px] transition-all duration-200 disabled:opacity-50"
               disabled={isDetectingLocation}
             >
               {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes 🎉'}
             </Button>
-            <p className="text-center text-sm text-white/60">Check in and show friends where you are</p>
+            <p className="text-center text-xs text-white/50 tracking-wide">Check in and show friends where you are</p>
           </div>
           
           {/* Planning - Secondary purple button */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Button
               onClick={() => handleStatusUpdate('planning')}
               size="lg"
-              className="w-full h-16 text-xl font-semibold rounded-full border-[3px] border-[#a855f7]/70 bg-[#a855f7]/10 backdrop-blur-sm text-white hover:bg-[#a855f7]/20 hover:border-[#a855f7] hover:shadow-[0_0_20px_rgba(168,85,247,0.3),inset_0_1px_0_rgba(168,85,247,0.1)] hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
+              className="w-full h-14 text-lg font-medium rounded-2xl border-2 border-[#a855f7] bg-[#a855f7]/10 text-white hover:bg-[#a855f7]/20 transition-all duration-200 disabled:opacity-50"
               disabled={isDetectingLocation}
             >
               Not yet, but planning on it 🎯
             </Button>
-            <p className="text-center text-sm text-white/60">Friends will see you're going out tonight</p>
+            <p className="text-center text-xs text-white/50 tracking-wide">Friends will see you're going out tonight</p>
           </div>
           
-          {/* No - Glass-morphism secondary button */}
-          <div className="space-y-1">
+          {/* No - Tertiary ghost button */}
+          <div className="space-y-1.5">
             <Button
               onClick={() => handleStatusUpdate('home')}
               variant="outline"
               size="lg"
-              className="w-full h-16 text-xl font-semibold rounded-full border-[3px] border-white/70 bg-white/5 backdrop-blur-sm text-white hover:bg-white/15 hover:border-white hover:shadow-[0_0_20px_rgba(255,255,255,0.2),inset_0_1px_0_rgba(255,255,255,0.1)] hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
+              className="w-full h-14 text-lg font-medium rounded-2xl border border-white/30 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white transition-all duration-200 disabled:opacity-50"
               disabled={isDetectingLocation}
             >
               No, staying in 🛋️
             </Button>
-            <p className="text-center text-sm text-white/60">You won't appear on tonight's list</p>
+            <p className="text-center text-xs text-white/50 tracking-wide">You won't appear on tonight's list</p>
           </div>
           
-          {/* Still deciding - Reminder button */}
-          <div className="space-y-1">
+          {/* Still deciding - Tertiary ghost button with dropdown */}
+          <div className="space-y-1.5">
             {showCustomReminder ? (
               <div className="space-y-3">
                 <Input
@@ -543,21 +538,21 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                   value={customReminderMinutes}
                   onChange={(e) => setCustomReminderMinutes(e.target.value)}
                   placeholder="Enter minutes..."
-                  className="h-14 text-lg bg-[#1a0f2e] border-2 border-white text-white placeholder:text-white/40 focus:ring-white"
+                  className="h-14 text-lg bg-[#1a0f2e] border-2 border-white/30 rounded-2xl text-white placeholder:text-white/40 focus:ring-white"
                   autoFocus
                 />
                 <div className="flex gap-2">
                   <Button
                     onClick={() => setShowCustomReminder(false)}
                     variant="outline"
-                    className="flex-1 h-12 rounded-full border-2 border-white/40 bg-transparent text-white hover:bg-white/10"
+                    className="flex-1 h-12 rounded-2xl border border-white/30 bg-transparent text-white hover:bg-white/10"
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={handleCustomReminderSubmit}
                     disabled={!customReminderMinutes || parseInt(customReminderMinutes, 10) <= 0}
-                    className="flex-1 h-12 rounded-full bg-[#d4ff00] text-[#2d1b4e] font-semibold hover:bg-[#d4ff00]/90"
+                    className="flex-1 h-12 rounded-2xl bg-[#d4ff00] text-[#0a0118] font-semibold hover:bg-[#d4ff00]/90"
                   >
                     Set Reminder
                   </Button>
@@ -569,7 +564,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                   <Button
                     variant="ghost"
                     size="lg"
-                    className="w-full h-14 text-lg font-medium rounded-full border border-dashed border-[#a855f7]/50 bg-[#a855f7]/10 backdrop-blur-sm text-white/70 hover:bg-[#a855f7]/20 hover:text-white hover:border-[#a855f7]/70 hover:shadow-[0_0_15px_rgba(168,85,247,0.2)] hover:scale-[1.01] transition-all duration-200 disabled:opacity-50"
+                    className="w-full h-14 text-lg font-medium rounded-2xl border border-white/30 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white transition-all duration-200 disabled:opacity-50"
                     disabled={isDetectingLocation}
                   >
                     {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : 'Still deciding… ⏰'}
