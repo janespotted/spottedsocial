@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronDown, Home, Target, Navigation } from 'lucide-react';
+import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronDown, ChevronRight, Home, Target, Navigation } from 'lucide-react';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -543,43 +543,59 @@ export default function Profile() {
 
         {/* Location Sharing Card */}
         <div className="bg-[#1D102D]/60 border border-[#a855f7]/20 rounded-2xl p-5">
-          {/* Compact Header */}
-          <div className="flex items-center gap-2.5 mb-5">
+          {/* Header */}
+          <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#a855f7] to-[#6b21a8] flex items-center justify-center">
               <MapPin className="h-4 w-4 text-white" />
             </div>
             <h3 className="font-medium text-white text-base">Location Sharing</h3>
           </div>
 
-          <div className="space-y-4">
-            {/* Status Row - Status + Change link inline */}
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                {currentStatus === 'out' ? (
-                  <p className="text-[#d4ff00] font-medium text-sm">
-                    You're out · {venueNeighborhood || 'Unknown area'}
-                  </p>
-                ) : currentStatus === 'planning' ? (
-                  <>
-                    <p className="text-[#a855f7] font-medium text-sm">
-                      You're planning{planningNeighborhood ? ` · ${planningNeighborhood}` : ''}
-                    </p>
-                    <p className="text-white/40 text-xs mt-0.5">
-                      Live location paused until you're out
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-white/50 font-medium text-sm">You're staying in tonight</p>
-                    <p className="text-white/40 text-xs mt-0.5">Live location paused</p>
-                  </>
-                )}
+          {/* Status Section - Inner Card */}
+          <div className="bg-white/5 rounded-xl p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                {/* Status Line with Icon */}
+                <div className="flex items-center gap-2 mb-1">
+                  {currentStatus === 'out' ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0" />
+                      <p className="text-[#d4ff00] font-medium text-sm truncate">
+                        You're out · {currentVenue || 'Unknown venue'}
+                      </p>
+                    </>
+                  ) : currentStatus === 'planning' ? (
+                    <>
+                      <Target className="h-3.5 w-3.5 text-[#a855f7] shrink-0" />
+                      <p className="text-[#a855f7] font-medium text-sm truncate">
+                        You're planning{planningNeighborhood ? ` · ${planningNeighborhood}` : ''}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Home className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                      <p className="text-white/50 font-medium text-sm">
+                        You're staying in tonight
+                      </p>
+                    </>
+                  )}
+                </div>
+                
+                {/* Helper Text */}
+                <p className="text-white/40 text-xs pl-5">
+                  {currentStatus === 'out' 
+                    ? 'Your live location is visible' 
+                    : 'Your live location is paused'}
+                </p>
               </div>
+              
+              {/* Change Status Dropdown */}
               <DropdownMenu>
-                <DropdownMenuTrigger className="text-white/50 text-xs hover:text-[#a855f7] transition-colors outline-none">
-                  Change
+                <DropdownMenuTrigger className="text-[#a855f7]/70 text-xs hover:text-[#a855f7] transition-colors outline-none whitespace-nowrap flex items-center gap-0.5 shrink-0">
+                  Change status
+                  <ChevronRight className="h-3 w-3" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-black/80 backdrop-blur-xl border-white/10 min-w-[200px] rounded-xl p-1.5 z-50">
+                <DropdownMenuContent className="bg-black/90 backdrop-blur-xl border-white/10 min-w-[200px] rounded-xl p-1.5 z-50">
                   {currentStatus === 'out' && (
                     <>
                       <DropdownMenuItem 
@@ -621,7 +637,7 @@ export default function Profile() {
                           <Target className="h-4 w-4 text-[#a855f7]" />
                           <span className="font-medium">Change neighborhood</span>
                         </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="bg-black/80 backdrop-blur-xl border-white/10 rounded-xl p-1.5 max-h-[300px] overflow-y-auto z-50">
+                        <DropdownMenuSubContent className="bg-black/90 backdrop-blur-xl border-white/10 rounded-xl p-1.5 max-h-[300px] overflow-y-auto z-50">
                           {(CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS.la).map((neighborhood) => (
                             <DropdownMenuItem
                               key={neighborhood}
@@ -658,13 +674,12 @@ export default function Profile() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+          </div>
 
-            {/* Subtle Divider */}
-            <div className="h-px bg-white/5" />
-
-            {/* Privacy Row */}
-            <div className="flex items-center justify-between">
-              <p className="text-white/60 text-sm">Who can see your location</p>
+          {/* Privacy Row - ONLY shown when user is "out" */}
+          {currentStatus === 'out' && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+              <p className="text-white/60 text-sm">Who can see your location?</p>
               <Select value={locationSharingLevel} onValueChange={handleLocationSharingChange}>
                 <SelectTrigger className="w-auto min-w-[130px] border-[#a855f7]/30 bg-white/5 backdrop-blur-sm text-white rounded-full h-8 text-sm px-3">
                   <div className="flex items-center gap-2">
@@ -685,7 +700,7 @@ export default function Profile() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Spots Section with Dropdown */}
