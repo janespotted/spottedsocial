@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronDown, ChevronRight, Home, Target, Navigation } from 'lucide-react';
+import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target } from 'lucide-react';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,9 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CityBadge } from '@/components/CityBadge';
 import { ProfileSkeleton } from '@/components/ProfileSkeleton';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
-import { useUserCity } from '@/hooks/useUserCity';
+
 
 interface WishlistPlace {
   id: string;
@@ -36,7 +34,7 @@ export default function Profile() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { unreadCount } = useNotifications();
-  const { city } = useUserCity();
+  
   useAutoVenueTracking(); // Trigger auto-venue tracking on profile view
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
@@ -292,81 +290,6 @@ export default function Profile() {
     }
   };
 
-  // Status change handlers
-  const handleNotGoingOut = async () => {
-    if (!user) return;
-    
-    try {
-      await supabase
-        .from('night_statuses')
-        .update({ 
-          status: 'home',
-          venue_id: null,
-          venue_name: null,
-          planning_neighborhood: null,
-          lat: null,
-          lng: null,
-          expires_at: null
-        })
-        .eq('user_id', user.id);
-      
-      setCurrentStatus('home');
-      setCurrentVenue(null);
-      setPlanningNeighborhood(null);
-      toast.success('Status updated to staying in');
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
-    }
-  };
-
-  const handleChangeNeighborhood = async (neighborhood: string) => {
-    if (!user) return;
-    
-    try {
-      await supabase
-        .from('night_statuses')
-        .upsert({
-          user_id: user.id,
-          status: 'planning',
-          planning_neighborhood: neighborhood,
-          venue_id: null,
-          venue_name: null,
-          expires_at: new Date(new Date().setHours(29, 0, 0, 0)).toISOString() // 5am next day
-        });
-      
-      setPlanningNeighborhood(neighborhood);
-      setCurrentStatus('planning');
-      toast.success(`Planning in ${neighborhood}`);
-    } catch (error) {
-      console.error('Error updating neighborhood:', error);
-      toast.error('Failed to update neighborhood');
-    }
-  };
-
-  const handleStartPlanning = async () => {
-    if (!user) return;
-    
-    try {
-      await supabase
-        .from('night_statuses')
-        .upsert({
-          user_id: user.id,
-          status: 'planning',
-          planning_neighborhood: null,
-          venue_id: null,
-          venue_name: null,
-          expires_at: new Date(new Date().setHours(29, 0, 0, 0)).toISOString() // 5am next day
-        });
-      
-      setCurrentStatus('planning');
-      setPlanningNeighborhood(null);
-      toast.success('Status updated to planning');
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
-    }
-  };
 
   const mockVenueImages = [
     'https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=400',
@@ -429,106 +352,34 @@ export default function Profile() {
         {/* User Identity */}
         <div>
           <h2 className="text-xl font-bold text-white">@{profile?.username || 'username'}</h2>
-          <DropdownMenu>
-            <DropdownMenuTrigger className={cn(
-              "flex items-center gap-1.5 cursor-pointer hover:bg-white/10 transition-all outline-none px-3 py-1.5 rounded-full border bg-white/5",
+          <button 
+            onClick={openCheckIn}
+            className={cn(
+              "flex items-center gap-1.5 cursor-pointer hover:bg-white/10 transition-all px-3 py-1.5 rounded-full border bg-white/5 mt-1",
               currentStatus === 'out' ? "border-[#d4ff00]/40" : 
               currentStatus === 'planning' ? "border-[#a855f7]/40" : 
               "border-white/10"
-            )}>
-              {currentStatus === 'out' && currentVenue ? (
-                <>
-                  <span className="text-[#d4ff00] font-medium">@ {currentVenue}</span>
-                  <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
-                </>
-              ) : currentStatus === 'planning' ? (
+            )}
+          >
+            {currentStatus === 'out' && currentVenue ? (
+              <>
+                <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
+                <span className="text-[#d4ff00] font-medium">Out · {currentVenue}</span>
+              </>
+            ) : currentStatus === 'planning' ? (
+              <>
+                <Target className="h-4 w-4 text-[#a855f7]" />
                 <span className="text-[#a855f7] font-medium">
-                  🎯 Planning{planningNeighborhood ? ` (${planningNeighborhood})` : ''}
+                  Planning{planningNeighborhood ? ` · ${planningNeighborhood}` : ''}
                 </span>
-              ) : (
-                <span className="text-white/40">Not Sharing Location</span>
-              )}
-              <ChevronDown className="h-4 w-4 text-white/60" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-black/60 backdrop-blur-xl border-white/10 min-w-[220px] rounded-xl p-1.5 z-50">
-              {/* Options based on current status */}
-              {currentStatus === 'out' && (
-                <>
-                  <DropdownMenuItem 
-                    onClick={openCheckIn}
-                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                  >
-                    <Navigation className="h-4 w-4 text-[#a855f7]" />
-                    <span className="font-medium">Change venue</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10 my-1" />
-                  <DropdownMenuItem 
-                    onClick={handleNotGoingOut}
-                    className="text-white/70 hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                  >
-                    <Home className="h-4 w-4 text-white/40" />
-                    Not going out anymore
-                  </DropdownMenuItem>
-                </>
-              )}
-              {currentStatus === 'planning' && (
-                <>
-                  <DropdownMenuItem 
-                    onClick={openCheckIn}
-                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                  >
-                    <MapPin className="h-4 w-4 text-[#d4ff00]" />
-                    <span className="font-medium">Going out</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10 my-1" />
-                  <DropdownMenuItem 
-                    onClick={handleNotGoingOut}
-                    className="text-white/70 hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                  >
-                    <Home className="h-4 w-4 text-white/40" />
-                    Not going out anymore
-                  </DropdownMenuItem>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5">
-                      <Target className="h-4 w-4 text-[#a855f7]" />
-                      <span className="font-medium">Change neighborhood</span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="bg-black/60 backdrop-blur-xl border-white/10 rounded-xl p-1.5 max-h-[300px] overflow-y-auto z-50">
-                      {(CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS.la).map((neighborhood) => (
-                        <DropdownMenuItem
-                          key={neighborhood}
-                          onClick={() => handleChangeNeighborhood(neighborhood)}
-                          className={`text-white hover:bg-white/10 cursor-pointer rounded-lg py-2 px-3 ${planningNeighborhood === neighborhood ? 'bg-white/10' : ''}`}
-                        >
-                          {neighborhood}
-                          {planningNeighborhood === neighborhood && <span className="ml-auto text-[#a855f7]">✓</span>}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </>
-              )}
-              {(!currentStatus || currentStatus === 'home') && (
-                <>
-                  <DropdownMenuItem 
-                    onClick={openCheckIn}
-                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                  >
-                    <MapPin className="h-4 w-4 text-[#d4ff00]" />
-                    <span className="font-medium">I'm going out</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10 my-1" />
-                  <DropdownMenuItem 
-                    onClick={handleStartPlanning}
-                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                  >
-                    <Target className="h-4 w-4 text-[#a855f7]" />
-                    <span className="font-medium">I'm planning</span>
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </>
+            ) : (
+              <>
+                <Home className="h-4 w-4 text-white/40" />
+                <span className="text-white/40 font-medium">Staying In</span>
+              </>
+            )}
+          </button>
         </div>
 
         {/* Avatar + Stats */}
@@ -626,90 +477,14 @@ export default function Profile() {
                 </p>
               </div>
               
-              {/* Change Status Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger className="text-[#a855f7]/70 text-xs hover:text-[#a855f7] transition-colors outline-none whitespace-nowrap flex items-center gap-0.5 shrink-0">
-                  Change status
-                  <ChevronRight className="h-3 w-3" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-black/90 backdrop-blur-xl border-white/10 min-w-[200px] rounded-xl p-1.5 z-50">
-                  {currentStatus === 'out' && (
-                    <>
-                      <DropdownMenuItem 
-                        onClick={openCheckIn}
-                        className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                      >
-                        <Navigation className="h-4 w-4 text-[#a855f7]" />
-                        <span className="font-medium">Change venue</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-white/10 my-1" />
-                      <DropdownMenuItem 
-                        onClick={handleNotGoingOut}
-                        className="text-white/70 hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                      >
-                        <Home className="h-4 w-4 text-white/40" />
-                        Not going out anymore
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  {currentStatus === 'planning' && (
-                    <>
-                      <DropdownMenuItem 
-                        onClick={openCheckIn}
-                        className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                      >
-                        <MapPin className="h-4 w-4 text-[#d4ff00]" />
-                        <span className="font-medium">Going out</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-white/10 my-1" />
-                      <DropdownMenuItem 
-                        onClick={handleNotGoingOut}
-                        className="text-white/70 hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                      >
-                        <Home className="h-4 w-4 text-white/40" />
-                        Not going out anymore
-                      </DropdownMenuItem>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5">
-                          <Target className="h-4 w-4 text-[#a855f7]" />
-                          <span className="font-medium">Change neighborhood</span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="bg-black/90 backdrop-blur-xl border-white/10 rounded-xl p-1.5 max-h-[300px] overflow-y-auto z-50">
-                          {(CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS.la).map((neighborhood) => (
-                            <DropdownMenuItem
-                              key={neighborhood}
-                              onClick={() => handleChangeNeighborhood(neighborhood)}
-                              className={`text-white hover:bg-white/10 cursor-pointer rounded-lg py-2 px-3 ${planningNeighborhood === neighborhood ? 'bg-white/10' : ''}`}
-                            >
-                              {neighborhood}
-                              {planningNeighborhood === neighborhood && <span className="ml-auto text-[#a855f7]">✓</span>}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    </>
-                  )}
-                  {(!currentStatus || currentStatus === 'home') && (
-                    <>
-                      <DropdownMenuItem 
-                        onClick={openCheckIn}
-                        className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                      >
-                        <MapPin className="h-4 w-4 text-[#d4ff00]" />
-                        <span className="font-medium">I'm going out</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-white/10 my-1" />
-                      <DropdownMenuItem 
-                        onClick={handleStartPlanning}
-                        className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
-                      >
-                        <Target className="h-4 w-4 text-[#a855f7]" />
-                        <span className="font-medium">I'm planning</span>
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Change Status Button */}
+              <button 
+                onClick={openCheckIn}
+                className="text-[#a855f7]/70 text-xs hover:text-[#a855f7] transition-colors whitespace-nowrap flex items-center gap-0.5 shrink-0"
+              >
+                Change status
+                <ChevronRight className="h-3 w-3" />
+              </button>
             </div>
           </div>
 
