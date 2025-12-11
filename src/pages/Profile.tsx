@@ -84,6 +84,43 @@ export default function Profile() {
     }
   }, [user]);
 
+  // Realtime subscription for night_statuses changes
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('profile-night-status')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'night_statuses',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchProfileData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
+  // Refetch on window focus (navigation back to page)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user?.id) {
+        fetchProfileData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user?.id]);
+
   const fetchProfileData = async () => {
     setLoading(true);
     const { data: profileData } = await supabase
@@ -560,14 +597,14 @@ export default function Profile() {
                   {currentStatus === 'out' ? (
                     <>
                       <span className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0" />
-                      <p className="text-[#d4ff00] font-medium text-sm truncate">
+                      <p className="text-[#d4ff00] font-medium text-sm">
                         You're out · {currentVenue || 'Unknown venue'}
                       </p>
                     </>
                   ) : currentStatus === 'planning' ? (
                     <>
                       <Target className="h-3.5 w-3.5 text-[#a855f7] shrink-0" />
-                      <p className="text-[#a855f7] font-medium text-sm truncate">
+                      <p className="text-[#a855f7] font-medium text-sm">
                         You're planning{planningNeighborhood ? ` · ${planningNeighborhood}` : ''}
                       </p>
                     </>
