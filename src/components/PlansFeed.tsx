@@ -3,6 +3,7 @@ import { Calendar, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PlanItem } from './PlanItem';
 import { CreatePlanDialog } from './CreatePlanDialog';
+import { EditPlanDialog } from './EditPlanDialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDemoMode } from '@/hooks/useDemoMode';
@@ -40,6 +41,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
   const [userVotes, setUserVotes] = useState<Record<string, 'up' | 'down'>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
   const [isUserPlanning, setIsUserPlanning] = useState(false);
   const [userProfile, setUserProfile] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
@@ -285,6 +287,19 @@ export function PlansFeed({ userId }: PlansFeedProps) {
     fetchPlans();
   };
 
+  const handleEditPlan = (plan: Plan) => {
+    setEditingPlan(plan);
+  };
+
+  const handleDeletePlan = (planId: string) => {
+    setPlans(prev => prev.filter(p => p.id !== planId));
+  };
+
+  const handlePlanUpdated = () => {
+    setEditingPlan(null);
+    fetchPlans();
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-5 px-4">
@@ -362,6 +377,8 @@ export function PlansFeed({ userId }: PlansFeedProps) {
             currentUserId={userId}
             userVote={userVotes[plan.id] || null}
             onVoteChange={fetchPlans}
+            onEdit={handleEditPlan}
+            onDelete={handleDeletePlan}
           />
         ))
       )}
@@ -372,6 +389,15 @@ export function PlansFeed({ userId }: PlansFeedProps) {
         userId={userId}
         onPlanCreated={handlePlanCreated}
       />
+
+      {editingPlan && (
+        <EditPlanDialog
+          open={!!editingPlan}
+          onOpenChange={(open) => !open && setEditingPlan(null)}
+          plan={editingPlan}
+          onPlanUpdated={handlePlanUpdated}
+        />
+      )}
     </div>
   );
 }
