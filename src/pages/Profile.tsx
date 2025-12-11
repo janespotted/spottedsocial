@@ -51,6 +51,7 @@ export default function Profile() {
   const [currentStatus, setCurrentStatus] = useState<'out' | 'planning' | 'home' | null>(null);
   const [currentVenue, setCurrentVenue] = useState<string | null>(null);
   const [planningNeighborhood, setPlanningNeighborhood] = useState<string | null>(null);
+  const [venueNeighborhood, setVenueNeighborhood] = useState<string | null>(null);
   
   // Triple-tap secret access to demo settings
   const tapCountRef = useRef(0);
@@ -99,7 +100,7 @@ export default function Profile() {
     // Check user's current night status (out, planning, or home)
     const { data: nightStatus } = await supabase
       .from('night_statuses')
-      .select('status, venue_name, planning_neighborhood')
+      .select('status, venue_name, venue_id, planning_neighborhood')
       .eq('user_id', user?.id)
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString())
@@ -110,10 +111,23 @@ export default function Profile() {
       setCurrentVenue(nightStatus.venue_name);
       setPlanningNeighborhood(nightStatus.planning_neighborhood);
       setIsLocationSharing(nightStatus.status === 'out' && !!nightStatus.venue_name);
+      
+      // Fetch venue neighborhood if user is out
+      if (nightStatus.status === 'out' && nightStatus.venue_id) {
+        const { data: venue } = await supabase
+          .from('venues')
+          .select('neighborhood')
+          .eq('id', nightStatus.venue_id)
+          .maybeSingle();
+        setVenueNeighborhood(venue?.neighborhood || null);
+      } else {
+        setVenueNeighborhood(null);
+      }
     } else {
       setCurrentStatus(null);
       setCurrentVenue(null);
       setPlanningNeighborhood(null);
+      setVenueNeighborhood(null);
       setIsLocationSharing(false);
     }
 
@@ -528,26 +542,49 @@ export default function Profile() {
         </div>
 
         {/* Location Sharing Card */}
-        <div className={`bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4 transition-opacity duration-300 ${currentStatus === 'planning' ? 'opacity-50' : ''}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#d4ff00] flex items-center justify-center">
-                <MapPin className="h-6 w-6 text-[#1a0f2e] fill-[#1a0f2e]" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-white">Location Sharing</h3>
-                <p className="text-white/60 text-sm">Who can see your location</p>
-              </div>
+        <div className="bg-[#2d1b4e]/60 border border-white/20 rounded-2xl p-4">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-full bg-[#d4ff00] flex items-center justify-center">
+              <MapPin className="h-6 w-6 text-[#1a0f2e] fill-[#1a0f2e]" />
             </div>
+            <h3 className="font-semibold text-white text-lg">Location Sharing</h3>
+          </div>
 
+          {/* Status Context Line */}
+          <div className="mb-4 pb-4 border-b border-white/10">
+            {currentStatus === 'out' ? (
+              <p className="text-[#d4ff00] font-medium">
+                You're out · {venueNeighborhood || 'Unknown area'}
+              </p>
+            ) : currentStatus === 'planning' ? (
+              <>
+                <p className="text-[#a855f7] font-medium">
+                  You're planning{planningNeighborhood ? ` · ${planningNeighborhood}` : ''}
+                </p>
+                <p className="text-white/50 text-sm mt-1">
+                  Your live location is paused until you're out.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-white/60 font-medium">You're staying in tonight</p>
+                <p className="text-white/50 text-sm mt-1">Your live location is paused.</p>
+              </>
+            )}
+          </div>
+
+          {/* Privacy Dropdown Row */}
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-white/80">Who can see your location</p>
             <Select value={locationSharingLevel} onValueChange={handleLocationSharingChange}>
-              <SelectTrigger className="w-[160px] border-[#d4ff00] bg-[#d4ff00]/10 text-white rounded-full">
+              <SelectTrigger className="w-[150px] border-[#d4ff00] bg-[#d4ff00]/10 text-white rounded-full h-9">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   <SelectValue />
                 </div>
               </SelectTrigger>
-              <SelectContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white">
+              <SelectContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white z-50">
                 <SelectItem value="close_friends" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
                   Close Friends
                 </SelectItem>
@@ -560,6 +597,90 @@ export default function Profile() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Change Status Link */}
+          <DropdownMenu>
+            <DropdownMenuTrigger className="text-[#a855f7] text-sm hover:underline cursor-pointer outline-none">
+              Change status
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-black/60 backdrop-blur-xl border-white/10 min-w-[220px] rounded-xl p-1.5 z-50">
+              {currentStatus === 'out' && (
+                <>
+                  <DropdownMenuItem 
+                    onClick={openCheckIn}
+                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
+                  >
+                    <Navigation className="h-4 w-4 text-[#a855f7]" />
+                    <span className="font-medium">Change venue</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10 my-1" />
+                  <DropdownMenuItem 
+                    onClick={handleNotGoingOut}
+                    className="text-white/70 hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
+                  >
+                    <Home className="h-4 w-4 text-white/40" />
+                    Not going out anymore
+                  </DropdownMenuItem>
+                </>
+              )}
+              {currentStatus === 'planning' && (
+                <>
+                  <DropdownMenuItem 
+                    onClick={openCheckIn}
+                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
+                  >
+                    <MapPin className="h-4 w-4 text-[#d4ff00]" />
+                    <span className="font-medium">Going out</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10 my-1" />
+                  <DropdownMenuItem 
+                    onClick={handleNotGoingOut}
+                    className="text-white/70 hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
+                  >
+                    <Home className="h-4 w-4 text-white/40" />
+                    Not going out anymore
+                  </DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5">
+                      <Target className="h-4 w-4 text-[#a855f7]" />
+                      <span className="font-medium">Change neighborhood</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="bg-black/60 backdrop-blur-xl border-white/10 rounded-xl p-1.5 max-h-[300px] overflow-y-auto z-50">
+                      {(CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS.la).map((neighborhood) => (
+                        <DropdownMenuItem
+                          key={neighborhood}
+                          onClick={() => handleChangeNeighborhood(neighborhood)}
+                          className={`text-white hover:bg-white/10 cursor-pointer rounded-lg py-2 px-3 ${planningNeighborhood === neighborhood ? 'bg-white/10' : ''}`}
+                        >
+                          {neighborhood}
+                          {planningNeighborhood === neighborhood && <span className="ml-auto text-[#a855f7]">✓</span>}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              )}
+              {(!currentStatus || currentStatus === 'home') && (
+                <>
+                  <DropdownMenuItem 
+                    onClick={openCheckIn}
+                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
+                  >
+                    <MapPin className="h-4 w-4 text-[#d4ff00]" />
+                    <span className="font-medium">I'm going out</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10 my-1" />
+                  <DropdownMenuItem 
+                    onClick={handleStartPlanning}
+                    className="text-white hover:bg-white/10 cursor-pointer rounded-lg py-2.5 px-3 gap-2.5"
+                  >
+                    <Target className="h-4 w-4 text-[#a855f7]" />
+                    <span className="font-medium">I'm planning</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Spots Section with Dropdown */}
