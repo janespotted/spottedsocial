@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MapPin, Search, Plus, X, ChevronDown, Calendar, Clock, Users, Lock } from 'lucide-react';
 import {
   Drawer,
@@ -16,6 +16,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { supabase } from '@/integrations/supabase/client';
 import { useUserCity } from '@/hooks/useUserCity';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useKeyboardAware } from '@/hooks/useKeyboardAware';
 import { toast } from 'sonner';
 import { format, addDays } from 'date-fns';
 
@@ -50,6 +51,9 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { city } = useUserCity();
   const demoEnabled = useDemoMode();
+  const { isKeyboardOpen, handleInputFocus } = useKeyboardAware();
+  const venueInputRef = useRef<HTMLInputElement>(null);
+  const venueListRef = useRef<HTMLDivElement>(null);
 
   // Friend selection state
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -213,16 +217,16 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] border-transparent max-h-[60vh]">
-        <DrawerHeader className="pb-2">
+      <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] border-transparent max-h-[85vh]">
+        <DrawerHeader className="pb-2 flex-shrink-0">
           <DrawerTitle className="text-foreground text-center">Share Your Plans</DrawerTitle>
         </DrawerHeader>
 
-        <div className="px-4 pb-6 flex flex-col h-full overflow-hidden">
+        <div className="px-4 pb-6 flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Venue Search - Always Visible */}
           {selectedVenue ? (
             <div 
-              className="flex items-center gap-3 py-2 cursor-pointer group"
+              className="flex items-center gap-3 py-2 cursor-pointer group flex-shrink-0"
               onClick={() => setSelectedVenue(null)}
             >
               <MapPin className="w-5 h-5 text-[#d4ff00]" />
@@ -233,12 +237,14 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
               <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
             </div>
           ) : (
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <div className="relative flex-shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
               <Input
+                ref={venueInputRef}
                 placeholder="Where are you going?"
                 value={venueSearch}
                 onChange={(e) => setVenueSearch(e.target.value)}
+                onFocus={handleInputFocus}
                 className="pl-10 bg-background/30 border-border/30 h-11"
                 autoFocus
               />
@@ -247,12 +253,19 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
 
           {/* Venue List - Shows when no venue selected */}
           {!selectedVenue && (
-            <ScrollArea className="flex-1 mt-3 -mx-4 px-4">
-              <div className="space-y-0.5">
+            <div 
+              ref={venueListRef}
+              className="flex-1 mt-3 -mx-4 px-4 overflow-y-auto overscroll-contain"
+              style={{ 
+                maxHeight: isKeyboardOpen ? '40vh' : '50vh',
+                WebkitOverflowScrolling: 'touch'
+              }}
+            >
+              <div className="space-y-0.5 pb-4">
                 {filteredVenues.map(venue => (
                   <div
                     key={venue.id}
-                    className="py-2.5 px-2 -mx-2 hover:bg-primary/10 cursor-pointer rounded-lg transition-colors"
+                    className="py-2.5 px-2 -mx-2 hover:bg-primary/10 active:bg-primary/20 cursor-pointer rounded-lg transition-colors"
                     onClick={() => {
                       setSelectedVenue(venue);
                       setVenueSearch('');
@@ -263,7 +276,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
                   </div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
           )}
 
           {/* Show more options and button only when venue is selected */}
