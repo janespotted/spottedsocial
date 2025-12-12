@@ -17,6 +17,7 @@ import { requestNotificationPermission } from '@/lib/notifications';
 import { logEvent } from '@/lib/event-logger';
 import { useUserCity } from '@/hooks/useUserCity';
 import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
+import { useKeyboardAware } from '@/hooks/useKeyboardAware';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -45,6 +46,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { city } = useUserCity();
+  const { handleInputFocus } = useKeyboardAware();
   const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home' | 'planning'>('home');
   
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -757,6 +759,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           <Input
             value={customVenue}
             onChange={(e) => setCustomVenue(e.target.value)}
+            onFocus={handleInputFocus}
             placeholder={detectedVenue ? "Enter different venue..." : "Enter venue name..."}
             className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#d4ff00] text-white placeholder:text-white/40 focus:ring-[#d4ff00]"
             autoFocus
