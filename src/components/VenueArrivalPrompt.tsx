@@ -110,12 +110,10 @@ export function VenueArrivalPrompt() {
             <MapPin className="h-8 w-8 text-[#a855f7]" />
           </div>
 
-          {/* Title */}
-          <p className="text-white/70 text-sm mb-1">You're near</p>
-          <h2 className="text-2xl font-bold text-white mb-6">{detectedVenue.name}</h2>
-
-          {/* Question */}
-          <p className="text-white/80 mb-6">Want to share you're out?</p>
+          {/* Single clear question with venue name */}
+          <h2 className="text-2xl font-bold text-white mb-6">
+            You're near {detectedVenue.name}.<br />Are you out?
+          </h2>
 
           {/* Confirm button */}
           <Button

@@ -33,9 +33,9 @@ export const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2
 };
 
 /**
- * Get current GPS coordinates
+ * Get current GPS coordinates with timestamp for stale detection
  */
-export const getCurrentLocation = (): Promise<{ lat: number; lng: number; accuracy: number }> => {
+export const getCurrentLocation = (): Promise<{ lat: number; lng: number; accuracy: number; timestamp: number }> => {
   return new Promise((resolve, reject) => {
     if (!('geolocation' in navigator)) {
       reject(new Error('Geolocation is not supported'));
@@ -48,6 +48,7 @@ export const getCurrentLocation = (): Promise<{ lat: number; lng: number; accura
           lat: position.coords.latitude,
           lng: position.coords.longitude,
           accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
         });
       },
       (error) => {
@@ -56,7 +57,7 @@ export const getCurrentLocation = (): Promise<{ lat: number; lng: number; accura
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 0,
+        maximumAge: 0, // Force fresh location, no caching
       }
     );
   });

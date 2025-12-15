@@ -1,19 +1,24 @@
 export type NightStatus = 'planning' | 'out' | 'home' | 'heading_out' | 'off' | null;
-export type DeliveryMethod = 'modal' | 'push' | 'toast';
+export type DeliveryMethod = 'modal' | 'toast' | 'push';
 
-export interface NudgeTriggerContext {
+export interface VenueArrivalContext {
   userId: string;
   status: NightStatus;
-  currentVenueId?: string;
-  detectedVenueId?: string;
-  gpsAccuracy?: number;
-}
-
-export interface ToastTriggerContext extends NudgeTriggerContext {
   currentVenueId: string | null;
   detectedVenueId: string;
+  distance: number; // Distance to detected venue in meters
   gpsAccuracy: number;
   locationSharingLevel: string;
+  lat: number;
+  lng: number;
+  timestamp: number; // For stale detection
+}
+
+export interface NudgeDecision {
+  shouldNudge: boolean;
+  reason: string;
+  deliveryMethod?: DeliveryMethod;
+  venue?: DetectedVenue;
 }
 
 export interface DwellTracker {
@@ -30,8 +35,30 @@ export interface DetectedVenue {
   distance?: number;
 }
 
-export interface NudgeDecision {
-  shouldNudge: boolean;
-  reason: string;
-  venue?: DetectedVenue;
+export interface VenueDeparture {
+  venueId: string;
+  departedAt: number;
+  maxDistanceReached: number; // Max distance observed since departure
+}
+
+export interface LocationSnapshot {
+  lat: number;
+  lng: number;
+  timestamp: number;
+}
+
+// Legacy types for backwards compatibility during migration
+export interface NudgeTriggerContext {
+  userId: string;
+  status: NightStatus;
+  currentVenueId?: string;
+  detectedVenueId?: string;
+  gpsAccuracy?: number;
+}
+
+export interface ToastTriggerContext extends NudgeTriggerContext {
+  currentVenueId: string | null;
+  detectedVenueId: string;
+  gpsAccuracy: number;
+  locationSharingLevel: string;
 }
