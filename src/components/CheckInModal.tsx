@@ -603,19 +603,6 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             Not yet, but planning on it 🎯
           </Button>
 
-          {/* Private Party - New option */}
-          <Button
-            onClick={() => {
-              handleStatusUpdate('private_party');
-            }}
-            size="lg"
-            className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#6366f1] to-[#4f46e5] text-white border border-[#6366f1]/40 hover:from-[#818cf8] hover:to-[#6366f1] hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-200 disabled:opacity-50"
-            disabled={isDetectingLocation}
-          >
-            <Home className="w-5 h-5 mr-2" />
-            I'm at a Private Party 🏠
-          </Button>
-          
           {/* No - Tertiary glass button */}
           <Button
             onClick={() => {
@@ -825,6 +812,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     </div>
   );
 
+  const handlePrivatePartyFromVenueConfirm = () => {
+    // Close venue confirm and start private party flow
+    setShowVenueConfirm(false);
+    setSelectedStatus('private_party');
+    setShowPrivatePartyPrivacy(true);
+  };
+
   const VenueConfirmContent = () => (
     <div className="relative p-6 space-y-6">
       <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
@@ -854,13 +848,37 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* No venue detected - show options */}
+          {!detectedVenue && (
+            <div className="space-y-3 mb-4">
+              <p className="text-sm text-white/60 text-center">
+                No nearby venues found
+              </p>
+              
+              {/* Private Party option - only shown when no venue detected */}
+              <Button
+                onClick={handlePrivatePartyFromVenueConfirm}
+                className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#6366f1] to-[#4f46e5] text-white border border-[#6366f1]/40 hover:from-[#818cf8] hover:to-[#6366f1] hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-200"
+              >
+                <Home className="w-5 h-5 mr-2" />
+                I'm at a Private Party 🏠
+              </Button>
+              
+              <div className="flex items-center gap-3 py-2">
+                <div className="flex-1 h-px bg-white/20" />
+                <span className="text-white/40 text-sm">or</span>
+                <div className="flex-1 h-px bg-white/20" />
+              </div>
+            </div>
+          )}
+          
           <Input
             value={customVenue}
             onChange={(e) => setCustomVenue(e.target.value)}
             onFocus={handleInputFocus}
             placeholder={detectedVenue ? "Enter different venue..." : "Enter venue name..."}
             className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#d4ff00] text-white placeholder:text-white/40 focus:ring-[#d4ff00]"
-            autoFocus
+            autoFocus={!!detectedVenue}
           />
           {detectedVenue && (
             <button
@@ -873,11 +891,6 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               Use detected venue: {detectedVenue}
             </button>
           )}
-          {!detectedVenue && (
-            <p className="text-sm text-white/60 text-center">
-              No nearby venues found. Enter manually.
-            </p>
-          )}
         </div>
       )}
 
@@ -886,7 +899,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         disabled={!customVenue.trim()}
         className="w-full h-14 text-lg font-semibold rounded-full bg-[#5b21b6] text-[#d4ff00] border-2 border-[#d4ff00] hover:bg-[#6d28d9] shadow-[0_0_20px_rgba(212,255,0,0.4)] disabled:opacity-50"
       >
-        Confirm
+        {detectedVenue ? 'Confirm' : 'Enter Venue Manually'}
       </Button>
     </div>
   );
