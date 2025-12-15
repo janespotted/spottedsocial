@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
-import { MapPin, Edit3, Clock, Bell, X, AlarmClock, ChevronDown } from 'lucide-react';
+import { MapPin, Edit3, Clock, Bell, X, AlarmClock, ChevronDown, Home } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -18,6 +18,7 @@ import { logEvent } from '@/lib/event-logger';
 import { useUserCity } from '@/hooks/useUserCity';
 import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
 import { useKeyboardAware } from '@/hooks/useKeyboardAware';
+import { PrivatePartyInviteModal } from '@/components/PrivatePartyInviteModal';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -47,7 +48,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const isMobile = useIsMobile();
   const { city } = useUserCity();
   const { handleInputFocus } = useKeyboardAware();
-  const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home' | 'planning'>('home');
+  const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home' | 'planning' | 'private_party'>('home');
   
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -66,6 +67,14 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [customReminderMinutes, setCustomReminderMinutes] = useState('');
   const [hasPendingReminder, setHasPendingReminder] = useState(false);
   const [pendingReminderTime, setPendingReminderTime] = useState<number | null>(null);
+
+  // Private party state
+  const [showPrivatePartyNeighborhood, setShowPrivatePartyNeighborhood] = useState(false);
+  const [showPrivatePartyPrivacy, setShowPrivatePartyPrivacy] = useState(false);
+  const [showPrivatePartyInvite, setShowPrivatePartyInvite] = useState(false);
+  const [privatePartyNeighborhood, setPrivatePartyNeighborhood] = useState<string>('');
+  const [privatePartyAddress, setPrivatePartyAddress] = useState<string>('');
+  const [privatePartyVisibility, setPrivatePartyVisibility] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('close_friends');
 
   // Check for pending reminder when modal opens
   useEffect(() => {
@@ -198,7 +207,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     }
   };
 
-  const handleStatusUpdate = async (status: 'out' | 'heading_out' | 'home' | 'planning') => {
+  const handleStatusUpdate = async (status: 'out' | 'heading_out' | 'home' | 'planning' | 'private_party') => {
     setSelectedStatus(status);
 
     if (status === 'out') {
@@ -208,11 +217,87 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     } else if (status === 'planning') {
       // Show privacy selector first for planning mode
       setShowPlanningPrivacy(true);
+    } else if (status === 'private_party') {
+      // Show privacy selector first for private party
+      setShowPrivatePartyPrivacy(true);
     } else {
       await stopLocationTracking();
       await updateStatus(status, null, null, null);
       onOpenChange(false);
     }
+  };
+
+  const handlePrivatePartyPrivacyConfirm = () => {
+    setShowPrivatePartyPrivacy(false);
+    setPrivatePartyNeighborhood('');
+    setShowPrivatePartyNeighborhood(true);
+  };
+
+  const handlePrivatePartyNeighborhoodConfirm = async () => {
+    if (!privatePartyNeighborhood) return;
+    
+    await updatePrivatePartyStatus();
+    setShowPrivatePartyNeighborhood(false);
+    // Ask if they want to invite friends
+    setShowPrivatePartyInvite(true);
+  };
+
+  const updatePrivatePartyStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const statusData = {
+        user_id: user.id,
+        status: 'out' as const,
+        lat: null,
+        lng: null,
+        venue_name: null,
+        venue_id: null,
+        updated_at: new Date().toISOString(),
+        expires_at: calculateExpiryTime(),
+        planning_neighborhood: null,
+        planning_visibility: privatePartyVisibility,
+        is_private_party: true,
+        party_neighborhood: privatePartyNeighborhood,
+        party_address: privatePartyAddress || null,
+      };
+
+      const { error } = await supabase
+        .from('night_statuses')
+        .upsert(statusData, { onConflict: 'user_id' });
+
+      if (error) throw error;
+
+      // Update profile
+      await supabase
+        .from('profiles')
+        .update({ 
+          is_out: true,
+          location_sharing_level: privatePartyVisibility,
+        })
+        .eq('id', user.id);
+
+      haptic.medium();
+      
+      // Show confirmation
+      showOutConfirmation(`Private Party (${privatePartyNeighborhood})`, privatePartyVisibility);
+      
+      logEvent('private_party_checkin', {
+        neighborhood: privatePartyNeighborhood,
+        visibility: privatePartyVisibility,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message,
+      });
+    }
+  };
+
+  const handlePrivatePartyInvitesSent = () => {
+    setShowPrivatePartyInvite(false);
+    onOpenChange(false);
   };
 
   const handlePlanningPrivacyConfirm = () => {
@@ -516,6 +601,19 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             disabled={isDetectingLocation}
           >
             Not yet, but planning on it 🎯
+          </Button>
+
+          {/* Private Party - New option */}
+          <Button
+            onClick={() => {
+              handleStatusUpdate('private_party');
+            }}
+            size="lg"
+            className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#6366f1] to-[#4f46e5] text-white border border-[#6366f1]/40 hover:from-[#818cf8] hover:to-[#6366f1] hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-200 disabled:opacity-50"
+            disabled={isDetectingLocation}
+          >
+            <Home className="w-5 h-5 mr-2" />
+            I'm at a Private Party 🏠
           </Button>
           
           {/* No - Tertiary glass button */}
@@ -915,17 +1013,142 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     </div>
   );
 
+  const PrivatePartyPrivacyContent = () => (
+    <div className="relative p-6 space-y-6">
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+      
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
+          <Home className="h-6 w-6 text-[#6366f1]" />
+        </div>
+        <div>
+          <h3 className="text-xl font-semibold text-white">Private Party</h3>
+          <p className="text-white/60 text-sm">Who can see you're at a party?</p>
+        </div>
+      </div>
+      
+      <div className="h-px bg-white/20" />
+
+      <div className="space-y-4">
+        <button
+          onClick={() => setPrivatePartyVisibility('close_friends')}
+          className="w-full flex items-center gap-4 text-left"
+        >
+          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+            privatePartyVisibility === 'close_friends' ? 'border-[#6366f1]' : 'border-white/40'
+          }`}>
+            {privatePartyVisibility === 'close_friends' && (
+              <div className="w-4 h-4 rounded-full bg-[#6366f1]" />
+            )}
+          </div>
+          <span className="text-lg text-white">Close Friends 💛</span>
+        </button>
+
+        <button
+          onClick={() => setPrivatePartyVisibility('all_friends')}
+          className="w-full flex items-center gap-4 text-left"
+        >
+          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+            privatePartyVisibility === 'all_friends' ? 'border-[#6366f1]' : 'border-white/40'
+          }`}>
+            {privatePartyVisibility === 'all_friends' && (
+              <div className="w-4 h-4 rounded-full bg-[#6366f1]" />
+            )}
+          </div>
+          <span className="text-lg text-white">All Friends 👫</span>
+        </button>
+
+        <button
+          onClick={() => setPrivatePartyVisibility('mutual_friends')}
+          className="w-full flex items-center gap-4 text-left"
+        >
+          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+            privatePartyVisibility === 'mutual_friends' ? 'border-[#6366f1]' : 'border-white/40'
+          }`}>
+            {privatePartyVisibility === 'mutual_friends' && (
+              <div className="w-4 h-4 rounded-full bg-[#6366f1]" />
+            )}
+          </div>
+          <span className="text-lg text-white">Mutual Friends 🔗</span>
+        </button>
+      </div>
+
+      <Button
+        onClick={handlePrivatePartyPrivacyConfirm}
+        className="w-full h-14 text-lg font-semibold rounded-full bg-[#6366f1] text-white border-2 border-[#6366f1] hover:bg-[#6366f1]/80 shadow-[0_0_20px_rgba(99,102,241,0.4)]"
+      >
+        Continue
+      </Button>
+    </div>
+  );
+
+  const PrivatePartyNeighborhoodContent = () => {
+    const neighborhoods = CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS['la'];
+    
+    return (
+      <div className="relative p-6 space-y-6">
+        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+        
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
+            <Home className="h-6 w-6 text-[#6366f1]" />
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-white">What neighborhood?</h3>
+            <p className="text-white/60 text-sm">Only the area is shown, not the address</p>
+          </div>
+        </div>
+        
+        <div className="h-px bg-white/20" />
+
+        <div className="space-y-4">
+          <Select value={privatePartyNeighborhood} onValueChange={setPrivatePartyNeighborhood}>
+            <SelectTrigger className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#6366f1]/50 text-white focus:ring-[#6366f1] focus:border-[#6366f1]">
+              <SelectValue placeholder="Select neighborhood..." />
+            </SelectTrigger>
+            <SelectContent className="bg-[#1a0f2e] border-2 border-[#6366f1]/30 max-h-60 z-[600]">
+              {neighborhoods.map((neighborhood) => (
+                <SelectItem 
+                  key={neighborhood} 
+                  value={neighborhood}
+                  className="text-white hover:bg-[#6366f1]/20 focus:bg-[#6366f1]/20 cursor-pointer"
+                >
+                  {neighborhood}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Button
+          onClick={handlePrivatePartyNeighborhoodConfirm}
+          disabled={!privatePartyNeighborhood}
+          className="w-full h-14 text-lg font-semibold rounded-full bg-[#6366f1] text-white border-2 border-[#6366f1] hover:bg-[#6366f1]/80 shadow-[0_0_20px_rgba(99,102,241,0.4)] disabled:opacity-50"
+        >
+          Confirm
+        </Button>
+
+        <p className="text-center text-sm text-white/60 italic">
+          Friends will see a fuzzy pin in this area
+        </p>
+      </div>
+    );
+  };
+
+  // Determine if any private party modal is showing
+  const isPrivatePartyFlowOpen = showPrivatePartyPrivacy || showPrivatePartyNeighborhood;
+
   return (
     <>
       {/* Status Modal */}
       {isMobile ? (
-        <Drawer open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood && !showPlanningPrivacy} onOpenChange={onOpenChange}>
+        <Drawer open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood && !showPlanningPrivacy && !isPrivatePartyFlowOpen} onOpenChange={onOpenChange}>
           <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-0 border-t-2 border-[#a855f7]/30 shadow-[0_-20px_60px_rgba(168,85,247,0.4)]">
             <StatusContent />
           </DrawerContent>
         </Drawer>
       ) : (
-        <Dialog open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood && !showPlanningPrivacy} onOpenChange={onOpenChange}>
+        <Dialog open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood && !showPlanningPrivacy && !isPrivatePartyFlowOpen} onOpenChange={onOpenChange}>
           <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 shadow-[0_0_80px_rgba(168,85,247,0.5),0_0_40px_rgba(139,92,246,0.4)] max-w-md p-0 overflow-hidden rounded-3xl">
             <StatusContent />
           </DialogContent>
@@ -991,6 +1214,49 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Private Party Privacy Modal */}
+      {isMobile ? (
+        <Drawer open={showPrivatePartyPrivacy} onOpenChange={setShowPrivatePartyPrivacy}>
+          <DrawerContent className="bg-[#2d1b4e] border-0">
+            <PrivatePartyPrivacyContent />
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={showPrivatePartyPrivacy} onOpenChange={setShowPrivatePartyPrivacy}>
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(99,102,241,0.6)] max-w-sm p-0 overflow-hidden">
+            <PrivatePartyPrivacyContent />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Private Party Neighborhood Modal */}
+      {isMobile ? (
+        <Drawer open={showPrivatePartyNeighborhood} onOpenChange={setShowPrivatePartyNeighborhood}>
+          <DrawerContent className="bg-[#2d1b4e] border-0">
+            <PrivatePartyNeighborhoodContent />
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={showPrivatePartyNeighborhood} onOpenChange={setShowPrivatePartyNeighborhood}>
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(99,102,241,0.6)] max-w-sm p-0 overflow-hidden">
+            <PrivatePartyNeighborhoodContent />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Private Party Invite Modal */}
+      <PrivatePartyInviteModal
+        open={showPrivatePartyInvite}
+        onClose={() => {
+          setShowPrivatePartyInvite(false);
+          onOpenChange(false);
+        }}
+        neighborhood={privatePartyNeighborhood}
+        address={privatePartyAddress}
+        onAddressChange={setPrivatePartyAddress}
+        onInvitesSent={handlePrivatePartyInvitesSent}
+      />
     </>
   );
 }
