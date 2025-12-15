@@ -6,7 +6,7 @@ const DISMISS_COOLDOWN_MS = 15 * 60 * 1000; // 15 min per venue
 
 // Toast-specific constants
 const TOAST_COOLDOWN_MS = 60 * 60 * 1000; // 60 minutes global cooldown
-const GPS_ACCURACY_THRESHOLD = 75; // meters
+const GPS_ACCURACY_THRESHOLD = 50; // meters - hard gate for all nudges
 const DWELL_TIME_MS = 45 * 1000; // 45 seconds
 
 // Trigger state (singleton)
@@ -84,13 +84,23 @@ export function canTrigger(context: NudgeTriggerContext): NudgeDecision {
     return { shouldNudge: false, reason: `Status '${context.status}' blocks nudge` };
   }
 
-  // 2. Debounce
+  // 2. GPS accuracy gate (hard gate - reject low-confidence reads)
+  if (context.gpsAccuracy === undefined || context.gpsAccuracy > GPS_ACCURACY_THRESHOLD) {
+    return { shouldNudge: false, reason: `GPS accuracy too low: ${Math.round(context.gpsAccuracy ?? 999)}m (need ≤${GPS_ACCURACY_THRESHOLD}m)` };
+  }
+
+  // 3. Dwell time check (45 seconds within radius)
+  if (context.detectedVenueId && !updateDwellTime(context.detectedVenueId)) {
+    return { shouldNudge: false, reason: 'Dwell time not met (need 45s within radius)' };
+  }
+
+  // 4. Debounce
   const now = Date.now();
   if (now - lastCheckTime < DEBOUNCE_MS) {
     return { shouldNudge: false, reason: 'Debounce active' };
   }
 
-  // 3. Checking guard
+  // 5. Checking guard
   if (isChecking) {
     return { shouldNudge: false, reason: 'Check already in progress' };
   }
