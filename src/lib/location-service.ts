@@ -35,7 +35,7 @@ export const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2
 /**
  * Get current GPS coordinates
  */
-export const getCurrentLocation = (): Promise<{ lat: number; lng: number }> => {
+export const getCurrentLocation = (): Promise<{ lat: number; lng: number; accuracy: number }> => {
   return new Promise((resolve, reject) => {
     if (!('geolocation' in navigator)) {
       reject(new Error('Geolocation is not supported'));
@@ -47,6 +47,7 @@ export const getCurrentLocation = (): Promise<{ lat: number; lng: number }> => {
         resolve({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
         });
       },
       (error) => {
