@@ -4,6 +4,7 @@ export function useKeyboardAware() {
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const initialViewportHeight = useRef<number>(window.innerHeight);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -13,11 +14,18 @@ export function useKeyboardAware() {
     initialViewportHeight.current = viewport.height;
 
     const handleResize = () => {
-      const heightDiff = initialViewportHeight.current - viewport.height;
-      // Keyboard is considered open if viewport shrunk by more than 150px
-      const open = heightDiff > 150;
-      setIsKeyboardOpen(open);
-      setKeyboardHeight(open ? heightDiff : 0);
+      // Debounce to prevent jitter during typing
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      
+      debounceRef.current = setTimeout(() => {
+        const heightDiff = initialViewportHeight.current - viewport.height;
+        // Keyboard is considered open if viewport shrunk by more than 150px
+        const open = heightDiff > 150;
+        setIsKeyboardOpen(open);
+        setKeyboardHeight(open ? heightDiff : 0);
+      }, 100);
     };
 
     viewport.addEventListener('resize', handleResize);
@@ -26,6 +34,9 @@ export function useKeyboardAware() {
     return () => {
       viewport.removeEventListener('resize', handleResize);
       viewport.removeEventListener('scroll', handleResize);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
     };
   }, []);
 
