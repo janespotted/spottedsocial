@@ -300,9 +300,17 @@ All colors MUST be HSL.
   }
 
   /* Touch optimization */
-  button, a, input, textarea {
+  button, a {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
-}
 
+  /* Input touch optimization - prevent jitter and iOS zoom */
+  input, textarea, select {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    -webkit-user-select: text;
+    user-select: text;
+    font-size: 16px; /* Prevents iOS auto-zoom on focus */
+  }
+}

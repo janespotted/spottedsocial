@@ -12,6 +12,7 @@ import { MeetUpProvider } from "./contexts/MeetUpContext";
 import { VenueInviteProvider } from "./contexts/VenueInviteContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { ImDownProvider } from "./contexts/ImDownContext";
+import { InputFocusProvider } from "./contexts/InputFocusContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminRoute } from "./components/AdminRoute";
 import { Layout } from "./components/Layout";
@@ -72,6 +73,7 @@ const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <InputFocusProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -249,6 +251,7 @@ const App = () => (
             </CheckInProvider>
           </AuthProvider>
         </BrowserRouter>
+        </InputFocusProvider>
       </TooltipProvider>
     </QueryClientProvider>
   </ErrorBoundary>

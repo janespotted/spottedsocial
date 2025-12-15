@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { useInputFocus } from '@/contexts/InputFocusContext';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentLocation, findNearestVenue } from '@/lib/location-service';
 import {
@@ -22,6 +23,7 @@ export { dismissVenuePrompt } from '@/lib/venue-arrival-nudge';
 export function useVenueArrivalNudge() {
   const { user } = useAuth();
   const { showVenueArrival, setDetectedVenue } = useCheckIn();
+  const { isInputFocusedRef } = useInputFocus();
   const hasCheckedRef = useRef(false);
   const [isOutStatus, setIsOutStatus] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -89,6 +91,12 @@ export function useVenueArrivalNudge() {
 
   const checkForNearbyVenue = useCallback(async () => {
     if (!user?.id) return;
+    
+    // Skip polling when user is typing to prevent jitter
+    if (isInputFocusedRef.current) {
+      console.log('[VenueArrivalNudge] Skipping - input focused');
+      return;
+    }
 
     try {
       // Fetch user's current status AND location_sharing_level in parallel
