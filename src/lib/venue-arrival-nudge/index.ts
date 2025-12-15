@@ -1,9 +1,19 @@
 // Types
-export type { NightStatus, DeliveryMethod, NudgeTriggerContext, DetectedVenue, NudgeDecision } from './types';
+export type { NightStatus, DeliveryMethod, NudgeTriggerContext, ToastTriggerContext, DetectedVenue, NudgeDecision, DwellTracker } from './types';
 
 // Trigger layer
-export { canTrigger, isVenueDismissed, dismissVenuePrompt, markCheckingStart, markCheckingEnd } from './trigger';
+export { 
+  canTrigger, 
+  canTriggerToast,
+  isVenueDismissed, 
+  dismissVenuePrompt, 
+  markCheckingStart, 
+  markCheckingEnd,
+  markToastShown,
+  suppressVenueTonight,
+  resetDwellTracker,
+} from './trigger';
 
 // Delivery layer
-export { createModalDelivery, createPushDelivery, getDeliveryMethod } from './delivery';
+export { createModalDelivery, createPushDelivery, getDeliveryMethod, getAudienceLabel } from './delivery';
 export type { NudgeDeliveryHandler } from './delivery';

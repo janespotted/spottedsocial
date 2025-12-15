@@ -1,10 +1,23 @@
 export type NightStatus = 'planning' | 'out' | 'home' | 'heading_out' | 'off' | null;
-export type DeliveryMethod = 'modal' | 'push';
+export type DeliveryMethod = 'modal' | 'push' | 'toast';
 
 export interface NudgeTriggerContext {
   userId: string;
   status: NightStatus;
   currentVenueId?: string;
+}
+
+export interface ToastTriggerContext extends NudgeTriggerContext {
+  currentVenueId: string | null;
+  detectedVenueId: string;
+  gpsAccuracy: number;
+  locationSharingLevel: string;
+}
+
+export interface DwellTracker {
+  venueId: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
 }
 
 export interface DetectedVenue {
