@@ -110,6 +110,15 @@ export function useVenueArrivalNudge() {
 
       // Get location WITH accuracy
       const location = await getCurrentLocation();
+      
+      // Hard gate: reject low-confidence reads immediately
+      const GPS_ACCURACY_THRESHOLD = 50;
+      if (location.accuracy > GPS_ACCURACY_THRESHOLD) {
+        resetDwellTracker();
+        console.log('[VenueArrivalNudge] GPS accuracy too low, resetting dwell:', Math.round(location.accuracy), 'm');
+        return;
+      }
+
       const nearestVenue = await findNearestVenue(location.lat, location.lng, 200);
 
       // No venue nearby - reset dwell tracker
@@ -157,6 +166,8 @@ export function useVenueArrivalNudge() {
         userId: user.id,
         status: nightStatus?.status ?? null,
         currentVenueId: nightStatus?.venue_id ?? undefined,
+        detectedVenueId: nearestVenue.id,
+        gpsAccuracy: location.accuracy,
       };
 
       // Check trigger conditions for modal

@@ -5,6 +5,8 @@ export interface NudgeTriggerContext {
   userId: string;
   status: NightStatus;
   currentVenueId?: string;
+  detectedVenueId?: string;
+  gpsAccuracy?: number;
 }
 
 export interface ToastTriggerContext extends NudgeTriggerContext {
