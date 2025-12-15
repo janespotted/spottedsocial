@@ -6,7 +6,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { dismissVenuePrompt } from '@/hooks/usePlanningVenueDetection';
+import { dismissVenuePrompt } from '@/lib/venue-arrival-nudge';
 import { haptic } from '@/lib/haptics';
 
 export function VenueArrivalPrompt() {

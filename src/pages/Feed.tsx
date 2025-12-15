@@ -4,7 +4,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
-import { usePlanningVenueDetection } from '@/hooks/usePlanningVenueDetection';
+import { useVenueArrivalNudge } from '@/hooks/useVenueArrivalNudge';
 import { useFeed } from '@/hooks/useFeed';
 import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
@@ -41,7 +41,7 @@ export default function Feed() {
   const { unreadCount } = useNotifications();
   const { city } = useUserCity();
   useAutoVenueTracking();
-  usePlanningVenueDetection();
+  useVenueArrivalNudge();
 
   const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends, cacheStories, getCachedStories } = useOfflineCache();
 

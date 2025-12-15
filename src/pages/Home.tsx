@@ -6,7 +6,7 @@ import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
-import { usePlanningVenueDetection } from '@/hooks/usePlanningVenueDetection';
+import { useVenueArrivalNudge } from '@/hooks/useVenueArrivalNudge';
 import { useFeed, Post } from '@/hooks/useFeed';
 import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
@@ -50,7 +50,7 @@ export default function Home() {
   const { city } = useUserCity();
   const { showNudgeModal, nudgeType, closeNudgeModal } = useDailyNudge();
   useAutoVenueTracking();
-  usePlanningVenueDetection();
+  useVenueArrivalNudge();
 
   const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends, cacheStories, getCachedStories } = useOfflineCache();
 
