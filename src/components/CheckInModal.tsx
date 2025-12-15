@@ -591,7 +591,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes 🎉'}
           </Button>
           
-          {/* Planning - Secondary purple button with gradient */}
+          {/* Planning - Secondary purple button */}
           <Button
             onClick={() => {
               handleStatusUpdate('planning');
@@ -600,7 +600,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#a855f7] to-[#9333ea] text-white border border-[#a855f7]/40 hover:from-[#b668f8] hover:to-[#a855f7] hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
-            Not yet, but planning on it 🎯
+            Planning on it 🎯
           </Button>
 
           {/* No - Tertiary glass button */}
@@ -613,104 +613,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             className="w-full h-14 text-lg font-medium rounded-2xl bg-white/5 backdrop-blur-sm border border-white/15 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/25 transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
-            No, staying in 🛋️
+            No — staying in 🛋️
           </Button>
-          
-          {/* Still deciding - Glass button with dropdown */}
-          {showCustomReminder ? (
-            <div className="space-y-3">
-              <Input
-                type="number"
-                value={customReminderMinutes}
-                onChange={(e) => setCustomReminderMinutes(e.target.value)}
-                placeholder="Enter minutes..."
-                className="h-14 text-lg bg-white/5 backdrop-blur-sm border border-white/15 rounded-2xl text-white placeholder:text-white/40 focus:ring-white/30 focus:border-white/30"
-                autoFocus
-              />
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => setShowCustomReminder(false)}
-                  variant="ghost"
-                  className="flex-1 h-12 rounded-2xl bg-white/5 border border-white/15 text-white hover:bg-white/10"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCustomReminderSubmit}
-                  disabled={!customReminderMinutes || parseInt(customReminderMinutes, 10) <= 0}
-                  className="flex-1 h-12 rounded-2xl bg-gradient-to-b from-[#f0ff80] to-[#d4ff00] text-[#0a0118] font-semibold hover:from-[#f5ffb3] hover:to-[#e5ff4d]"
-                >
-                  Set Reminder
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className="w-full h-14 text-lg font-medium rounded-2xl bg-white/5 backdrop-blur-sm border border-white/15 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/25 transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
-                  disabled={isDetectingLocation}
-                >
-                  {isDetectingLocation && selectedStatus === 'heading_out' ? 'Detecting location...' : (
-                    <>
-                      Still deciding… ⏰
-                      <ChevronDown className="w-4 h-4 opacity-60" />
-                    </>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent 
-                className="w-64 bg-[#1a0f2e]/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
-                align="center"
-                side="bottom"
-                sideOffset={8}
-                style={{ zIndex: 9999 }}
-              >
-                {hasPendingReminder && (
-                  <>
-                    <DropdownMenuItem 
-                      onClick={handleCancelReminder} 
-                      className="text-red-400 hover:bg-red-500/10 cursor-pointer py-3 rounded-xl mx-1"
-                    >
-                      <X className="w-4 h-4 mr-3" /> Cancel ({getRemainingTime()} left)
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-white/10 my-1" />
-                  </>
-                )}
-                <DropdownMenuLabel className="text-white/50 text-center py-2 text-sm">
-                  Remind me in...
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/10 my-1" />
-                <DropdownMenuItem 
-                  onClick={() => handleSetReminder(15)} 
-                  className="text-white hover:bg-white/10 cursor-pointer py-3 rounded-xl mx-1"
-                >
-                  <Clock className="w-4 h-4 mr-3 text-white/50" /> 15 min
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => handleSetReminder(60)} 
-                  className="text-white hover:bg-white/10 cursor-pointer py-3 rounded-xl mx-1"
-                >
-                  <Clock className="w-4 h-4 mr-3 text-white/50" /> 1 hour
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => handleSetReminder(120)} 
-                  className="text-white hover:bg-white/10 cursor-pointer py-3 rounded-xl mx-1"
-                >
-                  <Clock className="w-4 h-4 mr-3 text-white/50" /> 2 hours
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/10 my-1" />
-                <DropdownMenuItem 
-                  onClick={() => setShowCustomReminder(true)} 
-                  className="text-white hover:bg-white/10 cursor-pointer py-3 rounded-xl mx-1"
-                >
-                  <Edit3 className="w-4 h-4 mr-3 text-white/50" /> Custom...
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
         </div>
 
 
