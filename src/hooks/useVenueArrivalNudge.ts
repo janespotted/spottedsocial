@@ -3,22 +3,34 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useInputFocus } from '@/contexts/InputFocusContext';
 import { supabase } from '@/integrations/supabase/client';
-import { getCurrentLocation, findNearestVenue } from '@/lib/location-service';
+import { getCurrentLocation, findNearestVenue, calculateDistance } from '@/lib/location-service';
 import {
-  canTrigger,
-  canTriggerToast,
+  canTriggerVenueArrival,
   isVenueDismissed,
   markCheckingStart,
   markCheckingEnd,
   markToastShown,
   resetDwellTracker,
   createModalDelivery,
+  recordDeparture,
+  updatePreviousVenue,
+  getPreviousVenueId,
+  suppressVenueTonight,
 } from '@/lib/venue-arrival-nudge';
-import type { NudgeTriggerContext, ToastTriggerContext } from '@/lib/venue-arrival-nudge';
+import type { VenueArrivalContext, NightStatus } from '@/lib/venue-arrival-nudge';
 import { showVenueArrivalToast } from '@/components/VenueArrivalToast';
 
 // Re-export for consumers that need to dismiss venues
-export { dismissVenuePrompt } from '@/lib/venue-arrival-nudge';
+export { dismissVenuePrompt, suppressVenueTonight } from '@/lib/venue-arrival-nudge';
+
+// Store venue locations for departure detection
+interface VenueLocation {
+  id: string;
+  lat: number;
+  lng: number;
+}
+
+let knownVenues: Map<string, VenueLocation> = new Map();
 
 export function useVenueArrivalNudge() {
   const { user } = useAuth();
@@ -32,7 +44,12 @@ export function useVenueArrivalNudge() {
   const deliveryHandler = createModalDelivery(setDetectedVenue, showVenueArrival);
 
   // Silent venue update for toast flow (updates venue without changing status)
-  const silentVenueUpdate = useCallback(async (userId: string, venue: { id: string; name: string }, lat: number, lng: number) => {
+  const silentVenueUpdate = useCallback(async (
+    userId: string, 
+    venue: { id: string; name: string }, 
+    lat: number, 
+    lng: number
+  ) => {
     const now = new Date().toISOString();
     
     try {
@@ -83,9 +100,8 @@ export function useVenueArrivalNudge() {
     }
   }, []);
 
-  // Handler to open audience selector (placeholder - integrate with your audience sheet)
+  // Handler to open audience selector
   const handleChangeAudience = useCallback(() => {
-    // TODO: Open the audience selector sheet/modal
     console.log('[VenueArrivalNudge] Change audience requested');
   }, []);
 
@@ -103,7 +119,7 @@ export function useVenueArrivalNudge() {
       const [{ data: nightStatus }, { data: profile }] = await Promise.all([
         supabase
           .from('night_statuses')
-          .select('status, venue_id')
+          .select('status, venue_id, lat, lng')
           .eq('user_id', user.id)
           .maybeSingle(),
         supabase
@@ -116,47 +132,77 @@ export function useVenueArrivalNudge() {
       // Track if user is out for polling setup
       setIsOutStatus(nightStatus?.status === 'out');
 
-      // Get location WITH accuracy
+      // Get location WITH accuracy AND timestamp
       const location = await getCurrentLocation();
       
-      // Hard gate: reject low-confidence reads immediately
-      const GPS_ACCURACY_THRESHOLD = 50;
-      if (location.accuracy > GPS_ACCURACY_THRESHOLD) {
-        resetDwellTracker();
-        console.log('[VenueArrivalNudge] GPS accuracy too low, resetting dwell:', Math.round(location.accuracy), 'm');
-        return;
+      // Check for departure from previous venue
+      const prevVenueId = getPreviousVenueId();
+      if (prevVenueId && knownVenues.has(prevVenueId)) {
+        const prevVenue = knownVenues.get(prevVenueId)!;
+        const distanceFromPrevVenue = calculateDistance(
+          location.lat, 
+          location.lng, 
+          prevVenue.lat, 
+          prevVenue.lng
+        );
+        
+        // If moved significantly away from previous venue, record departure
+        if (distanceFromPrevVenue > 300) {
+          recordDeparture(prevVenueId, distanceFromPrevVenue);
+          console.log('[VenueArrivalNudge] Departure recorded:', prevVenueId, Math.round(distanceFromPrevVenue), 'm');
+        }
       }
 
-      const nearestVenue = await findNearestVenue(location.lat, location.lng, 200);
+      // Find nearest venue
+      const nearestVenue = await findNearestVenue(location.lat, location.lng, 500);
 
-      // No venue nearby - reset dwell tracker
+      // No venue within max detection range - reset dwell tracker
       if (!nearestVenue) {
         resetDwellTracker();
-        console.log('[VenueArrivalNudge] No venue within range');
+        updatePreviousVenue(null);
+        console.log('[VenueArrivalNudge] No venue within 500m');
         return;
       }
 
-      // BRANCH: User is already "out" → Toast flow
-      if (nightStatus?.status === 'out') {
-        const toastContext: ToastTriggerContext = {
-          userId: user.id,
-          status: nightStatus.status,
-          currentVenueId: nightStatus.venue_id ?? null,
-          detectedVenueId: nearestVenue.id,
-          gpsAccuracy: location.accuracy,
-          locationSharingLevel: profile?.location_sharing_level ?? 'all_friends',
-        };
+      // Store venue location for future departure detection
+      knownVenues.set(nearestVenue.id, {
+        id: nearestVenue.id,
+        lat: location.lat, // Approximate using user's location
+        lng: location.lng,
+      });
 
-        const decision = canTriggerToast(toastContext);
-        if (!decision.shouldNudge) {
-          console.log('[VenueArrivalNudge] Toast blocked:', decision.reason);
-          return;
-        }
+      // Build unified context
+      const context: VenueArrivalContext = {
+        userId: user.id,
+        status: (nightStatus?.status as NightStatus) ?? null,
+        currentVenueId: nightStatus?.venue_id ?? null,
+        detectedVenueId: nearestVenue.id,
+        distance: nearestVenue.distance,
+        gpsAccuracy: location.accuracy,
+        locationSharingLevel: profile?.location_sharing_level ?? 'all_friends',
+        lat: location.lat,
+        lng: location.lng,
+        timestamp: location.timestamp,
+      };
 
-        // Mark toast as shown BEFORE delivering
+      // Single unified trigger check
+      const decision = canTriggerVenueArrival(context);
+      
+      if (!decision.shouldNudge) {
+        console.log('[VenueArrivalNudge] Blocked:', decision.reason);
+        return;
+      }
+
+      console.log('[VenueArrivalNudge] Triggering:', decision.deliveryMethod, 'for', nearestVenue.name);
+      markCheckingStart();
+
+      // Update previous venue tracking
+      updatePreviousVenue(nearestVenue.id);
+
+      if (decision.deliveryMethod === 'toast') {
+        // Toast flow for "out" users
         markToastShown(nearestVenue.id);
 
-        // Deliver via toast
         showVenueArrivalToast({
           venueName: nearestVenue.name,
           venueId: nearestVenue.id,
@@ -166,47 +212,27 @@ export function useVenueArrivalNudge() {
 
         // Silent venue update in background
         await silentVenueUpdate(user.id, nearestVenue, location.lat, location.lng);
-        return;
+      } else {
+        // Modal flow for planning/no-status users
+        if (isVenueDismissed(nearestVenue.id)) {
+          console.log('[VenueArrivalNudge] Venue dismissed recently:', nearestVenue.name);
+          return;
+        }
+
+        deliveryHandler.deliver({
+          id: nearestVenue.id,
+          name: nearestVenue.name,
+          lat: location.lat,
+          lng: location.lng,
+          distance: nearestVenue.distance,
+        });
       }
-
-      // EXISTING: User is planning/no-status → Modal flow
-      const context: NudgeTriggerContext = {
-        userId: user.id,
-        status: nightStatus?.status ?? null,
-        currentVenueId: nightStatus?.venue_id ?? undefined,
-        detectedVenueId: nearestVenue.id,
-        gpsAccuracy: location.accuracy,
-      };
-
-      // Check trigger conditions for modal
-      const decision = canTrigger(context);
-      if (!decision.shouldNudge) {
-        console.log('[VenueArrivalNudge] Modal blocked:', decision.reason);
-        return;
-      }
-
-      markCheckingStart();
-
-      // Check venue-specific cooldown
-      if (isVenueDismissed(nearestVenue.id)) {
-        console.log('[VenueArrivalNudge] Venue dismissed recently:', nearestVenue.name);
-        return;
-      }
-
-      // Deliver the nudge via modal
-      deliveryHandler.deliver({
-        id: nearestVenue.id,
-        name: nearestVenue.name,
-        lat: location.lat,
-        lng: location.lng,
-        distance: nearestVenue.distance,
-      });
     } catch (error) {
       console.error('[VenueArrivalNudge] Detection error:', error);
     } finally {
       markCheckingEnd();
     }
-  }, [user?.id, deliveryHandler, silentVenueUpdate, handleChangeAudience]);
+  }, [user?.id, deliveryHandler, silentVenueUpdate, handleChangeAudience, isInputFocusedRef]);
 
   // Initial check on mount
   useEffect(() => {
