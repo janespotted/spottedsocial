@@ -431,9 +431,12 @@ export type Database = {
           expires_at: string | null
           id: string
           is_demo: boolean | null
+          is_private_party: boolean | null
           is_promoted: boolean | null
           lat: number | null
           lng: number | null
+          party_address: string | null
+          party_neighborhood: string | null
           planning_neighborhood: string | null
           planning_visibility: string | null
           status: Database["public"]["Enums"]["night_status_enum"]
@@ -446,9 +449,12 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_demo?: boolean | null
+          is_private_party?: boolean | null
           is_promoted?: boolean | null
           lat?: number | null
           lng?: number | null
+          party_address?: string | null
+          party_neighborhood?: string | null
           planning_neighborhood?: string | null
           planning_visibility?: string | null
           status?: Database["public"]["Enums"]["night_status_enum"]
@@ -461,9 +467,12 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_demo?: boolean | null
+          is_private_party?: boolean | null
           is_promoted?: boolean | null
           lat?: number | null
           lng?: number | null
+          party_address?: string | null
+          party_neighborhood?: string | null
           planning_neighborhood?: string | null
           planning_visibility?: string | null
           status?: Database["public"]["Enums"]["night_status_enum"]

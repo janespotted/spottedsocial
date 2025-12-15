@@ -7,7 +7,8 @@ export type EventType =
   | 'invite_sent'
   | 'invite_received'
   | 'invite_accepted'
-  | 'invite_declined';
+  | 'invite_declined'
+  | 'private_party_checkin';
 
 /**
  * Lightweight event logger for internal debugging

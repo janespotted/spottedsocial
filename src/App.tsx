@@ -13,6 +13,7 @@ import { VenueInviteProvider } from "./contexts/VenueInviteContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { ImDownProvider } from "./contexts/ImDownContext";
 import { InputFocusProvider } from "./contexts/InputFocusContext";
+import { PrivatePartyProvider } from "./contexts/PrivatePartyContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminRoute } from "./components/AdminRoute";
 import { Layout } from "./components/Layout";
@@ -85,6 +86,7 @@ const App = () => (
                   <VenueInviteProvider>
                     <NotificationsProvider>
                       <ImDownProvider>
+                        <PrivatePartyProvider>
                         <AutoTracker />
                         <FriendIdCard />
                         <VenueIdCard />
@@ -242,6 +244,7 @@ const App = () => (
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
+                        </PrivatePartyProvider>
                       </ImDownProvider>
                     </NotificationsProvider>
                   </VenueInviteProvider>
