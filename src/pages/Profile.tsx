@@ -352,13 +352,6 @@ export default function Profile() {
               <Settings className="h-5 w-5" />
             </button>
             <button
-              onClick={() => navigate('/friend-requests')}
-              className="w-10 h-10 rounded-full bg-[#2d1b4e] border border-[#a855f7]/40 flex items-center justify-center text-white hover:bg-[#a855f7]/20 transition-colors"
-              aria-label="Friend Requests"
-            >
-              <UserPlus className="h-5 w-5" />
-            </button>
-            <button
               onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
               className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
               aria-label="View activity"
@@ -453,6 +446,13 @@ export default function Profile() {
                 <div className="text-2xl font-bold text-white">{placesCount}</div>
                 <div className="text-white/60 text-sm">Places</div>
               </div>
+              <button
+                onClick={() => navigate('/friend-requests')}
+                className="w-9 h-9 rounded-full bg-[#2d1b4e] border border-[#a855f7]/40 flex items-center justify-center text-white hover:bg-[#a855f7]/20 transition-colors ml-3"
+                aria-label="Friend Requests"
+              >
+                <UserPlus className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>
