@@ -10,7 +10,7 @@ import { MapPin, Edit3, Clock, Bell, X, AlarmClock, ChevronDown, Home } from 'lu
 import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
+import { captureLocationWithVenue, createNewVenue, detectNeighborhoodFromGPS, type LocationData } from '@/lib/location-service';
 
 import { haptic } from '@/lib/haptics';
 import { requestNotificationPermission } from '@/lib/notifications';
@@ -75,6 +75,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [privatePartyNeighborhood, setPrivatePartyNeighborhood] = useState<string>('');
   const [privatePartyAddress, setPrivatePartyAddress] = useState<string>('');
   const [privatePartyVisibility, setPrivatePartyVisibility] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('close_friends');
+  const [isDetectingNeighborhood, setIsDetectingNeighborhood] = useState(false);
+  const [showNeighborhoodManualSelect, setShowNeighborhoodManualSelect] = useState(false);
 
   // Check for pending reminder when modal opens
   useEffect(() => {
@@ -227,10 +229,28 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     }
   };
 
-  const handlePrivatePartyPrivacyConfirm = () => {
+  const handlePrivatePartyPrivacyConfirm = async () => {
     setShowPrivatePartyPrivacy(false);
     setPrivatePartyNeighborhood('');
+    setShowNeighborhoodManualSelect(false);
     setShowPrivatePartyNeighborhood(true);
+    
+    // Auto-detect neighborhood from GPS
+    setIsDetectingNeighborhood(true);
+    try {
+      const detectedNeighborhood = await detectNeighborhoodFromGPS(city);
+      if (detectedNeighborhood) {
+        setPrivatePartyNeighborhood(detectedNeighborhood);
+      } else {
+        // Fallback to manual selection if detection fails
+        setShowNeighborhoodManualSelect(true);
+      }
+    } catch (error) {
+      console.error('Failed to detect neighborhood:', error);
+      setShowNeighborhoodManualSelect(true);
+    } finally {
+      setIsDetectingNeighborhood(false);
+    }
   };
 
   const handlePrivatePartyNeighborhoodConfirm = async () => {
@@ -1002,6 +1022,73 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const PrivatePartyNeighborhoodContent = () => {
     const neighborhoods = CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS['la'];
     
+    // Loading state while detecting
+    if (isDetectingNeighborhood) {
+      return (
+        <div className="relative p-6 space-y-6">
+          <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+          
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
+              <Home className="h-6 w-6 text-[#6366f1]" />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-white">Private Party</h3>
+              <p className="text-white/60 text-sm">Finding your neighborhood...</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-3 text-white/70">
+              <MapPin className="h-5 w-5 animate-pulse text-[#6366f1]" />
+              <span>📍 Detecting your neighborhood...</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Confirmation state (auto-detected)
+    if (privatePartyNeighborhood && !showNeighborhoodManualSelect) {
+      return (
+        <div className="relative p-6 space-y-6">
+          <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+          
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
+              <Home className="h-6 w-6 text-[#6366f1]" />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-white">Private Party</h3>
+              <p className="text-white/60 text-sm">Only the area is shown, not the address</p>
+            </div>
+          </div>
+          
+          <div className="h-px bg-white/20" />
+
+          <div className="text-center py-4">
+            <p className="text-white/60 text-sm mb-2">📍 Detected:</p>
+            <p className="text-2xl font-semibold text-white">{privatePartyNeighborhood}</p>
+          </div>
+
+          <Button
+            onClick={handlePrivatePartyNeighborhoodConfirm}
+            className="w-full h-14 text-lg font-semibold rounded-full bg-[#6366f1] text-white border-2 border-[#6366f1] hover:bg-[#6366f1]/80 shadow-[0_0_20px_rgba(99,102,241,0.4)]"
+          >
+            Looks right!
+          </Button>
+
+          <button
+            onClick={() => setShowNeighborhoodManualSelect(true)}
+            className="w-full text-center text-white/60 text-sm hover:text-white/80 transition-colors"
+          >
+            Not right? Change
+          </button>
+        </div>
+      );
+    }
+
+    // Manual selection fallback
     return (
       <div className="relative p-6 space-y-6">
         <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
