@@ -16,7 +16,6 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
 
   const videoConstraints = {
     facingMode: facingMode,
-    aspectRatio: 1, // Square for posts
   };
 
   const flipCamera = () => {
