@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
+import { useInputFocus } from '@/contexts/InputFocusContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
@@ -49,6 +50,7 @@ export default function Home() {
   const { unreadCount } = useNotifications();
   const { city } = useUserCity();
   const { showNudgeModal, nudgeType, closeNudgeModal } = useDailyNudge();
+  const { setInputFocused } = useInputFocus();
   useAutoVenueTracking();
   useVenueArrivalNudge();
 
@@ -623,6 +625,13 @@ export default function Home() {
                               handlePostComment(post.id);
                             }
                           }}
+                          onFocus={(e) => {
+                            setInputFocused(true);
+                            setTimeout(() => {
+                              e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }, 300);
+                          }}
+                          onBlur={() => setInputFocused(false)}
                           placeholder="Add a comment..."
                           maxLength={500}
                           className="flex-1 bg-[#1a0f2e]/60 border border-white/10 rounded-full px-4 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-[#d4ff00]/40"
