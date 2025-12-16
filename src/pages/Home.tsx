@@ -151,13 +151,21 @@ export default function Home() {
     }
 
     // Get friends with planning status (including neighborhood)
-    const { data: planningStatuses } = await supabase
+    // In bootstrap mode, also filter out demo night_statuses
+    let statusQuery = supabase
       .from('night_statuses')
-      .select('user_id, planning_neighborhood')
+      .select('user_id, planning_neighborhood, is_demo')
       .in('user_id', friendIds)
       .eq('status', 'planning')
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString());
+    
+    // Filter out demo statuses in bootstrap mode
+    if (bootstrapEnabled && !demoEnabled) {
+      statusQuery = statusQuery.eq('is_demo', false);
+    }
+    
+    const { data: planningStatuses } = await statusQuery;
 
     if (!planningStatuses || planningStatuses.length === 0) {
       setPlanningFriends([]);
