@@ -51,6 +51,8 @@ export default function Profile() {
   const [currentVenue, setCurrentVenue] = useState<string | null>(null);
   const [planningNeighborhood, setPlanningNeighborhood] = useState<string | null>(null);
   const [venueNeighborhood, setVenueNeighborhood] = useState<string | null>(null);
+  const [isPrivateParty, setIsPrivateParty] = useState(false);
+  const [partyNeighborhood, setPartyNeighborhood] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   
@@ -155,7 +157,7 @@ export default function Profile() {
     // Check user's current night status (out, planning, or home)
     const { data: nightStatus } = await supabase
       .from('night_statuses')
-      .select('status, venue_name, venue_id, planning_neighborhood')
+      .select('status, venue_name, venue_id, planning_neighborhood, is_private_party, party_neighborhood')
       .eq('user_id', user?.id)
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString())
@@ -165,7 +167,9 @@ export default function Profile() {
       setCurrentStatus(nightStatus.status as 'out' | 'planning' | 'home');
       setCurrentVenue(nightStatus.venue_name);
       setPlanningNeighborhood(nightStatus.planning_neighborhood);
-      setIsLocationSharing(nightStatus.status === 'out' && !!nightStatus.venue_name);
+      setIsPrivateParty(nightStatus.is_private_party || false);
+      setPartyNeighborhood(nightStatus.party_neighborhood);
+      setIsLocationSharing(nightStatus.status === 'out' && (!!nightStatus.venue_name || nightStatus.is_private_party));
       
       // Fetch venue neighborhood if user is out
       if (nightStatus.status === 'out' && nightStatus.venue_id) {
@@ -183,6 +187,8 @@ export default function Profile() {
       setCurrentVenue(null);
       setPlanningNeighborhood(null);
       setVenueNeighborhood(null);
+      setIsPrivateParty(false);
+      setPartyNeighborhood(null);
       setIsLocationSharing(false);
     }
 
@@ -381,11 +387,25 @@ export default function Profile() {
               "border-white/10"
             )}
           >
-            {currentStatus === 'out' && currentVenue ? (
-              <>
-                <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
-                <span className="text-[#d4ff00] font-medium">Out · {currentVenue}</span>
-              </>
+            {currentStatus === 'out' ? (
+              isPrivateParty ? (
+                <>
+                  <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
+                  <span className="text-[#d4ff00] font-medium">
+                    Out · Private Party{partyNeighborhood ? ` (${partyNeighborhood})` : ''}
+                  </span>
+                </>
+              ) : currentVenue ? (
+                <>
+                  <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
+                  <span className="text-[#d4ff00] font-medium">Out · {currentVenue}</span>
+                </>
+              ) : (
+                <>
+                  <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
+                  <span className="text-[#d4ff00] font-medium">Out</span>
+                </>
+              )
             ) : currentStatus === 'planning' ? (
               <>
                 <Target className="h-4 w-4 text-[#a855f7]" />
@@ -488,7 +508,9 @@ export default function Profile() {
                     <>
                       <span className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0" />
                       <p className="text-[#d4ff00] font-medium text-sm">
-                        You're out · {currentVenue || 'Unknown venue'}
+                        You're out · {isPrivateParty 
+                          ? `Private Party${partyNeighborhood ? ` (${partyNeighborhood})` : ''}` 
+                          : (currentVenue || 'Unknown venue')}
                       </p>
                     </>
                   ) : currentStatus === 'planning' ? (
