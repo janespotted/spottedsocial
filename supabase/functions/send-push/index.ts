@@ -21,6 +21,77 @@ interface PushSubscription {
   };
 }
 
+// Valid notification types - must be one of these
+const VALID_NOTIFICATION_TYPES = [
+  'meetup_request',
+  'venue_invite',
+  'friend_request',
+  'friend_accepted',
+  'invite_accepted',
+  'dm',
+  'meetup_accepted',
+  'venue_invite_accepted',
+] as const;
+
+// UUID v4 regex pattern
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Input validation constants
+const MAX_MESSAGE_LENGTH = 500;
+const MAX_NOTIFICATION_ID_LENGTH = 100;
+
+function validatePayload(payload: unknown): { valid: boolean; error?: string } {
+  if (!payload || typeof payload !== 'object') {
+    return { valid: false, error: 'Invalid payload format' };
+  }
+
+  const p = payload as Record<string, unknown>;
+
+  // Validate notification_id
+  if (typeof p.notification_id !== 'string' || p.notification_id.length === 0 || p.notification_id.length > MAX_NOTIFICATION_ID_LENGTH) {
+    return { valid: false, error: 'Invalid notification_id' };
+  }
+
+  // Validate receiver_id is valid UUID
+  if (typeof p.receiver_id !== 'string' || !UUID_REGEX.test(p.receiver_id)) {
+    return { valid: false, error: 'Invalid receiver_id format' };
+  }
+
+  // Validate sender_id is valid UUID
+  if (typeof p.sender_id !== 'string' || !UUID_REGEX.test(p.sender_id)) {
+    return { valid: false, error: 'Invalid sender_id format' };
+  }
+
+  // Validate type is one of allowed values
+  if (typeof p.type !== 'string' || !VALID_NOTIFICATION_TYPES.includes(p.type as typeof VALID_NOTIFICATION_TYPES[number])) {
+    return { valid: false, error: `Invalid notification type. Must be one of: ${VALID_NOTIFICATION_TYPES.join(', ')}` };
+  }
+
+  // Validate message length
+  if (typeof p.message !== 'string' || p.message.length === 0 || p.message.length > MAX_MESSAGE_LENGTH) {
+    return { valid: false, error: `Message must be between 1 and ${MAX_MESSAGE_LENGTH} characters` };
+  }
+
+  return { valid: true };
+}
+
+function validateSubscriptionEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint);
+    // Must be HTTPS and from a known push service
+    return url.protocol === 'https:' && (
+      url.hostname.endsWith('.push.apple.com') ||
+      url.hostname.endsWith('.googleapis.com') ||
+      url.hostname.endsWith('.mozilla.com') ||
+      url.hostname.endsWith('.microsoft.com') ||
+      url.hostname.endsWith('.windows.com') ||
+      url.hostname.includes('push') // Generic fallback for other push services
+    );
+  } catch {
+    return false;
+  }
+}
+
 // Web Push requires signing with VAPID keys
 async function sendWebPush(
   subscription: PushSubscription,
@@ -140,8 +211,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    const payload: PushPayload = await req.json();
-    console.log('Received push request:', payload);
+    const rawPayload = await req.json();
+    
+    // Validate input payload structure and values
+    const validation = validatePayload(rawPayload);
+    if (!validation.valid) {
+      console.error('Payload validation failed:', validation.error);
+      return new Response(
+        JSON.stringify({ error: `Bad Request: ${validation.error}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const payload = rawPayload as PushPayload;
+    console.log('Received push request:', { type: payload.type, receiver_id: payload.receiver_id });
 
     // SECURITY: Verify sender_id matches authenticated user to prevent impersonation
     if (payload.sender_id !== user.id) {
@@ -187,6 +270,16 @@ Deno.serve(async (req) => {
 
     const senderName = senderProfile?.display_name || 'Someone';
     const subscription = receiverProfile.push_subscription as PushSubscription;
+
+    // Validate subscription endpoint for security
+    if (!subscription.endpoint || !validateSubscriptionEndpoint(subscription.endpoint)) {
+      console.error('Invalid subscription endpoint:', subscription.endpoint);
+      return new Response(
+        JSON.stringify({ success: false, reason: 'invalid_subscription' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const content = getNotificationContent(type, message, senderName);
 
     // Send the push notification
