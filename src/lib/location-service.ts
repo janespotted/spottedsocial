@@ -171,3 +171,34 @@ export const getVenueById = async (venueId: string) => {
     return null;
   }
 };
+
+/**
+ * Detect neighborhood from GPS coordinates by finding the nearest venue
+ */
+export const detectNeighborhoodFromGPS = async (city: string): Promise<string | null> => {
+  try {
+    const coords = await getCurrentLocation();
+    
+    // Find nearest venue within a large radius (50km) just to get neighborhood
+    const { data, error } = await supabase.rpc('find_nearest_venue', {
+      user_lat: coords.lat,
+      user_lng: coords.lng,
+      radius_meters: 50000, // 50km radius
+    });
+
+    if (error) throw error;
+    
+    if (data && data.length > 0) {
+      // Get the venue to find its neighborhood
+      const venue = await getVenueById(data[0].venue_id);
+      if (venue?.neighborhood) {
+        return venue.neighborhood;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error detecting neighborhood:', error);
+    return null;
+  }
+};
