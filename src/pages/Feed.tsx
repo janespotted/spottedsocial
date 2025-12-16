@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
+import { useInputFocus } from '@/contexts/InputFocusContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { useVenueArrivalNudge } from '@/hooks/useVenueArrivalNudge';
 import { useFeed } from '@/hooks/useFeed';
@@ -40,6 +41,7 @@ export default function Feed() {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
   const { city } = useUserCity();
+  const { setInputFocused } = useInputFocus();
   useAutoVenueTracking();
   useVenueArrivalNudge();
 
@@ -514,6 +516,13 @@ export default function Feed() {
                               handlePostComment(post.id);
                             }
                           }}
+                          onFocus={(e) => {
+                            setInputFocused(true);
+                            setTimeout(() => {
+                              e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }, 300);
+                          }}
+                          onBlur={() => setInputFocused(false)}
                           placeholder="Add a comment..."
                           maxLength={500}
                           className="flex-1 bg-[#0a0118]/60 border border-white/10 rounded-full px-4 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-[#d4ff00]/40"

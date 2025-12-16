@@ -1,6 +1,7 @@
 import { Home, MapPin, BarChart3, MessageSquare } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useInputFocus } from '@/contexts/InputFocusContext';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 
 const navItems = [
@@ -13,10 +14,14 @@ const navItems = [
 
 export function BottomNav() {
   const location = useLocation();
+  const { isInputFocused } = useInputFocus();
 
   return (
     <nav 
-      className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-[#2d1b4e] to-[#1a0f2e] border-t border-[#a855f7]/20 backdrop-blur-lg z-50"
+      className={cn(
+        "fixed bottom-0 left-0 right-0 bg-gradient-to-t from-[#2d1b4e] to-[#1a0f2e] border-t border-[#a855f7]/20 backdrop-blur-lg z-50 transition-transform duration-200 ease-out",
+        isInputFocused && "translate-y-full"
+      )}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
