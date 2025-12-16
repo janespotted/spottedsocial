@@ -18,6 +18,7 @@ import { useNotifications } from '@/contexts/NotificationsContext';
 import { CityBadge } from '@/components/CityBadge';
 import { LeaderboardSkeleton } from '@/components/LeaderboardSkeleton';
 import { isVenueOpen, VenueHours } from '@/lib/venue-hours';
+import { isNightlifeHours } from '@/lib/time-context';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CITY_NEIGHBORHOODS, getCityLabel } from '@/lib/city-neighborhoods';
 interface VenueStats {
@@ -153,7 +154,7 @@ export default function Leaderboard() {
       // If demoEnabled is true, show everything (no filter)
 
       // Parallelize: fetch promoted venues AND night statuses at the same time
-      let promotedQuery = supabase.from('venues').select('id, name, popularity_rank, is_promoted, opened_at, neighborhood').eq('is_promoted', true).eq('city', city);
+      let promotedQuery = supabase.from('venues').select('id, name, popularity_rank, is_promoted, opened_at, neighborhood, operating_hours').eq('is_promoted', true).eq('city', city);
       if (selectedNeighborhood) {
         promotedQuery = promotedQuery.eq('neighborhood', selectedNeighborhood);
       }
@@ -165,7 +166,7 @@ export default function Leaderboard() {
           // Fetch ALL venues in the selected neighborhood
           topVenuesQuery = supabase
             .from('venues')
-            .select('id, name, neighborhood, popularity_rank, is_promoted, opened_at')
+            .select('id, name, neighborhood, popularity_rank, is_promoted, opened_at, operating_hours')
             .eq('city', city)
             .eq('neighborhood', selectedNeighborhood)
             .order('popularity_rank', { ascending: true });
@@ -173,7 +174,7 @@ export default function Leaderboard() {
           // Fetch top 30 venues city-wide by popularity_rank (ensures 20 always show)
           topVenuesQuery = supabase
             .from('venues')
-            .select('id, name, neighborhood, popularity_rank, is_promoted, opened_at')
+            .select('id, name, neighborhood, popularity_rank, is_promoted, opened_at, operating_hours')
             .eq('city', city)
             .order('popularity_rank', { ascending: true })
             .limit(30);
@@ -225,6 +226,7 @@ export default function Leaderboard() {
           isPromoted: venue.is_promoted,
           isNewlyOpened,
           popularity_rank: venue.popularity_rank || 999,
+          operatingHours: (venue as any).operating_hours as VenueHours | null,
           recentCheckinCount: 0,
         });
       });
@@ -249,6 +251,7 @@ export default function Leaderboard() {
         isPromoted: true,
         isNewlyOpened,
         popularity_rank: venue.popularity_rank || 999,
+        operatingHours: (venue as any).operating_hours as VenueHours | null,
         recentCheckinCount: 0,
       });
     });
@@ -314,8 +317,8 @@ export default function Leaderboard() {
     
     // Filter out closed venues - only show open venues on leaderboard
     const openVenueArray = venueArray.filter(v => {
-      // If no operating hours data, assume open (benefit of the doubt)
-      if (!v.operatingHours) return true;
+      // If no operating hours data, only show during nightlife hours (11am-5am)
+      if (!v.operatingHours) return isNightlifeHours();
       return isVenueOpen(v.operatingHours);
     });
     
