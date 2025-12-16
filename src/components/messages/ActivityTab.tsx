@@ -217,15 +217,40 @@ export function ActivityTab() {
         // Pick a random venue from top 5 open venues
         const topOpenVenues = openVenues.slice(0, 5);
         const randomVenue = topOpenVenues[Math.floor(Math.random() * topOpenVenues.length)];
-        activityList.push({
-          id: 'trending-1',
-          type: 'trending',
-          title: `${randomVenue.name} is trending`,
-          subtitle: '12+ here now',
-          timestamp: new Date(Date.now() - 300000).toISOString(),
-          action: 'view',
-          venue_id: randomVenue.id,
-        });
+        
+        // Get actual check-in count for this venue (only non-demo in bootstrap mode)
+        let checkInQuery = supabase
+          .from('checkins')
+          .select('id', { count: 'exact', head: true })
+          .eq('venue_id', randomVenue.id)
+          .is('ended_at', null);
+        
+        // In bootstrap mode (not demo), only count real check-ins
+        if (bootstrapEnabled && !demoEnabled) {
+          checkInQuery = checkInQuery.eq('is_demo', false);
+        }
+        
+        const { count: checkInCount } = await checkInQuery;
+        const realCount = checkInCount || 0;
+        
+        // Only show trending if there are actual check-ins OR if demo mode is enabled
+        if (realCount > 0 || demoEnabled) {
+          const subtitle = demoEnabled 
+            ? '12+ here now' 
+            : realCount > 0 
+              ? `${realCount} here now` 
+              : 'Trending spot';
+          
+          activityList.push({
+            id: 'trending-1',
+            type: 'trending',
+            title: `${randomVenue.name} is trending`,
+            subtitle,
+            timestamp: new Date(Date.now() - 300000).toISOString(),
+            action: 'view',
+            venue_id: randomVenue.id,
+          });
+        }
       }
     }
 
@@ -435,13 +460,21 @@ export function ActivityTab() {
     }
 
     // Get friends with planning status (including neighborhood)
-    const { data: planningStatuses } = await supabase
+    // In bootstrap mode, also filter out demo night_statuses
+    let statusQuery = supabase
       .from('night_statuses')
-      .select('user_id, planning_neighborhood')
+      .select('user_id, planning_neighborhood, is_demo')
       .in('user_id', friendIds)
       .eq('status', 'planning')
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString());
+    
+    // Filter out demo statuses in bootstrap mode
+    if (bootstrapEnabled && !demoEnabled) {
+      statusQuery = statusQuery.eq('is_demo', false);
+    }
+    
+    const { data: planningStatuses } = await statusQuery;
 
     if (!planningStatuses || planningStatuses.length === 0) {
       setPlanningFriends([]);
