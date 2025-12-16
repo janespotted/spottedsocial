@@ -23,6 +23,7 @@ import { useNotifications } from '@/contexts/NotificationsContext';
 import { useToast } from '@/hooks/use-toast';
 import { CityBadge } from '@/components/CityBadge';
 import { logger } from '@/lib/logger';
+import { escapeHtml, escapeUrl } from '@/lib/html-escape';
 
 interface FriendLocation {
   user_id: string;
@@ -556,8 +557,8 @@ export default function Map() {
     el.style.cursor = 'pointer';
     el.style.zIndex = '15';
     
-    const avatarUrl = userProfile?.avatar_url || '/placeholder.svg';
-    const initials = userProfile?.display_name?.charAt(0).toUpperCase() || 'M';
+    const avatarUrl = escapeUrl(userProfile?.avatar_url) || '/placeholder.svg';
+    const initials = escapeHtml(userProfile?.display_name?.charAt(0).toUpperCase()) || 'M';
     
     el.innerHTML = `
       <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
@@ -644,13 +645,16 @@ export default function Map() {
       
       const colors = ringColors[friend.relationshipType || 'direct'];
       
+      const safeAvatarUrl = escapeUrl(friend.profiles?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(friend.profiles?.display_name || 'user')}`;
+      const safeDisplayName = escapeHtml(friend.profiles?.display_name);
+      
       el.innerHTML = `
         <div style="position: relative; width: 100%; height: 100%;">
           <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${colors.border}; box-shadow: 0 0 8px ${colors.shadow};"></div>
           <img 
-            src="${friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`}" 
+            src="${safeAvatarUrl}" 
             style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; padding: 3px;"
-            alt="${friend.profiles?.display_name}"
+            alt="${safeDisplayName}"
           />
           ${colors.badge ? `
             <div style="position: absolute; bottom: -2px; right: -2px; width: 16px; height: 16px; background: #1a0f2e; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid ${colors.border}; font-size: 9px;">
@@ -698,14 +702,18 @@ export default function Map() {
         const displayFriends = cluster.slice(0, 3);
         const remainingCount = cluster.length - 3;
         
+        const safeAvatar0 = escapeUrl(displayFriends[0]?.profiles?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayFriends[0]?.profiles?.display_name || 'user0')}`;
+        const safeAvatar1 = escapeUrl(displayFriends[1]?.profiles?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayFriends[1]?.profiles?.display_name || 'user1')}`;
+        const safeAvatar2 = escapeUrl(displayFriends[2]?.profiles?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayFriends[2]?.profiles?.display_name || 'user2')}`;
+        
         el.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%;">
             <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(45, 27, 78, 0.95); border: 2px solid rgba(168, 85, 247, 0.5); box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);"></div>
-            <img src="${displayFriends[0]?.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayFriends[0]?.profiles?.display_name}`}" 
+            <img src="${safeAvatar0}" 
                  style="position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1.5px solid #a855f7;" />
-            <img src="${displayFriends[1]?.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayFriends[1]?.profiles?.display_name}`}" 
+            <img src="${safeAvatar1}" 
                  style="position: absolute; bottom: 14px; left: 10px; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1.5px solid #a855f7;" />
-            <img src="${displayFriends[2]?.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayFriends[2]?.profiles?.display_name}`}" 
+            <img src="${safeAvatar2}" 
                  style="position: absolute; bottom: 14px; right: 10px; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1.5px solid #a855f7;" />
             <div style="position: absolute; bottom: -4px; right: -4px; min-width: 22px; height: 22px; background: #a855f7; border-radius: 11px; display: flex; align-items: center; justify-content: center; padding: 0 6px; font-size: 11px; font-weight: 600; color: white; border: 2px solid #1a0f2e;">
               +${remainingCount}
