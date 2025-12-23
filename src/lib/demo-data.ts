@@ -100,6 +100,8 @@ export const PB_PROMOTED_VENUES = [
   { name: "Mary Lou's", lat: 26.7148, lng: -80.0530, neighborhood: "Clematis Street", type: "lounge" },
   { name: "Lola 41", lat: 26.7050, lng: -80.0378, neighborhood: "Worth Avenue", type: "lounge" },
   { name: "ER Bradley's Saloon", lat: 26.7151, lng: -80.0527, neighborhood: "Clematis Street", type: "bar" },
+  { name: "123 Datura", lat: 26.7149, lng: -80.0536, neighborhood: "Downtown WPB", type: "bar" },
+  { name: "Four", lat: 26.7149, lng: -80.0536, neighborhood: "Downtown WPB", type: "lounge" },
   { name: "HMF at The Breakers", lat: 26.7060, lng: -80.0341, neighborhood: "Palm Beach Island", type: "lounge" },
   { name: "Imoto", lat: 26.7055, lng: -80.0365, neighborhood: "Royal Poinciana Way", type: "bar" },
   
