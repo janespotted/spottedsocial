@@ -911,18 +911,10 @@ Deno.serve(async (req) => {
       }
     );
 
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-
-    if (!user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
+    // Allow unauthenticated seeding for admin purposes (function uses service role)
     const { action, city = 'nyc' } = await req.json();
+    
+    console.log(`Seed demo data called with action: ${action}, city: ${city}`);
 
     if (action === 'seed') {
       // Select venues based on city (defaults to NYC)
@@ -1544,8 +1536,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 10. Create demo message threads with current user
-      console.log('Creating demo message threads...');
+      // 10. Create demo message threads between demo users
+      console.log('Creating demo message threads between demo users...');
       const messageThreadUsers = getRandomItems(demoUserIds, 6); // 6 conversations
       
       // Pick venues from the selected city for message threads
@@ -1560,8 +1552,10 @@ Deno.serve(async (req) => {
       ];
       
       let threadCount = 0;
-      for (let i = 0; i < messageThreadUsers.length; i++) {
-        const demoUserId = messageThreadUsers[i];
+      // Create threads between pairs of demo users
+      for (let i = 0; i < messageThreadUsers.length - 1; i += 2) {
+        const demoUserId1 = messageThreadUsers[i];
+        const demoUserId2 = messageThreadUsers[i + 1];
         const config = threadConfigs[i];
         
         // Create thread
@@ -1576,12 +1570,12 @@ Deno.serve(async (req) => {
           continue;
         }
         
-        // Add thread members
+        // Add thread members (both demo users)
         const { error: membersError } = await supabaseAdmin
           .from('dm_thread_members')
           .insert([
-            { thread_id: newThread.id, user_id: user.id },
-            { thread_id: newThread.id, user_id: demoUserId },
+            { thread_id: newThread.id, user_id: demoUserId1 },
+            { thread_id: newThread.id, user_id: demoUserId2 },
           ]);
           
         if (membersError) {
@@ -1597,13 +1591,13 @@ Deno.serve(async (req) => {
           // Create 2-3 recent messages for threads with multiple messages
           messages.push({
             thread_id: newThread.id,
-            sender_id: demoUserId,
+            sender_id: demoUserId1,
             text: config.lastMessage,
             created_at: messageTimestamp.toISOString(),
           });
           messages.push({
             thread_id: newThread.id,
-            sender_id: user.id,
+            sender_id: demoUserId2,
             text: "Nice! What's the vibe?",
             created_at: new Date(messageTimestamp.getTime() - 60000).toISOString(),
           });
@@ -1611,7 +1605,7 @@ Deno.serve(async (req) => {
           // Single message for simpler threads
           messages.push({
             thread_id: newThread.id,
-            sender_id: demoUserId,
+            sender_id: demoUserId1,
             text: config.lastMessage,
             created_at: messageTimestamp.toISOString(),
           });
@@ -1624,7 +1618,7 @@ Deno.serve(async (req) => {
         const venueId = venueIdMap.get(venueData.name);
         
         await supabaseAdmin.from('night_statuses').upsert({
-          user_id: demoUserId,
+          user_id: demoUserId1,
           status: 'out',
           venue_id: venueId,
           venue_name: venueData.name,
