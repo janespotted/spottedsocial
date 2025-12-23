@@ -121,9 +121,6 @@ export const PB_PROMOTED_VENUES = [
   
   // Rosemary Square
   { name: "Blue Martini", lat: 26.7110, lng: -80.0623, neighborhood: "Rosemary Square", type: "lounge" },
-  
-  // Northwood Village
-  { name: "Voltaire", lat: 26.7290, lng: -80.0520, neighborhood: "Northwood Village", type: "club" },
 ];
 
 // Additional non-promoted demo venues (only appear when full demo mode is ON)

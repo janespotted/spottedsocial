@@ -117,9 +117,6 @@ const PB_VENUES = [
   
   // Rosemary Square
   { name: "Blue Martini", lat: 26.7110, lng: -80.0623, rank: 19, neighborhood: "Rosemary Square", type: "lounge" },
-  
-  // Northwood Village
-  { name: "Voltaire", lat: 26.7290, lng: -80.0520, rank: 20, neighborhood: "Northwood Village", type: "club" },
 ];
 
 // REMOVED: DEMO_VENUES - these don't exist in the database
@@ -775,15 +772,6 @@ const PB_VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string 
       { text: "Great for groups. The energy picks up after 10pm when people finish dinner.", rating: 4 },
       { text: "Not just a restaurant - it's a party. The tequila selection is insane.", rating: 4 },
       { text: null, rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Voltaire": {
-    reviews: [
-      { text: "Northwood's coolest spot! Live music, art vibes, great wine list. Worth the drive from downtown.", rating: 5 },
-      { text: "The outdoor courtyard is magical. Different vibe than Clematis - more artsy and chill.", rating: 4 },
-      { text: "Hidden gem of WPB. The programming is always interesting.", rating: 4 },
-      { text: null, rating: 5 },
       { text: null, rating: 4 },
     ]
   },
