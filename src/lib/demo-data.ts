@@ -93,6 +93,36 @@ export const LA_PROMOTED_VENUES = [
   { name: "Dirty Laundry", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
 ];
 
+// Real Palm Beach / West Palm Beach top-tier venues
+export const PB_PROMOTED_VENUES = [
+  // Worth Avenue / Palm Beach Island
+  { name: "Buccan", lat: 26.7056, lng: -80.0364, neighborhood: "Worth Avenue", type: "bar" },
+  { name: "HMF at The Breakers", lat: 26.7060, lng: -80.0341, neighborhood: "Palm Beach Island", type: "lounge" },
+  { name: "Café Boulud", lat: 26.7061, lng: -80.0339, neighborhood: "Palm Beach Island", type: "bar" },
+  { name: "Cucina", lat: 26.7058, lng: -80.0366, neighborhood: "Worth Avenue", type: "bar" },
+  { name: "The Seafood Bar at The Breakers", lat: 26.7059, lng: -80.0340, neighborhood: "Palm Beach Island", type: "bar" },
+  { name: "Taboo", lat: 26.7053, lng: -80.0370, neighborhood: "Worth Avenue", type: "bar" },
+  
+  // Clematis Street / Downtown WPB
+  { name: "Respectable Street", lat: 26.7145, lng: -80.0534, neighborhood: "Clematis Street", type: "club" },
+  { name: "Hullabaloo", lat: 26.7149, lng: -80.0528, neighborhood: "Clematis Street", type: "bar" },
+  { name: "Rocco's Tacos", lat: 26.7147, lng: -80.0530, neighborhood: "Clematis Street", type: "bar" },
+  { name: "O'Shea's Irish Pub", lat: 26.7148, lng: -80.0532, neighborhood: "Clematis Street", type: "bar" },
+  { name: "Roxy's Pub", lat: 26.7150, lng: -80.0529, neighborhood: "Clematis Street", type: "bar" },
+  { name: "Lost Weekend", lat: 26.7146, lng: -80.0533, neighborhood: "Clematis Street", type: "bar" },
+  
+  // CityPlace / Rosemary Square
+  { name: "Blue Martini", lat: 26.7110, lng: -80.0623, neighborhood: "CityPlace", type: "lounge" },
+  { name: "City Cellar Wine Bar", lat: 26.7112, lng: -80.0620, neighborhood: "CityPlace", type: "bar" },
+  { name: "The Blind Monk", lat: 26.7111, lng: -80.0621, neighborhood: "CityPlace", type: "bar" },
+  { name: "Galley", lat: 26.7113, lng: -80.0619, neighborhood: "CityPlace", type: "bar" },
+  
+  // Northwood / Warehouse District
+  { name: "Voltaire", lat: 26.7290, lng: -80.0520, neighborhood: "Northwood Village", type: "bar" },
+  { name: "Pistache French Bistro", lat: 26.7152, lng: -80.0527, neighborhood: "Clematis Street", type: "bar" },
+  { name: "The Alchemist", lat: 26.7143, lng: -80.0535, neighborhood: "Clematis Street", type: "bar" },
+];
+
 // Additional non-promoted demo venues (only appear when full demo mode is ON)
 export const NYC_DEMO_VENUES = [
   { name: "Silo", lat: 40.7489, lng: -73.9680 },
@@ -108,6 +138,12 @@ export const LA_DEMO_VENUES = [
   { name: "Lure Nightclub", lat: 34.0481, lng: -118.2394 },
   { name: "Heart Weho", lat: 34.0877, lng: -118.3840 },
   { name: "Boardner's", lat: 34.0481, lng: -118.2394 },
+];
+
+export const PB_DEMO_VENUES = [
+  { name: "Palm Beach Grill", lat: 26.7055, lng: -80.0368 },
+  { name: "Bice Ristorante", lat: 26.7054, lng: -80.0367 },
+  { name: "Chez Jean-Pierre", lat: 26.7052, lng: -80.0371 },
 ];
 
 export const NYC_DEMO_USERS = [
@@ -154,6 +190,19 @@ export const LA_DEMO_USERS = [
   { display_name: 'Eden Walsh', username: 'eden_vibes', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Eden', bio: 'West Coast beats' },
   { display_name: 'Flynn Hayes', username: 'flynn_la', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Flynn', bio: 'LA nightlife curator 🌟' },
   { display_name: 'Harper Lane', username: 'harpernights', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Harper', bio: 'Living for LA nights ✨' },
+];
+
+export const PB_DEMO_USERS = [
+  { display_name: 'Brooks Wellington', username: 'brooks_pb', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Brooks', bio: 'Palm Beach nightlife 🌴' },
+  { display_name: 'Sloane Carter', username: 'sloane_worth', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sloane', bio: 'Worth Avenue regular ✨' },
+  { display_name: 'Preston Monroe', username: 'prestonpb', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Preston', bio: 'Clematis Street explorer' },
+  { display_name: 'Blair Ashford', username: 'blair_nights', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Blair', bio: 'CityPlace enthusiast 🎉' },
+  { display_name: 'Trey Worthington', username: 'trey_wpb', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Trey', bio: 'WPB nightlife curator' },
+  { display_name: 'Mila Beaumont', username: 'mila_island', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mila', bio: 'Island life 🏝️' },
+  { display_name: 'Chase Devereaux', username: 'chase_pb', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ChasePB', bio: 'Breakers bar hopper' },
+  { display_name: 'Hadley Pierce', username: 'hadley_vibes', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Hadley', bio: 'South Florida nights 🌙' },
+  { display_name: 'Reid Thornton', username: 'reid_out', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Reid', bio: 'Always at Respectable' },
+  { display_name: 'Tinsley Graham', username: 'tinsley_pb', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tinsley', bio: 'Palm Beach socialite 💎' },
 ];
 
 export const DEMO_CAPTIONS = [
@@ -214,15 +263,21 @@ export const DEMO_YAP_MESSAGES = [
 
 // City-specific getter functions
 export function getPromotedVenuesForCity(city: SupportedCity) {
-  return city === 'la' ? LA_PROMOTED_VENUES : NYC_PROMOTED_VENUES;
+  if (city === 'la') return LA_PROMOTED_VENUES;
+  if (city === 'pb') return PB_PROMOTED_VENUES;
+  return NYC_PROMOTED_VENUES;
 }
 
 export function getDemoVenuesForCity(city: SupportedCity) {
-  return city === 'la' ? LA_DEMO_VENUES : NYC_DEMO_VENUES;
+  if (city === 'la') return LA_DEMO_VENUES;
+  if (city === 'pb') return PB_DEMO_VENUES;
+  return NYC_DEMO_VENUES;
 }
 
 export function getDemoUsersForCity(city: SupportedCity) {
-  return city === 'la' ? LA_DEMO_USERS : NYC_DEMO_USERS;
+  if (city === 'la') return LA_DEMO_USERS;
+  if (city === 'pb') return PB_DEMO_USERS;
+  return NYC_DEMO_USERS;
 }
 
 // Keep legacy export for backwards compatibility
