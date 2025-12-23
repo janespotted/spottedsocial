@@ -93,33 +93,38 @@ export const LA_PROMOTED_VENUES = [
   { name: "Dirty Laundry", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
 ];
 
-// Real Palm Beach / West Palm Beach top-tier venues
+// Real Palm Beach / West Palm Beach top-tier venues - NIGHTLIFE FOCUSED ONLY
 export const PB_PROMOTED_VENUES = [
-  // Worth Avenue / Palm Beach Island
-  { name: "Buccan", lat: 26.7056, lng: -80.0364, neighborhood: "Worth Avenue", type: "bar" },
+  // Top Tier - Exclusive Party Restaurants
+  { name: "Cucina", lat: 26.7056, lng: -80.0364, neighborhood: "Royal Poinciana Way", type: "club" },
+  { name: "Mary Lou's", lat: 26.7148, lng: -80.0530, neighborhood: "Clematis Street", type: "lounge" },
+  { name: "Lola 41", lat: 26.7050, lng: -80.0378, neighborhood: "Worth Avenue", type: "lounge" },
+  { name: "ER Bradley's Saloon", lat: 26.7151, lng: -80.0527, neighborhood: "Clematis Street", type: "bar" },
   { name: "HMF at The Breakers", lat: 26.7060, lng: -80.0341, neighborhood: "Palm Beach Island", type: "lounge" },
-  { name: "Café Boulud", lat: 26.7061, lng: -80.0339, neighborhood: "Palm Beach Island", type: "bar" },
-  { name: "Cucina", lat: 26.7058, lng: -80.0366, neighborhood: "Worth Avenue", type: "bar" },
-  { name: "The Seafood Bar at The Breakers", lat: 26.7059, lng: -80.0340, neighborhood: "Palm Beach Island", type: "bar" },
-  { name: "Taboo", lat: 26.7053, lng: -80.0370, neighborhood: "Worth Avenue", type: "bar" },
+  { name: "Imoto", lat: 26.7055, lng: -80.0365, neighborhood: "Royal Poinciana Way", type: "bar" },
   
-  // Clematis Street / Downtown WPB
+  // Classic Bars - Clematis Street
   { name: "Respectable Street", lat: 26.7145, lng: -80.0534, neighborhood: "Clematis Street", type: "club" },
-  { name: "Hullabaloo", lat: 26.7149, lng: -80.0528, neighborhood: "Clematis Street", type: "bar" },
-  { name: "Rocco's Tacos", lat: 26.7147, lng: -80.0530, neighborhood: "Clematis Street", type: "bar" },
-  { name: "O'Shea's Irish Pub", lat: 26.7148, lng: -80.0532, neighborhood: "Clematis Street", type: "bar" },
   { name: "Roxy's Pub", lat: 26.7150, lng: -80.0529, neighborhood: "Clematis Street", type: "bar" },
+  { name: "Hullabaloo", lat: 26.7149, lng: -80.0528, neighborhood: "Clematis Street", type: "bar" },
+  { name: "Clematis Social", lat: 26.7148, lng: -80.0530, neighborhood: "Clematis Street", type: "bar" },
+  { name: "O'Shea's Irish Pub", lat: 26.7148, lng: -80.0532, neighborhood: "Clematis Street", type: "bar" },
+  { name: "Rocco's Tacos", lat: 26.7147, lng: -80.0530, neighborhood: "Clematis Street", type: "bar" },
   { name: "Lost Weekend", lat: 26.7146, lng: -80.0533, neighborhood: "Clematis Street", type: "bar" },
+  { name: "Camelot", lat: 26.7142, lng: -80.0536, neighborhood: "Clematis Street", type: "bar" },
+  { name: "Pawn Shop Lounge", lat: 26.7146, lng: -80.0532, neighborhood: "Clematis Street", type: "lounge" },
   
-  // CityPlace / Rosemary Square
-  { name: "Blue Martini", lat: 26.7110, lng: -80.0623, neighborhood: "CityPlace", type: "lounge" },
-  { name: "City Cellar Wine Bar", lat: 26.7112, lng: -80.0620, neighborhood: "CityPlace", type: "bar" },
-  { name: "The Blind Monk", lat: 26.7111, lng: -80.0621, neighborhood: "CityPlace", type: "bar" },
-  { name: "Galley", lat: 26.7113, lng: -80.0619, neighborhood: "CityPlace", type: "bar" },
+  // Rosemary Square / CityPlace
+  { name: "Blue Martini", lat: 26.7110, lng: -80.0623, neighborhood: "Rosemary Square", type: "club" },
+  { name: "The Blind Monk", lat: 26.7111, lng: -80.0621, neighborhood: "Rosemary Square", type: "bar" },
+  { name: "City Cellar Wine Bar", lat: 26.7112, lng: -80.0620, neighborhood: "Rosemary Square", type: "bar" },
+  { name: "Galley", lat: 26.7113, lng: -80.0619, neighborhood: "Rosemary Square", type: "bar" },
   
-  // Northwood / Warehouse District
+  // Other Areas
   { name: "Voltaire", lat: 26.7290, lng: -80.0520, neighborhood: "Northwood Village", type: "bar" },
-  { name: "Pistache French Bistro", lat: 26.7152, lng: -80.0527, neighborhood: "Clematis Street", type: "bar" },
+  { name: "Grandview Public Market", lat: 26.7285, lng: -80.0525, neighborhood: "Warehouse District", type: "bar" },
+  { name: "Banko Cantina", lat: 26.7144, lng: -80.0531, neighborhood: "Clematis Street", type: "bar" },
+  { name: "Topside at The Beacon", lat: 26.7143, lng: -80.0535, neighborhood: "Clematis Street", type: "rooftop" },
   { name: "The Alchemist", lat: 26.7143, lng: -80.0535, neighborhood: "Clematis Street", type: "bar" },
 ];
 

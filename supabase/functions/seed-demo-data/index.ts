@@ -89,6 +89,42 @@ const LA_VENUES = [
   { name: "The Escondite", lat: 34.0488, lng: -118.2506, rank: 40, neighborhood: "Downtown LA" },
 ];
 
+// Palm Beach / West Palm Beach venues - Nightlife focused only (party restaurants & bars)
+const PB_VENUES = [
+  // TOP TIER - Exclusive Party Restaurants (Palm Beach Island / Royal Poinciana Way)
+  { name: "Cucina", lat: 26.7056, lng: -80.0364, rank: 1, neighborhood: "Royal Poinciana Way" },
+  { name: "Mary Lou's", lat: 26.7148, lng: -80.0530, rank: 2, neighborhood: "Clematis Street" },
+  { name: "Lola 41", lat: 26.7050, lng: -80.0378, rank: 3, neighborhood: "Worth Avenue" },
+  { name: "ER Bradley's Saloon", lat: 26.7151, lng: -80.0527, rank: 4, neighborhood: "Clematis Street" },
+  { name: "HMF at The Breakers", lat: 26.7060, lng: -80.0341, rank: 5, neighborhood: "Palm Beach Island" },
+  { name: "Imoto", lat: 26.7055, lng: -80.0365, rank: 6, neighborhood: "Royal Poinciana Way" },
+  
+  // Classic Bars - Clematis Street
+  { name: "Respectable Street", lat: 26.7145, lng: -80.0534, rank: 7, neighborhood: "Clematis Street" },
+  { name: "Roxy's Pub", lat: 26.7150, lng: -80.0529, rank: 8, neighborhood: "Clematis Street" },
+  { name: "Hullabaloo", lat: 26.7149, lng: -80.0528, rank: 9, neighborhood: "Clematis Street" },
+  { name: "Clematis Social", lat: 26.7148, lng: -80.0530, rank: 10, neighborhood: "Clematis Street" },
+  { name: "O'Shea's Irish Pub", lat: 26.7148, lng: -80.0532, rank: 11, neighborhood: "Clematis Street" },
+  { name: "Rocco's Tacos", lat: 26.7147, lng: -80.0530, rank: 12, neighborhood: "Clematis Street" },
+  { name: "Lost Weekend", lat: 26.7146, lng: -80.0533, rank: 13, neighborhood: "Clematis Street" },
+  { name: "Camelot", lat: 26.7142, lng: -80.0536, rank: 14, neighborhood: "Clematis Street" },
+  { name: "Pawn Shop Lounge", lat: 26.7146, lng: -80.0532, rank: 15, neighborhood: "Clematis Street" },
+  
+  // Rosemary Square / CityPlace
+  { name: "Blue Martini", lat: 26.7110, lng: -80.0623, rank: 16, neighborhood: "Rosemary Square" },
+  { name: "The Blind Monk", lat: 26.7111, lng: -80.0621, rank: 17, neighborhood: "Rosemary Square" },
+  { name: "City Cellar Wine Bar", lat: 26.7112, lng: -80.0620, rank: 18, neighborhood: "Rosemary Square" },
+  { name: "Galley", lat: 26.7113, lng: -80.0619, rank: 19, neighborhood: "Rosemary Square" },
+  
+  // Northwood / Other
+  { name: "Voltaire", lat: 26.7290, lng: -80.0520, rank: 20, neighborhood: "Northwood Village" },
+  { name: "Grandview Public Market", lat: 26.7285, lng: -80.0525, rank: 21, neighborhood: "Warehouse District" },
+  { name: "Banko Cantina", lat: 26.7144, lng: -80.0531, rank: 22, neighborhood: "Clematis Street" },
+  { name: "Topside at The Beacon", lat: 26.7143, lng: -80.0535, rank: 23, neighborhood: "Clematis Street" },
+  { name: "The Alchemist", lat: 26.7143, lng: -80.0535, rank: 24, neighborhood: "Clematis Street" },
+  { name: "Grease Burger Bar", lat: 26.7147, lng: -80.0531, rank: 25, neighborhood: "Clematis Street" },
+];
+
 // REMOVED: DEMO_VENUES - these don't exist in the database
 // All posts/stories/yaps now use only SELECTED_VENUES (real DB venues) for proper city filtering
 
@@ -608,6 +644,190 @@ const LA_VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string 
   },
 };
 
+// Palm Beach venue-specific reviews (nightlife focused)
+const PB_VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | null; rating: number }> }> = {
+  "Cucina": {
+    reviews: [
+      { text: "THE party spot on Palm Beach Island. DJ starts at 10pm and the dance floor gets PACKED. Bottle service is the move.", rating: 5 },
+      { text: "Palm Beach's playground - came for dinner, stayed until 2am dancing. The crowd is gorgeous and the vibe is electric.", rating: 5 },
+      { text: "Selective door but once inside it's incredible. The lights sync with the DJ beats. This is where the money parties.", rating: 4 },
+      { text: "Every Saturday night the place transforms. One of the only real late-night party scenes on the island.", rating: 5 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Mary Lou's": {
+    reviews: [
+      { text: "The HOTTEST new spot in WPB. Dark, sultry, massive disco ball. Saw a few celebs in the banquettes last weekend.", rating: 5 },
+      { text: "Reimagining the lavish parties of 70's and 80's Palm Beach. Champagne flowing, DJs spinning. An absolute must.", rating: 5 },
+      { text: "Finally a real nightlife spot downtown. The speakeasy entrance adds to the vibe. Gets packed after 11.", rating: 5 },
+      { text: "The cocktails are incredible and the music is always on point. This is what Clematis needed.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Lola 41": {
+    reviews: [
+      { text: "Came for dinner, stayed for the DJ. Worth Ave goes OFF after midnight here. Super chic crowd.", rating: 5 },
+      { text: "The sushi is amazing but the late-night scene is the real draw. One of the few places on Worth with energy.", rating: 5 },
+      { text: "Dress code is strict but the party is worth it. Beautiful people, great music, strong drinks.", rating: 4 },
+      { text: "Perfect Palm Beach scene - upscale but fun. The patio is stunning.", rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "ER Bradley's Saloon": {
+    reviews: [
+      { text: "The OG Clematis bar since 1995! Live music every night, always packed. This is WPB's heartbeat.", rating: 5 },
+      { text: "Been coming here for 20 years and it never disappoints. Real local vibes, great bands, cold drinks.", rating: 5 },
+      { text: "If you want to know what WPB nightlife is about, start here. The outdoor area is always bumping.", rating: 4 },
+      { text: "Best live music venue on Clematis. No pretense, just good times.", rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "HMF at The Breakers": {
+    reviews: [
+      { text: "The Breakers' hidden gem. Upscale lounge vibes, great cocktails, DJ on weekends. Hotel crowd keeps it interesting.", rating: 5 },
+      { text: "Best spot on the island for a proper night out. The crowd is older and well-dressed. Order the truffle fries.", rating: 4 },
+      { text: "Palm Beach elegance with actual nightlife energy. Perfect for date night that turns into a late night.", rating: 5 },
+      { text: "The cocktail program is seriously impressive. Gets livelier as the night goes on.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Imoto": {
+    reviews: [
+      { text: "Late-night sushi and sake in the cutest space. The trendy Royal Poinciana crowd hangs here after dinner.", rating: 5 },
+      { text: "Buccan's sister spot and just as good for a night out. Order the Imoto roll and stick around for drinks.", rating: 4 },
+      { text: "Intimate but lively. Great for starting the night before heading somewhere louder.", rating: 4 },
+      { text: null, rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Respectable Street": {
+    reviews: [
+      { text: "LEGENDARY venue! Been coming here since the 80s. The alt/punk vibes are unmatched in South Florida.", rating: 5 },
+      { text: "Amazing live music scene since 1987. The checkerboard dance floor and psychedelic murals are iconic.", rating: 5 },
+      { text: "If you want real underground music and culture, this is the only spot. Not fancy but AUTHENTIC.", rating: 5 },
+      { text: "National touring acts in an intimate setting. This place is a Palm Beach County treasure.", rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Roxy's Pub": {
+    reviews: [
+      { text: "Best rooftop in downtown WPB! The new renovation is incredible. 64 beers on tap.", rating: 5 },
+      { text: "Irish pub atmosphere downstairs, rooftop party upstairs. St. Paddy's Day here is legendary.", rating: 4 },
+      { text: "The rooftop views of Clematis are unbeatable. Gets packed on weekends but worth it.", rating: 4 },
+      { text: null, rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Hullabaloo": {
+    reviews: [
+      { text: "Gastropub with actual nightlife energy. The bar scene here is underrated. Great cocktails.", rating: 4 },
+      { text: "Food is fantastic and it gets lively late. One of the few places on Clematis with sophistication.", rating: 4 },
+      { text: "Perfect for dinner that turns into drinks that turns into a night out.", rating: 4 },
+      { text: null, rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Blue Martini": {
+    reviews: [
+      { text: "The spot for the 30+ crowd! Live music, dancing, great martinis. Rosemary Square's best nightlife.", rating: 5 },
+      { text: "Gets packed Thursday through Saturday. The dance floor is legit. Dress code enforced.", rating: 4 },
+      { text: "Multiple rooms with different vibes. Can actually dance here unlike most WPB spots.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Clematis Social": {
+    reviews: [
+      { text: "Solid bar for starting the night. Good drinks, friendly crowd, central location on Clematis.", rating: 4 },
+      { text: "The outdoor area is great for people watching. Gets busier as the night goes on.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 3 },
+    ]
+  },
+  "O'Shea's Irish Pub": {
+    reviews: [
+      { text: "Classic Irish pub vibes! Great for sports, cold beers, and a rowdy good time.", rating: 4 },
+      { text: "The outdoor patio is prime real estate on Clematis. Reliable spot for any night.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 3 },
+    ]
+  },
+  "Rocco's Tacos": {
+    reviews: [
+      { text: "The tableside guac is fire and the margaritas hit HARD. Gets rowdy late night.", rating: 4 },
+      { text: "Great for groups. The energy picks up after 10pm when people finish dinner.", rating: 4 },
+      { text: "Not just a restaurant - it's a party. The tequila selection is insane.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Voltaire": {
+    reviews: [
+      { text: "Northwood's coolest spot! Live music, art vibes, great wine list. Worth the drive from downtown.", rating: 5 },
+      { text: "The outdoor courtyard is magical. Different vibe than Clematis - more artsy and chill.", rating: 4 },
+      { text: "Hidden gem of WPB. The programming is always interesting.", rating: 4 },
+      { text: null, rating: 5 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "The Blind Monk": {
+    reviews: [
+      { text: "Best wine bar in WPB. Intimate, romantic, great for late night. The cheese board is a must.", rating: 5 },
+      { text: "Hidden speakeasy vibes in Rosemary Square. Perfect for a more sophisticated night out.", rating: 4 },
+      { text: null, rating: 5 },
+      { text: null, rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Lost Weekend": {
+    reviews: [
+      { text: "Dive bar energy on Clematis! Cheap drinks, no attitude, just good times. Cash only adds to the charm.", rating: 4 },
+      { text: "The kind of bar where you end up at 2am. No frills, just fun.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 3 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Camelot": {
+    reviews: [
+      { text: "Late night spot that gets wild. Not fancy but always a party. Clematis staple.", rating: 4 },
+      { text: "When everywhere else closes, Camelot keeps going. True late-night energy.", rating: 4 },
+      { text: null, rating: 3 },
+      { text: null, rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "City Cellar Wine Bar": {
+    reviews: [
+      { text: "Upscale wine bar with energy. Great for starting the night in Rosemary Square.", rating: 4 },
+      { text: "The wine list is extensive and the patio is lovely. Gets busy on weekends.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 3 },
+    ]
+  },
+  "Pawn Shop Lounge": {
+    reviews: [
+      { text: "Speakeasy vibes on Clematis! Great cocktails, moody lighting, intimate space.", rating: 4 },
+      { text: "The craft cocktail program is legit. Perfect for a more refined night out.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 4 },
+    ]
+  },
+  "Grandview Public Market": {
+    reviews: [
+      { text: "The Warehouse District's hangout! Multiple vendors, great bar, chill vibes. Perfect for groups.", rating: 4 },
+      { text: "Not a traditional bar but great for drinks and hanging out. Very WPB.", rating: 4 },
+      { text: null, rating: 4 },
+      { text: null, rating: 3 },
+      { text: null, rating: 4 },
+    ]
+  },
+};
+
 const DEMO_YAP_MESSAGES = [
   { text: "Pretty sure Justin Bieber just walked in...", score: 78, comments: 9 },
   { text: "This music is awesome who's the DJ right now", score: 50, comments: 9 },
@@ -686,8 +906,19 @@ Deno.serve(async (req) => {
 
     if (action === 'seed') {
       // Select venues based on city (defaults to NYC)
-      const SELECTED_VENUES = city === 'la' ? LA_VENUES : NYC_VENUES;
-      const SELECTED_REVIEWS = city === 'la' ? LA_VENUE_SPECIFIC_REVIEWS : VENUE_SPECIFIC_REVIEWS;
+      let SELECTED_VENUES;
+      let SELECTED_REVIEWS;
+      
+      if (city === 'la') {
+        SELECTED_VENUES = LA_VENUES;
+        SELECTED_REVIEWS = LA_VENUE_SPECIFIC_REVIEWS;
+      } else if (city === 'pb') {
+        SELECTED_VENUES = PB_VENUES;
+        SELECTED_REVIEWS = PB_VENUE_SPECIFIC_REVIEWS;
+      } else {
+        SELECTED_VENUES = NYC_VENUES;
+        SELECTED_REVIEWS = VENUE_SPECIFIC_REVIEWS;
+      }
       
       // Clean up existing demo data before seeding
       console.log('Cleaning up existing demo data...');
