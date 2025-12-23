@@ -96,33 +96,35 @@ const PB_VENUES = [
   { name: "Mary Lou's", lat: 26.7148, lng: -80.0530, rank: 2, neighborhood: "Clematis Street" },
   { name: "Lola 41", lat: 26.7050, lng: -80.0378, rank: 3, neighborhood: "Worth Avenue" },
   { name: "ER Bradley's Saloon", lat: 26.7151, lng: -80.0527, rank: 4, neighborhood: "Clematis Street" },
-  { name: "HMF at The Breakers", lat: 26.7060, lng: -80.0341, rank: 5, neighborhood: "Palm Beach Island" },
-  { name: "Imoto", lat: 26.7055, lng: -80.0365, rank: 6, neighborhood: "Royal Poinciana Way" },
+  { name: "123 Datura", lat: 26.7149, lng: -80.0536, rank: 5, neighborhood: "Downtown WPB" },
+  { name: "Four", lat: 26.7149, lng: -80.0536, rank: 6, neighborhood: "Downtown WPB" },
+  { name: "HMF at The Breakers", lat: 26.7060, lng: -80.0341, rank: 7, neighborhood: "Palm Beach Island" },
+  { name: "Imoto", lat: 26.7055, lng: -80.0365, rank: 8, neighborhood: "Royal Poinciana Way" },
   
   // Classic Bars - Clematis Street
-  { name: "Respectable Street", lat: 26.7145, lng: -80.0534, rank: 7, neighborhood: "Clematis Street" },
-  { name: "Roxy's Pub", lat: 26.7150, lng: -80.0529, rank: 8, neighborhood: "Clematis Street" },
-  { name: "Hullabaloo", lat: 26.7149, lng: -80.0528, rank: 9, neighborhood: "Clematis Street" },
-  { name: "Clematis Social", lat: 26.7148, lng: -80.0530, rank: 10, neighborhood: "Clematis Street" },
-  { name: "O'Shea's Irish Pub", lat: 26.7148, lng: -80.0532, rank: 11, neighborhood: "Clematis Street" },
-  { name: "Rocco's Tacos", lat: 26.7147, lng: -80.0530, rank: 12, neighborhood: "Clematis Street" },
-  { name: "Lost Weekend", lat: 26.7146, lng: -80.0533, rank: 13, neighborhood: "Clematis Street" },
-  { name: "Camelot", lat: 26.7142, lng: -80.0536, rank: 14, neighborhood: "Clematis Street" },
-  { name: "Pawn Shop Lounge", lat: 26.7146, lng: -80.0532, rank: 15, neighborhood: "Clematis Street" },
+  { name: "Respectable Street", lat: 26.7145, lng: -80.0534, rank: 9, neighborhood: "Clematis Street" },
+  { name: "Roxy's Pub", lat: 26.7150, lng: -80.0529, rank: 10, neighborhood: "Clematis Street" },
+  { name: "Hullabaloo", lat: 26.7149, lng: -80.0528, rank: 11, neighborhood: "Clematis Street" },
+  { name: "Clematis Social", lat: 26.7148, lng: -80.0530, rank: 12, neighborhood: "Clematis Street" },
+  { name: "O'Shea's Irish Pub", lat: 26.7148, lng: -80.0532, rank: 13, neighborhood: "Clematis Street" },
+  { name: "Rocco's Tacos", lat: 26.7147, lng: -80.0530, rank: 14, neighborhood: "Clematis Street" },
+  { name: "Lost Weekend", lat: 26.7146, lng: -80.0533, rank: 15, neighborhood: "Clematis Street" },
+  { name: "Camelot", lat: 26.7142, lng: -80.0536, rank: 16, neighborhood: "Clematis Street" },
+  { name: "Pawn Shop Lounge", lat: 26.7146, lng: -80.0532, rank: 17, neighborhood: "Clematis Street" },
   
   // Rosemary Square / CityPlace
-  { name: "Blue Martini", lat: 26.7110, lng: -80.0623, rank: 16, neighborhood: "Rosemary Square" },
-  { name: "The Blind Monk", lat: 26.7111, lng: -80.0621, rank: 17, neighborhood: "Rosemary Square" },
-  { name: "City Cellar Wine Bar", lat: 26.7112, lng: -80.0620, rank: 18, neighborhood: "Rosemary Square" },
-  { name: "Galley", lat: 26.7113, lng: -80.0619, rank: 19, neighborhood: "Rosemary Square" },
+  { name: "Blue Martini", lat: 26.7110, lng: -80.0623, rank: 18, neighborhood: "Rosemary Square" },
+  { name: "The Blind Monk", lat: 26.7111, lng: -80.0621, rank: 19, neighborhood: "Rosemary Square" },
+  { name: "City Cellar Wine Bar", lat: 26.7112, lng: -80.0620, rank: 20, neighborhood: "Rosemary Square" },
+  { name: "Galley", lat: 26.7113, lng: -80.0619, rank: 21, neighborhood: "Rosemary Square" },
   
   // Northwood / Other
-  { name: "Voltaire", lat: 26.7290, lng: -80.0520, rank: 20, neighborhood: "Northwood Village" },
-  { name: "Grandview Public Market", lat: 26.7285, lng: -80.0525, rank: 21, neighborhood: "Warehouse District" },
-  { name: "Banko Cantina", lat: 26.7144, lng: -80.0531, rank: 22, neighborhood: "Clematis Street" },
-  { name: "Topside at The Beacon", lat: 26.7143, lng: -80.0535, rank: 23, neighborhood: "Clematis Street" },
-  { name: "The Alchemist", lat: 26.7143, lng: -80.0535, rank: 24, neighborhood: "Clematis Street" },
-  { name: "Grease Burger Bar", lat: 26.7147, lng: -80.0531, rank: 25, neighborhood: "Clematis Street" },
+  { name: "Voltaire", lat: 26.7290, lng: -80.0520, rank: 22, neighborhood: "Northwood Village" },
+  { name: "Grandview Public Market", lat: 26.7285, lng: -80.0525, rank: 23, neighborhood: "Warehouse District" },
+  { name: "Banko Cantina", lat: 26.7144, lng: -80.0531, rank: 24, neighborhood: "Clematis Street" },
+  { name: "Topside at The Beacon", lat: 26.7143, lng: -80.0535, rank: 25, neighborhood: "Clematis Street" },
+  { name: "The Alchemist", lat: 26.7143, lng: -80.0535, rank: 26, neighborhood: "Clematis Street" },
+  { name: "Grease Burger Bar", lat: 26.7147, lng: -80.0531, rank: 27, neighborhood: "Clematis Street" },
 ];
 
 // REMOVED: DEMO_VENUES - these don't exist in the database
@@ -680,6 +682,24 @@ const PB_VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string 
       { text: "If you want to know what WPB nightlife is about, start here. The outdoor area is always bumping.", rating: 4 },
       { text: "Best live music venue on Clematis. No pretense, just good times.", rating: 5 },
       { text: null, rating: 4 },
+    ]
+  },
+  "123 Datura": {
+    reviews: [
+      { text: "The perfect neighborhood bar! Craft cocktails, late night pizza, and a great crowd. Open til 2am.", rating: 5 },
+      { text: "Love the rustic-modern vibe. Great for private events but also chill enough to pop in after work.", rating: 5 },
+      { text: "Finally a real downtown WPB bar that isn't trying too hard. Good drinks, good people.", rating: 4 },
+      { text: "The pizza is surprisingly amazing. Come for drinks, stay for the pepperoni.", rating: 4 },
+      { text: null, rating: 5 },
+    ]
+  },
+  "Four": {
+    reviews: [
+      { text: "Best speakeasy in WPB! 23+ only keeps it sophisticated. The bottle service is worth it.", rating: 5 },
+      { text: "Old NY cocktail bar vibes in downtown WPB. The mixology is next level.", rating: 5 },
+      { text: "Intimate and upscale. The DJ sets the mood perfectly. Feels like a hidden gem.", rating: 5 },
+      { text: "Dark, moody, sexy. This is where you go when you're done with the basic bars.", rating: 4 },
+      { text: null, rating: 5 },
     ]
   },
   "HMF at The Breakers": {
