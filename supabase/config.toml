@@ -7,7 +7,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.seed-demo-data]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-push]
 verify_jwt = true
