@@ -1,10 +1,11 @@
-// City detection service for dual-city bootstrap mode (NYC + LA)
+// City detection service for multi-city bootstrap mode (NYC + LA + Palm Beach)
 
-export type SupportedCity = 'nyc' | 'la';
+export type SupportedCity = 'nyc' | 'la' | 'pb';
 
 export const CITY_CENTERS = {
   nyc: { lat: 40.7128, lng: -74.0060, radius: 100 }, // 100 mile radius
   la: { lat: 34.0522, lng: -118.2437, radius: 100 },
+  pb: { lat: 26.7056, lng: -80.0364, radius: 10 }, // 10 mile radius - Palm Beach Island + West Palm Beach only
 };
 
 const CITY_CACHE_KEY = 'detected_city';
@@ -15,7 +16,7 @@ const CITY_CACHE_KEY = 'detected_city';
 export function getCachedCity(): SupportedCity | null {
   try {
     const cached = localStorage.getItem(CITY_CACHE_KEY);
-    if (cached === 'nyc' || cached === 'la') {
+    if (cached === 'nyc' || cached === 'la' || cached === 'pb') {
       return cached;
     }
   } catch (error) {
@@ -94,6 +95,12 @@ function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
 function findClosestCity(coords: { lat: number; lng: number }): SupportedCity {
   const nycDistance = calculateDistance(coords, CITY_CENTERS.nyc);
   const laDistance = calculateDistance(coords, CITY_CENTERS.la);
+  const pbDistance = calculateDistance(coords, CITY_CENTERS.pb);
+  
+  // Check Palm Beach first (smaller radius, more specific)
+  if (pbDistance <= CITY_CENTERS.pb.radius) {
+    return 'pb';
+  }
   
   // Check if within NYC radius
   if (nycDistance <= CITY_CENTERS.nyc.radius) {
@@ -105,8 +112,11 @@ function findClosestCity(coords: { lat: number; lng: number }): SupportedCity {
     return 'la';
   }
   
-  // If outside both radii, return closest city
-  return nycDistance < laDistance ? 'nyc' : 'la';
+  // If outside all radii, return closest city
+  const minDistance = Math.min(nycDistance, laDistance, pbDistance);
+  if (minDistance === pbDistance) return 'pb';
+  if (minDistance === laDistance) return 'la';
+  return 'nyc';
 }
 
 /**

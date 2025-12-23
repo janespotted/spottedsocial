@@ -18,7 +18,7 @@ export default function DemoSettings() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { city } = useUserCity();
-  const cityLabel = city === 'la' ? 'LA' : 'NYC';
+  const cityLabel = city === 'la' ? 'LA' : city === 'pb' ? 'Palm Beach' : 'NYC';
   const [demoEnabled, setDemoEnabled] = useState(false);
   const [bootstrapEnabled, setBootstrapEnabled] = useState(false);
   const [seeded, setSeeded] = useState(false);
@@ -100,7 +100,7 @@ export default function DemoSettings() {
     if (!user) return;
     
     const seedCity = targetCity || city;
-    const seedCityLabel = seedCity === 'la' ? 'LA' : 'NYC';
+    const seedCityLabel = seedCity === 'la' ? 'LA' : seedCity === 'pb' ? 'Palm Beach' : 'NYC';
     
     setLoading(true);
     try {
@@ -158,7 +158,7 @@ export default function DemoSettings() {
 
   const handleCitySelect = (selectedCity: SupportedCity) => {
     cacheCity(selectedCity);
-    const label = selectedCity === 'la' ? 'LA' : 'NYC';
+    const label = selectedCity === 'la' ? 'LA' : selectedCity === 'pb' ? 'Palm Beach' : 'NYC';
     toast.success(`City set to ${label}`);
   };
 
@@ -185,17 +185,21 @@ export default function DemoSettings() {
       // Show the actual coordinates for debugging
       toast.info(`GPS: ${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`);
       
-      // Calculate distance to both cities
+      // Calculate distance to all cities
       const { calculateDistance, CITY_CENTERS } = await import('@/lib/city-detection');
       const nycDistance = calculateDistance(position, CITY_CENTERS.nyc);
       const laDistance = calculateDistance(position, CITY_CENTERS.la);
+      const pbDistance = calculateDistance(position, CITY_CENTERS.pb);
       
-      // Determine closest city
-      const detectedCity: SupportedCity = nycDistance < laDistance ? 'nyc' : 'la';
+      // Check Palm Beach first (smaller radius)
+      const detectedCity: SupportedCity = 
+        pbDistance <= CITY_CENTERS.pb.radius ? 'pb' : 
+        nycDistance < laDistance ? 'nyc' : 'la';
       cacheCity(detectedCity);
       
-      const label = detectedCity === 'la' ? 'LA' : 'NYC';
-      toast.success(`Detected: ${label}! (${Math.round(detectedCity === 'nyc' ? nycDistance : laDistance)} miles away)`);
+      const label = detectedCity === 'la' ? 'LA' : detectedCity === 'pb' ? 'Palm Beach' : 'NYC';
+      const distance = detectedCity === 'nyc' ? nycDistance : detectedCity === 'la' ? laDistance : pbDistance;
+      toast.success(`Detected: ${label}! (${Math.round(distance)} miles away)`);
     } catch (error: any) {
       if (error?.code === 1) {
         toast.error('GPS permission denied. Please enable location access.');
@@ -312,6 +316,16 @@ export default function DemoSettings() {
                 >
                   LA
                 </Button>
+                <Button
+                  onClick={() => handleCitySelect('pb')}
+                  variant={city === 'pb' ? 'default' : 'outline'}
+                  className={city === 'pb' 
+                    ? 'flex-1 bg-[#a855f7] text-white hover:bg-[#a855f7]/90' 
+                    : 'flex-1 border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10'
+                  }
+                >
+                  PB
+                </Button>
               </div>
 
               <Button
@@ -374,6 +388,14 @@ export default function DemoSettings() {
                       <Users className="h-4 w-4 mr-2" />
                       {loading ? 'Seeding...' : 'Seed LA Data'}
                     </Button>
+                    <Button
+                      onClick={() => handleSeedData('pb')}
+                      disabled={loading}
+                      className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      {loading ? 'Seeding...' : 'Seed Palm Beach Data'}
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -384,7 +406,7 @@ export default function DemoSettings() {
                         variant="outline"
                         className="flex-1 border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10"
                       >
-                        Re-seed NYC
+                        NYC
                       </Button>
                       <Button
                         onClick={() => handleSeedData('la')}
@@ -392,7 +414,15 @@ export default function DemoSettings() {
                         variant="outline"
                         className="flex-1 border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10"
                       >
-                        Re-seed LA
+                        LA
+                      </Button>
+                      <Button
+                        onClick={() => handleSeedData('pb')}
+                        disabled={loading}
+                        variant="outline"
+                        className="flex-1 border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10"
+                      >
+                        PB
                       </Button>
                     </div>
                     <Button
@@ -457,6 +487,8 @@ export default function DemoSettings() {
                   <div className="text-white/50 pt-2">
                     Includes: {city === 'la' 
                       ? 'Sunset Room, Sound Nightclub, The Abbey, Death & Co LA, and more...'
+                      : city === 'pb'
+                      ? 'Buccan, HMF at The Breakers, Respectable Street, Blue Martini, and more...'
                       : 'Superbueno, Ketchy Shuby, Gospël, The Box, Attaboy, Saint Tuesday, and more...'}
                   </div>
                 </div>

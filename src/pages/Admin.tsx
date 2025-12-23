@@ -23,7 +23,7 @@ interface Venue {
 
 export default function Admin() {
   const navigate = useNavigate();
-  const [selectedCity, setSelectedCity] = useState<'nyc' | 'la'>('nyc');
+  const [selectedCity, setSelectedCity] = useState<'nyc' | 'la' | 'pb'>('nyc');
   const [promotedVenues, setPromotedVenues] = useState<Venue[]>([]);
   const [allVenues, setAllVenues] = useState<Venue[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,6 +152,13 @@ export default function Admin() {
               >
                 LA
               </Button>
+              <Button
+                variant={selectedCity === 'pb' ? 'default' : 'outline'}
+                onClick={() => setSelectedCity('pb')}
+                className={selectedCity === 'pb' ? 'bg-primary' : 'border-white/20 text-white hover:bg-white/10'}
+              >
+                PB
+              </Button>
             </div>
 
             {/* Currently Promoted */}
@@ -261,6 +268,13 @@ export default function Admin() {
                 className={selectedCity === 'la' ? 'bg-primary' : 'border-white/20 text-white hover:bg-white/10'}
               >
                 LA
+              </Button>
+              <Button
+                variant={selectedCity === 'pb' ? 'default' : 'outline'}
+                onClick={() => setSelectedCity('pb')}
+                className={selectedCity === 'pb' ? 'bg-primary' : 'border-white/20 text-white hover:bg-white/10'}
+              >
+                PB
               </Button>
             </div>
 
