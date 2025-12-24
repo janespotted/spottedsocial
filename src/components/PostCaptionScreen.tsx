@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { calculateExpiryTime } from '@/lib/time-utils';
 import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
+import { validatePostText } from '@/lib/validation-schemas';
 
 interface PostCaptionScreenProps {
   imageFile: File;
@@ -151,8 +152,10 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
   };
 
   const handleShare = async () => {
-    if (!caption.trim()) {
-      toast.error('Please add a caption');
+    // Validate caption with Zod schema
+    const validation = validatePostText(caption);
+    if (!validation.success) {
+      toast.error(validation.error || 'Invalid caption');
       return;
     }
     if (!user) return;
@@ -168,7 +171,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
 
       const { error } = await supabase.from('posts').insert({
         user_id: user.id,
-        text: caption,
+        text: validation.data!, // Use validated and trimmed text
         image_url: imageUrl,
         venue_name: locationData?.venueName || location || null,
         venue_id: locationData?.venueId || null,
