@@ -18,7 +18,7 @@ import {
   suppressVenueTonight,
 } from '@/lib/venue-arrival-nudge';
 import type { VenueArrivalContext, NightStatus } from '@/lib/venue-arrival-nudge';
-import { showVenueArrivalToast } from '@/components/VenueArrivalToast';
+import { toast } from 'sonner';
 
 // Re-export for consumers that need to dismiss venues
 export { dismissVenuePrompt, suppressVenueTonight } from '@/lib/venue-arrival-nudge';
@@ -100,10 +100,6 @@ export function useVenueArrivalNudge() {
     }
   }, []);
 
-  // Handler to open audience selector
-  const handleChangeAudience = useCallback(() => {
-    console.log('[VenueArrivalNudge] Change audience requested');
-  }, []);
 
   const checkForNearbyVenue = useCallback(async () => {
     if (!user?.id) return;
@@ -214,18 +210,17 @@ export function useVenueArrivalNudge() {
       updatePreviousVenue(nearestVenue.id);
 
       if (decision.deliveryMethod === 'toast') {
-        // Toast flow for "out" users
+        // Auto-update venue for "out" users - no confirmation needed
         markToastShown(nearestVenue.id);
-
-        showVenueArrivalToast({
-          venueName: nearestVenue.name,
-          venueId: nearestVenue.id,
-          locationSharingLevel: profile?.location_sharing_level ?? 'all_friends',
-          onChangeAudience: handleChangeAudience,
-        });
-
-        // Silent venue update in background
+        
+        // Update venue automatically
         await silentVenueUpdate(user.id, nearestVenue, location.lat, location.lng);
+        
+        // Show brief informational notification (auto-dismisses)
+        toast(`📍 Now at ${nearestVenue.name}`, {
+          duration: 3000,
+          position: 'bottom-center',
+        });
       } else {
         // Modal flow for planning/no-status users
         if (isVenueDismissed(nearestVenue.id)) {
@@ -246,7 +241,7 @@ export function useVenueArrivalNudge() {
     } finally {
       markCheckingEnd();
     }
-  }, [user?.id, deliveryHandler, silentVenueUpdate, handleChangeAudience, isInputFocusedRef]);
+  }, [user?.id, deliveryHandler, silentVenueUpdate, isInputFocusedRef, setNearbyVenues]);
 
   // Initial check on mount
   useEffect(() => {
