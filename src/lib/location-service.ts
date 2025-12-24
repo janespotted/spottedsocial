@@ -96,6 +96,40 @@ export const findNearestVenue = async (
 };
 
 /**
+ * Find multiple nearby venues within radius
+ */
+export const findNearbyVenues = async (
+  lat: number,
+  lng: number,
+  radiusMeters: number = 500,
+  maxResults: number = 10
+): Promise<VenueMatch[]> => {
+  try {
+    const { data, error } = await supabase.rpc('find_nearby_venues', {
+      user_lat: lat,
+      user_lng: lng,
+      radius_meters: radiusMeters,
+      max_results: maxResults,
+    });
+
+    if (error) throw error;
+    
+    if (data && data.length > 0) {
+      return data.map((v: { venue_id: string; venue_name: string; distance_meters: number }) => ({
+        id: v.venue_id,
+        name: v.venue_name,
+        distance: v.distance_meters,
+      }));
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Error finding nearby venues:', error);
+    return [];
+  }
+};
+
+/**
  * Create a new venue at given coordinates
  */
 export const createNewVenue = async (

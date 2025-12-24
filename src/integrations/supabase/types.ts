@@ -1660,6 +1660,19 @@ export type Database = {
         Args: { group_name?: string; member_ids: string[] }
         Returns: string
       }
+      find_nearby_venues: {
+        Args: {
+          max_results?: number
+          radius_meters?: number
+          user_lat: number
+          user_lng: number
+        }
+        Returns: {
+          distance_meters: number
+          venue_id: string
+          venue_name: string
+        }[]
+      }
       find_nearest_venue: {
         Args: { radius_meters?: number; user_lat: number; user_lng: number }
         Returns: {
