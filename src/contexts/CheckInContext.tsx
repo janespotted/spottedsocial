@@ -5,6 +5,7 @@ export interface DetectedVenue {
   name: string;
   lat: number;
   lng: number;
+  distance?: number;
 }
 
 interface CheckInContextType {
@@ -16,9 +17,11 @@ interface CheckInContextType {
   // Venue arrival prompt state
   showVenueArrivalPrompt: boolean;
   detectedVenue: DetectedVenue | null;
+  nearbyVenues: DetectedVenue[];
   showVenueArrival: () => void;
   hideVenueArrival: () => void;
   setDetectedVenue: (venue: DetectedVenue | null) => void;
+  setNearbyVenues: (venues: DetectedVenue[]) => void;
   // Check-in confirmation state
   showCheckInConfirmation: boolean;
   checkInConfirmationType: 'out' | 'planning' | null;
@@ -37,6 +40,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
   const [isReminderTriggered, setIsReminderTriggered] = useState(false);
   const [showVenueArrivalPrompt, setShowVenueArrivalPrompt] = useState(false);
   const [detectedVenue, setDetectedVenue] = useState<DetectedVenue | null>(null);
+  const [nearbyVenues, setNearbyVenues] = useState<DetectedVenue[]>([]);
   
   // Check-in confirmation state
   const [showCheckInConfirmation, setShowCheckInConfirmation] = useState(false);
@@ -64,6 +68,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
   const hideVenueArrival = () => {
     setShowVenueArrivalPrompt(false);
     setDetectedVenue(null);
+    setNearbyVenues([]);
   };
 
   const showOutConfirmation = (venueName: string, privacyLevel: string) => {
@@ -99,9 +104,11 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       closeCheckIn,
       showVenueArrivalPrompt,
       detectedVenue,
+      nearbyVenues,
       showVenueArrival,
       hideVenueArrival,
       setDetectedVenue,
+      setNearbyVenues,
       showCheckInConfirmation,
       checkInConfirmationType,
       checkInVenueName,

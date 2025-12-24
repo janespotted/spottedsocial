@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogOverlay } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { MapPin, X } from 'lucide-react';
-import { useCheckIn } from '@/contexts/CheckInContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MapPin, X, ChevronDown } from 'lucide-react';
+import { useCheckIn, DetectedVenue } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -11,11 +12,27 @@ import { haptic } from '@/lib/haptics';
 
 export function VenueArrivalPrompt() {
   const { user } = useAuth();
-  const { showVenueArrivalPrompt, hideVenueArrival, detectedVenue } = useCheckIn();
+  const { showVenueArrivalPrompt, hideVenueArrival, detectedVenue, nearbyVenues } = useCheckIn();
   const [isConfirming, setIsConfirming] = useState(false);
+  const [selectedVenue, setSelectedVenue] = useState<DetectedVenue | null>(null);
+
+  // Initialize selected venue when detected venue changes
+  useEffect(() => {
+    if (detectedVenue) {
+      setSelectedVenue(detectedVenue);
+    }
+  }, [detectedVenue]);
+
+  const handleVenueChange = (venueId: string) => {
+    const venue = nearbyVenues.find(v => v.id === venueId);
+    if (venue) {
+      setSelectedVenue(venue);
+      haptic.light();
+    }
+  };
 
   const handleConfirm = async () => {
-    if (!user?.id || !detectedVenue) return;
+    if (!user?.id || !selectedVenue) return;
     
     setIsConfirming(true);
     haptic.success();
@@ -40,10 +57,10 @@ export function VenueArrivalPrompt() {
         .from('checkins')
         .insert({
           user_id: user.id,
-          venue_id: detectedVenue.id,
-          venue_name: detectedVenue.name,
-          lat: detectedVenue.lat,
-          lng: detectedVenue.lng,
+          venue_id: selectedVenue.id,
+          venue_name: selectedVenue.name,
+          lat: selectedVenue.lat,
+          lng: selectedVenue.lng,
           started_at: now,
         });
 
@@ -53,10 +70,10 @@ export function VenueArrivalPrompt() {
         .upsert({
           user_id: user.id,
           status: 'out',
-          venue_id: detectedVenue.id,
-          venue_name: detectedVenue.name,
-          lat: detectedVenue.lat,
-          lng: detectedVenue.lng,
+          venue_id: selectedVenue.id,
+          venue_name: selectedVenue.name,
+          lat: selectedVenue.lat,
+          lng: selectedVenue.lng,
           expires_at: expiresAt.toISOString(),
           updated_at: now,
         }, { onConflict: 'user_id' });
@@ -66,14 +83,14 @@ export function VenueArrivalPrompt() {
         .from('profiles')
         .update({
           is_out: true,
-          last_known_lat: detectedVenue.lat,
-          last_known_lng: detectedVenue.lng,
+          last_known_lat: selectedVenue.lat,
+          last_known_lng: selectedVenue.lng,
           last_location_at: now,
         })
         .eq('id', user.id);
 
       hideVenueArrival();
-      toast.success(`You're out at ${detectedVenue.name}! 🎉`);
+      toast.success(`You're out at ${selectedVenue.name}! 🎉`);
     } catch (error) {
       console.error('Error confirming arrival:', error);
       toast.error('Failed to update status');
@@ -90,7 +107,10 @@ export function VenueArrivalPrompt() {
     hideVenueArrival();
   };
 
-  if (!detectedVenue) return null;
+  if (!selectedVenue) return null;
+
+  // Filter other venues (exclude the currently selected one)
+  const otherVenues = nearbyVenues.filter(v => v.id !== selectedVenue.id);
 
   return (
     <Dialog open={showVenueArrivalPrompt} onOpenChange={(open) => !open && handleDismiss()}>
@@ -111,9 +131,49 @@ export function VenueArrivalPrompt() {
           </div>
 
           {/* Single clear question with venue name */}
-          <h2 className="text-2xl font-bold text-white mb-6">
-            You're near {detectedVenue.name}.<br />Are you out?
+          <h2 className="text-2xl font-bold text-white mb-2">
+            You're near {selectedVenue.name}.<br />Are you out?
           </h2>
+
+          {/* Venue selector dropdown - only show if there are other venues */}
+          {otherVenues.length > 0 && (
+            <div className="mb-6 mt-4">
+              <p className="text-sm text-white/50 mb-2">Not right? Select another:</p>
+              <Select value={selectedVenue.id} onValueChange={handleVenueChange}>
+                <SelectTrigger className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20 focus:ring-[#a855f7]/50">
+                  <SelectValue>
+                    <span className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-[#a855f7]" />
+                      {selectedVenue.name}
+                      {selectedVenue.distance && (
+                        <span className="text-white/50 text-xs">
+                          ({Math.round(selectedVenue.distance)}m)
+                        </span>
+                      )}
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a0f2e] border-[#a855f7]/40 z-[600]">
+                  {nearbyVenues.map(venue => (
+                    <SelectItem 
+                      key={venue.id} 
+                      value={venue.id}
+                      className="text-white hover:bg-[#a855f7]/20 focus:bg-[#a855f7]/20 focus:text-white cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2">
+                        {venue.name}
+                        {venue.distance && (
+                          <span className="text-white/50 text-xs">
+                            ({Math.round(venue.distance)}m)
+                          </span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Confirm button */}
           <Button

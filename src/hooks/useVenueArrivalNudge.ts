@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useInputFocus } from '@/contexts/InputFocusContext';
 import { supabase } from '@/integrations/supabase/client';
-import { getCurrentLocation, findNearestVenue, calculateDistance } from '@/lib/location-service';
+import { getCurrentLocation, findNearestVenue, findNearbyVenues, calculateDistance } from '@/lib/location-service';
 import {
   canTriggerVenueArrival,
   isVenueDismissed,
@@ -34,7 +34,7 @@ let knownVenues: Map<string, VenueLocation> = new Map();
 
 export function useVenueArrivalNudge() {
   const { user } = useAuth();
-  const { showVenueArrival, setDetectedVenue } = useCheckIn();
+  const { showVenueArrival, setDetectedVenue, setNearbyVenues } = useCheckIn();
   const { isInputFocusedRef } = useInputFocus();
   const hasCheckedRef = useRef(false);
   const [isOutStatus, setIsOutStatus] = useState(false);
@@ -153,16 +153,30 @@ export function useVenueArrivalNudge() {
         }
       }
 
-      // Find nearest venue
-      const nearestVenue = await findNearestVenue(location.lat, location.lng, 500);
+      // Find nearest venue and nearby alternatives
+      const [nearestVenue, allNearbyVenues] = await Promise.all([
+        findNearestVenue(location.lat, location.lng, 500),
+        findNearbyVenues(location.lat, location.lng, 500, 10),
+      ]);
 
       // No venue within max detection range - reset dwell tracker
       if (!nearestVenue) {
         resetDwellTracker();
         updatePreviousVenue(null);
+        setNearbyVenues([]);
         console.log('[VenueArrivalNudge] No venue within 500m');
         return;
       }
+
+      // Store nearby venues for the dropdown
+      const nearbyVenuesWithCoords = allNearbyVenues.map(v => ({
+        id: v.id,
+        name: v.name,
+        lat: location.lat,
+        lng: location.lng,
+        distance: v.distance,
+      }));
+      setNearbyVenues(nearbyVenuesWithCoords);
 
       // Store venue location for future departure detection
       knownVenues.set(nearestVenue.id, {
