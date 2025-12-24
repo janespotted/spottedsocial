@@ -40,7 +40,23 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_NOTIFICATION_ID_LENGTH = 100;
 
-function validatePayload(payload: unknown): { valid: boolean; error?: string } {
+/**
+ * Sanitize message content by escaping HTML entities and removing potentially
+ * dangerous characters. This prevents XSS if push notifications render HTML.
+ */
+function sanitizeMessage(message: string): string {
+  return message
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    // Remove control characters except newlines and tabs
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+}
+
+function validatePayload(payload: unknown): { valid: boolean; error?: string; sanitizedMessage?: string } {
   if (!payload || typeof payload !== 'object') {
     return { valid: false, error: 'Invalid payload format' };
   }
@@ -72,7 +88,10 @@ function validatePayload(payload: unknown): { valid: boolean; error?: string } {
     return { valid: false, error: `Message must be between 1 and ${MAX_MESSAGE_LENGTH} characters` };
   }
 
-  return { valid: true };
+  // Sanitize message content to prevent XSS/injection
+  const sanitizedMessage = sanitizeMessage(p.message);
+
+  return { valid: true, sanitizedMessage };
 }
 
 function validateSubscriptionEndpoint(endpoint: string): boolean {
@@ -235,7 +254,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { receiver_id, sender_id, type, message } = payload;
+    // Use the sanitized message from validation
+    const { receiver_id, sender_id, type } = payload;
+    const message = validation.sanitizedMessage!;
 
     // Get receiver's push subscription
     const { data: receiverProfile, error: profileError } = await supabase
