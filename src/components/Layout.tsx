@@ -9,6 +9,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useCheckInPrompt } from '@/hooks/useCheckInPrompt';
+import { useVenueArrivalNudge } from '@/hooks/useVenueArrivalNudge';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { showBrowserNotification } from '@/lib/notifications';
@@ -27,6 +28,9 @@ export function Layout({ children }: LayoutProps) {
   
   // Auto check-in prompt (runs after onboarding, during nightlife hours)
   useCheckInPrompt();
+  
+  // Venue arrival detection (runs on all pages)
+  useVenueArrivalNudge();
   
   // Map page needs full width and flex layout
   const isMapPage = location.pathname === '/map';
