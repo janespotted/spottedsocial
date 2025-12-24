@@ -62,6 +62,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [customVenue, setCustomVenue] = useState<string>('');
   const [isEditingVenue, setIsEditingVenue] = useState(false);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
   const locationIntervalRef = useRef<number | null>(null);
   const [showCustomReminder, setShowCustomReminder] = useState(false);
   const [customReminderMinutes, setCustomReminderMinutes] = useState('');
@@ -189,11 +190,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         // Found a venue
         setDetectedVenue(locData.venueName);
         setCustomVenue(locData.venueName);
+        setSelectedVenueId(locData.venueId);
         setShowVenueConfirm(true);
       } else {
         // No venue found - prompt for manual entry
         setDetectedVenue('');
         setCustomVenue('');
+        setSelectedVenueId(null);
         setIsEditingVenue(true);
         setShowVenueConfirm(true);
       }
@@ -414,7 +417,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       return;
     }
 
-    let finalVenueId = locationData.venueId;
+    // Use selected venue if user picked from dropdown, otherwise use original
+    let finalVenueId = selectedVenueId || locationData.venueId;
     let finalVenueName = customVenue.trim() || locationData.venueName;
 
     // If user entered custom venue and no venue ID, create new venue
@@ -743,90 +747,127 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     setShowPrivatePartyPrivacy(true);
   };
 
-  const VenueConfirmContent = () => (
-    <div className="relative p-6 space-y-6">
-      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
-      
-      <div className="space-y-2">
-        <h3 className="text-xl font-semibold text-white">
-          {detectedVenue ? 'Confirm Your Location' : 'Where Are You?'}
-        </h3>
-        <div className="h-px bg-white/20" />
-      </div>
+  const handleVenueSelect = (venueId: string) => {
+    const venue = locationData?.nearbyVenues.find(v => v.id === venueId);
+    if (venue) {
+      setSelectedVenueId(venue.id);
+      setDetectedVenue(venue.name);
+      setCustomVenue(venue.name);
+    }
+  };
 
-      {detectedVenue && !isEditingVenue ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 p-4 bg-[#5b21b6]/20 border-2 border-[#d4ff00] rounded-xl">
-            <MapPin className="h-6 w-6 text-[#d4ff00]" />
-            <span className="text-lg text-white font-medium flex-1">{detectedVenue}</span>
-            <button
-              onClick={() => setIsEditingVenue(true)}
-              className="text-white/60 hover:text-white transition-colors"
-            >
-              <Edit3 className="h-5 w-5" />
-            </button>
-          </div>
-          <p className="text-sm text-white/60 text-center">
-            We detected you're near this venue
-          </p>
+  const VenueConfirmContent = () => {
+    const nearbyVenues = locationData?.nearbyVenues || [];
+    const hasMultipleVenues = nearbyVenues.length > 1;
+
+    return (
+      <div className="relative p-6 space-y-6">
+        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+        
+        <div className="space-y-2">
+          <h3 className="text-xl font-semibold text-white">
+            {detectedVenue ? 'Confirm Your Location' : 'Where Are You?'}
+          </h3>
+          <div className="h-px bg-white/20" />
         </div>
-      ) : (
-        <div className="space-y-4">
-          {/* No venue detected - show options */}
-          {!detectedVenue && (
-            <div className="space-y-3 mb-4">
-              <p className="text-sm text-white/60 text-center">
-                No nearby venues found
-              </p>
-              
-              {/* Private Party option - only shown when no venue detected */}
-              <Button
-                onClick={handlePrivatePartyFromVenueConfirm}
-                className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#6366f1] to-[#4f46e5] text-white border border-[#6366f1]/40 hover:from-[#818cf8] hover:to-[#6366f1] hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-200"
+
+        {detectedVenue && !isEditingVenue ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-[#5b21b6]/20 border-2 border-[#d4ff00] rounded-xl">
+              <MapPin className="h-6 w-6 text-[#d4ff00]" />
+              <span className="text-lg text-white font-medium flex-1">{detectedVenue}</span>
+              <button
+                onClick={() => setIsEditingVenue(true)}
+                className="text-white/60 hover:text-white transition-colors"
               >
-                <Home className="w-5 h-5 mr-2" />
-                I'm at a Private Party 🏠
-              </Button>
-              
-              <div className="flex items-center gap-3 py-2">
-                <div className="flex-1 h-px bg-white/20" />
-                <span className="text-white/40 text-sm">or</span>
-                <div className="flex-1 h-px bg-white/20" />
-              </div>
+                <Edit3 className="h-5 w-5" />
+              </button>
             </div>
-          )}
-          
-          <Input
-            value={customVenue}
-            onChange={(e) => setCustomVenue(e.target.value)}
-            onFocus={handleInputFocus}
-            placeholder={detectedVenue ? "Enter different venue..." : "Enter venue name..."}
-            className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#d4ff00] text-white placeholder:text-white/40 focus:ring-[#d4ff00]"
-            autoFocus={!!detectedVenue}
-          />
-          {detectedVenue && (
-            <button
-              onClick={() => {
-                setCustomVenue(detectedVenue);
-                setIsEditingVenue(false);
-              }}
-              className="text-sm text-[#d4ff00] hover:underline"
-            >
-              Use detected venue: {detectedVenue}
-            </button>
-          )}
-        </div>
-      )}
+            <p className="text-sm text-white/60 text-center">
+              We detected you're near this venue
+            </p>
 
-      <Button
-        onClick={handleVenueConfirm}
-        disabled={!customVenue.trim()}
-        className="w-full h-14 text-lg font-semibold rounded-full bg-[#5b21b6] text-[#d4ff00] border-2 border-[#d4ff00] hover:bg-[#6d28d9] shadow-[0_0_20px_rgba(212,255,0,0.4)] disabled:opacity-50"
-      >
-        {detectedVenue ? 'Confirm' : 'Enter Venue Manually'}
-      </Button>
-    </div>
-  );
+            {/* Dropdown to select different nearby venue */}
+            {hasMultipleVenues && (
+              <div className="space-y-2">
+                <p className="text-sm text-white/60">Not right? Select another:</p>
+                <Select value={selectedVenueId || ''} onValueChange={handleVenueSelect}>
+                  <SelectTrigger className="h-12 bg-[#1a0f2e] border border-white/20 text-white focus:ring-[#d4ff00] focus:border-[#d4ff00]">
+                    <SelectValue placeholder="Select a different venue..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a0f2e] border border-white/20 z-[600]">
+                    {nearbyVenues.map((venue) => (
+                      <SelectItem 
+                        key={venue.id} 
+                        value={venue.id}
+                        className="text-white hover:bg-[#5b21b6]/30 focus:bg-[#5b21b6]/30 cursor-pointer"
+                      >
+                        {venue.name} ({Math.round(venue.distance)}m)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* No venue detected - show options */}
+            {!detectedVenue && (
+              <div className="space-y-3 mb-4">
+                <p className="text-sm text-white/60 text-center">
+                  No nearby venues found
+                </p>
+                
+                {/* Private Party option - only shown when no venue detected */}
+                <Button
+                  onClick={handlePrivatePartyFromVenueConfirm}
+                  className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#6366f1] to-[#4f46e5] text-white border border-[#6366f1]/40 hover:from-[#818cf8] hover:to-[#6366f1] hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-200"
+                >
+                  <Home className="w-5 h-5 mr-2" />
+                  I'm at a Private Party 🏠
+                </Button>
+                
+                <div className="flex items-center gap-3 py-2">
+                  <div className="flex-1 h-px bg-white/20" />
+                  <span className="text-white/40 text-sm">or</span>
+                  <div className="flex-1 h-px bg-white/20" />
+                </div>
+              </div>
+            )}
+            
+            <Input
+              value={customVenue}
+              onChange={(e) => setCustomVenue(e.target.value)}
+              onFocus={handleInputFocus}
+              placeholder={detectedVenue ? "Enter different venue..." : "Enter venue name..."}
+              className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#d4ff00] text-white placeholder:text-white/40 focus:ring-[#d4ff00]"
+              autoFocus={!!detectedVenue}
+            />
+            {detectedVenue && (
+              <button
+                onClick={() => {
+                  setCustomVenue(detectedVenue);
+                  setIsEditingVenue(false);
+                }}
+                className="text-sm text-[#d4ff00] hover:underline"
+              >
+                Use detected venue: {detectedVenue}
+              </button>
+            )}
+          </div>
+        )}
+
+        <Button
+          onClick={handleVenueConfirm}
+          disabled={!customVenue.trim()}
+          className="w-full h-14 text-lg font-semibold rounded-full bg-[#5b21b6] text-[#d4ff00] border-2 border-[#d4ff00] hover:bg-[#6d28d9] shadow-[0_0_20px_rgba(212,255,0,0.4)] disabled:opacity-50"
+        >
+          {detectedVenue ? 'Confirm' : 'Enter Venue Manually'}
+        </Button>
+      </div>
+    );
+  };
 
   const PlanningNeighborhoodContent = () => {
     const neighborhoods = CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS['la'];
