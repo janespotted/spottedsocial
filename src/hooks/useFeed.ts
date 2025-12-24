@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { haptic } from '@/lib/haptics';
 import { withRetry } from '@/lib/retry';
 import { logger } from '@/lib/logger';
+import { validateCommentText } from '@/lib/validation-schemas';
 
 export interface Post {
   id: string;
@@ -388,13 +389,20 @@ export function useFeed(options: UseFeedOptions) {
   }, [expandedPostId, comments, fetchComments]);
 
   const handlePostComment = useCallback(async (postId: string) => {
-    const commentText = newComment[postId]?.trim();
-    if (!commentText || !userId) return;
+    const rawText = newComment[postId];
+    if (!rawText || !userId) return;
+
+    // Validate comment with Zod schema
+    const validation = validateCommentText(rawText);
+    if (!validation.success) {
+      logger.warn('feed:invalid_comment', { error: validation.error });
+      return;
+    }
 
     const { error } = await supabase.from('post_comments').insert({
       post_id: postId,
       user_id: userId,
-      text: commentText,
+      text: validation.data!, // Use validated and trimmed text
     });
 
     if (error) {
