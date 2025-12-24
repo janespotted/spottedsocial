@@ -6,6 +6,7 @@ export interface LocationData {
   timestamp: string;
   venueId: string | null;
   venueName: string | null;
+  nearbyVenues: VenueMatch[];
 }
 
 export interface VenueMatch {
@@ -165,7 +166,7 @@ export const createNewVenue = async (
 
 /**
  * Main function: Capture location and derive venue
- * Returns complete location data with venue information
+ * Returns complete location data with venue information and nearby alternatives
  */
 export const captureLocationWithVenue = async (): Promise<LocationData> => {
   // Get fresh GPS coordinates
@@ -174,8 +175,11 @@ export const captureLocationWithVenue = async (): Promise<LocationData> => {
   // Create timestamp
   const timestamp = new Date().toISOString();
   
-  // Try to find nearest venue
-  const nearestVenue = await findNearestVenue(coords.lat, coords.lng, 200);
+  // Fetch nearby venues (includes the nearest one)
+  const nearbyVenues = await findNearbyVenues(coords.lat, coords.lng, 500, 10);
+  
+  // The nearest venue is the first one (if any)
+  const nearestVenue = nearbyVenues.length > 0 ? nearbyVenues[0] : null;
   
   return {
     lat: coords.lat,
@@ -183,6 +187,7 @@ export const captureLocationWithVenue = async (): Promise<LocationData> => {
     timestamp,
     venueId: nearestVenue?.id || null,
     venueName: nearestVenue?.name || null,
+    nearbyVenues,
   };
 };
 

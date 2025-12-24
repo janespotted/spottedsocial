@@ -58,6 +58,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
           timestamp: new Date().toISOString(),
           venueId: activeStatus.venue_id || undefined,
           venueName: activeStatus.venue_name,
+          nearbyVenues: [],
         });
         setCapturingLocation(false);
       } else {
