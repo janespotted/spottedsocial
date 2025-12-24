@@ -27,7 +27,7 @@ export function NoFriendsBanner({ friendsCount }: NoFriendsBannerProps) {
   }
 
   return (
-    <div className="mx-4 mb-4 bg-gradient-to-r from-[#a855f7]/20 to-[#d4ff00]/10 border border-[#a855f7]/40 rounded-2xl p-4 relative">
+    <div className="mx-4 mt-4 mb-4 bg-gradient-to-r from-[#a855f7]/20 to-[#d4ff00]/10 border border-[#a855f7]/40 rounded-2xl p-4 relative">
       <button
         onClick={handleDismiss}
         className="absolute top-3 right-3 text-white/40 hover:text-white transition-colors"
