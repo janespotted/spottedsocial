@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { detectUserCity, getCachedCity, type SupportedCity } from '@/lib/city-detection';
+import { useState, useEffect, useCallback } from 'react';
+import { detectUserCity, getCachedCity, clearCachedCity, type SupportedCity } from '@/lib/city-detection';
 
 export function useUserCity() {
   // Synchronously initialize from localStorage cache to avoid race condition
@@ -39,5 +39,15 @@ export function useUserCity() {
     };
   }, []);
 
-  return { city, isLoading };
+  // Force refresh city detection via GPS
+  const refreshCity = useCallback(async () => {
+    setIsLoading(true);
+    clearCachedCity();
+    const detectedCity = await detectUserCity(true);
+    setCity(detectedCity);
+    setIsLoading(false);
+    return detectedCity;
+  }, []);
+
+  return { city, isLoading, refreshCity };
 }
