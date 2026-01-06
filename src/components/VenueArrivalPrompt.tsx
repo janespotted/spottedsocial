@@ -2,19 +2,24 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogOverlay } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, X, ChevronDown } from 'lucide-react';
+import { MapPin, X, Navigation } from 'lucide-react';
 import { useCheckIn, DetectedVenue } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { dismissVenuePrompt } from '@/lib/venue-arrival-nudge';
 import { haptic } from '@/lib/haptics';
+import { logVenueConfirmation, logVenueDismissal } from '@/lib/location-detection-logger';
+import { VenueCorrectionSheet } from '@/components/VenueCorrectionSheet';
+import { AddVenueSheet } from '@/components/AddVenueSheet';
 
 export function VenueArrivalPrompt() {
   const { user } = useAuth();
   const { showVenueArrivalPrompt, hideVenueArrival, detectedVenue, nearbyVenues } = useCheckIn();
   const [isConfirming, setIsConfirming] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<DetectedVenue | null>(null);
+  const [showCorrectionSheet, setShowCorrectionSheet] = useState(false);
+  const [showAddVenueSheet, setShowAddVenueSheet] = useState(false);
 
   // Initialize selected venue when detected venue changes
   useEffect(() => {
@@ -90,6 +95,11 @@ export function VenueArrivalPrompt() {
         .eq('id', user.id);
 
       hideVenueArrival();
+      // Log confirmation analytics
+      if (detectedVenue) {
+        const wasCorrect = detectedVenue.id === selectedVenue.id;
+        logVenueConfirmation(detectedVenue.id, selectedVenue.id, wasCorrect);
+      }
       toast.success(`You're out at ${selectedVenue.name}! 🎉`);
     } catch (error) {
       console.error('Error confirming arrival:', error);
@@ -102,9 +112,21 @@ export function VenueArrivalPrompt() {
   const handleDismiss = () => {
     if (detectedVenue) {
       dismissVenuePrompt(detectedVenue.id);
+      logVenueDismissal(detectedVenue.id, 'user_dismissed');
     }
     haptic.light();
     hideVenueArrival();
+  };
+
+  const handleSelectCorrectedVenue = (venue: { id: string; name: string; distance: number }) => {
+    setSelectedVenue({
+      id: venue.id,
+      name: venue.name,
+      lat: 0, // Will be fetched from DB on confirm
+      lng: 0,
+      distance: venue.distance,
+    });
+    haptic.light();
   };
 
   if (!selectedVenue) return null;
@@ -184,6 +206,18 @@ export function VenueArrivalPrompt() {
             {isConfirming ? 'Updating...' : "Yes, I'm here! 🎉"}
           </Button>
 
+          {/* I'm somewhere else button */}
+          <button
+            onClick={() => {
+              haptic.light();
+              setShowCorrectionSheet(true);
+            }}
+            className="flex items-center justify-center gap-1 text-[#a855f7] hover:text-[#c084fc] text-sm transition-colors mb-2"
+          >
+            <Navigation className="h-3.5 w-3.5" />
+            I'm somewhere else
+          </button>
+
           {/* Dismiss button */}
           <button
             onClick={handleDismiss}
@@ -193,6 +227,22 @@ export function VenueArrivalPrompt() {
           </button>
         </div>
       </DialogContent>
+
+      {/* Venue Correction Sheet */}
+      <VenueCorrectionSheet
+        open={showCorrectionSheet}
+        onOpenChange={setShowCorrectionSheet}
+        nearbyVenues={nearbyVenues.map(v => ({ id: v.id, name: v.name, distance: v.distance || 0 }))}
+        onSelectVenue={handleSelectCorrectedVenue}
+        onAddNewVenue={() => setShowAddVenueSheet(true)}
+        currentVenueId={selectedVenue?.id}
+      />
+
+      {/* Add Venue Sheet */}
+      <AddVenueSheet
+        open={showAddVenueSheet}
+        onOpenChange={setShowAddVenueSheet}
+      />
     </Dialog>
   );
 }

@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { MapPin, X } from 'lucide-react';
+import { MapPin, X, Navigation } from 'lucide-react';
 import { getAudienceLabel, suppressVenueTonight } from '@/lib/venue-arrival-nudge';
 
 interface VenueArrivalToastProps {
@@ -8,6 +8,7 @@ interface VenueArrivalToastProps {
   venueId: string;
   locationSharingLevel: string;
   onChangeAudience: () => void;
+  onWrongVenue?: () => void;
 }
 
 export function showVenueArrivalToast({
@@ -15,6 +16,7 @@ export function showVenueArrivalToast({
   venueId,
   locationSharingLevel,
   onChangeAudience,
+  onWrongVenue,
 }: VenueArrivalToastProps) {
   toast.custom(
     (t) => (
@@ -60,16 +62,30 @@ export function showVenueArrivalToast({
           </Button>
         </div>
 
-        {/* Not here link */}
-        <button
-          onClick={() => {
-            suppressVenueTonight(venueId);
-            toast.dismiss(t);
-          }}
-          className="text-xs text-white/40 hover:text-white/60 mt-3 transition-colors w-full text-center"
-        >
-          Not here
-        </button>
+        {/* Bottom links */}
+        <div className="flex justify-between items-center mt-3">
+          {onWrongVenue && (
+            <button
+              onClick={() => {
+                toast.dismiss(t);
+                onWrongVenue();
+              }}
+              className="text-xs text-[#a855f7] hover:text-[#c084fc] transition-colors flex items-center gap-1"
+            >
+              <Navigation className="h-3 w-3" />
+              Wrong venue?
+            </button>
+          )}
+          <button
+            onClick={() => {
+              suppressVenueTonight(venueId);
+              toast.dismiss(t);
+            }}
+            className="text-xs text-white/40 hover:text-white/60 transition-colors ml-auto"
+          >
+            Not here
+          </button>
+        </div>
       </div>
     ),
     {

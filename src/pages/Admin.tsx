@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { ArrowLeft, Lock, Search, Plus, X, MapPin, Star } from 'lucide-react';
+import { ArrowLeft, Lock, Search, Plus, X, MapPin, Star, FileText, BarChart3 } from 'lucide-react';
+import { VenueReportsPanel } from '@/components/admin/VenueReportsPanel';
+import { DetectionAnalyticsPanel } from '@/components/admin/DetectionAnalyticsPanel';
 
 interface Venue {
   id: string;
@@ -126,12 +128,22 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="promoted" className="w-full">
-          <TabsList className="w-full bg-white/5 border border-white/10">
-            <TabsTrigger value="promoted" className="flex-1 data-[state=active]:bg-primary">
-              Promoted Venues
+          <TabsList className="w-full bg-white/5 border border-white/10 grid grid-cols-4">
+            <TabsTrigger value="promoted" className="data-[state=active]:bg-primary text-xs">
+              <Star className="h-3 w-3 mr-1" />
+              Promoted
             </TabsTrigger>
-            <TabsTrigger value="all" className="flex-1 data-[state=active]:bg-primary">
-              All Venues
+            <TabsTrigger value="all" className="data-[state=active]:bg-primary text-xs">
+              <MapPin className="h-3 w-3 mr-1" />
+              Venues
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="data-[state=active]:bg-primary text-xs">
+              <FileText className="h-3 w-3 mr-1" />
+              Reports
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-primary text-xs">
+              <BarChart3 className="h-3 w-3 mr-1" />
+              Analytics
             </TabsTrigger>
           </TabsList>
 
@@ -323,6 +335,16 @@ export default function Admin() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Reports Tab */}
+          <TabsContent value="reports" className="mt-4 space-y-4">
+            <VenueReportsPanel />
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="mt-4 space-y-4">
+            <DetectionAnalyticsPanel />
           </TabsContent>
         </Tabs>
       </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus } from 'lucide-react';
+import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -9,10 +9,13 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { QRCodeModal } from '@/components/QRCodeModal';
+import { useUserCity } from '@/hooks/useUserCity';
+import { cacheCity, type SupportedCity } from '@/lib/city-detection';
 
 export default function Settings() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { city, refreshCity } = useUserCity();
   const { 
     isSupported, 
     permission, 
@@ -24,6 +27,17 @@ export default function Settings() {
   const [isToggling, setIsToggling] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+
+  const cityLabels: Record<SupportedCity, string> = {
+    nyc: 'New York City',
+    la: 'Los Angeles',
+    pb: 'Palm Beach',
+  };
+
+  const handleCityChange = (newCity: SupportedCity) => {
+    cacheCity(newCity);
+    toast.success(`City changed to ${cityLabels[newCity]}`);
+  };
 
   useEffect(() => {
     if (user) {
@@ -140,6 +154,37 @@ export default function Settings() {
             {!isSupported && (
               <span className="text-white/40 text-xs">Browser not supported</span>
             )}
+          </div>
+        </Card>
+
+        {/* City Selector Section */}
+        <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
+          <div className="p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
+                <MapPin className="h-5 w-5 text-[#a855f7]" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-white">Your City</h3>
+                <p className="text-white/60 text-sm">Where you're going out</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {(['nyc', 'la', 'pb'] as SupportedCity[]).map((c) => (
+                <Button
+                  key={c}
+                  variant={city === c ? 'default' : 'outline'}
+                  onClick={() => handleCityChange(c)}
+                  className={
+                    city === c
+                      ? 'flex-1 bg-[#a855f7] hover:bg-[#9333ea]'
+                      : 'flex-1 border-white/20 text-white hover:bg-white/10'
+                  }
+                >
+                  {c.toUpperCase()}
+                </Button>
+              ))}
+            </div>
           </div>
         </Card>
 
