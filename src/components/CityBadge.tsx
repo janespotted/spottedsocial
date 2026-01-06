@@ -8,7 +8,6 @@ export function CityBadge() {
   const getCityDisplayName = () => {
     switch (city) {
       case 'la': return 'LA';
-      case 'pb': return 'PB';
       default: return 'NYC';
     }
   };

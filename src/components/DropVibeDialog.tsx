@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2, Camera, MessageCircle, Upload, ArrowLeft } from 'lucide-react';
 import { haptic } from '@/lib/haptics';
+import { validateBuzzText } from '@/lib/validation-schemas';
 
 interface DropVibeDialogProps {
   open: boolean;
@@ -132,6 +133,13 @@ export function DropVibeDialog({
   const handleSubmitVibe = async () => {
     if (!vibeText.trim() || !user) return;
 
+    // Validate input
+    const validation = validateBuzzText(vibeText);
+    if (!validation.success) {
+      toast.error(validation.error || 'Invalid vibe message');
+      return;
+    }
+
     setUploading(true);
 
     try {
@@ -141,7 +149,7 @@ export function DropVibeDialog({
           user_id: user.id,
           venue_id: venueId,
           venue_name: venueName,
-          text: vibeText.trim(),
+          text: validation.data!,
           emoji_vibe: selectedEmoji,
           is_anonymous: vibeAnonymous,
           expires_at: calculateExpiryTime(),
