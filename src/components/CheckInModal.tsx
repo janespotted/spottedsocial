@@ -46,7 +46,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const { isReminderTriggered, showOutConfirmation, showPlanningConfirmation } = useCheckIn();
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const { city } = useUserCity();
+  const { city, refreshCity, isLoading: isDetectingCity } = useUserCity();
   const { handleInputFocus } = useKeyboardAware();
   const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home' | 'planning' | 'private_party'>('home');
   
@@ -323,10 +323,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     onOpenChange(false);
   };
 
-  const handlePlanningPrivacyConfirm = () => {
+  const handlePlanningPrivacyConfirm = async () => {
     setShowPlanningPrivacy(false);
-    // Show neighborhood selector after privacy is set
+    // Refresh city detection based on current GPS before showing neighborhoods
     setPlanningNeighborhood('');
+    await refreshCity();
     setShowPlanningNeighborhood(true);
   };
 

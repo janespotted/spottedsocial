@@ -122,13 +122,16 @@ function findClosestCity(coords: { lat: number; lng: number }): SupportedCity {
 /**
  * Detect user's city based on GPS location
  * Falls back to NYC on failure or cached value
+ * @param forceRefresh - If true, skip cache and always use GPS
  */
-export async function detectUserCity(): Promise<SupportedCity> {
-  // 1. Check cached city first
-  const cached = getCachedCity();
-  if (cached) {
-    console.log('Using cached city:', cached);
-    return cached;
+export async function detectUserCity(forceRefresh = false): Promise<SupportedCity> {
+  // 1. Check cached city first (unless forcing refresh)
+  if (!forceRefresh) {
+    const cached = getCachedCity();
+    if (cached) {
+      console.log('Using cached city:', cached);
+      return cached;
+    }
   }
   
   // 2. Try GPS detection
