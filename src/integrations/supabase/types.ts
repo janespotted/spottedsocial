@@ -1277,6 +1277,70 @@ export type Database = {
         }
         Relationships: []
       }
+      venue_auto_corrections: {
+        Row: {
+          created_at: string | null
+          id: string
+          new_lat: number
+          new_lng: number
+          old_lat: number
+          old_lng: number
+          report_count: number
+          reverted_at: string | null
+          reverted_by: string | null
+          unique_user_count: number
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          new_lat: number
+          new_lng: number
+          old_lat: number
+          old_lng: number
+          report_count: number
+          reverted_at?: string | null
+          reverted_by?: string | null
+          unique_user_count: number
+          venue_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          new_lat?: number
+          new_lng?: number
+          old_lat?: number
+          old_lng?: number
+          report_count?: number
+          reverted_at?: string | null
+          reverted_by?: string | null
+          unique_user_count?: number
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_auto_corrections_reverted_by_fkey"
+            columns: ["reverted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_auto_corrections_reverted_by_fkey"
+            columns: ["reverted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_auto_corrections_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venue_buzz_messages: {
         Row: {
           created_at: string | null
@@ -1326,6 +1390,8 @@ export type Database = {
       }
       venue_location_reports: {
         Row: {
+          auto_corrected_at: string | null
+          auto_correction_id: string | null
           created_at: string | null
           id: string
           notes: string | null
@@ -1343,6 +1409,8 @@ export type Database = {
           venue_id: string | null
         }
         Insert: {
+          auto_corrected_at?: string | null
+          auto_correction_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
@@ -1360,6 +1428,8 @@ export type Database = {
           venue_id?: string | null
         }
         Update: {
+          auto_corrected_at?: string | null
+          auto_correction_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
