@@ -15,6 +15,23 @@ export interface VenueMatch {
   distance: number;
 }
 
+export type LocationResult = 
+  | {
+      success: true;
+      data: {
+        lat: number;
+        lng: number;
+        accuracy: number;
+        timestamp: number;
+      };
+      warning?: 'low_accuracy';
+    }
+  | {
+      success: false;
+      error: 'permission_denied' | 'position_unavailable' | 'timeout' | 'not_supported';
+      message: string;
+    };
+
 /**
  * Calculate distance between two points using Haversine formula
  */
@@ -34,7 +51,30 @@ export const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2
 };
 
 /**
- * Get current GPS coordinates with timestamp for stale detection
+ * Check if geolocation is supported
+ */
+export const isGeolocationSupported = (): boolean => {
+  return 'geolocation' in navigator;
+};
+
+/**
+ * Check geolocation permission status
+ */
+export const checkLocationPermission = async (): Promise<'granted' | 'denied' | 'prompt'> => {
+  try {
+    if (!navigator.permissions) {
+      // Fallback for browsers that don't support permissions API
+      return 'prompt';
+    }
+    const result = await navigator.permissions.query({ name: 'geolocation' });
+    return result.state;
+  } catch {
+    return 'prompt';
+  }
+};
+
+/**
+ * Get current GPS coordinates with proper error handling
  */
 export const getCurrentLocation = (): Promise<{ lat: number; lng: number; accuracy: number; timestamp: number }> => {
   return new Promise((resolve, reject) => {
@@ -62,6 +102,87 @@ export const getCurrentLocation = (): Promise<{ lat: number; lng: number; accura
       }
     );
   });
+};
+
+/**
+ * Get current location with comprehensive error handling and status
+ */
+export const getLocationWithStatus = async (): Promise<LocationResult> => {
+  // Check if geolocation is supported
+  if (!isGeolocationSupported()) {
+    return {
+      success: false,
+      error: 'not_supported',
+      message: 'Location services are not supported in this browser',
+    };
+  }
+
+  // Check permission status first
+  const permission = await checkLocationPermission();
+  if (permission === 'denied') {
+    return {
+      success: false,
+      error: 'permission_denied',
+      message: 'Location access is denied. Please enable in browser settings.',
+    };
+  }
+
+  // Attempt to get position with timeout
+  try {
+    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      });
+    });
+
+    const result: LocationResult = {
+      success: true,
+      data: {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: position.timestamp,
+      },
+    };
+
+    // Check accuracy threshold (> 100m is considered low)
+    if (position.coords.accuracy > 100) {
+      result.warning = 'low_accuracy';
+    }
+
+    return result;
+  } catch (error) {
+    const geoError = error as GeolocationPositionError;
+    
+    switch (geoError.code) {
+      case geoError.PERMISSION_DENIED:
+        return {
+          success: false,
+          error: 'permission_denied',
+          message: 'Location access was denied. Please enable in settings.',
+        };
+      case geoError.POSITION_UNAVAILABLE:
+        return {
+          success: false,
+          error: 'position_unavailable',
+          message: 'Location information is unavailable.',
+        };
+      case geoError.TIMEOUT:
+        return {
+          success: false,
+          error: 'timeout',
+          message: 'Location request timed out. Please try again.',
+        };
+      default:
+        return {
+          success: false,
+          error: 'position_unavailable',
+          message: 'Could not get your location.',
+        };
+    }
+  }
 };
 
 /**

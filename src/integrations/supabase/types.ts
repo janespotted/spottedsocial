@@ -426,6 +426,86 @@ export type Database = {
           },
         ]
       }
+      location_detection_logs: {
+        Row: {
+          confirmed_venue_id: string | null
+          created_at: string | null
+          detected_venue_id: string | null
+          distance_to_venue: number | null
+          error_message: string | null
+          error_type: string | null
+          event_type: string
+          gps_accuracy: number | null
+          id: string
+          metadata: Json | null
+          user_id: string | null
+          user_lat: number | null
+          user_lng: number | null
+          was_correct: boolean | null
+        }
+        Insert: {
+          confirmed_venue_id?: string | null
+          created_at?: string | null
+          detected_venue_id?: string | null
+          distance_to_venue?: number | null
+          error_message?: string | null
+          error_type?: string | null
+          event_type: string
+          gps_accuracy?: number | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+          user_lat?: number | null
+          user_lng?: number | null
+          was_correct?: boolean | null
+        }
+        Update: {
+          confirmed_venue_id?: string | null
+          created_at?: string | null
+          detected_venue_id?: string | null
+          distance_to_venue?: number | null
+          error_message?: string | null
+          error_type?: string | null
+          event_type?: string
+          gps_accuracy?: number | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+          user_lat?: number | null
+          user_lng?: number | null
+          was_correct?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_detection_logs_confirmed_venue_id_fkey"
+            columns: ["confirmed_venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_detection_logs_detected_venue_id_fkey"
+            columns: ["detected_venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_detection_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_detection_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       night_statuses: {
         Row: {
           expires_at: string | null
@@ -1244,6 +1324,96 @@ export type Database = {
           },
         ]
       }
+      venue_location_reports: {
+        Row: {
+          created_at: string | null
+          id: string
+          notes: string | null
+          report_type: string
+          reported_lat: number
+          reported_lng: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          suggested_venue_name: string | null
+          suggested_venue_type: string | null
+          user_id: string | null
+          user_lat: number
+          user_lng: number
+          venue_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          report_type: string
+          reported_lat: number
+          reported_lng: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          suggested_venue_name?: string | null
+          suggested_venue_type?: string | null
+          user_id?: string | null
+          user_lat: number
+          user_lng: number
+          venue_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          report_type?: string
+          reported_lat?: number
+          reported_lng?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          suggested_venue_name?: string | null
+          suggested_venue_type?: string | null
+          user_id?: string | null
+          user_lat?: number
+          user_lng?: number
+          venue_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_location_reports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_location_reports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_location_reports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_location_reports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_location_reports_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venue_reviews: {
         Row: {
           created_at: string
@@ -1300,6 +1470,7 @@ export type Database = {
           id: string
           is_demo: boolean | null
           is_promoted: boolean | null
+          is_user_submitted: boolean | null
           lat: number
           lng: number
           name: string
@@ -1320,6 +1491,7 @@ export type Database = {
           id?: string
           is_demo?: boolean | null
           is_promoted?: boolean | null
+          is_user_submitted?: boolean | null
           lat: number
           lng: number
           name: string
@@ -1340,6 +1512,7 @@ export type Database = {
           id?: string
           is_demo?: boolean | null
           is_promoted?: boolean | null
+          is_user_submitted?: boolean | null
           lat?: number
           lng?: number
           name?: string
