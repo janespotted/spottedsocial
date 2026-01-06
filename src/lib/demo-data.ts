@@ -264,19 +264,16 @@ export const DEMO_YAP_MESSAGES = [
 // City-specific getter functions
 export function getPromotedVenuesForCity(city: SupportedCity) {
   if (city === 'la') return LA_PROMOTED_VENUES;
-  if (city === 'pb') return PB_PROMOTED_VENUES;
   return NYC_PROMOTED_VENUES;
 }
 
 export function getDemoVenuesForCity(city: SupportedCity) {
   if (city === 'la') return LA_DEMO_VENUES;
-  if (city === 'pb') return PB_DEMO_VENUES;
   return NYC_DEMO_VENUES;
 }
 
 export function getDemoUsersForCity(city: SupportedCity) {
   if (city === 'la') return LA_DEMO_USERS;
-  if (city === 'pb') return PB_DEMO_USERS;
   return NYC_DEMO_USERS;
 }
 

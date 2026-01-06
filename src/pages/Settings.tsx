@@ -31,7 +31,6 @@ export default function Settings() {
   const cityLabels: Record<SupportedCity, string> = {
     nyc: 'New York City',
     la: 'Los Angeles',
-    pb: 'Palm Beach',
   };
 
   const handleCityChange = (newCity: SupportedCity) => {
@@ -170,7 +169,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="flex gap-2">
-              {(['nyc', 'la', 'pb'] as SupportedCity[]).map((c) => (
+              {(['nyc', 'la'] as SupportedCity[]).map((c) => (
                 <Button
                   key={c}
                   variant={city === c ? 'default' : 'outline'}

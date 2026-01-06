@@ -24,6 +24,33 @@ export const commentSchema = z.object({
     .max(500, { message: 'Comment must be less than 500 characters' }),
 });
 
+// Yap message validation schema
+export const yapMessageSchema = z.object({
+  text: z
+    .string()
+    .trim()
+    .min(1, { message: 'Message cannot be empty' })
+    .max(280, { message: 'Message must be less than 280 characters' }),
+});
+
+// Venue buzz message validation schema
+export const buzzMessageSchema = z.object({
+  text: z
+    .string()
+    .trim()
+    .min(1, { message: 'Vibe message cannot be empty' })
+    .max(140, { message: 'Vibe message must be less than 140 characters' }),
+});
+
+// Yap comment validation schema
+export const yapCommentSchema = z.object({
+  text: z
+    .string()
+    .trim()
+    .min(1, { message: 'Comment cannot be empty' })
+    .max(500, { message: 'Comment must be less than 500 characters' }),
+});
+
 // Validate post text and return result
 export function validatePostText(text: string): { success: boolean; error?: string; data?: string } {
   const result = postSchema.shape.text.safeParse(text);
@@ -36,6 +63,33 @@ export function validatePostText(text: string): { success: boolean; error?: stri
 // Validate comment text and return result
 export function validateCommentText(text: string): { success: boolean; error?: string; data?: string } {
   const result = commentSchema.shape.text.safeParse(text);
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+  return { success: false, error: result.error.errors[0]?.message || 'Invalid comment' };
+}
+
+// Validate yap message text
+export function validateYapText(text: string): { success: boolean; error?: string; data?: string } {
+  const result = yapMessageSchema.shape.text.safeParse(text);
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+  return { success: false, error: result.error.errors[0]?.message || 'Invalid message' };
+}
+
+// Validate buzz message text
+export function validateBuzzText(text: string): { success: boolean; error?: string; data?: string } {
+  const result = buzzMessageSchema.shape.text.safeParse(text);
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+  return { success: false, error: result.error.errors[0]?.message || 'Invalid vibe message' };
+}
+
+// Validate yap comment text
+export function validateYapCommentText(text: string): { success: boolean; error?: string; data?: string } {
+  const result = yapCommentSchema.shape.text.safeParse(text);
   if (result.success) {
     return { success: true, data: result.data };
   }

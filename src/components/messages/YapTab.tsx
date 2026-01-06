@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { YapSkeleton } from './MessagesSkeleton';
+import { validateYapText, validateYapCommentText } from '@/lib/validation-schemas';
 
 interface YapMessage {
   id: string;
@@ -238,6 +239,13 @@ export function YapTab() {
   const handlePostYap = async () => {
     if (!user || !newYap.trim() || !selectedVenue) return;
 
+    // Validate input
+    const validation = validateYapText(newYap);
+    if (!validation.success) {
+      toast.error(validation.error || 'Invalid message');
+      return;
+    }
+
     setIsPosting(true);
     try {
       // Generate anonymous handle (User + 6 random digits)
@@ -257,7 +265,7 @@ export function YapTab() {
         .from('yap_messages')
         .insert({
           user_id: user.id,
-          text: newYap.trim(),
+          text: validation.data!,
           venue_name: selectedVenue,
           is_anonymous: true,
           author_handle: handle,
@@ -400,6 +408,13 @@ export function YapTab() {
   const handlePostComment = async (yapId: string) => {
     if (!user || !newComment[yapId]?.trim()) return;
 
+    // Validate input
+    const validation = validateYapCommentText(newComment[yapId]);
+    if (!validation.success) {
+      toast.error(validation.error || 'Invalid comment');
+      return;
+    }
+
     try {
       const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -408,7 +423,7 @@ export function YapTab() {
         .insert({
           yap_id: yapId,
           user_id: user.id,
-          text: newComment[yapId].trim(),
+          text: validation.data!,
           is_anonymous: true,
           author_handle: handle,
         });
