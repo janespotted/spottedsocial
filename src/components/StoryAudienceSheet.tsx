@@ -30,7 +30,7 @@ interface StoryAudienceSheetProps {
 const visibilityOptions: { value: VisibilityOption; label: string; description: string; icon: typeof Heart }[] = [
   { value: 'close_friends', label: 'Close Friends', description: 'Your inner circle', icon: Heart },
   { value: 'all_friends', label: 'All Friends', description: 'Everyone you are friends with', icon: Users },
-  { value: 'mutual_friends', label: 'Mutual Friends', description: 'Friends of friends', icon: Share2 },
+  { value: 'mutual_friends', label: 'Mutual Friends', description: 'Friends + their friends', icon: Share2 },
 ];
 
 export function StoryAudienceSheet({

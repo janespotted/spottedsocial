@@ -297,7 +297,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
             {[
               { value: 'close_friends' as const, label: 'Close Friends', icon: Heart, description: 'Only your closest friends' },
               { value: 'all_friends' as const, label: 'All Friends', icon: Users, description: 'Everyone you are friends with' },
-              { value: 'mutual_friends' as const, label: 'Mutual Friends', icon: Share2, description: 'Friends of your friends' },
+              { value: 'mutual_friends' as const, label: 'Mutual Friends', icon: Share2, description: 'Friends + their friends' },
             ].map((option) => (
               <button
                 key={option.value}

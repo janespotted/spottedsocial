@@ -2017,6 +2017,10 @@ export type Database = {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
       }
+      is_friend_or_mutual: {
+        Args: { target_user_id: string; viewer_id: string }
+        Returns: boolean
+      }
       is_mutual_friend: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
