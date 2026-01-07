@@ -1186,6 +1186,7 @@ export type Database = {
           user_id: string
           venue_id: string | null
           venue_name: string | null
+          visibility: string
         }
         Insert: {
           created_at?: string
@@ -1199,6 +1200,7 @@ export type Database = {
           user_id: string
           venue_id?: string | null
           venue_name?: string | null
+          visibility?: string
         }
         Update: {
           created_at?: string
@@ -1212,6 +1214,7 @@ export type Database = {
           user_id?: string
           venue_id?: string | null
           venue_name?: string | null
+          visibility?: string
         }
         Relationships: [
           {
