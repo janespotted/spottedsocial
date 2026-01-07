@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, MapPin, Loader2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Loader2, Users, Heart, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { calculateExpiryTime } from '@/lib/time-utils';
 import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
 import { validatePostText } from '@/lib/validation-schemas';
+
+type PostVisibility = 'close_friends' | 'all_friends' | 'mutual_friends';
 
 interface PostCaptionScreenProps {
   imageFile: File;
@@ -28,6 +30,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [showVenueInput, setShowVenueInput] = useState(false);
   const [customVenueName, setCustomVenueName] = useState('');
+  const [visibility, setVisibility] = useState<PostVisibility>('all_friends');
 
   useEffect(() => {
     if (user) {
@@ -176,6 +179,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
         venue_name: locationData?.venueName || location || null,
         venue_id: locationData?.venueId || null,
         expires_at: calculateExpiryTime(),
+        visibility,
       });
 
       if (error) throw error;
@@ -281,6 +285,41 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
                 Add location
               </button>
             )}
+          </div>
+        </div>
+
+        <div className="h-px bg-white/10" />
+
+        {/* Audience Selector */}
+        <div className="p-4">
+          <p className="text-white/60 text-sm mb-3">Who can see this?</p>
+          <div className="flex flex-col gap-2">
+            {[
+              { value: 'close_friends' as const, label: 'Close Friends', icon: Heart, description: 'Only your closest friends' },
+              { value: 'all_friends' as const, label: 'All Friends', icon: Users, description: 'Everyone you are friends with' },
+              { value: 'mutual_friends' as const, label: 'Mutual Friends', icon: Share2, description: 'Friends of your friends' },
+            ].map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setVisibility(option.value)}
+                className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                  visibility === option.value
+                    ? 'bg-[#a855f7]/20 border border-[#a855f7]'
+                    : 'bg-white/5 border border-transparent hover:bg-white/10'
+                }`}
+              >
+                <option.icon className={`h-5 w-5 ${visibility === option.value ? 'text-[#a855f7]' : 'text-white/60'}`} />
+                <div className="flex-1 text-left">
+                  <p className={`font-medium ${visibility === option.value ? 'text-white' : 'text-white/80'}`}>
+                    {option.label}
+                  </p>
+                  <p className="text-xs text-white/40">{option.description}</p>
+                </div>
+                {visibility === option.value && (
+                  <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
+                )}
+              </button>
+            ))}
           </div>
         </div>
 

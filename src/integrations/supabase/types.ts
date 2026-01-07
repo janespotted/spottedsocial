@@ -957,6 +957,7 @@ export type Database = {
           user_id: string
           venue_id: string | null
           venue_name: string | null
+          visibility: string
         }
         Insert: {
           comments_count?: number | null
@@ -971,6 +972,7 @@ export type Database = {
           user_id: string
           venue_id?: string | null
           venue_name?: string | null
+          visibility?: string
         }
         Update: {
           comments_count?: number | null
@@ -985,6 +987,7 @@ export type Database = {
           user_id?: string
           venue_id?: string | null
           venue_name?: string | null
+          visibility?: string
         }
         Relationships: [
           {
