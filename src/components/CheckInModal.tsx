@@ -303,7 +303,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       haptic.medium();
       
       // Show confirmation
-      showOutConfirmation(`Private Party (${privatePartyNeighborhood})`, privatePartyVisibility);
+      showOutConfirmation(`Private Party (${privatePartyNeighborhood})`, '', privatePartyVisibility);
       
       logEvent('private_party_checkin', {
         neighborhood: privatePartyNeighborhood,
@@ -473,7 +473,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         onOpenChange(false);
 
         // Show celebration confirmation card instead of toast
-        showOutConfirmation(finalVenueName, shareOption);
+        showOutConfirmation(finalVenueName, finalVenueId || '', shareOption);
       } catch (error) {
         console.error('Error updating location sharing:', error);
         toast({

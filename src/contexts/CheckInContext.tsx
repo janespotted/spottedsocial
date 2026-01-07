@@ -26,9 +26,10 @@ interface CheckInContextType {
   showCheckInConfirmation: boolean;
   checkInConfirmationType: 'out' | 'planning' | null;
   checkInVenueName: string | null;
+  checkInVenueId: string | null;
   checkInNeighborhood: string | null;
   checkInPrivacyLevel: string | null;
-  showOutConfirmation: (venueName: string, privacyLevel: string) => void;
+  showOutConfirmation: (venueName: string, venueId: string, privacyLevel: string) => void;
   showPlanningConfirmation: (neighborhood: string | null, privacyLevel: string) => void;
   closeCheckInConfirmation: () => void;
 }
@@ -46,6 +47,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
   const [showCheckInConfirmation, setShowCheckInConfirmation] = useState(false);
   const [checkInConfirmationType, setCheckInConfirmationType] = useState<'out' | 'planning' | null>(null);
   const [checkInVenueName, setCheckInVenueName] = useState<string | null>(null);
+  const [checkInVenueId, setCheckInVenueId] = useState<string | null>(null);
   const [checkInNeighborhood, setCheckInNeighborhood] = useState<string | null>(null);
   const [checkInPrivacyLevel, setCheckInPrivacyLevel] = useState<string | null>(null);
 
@@ -71,9 +73,10 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
     setNearbyVenues([]);
   };
 
-  const showOutConfirmation = (venueName: string, privacyLevel: string) => {
+  const showOutConfirmation = (venueName: string, venueId: string, privacyLevel: string) => {
     setCheckInConfirmationType('out');
     setCheckInVenueName(venueName);
+    setCheckInVenueId(venueId);
     setCheckInNeighborhood(null);
     setCheckInPrivacyLevel(privacyLevel);
     setShowCheckInConfirmation(true);
@@ -91,6 +94,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
     setShowCheckInConfirmation(false);
     setCheckInConfirmationType(null);
     setCheckInVenueName(null);
+    setCheckInVenueId(null);
     setCheckInNeighborhood(null);
     setCheckInPrivacyLevel(null);
   };
@@ -112,6 +116,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       showCheckInConfirmation,
       checkInConfirmationType,
       checkInVenueName,
+      checkInVenueId,
       checkInNeighborhood,
       checkInPrivacyLevel,
       showOutConfirmation,

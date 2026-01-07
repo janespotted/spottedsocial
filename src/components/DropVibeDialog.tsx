@@ -119,7 +119,7 @@ export function DropVibeDialog({
       if (insertError) throw insertError;
 
       haptic.success();
-      toast.success('Clip shared to Tonight\'s Buzz! ✨');
+      toast.success('Added to Tonight\'s Buzz! ✨');
       onVibeSubmitted?.();
       handleClose();
     } catch (error: any) {
@@ -158,7 +158,7 @@ export function DropVibeDialog({
       if (error) throw error;
 
       haptic.success();
-      toast.success('Vibe dropped! ✨');
+      toast.success('Added to Tonight\'s Buzz! ✨');
       onVibeSubmitted?.();
       handleClose();
     } catch (error: any) {
@@ -183,7 +183,7 @@ export function DropVibeDialog({
               </button>
             )}
             <DialogTitle className="text-xl font-bold text-white">
-              {viewMode === 'select' && `Drop a Vibe at ${venueName}`}
+              {viewMode === 'select' && `Add to Tonight's Buzz`}
               {viewMode === 'clip' && 'Share a Clip'}
               {viewMode === 'vibe' && 'Quick Vibe'}
             </DialogTitle>
@@ -193,7 +193,7 @@ export function DropVibeDialog({
         {/* Selection View */}
         {viewMode === 'select' && (
           <div className="space-y-4 py-4">
-            <p className="text-white/60 text-sm text-center">Show what's happening tonight</p>
+            <p className="text-white/60 text-sm text-center">Everyone at {venueName} can see this</p>
             <div className="grid grid-cols-2 gap-4">
               <button
                 onClick={() => setViewMode('clip')}
@@ -322,7 +322,7 @@ export function DropVibeDialog({
               <Textarea
                 value={vibeText}
                 onChange={(e) => setVibeText(e.target.value.slice(0, 140))}
-                placeholder="What's the vibe like right now?"
+                placeholder="What's it like here right now?"
                 className="bg-[#0a0118] border-[#a855f7]/40 text-white placeholder:text-white/40 min-h-[100px] resize-none"
               />
               <span className="absolute bottom-2 right-2 text-xs text-white/40">
@@ -358,7 +358,7 @@ export function DropVibeDialog({
                     Posting...
                   </>
                 ) : (
-                  'Drop Vibe'
+                  'Add to Buzz'
                 )}
               </Button>
             </div>
