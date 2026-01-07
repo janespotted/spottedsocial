@@ -13,6 +13,7 @@ interface CreateStoryDialogProps {
 }
 
 type AudienceOption = 'friends' | 'buzz' | 'both';
+type VisibilityOption = 'close_friends' | 'all_friends' | 'mutual_friends';
 type FlowStep = 'capture' | 'edit' | 'audience';
 
 export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps) {
@@ -24,6 +25,7 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
   const [venueName, setVenueName] = useState<string | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
   const [audience, setAudience] = useState<AudienceOption>('friends');
+  const [visibility, setVisibility] = useState<VisibilityOption>('all_friends');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [editedBlob, setEditedBlob] = useState<Blob | null>(null);
 
@@ -41,6 +43,7 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
       setFile(null);
       setPreview(null);
       setAudience('friends');
+      setVisibility('all_friends');
       setIsAnonymous(false);
       setEditedBlob(null);
     }
@@ -148,6 +151,7 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
           venue_id: currentVenueId,
           is_public_buzz: isPublicBuzz,
           is_anonymous: isAnonymous && isPublicBuzz,
+          visibility,
           expires_at: calculateExpiryTime(),
         });
 
@@ -209,6 +213,8 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
         venueName={venueName}
         audience={audience}
         onAudienceChange={setAudience}
+        visibility={visibility}
+        onVisibilityChange={setVisibility}
         isAnonymous={isAnonymous}
         onAnonymousChange={setIsAnonymous}
         onPost={handleSubmit}
