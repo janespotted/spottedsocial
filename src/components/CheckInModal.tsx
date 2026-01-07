@@ -696,7 +696,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               <div className="w-4 h-4 rounded-full bg-[#d4ff00]" />
             )}
           </div>
-          <span className="text-lg text-white">Close Friends 💛</span>
+          <div className="flex-1">
+            <span className="text-lg text-white block">Close Friends 💛</span>
+            <span className="text-sm text-white/50">Only your closest friends</span>
+          </div>
         </button>
 
         <button
@@ -710,7 +713,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               <div className="w-4 h-4 rounded-full bg-[#d4ff00]" />
             )}
           </div>
-          <span className="text-lg text-white">All Friends 👫</span>
+          <div className="flex-1">
+            <span className="text-lg text-white block">All Friends 👫</span>
+            <span className="text-sm text-white/50">Everyone you're friends with</span>
+          </div>
         </button>
 
         <button
@@ -724,7 +730,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               <div className="w-4 h-4 rounded-full bg-[#d4ff00]" />
             )}
           </div>
-          <span className="text-lg text-white">Mutual Friends 🔗</span>
+          <div className="flex-1">
+            <span className="text-lg text-white block">Mutual Friends 🔗</span>
+            <span className="text-sm text-white/50">Friends + their friends</span>
+          </div>
         </button>
       </div>
 
@@ -947,7 +956,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               <div className="w-4 h-4 rounded-full bg-[#a855f7]" />
             )}
           </div>
-          <span className="text-lg text-white">Close Friends 💛</span>
+          <div className="flex-1">
+            <span className="text-lg text-white block">Close Friends 💛</span>
+            <span className="text-sm text-white/50">Only your closest friends</span>
+          </div>
         </button>
 
         <button
@@ -961,7 +973,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               <div className="w-4 h-4 rounded-full bg-[#a855f7]" />
             )}
           </div>
-          <span className="text-lg text-white">All Friends 👫</span>
+          <div className="flex-1">
+            <span className="text-lg text-white block">All Friends 👫</span>
+            <span className="text-sm text-white/50">Everyone you're friends with</span>
+          </div>
         </button>
 
         <button
@@ -975,7 +990,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               <div className="w-4 h-4 rounded-full bg-[#a855f7]" />
             )}
           </div>
-          <span className="text-lg text-white">Mutual Friends 🔗</span>
+          <div className="flex-1">
+            <span className="text-lg text-white block">Mutual Friends 🔗</span>
+            <span className="text-sm text-white/50">Friends + their friends</span>
+          </div>
         </button>
       </div>
 
@@ -1020,7 +1038,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               <div className="w-4 h-4 rounded-full bg-[#6366f1]" />
             )}
           </div>
-          <span className="text-lg text-white">Close Friends 💛</span>
+          <div className="flex-1">
+            <span className="text-lg text-white block">Close Friends 💛</span>
+            <span className="text-sm text-white/50">Only your closest friends</span>
+          </div>
         </button>
 
         <button
@@ -1034,7 +1055,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               <div className="w-4 h-4 rounded-full bg-[#6366f1]" />
             )}
           </div>
-          <span className="text-lg text-white">All Friends 👫</span>
+          <div className="flex-1">
+            <span className="text-lg text-white block">All Friends 👫</span>
+            <span className="text-sm text-white/50">Everyone you're friends with</span>
+          </div>
         </button>
 
         <button
@@ -1048,7 +1072,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               <div className="w-4 h-4 rounded-full bg-[#6366f1]" />
             )}
           </div>
-          <span className="text-lg text-white">Mutual Friends 🔗</span>
+          <div className="flex-1">
+            <span className="text-lg text-white block">Mutual Friends 🔗</span>
+            <span className="text-sm text-white/50">Friends + their friends</span>
+          </div>
         </button>
       </div>
 
