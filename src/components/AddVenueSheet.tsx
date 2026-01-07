@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { reportVenueLocation } from '@/lib/location-detection-logger';
 import { getCurrentLocation } from '@/lib/location-service';
 import { haptic } from '@/lib/haptics';
+import { checkAndRecordRateLimit, getRateLimitMessage } from '@/lib/rate-limit';
 
 interface AddVenueSheetProps {
   open: boolean;
@@ -54,6 +55,13 @@ export function AddVenueSheet({
 
     if (!location) {
       toast.error('Please capture your location first');
+      return;
+    }
+
+    // Check rate limit first
+    const allowed = await checkAndRecordRateLimit('new_venue');
+    if (!allowed) {
+      toast.error(getRateLimitMessage('new_venue'));
       return;
     }
 

@@ -3,7 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { SplashScreen } from "./components/SplashScreen";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
 import { FriendIdCardProvider } from "./contexts/FriendIdCardContext";
@@ -54,8 +55,15 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 // Component to trigger auto-tracking on app open
-function AutoTracker() {
-  const { user } = useAuth();
+function AutoTracker({ onReady }: { onReady: () => void }) {
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading) {
+      // Auth state resolved, hide splash
+      onReady();
+    }
+  }, [loading, onReady]);
 
   useEffect(() => {
     if (user) {
@@ -68,6 +76,173 @@ function AutoTracker() {
   }, [user]);
 
   return null;
+}
+
+function AppContent() {
+  const [showSplash, setShowSplash] = useState(true);
+
+  return (
+    <>
+      {showSplash && <SplashScreen />}
+      <AutoTracker onReady={() => setShowSplash(false)} />
+      <FriendIdCard />
+      <VenueIdCard />
+      <MeetUpConfirmation />
+      <InviteFriendsModal />
+      <VenueInviteConfirmation />
+      <ImDownConfirmation />
+      <NotificationBanner />
+      <VenueArrivalPrompt />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/invite/:code" element={<InviteLanding />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        
+        {/* Protected routes */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PageErrorBoundary pageName="Home">
+                  <Home />
+                </PageErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/map"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PageErrorBoundary pageName="Map">
+                  <Map />
+                </PageErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/leaderboard"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PageErrorBoundary pageName="Leaderboard">
+                  <Leaderboard />
+                </PageErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/feed"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PageErrorBoundary pageName="Feed">
+                  <Feed />
+                </PageErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PageErrorBoundary pageName="Messages">
+                  <Messages />
+                </PageErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages/:threadId"
+          element={
+            <ProtectedRoute>
+              <Thread />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/friend-requests"
+          element={
+            <ProtectedRoute>
+              <FriendRequests />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Profile />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile/edit"
+          element={
+            <ProtectedRoute>
+              <EditProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile/close-friends"
+          element={
+            <ProtectedRoute>
+              <CloseFriends />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/demo-settings"
+          element={
+            <ProtectedRoute>
+              <DemoSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <Notifications />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <Admin />
+              </AdminRoute>
+            </ProtectedRoute>
+          }
+        />
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
 }
 
 const App = () => (
@@ -87,163 +262,7 @@ const App = () => (
                     <NotificationsProvider>
                       <ImDownProvider>
                         <PrivatePartyProvider>
-                        <AutoTracker />
-                        <FriendIdCard />
-                        <VenueIdCard />
-                        <MeetUpConfirmation />
-                        <InviteFriendsModal />
-                        <VenueInviteConfirmation />
-                        <ImDownConfirmation />
-                        <NotificationBanner />
-                        <VenueArrivalPrompt />
-                    <Routes>
-                  {/* Public routes */}
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/invite/:code" element={<InviteLanding />} />
-                  <Route path="/terms" element={<Terms />} />
-                  <Route path="/privacy" element={<Privacy />} />
-                  
-                  {/* Protected routes */}
-                  <Route
-                    path="/"
-                    element={
-                      <ProtectedRoute>
-                        <Layout>
-                          <PageErrorBoundary pageName="Home">
-                            <Home />
-                          </PageErrorBoundary>
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/map"
-                    element={
-                      <ProtectedRoute>
-                        <Layout>
-                          <PageErrorBoundary pageName="Map">
-                            <Map />
-                          </PageErrorBoundary>
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/leaderboard"
-                    element={
-                      <ProtectedRoute>
-                        <Layout>
-                          <PageErrorBoundary pageName="Leaderboard">
-                            <Leaderboard />
-                          </PageErrorBoundary>
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/feed"
-                    element={
-                      <ProtectedRoute>
-                        <Layout>
-                          <PageErrorBoundary pageName="Feed">
-                            <Feed />
-                          </PageErrorBoundary>
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/messages"
-                    element={
-                      <ProtectedRoute>
-                        <Layout>
-                          <PageErrorBoundary pageName="Messages">
-                            <Messages />
-                          </PageErrorBoundary>
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/messages/:threadId"
-                    element={
-                      <ProtectedRoute>
-                        <Thread />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/friend-requests"
-                    element={
-                      <ProtectedRoute>
-                        <FriendRequests />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/profile"
-                    element={
-                      <ProtectedRoute>
-                        <Layout>
-                          <Profile />
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/profile/edit"
-                    element={
-                      <ProtectedRoute>
-                        <EditProfile />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/profile/close-friends"
-                    element={
-                      <ProtectedRoute>
-                        <CloseFriends />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/demo-settings"
-                    element={
-                      <ProtectedRoute>
-                        <DemoSettings />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/settings"
-                    element={
-                      <ProtectedRoute>
-                        <Settings />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/notifications"
-                    element={
-                      <ProtectedRoute>
-                        <Notifications />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin"
-                    element={
-                      <ProtectedRoute>
-                        <AdminRoute>
-                          <Admin />
-                        </AdminRoute>
-                      </ProtectedRoute>
-                    }
-                  />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
+                          <AppContent />
                         </PrivatePartyProvider>
                       </ImDownProvider>
                     </NotificationsProvider>
