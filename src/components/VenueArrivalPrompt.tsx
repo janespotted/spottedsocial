@@ -6,7 +6,6 @@ import { MapPin, X, Navigation } from 'lucide-react';
 import { useCheckIn, DetectedVenue } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { dismissVenuePrompt } from '@/lib/venue-arrival-nudge';
 import { haptic } from '@/lib/haptics';
 import { logVenueConfirmation, logVenueDismissal } from '@/lib/location-detection-logger';
@@ -15,7 +14,7 @@ import { AddVenueSheet } from '@/components/AddVenueSheet';
 
 export function VenueArrivalPrompt() {
   const { user } = useAuth();
-  const { showVenueArrivalPrompt, hideVenueArrival, detectedVenue, nearbyVenues } = useCheckIn();
+  const { showVenueArrivalPrompt, hideVenueArrival, detectedVenue, nearbyVenues, showOutConfirmation } = useCheckIn();
   const [isConfirming, setIsConfirming] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<DetectedVenue | null>(null);
   const [showCorrectionSheet, setShowCorrectionSheet] = useState(false);
@@ -100,10 +99,18 @@ export function VenueArrivalPrompt() {
         const wasCorrect = detectedVenue.id === selectedVenue.id;
         logVenueConfirmation(detectedVenue.id, selectedVenue.id, wasCorrect);
       }
-      toast.success(`You're out at ${selectedVenue.name}! 🎉`);
+      
+      // Show confirmation with buzz prompt - get privacy level from profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('location_sharing_level')
+        .eq('id', user.id)
+        .single();
+      
+      const privacyLevel = profile?.location_sharing_level || 'all_friends';
+      showOutConfirmation(selectedVenue.name, selectedVenue.id, privacyLevel);
     } catch (error) {
       console.error('Error confirming arrival:', error);
-      toast.error('Failed to update status');
     } finally {
       setIsConfirming(false);
     }
