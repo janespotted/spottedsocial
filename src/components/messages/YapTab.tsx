@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { YapSkeleton } from './MessagesSkeleton';
 import { validateYapText, validateYapCommentText } from '@/lib/validation-schemas';
+import { checkAndRecordRateLimit, getRateLimitMessage } from '@/lib/rate-limit';
 
 interface YapMessage {
   id: string;
@@ -246,6 +247,13 @@ export function YapTab() {
       return;
     }
 
+    // Check rate limit
+    const allowed = await checkAndRecordRateLimit('yap_message');
+    if (!allowed) {
+      toast.error(getRateLimitMessage('yap_message'));
+      return;
+    }
+
     setIsPosting(true);
     try {
       // Generate anonymous handle (User + 6 random digits)
@@ -412,6 +420,13 @@ export function YapTab() {
     const validation = validateYapCommentText(newComment[yapId]);
     if (!validation.success) {
       toast.error(validation.error || 'Invalid comment');
+      return;
+    }
+
+    // Check rate limit
+    const allowed = await checkAndRecordRateLimit('yap_comment');
+    if (!allowed) {
+      toast.error(getRateLimitMessage('yap_comment'));
       return;
     }
 

@@ -1070,6 +1070,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_actions: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reports: {
         Row: {
           created_at: string | null
@@ -1897,7 +1918,17 @@ export type Database = {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
       }
+      check_rate_limit: {
+        Args: {
+          p_action_type: string
+          p_max_count: number
+          p_user_id: string
+          p_window_hours: number
+        }
+        Returns: boolean
+      }
       cleanup_old_checkins: { Args: never; Returns: number }
+      cleanup_old_rate_limits: { Args: never; Returns: number }
       create_dm_thread: { Args: { friend_id: string }; Returns: string }
       create_group_thread: {
         Args: { group_name?: string; member_ids: string[] }
@@ -1987,6 +2018,14 @@ export type Database = {
       process_invite_code: {
         Args: { invite_code: string; new_user_id: string }
         Returns: Json
+      }
+      record_rate_limited_action: {
+        Args: {
+          p_action_type: string
+          p_max_count: number
+          p_window_hours: number
+        }
+        Returns: boolean
       }
       user_is_thread_member: { Args: { thread_uuid: string }; Returns: boolean }
       validate_invite_code: { Args: { code_to_check: string }; Returns: Json }
