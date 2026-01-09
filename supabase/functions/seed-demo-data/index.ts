@@ -895,7 +895,7 @@ Deno.serve(async (req) => {
     );
 
     // Allow unauthenticated seeding for admin purposes (function uses service role)
-    const { action, city = 'nyc' } = await req.json();
+    const { action, city = 'nyc', userId } = await req.json();
     
     console.log(`Seed demo data called with action: ${action}, city: ${city}`);
 
@@ -1357,6 +1357,84 @@ Deno.serve(async (req) => {
         }
       }
 
+      // 6.5 Create post likes
+      console.log('Creating demo post likes...');
+      const postLikes = [];
+      const postsToLike = getRandomItems(insertedPosts || [], 40);
+
+      for (const post of postsToLike) {
+        const numLikes = 1 + Math.floor(Math.random() * 5);
+        const likers = getRandomItems(demoUserIds, numLikes);
+        
+        for (const likerId of likers) {
+          postLikes.push({
+            post_id: post.id,
+            user_id: likerId,
+            created_at: getRecentTimestamp(2),
+          });
+        }
+      }
+
+      if (postLikes.length > 0) {
+        await supabaseAdmin.from('post_likes').insert(postLikes);
+        console.log(`Created ${postLikes.length} demo post likes`);
+      }
+
+      // 6.6 Create demo notifications for current user (likes & comments)
+      console.log('Creating demo activity notifications...');
+      const demoNotifications = [];
+      const commentPreviews = [
+        "Looks amazing! 🔥",
+        "So jealous rn 😭",
+        "On my way!",
+        "Best spot ever",
+        "This is fire 🔥",
+        "Need to check this out",
+      ];
+
+      // Get profiles for demo users to use their names
+      const { data: demoProfilesForNotifs } = await supabaseAdmin
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', demoUserIds);
+
+      const profileMap = new Map(demoProfilesForNotifs?.map(p => [p.id, p.display_name]) || []);
+
+      // Create 8-12 like/comment notifications for the current user (if userId provided)
+      if (userId) {
+        const notifUsers = getRandomItems(demoUserIds, 10);
+        for (let i = 0; i < notifUsers.length; i++) {
+          const demoUserId = notifUsers[i];
+          const displayName = profileMap.get(demoUserId) || 'Someone';
+          
+          if (i % 2 === 0) {
+            demoNotifications.push({
+              sender_id: demoUserId,
+              receiver_id: userId,
+              type: 'post_like',
+              message: `${displayName} liked your post ❤️`,
+              created_at: getRecentTimestamp(1),
+              is_demo: true,
+            });
+          } else {
+            const preview = commentPreviews[Math.floor(Math.random() * commentPreviews.length)];
+            demoNotifications.push({
+              sender_id: demoUserId,
+              receiver_id: userId,
+              type: 'post_comment',
+              message: `${displayName} commented: "${preview}"`,
+              created_at: getRecentTimestamp(1),
+              is_demo: true,
+            });
+          }
+        }
+      }
+
+      if (demoNotifications.length > 0) {
+        await supabaseAdmin.from('notifications').insert(demoNotifications);
+        console.log(`Created ${demoNotifications.length} demo activity notifications`);
+      }
+
       // 7. Create yap messages with scores and handles
       const hottestVenues = getRandomItems([...SELECTED_VENUES], 10);
       const yapMessages = [];
@@ -1768,6 +1846,7 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('friendships').delete().in('user_id', demoIds);
         await supabaseAdmin.from('friendships').delete().in('friend_id', demoIds);
       }
+      await supabaseAdmin.from('notifications').delete().eq('is_demo', true);
       await supabaseAdmin.from('profiles').delete().eq('is_demo', true);
 
       return new Response(
