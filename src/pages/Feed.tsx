@@ -12,6 +12,7 @@ import { useUserCity } from '@/hooks/useUserCity';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell } from 'lucide-react';
+import { NotificationBadge } from '@/components/NotificationBadge';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
@@ -173,11 +174,7 @@ export default function Feed() {
               aria-label="View activity"
             >
               <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs font-bold flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
+              <NotificationBadge count={unreadCount} />
             </button>
             <button 
               onClick={openCheckIn} 

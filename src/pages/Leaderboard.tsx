@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { ChevronUp, ChevronDown, Bell, BarChart3, ChevronRight } from 'lucide-react';
+import { NotificationBadge } from '@/components/NotificationBadge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -473,11 +474,7 @@ export default function Leaderboard() {
               aria-label="View activity"
             >
               <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs font-bold flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
+              <NotificationBadge count={unreadCount} />
             </button>
             <button 
               onClick={openCheckIn} 
