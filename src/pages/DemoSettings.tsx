@@ -106,9 +106,9 @@ export default function DemoSettings() {
     try {
       toast.info(`Seeding ${seedCityLabel} demo data... This may take a moment.`);
       
-      // Call edge function with city parameter
+      // Call edge function with city parameter and userId for targeted notifications
       const { data, error } = await supabase.functions.invoke('seed-demo-data', {
-        body: { action: 'seed', city: seedCity }
+        body: { action: 'seed', city: seedCity, userId: user.id }
       });
       
       if (error) throw error;
