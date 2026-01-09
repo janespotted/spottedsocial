@@ -11,7 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { logEvent } from '@/lib/event-logger';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target } from 'lucide-react';
+import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target, Heart } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
@@ -22,7 +22,7 @@ import { ActivitySkeleton } from './MessagesSkeleton';
 
 interface Activity {
   id: string;
-  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite';
+  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment';
   title: string;
   subtitle?: string;
   timestamp: string;
@@ -139,9 +139,9 @@ export function ActivityTab() {
       supabase.from('notifications')
         .select(`id, type, message, created_at, sender_id, is_read`)
         .eq('receiver_id', user?.id)
-        .in('type', ['meetup_request', 'venue_invite'])
+        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment'])
         .order('created_at', { ascending: false })
-        .limit(20),
+        .limit(30),
     ]);
 
     const userCurrentVenue = currentStatusResult.data?.venue_name?.toLowerCase() || null;
@@ -174,15 +174,24 @@ export function ActivityTab() {
       const realActivities: Activity[] = filteredInvites.map(invite => {
         const profile = profileMap.get(invite.sender_id);
         const isVenueInvite = invite.type === 'venue_invite';
+        const isPostLike = invite.type === 'post_like';
+        const isPostComment = invite.type === 'post_comment';
+        
         // Extract venue name from message like "X invited you to VenueName."
         const venueMatch = invite.message.match(/invited you to (.+?)\.?\s*(?:Want to go\?)?$/i);
         const venueName = venueMatch?.[1] || 'a venue';
         
+        // Map notification types to activity types
+        let activityType: Activity['type'] = 'meet_up';
+        if (isVenueInvite) activityType = 'venue_invite';
+        if (isPostLike) activityType = 'post_like';
+        if (isPostComment) activityType = 'post_comment';
+        
         return {
           id: invite.id,
-          type: isVenueInvite ? 'venue_invite' : 'meet_up',
+          type: activityType,
           title: profile?.display_name || 'Someone',
-          subtitle: isVenueInvite ? venueName : 'Meet Up',
+          subtitle: isVenueInvite ? venueName : isPostLike ? 'liked your post' : isPostComment ? invite.message : 'Meet Up',
           timestamp: invite.created_at || new Date().toISOString(),
           avatar_url: profile?.avatar_url,
           user_id: invite.sender_id,
@@ -319,6 +328,10 @@ export function ActivityTab() {
         return <Users className="h-5 w-5 text-[#a855f7]" />;
       case 'venue_invite':
         return <MapPin className="h-5 w-5 text-[#d4ff00]" />;
+      case 'post_like':
+        return <Heart className="h-5 w-5 text-red-500 fill-red-500" />;
+      case 'post_comment':
+        return <MessageCircle className="h-5 w-5 text-blue-400" />;
       default:
         return null;
     }
@@ -598,6 +611,7 @@ export function ActivityTab() {
         const invites = activities.filter(a => a.type === 'meet_up' || a.type === 'venue_invite');
         const friendsOut = activities.filter(a => a.type === 'check_in');
         const trending = activities.filter(a => a.type === 'trending');
+        const postEngagement = activities.filter(a => a.type === 'post_like' || a.type === 'post_comment');
 
         const renderActivityCard = (activity: Activity) => (
           <div
@@ -674,6 +688,26 @@ export function ActivityTab() {
                     <span className="text-white/70 block text-xs mt-0.5">is trending · {activity.subtitle}</span>
                   </div>
                 )}
+                {activity.type === 'post_like' && (
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-white/70 block text-xs mt-0.5">liked your post ❤️</span>
+                  </div>
+                )}
+                {activity.type === 'post_comment' && (
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-white/70 block text-xs mt-0.5 line-clamp-1">
+                      {activity.subtitle?.replace(/^.+? commented: /, '') || 'commented on your post'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Actions - fixed on right */}
@@ -733,7 +767,7 @@ export function ActivityTab() {
           </div>
         );
 
-        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0;
+        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0;
 
         return hasContent ? (
           <div className="space-y-5">
@@ -754,7 +788,19 @@ export function ActivityTab() {
         )}
       </div>
 
-            {/* Section 2: Friends Out Now */}
+            {/* Section 2: Post Engagement (Likes & Comments) */}
+            {postEngagement.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  Likes & Comments
+                </h3>
+                <div className="space-y-3">
+                  {postEngagement.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
+
+            {/* Section 3: Friends Out Now */}
             {friendsOut.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
@@ -766,7 +812,7 @@ export function ActivityTab() {
               </div>
             )}
 
-            {/* Section 3: Trending Now */}
+            {/* Section 4: Trending Now */}
             {trending.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
