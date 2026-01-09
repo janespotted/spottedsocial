@@ -20,11 +20,18 @@ import { useKeyboardAware } from '@/hooks/useKeyboardAware';
 import { toast } from 'sonner';
 import { format, addDays } from 'date-fns';
 
+interface PreselectedFriend {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 interface CreatePlanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userId: string;
   onPlanCreated: () => void;
+  preselectedFriend?: PreselectedFriend | null;
 }
 
 interface Venue {
@@ -40,7 +47,7 @@ interface Friend {
   username: string;
 }
 
-export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: CreatePlanDialogProps) {
+export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, preselectedFriend }: CreatePlanDialogProps) {
   const [description, setDescription] = useState('');
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [planDate, setPlanDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -68,8 +75,19 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated }: 
     if (open && city) {
       fetchVenues();
       fetchFriends();
+      
+      // If preselectedFriend provided, add them and open more options
+      if (preselectedFriend) {
+        setSelectedFriends([{
+          id: preselectedFriend.id,
+          display_name: preselectedFriend.display_name,
+          avatar_url: preselectedFriend.avatar_url,
+          username: '', // Not needed for display
+        }]);
+        setShowMoreOptions(true);
+      }
     }
-  }, [open, city]);
+  }, [open, city, preselectedFriend]);
 
   const fetchVenues = async () => {
     const { data, error } = await supabase

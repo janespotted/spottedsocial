@@ -14,7 +14,7 @@ import { useUserCity } from '@/hooks/useUserCity';
 import { useDailyNudge } from '@/hooks/useDailyNudge';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search } from 'lucide-react';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -38,6 +38,7 @@ import { PlansFeed } from '@/components/PlansFeed';
 import { DailyNudgeModal } from '@/components/DailyNudgeModal';
 import { NoFriendsBanner } from '@/components/NoFriendsBanner';
 import { isNightlifeHours } from '@/lib/time-context';
+import { FriendSearchModal } from '@/components/FriendSearchModal';
 
 export default function Home() {
   const { user } = useAuth();
@@ -95,6 +96,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
   const [feedMode, setFeedMode] = useState<'newsfeed' | 'plans'>(() => isNightlifeHours() ? 'newsfeed' : 'plans');
+  const [showFriendSearch, setShowFriendSearch] = useState(false);
 
   // Store fetch functions in refs to avoid dependency changes causing re-renders
   const fetchFriendsRef = useRef(fetchFriends);
@@ -689,7 +691,18 @@ export default function Home() {
         </button>
       )}
 
+      {/* Friend Search FAB - always visible */}
+      <button
+        onClick={() => setShowFriendSearch(true)}
+        className="fixed bottom-28 left-6 z-20 w-14 h-14 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.5)] hover:scale-110 transition-transform"
+        aria-label="Find friends"
+      >
+        <Search className="h-6 w-6 text-white" />
+      </button>
+
       <CreatePostDialog open={showCreatePost} onOpenChange={setShowCreatePost} />
+
+      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
 
       {selectedPostForLikes && (
         <PostLikesModal
