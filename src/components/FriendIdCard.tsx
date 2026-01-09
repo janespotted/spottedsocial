@@ -4,7 +4,7 @@ import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, ChevronRight } from 'lucide-react';
+import { X, ChevronRight, CalendarPlus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MessageCircle, MoreVertical, Flag, Ban, X as CloseIcon } from 'lucide-react';
@@ -15,6 +15,7 @@ import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { ReportDialog } from '@/components/ReportDialog';
 import { toast } from 'sonner';
 import { StoryViewer } from '@/components/StoryViewer';
+import { CreatePlanDialog } from '@/components/CreatePlanDialog';
 
 interface FriendData {
   id: string;
@@ -64,6 +65,7 @@ export function FriendIdCard() {
   const [venueCoords, setVenueCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [hasStory, setHasStory] = useState(false);
   const [showStoryViewer, setShowStoryViewer] = useState(false);
+  const [showCreatePlanDialog, setShowCreatePlanDialog] = useState(false);
 
   useEffect(() => {
     if (selectedFriend && user) {
@@ -94,6 +96,7 @@ export function FriendIdCard() {
       setIsDemoUser(false);
       setVenueCoords(null);
       setHasStory(false);
+      setShowCreatePlanDialog(false);
     }
   }, [selectedFriend, demoEnabled]);
 
@@ -378,6 +381,16 @@ export function FriendIdCard() {
     closeFriendCard();
   };
 
+  const handleMakePlans = () => {
+    if (!selectedFriend) return;
+    setShowCreatePlanDialog(true);
+  };
+
+  const handlePlanCreated = () => {
+    setShowCreatePlanDialog(false);
+    closeFriendCard();
+  };
+
   const handleVenueClick = async (venueName: string) => {
     closeFriendCard();
     
@@ -647,15 +660,26 @@ export function FriendIdCard() {
                   </Popover>
                 )}
 
-                {/* Action Buttons - Hidden for demo users only when demo mode is OFF (bootstrap/production) */}
+                {/* Action Buttons - Context-aware based on friend's status */}
                 {(!isDemoUser || demoEnabled) && (
                   <div className="flex items-center gap-2 flex-1">
-                    <button
-                      onClick={handleMeetUp}
-                      className="flex-1 py-2 px-5 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors"
-                    >
-                      Meet Up
-                    </button>
+                    {/* Show "Meet Up" if friend is out, "Make Plans" otherwise */}
+                    {(demoEnabled && selectedFriend?.venueName) || (userStatus?.isOut) ? (
+                      <button
+                        onClick={handleMeetUp}
+                        className="flex-1 py-2 px-5 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors"
+                      >
+                        Meet Up
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleMakePlans}
+                        className="flex-1 py-2 px-5 rounded-full border-2 border-[#a855f7] text-[#a855f7] text-sm font-semibold hover:bg-[#a855f7]/10 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <CalendarPlus className="h-4 w-4" />
+                        Make Plans
+                      </button>
+                    )}
                     <button
                       onClick={handleOpenDM}
                       className="p-2 rounded-full bg-transparent border-2 border-white/20 text-white hover:bg-white/10 transition-colors"
@@ -692,6 +716,21 @@ export function FriendIdCard() {
         }}
         allStoryUsers={[selectedFriend.userId]}
         currentUserIndex={0}
+      />
+    )}
+
+    {/* Create Plan Dialog */}
+    {selectedFriend && user && (
+      <CreatePlanDialog
+        open={showCreatePlanDialog}
+        onOpenChange={setShowCreatePlanDialog}
+        userId={user.id}
+        onPlanCreated={handlePlanCreated}
+        preselectedFriend={{
+          id: selectedFriend.userId,
+          display_name: selectedFriend.displayName,
+          avatar_url: selectedFriend.avatarUrl,
+        }}
       />
     )}
   </>
