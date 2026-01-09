@@ -374,7 +374,7 @@ export async function seedDemoData(currentUserId: string) {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ action: 'seed' }),
+        body: JSON.stringify({ action: 'seed', userId: currentUserId }),
       }
     );
 
