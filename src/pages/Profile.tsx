@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode } from 'lucide-react';
+import { NotificationBadge } from '@/components/NotificationBadge';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -357,11 +358,7 @@ export default function Profile() {
               aria-label="View activity"
             >
               <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs font-bold flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
+              <NotificationBadge count={unreadCount} />
             </button>
             <button 
               onClick={openCheckIn}
