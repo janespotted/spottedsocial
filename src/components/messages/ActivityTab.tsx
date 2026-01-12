@@ -22,7 +22,7 @@ import { ActivitySkeleton } from './MessagesSkeleton';
 
 interface Activity {
   id: string;
-  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment';
+  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment' | 'city_pulse';
   title: string;
   subtitle?: string;
   timestamp: string;
@@ -33,6 +33,28 @@ interface Activity {
   action?: 'meet_up' | 'view' | 'accept_decline' | 'message';
   isAtVenue?: boolean;
 }
+
+// Session-based frequency limiting for city pulse (max 2 per session)
+const PULSE_SESSION_KEY = 'spotted_city_pulse_count';
+const MAX_PULSES_PER_SESSION = 2;
+
+const getPulseCount = (): number => {
+  try {
+    return parseInt(sessionStorage.getItem(PULSE_SESSION_KEY) || '0', 10);
+  } catch {
+    return 0;
+  }
+};
+
+const incrementPulseCount = (): void => {
+  try {
+    sessionStorage.setItem(PULSE_SESSION_KEY, String(getPulseCount() + 1));
+  } catch {
+    // Ignore storage errors
+  }
+};
+
+const canShowPulse = (): boolean => getPulseCount() < MAX_PULSES_PER_SESSION;
 
 const generateDemoActivities = (city: SupportedCity, userCurrentVenue: string | null): Activity[] => {
   const demoUsers = getDemoUsersForCity(city);
@@ -263,6 +285,64 @@ export function ActivityTab() {
       }
     }
 
+    // Fetch city pulse data (only if not demo mode and can show pulse)
+    if (!demoEnabled && canShowPulse()) {
+      // Get neighborhood activity in last hour - real check-ins only
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      
+      const { data: neighborhoodActivity } = await supabase
+        .from('checkins')
+        .select(`
+          venue_id,
+          venues!inner (
+            neighborhood,
+            city
+          )
+        `)
+        .is('ended_at', null)
+        .gte('created_at', oneHourAgo)
+        .eq('is_demo', false);
+
+      if (neighborhoodActivity && neighborhoodActivity.length > 0) {
+        // Filter to user's city and count by neighborhood
+        const neighborhoodCounts = new Map<string, number>();
+        
+        for (const checkIn of neighborhoodActivity) {
+          const venue = checkIn.venues as unknown as { neighborhood: string; city: string };
+          if (venue?.city === city && venue?.neighborhood) {
+            neighborhoodCounts.set(
+              venue.neighborhood,
+              (neighborhoodCounts.get(venue.neighborhood) || 0) + 1
+            );
+          }
+        }
+
+        // Find the neighborhood with most activity (minimum 3 check-ins)
+        let topNeighborhood: string | null = null;
+        let topCount = 0;
+        
+        for (const [neighborhood, count] of neighborhoodCounts.entries()) {
+          if (count >= 3 && count > topCount) {
+            topNeighborhood = neighborhood;
+            topCount = count;
+          }
+        }
+
+        // Add city pulse if we found meaningful activity
+        if (topNeighborhood && topCount >= 3) {
+          incrementPulseCount(); // Track that we're showing a pulse
+          
+          activityList.push({
+            id: `city-pulse-${Date.now()}`,
+            type: 'city_pulse',
+            title: `${topCount} people checked in around ${topNeighborhood}`,
+            subtitle: 'in the last hour',
+            timestamp: new Date(Date.now() - 10 * 60000).toISOString(), // Show as "10m ago"
+          });
+        }
+      }
+    }
+
     // Set initial activities immediately (fast render with real invites/demo/trending)
     setActivities(activityList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
 
@@ -332,6 +412,8 @@ export function ActivityTab() {
         return <Heart className="h-5 w-5 text-red-500 fill-red-500" />;
       case 'post_comment':
         return <MessageCircle className="h-5 w-5 text-blue-400" />;
+      case 'city_pulse':
+        return <MapPin className="h-5 w-5 text-white/40" />; // Muted, ambient signal
       default:
         return null;
     }
@@ -612,11 +694,15 @@ export function ActivityTab() {
         const friendsOut = activities.filter(a => a.type === 'check_in');
         const trending = activities.filter(a => a.type === 'trending');
         const postEngagement = activities.filter(a => a.type === 'post_like' || a.type === 'post_comment');
+        const cityPulse = activities.filter(a => a.type === 'city_pulse');
+
+        // Special muted style for city pulse
+        const PULSE_CARD_STYLE = 'bg-[#1a0f2e]/40 border border-white/10';
 
         const renderActivityCard = (activity: Activity) => (
           <div
             key={activity.id}
-            className={`rounded-2xl p-4 transition-all hover:scale-[1.01] ${CARD_STYLE}`}
+            className={`rounded-2xl p-4 transition-all hover:scale-[1.01] ${activity.type === 'city_pulse' ? PULSE_CARD_STYLE : CARD_STYLE}`}
           >
             <div className="flex items-start gap-3">
               {/* Icon/Avatar */}
@@ -697,6 +783,12 @@ export function ActivityTab() {
                     <span className="text-white/70 block text-xs mt-0.5">liked your post ❤️</span>
                   </div>
                 )}
+                {activity.type === 'city_pulse' && (
+                  <div className="text-white/60 text-sm">
+                    <span>{activity.title}</span>
+                    <span className="text-white/40 text-xs block mt-0.5">{activity.subtitle}</span>
+                  </div>
+                )}
                 {activity.type === 'post_comment' && (
                   <div className="text-white text-sm">
                     <div className="flex items-center gap-2">
@@ -767,7 +859,7 @@ export function ActivityTab() {
           </div>
         );
 
-        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0;
+        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0;
 
         return hasContent ? (
           <div className="space-y-5">
@@ -821,6 +913,13 @@ export function ActivityTab() {
                 <div className="space-y-3">
                   {trending.map(renderActivityCard)}
                 </div>
+              </div>
+            )}
+
+            {/* Section 5: City Pulse - Ambient signal (no header, subtle) */}
+            {cityPulse.length > 0 && (
+              <div className="space-y-3 opacity-80">
+                {cityPulse.map(renderActivityCard)}
               </div>
             )}
           </div>
