@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Camera, MessageCircle } from 'lucide-react';
@@ -20,10 +21,16 @@ export function CheckInConfirmation() {
     closeCheckInConfirmation 
   } = useCheckIn();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>('');
   const [phase, setPhase] = useState<'celebration' | 'buzz_prompt'>('celebration');
   const [showDropVibeDialog, setShowDropVibeDialog] = useState(false);
+
+  const handleDismissAndNavigate = () => {
+    closeCheckInConfirmation();
+    navigate('/map');
+  };
 
   // Fetch user profile
   useEffect(() => {
@@ -125,7 +132,7 @@ export function CheckInConfirmation() {
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      closeCheckInConfirmation();
+      handleDismissAndNavigate();
     }
   };
 
@@ -135,7 +142,7 @@ export function CheckInConfirmation() {
 
   const handleVibeSubmitted = () => {
     setShowDropVibeDialog(false);
-    closeCheckInConfirmation();
+    handleDismissAndNavigate();
   };
 
   const getPrivacyLabel = (level: string): string => {
@@ -199,7 +206,7 @@ export function CheckInConfirmation() {
 
                 {/* Maybe later */}
                 <button
-                  onClick={closeCheckInConfirmation}
+                  onClick={handleDismissAndNavigate}
                   className="text-white/60 hover:text-white text-sm transition-colors"
                 >
                   Maybe later
