@@ -702,14 +702,20 @@ export default function Leaderboard() {
         {venues.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
             <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
-              <ChevronUp className="h-10 w-10 text-[#a855f7]/60" />
+              <BarChart3 className="h-10 w-10 text-[#a855f7]/60" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">
-              No venues trending yet
+              The night hasn't started yet
             </h3>
-            <p className="text-white/50 text-sm max-w-xs">
-              Check in to be the first! Venues appear here when friends are out.
+            <p className="text-white/50 text-sm max-w-xs mb-6">
+              When people check in, the hottest spots show up here.
             </p>
+            <button
+              onClick={openCheckIn}
+              className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6 py-2.5 font-medium transition-colors"
+            >
+              Be the First
+            </button>
           </div>
         )}
           </>

@@ -44,12 +44,15 @@ export default function Notifications() {
       {/* Notifications List */}
       <div className="max-w-[430px] mx-auto pb-24">
         {notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 px-4">
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
             <div className="w-20 h-20 rounded-full bg-[#2d1b4e] border border-[#a855f7]/30 flex items-center justify-center mb-4">
               <span className="text-4xl">🔔</span>
             </div>
-            <p className="text-white/60 text-center">
-              No notifications yet
+            <h3 className="text-xl font-semibold text-white mb-2">
+              All caught up
+            </h3>
+            <p className="text-white/50 text-sm max-w-xs">
+              When friends interact with you, you'll see it here.
             </p>
           </div>
         ) : (

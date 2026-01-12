@@ -924,10 +924,19 @@ export function ActivityTab() {
             )}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <MapPin className="h-16 w-16 mx-auto text-white/20 mb-4" />
-            <p className="text-white/60">No recent activity</p>
-            <p className="text-white/40 text-sm mt-2">Check in to see what your friends are up to</p>
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+              <MapPin className="h-10 w-10 text-[#a855f7]/60" />
+            </div>
+            <h3 className="text-xl font-semibold text-white mb-2">
+              Nothing yet — but that's okay
+            </h3>
+            <p className="text-white/50 text-sm max-w-xs mb-4">
+              When friends invite you or check in nearby, you'll see it here.
+            </p>
+            <p className="text-white/30 text-xs">
+              💡 Check in to let friends know you're around
+            </p>
           </div>
         );
       })()}

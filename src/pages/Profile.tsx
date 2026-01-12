@@ -627,10 +627,10 @@ export default function Profile() {
                   <MapPin className="h-8 w-8 text-[#a855f7]/60" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">
-                  No recent spots yet
+                  Your night out history starts here
                 </h3>
                 <p className="text-white/50 text-sm max-w-xs">
-                  Check in at venues and they'll appear here
+                  Check in at spots and they'll show up on your profile.
                 </p>
               </div>
             )
@@ -659,10 +659,10 @@ export default function Profile() {
                   <Bookmark className="h-8 w-8 text-[#a855f7]/60" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">
-                  No saved places yet
+                  Build your wishlist
                 </h3>
                 <p className="text-white/50 text-sm max-w-xs">
-                  Tap the + on venues you want to visit and they'll appear here
+                  Save spots you want to check out. They'll live here.
                 </p>
               </div>
             )
