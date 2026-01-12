@@ -386,17 +386,23 @@ export default function Home() {
                   Fresh start! 🌅
                 </h3>
                 <p className="text-white/50 text-sm max-w-xs">
-                  Luckily, your posts deleted at 5am :). Start making plans for your next night out!
+                  Last night's posts are gone. Ready for tonight?
                 </p>
               </>
             ) : (
               <>
                 <h3 className="text-xl font-semibold text-white mb-2">
-                  Your friends are quiet tonight
+                  It's early — you're ahead of the curve
                 </h3>
-                <p className="text-white/50 text-sm max-w-xs">
-                  When they check in and post, their updates will appear here. Posts disappear by 5am.
+                <p className="text-white/50 text-sm max-w-xs mb-6">
+                  When friends check in, you'll see them here. Why not be the first?
                 </p>
+                <button
+                  onClick={openCheckIn}
+                  className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6 py-2.5 font-medium transition-colors"
+                >
+                  Set Your Status
+                </button>
               </>
             )}
           </div>

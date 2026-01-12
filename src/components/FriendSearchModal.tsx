@@ -227,12 +227,15 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
                 <div className="animate-pulse text-white/60">Loading friends...</div>
               </div>
             ) : filteredFriends.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-white/60">
-                  {search ? 'No friends found' : 'No friends yet'}
-                </p>
-                <p className="text-white/40 text-sm mt-2">
-                  {search ? 'Try a different search' : 'Add friends to see them here'}
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+                  <Search className="h-8 w-8 text-[#a855f7]/60" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  {search ? 'No friends found' : 'Your friend list is empty'}
+                </h3>
+                <p className="text-white/50 text-sm max-w-xs">
+                  {search ? 'Try a different search' : 'Invite your crew to get started.'}
                 </p>
               </div>
             ) : (

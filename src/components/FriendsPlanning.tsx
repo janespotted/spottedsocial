@@ -232,9 +232,9 @@ export function FriendsPlanning({
       </div>
       
       {/* Empty state when no friends */}
-      {friends.length === 0 && (
+      {friends.length === 0 && !isUserPlanning && (
         <p className="text-white/40 text-xs text-center py-2">
-          No friends planning yet — be the first!
+          No one's started planning yet. Kick things off?
         </p>
       )}
       

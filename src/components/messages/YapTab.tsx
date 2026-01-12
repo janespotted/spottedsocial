@@ -659,18 +659,31 @@ export function YapTab() {
             ))}
 
             {messages.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-white/60">No yaps yet at {selectedVenue}</p>
-                <p className="text-white/40 text-sm mt-2">Be the first to start the conversation</p>
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+                  <MessageCircle className="h-8 w-8 text-[#d4ff00]/60" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  You're the first one here
+                </h3>
+                <p className="text-white/50 text-sm max-w-xs">
+                  Drop a yap — others at {selectedVenue} will see it.
+                </p>
               </div>
             )}
           </div>
         </>
       ) : (
-        <div className="text-center py-12">
-          <MessageCircle className="h-16 w-16 mx-auto text-white/20 mb-4" />
-          <p className="text-white/60 font-semibold">Yap is only available when you're at a venue</p>
-          <p className="text-white/40 text-sm mt-2">Check in to join the conversation</p>
+        <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+          <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+            <MessageCircle className="h-10 w-10 text-[#a855f7]/60" />
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">
+            Yap unlocks when you arrive
+          </h3>
+          <p className="text-white/50 text-sm max-w-xs">
+            Check in at a spot to join the conversation.
+          </p>
         </div>
       )}
     </div>

@@ -161,9 +161,22 @@ export default function CloseFriends() {
         {loading ? (
           <div className="text-center text-white/60 py-8">Loading friends...</div>
         ) : friends.length === 0 ? (
-          <div className="text-center text-white/60 py-8">
-            <p>You don't have any friends yet.</p>
-            <p className="text-sm mt-2">Add friends to manage your close friends list.</p>
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+              <Heart className="h-10 w-10 text-[#d4ff00]/60" />
+            </div>
+            <h3 className="text-xl font-semibold text-white mb-2">
+              Add friends first
+            </h3>
+            <p className="text-white/50 text-sm max-w-xs mb-6">
+              Once you have friends, you can mark your closest ones here.
+            </p>
+            <button
+              onClick={() => navigate('/friends')}
+              className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6 py-2.5 font-medium transition-colors"
+            >
+              Find Friends
+            </button>
           </div>
         ) : (
           <div className="space-y-2">

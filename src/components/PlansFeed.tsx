@@ -363,10 +363,9 @@ export function PlansFeed({ userId }: PlansFeedProps) {
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center mb-5">
             <Calendar className="w-10 h-10 text-primary" />
           </div>
-          <h3 className="text-xl font-semibold text-foreground mb-2">No plans yet</h3>
+          <h3 className="text-xl font-semibold text-foreground mb-2">Tonight's a blank canvas</h3>
           <p className="text-muted-foreground text-sm max-w-[280px] leading-relaxed">
-            Luckily, your posts deleted at 5am 😅<br/>
-            Start making plans for your next night out!
+            Drop a plan and see who's down to join.
           </p>
         </div>
       ) : (
