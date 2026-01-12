@@ -388,8 +388,9 @@ export function useFeed(options: UseFeedOptions) {
     }
   }, [expandedPostId, comments, fetchComments]);
 
-  const handlePostComment = useCallback(async (postId: string) => {
-    const rawText = newComment[postId];
+  const handlePostComment = useCallback(async (postId: string, text?: string) => {
+    // Support both old (state-based) and new (direct text) API
+    const rawText = text ?? newComment[postId];
     if (!rawText || !userId) return;
 
     // Validate comment with Zod schema
@@ -410,7 +411,10 @@ export function useFeed(options: UseFeedOptions) {
       return;
     }
 
-    setNewComment(prev => ({ ...prev, [postId]: '' }));
+    // Only clear state-based input if we used it
+    if (!text) {
+      setNewComment(prev => ({ ...prev, [postId]: '' }));
+    }
     await fetchComments(postId);
     await fetchPosts();
   }, [newComment, userId, fetchComments, fetchPosts]);

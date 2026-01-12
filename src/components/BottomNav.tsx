@@ -1,7 +1,8 @@
+import { memo } from 'react';
 import { Home, MapPin, BarChart3, MessageSquare } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useInputFocus } from '@/contexts/InputFocusContext';
+import { useInputFocusState } from '@/contexts/InputFocusContext';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 
 const navItems = [
@@ -12,9 +13,9 @@ const navItems = [
   { to: '/profile', icon: null, label: 'S', isSpecial: true },
 ];
 
-export function BottomNav() {
+export const BottomNav = memo(function BottomNav() {
   const location = useLocation();
-  const { isInputFocused } = useInputFocus();
+  const isInputFocused = useInputFocusState();
 
   return (
     <nav 
@@ -68,4 +69,4 @@ export function BottomNav() {
       </div>
     </nav>
   );
-}
+});
