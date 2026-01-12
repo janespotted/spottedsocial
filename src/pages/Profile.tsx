@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode } from 'lucide-react';
+import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode, Camera } from 'lucide-react';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { QRCodeModal } from '@/components/QRCodeModal';
@@ -32,6 +32,16 @@ interface RecentSpot {
   visited_at: string;
 }
 
+interface UserPost {
+  id: string;
+  image_url: string | null;
+  text: string;
+  created_at: string | null;
+  likes_count: number | null;
+  comments_count: number | null;
+  venue_name: string | null;
+}
+
 export default function Profile() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
@@ -47,7 +57,8 @@ export default function Profile() {
   const [locationSharingLevel, setLocationSharingLevel] = useState('all_friends');
   const [wishlistPlaces, setWishlistPlaces] = useState<WishlistPlace[]>([]);
   const [recentSpots, setRecentSpots] = useState<RecentSpot[]>([]);
-  const [spotsView, setSpotsView] = useState<'recent' | 'wishlist'>('recent');
+  const [spotsView, setSpotsView] = useState<'recent' | 'wishlist' | 'posts'>('recent');
+  const [userPosts, setUserPosts] = useState<UserPost[]>([]);
   const [currentStatus, setCurrentStatus] = useState<'out' | 'planning' | 'home' | null>(null);
   const [currentVenue, setCurrentVenue] = useState<string | null>(null);
   const [planningNeighborhood, setPlanningNeighborhood] = useState<string | null>(null);
@@ -263,6 +274,16 @@ export default function Profile() {
     }
 
     setRecentSpots(uniqueRecentSpots);
+
+    // Get user's posts
+    const { data: postsData } = await supabase
+      .from('posts')
+      .select('id, image_url, text, created_at, likes_count, comments_count, venue_name')
+      .eq('user_id', user?.id)
+      .order('created_at', { ascending: false })
+      .limit(12);
+
+    setUserPosts(postsData || []);
     setLoading(false);
   };
 
@@ -584,7 +605,7 @@ export default function Profile() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <Select value={spotsView} onValueChange={(v) => setSpotsView(v as 'recent' | 'wishlist')}>
+            <Select value={spotsView} onValueChange={(v) => setSpotsView(v as 'recent' | 'wishlist' | 'posts')}>
                 <SelectTrigger className="border-none bg-transparent p-0 h-auto text-xl font-bold text-white gap-2 focus:ring-0 focus:ring-offset-0">
                   <SelectValue />
                 </SelectTrigger>
@@ -594,6 +615,9 @@ export default function Profile() {
                   </SelectItem>
                   <SelectItem value="wishlist" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
                     Wishlist
+                  </SelectItem>
+                  <SelectItem value="posts" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
+                    Your Posts
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -634,7 +658,7 @@ export default function Profile() {
                 </p>
               </div>
             )
-          ) : (
+          ) : spotsView === 'wishlist' ? (
             wishlistPlaces.length > 0 ? (
               <div className="grid grid-cols-3 gap-3">
                 {wishlistPlaces.map((place, idx) => (
@@ -663,6 +687,47 @@ export default function Profile() {
                 </h3>
                 <p className="text-white/50 text-sm max-w-xs">
                   Save spots you want to check out. They'll live here.
+                </p>
+              </div>
+            )
+          ) : (
+            userPosts.length > 0 ? (
+              <div className="grid grid-cols-3 gap-3">
+                {userPosts.map((post) => (
+                  <div key={post.id} className="space-y-2">
+                    <div 
+                      className="aspect-square rounded-xl overflow-hidden bg-[#2d1b4e] border border-[#a855f7]/20 relative"
+                      style={{
+                        backgroundImage: post.image_url ? `url(${post.image_url})` : undefined,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}
+                    >
+                      {!post.image_url && (
+                        <div className="w-full h-full flex items-center justify-center p-2">
+                          <p className="text-white/60 text-xs text-center line-clamp-3">
+                            {post.text}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-center gap-3 text-white/40 text-xs">
+                      <span>❤️ {post.likes_count || 0}</span>
+                      <span>💬 {post.comments_count || 0}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-[#2d1b4e]/30 rounded-2xl border border-[#a855f7]/10">
+                <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+                  <Camera className="h-8 w-8 text-[#a855f7]/60" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  No posts yet
+                </h3>
+                <p className="text-white/50 text-sm max-w-xs">
+                  Share moments from your nights out and they'll appear here.
                 </p>
               </div>
             )
