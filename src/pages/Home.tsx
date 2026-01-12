@@ -3,7 +3,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
-import { useInputFocus } from '@/contexts/InputFocusContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
@@ -39,6 +38,7 @@ import { DailyNudgeModal } from '@/components/DailyNudgeModal';
 import { NoFriendsBanner } from '@/components/NoFriendsBanner';
 import { isNightlifeHours } from '@/lib/time-context';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
+import { CommentInput } from '@/components/CommentInput';
 
 export default function Home() {
   const { user } = useAuth();
@@ -51,7 +51,6 @@ export default function Home() {
   const { unreadCount } = useNotifications();
   const { city } = useUserCity();
   const { showNudgeModal, nudgeType, closeNudgeModal } = useDailyNudge();
-  const { setInputFocused } = useInputFocus();
   useAutoVenueTracking();
 
   const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends, cacheStories, getCachedStories } = useOfflineCache();
@@ -612,44 +611,12 @@ export default function Home() {
                       </div>
                     ))}
 
-                    <div className="flex gap-2 items-end pt-2">
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarImage src={user?.user_metadata?.avatar_url} />
-                        <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                          {user?.email?.[0].toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 flex gap-2">
-                        <input
-                          type="text"
-                          value={newComment[post.id] || ''}
-                          onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handlePostComment(post.id);
-                            }
-                          }}
-                          onFocus={(e) => {
-                            setInputFocused(true);
-                            setTimeout(() => {
-                              e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }, 300);
-                          }}
-                          onBlur={() => setInputFocused(false)}
-                          placeholder="Add a comment..."
-                          maxLength={500}
-                          className="flex-1 bg-[#1a0f2e]/60 border border-white/10 rounded-full px-4 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-[#d4ff00]/40"
-                        />
-                        <button
-                          onClick={() => handlePostComment(post.id)}
-                          disabled={!newComment[post.id]?.trim()}
-                          className="text-[#d4ff00] hover:text-[#d4ff00]/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Send className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </div>
+                    <CommentInput
+                      postId={post.id}
+                      userAvatarUrl={user?.user_metadata?.avatar_url}
+                      userInitial={user?.email?.[0].toUpperCase()}
+                      onSubmit={handlePostComment}
+                    />
                   </div>
                 )}
               </div>

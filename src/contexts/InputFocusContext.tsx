@@ -1,106 +1,70 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useCallback, useSyncExternalStore } from 'react';
+
+// Store for managing input focus state with minimal re-renders
+class InputFocusStore {
+  private focused = false;
+  private listeners = new Set<() => void>();
+
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+
+  getSnapshot = () => this.focused;
+
+  // For synchronous reads without subscription (used by venue arrival nudge)
+  isFocused = () => this.focused;
+
+  setFocused = (value: boolean) => {
+    if (this.focused !== value) {
+      this.focused = value;
+      this.listeners.forEach(listener => listener());
+    }
+  };
+}
+
+// Singleton store instance
+const inputFocusStore = new InputFocusStore();
 
 interface InputFocusContextType {
-  isInputFocused: boolean;
   setInputFocused: (focused: boolean) => void;
-  isInputFocusedRef: React.MutableRefObject<boolean>;
+  isInputFocused: () => boolean;
 }
 
 const InputFocusContext = createContext<InputFocusContextType>({
-  isInputFocused: false,
   setInputFocused: () => {},
-  isInputFocusedRef: { current: false },
+  isInputFocused: () => false,
 });
 
 export function InputFocusProvider({ children }: { children: React.ReactNode }) {
-  const [isInputFocused, setIsInputFocusedState] = useState(false);
-  const isInputFocusedRef = useRef(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
+  // setInputFocused is stable and doesn't cause re-renders
   const setInputFocused = useCallback((focused: boolean) => {
-    // Clear any pending timeout
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-
-    isInputFocusedRef.current = focused;
-    setIsInputFocusedState(focused);
-
-    // If focusing, set a safety timeout to auto-reset after 30 seconds
-    // This prevents the nav from being permanently hidden if blur doesn't fire
-    if (focused) {
-      timeoutRef.current = setTimeout(() => {
-        isInputFocusedRef.current = false;
-        setIsInputFocusedState(false);
-      }, 30000);
-    }
+    inputFocusStore.setFocused(focused);
   }, []);
 
-  // Safety net: Listen for visibility changes to reset focus state
-  // When user switches apps or tabs, the keyboard closes
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && isInputFocusedRef.current) {
-        isInputFocusedRef.current = false;
-        setIsInputFocusedState(false);
-      }
-    };
-
-    // Reset focus when window loses focus (mobile app switching)
-    const handleWindowBlur = () => {
-      if (isInputFocusedRef.current) {
-        // Small delay to allow for normal focus transitions
-        setTimeout(() => {
-          const activeElement = document.activeElement;
-          const isInputActive = activeElement?.tagName === 'INPUT' || 
-                               activeElement?.tagName === 'TEXTAREA' ||
-                               activeElement?.getAttribute('contenteditable') === 'true';
-          
-          if (!isInputActive && isInputFocusedRef.current) {
-            isInputFocusedRef.current = false;
-            setIsInputFocusedState(false);
-          }
-        }, 300);
-      }
-    };
-
-    // Periodic check to ensure state is synced with actual focus
-    const checkFocusState = () => {
-      const activeElement = document.activeElement;
-      const isInputActive = activeElement?.tagName === 'INPUT' || 
-                           activeElement?.tagName === 'TEXTAREA' ||
-                           activeElement?.getAttribute('contenteditable') === 'true';
-      
-      if (!isInputActive && isInputFocusedRef.current) {
-        isInputFocusedRef.current = false;
-        setIsInputFocusedState(false);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
-    
-    // Check every 2 seconds as a fallback
-    const intervalId = setInterval(checkFocusState, 2000);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
-      clearInterval(intervalId);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
+  // isInputFocused is a function that reads current value (no subscription)
+  const isInputFocused = useCallback(() => {
+    return inputFocusStore.isFocused();
   }, []);
 
   return (
-    <InputFocusContext.Provider value={{ isInputFocused, setInputFocused, isInputFocusedRef }}>
+    <InputFocusContext.Provider value={{ setInputFocused, isInputFocused }}>
       {children}
     </InputFocusContext.Provider>
   );
 }
 
+// Hook for setting focus state (used by inputs) - does NOT cause re-renders
 export function useInputFocus() {
-  return useContext(InputFocusContext);
+  const context = useContext(InputFocusContext);
+  return context;
+}
+
+// Hook for subscribing to focus state (used only by BottomNav) - ONLY this component re-renders
+export function useInputFocusState() {
+  return useSyncExternalStore(
+    inputFocusStore.subscribe,
+    inputFocusStore.getSnapshot,
+    inputFocusStore.getSnapshot
+  );
 }

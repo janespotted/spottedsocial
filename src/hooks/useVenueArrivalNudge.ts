@@ -35,7 +35,7 @@ let knownVenues: Map<string, VenueLocation> = new Map();
 export function useVenueArrivalNudge() {
   const { user } = useAuth();
   const { showVenueArrival, setDetectedVenue, setNearbyVenues } = useCheckIn();
-  const { isInputFocusedRef } = useInputFocus();
+  const { isInputFocused } = useInputFocus();
   const hasCheckedRef = useRef(false);
   const [isOutStatus, setIsOutStatus] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -105,7 +105,7 @@ export function useVenueArrivalNudge() {
     if (!user?.id) return;
     
     // Skip polling when user is typing to prevent jitter
-    if (isInputFocusedRef.current) {
+    if (isInputFocused()) {
       console.log('[VenueArrivalNudge] Skipping - input focused');
       return;
     }
@@ -241,7 +241,7 @@ export function useVenueArrivalNudge() {
     } finally {
       markCheckingEnd();
     }
-  }, [user?.id, deliveryHandler, silentVenueUpdate, isInputFocusedRef, setNearbyVenues]);
+  }, [user?.id, deliveryHandler, silentVenueUpdate, isInputFocused, setNearbyVenues]);
 
   // Initial check on mount
   useEffect(() => {

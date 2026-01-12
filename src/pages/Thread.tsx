@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
@@ -6,21 +6,14 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { ChevronLeft, Camera, Send, Image, Users, ChevronDown, UserPlus, ChevronRight } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { ChevronLeft, Users, ChevronDown, UserPlus, ChevronRight } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { logger } from '@/lib/logger';
+import { MessageInput } from '@/components/MessageInput';
 
 // Validation schema for DM messages
 const messageSchema = z.object({
@@ -60,20 +53,16 @@ export default function Thread() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherMember, setOtherMember] = useState<ThreadMember | null>(null);
   const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
-  const [newMessage, setNewMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showMembersPopover, setShowMembersPopover] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
   
   // Map sender_id to member info for group chats
   const [memberMap, setMemberMap] = useState<Map<string, ThreadMember>>(new Map());
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user || !threadId) return;
+  const handleImageUpload = useCallback(async (file: File) => {
+    if (!user || !threadId) return;
 
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
@@ -112,14 +101,8 @@ export default function Thread() {
       toast.error('Failed to send image');
     } finally {
       setIsUploading(false);
-      if (cameraInputRef.current) {
-        cameraInputRef.current.value = '';
-      }
-      if (galleryInputRef.current) {
-        galleryInputRef.current.value = '';
-      }
     }
-  };
+  }, [user, threadId]);
 
   const handleVenueClick = async (venueName: string, venueId?: string | null) => {
     if (venueId) {
@@ -286,12 +269,11 @@ export default function Thread() {
     };
   };
 
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !user) return;
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text.trim() || !user) return;
 
     // Validate message with Zod
-    const validation = messageSchema.safeParse({ text: newMessage });
+    const validation = messageSchema.safeParse({ text });
     if (!validation.success) {
       toast.error(validation.error.errors[0].message);
       return;
@@ -310,8 +292,7 @@ export default function Thread() {
     }
 
     logger.dm(threadId!, otherMember?.user_id || 'unknown');
-    setNewMessage('');
-  };
+  }, [user, threadId, otherMember]);
 
   const getTimeAgo = (date: string) => {
     return formatDistanceToNow(new Date(date), { addSuffix: true })
@@ -588,71 +569,11 @@ export default function Thread() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="sticky bottom-0 bg-[#1a0f2e]/95 backdrop-blur border-t border-[#a855f7]/20 p-4">
-        <input
-          type="file"
-          ref={cameraInputRef}
-          onChange={handleImageUpload}
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-        />
-        <input
-          type="file"
-          ref={galleryInputRef}
-          onChange={handleImageUpload}
-          accept="image/*"
-          className="hidden"
-        />
-        <form onSubmit={sendMessage} className="flex items-center gap-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                disabled={isUploading}
-                className="text-white/60 hover:text-white hover:bg-[#2d1b4e]"
-              >
-                <Camera className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40">
-              <DropdownMenuItem 
-                onClick={() => cameraInputRef.current?.click()}
-                className="text-white hover:bg-[#2d1b4e] cursor-pointer"
-              >
-                <Camera className="mr-2 h-4 w-4" />
-                Camera
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => galleryInputRef.current?.click()}
-                className="text-white hover:bg-[#2d1b4e] cursor-pointer"
-              >
-                <Image className="mr-2 h-4 w-4" />
-                Upload from camera roll
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Message..."
-            className="flex-1 bg-[#2d1b4e]/60 border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full"
-          />
-
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!newMessage.trim()}
-              className="bg-[#a855f7] hover:bg-[#9333ea] text-white shadow-[0_0_10px_rgba(168,85,247,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send className="h-5 w-5" />
-            </Button>
-        </form>
-      </div>
+      <MessageInput
+        onSendMessage={sendMessage}
+        onImageUpload={handleImageUpload}
+        isUploading={isUploading}
+      />
     </div>
   </div>
   );
