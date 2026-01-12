@@ -66,6 +66,11 @@ export function FriendIdCard() {
   const [hasStory, setHasStory] = useState(false);
   const [showStoryViewer, setShowStoryViewer] = useState(false);
   const [showCreatePlanDialog, setShowCreatePlanDialog] = useState(false);
+  const [preselectedFriendForPlan, setPreselectedFriendForPlan] = useState<{
+    id: string;
+    display_name: string;
+    avatar_url: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (selectedFriend && user) {
@@ -383,12 +388,22 @@ export function FriendIdCard() {
 
   const handleMakePlans = () => {
     if (!selectedFriend) return;
+    
+    // Store friend data before closing the card
+    setPreselectedFriendForPlan({
+      id: selectedFriend.userId,
+      display_name: selectedFriend.displayName,
+      avatar_url: selectedFriend.avatarUrl,
+    });
+    
+    // Close the friend card first, then open dialog
+    closeFriendCard();
     setShowCreatePlanDialog(true);
   };
 
   const handlePlanCreated = () => {
     setShowCreatePlanDialog(false);
-    closeFriendCard();
+    setPreselectedFriendForPlan(null);
   };
 
   const handleVenueClick = async (venueName: string) => {
@@ -719,18 +734,17 @@ export function FriendIdCard() {
       />
     )}
 
-    {/* Create Plan Dialog */}
-    {selectedFriend && user && (
+    {/* Create Plan Dialog - rendered outside of selectedFriend check so it stays open after card closes */}
+    {user && (
       <CreatePlanDialog
         open={showCreatePlanDialog}
-        onOpenChange={setShowCreatePlanDialog}
+        onOpenChange={(open) => {
+          setShowCreatePlanDialog(open);
+          if (!open) setPreselectedFriendForPlan(null);
+        }}
         userId={user.id}
         onPlanCreated={handlePlanCreated}
-        preselectedFriend={{
-          id: selectedFriend.userId,
-          display_name: selectedFriend.displayName,
-          avatar_url: selectedFriend.avatarUrl,
-        }}
+        preselectedFriend={preselectedFriendForPlan}
       />
     )}
   </>
