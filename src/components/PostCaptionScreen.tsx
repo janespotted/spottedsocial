@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, MapPin, Loader2, Users, Heart, Share2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Loader2, Users, Heart, Share2, ChevronDown, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -20,6 +20,12 @@ interface PostCaptionScreenProps {
   onSuccess: () => void;
 }
 
+const visibilityOptions = [
+  { value: 'close_friends' as const, label: 'Close Friends', icon: Heart, description: 'Only your closest friends' },
+  { value: 'all_friends' as const, label: 'All Friends', icon: Users, description: 'Everyone you are friends with' },
+  { value: 'mutual_friends' as const, label: 'Mutual Friends', icon: Share2, description: 'Friends + their friends' },
+];
+
 export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }: PostCaptionScreenProps) {
   const { user } = useAuth();
   const [caption, setCaption] = useState('');
@@ -31,6 +37,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
   const [showVenueInput, setShowVenueInput] = useState(false);
   const [customVenueName, setCustomVenueName] = useState('');
   const [visibility, setVisibility] = useState<PostVisibility>('all_friends');
+  const [showAudienceSheet, setShowAudienceSheet] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -44,7 +51,6 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
     
     setCapturingLocation(true);
     try {
-      // First check if user has an active check-in
       const { data: activeStatus } = await supabase
         .from('night_statuses')
         .select('venue_id, venue_name, lat, lng')
@@ -54,7 +60,6 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
         .maybeSingle();
 
       if (activeStatus?.venue_name) {
-        // Use checked-in venue automatically
         setLocation(activeStatus.venue_name);
         setLocationData({
           lat: activeStatus.lat || 0,
@@ -66,7 +71,6 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
         });
         setCapturingLocation(false);
       } else {
-        // Fall back to GPS capture
         captureLocation();
       }
     } catch (error) {
@@ -155,7 +159,6 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
   };
 
   const handleShare = async () => {
-    // Validate caption with Zod schema
     const validation = validatePostText(caption);
     if (!validation.success) {
       toast.error(validation.error || 'Invalid caption');
@@ -174,7 +177,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
 
       const { error } = await supabase.from('posts').insert({
         user_id: user.id,
-        text: validation.data!, // Use validated and trimmed text
+        text: validation.data!,
         image_url: imageUrl,
         venue_name: locationData?.venueName || location || null,
         venue_id: locationData?.venueId || null,
@@ -194,21 +197,34 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
     }
   };
 
+  const getVisibilityLabel = () => {
+    const option = visibilityOptions.find(o => o.value === visibility);
+    return option?.label || 'All Friends';
+  };
+
+  const getVisibilityIcon = () => {
+    const option = visibilityOptions.find(o => o.value === visibility);
+    return option?.icon || Users;
+  };
+
+  const VisibilityIcon = getVisibilityIcon();
+
   return (
     <div className="fixed inset-0 z-50 bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10">
+      {/* Header - tighter padding */}
+      <div className="flex items-center justify-between px-3 py-3">
         <button
           onClick={onBack}
-          className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"
+          className="p-2 -ml-1 rounded-full hover:bg-white/10 transition-colors"
         >
-          <ArrowLeft className="h-6 w-6 text-white" />
+          <ArrowLeft className="h-5 w-5 text-white" />
         </button>
-        <span className="text-white font-semibold text-lg">New Post</span>
+        <span className="text-white font-semibold">New Post</span>
         <Button
           onClick={handleShare}
           disabled={loading || !caption.trim()}
-          className="bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90 font-semibold px-6"
+          size="sm"
+          className="bg-white text-[#1a0f2e] hover:bg-white/90 font-semibold px-5 rounded-full disabled:opacity-40"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Share'}
         </Button>
@@ -216,118 +232,9 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* User + Caption Row */}
-        <div className="flex gap-3 p-4">
-          <Avatar className="h-10 w-10 flex-shrink-0">
-            <AvatarImage src={profile?.avatar_url || undefined} />
-            <AvatarFallback className="bg-[#a855f7] text-white">
-              {profile?.display_name?.[0] || 'U'}
-            </AvatarFallback>
-          </Avatar>
-          
-          <div className="flex-1 flex gap-3">
-            <Textarea
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="Write a caption..."
-              className="flex-1 bg-transparent border-none text-white placeholder:text-white/40 resize-none min-h-[100px] p-0 focus-visible:ring-0"
-              maxLength={500}
-            />
-            
-            {/* Image Preview Thumbnail */}
-            <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden">
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="h-px bg-white/10" />
-
-        {/* Location */}
-        <div className="p-4">
-          <div className="flex items-center gap-3 text-white/60">
-            <MapPin className="h-5 w-5" />
-            {capturingLocation ? (
-              <span className="text-sm">Detecting location...</span>
-            ) : showVenueInput ? (
-              <div className="flex-1 flex gap-2">
-                <Input
-                  value={customVenueName}
-                  onChange={(e) => setCustomVenueName(e.target.value)}
-                  placeholder="Add location"
-                  className="bg-transparent border-white/20 text-white placeholder:text-white/40"
-                />
-                <Button
-                  onClick={handleCreateVenue}
-                  disabled={!customVenueName.trim() || loading}
-                  size="sm"
-                  className="bg-[#a855f7] hover:bg-[#a855f7]/90"
-                >
-                  Add
-                </Button>
-              </div>
-            ) : location ? (
-              <button 
-                onClick={() => setShowVenueInput(true)}
-                className="text-white hover:text-white/80 transition-colors"
-              >
-                {location}
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowVenueInput(true)}
-                className="text-white/60 hover:text-white transition-colors"
-              >
-                Add location
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="h-px bg-white/10" />
-
-        {/* Audience Selector */}
-        <div className="p-4">
-          <p className="text-white/60 text-sm mb-3">Who can see this?</p>
-          <div className="flex flex-col gap-2">
-            {[
-              { value: 'close_friends' as const, label: 'Close Friends', icon: Heart, description: 'Only your closest friends' },
-              { value: 'all_friends' as const, label: 'All Friends', icon: Users, description: 'Everyone you are friends with' },
-              { value: 'mutual_friends' as const, label: 'Mutual Friends', icon: Share2, description: 'Friends + their friends' },
-            ].map((option) => (
-              <button
-                key={option.value}
-                onClick={() => setVisibility(option.value)}
-                className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
-                  visibility === option.value
-                    ? 'bg-[#a855f7]/20 border border-[#a855f7]'
-                    : 'bg-white/5 border border-transparent hover:bg-white/10'
-                }`}
-              >
-                <option.icon className={`h-5 w-5 ${visibility === option.value ? 'text-[#a855f7]' : 'text-white/60'}`} />
-                <div className="flex-1 text-left">
-                  <p className={`font-medium ${visibility === option.value ? 'text-white' : 'text-white/80'}`}>
-                    {option.label}
-                  </p>
-                  <p className="text-xs text-white/40">{option.description}</p>
-                </div>
-                {visibility === option.value && (
-                  <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="h-px bg-white/10" />
-
-        {/* Large Image Preview */}
-        <div className="p-4">
-          <div className="aspect-square w-full max-w-md mx-auto rounded-xl overflow-hidden">
+        {/* Hero Image - edge-to-edge with rounded corners */}
+        <div className="px-3 pb-3">
+          <div className="aspect-[4/5] w-full rounded-2xl overflow-hidden">
             <img
               src={imagePreview}
               alt="Post preview"
@@ -336,13 +243,124 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
           </div>
         </div>
 
-        {/* Character Count */}
-        <div className="px-4 pb-4">
-          <p className="text-xs text-white/40 text-right">
-            {caption.length}/500
-          </p>
+        {/* Caption - lightweight, borderless */}
+        <div className="px-3 py-2">
+          <div className="flex items-start gap-3">
+            <Avatar className="h-8 w-8 flex-shrink-0">
+              <AvatarImage src={profile?.avatar_url || undefined} />
+              <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+                {profile?.display_name?.[0] || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Write a caption..."
+                className="w-full bg-transparent text-white placeholder:text-white/30 resize-none text-base leading-relaxed focus:outline-none min-h-[60px]"
+                maxLength={500}
+                rows={2}
+              />
+              <p className="text-xs text-white/30 text-right">{caption.length}/500</p>
+            </div>
+          </div>
         </div>
+
+        {/* Location - subtle pill style */}
+        <div className="px-3 py-2">
+          {capturingLocation ? (
+            <div className="flex items-center gap-2 text-white/40 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Detecting location...</span>
+            </div>
+          ) : showVenueInput ? (
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-white/40 flex-shrink-0" />
+              <Input
+                value={customVenueName}
+                onChange={(e) => setCustomVenueName(e.target.value)}
+                placeholder="Add location"
+                className="flex-1 h-8 bg-white/5 border-white/10 text-white text-sm placeholder:text-white/30 rounded-full px-3"
+              />
+              <Button
+                onClick={handleCreateVenue}
+                disabled={!customVenueName.trim() || loading}
+                size="sm"
+                className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/90 rounded-full px-3"
+              >
+                Add
+              </Button>
+              <button
+                onClick={() => setShowVenueInput(false)}
+                className="p-1 text-white/40 hover:text-white/60"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setShowVenueInput(true)}
+              className="flex items-center gap-2 text-sm"
+            >
+              <MapPin className="h-4 w-4 text-white/40" />
+              <span className={location ? "text-white" : "text-white/40"}>
+                {location || "Add location"}
+              </span>
+            </button>
+          )}
+        </div>
+
+        {/* Audience - single row, opens sheet */}
+        <button 
+          onClick={() => setShowAudienceSheet(true)}
+          className="w-full flex items-center justify-between px-3 py-3 mt-1"
+        >
+          <div className="flex items-center gap-2">
+            <VisibilityIcon className="h-4 w-4 text-white/40" />
+            <span className="text-sm text-white/60">Audience</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-white">
+            <span className="text-sm">{getVisibilityLabel()}</span>
+            <ChevronDown className="h-4 w-4 text-white/40" />
+          </div>
+        </button>
       </div>
+
+      {/* Audience Selection Sheet */}
+      <Sheet open={showAudienceSheet} onOpenChange={setShowAudienceSheet}>
+        <SheetContent side="bottom" className="bg-[#1a0f2e] border-white/10 rounded-t-2xl px-0 pb-8">
+          <SheetHeader className="px-4 pb-2">
+            <SheetTitle className="text-white text-center">Who can see this?</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col">
+            {visibilityOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => {
+                  setVisibility(option.value);
+                  setShowAudienceSheet(false);
+                }}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
+              >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  visibility === option.value ? 'bg-[#a855f7]/20' : 'bg-white/5'
+                }`}>
+                  <option.icon className={`h-5 w-5 ${
+                    visibility === option.value ? 'text-[#a855f7]' : 'text-white/60'
+                  }`} />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-medium text-white">{option.label}</p>
+                  <p className="text-xs text-white/40">{option.description}</p>
+                </div>
+                {visibility === option.value && (
+                  <Check className="h-5 w-5 text-[#a855f7]" />
+                )}
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
