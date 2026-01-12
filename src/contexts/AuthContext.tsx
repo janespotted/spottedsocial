@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { logEvent } from '@/lib/event-logger';
 
@@ -49,7 +48,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     // Set up auth state listener
@@ -68,7 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(() => {
             processPendingInvite(session.user.id);
           }, 0);
-          navigate('/');
+          
+          // Use window.location for navigation to avoid hook dependency
+          // This ensures we redirect even on initial mount
+          if (window.location.pathname === '/auth') {
+            window.location.href = '/';
+          }
         }
       }
     );
@@ -81,12 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-    navigate('/auth');
-  };
+    window.location.href = '/auth';
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, session, loading, signOut }}>
