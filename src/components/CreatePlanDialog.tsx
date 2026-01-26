@@ -16,7 +16,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { supabase } from '@/integrations/supabase/client';
 import { useUserCity } from '@/hooks/useUserCity';
 import { useDemoMode } from '@/hooks/useDemoMode';
-import { useKeyboardAware } from '@/hooks/useKeyboardAware';
+
 import { toast } from 'sonner';
 import { format, addDays } from 'date-fns';
 
@@ -58,7 +58,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { city } = useUserCity();
   const demoEnabled = useDemoMode();
-  const { isKeyboardOpen, handleInputFocus } = useKeyboardAware();
+  
   const venueInputRef = useRef<HTMLInputElement>(null);
   const venueListRef = useRef<HTMLDivElement>(null);
 
@@ -234,7 +234,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
   });
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
       <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] border-transparent max-h-[85vh]">
         <DrawerHeader className="pb-2 flex-shrink-0">
           <DrawerTitle className="text-foreground text-center">Share Your Plans</DrawerTitle>
@@ -262,7 +262,6 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                 placeholder="Where are you going?"
                 value={venueSearch}
                 onChange={(e) => setVenueSearch(e.target.value)}
-                onFocus={handleInputFocus}
                 className="pl-10 bg-background/30 border-border/30 h-11"
                 autoFocus
               />
@@ -273,9 +272,9 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
           {!selectedVenue && (
             <div 
               ref={venueListRef}
-              className="flex-1 mt-3 -mx-4 px-4 overflow-y-auto overscroll-contain"
+              className="flex-1 mt-3 -mx-4 px-4 overflow-y-auto overscroll-contain touch-pan-y"
               style={{ 
-                maxHeight: isKeyboardOpen ? '40vh' : '50vh',
+                maxHeight: '50vh',
                 WebkitOverflowScrolling: 'touch'
               }}
             >
