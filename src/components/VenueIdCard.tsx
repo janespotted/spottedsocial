@@ -80,6 +80,7 @@ export function VenueIdCard() {
   const demoEnabled = useDemoMode();
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendAtVenue[]>([]);
+  const [friendsPlanning, setFriendsPlanning] = useState<FriendAtVenue[]>([]);
   const [distance, setDistance] = useState<string>('--');
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [buzzItems, setBuzzItems] = useState<BuzzItemData[]>([]);
@@ -276,6 +277,88 @@ export function VenueIdCard() {
           .maybeSingle();
 
         setIsUserAtVenue(userStatus?.venue_id === selectedVenueId);
+
+        // Fetch friends planning to go to this venue (from plans table)
+        const today = new Date().toISOString().split('T')[0];
+        const now = new Date().toISOString();
+
+        // Get plans for this venue today that haven't expired
+        const { data: venuePlans } = await supabase
+          .from('plans')
+          .select('id, user_id, plan_time')
+          .eq('venue_id', selectedVenueId)
+          .eq('plan_date', today)
+          .gt('expires_at', now);
+
+        if (venuePlans && venuePlans.length > 0) {
+          const planIds = venuePlans.map(p => p.id);
+          const creatorIds = venuePlans.map(p => p.user_id);
+
+          // Get "I'm Down" users for these plans
+          const { data: downs } = await supabase
+            .from('plan_downs')
+            .select('user_id')
+            .in('plan_id', planIds);
+
+          // Get participants for these plans
+          const { data: participants } = await supabase
+            .from('plan_participants')
+            .select('user_id')
+            .in('plan_id', planIds);
+
+          // Get friend IDs again for comparison
+          const { data: sentFriendshipsForPlans } = await supabase
+            .from('friendships')
+            .select('friend_id')
+            .eq('user_id', user.id)
+            .eq('status', 'accepted');
+
+          const { data: receivedFriendshipsForPlans } = await supabase
+            .from('friendships')
+            .select('user_id')
+            .eq('friend_id', user.id)
+            .eq('status', 'accepted');
+
+          const allFriendIds = [
+            ...(sentFriendshipsForPlans?.map(f => f.friend_id) || []),
+            ...(receivedFriendshipsForPlans?.map(f => f.user_id) || [])
+          ];
+
+          // Combine all interested users (deduplicated)
+          const allInterestedIds = [...new Set([
+            ...creatorIds,
+            ...(downs || []).map(d => d.user_id),
+            ...(participants || []).map(p => p.user_id),
+          ])];
+
+          // Filter to only friends (exclude current user and those already at venue)
+          const friendsAtVenueIds = new Set(friendsAtVenue.map(f => f.id));
+          const interestedFriendIds = allInterestedIds.filter(id => 
+            id !== user.id && allFriendIds.includes(id) && !friendsAtVenueIds.has(id)
+          );
+
+          if (interestedFriendIds.length > 0) {
+            // Get profiles for planning friends
+            const { data: planningProfiles } = await supabase
+              .from('profiles')
+              .select('id, display_name, avatar_url')
+              .in('id', interestedFriendIds);
+
+            // Filter out demo users when demo mode is OFF
+            let filteredPlanningProfiles = planningProfiles || [];
+            if (!demoEnabled) {
+              const { data: fullProfiles } = await supabase.rpc('get_profiles_safe');
+              const nonDemoIds = new Set((fullProfiles || []).filter((p: any) => p.is_demo === false).map((p: any) => p.id));
+              filteredPlanningProfiles = filteredPlanningProfiles.filter(p => nonDemoIds.has(p.id));
+            }
+
+            setFriendsPlanning(filteredPlanningProfiles);
+          } else {
+            setFriendsPlanning([]);
+          }
+        } else {
+          setFriendsPlanning([]);
+        }
       }
     } catch (error) {
       console.error('Error fetching venue data:', error);
@@ -690,6 +773,70 @@ export function VenueIdCard() {
                   </div>
                 </div>
               </div>
+
+              {/* Friends Planning to Go - NEW SECTION */}
+              {friendsPlanning.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-base">🎯</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="flex -space-x-2 cursor-pointer hover:opacity-90 transition-opacity">
+                          {friendsPlanning.slice(0, 4).map((friend) => (
+                            <Avatar key={friend.id} className="w-10 h-10 border-2 border-[#0a0118]">
+                              <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                              <AvatarFallback className="bg-[#a855f7]/70 text-white">
+                                {friend.display_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                          ))}
+                          {friendsPlanning.length > 4 && (
+                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#a855f7]/30 border-2 border-[#0a0118] text-xs text-white">
+                              +{friendsPlanning.length - 4}
+                            </div>
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl z-[400]" align="start">
+                        <p className="text-white/60 text-xs px-2 mb-2">
+                          Friends planning to go
+                        </p>
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {friendsPlanning.map((friend) => (
+                            <button
+                              key={friend.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openFriendCard({
+                                  userId: friend.id,
+                                  displayName: friend.display_name,
+                                  avatarUrl: friend.avatar_url,
+                                  venueName: venue.name,
+                                  lat: venue.lat,
+                                  lng: venue.lng,
+                                });
+                              }}
+                              className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
+                            >
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                                <AvatarFallback className="bg-[#a855f7]/70 text-white text-xs">
+                                  {friend.display_name[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-white text-sm flex-1 text-left">{friend.display_name}</span>
+                              <ChevronRight className="h-4 w-4 text-white/40" />
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <span className="text-sm text-white/60">
+                      {friendsPlanning.length} friend{friendsPlanning.length !== 1 ? 's' : ''} planning
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Primary CTA - Invite Friends */}
               <Button
