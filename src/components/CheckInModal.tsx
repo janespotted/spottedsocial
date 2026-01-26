@@ -587,56 +587,59 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   };
 
   const StatusContent = () => (
-    <div className="flex flex-col items-center justify-between p-6 min-h-[600px] animate-scale-in">
+    <div className="relative flex flex-col items-center justify-between p-6 min-h-[600px] animate-scale-in">
+      {/* Subtle corner accent for depth */}
+      <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-radial from-[#a855f7]/15 to-transparent rounded-full blur-3xl pointer-events-none" />
+      
       {/* Header */}
-      <div className="w-full flex items-start justify-between pt-4">
-        <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
+      <div className="relative w-full flex items-start justify-between pt-4">
+        <h1 className="text-2xl font-light tracking-[0.3em] text-white/90">Spotted</h1>
         <img 
           src={spottedLogo} 
           alt="Spotted" 
-          className="h-10 w-10 object-contain drop-shadow-[0_0_10px_rgba(212,255,0,0.6)]" 
+          className="h-10 w-10 object-contain drop-shadow-[0_0_8px_rgba(212,255,0,0.5)]" 
         />
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full">
-        <h2 className="text-4xl font-semibold text-[#d4ff00] text-center mb-12 tracking-wide drop-shadow-[0_0_15px_rgba(212,255,0,0.3)]">
+      <div className="relative flex-1 flex flex-col items-center justify-center w-full">
+        <h2 className="text-4xl font-semibold text-[#d4ff00] text-center mb-8 tracking-wide drop-shadow-[0_0_10px_rgba(212,255,0,0.25)]">
           Are you out?
         </h2>
 
-        <div className="w-full space-y-6">
-          {/* Yes - Primary yellow button with refined styling */}
+        <div className="w-full space-y-4">
+          {/* Yes - Primary button with refined glow */}
           <Button
             onClick={() => {
               handleStatusUpdate('out');
             }}
             size="lg"
-            className="w-full h-14 text-lg font-semibold rounded-2xl bg-gradient-to-b from-[#f0ff80] via-[#e5ff4d] to-[#d4ff00] text-[#0a0118] hover:from-[#f5ffb3] hover:via-[#f0ff80] hover:to-[#e5ff4d] shadow-[0_0_20px_rgba(212,255,0,0.3)] hover:shadow-[0_0_25px_rgba(212,255,0,0.45)] transition-all duration-200 disabled:opacity-50"
+            className="w-full h-14 text-lg font-semibold rounded-2xl bg-gradient-to-b from-[#e8ff66] to-[#d4ff00] text-[#0a0118] hover:from-[#f0ff80] hover:to-[#e5ff4d] shadow-[0_0_20px_rgba(212,255,0,0.2),inset_0_1px_0_rgba(255,255,255,0.35)] hover:shadow-[0_0_28px_rgba(212,255,0,0.35),inset_0_1px_0_rgba(255,255,255,0.4)] transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
             {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes 🎉'}
           </Button>
           
-          {/* Planning - Secondary purple button */}
+          {/* Planning - Secondary button with subtle glow */}
           <Button
             onClick={() => {
               handleStatusUpdate('planning');
             }}
             size="lg"
-            className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#a855f7] to-[#9333ea] text-white border border-[#a855f7]/40 hover:from-[#b668f8] hover:to-[#a855f7] hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all duration-200 disabled:opacity-50"
+            className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#a855f7]/90 to-[#7c3aed] text-white border border-[#a855f7]/25 hover:border-[#a855f7]/40 hover:from-[#b668f8]/90 hover:to-[#9333ea] shadow-[0_0_16px_rgba(168,85,247,0.15),inset_0_1px_0_rgba(255,255,255,0.1)] hover:shadow-[0_0_24px_rgba(168,85,247,0.25),inset_0_1px_0_rgba(255,255,255,0.15)] transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
             Planning on it 🎯
           </Button>
 
-          {/* No - Tertiary glass button */}
+          {/* No - Tertiary glass button with refined effect */}
           <Button
             onClick={() => {
               handleStatusUpdate('home');
             }}
             variant="ghost"
             size="lg"
-            className="w-full h-14 text-lg font-medium rounded-2xl bg-white/5 backdrop-blur-sm border border-white/15 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/25 transition-all duration-200 disabled:opacity-50"
+            className="w-full h-14 text-lg font-medium rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 text-white/60 hover:bg-white/[0.08] hover:text-white/85 hover:border-white/20 transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
             No — staying in 🛋️
@@ -1217,13 +1220,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       {/* Status Modal */}
       {isMobile ? (
         <Drawer open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood && !showPlanningPrivacy && !isPrivatePartyFlowOpen} onOpenChange={onOpenChange}>
-          <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-0 border-t-2 border-[#a855f7]/30 shadow-[0_-20px_60px_rgba(168,85,247,0.4)]">
+          <DrawerContent className="bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/98 to-[#0a0118] backdrop-blur-xl border-0 border-t border-white/10 shadow-[0_-20px_60px_rgba(168,85,247,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]">
             <StatusContent />
           </DrawerContent>
         </Drawer>
       ) : (
         <Dialog open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood && !showPlanningPrivacy && !isPrivatePartyFlowOpen} onOpenChange={onOpenChange}>
-          <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 shadow-[0_0_80px_rgba(168,85,247,0.5),0_0_40px_rgba(139,92,246,0.4)] max-w-md p-0 overflow-hidden rounded-3xl" aria-describedby={undefined}>
+          <DialogContent className="bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/98 to-[#0a0118] backdrop-blur-xl border border-white/10 shadow-[0_0_60px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] max-w-md p-0 overflow-hidden rounded-3xl" aria-describedby={undefined}>
             <VisuallyHidden><DialogTitle>Check In Status</DialogTitle></VisuallyHidden>
             <StatusContent />
           </DialogContent>
