@@ -188,7 +188,8 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
     // Debounce: skip if called within 30 seconds
     const currentTime = Date.now();
     if (currentTime - trackingState.lastTrackTime < TRACK_DEBOUNCE_MS) {
-      console.log('🔵 Auto-tracking debounced (within 30s cooldown)');
+      // Use debug to reduce log spam in production
+      console.debug('🔵 Auto-tracking debounced (within 30s cooldown)');
       return;
     }
     trackingState.lastTrackTime = currentTime;
@@ -196,7 +197,7 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
     // Check if user is marked as "Out"
     const isOut = await isUserOut(userId);
     if (!isOut) {
-      console.log('🔵 User not marked as Out, skipping auto-tracking');
+      console.debug('🔵 User not marked as Out, skipping auto-tracking');
       return;
     }
 

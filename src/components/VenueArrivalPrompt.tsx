@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogOverlay } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogOverlay, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MapPin, X, Navigation } from 'lucide-react';
@@ -11,6 +11,7 @@ import { haptic } from '@/lib/haptics';
 import { logVenueConfirmation, logVenueDismissal } from '@/lib/location-detection-logger';
 import { VenueCorrectionSheet } from '@/components/VenueCorrectionSheet';
 import { AddVenueSheet } from '@/components/AddVenueSheet';
+import { VisuallyHidden } from '@/components/ui/visually-hidden';
 
 export function VenueArrivalPrompt() {
   const { user } = useAuth();
@@ -144,7 +145,10 @@ export function VenueArrivalPrompt() {
   return (
     <Dialog open={showVenueArrivalPrompt} onOpenChange={(open) => !open && handleDismiss()}>
       <DialogOverlay className="bg-black/80 backdrop-blur-sm z-[500]" />
-      <DialogContent className="max-w-[380px] bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 rounded-3xl p-0 overflow-hidden z-[500]">
+      <DialogContent className="max-w-[380px] bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 rounded-3xl p-0 overflow-hidden z-[500]" aria-describedby={undefined}>
+        <VisuallyHidden>
+          <DialogTitle>Venue Arrival</DialogTitle>
+        </VisuallyHidden>
         {/* Close button */}
         <button
           onClick={handleDismiss}

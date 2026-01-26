@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { VisuallyHidden } from '@/components/ui/visually-hidden';
 
 interface DailyNudgeModalProps {
   open: boolean;
@@ -108,7 +109,10 @@ export function DailyNudgeModal({ open, onClose, nudgeType }: DailyNudgeModalPro
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-[#a855f7]/30 max-w-[380px] p-6">
+      <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-[#a855f7]/30 max-w-[380px] p-6" aria-describedby={undefined}>
+        <VisuallyHidden>
+          <DialogTitle>Daily Check-in</DialogTitle>
+        </VisuallyHidden>
         <div className="flex flex-col items-center text-center space-y-6">
           {/* Header */}
           <div className="space-y-2">
