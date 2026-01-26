@@ -193,7 +193,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
   };
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
       <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] border-transparent max-h-[85vh]">
         <DrawerHeader className="pb-2">
           <DrawerTitle className="text-foreground text-center">Find Friends</DrawerTitle>
