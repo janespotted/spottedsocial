@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
 import { MapPin, Edit3, Clock, Bell, X, AlarmClock, ChevronDown, Home } from 'lucide-react';
@@ -19,6 +19,7 @@ import { useUserCity } from '@/hooks/useUserCity';
 import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
 import { useKeyboardAware } from '@/hooks/useKeyboardAware';
 import { PrivatePartyInviteModal } from '@/components/PrivatePartyInviteModal';
+import { VisuallyHidden } from '@/components/ui/visually-hidden';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -1222,7 +1223,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </Drawer>
       ) : (
         <Dialog open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood && !showPlanningPrivacy && !isPrivatePartyFlowOpen} onOpenChange={onOpenChange}>
-          <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 shadow-[0_0_80px_rgba(168,85,247,0.5),0_0_40px_rgba(139,92,246,0.4)] max-w-md p-0 overflow-hidden rounded-3xl">
+          <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 shadow-[0_0_80px_rgba(168,85,247,0.5),0_0_40px_rgba(139,92,246,0.4)] max-w-md p-0 overflow-hidden rounded-3xl" aria-describedby={undefined}>
+            <VisuallyHidden><DialogTitle>Check In Status</DialogTitle></VisuallyHidden>
             <StatusContent />
           </DialogContent>
         </Dialog>
@@ -1237,7 +1239,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </Drawer>
       ) : (
         <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
-          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden">
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden" aria-describedby={undefined}>
+            <VisuallyHidden><DialogTitle>Share Location</DialogTitle></VisuallyHidden>
             <ShareLocationContent />
           </DialogContent>
         </Dialog>
@@ -1252,7 +1255,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </Drawer>
       ) : (
         <Dialog open={showPlanningPrivacy} onOpenChange={setShowPlanningPrivacy}>
-          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden">
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden" aria-describedby={undefined}>
+            <VisuallyHidden><DialogTitle>Planning Privacy</DialogTitle></VisuallyHidden>
             <PlanningPrivacyContent />
           </DialogContent>
         </Dialog>
@@ -1267,7 +1271,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </Drawer>
       ) : (
         <Dialog open={showPlanningNeighborhood} onOpenChange={setShowPlanningNeighborhood}>
-          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden">
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden" aria-describedby={undefined}>
+            <VisuallyHidden><DialogTitle>Planning Neighborhood</DialogTitle></VisuallyHidden>
             <PlanningNeighborhoodContent />
           </DialogContent>
         </Dialog>
@@ -1282,7 +1287,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </Drawer>
       ) : (
         <Dialog open={showVenueConfirm} onOpenChange={setShowVenueConfirm}>
-          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden">
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(147,51,234,0.6)] max-w-sm p-0 overflow-hidden" aria-describedby={undefined}>
+            <VisuallyHidden><DialogTitle>Confirm Venue</DialogTitle></VisuallyHidden>
             <VenueConfirmContent />
           </DialogContent>
         </Dialog>
@@ -1297,7 +1303,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </Drawer>
       ) : (
         <Dialog open={showPrivatePartyPrivacy} onOpenChange={setShowPrivatePartyPrivacy}>
-          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(99,102,241,0.6)] max-w-sm p-0 overflow-hidden">
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(99,102,241,0.6)] max-w-sm p-0 overflow-hidden" aria-describedby={undefined}>
+            <VisuallyHidden><DialogTitle>Private Party Privacy</DialogTitle></VisuallyHidden>
             <PrivatePartyPrivacyContent />
           </DialogContent>
         </Dialog>
@@ -1312,7 +1319,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </Drawer>
       ) : (
         <Dialog open={showPrivatePartyNeighborhood} onOpenChange={setShowPrivatePartyNeighborhood}>
-          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(99,102,241,0.6)] max-w-sm p-0 overflow-hidden">
+          <DialogContent className="bg-[#2d1b4e] border-0 shadow-[0_0_40px_rgba(99,102,241,0.6)] max-w-sm p-0 overflow-hidden" aria-describedby={undefined}>
+            <VisuallyHidden><DialogTitle>Private Party Neighborhood</DialogTitle></VisuallyHidden>
             <PrivatePartyNeighborhoodContent />
           </DialogContent>
         </Dialog>

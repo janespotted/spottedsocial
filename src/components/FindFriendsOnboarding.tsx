@@ -4,11 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogOverlay } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogOverlay, DialogTitle } from '@/components/ui/dialog';
 import { Link2, Copy, Share2, Search, UserPlus, QrCode, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
 import { QRCodeModal } from '@/components/QRCodeModal';
+import { VisuallyHidden } from '@/components/ui/visually-hidden';
 
 interface FindFriendsOnboardingProps {
   onComplete: () => void;
@@ -445,7 +446,10 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
       {/* Skip Confirmation Modal */}
       <Dialog open={showSkipConfirmation} onOpenChange={setShowSkipConfirmation}>
         <DialogOverlay className="bg-black/80 backdrop-blur-sm z-[200]" />
-        <DialogContent className="max-w-[340px] bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 rounded-3xl p-6 z-[200]">
+        <DialogContent className="max-w-[340px] bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 rounded-3xl p-6 z-[200]" aria-describedby={undefined}>
+          <VisuallyHidden>
+            <DialogTitle>Skip Confirmation</DialogTitle>
+          </VisuallyHidden>
           <div className="text-center">
             <div className="mx-auto w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center mb-4">
               <AlertTriangle className="h-7 w-7 text-amber-400" />
