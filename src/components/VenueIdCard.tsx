@@ -37,6 +37,7 @@ interface VenueData {
   type: string;
   lat: number;
   lng: number;
+  is_map_promoted?: boolean;
 }
 
 interface FriendAtVenue {
@@ -671,6 +672,14 @@ export function VenueIdCard() {
               {/* Venue Info */}
               <div className="mb-4">
                 <div className="flex items-start justify-between mb-1">
+                   {/* Featured Tonight pill for promoted venues */}
+                   {venue.is_map_promoted && (
+                     <span className="inline-flex items-center gap-1 px-2 py-0.5 mb-2 rounded-full text-[10px] font-medium bg-[#d4ff00]/10 text-[#d4ff00] border border-[#d4ff00]/20">
+                       Featured Tonight
+                     </span>
+                   )}
+                 </div>
+                 <div className="flex items-start justify-between mb-1">
                   <h2 className="text-2xl font-bold text-white flex-1">
                     {venue.name}
                   </h2>

@@ -834,22 +834,21 @@ export default function Map() {
 
         const el = document.createElement('div');
         el.className = 'venue-marker';
-        el.style.width = `${containerSize}px`;
-        el.style.height = `${containerSize}px`;
+         el.style.width = `${isMapPromoted ? 70 : containerSize}px`;
+         el.style.height = `${isMapPromoted ? 70 : containerSize}px`;
         el.style.cursor = 'pointer';
-        el.style.position = 'relative';
         el.style.zIndex = isMapPromoted ? '30' : '12';
         el.dataset.promoted = String(isMapPromoted);
         
         el.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-            ${isMapPromoted || isTopHot ? `<div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, ${isMapPromoted ? 'rgba(212, 255, 0, 0.4)' : 'rgba(168, 85, 247, 0.3)'} 0%, transparent 70%); animation: pulse ${isMapPromoted ? '1.5s' : '2s'} infinite;"></div>` : ''}
-            <div style="width: ${pinSize}px; height: ${pinSize}px; background: ${isMapPromoted ? 'linear-gradient(135deg, #a855f7, #d4ff00)' : '#a855f7'}; border-radius: 50%; opacity: ${isMapPromoted ? 1 : opacity}; box-shadow: 0 0 ${isMapPromoted ? '12px' : (isTopHot ? '6px' : '3px')} ${isMapPromoted ? 'rgba(212, 255, 0, 0.6)' : `rgba(168, 85, 247, ${isTopHot ? '0.5' : '0.3'})`}; display: flex; align-items: center; justify-content: center; border: ${isMapPromoted ? '2px' : '1.5px'} solid ${isMapPromoted ? '#d4ff00' : 'rgba(255, 255, 255, 0.8)'};">
+             ${isMapPromoted ? `<div class="promoted-halo" style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(212, 255, 0, 0.12) 0%, transparent 65%);"></div>` : ''}
+             ${isTopHot && !isMapPromoted ? `<div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, transparent 70%);"></div>` : ''}
+             <div style="width: ${pinSize}px; height: ${pinSize}px; background: #a855f7; border-radius: 50%; opacity: ${opacity}; box-shadow: 0 0 ${isMapPromoted ? '8px' : (isTopHot ? '6px' : '3px')} ${isMapPromoted ? 'rgba(212, 255, 0, 0.15)' : `rgba(168, 85, 247, ${isTopHot ? '0.5' : '0.3'})`}; display: flex; align-items: center; justify-content: center; border: 1.5px solid rgba(255, 255, 255, 0.8);">
               <svg width="${pinSize * 0.5}" height="${pinSize * 0.5}" viewBox="0 0 24 24" fill="white">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
               </svg>
             </div>
-            ${isMapPromoted ? `<div style="position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; background: #d4ff00; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 1.5px solid #1a0f2e;">⭐</div>` : ''}
           </div>
         `;
 
