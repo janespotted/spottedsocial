@@ -270,6 +270,24 @@ All colors MUST be HSL.
     );
     pointer-events: none;
   }
+ 
+   /* Floating orb animation for ambient backgrounds */
+   @keyframes float-slow {
+     0%, 100% {
+       transform: translate(0, 0) scale(1);
+     }
+     50% {
+       transform: translate(10px, -15px) scale(1.05);
+     }
+   }
+ 
+   .animate-float-slow {
+     animation: float-slow 8s ease-in-out infinite;
+   }
+ 
+   .animate-float-slow-reverse {
+     animation: float-slow 10s ease-in-out infinite reverse;
+   }
 }
 
 /* iOS Safe Area Insets for notched devices */
