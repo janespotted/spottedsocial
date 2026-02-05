@@ -431,7 +431,7 @@ export default function Home() {
                       </AvatarFallback>
                     </Avatar>
                   </button>
-                  <div className="text-left">
+                  <div className="text-left min-w-0 flex-1">
                     <button
                       onClick={() => openFriendCard({
                         userId: post.user_id,
