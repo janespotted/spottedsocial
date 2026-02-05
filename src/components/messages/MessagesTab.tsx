@@ -301,7 +301,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
                 Start a Chat
               </button>
               <p className="text-white/30 text-xs">
-                💡 When you're both at the same spot, start a conversation!
+                💡 Message close friends, friends, and mutuals anytime
               </p>
             </div>
           ) : (
