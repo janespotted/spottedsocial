@@ -1,164 +1,204 @@
 
 
-## Comprehensive LA Venue Leaderboard Rework
+## Comprehensive NYC Venue Leaderboard Rework
 
 ### Overview
-Rework the LA venue data to reflect current 2025-2026 nightlife trends, remove non-nightlife venues, fix duplicates, and create accurate neighborhood-level rankings based on research from TimeOut LA, The Infatuation, Eater LA, LALA Guide, and Reddit.
+Rework the NYC venue data to reflect current 2025-2026 nightlife trends, identify any non-nightlife venues, fix duplicates, and create accurate neighborhood-level rankings based on research from TimeOut NY, The Infatuation, Eater NY, DJ Mag Top 100, and World's 50 Best Bars.
 
 ---
 
-### Phase 1: Remove Non-Nightlife Venues
-
-These venues are NOT bars/clubs and should be removed from the leaderboard:
-
-| Venue | Reason |
-|-------|--------|
-| The Galley | Food hall, not a nightlife venue |
-| Blue Bottle Abbot Kinney | Coffee shop |
-| Intelligentsia Abbot Kinney | Coffee shop |
-| Civil Coffee HP | Coffee shop |
-| Dogtown Coffee SM | Coffee shop |
-| Dudley Market | Market/cafe, not bar |
-| Kitchen Mouse HP | Restaurant, not bar |
-| Cafe de Leche HP | Coffee shop |
-| Rose Cafe Abbot Kinney | Restaurant/cafe |
-| Eastside Market EP | Market, not bar |
+### Research Sources Used
+- **World's 50 Best Bars 2025**: Double Chicken Please (#14 world, #1 North America 2023), Attaboy, Dante
+- **DJ Mag Top 100 Clubs 2025**: Avant Gardner/Brooklyn Mirage (#17)
+- **TimeOut NY Best Bars 2025-2026**: Death & Co, Employees Only, Little Branch, PDT
+- **The Infatuation NYC**: Neighborhood guides for LES, Williamsburg, West Village, East Village, Bushwick
+- **Eater NY**: Best cocktail bars maps
 
 ---
 
-### Phase 2: Remove Duplicates
+### Phase 1: Venues to Remove (Non-Nightlife/Duplicates)
 
-Keep the canonical name, remove duplicates:
+**Non-Nightlife Venues** (restaurants, coffee shops, etc.):
 
-| Keep | Remove |
-|------|--------|
-| Bungalow Santa Monica | The Bungalow |
-| Short Stop Echo Park | The Short Stop |
-| No Vacancy Hollywood | No Vacancy |
-| Break Room 86 Ktown | Break Room 86 |
-| Akbar Silver Lake | Akbar |
-| The Black Cat | Black Cat Silver Lake |
-| 1642 EP | 1642 |
-| Basement Tavern SM | The Basement Tavern |
-| The Edison DTLA | The Edison |
-| Dirty Laundry Hollywood | Dirty Laundry |
-| Tenants of the Trees | Tenants of Trees |
-| Skybar Mondrian | Skybar |
-| EP and LP WeHo | EP & LP |
-| Clifton's Cafeteria | Clifton's Republic |
-| Mohawk Bend Echo Park | Mohawk Bend Silver Lake |
-| Townhouse Del Monte | The Townhouse & Del Monte Speakeasy |
+| Venue | Neighborhood | Reason |
+|-------|--------------|--------|
+| CBGB Memorial | East Village | Memorial/museum, not a bar |
+| Cookshop Chelsea | Chelsea | Restaurant, not bar |
+| Txikito Chelsea | Chelsea | Spanish restaurant, not bar |
+| Pig Beach CG | Carroll Gardens | BBQ restaurant, not bar |
+| Molasses Books | Bushwick | Bookstore/cafe, not bar |
+
+**Potential Duplicates to Check:**
+| Venue | Notes |
+|-------|-------|
+| PHD Rooftop vs PHD Dream Midtown vs PHD Terrace Chelsea | Same brand, different locations - keep all as distinct |
 
 ---
 
-### Phase 3: Update Rankings Based on Research
+### Phase 2: Update Rankings by Neighborhood
 
-**Methodology:**
-- Cross-referenced TimeOut LA, The Infatuation, Eater LA, LALA Guide, Rare Nightlife, DJ Mag Top 100
-- Prioritized venues with current buzz (2025-2026)
-- Applied neighborhood-specific rankings (top venue in each neighborhood = rank 1-3)
+**Lower East Side (World-Class Cocktail Destination)**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Double Chicken Please | #14 World's 50 Best Bars, #1 North America 2023 |
+| 2 | Attaboy | World's 50 Best Bars regular |
+| 3 | Pianos LES | Iconic live music venue |
+| 4 | Mercury Lounge LES | Historic rock venue |
+| 5 | Kiki's LES | Greek taverna vibes |
+| 6 | The Back Room LES | Speakeasy classic |
+| 7 | Forgtmenot LES | Divey favorite |
+| 8 | Welcome to the Johnsons | 70s rec room vibes |
+| 9 | The Ten Bells | Natural wine bar |
+| 10 | Superbueno | New hot spot 2025 |
+
+**East Village**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Death and Co EV | Legendary cocktail bar |
+| 2 | Please Don't Tell (PDT) | Original speakeasy |
+| 3 | Attaboy | Should add if missing (originally from Milk & Honey) |
+| 4 | Holiday Cocktail EV | Infatuation favorite |
+| 5 | Mace EV | World's 50 Best Bars |
+| 6 | McSorley's Old Ale | Historic dive (1854) |
+| 7 | The Wayland EV | Great cocktails + vibes |
+| 8 | Nublu EV | Live music + dancing |
+| 9 | Angel's Share | #9 World's Best Bars |
+| 10 | Amor y Amargo | Bitters-focused gem |
+
+**West Village**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Employees Only WV | World's 50 Best Bars |
+| 2 | Little Branch WV | Milk & Honey sister bar |
+| 3 | Dante WV | World's Best Bar 2019, still top-tier |
+| 4 | Katana Kitten | Japanese-inspired cocktails |
+| 5 | The Spaniard | Wine bar favorite |
+| 6 | Cubbyhole | Iconic lesbian bar |
+| 7 | Marie's Crisis | Piano bar institution |
+| 8 | Julius' | Historic LGBTQ+ bar |
+| 9 | Stonewall Inn | Historic landmark |
+| 10 | The Duplex | Cabaret + piano bar |
+
+**Williamsburg**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Brooklyn Mirage | DJ Mag #17, 8000+ capacity |
+| 2 | Baby's All Right | Best live music + late night |
+| 3 | Black Flamingo WB | Dancing + cocktails |
+| 4 | Brooklyn Bowl WB | Bowling + concerts |
+| 5 | Maison Premiere | World-class oyster bar + cocktails |
+| 6 | Commodore | Classic WB vibes |
+| 7 | Skinny Dennis | Honky-tonk dive |
+| 8 | Donna WB | Tropical cocktails |
+| 9 | Spritzenhaus | Beer hall + garden |
+| 10 | Westlight | Rooftop views |
+
+**Bushwick (Dance Music Capital)**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | House of Yes | Performance + nightlife institution |
+| 2 | Jupiter Disco | Best cocktails + dancing |
+| 3 | Mood Ring BW | Corner.inc #2 Bushwick |
+| 4 | Elsewhere | Multi-room venue |
+| 5 | Bossa Nova Civic | Techno focused |
+| 6 | The Keep BW | Intimate cocktails |
+| 7 | Heavy Woods BW | Tropical dive |
+| 8 | Happyfun Hideaway | LGBTQ+ favorite |
+| 9 | The Johnson's BW | Dive bar |
+| 10 | Pine Box Rock Shop | Craft beer + live music |
+
+**Meatpacking**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Le Bain | Standard Hotel rooftop legend |
+| 2 | Catch NYC | Scene-y restaurant bar |
+| 3 | STK Meatpacking | Steakhouse + nightlife |
+| 4 | Top of the Standard | Views + cocktails |
+| 5 | Tao Downtown | Mega-club vibes |
+
+**Chelsea**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | McKittrick Hotel | Sleep No More + rooftop bars |
+| 2 | Marquee NYC | DJ Mag Top 100 (#54) |
+| 3 | Bathtub Gin Chelsea | Speakeasy classic |
+| 4 | The Tippler Chelsea | Underground vibes |
+| 5 | The Eagle Chelsea | Iconic gay bar |
+| 6 | Barracuda Chelsea | LGBTQ+ staple |
+
+**SoHo/Nolita**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | The Ear Inn SoHo | Since 1817, legendary dive |
+| 2 | Fanelli Cafe SoHo | Since 1847, historic |
+| 3 | Spring Lounge SoHo | "Shark Bar" - opens 8am |
+| 4 | The Mulberry Bar | Nolita favorite |
+| 5 | Sweet & Vicious | Garden vibes |
+
+**Greenpoint**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Habitat GP | Cocktail destination |
+| 2 | Ramona GP | Local favorite |
+| 3 | Diamond GP | Oysters + cocktails |
+| 4 | Troost GP | Cozy wine bar |
+| 5 | The Diamond | Classic dive |
+
+**Midtown**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Campbell NYC | Grand Central iconic |
+| 2 | Rainbow Room NYC | Historic views |
+| 3 | PHD Dream Midtown | Rooftop scene |
+| 4 | Dear Irving | Cocktail excellence |
+| 5 | Fine & Rare | Whiskey destination |
+
+**Flatiron**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Flatiron Room NYC | Whiskey haven |
+| 2 | Raines Law Room NYC | Speakeasy classic |
+| 3 | LAVO NYC | Restaurant + club |
+
+**Financial District**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Dead Rabbit FiDi | World's Best Bar 2015-2016 |
+| 2 | Stone Street Tavern | Outdoor drinking scene |
+| 3 | Pier A Harbor House | Waterfront views |
+
+**Gowanus**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Public Records | Audiophile club + cafe |
+| 2 | Royal Palms | Shuffleboard + cocktails |
+| 3 | Lavender Lake | Waterfront bar |
+
+**Carroll Gardens**
+| Rank | Venue | Notes |
+|------|-------|-------|
+| 1 | Clover Club CG | World-class cocktails |
+| 2 | Brooklyn Social CG | Classic neighborhood bar |
+| 3 | Leyenda CG | Latin-inspired cocktails |
+| 4 | Long Island Bar CG | Retro cocktail bar |
 
 ---
 
-### Updated Rankings by Neighborhood
+### Phase 3: New Venues to Add (Missing from Database)
 
-**West Hollywood (Clubs/Nightlife Capital)**
-| Rank | Venue | Type | Notes |
-|------|-------|------|-------|
-| 1 | Sunset at EDITION | nightclub | Hottest club in LA right now |
-| 2 | Zouk LA | nightclub | New 2025, massive buzz |
-| 3 | Bar Lis | nightclub | Consistently packed |
-| 4 | Keys | nightclub | A-list crowd |
-| 5 | Poppy | nightclub | Industry favorite |
-| 6 | Galerie on Sunset | lounge | New supper club, hot 2025 |
-| 7 | The Abbey WeHo | nightclub | Iconic LGBTQ+ venue |
-| 8 | Raspoutine | nightclub | High-end vibe |
-| 9 | Andy's | lounge | Anderson .Paak's new spot |
-| 10 | Chateau Marmont Bar | cocktail_bar | Classic Hollywood |
+Based on research, these highly-ranked venues should be added:
 
-**Hollywood**
-| Rank | Venue | Notes |
-|------|-------|-------|
-| 1 | Bar Lis | Top club in Hollywood |
-| 2 | The Spotlight | New hot spot |
-| 3 | No Vacancy Hollywood | Iconic speakeasy |
-| 4 | Academy LA | DJ Mag Top 100 (#29) |
-| 5 | Sound Nightclub | Dance music staple |
-| 6 | Dirty Laundry Hollywood | Hidden gem |
-| 7 | Good Times at Davey Wayne's | Fun retro vibe |
-| 8 | La Descarga Hollywood | Best rum bar |
-| 9 | Harvard and Stone Hollywood | Late night favorite |
-| 10 | Highlight Room Hollywood | Rooftop views |
-
-**Koreatown (Best nightlife neighborhood per The Infatuation)**
-| Rank | Venue | Notes |
-|------|-------|-------|
-| 1 | Kiss Kiss Bang Bang | Houston Brothers disco, hottest new spot |
-| 2 | Dan Sung Sa Ktown | Legendary late-night |
-| 3 | HMS Bounty Ktown | Iconic dive bar |
-| 4 | Lock and Key Ktown | Great cocktails |
-| 5 | The Prince Ktown | Classic booth vibes |
-| 6 | Break Room 86 Ktown | 80s karaoke bar |
-| 7 | LINE Hotel Rooftop | Views + scene |
-| 8 | Normandie Club Ktown | Upscale cocktails |
-| 9 | R Bar Ktown | Industry favorite |
-| 10 | Frank n Hank Ktown | Divey, fun |
-
-**Venice**
-| Rank | Venue | Notes |
-|------|-------|-------|
-| 1 | The Brig Venice | Best overall |
-| 2 | Townhouse Del Monte | Speakeasy downstairs |
-| 3 | Venice Whaler | Beach vibes |
-| 4 | High Venice Rooftop | Great views |
-| 5 | Hinano Cafe Venice | Classic dive |
-| 6 | The Otheroom Venice | Wine/cocktails |
-| 7 | Larry's Venice Beach | Casual beach bar |
-| 8 | James Beach Venice | Good scene |
-| 9 | Gjelina Venice | Late night |
-| 10 | The Roosterfish | LGBTQ+ classic |
-
-**Silver Lake / Echo Park**
-| Rank | Venue | Notes |
-|------|-------|-------|
-| 1 | Thunderbolt | Top 50 North America bars |
-| 2 | The Virgil SL | Dancing + DJs |
-| 3 | Little Joy Echo Park | Legendary dive |
-| 4 | Thirsty Crow SL | Whiskey bar favorite |
-| 5 | Short Stop Echo Park | Dance party vibes |
-| 6 | Akbar Silver Lake | LGBTQ+ institution |
-| 7 | Cha Cha Lounge SL | Divey tropical |
-| 8 | The Echoplex | Live music venue |
-| 9 | 4100 Bar SL | Late night staple |
-| 10 | Button Mash EP | Arcade + bar |
-
-**Highland Park**
-| Rank | Venue | Notes |
-|------|-------|-------|
-| 1 | Highland Park Bowl | Bowling + cocktails |
-| 2 | ETA Highland Park | Best cocktail bar |
-| 3 | Block Party Highland Park | Great patio |
-| 4 | Hi Hat HP | Live music |
-| 5 | The York | Neighborhood favorite |
-| 6 | Good Luck HP | Tiki vibes |
-| 7 | Blind Barber Highland Park | Speakeasy |
-| 8 | Hermosillo HP | Mexican cantina |
-| 9 | Checker Hall HP | Beer hall |
-| 10 | Triple Beam HP | Brewery |
-
-**Downtown LA**
-| Rank | Venue | Notes |
-|------|-------|-------|
-| 1 | Academy LA | DJ Mag Top 100 |
-| 2 | Sinners y Santos | Hot new complex |
-| 3 | Level 8 | Vegas-style venue at Moxy |
-| 4 | The Edison DTLA | Speakeasy classic |
-| 5 | Exchange LA | Massive club |
-| 6 | Seven Grand | Whiskey bar |
-| 7 | Everson Royce Arts District | Arts District favorite |
-| 8 | Perch DTLA | Best rooftop |
-| 9 | 71Above DTLA | Views + cocktails |
-| 10 | Pattern Bar DTLA | Craft cocktails |
+| Venue | Neighborhood | Type | Rank |
+|-------|--------------|------|------|
+| Double Chicken Please | Lower East Side | cocktail_bar | 1 |
+| Attaboy | East Village | cocktail_bar | 3 |
+| Dante | West Village | cocktail_bar | 3 |
+| Angel's Share | East Village | cocktail_bar | 9 |
+| Superbueno | Lower East Side | cocktail_bar | 10 |
+| Maison Premiere | Williamsburg | cocktail_bar | 5 |
+| Commodore | Williamsburg | bar | 6 |
+| Skinny Dennis | Williamsburg | bar | 7 |
+| Katana Kitten | West Village | cocktail_bar | 4 |
 
 ---
 
@@ -167,82 +207,73 @@ Keep the canonical name, remove duplicates:
 **SQL Operations:**
 
 ```sql
--- 1. Delete non-nightlife venues
-DELETE FROM venues WHERE city = 'la' AND name IN (
-  'The Galley',
-  'Blue Bottle Abbot Kinney',
-  'Intelligentsia Abbot Kinney', 
-  'Civil Coffee HP',
-  'Dogtown Coffee SM',
-  'Dudley Market',
-  'Kitchen Mouse HP',
-  'Cafe de Leche HP',
-  'Rose Cafe Abbot Kinney',
-  'Eastside Market EP'
+-- 1. Remove non-nightlife venues
+DELETE FROM venues WHERE city = 'nyc' AND name IN (
+  'CBGB Memorial',
+  'Cookshop Chelsea',
+  'Txikito Chelsea',
+  'Pig Beach CG',
+  'Molasses Books'
 );
 
--- 2. Delete duplicate venues (keep canonical names)
-DELETE FROM venues WHERE city = 'la' AND name IN (
-  'The Bungalow',
-  'The Short Stop',
-  'No Vacancy',
-  'Break Room 86',
-  'Akbar',
-  'Black Cat Silver Lake',
-  '1642',
-  'The Basement Tavern',
-  'The Edison',
-  'Dirty Laundry',
-  'Tenants of Trees',
-  'Skybar',
-  'EP & LP',
-  'Clifton''s Republic',
-  'Mohawk Bend Silver Lake',
-  'The Townhouse & Del Monte Speakeasy'
-);
+-- 2. Update key venue rankings
 
--- 3. Update rankings for newly added venues
+-- Lower East Side (if Double Chicken Please exists)
 UPDATE venues SET popularity_rank = 1 
-WHERE name = 'Kiss Kiss Bang Bang' AND city = 'la';
+WHERE name = 'Double Chicken Please' AND city = 'nyc';
 
-UPDATE venues SET popularity_rank = 2 
-WHERE name = 'Zouk LA' AND city = 'la';
-
-UPDATE venues SET popularity_rank = 6 
-WHERE name = 'Galerie on Sunset' AND city = 'la';
-
-UPDATE venues SET popularity_rank = 9 
-WHERE name = 'Andy''s' AND city = 'la';
-
+-- Keep Pianos as a strong venue but not #1
 UPDATE venues SET popularity_rank = 3 
-WHERE name = 'Level 8' AND city = 'la';
+WHERE name = 'Pianos LES' AND city = 'nyc';
 
--- 4. Update key venue rankings based on research
--- Highland Park
+-- East Village (Death & Co is legendary)
 UPDATE venues SET popularity_rank = 1 
-WHERE name = 'Highland Park Bowl' AND city = 'la';
+WHERE name = 'Death and Co EV' AND city = 'nyc';
+
+-- West Village (Employees Only is world-famous)
+UPDATE venues SET popularity_rank = 1 
+WHERE name = 'Employees Only WV' AND city = 'nyc';
 
 UPDATE venues SET popularity_rank = 2 
-WHERE name = 'ETA Highland Park' AND city = 'la';
+WHERE name = 'Little Branch WV' AND city = 'nyc';
 
--- Silver Lake (Thunderbolt is top bar)
+-- Williamsburg (Brooklyn Mirage is DJ Mag #17)
 UPDATE venues SET popularity_rank = 1 
-WHERE name = 'Thunderbolt' AND city = 'la';
+WHERE name = 'Brooklyn Mirage' AND city = 'nyc';
 
--- Venice (fix Roosterfish to top 10)
-UPDATE venues SET popularity_rank = 10 
-WHERE name = 'The Roosterfish' AND city = 'la';
-
--- Koreatown (Dan Sung Sa and HMS Bounty are legends)
 UPDATE venues SET popularity_rank = 2 
-WHERE name = 'Dan Sung Sa Ktown' AND city = 'la';
+WHERE name = 'Baby''s All Right' AND city = 'nyc';
 
-UPDATE venues SET popularity_rank = 3 
-WHERE name = 'HMS Bounty Ktown' AND city = 'la';
+-- Bushwick (House of Yes is iconic)
+UPDATE venues SET popularity_rank = 1 
+WHERE name = 'House of Yes' AND city = 'nyc';
 
--- DTLA (Seven Grand is a classic)
-UPDATE venues SET popularity_rank = 6 
-WHERE name = 'Seven Grand' AND city = 'la';
+UPDATE venues SET popularity_rank = 2 
+WHERE name = 'Jupiter Disco' AND city = 'nyc';
+
+-- Financial District (Dead Rabbit is legendary)
+UPDATE venues SET popularity_rank = 1 
+WHERE name = 'Dead Rabbit FiDi' AND city = 'nyc';
+
+-- Carroll Gardens (Clover Club is world-class)
+UPDATE venues SET popularity_rank = 1 
+WHERE name = 'Clover Club CG' AND city = 'nyc';
+
+-- SoHo (Ear Inn is historic)
+UPDATE venues SET popularity_rank = 1 
+WHERE name = 'The Ear Inn SoHo' AND city = 'nyc';
+
+-- Meatpacking (Le Bain is iconic)
+UPDATE venues SET popularity_rank = 1 
+WHERE name = 'Le Bain' AND city = 'nyc';
+
+-- Chelsea (McKittrick is unique)
+UPDATE venues SET popularity_rank = 1 
+WHERE name = 'McKittrick Hotel' AND city = 'nyc';
+
+-- Gowanus (Public Records is the audiophile destination)
+UPDATE venues SET popularity_rank = 1 
+WHERE name = 'Public Records' AND city = 'nyc';
 ```
 
 ---
@@ -251,19 +282,18 @@ WHERE name = 'Seven Grand' AND city = 'la';
 
 | Action | Count |
 |--------|-------|
-| Venues to remove (non-nightlife) | 10 |
-| Duplicates to remove | 16 |
-| Rankings to update | 12+ |
-| **Net venue count after cleanup** | ~289 |
+| Venues to remove (non-nightlife) | 5 |
+| Rankings to update | 15+ |
+| New venues to potentially add | 9 |
 
 ---
 
 ### Expected Result
 
 After this cleanup:
-- **Leaderboard shows only real nightlife venues** (no coffee shops, food halls, restaurants)
-- **No duplicate entries** cluttering the list
-- **Rankings reflect 2025-2026 buzz** from credible sources
-- **Neighborhood filters show accurate top spots** (Roosterfish is top in Venice, Thunderbolt is top in Silver Lake, etc.)
-- **New venues** (Kiss Kiss Bang Bang, Zouk LA, etc.) appear with proper rankings
+- **World-class cocktail bars** (Double Chicken Please, Death & Co, Employees Only, Dead Rabbit) properly ranked #1 in their neighborhoods
+- **DJ Mag venues** (Brooklyn Mirage #17, Marquee #54) properly prioritized
+- **Neighborhood filters accurate**: House of Yes is #1 Bushwick, Le Bain is #1 Meatpacking
+- **Historic venues** (Ear Inn since 1817, Fanelli since 1847, McSorley's since 1854) properly represented
+- **No non-nightlife venues** cluttering the leaderboard
 
