@@ -1,128 +1,61 @@
 
 
-## Enhance Find Friends Page Aesthetics
+## Simplify Find Friends Page
 
 ### Overview
-Improve the visual design of the Find Friends page to match the premium, polished aesthetic of other pages in the app while maintaining functionality.
+Streamline the invite flow to be a simple "copy link & share" experience, add iMessage redirect option, and add a "People You May Know" section showing friends of friends.
 
 ---
 
-### Current Issues Identified
+### Current Issues
 
-| Issue | Description |
-|-------|-------------|
-| Cards look flat | Minimal visual depth, lack of glow effects |
-| Icon circles inconsistent | Mix of solid and transparent backgrounds |
-| URL display unappealing | Long URL in mono font looks cluttered |
-| No visual hierarchy | All sections look the same weight |
-| Missing premium touches | No gradients, glows, or subtle animations |
-| Spacing feels cramped | Cards could breathe more |
-
----
-
-### Proposed Design Improvements
-
-#### 1. Enhanced Card Styling
-Add glassmorphism effects and subtle glows matching Home/Profile pages:
-
-```text
-Before: bg-[#2d1b4e]/60 border border-white/20
-After:  bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 
-        shadow-[0_0_30px_rgba(168,85,247,0.15)]
-```
-
-#### 2. Hero Section at Top
-Add a welcoming visual header with the user's avatar and friend count:
-
-```text
-+------------------------------------------+
-|                                          |
-|  ┌──────┐   Grow Your Circle             |
-|  │ 👤   │   You have 12 friends          |
-|  └──────┘   Invite more to see where     |
-|             they're going tonight        |
-|                                          |
-+------------------------------------------+
-```
-
-#### 3. Improved Link Display
-Instead of showing the full ugly URL, show a shortened, cleaner version:
-
-```text
-Before: https://92205838-7a85-43c9-9804-...
-After:  spotted.app/invite/XPPB5CNM  (or just the code)
-```
-
-With a prominent "Tap to copy" indicator.
-
-#### 4. Icon Circle Consistency
-All icon circles use the same gradient glow style:
-
-```text
-w-14 h-14 rounded-full 
-bg-gradient-to-br from-[#a855f7] to-[#7c3aed]
-shadow-[0_0_20px_rgba(168,85,247,0.5)]
-flex items-center justify-center
-```
-
-#### 5. Section Badges/Labels
-Add small labels to make sections more scannable:
-
-```text
-┌────────────────────────────────────┐
-│ 🔗 INVITE                          │
-│                                    │
-│    Share Your Link                 │
-│    ...                             │
-└────────────────────────────────────┘
-```
-
-#### 6. Animated Elements
-Add subtle animations for polish:
-- Gentle pulse on the share button
-- Hover lift effect on cards
-- Icon rotation on refresh button when idle
+| Problem | Solution |
+|---------|----------|
+| Invite code display is confusing | Remove code display, just show simple "Share Link" button |
+| Too many steps/elements | Condense to one clear CTA |
+| No iMessage integration | Add "Text a Friend" button that opens `sms:?body=...` |
+| No friend suggestions | Add "People You May Know" section |
+| Refresh button is confusing | Remove it - users don't need to regenerate codes |
 
 ---
 
-### Visual Mockup
+### Simplified Layout
 
 ```text
 +------------------------------------------+
 | ←  Find Friends                  [Check] |
 +------------------------------------------+
 |                                          |
-|      ┌─────────────────────────┐         |
-|      │    ✨ Grow Your Squad   │         |
-|      │    12 friends on Spotted│         |
-|      └─────────────────────────┘         |
-|                                          |
 |  ┌─────────────────────────────────────┐ |
-|  │ 🔗 Share Your Link                  │ |
-|  │ ────────────────────────────────────│ |
+|  │  ✉️  Invite Friends                 │ |
 |  │                                     │ |
-|  │   Your invite code:                 │ |
-|  │   ┌─────────────────────────────┐   │ |
-|  │   │   XPPB5CNM            📋    │   │ |
-|  │   └─────────────────────────────┘   │ |
+|  │  ┌─────────────────────────────────┐│ |
+|  │  │      📲 Text a Friend           ││ |
+|  │  └─────────────────────────────────┘│ |
 |  │                                     │ |
-|  │   ┌─────────────────────────────┐   │ |
-|  │   │     ✨ Share Invite ✨      │   │ |
-|  │   └─────────────────────────────┘   │ |
+|  │  ┌─────────────────────────────────┐│ |
+|  │  │      🔗 Copy Invite Link        ││ |
+|  │  └─────────────────────────────────┘│ |
 |  │                                     │ |
-|  │   👥 3 friends joined via link      │ |
+|  │  👥 3 friends joined via your link  │ |
 |  │                                     │ |
 |  └─────────────────────────────────────┘ |
 |                                          |
+|  People You May Know                     |
 |  ┌─────────────────────────────────────┐ |
-|  │ 🔍 Find on Spotted                  │ |
-|  │ ────────────────────────────────────│ |
-|  │   Search username or name...        │ |
+|  │ [Avatar] Sarah M.        [ Add ]    │ |
+|  │          🔗 5 mutual friends        │ |
+|  ├─────────────────────────────────────┤ |
+|  │ [Avatar] Mike T.         [ Add ]    │ |
+|  │          🔗 3 mutual friends        │ |
 |  └─────────────────────────────────────┘ |
 |                                          |
 |  ┌─────────────────────────────────────┐ |
-|  │ 📱 Show My QR Code                → │ |
-|  │    For adding friends in person     │ |
+|  │ 🔍 Search by username               │ |
+|  └─────────────────────────────────────┘ |
+|                                          |
+|  ┌─────────────────────────────────────┐ |
+|  │ 📱 Show QR Code                   → │ |
 |  └─────────────────────────────────────┘ |
 |                                          |
 +------------------------------------------+
@@ -132,79 +65,205 @@ Add subtle animations for polish:
 
 ### Technical Implementation
 
-#### File to Modify
-`src/pages/Friends.tsx`
+#### 1. Simplified Invite Section
 
-#### Key Style Changes
+Remove the code display and refresh button. Replace with two clear buttons:
 
-**Card Container:**
 ```typescript
-className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 
-           rounded-3xl p-5 space-y-4 
-           shadow-[0_0_30px_rgba(168,85,247,0.15)]
-           hover:shadow-[0_0_40px_rgba(168,85,247,0.25)] 
-           transition-all duration-300"
+// Text a Friend button - opens SMS with pre-filled message
+const handleTextFriend = () => {
+  const message = encodeURIComponent(
+    `Hey! Join me on Spotted to see where friends are going out tonight 🎉 ${getInviteUrl()}`
+  );
+  window.location.href = `sms:?&body=${message}`;
+};
+
+// Copy link button - simple copy to clipboard
+const handleCopyLink = async () => {
+  await navigator.clipboard.writeText(getInviteUrl());
+  haptic.light();
+  toast.success('Link copied!');
+};
 ```
 
-**Icon Circles:**
+#### 2. People You May Know Section
+
+Create a new function to fetch friends of friends who aren't already friends:
+
 ```typescript
-className="w-14 h-14 rounded-full 
-           bg-gradient-to-br from-[#a855f7] to-[#7c3aed]
-           shadow-[0_0_20px_rgba(168,85,247,0.5)]
-           flex items-center justify-center"
+// New state
+const [suggestedFriends, setSuggestedFriends] = useState<SuggestedFriend[]>([]);
+const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+
+interface SuggestedFriend {
+  id: string;
+  display_name: string;
+  username: string;
+  avatar_url: string | null;
+  mutual_count: number;
+}
+
+// Fetch friends of friends (client-side logic)
+const fetchSuggestedFriends = async () => {
+  if (!user?.id) return;
+  setLoadingSuggestions(true);
+  
+  try {
+    // 1. Get current user's friend IDs
+    const { data: myFriendships } = await supabase
+      .from('friendships')
+      .select('user_id, friend_id')
+      .eq('status', 'accepted')
+      .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
+    
+    const myFriendIds = new Set<string>();
+    myFriendships?.forEach(f => {
+      myFriendIds.add(f.user_id === user.id ? f.friend_id : f.user_id);
+    });
+    
+    // 2. Get friends of those friends
+    if (myFriendIds.size === 0) {
+      setSuggestedFriends([]);
+      return;
+    }
+    
+    const friendIdArray = [...myFriendIds];
+    const { data: friendsOfFriends } = await supabase
+      .from('friendships')
+      .select('user_id, friend_id')
+      .eq('status', 'accepted')
+      .or(friendIdArray.map(id => `user_id.eq.${id},friend_id.eq.${id}`).join(','));
+    
+    // 3. Count mutual connections and filter out self/existing friends
+    const mutualCounts: Record<string, number> = {};
+    friendsOfFriends?.forEach(f => {
+      const otherId = myFriendIds.has(f.user_id) ? f.friend_id : f.user_id;
+      if (otherId !== user.id && !myFriendIds.has(otherId)) {
+        mutualCounts[otherId] = (mutualCounts[otherId] || 0) + 1;
+      }
+    });
+    
+    // 4. Get profiles for top suggestions (sorted by mutual count)
+    const topSuggestionIds = Object.entries(mutualCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([id]) => id);
+    
+    if (topSuggestionIds.length === 0) {
+      setSuggestedFriends([]);
+      return;
+    }
+    
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, username, avatar_url')
+      .in('id', topSuggestionIds);
+    
+    const suggestions = profiles?.map(p => ({
+      ...p,
+      mutual_count: mutualCounts[p.id] || 0
+    })).sort((a, b) => b.mutual_count - a.mutual_count) || [];
+    
+    setSuggestedFriends(suggestions);
+  } catch (error) {
+    console.error('Error fetching suggestions:', error);
+  } finally {
+    setLoadingSuggestions(false);
+  }
+};
 ```
 
-**Invite Code Display (cleaner):**
-```typescript
-// Show just the code with a subtle label
-<div className="text-center">
-  <span className="text-white/50 text-xs uppercase tracking-wider">
-    Your invite code
-  </span>
-  <div className="text-2xl font-bold text-white tracking-widest mt-1">
-    {inviteCode}
+---
+
+### Changes to Make
+
+#### File: `src/pages/Friends.tsx`
+
+| Section | Change |
+|---------|--------|
+| Hero section | Keep "Grow Your Squad" badge, simplify text |
+| Invite section | Remove code display, add "Text a Friend" + "Copy Link" buttons |
+| Remove | Refresh code button, code display box |
+| Add | "People You May Know" section before search |
+| Search section | Collapse into a single row that expands on tap |
+| QR section | Keep as-is |
+
+#### New UI Elements
+
+**Text a Friend Button:**
+```tsx
+<Button
+  onClick={handleTextFriend}
+  className="w-full bg-gradient-to-r from-[#a855f7] to-[#7c3aed] ..."
+>
+  <MessageCircle className="h-4 w-4 mr-2" />
+  Text a Friend
+</Button>
+```
+
+**Copy Link Button:**
+```tsx
+<Button
+  onClick={handleCopyLink}
+  variant="outline"
+  className="w-full border-[#a855f7]/40 ..."
+>
+  {justCopied ? <Check /> : <Copy />}
+  {justCopied ? 'Copied!' : 'Copy Invite Link'}
+</Button>
+```
+
+**People You May Know Row:**
+```tsx
+<div className="flex items-center gap-3 p-3 ...">
+  <Avatar className="h-12 w-12">
+    <AvatarImage src={friend.avatar_url} />
+    <AvatarFallback>{friend.display_name?.[0]}</AvatarFallback>
+  </Avatar>
+  <div className="flex-1">
+    <p className="font-medium text-white">{friend.display_name}</p>
+    <p className="text-white/50 text-sm flex items-center gap-1">
+      <Users className="h-3 w-3" />
+      {friend.mutual_count} mutual friend{friend.mutual_count !== 1 ? 's' : ''}
+    </p>
   </div>
-</div>
-```
-
-**Share Button with Glow:**
-```typescript
-className="w-full bg-gradient-to-r from-[#a855f7] to-[#7c3aed] 
-           hover:from-[#9333ea] hover:to-[#6b21a8]
-           shadow-[0_0_25px_rgba(168,85,247,0.6)]
-           text-white font-semibold py-3 rounded-2xl
-           transition-all duration-300 hover:scale-[1.02]"
-```
-
-**QR Code Button with Chevron:**
-```typescript
-// Add ChevronRight icon at the end for better affordance
-<div className="flex items-center justify-between">
-  <div>...</div>
-  <ChevronRight className="h-5 w-5 text-white/40" />
+  <Button onClick={() => sendFriendRequest(friend.id)} size="sm">
+    <UserPlus className="h-4 w-4 mr-1" />
+    Add
+  </Button>
 </div>
 ```
 
 ---
 
-### Additional Enhancements
+### iMessage / SMS Integration
 
-1. **Add friend count to header context** - Fetch and display how many friends the user currently has
-2. **Subtle gradient dividers** between sections instead of hard borders
-3. **Empty state for search** - Add a friendly illustration when no search has been performed
-4. **Success animation** - When copying link, show a brief checkmark animation
+The `sms:` URL scheme works on both iOS and Android:
+
+```typescript
+// iOS & Android compatible
+const handleTextFriend = () => {
+  const message = encodeURIComponent(
+    `Hey! Join me on Spotted to see where friends are going out 🎉 ${getInviteUrl()}`
+  );
+  // Use ?& for cross-platform compatibility
+  window.location.href = `sms:?&body=${message}`;
+};
+```
+
+On iOS, this opens iMessage. On Android, it opens the default SMS app.
 
 ---
 
 ### Summary of Changes
 
-| Element | Change |
-|---------|--------|
-| Cards | Glassmorphism, glow shadows, rounded-3xl |
-| Icons | Gradient backgrounds with glow |
-| URL display | Show just invite code with label |
-| Share button | Gradient with prominent glow |
-| QR button | Add chevron, improve hover state |
-| Spacing | Increase padding (p-5), add more vertical rhythm |
-| Overall | More premium, matches Home/Profile aesthetic |
+| Remove | Add |
+|--------|-----|
+| Invite code display | "Text a Friend" button (opens SMS) |
+| Refresh button | "Copy Link" button |
+| Complex card layout | Simple two-button layout |
+| - | "People You May Know" section |
+| - | Mutual friend counts |
+
+This makes the page much simpler: two obvious ways to invite (text or copy), friend suggestions based on mutual connections, and search/QR as secondary options.
 
