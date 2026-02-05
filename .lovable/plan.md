@@ -1,70 +1,95 @@
 
 
-## Fix Back Button on Friends Page
+## Consolidate Friends Buttons on Profile
 
 ### Problem
-The back button on the `/friends` page uses `navigate(-1)` which fails when:
-- User refreshes the page
-- User navigates directly via URL
-- No history exists in the session
+Two separate friend-related buttons in close proximity:
+1. Small `UserPlus` icon next to stats → goes to Requests tab
+2. Large "Invite Friends" button → goes to Invite tab
+
+This is confusing and takes up unnecessary space.
+
+---
 
 ### Solution
-Replace `navigate(-1)` with a smarter navigation that falls back to `/profile` when there's no history.
+Consolidate into a **single unified button** that goes to the Friends page with smart defaults.
+
+---
+
+### Proposed Layout
+
+```text
+Current:
++------------------+  +------------------+
+|   50    |   2    | [+] ← small icon
+| Friends | Places |
++------------------+------------------+
+| [👥 Invite Friends]  [QR] [Edit] |
++-------------------------------------+
+
+After:
++------------------+  +------------------+
+|   50    |   2    |
+| Friends | Places |
++------------------+------------------+
+| [👥 Friends]         [QR]   [Edit] |
++-------------------------------------+
+```
 
 ---
 
 ### Implementation
 
-#### File: `src/pages/Friends.tsx`
+#### File: `src/pages/Profile.tsx`
 
-Change the back button handler from:
+**Remove**: The small UserPlus icon button (lines 467-473)
+
+**Update**: The "Invite Friends" button to become a general "Friends" button:
 ```tsx
-onClick={() => navigate(-1)}
+<Button
+  onClick={() => navigate('/friends')}
+  className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full"
+>
+  <Users className="h-4 w-4 mr-2" />
+  Friends
+</Button>
 ```
 
-To use a helper that checks for history:
-```tsx
-const handleBack = () => {
-  // If we have history, go back; otherwise go to profile
-  if (window.history.length > 1) {
-    navigate(-1);
-  } else {
-    navigate('/profile');
-  }
-};
-```
-
-Or simply always navigate to `/profile` for consistency (matching the pattern used in `CloseFriends.tsx` line 138):
-```tsx
-onClick={() => navigate('/profile')}
-```
+This single button takes users to `/friends` where they can access all tabs:
+- Requests (with pending count badge)
+- Find (search existing users)
+- Invite (share link/QR)
 
 ---
 
-### Recommended Approach
+### Benefits
 
-Use a direct route (`/profile`) for the back button since:
-1. Friends page is always accessed from Profile
-2. More predictable behavior
-3. Consistent with other similar pages (CloseFriends navigates to `/profile/edit`)
+| Before | After |
+|--------|-------|
+| 2 friend buttons | 1 unified button |
+| Confusing entry points | Single clear entry point |
+| Redundant UI | Cleaner profile layout |
+| Different icons (UserPlus x2) | Single Users icon |
+
+---
+
+### Alternative Consideration
+
+If you want to keep requests prominent, we could add a notification badge to the single button when there are pending requests:
 
 ```tsx
-// Line 467 - Change from:
-<button
-  onClick={() => navigate(-1)}
-  className="p-2 -ml-2 text-white/80 hover:text-white"
->
-  <ArrowLeft className="h-5 w-5" />
-</button>
-
-// To:
-<button
-  onClick={() => navigate('/profile')}
-  className="p-2 -ml-2 text-white/80 hover:text-white"
->
-  <ArrowLeft className="h-5 w-5" />
-</button>
+<Button onClick={() => navigate('/friends')} className="...">
+  <Users className="h-4 w-4 mr-2" />
+  Friends
+  {pendingRequestsCount > 0 && (
+    <span className="ml-2 bg-red-500 text-white text-xs px-1.5 rounded-full">
+      {pendingRequestsCount}
+    </span>
+  )}
+</Button>
 ```
+
+This way users still see pending requests at a glance.
 
 ---
 
@@ -72,5 +97,5 @@ Use a direct route (`/profile`) for the back button since:
 
 | File | Change |
 |------|--------|
-| `src/pages/Friends.tsx` | Update back button to `navigate('/profile')` |
+| `src/pages/Profile.tsx` | Remove small UserPlus button, update main button to "Friends" |
 
