@@ -155,7 +155,15 @@ export default function Leaderboard() {
       // If demoEnabled is true, show everything (no filter)
 
       // Parallelize: fetch promoted venues AND night statuses at the same time
-      let promotedQuery = supabase.from('venues').select('id, name, popularity_rank, is_leaderboard_promoted, opened_at, neighborhood, operating_hours').eq('is_leaderboard_promoted', true).eq('city', city);
+      // Fetch promoted venues ordered by leaderboard_promo_order (active spots are order 1-2)
+      let promotedQuery = supabase
+        .from('venues')
+        .select('id, name, popularity_rank, is_leaderboard_promoted, leaderboard_promo_order, opened_at, neighborhood, operating_hours')
+        .eq('is_leaderboard_promoted', true)
+        .eq('city', city)
+        .not('leaderboard_promo_order', 'is', null)
+        .lte('leaderboard_promo_order', 2)
+        .order('leaderboard_promo_order', { ascending: true });
       if (selectedNeighborhood) {
         promotedQuery = promotedQuery.eq('neighborhood', selectedNeighborhood);
       }
@@ -325,13 +333,11 @@ export default function Leaderboard() {
     
     // Get all promoted venues that are OPEN and sort by count desc, then popularity_rank asc
     const allPromotedVenues = openVenueArray.filter(v => v.isPromoted);
-    allPromotedVenues.sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.popularity_rank - b.popularity_rank;
-    });
+    // Already filtered to only active spots (order 1-2) in query, just sort by popularity
+    allPromotedVenues.sort((a, b) => a.popularity_rank - b.popularity_rank);
     
-    // Get top 2 promoted venues only
-    const topPromotedVenues = allPromotedVenues.slice(0, 2);
+    // Use all promoted venues (already limited to 2 active spots by query filter)
+    const topPromotedVenues = allPromotedVenues;
     
     // Get all non-promoted venues that are OPEN and sort by count desc, then popularity_rank asc
     const nonPromotedVenues = openVenueArray.filter(v => !v.isPromoted);

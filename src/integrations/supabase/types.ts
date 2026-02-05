@@ -1840,6 +1840,7 @@ export type Database = {
           is_map_promoted: boolean | null
           is_user_submitted: boolean | null
           lat: number
+          leaderboard_promo_order: number | null
           lng: number
           name: string
           neighborhood: string
@@ -1862,6 +1863,7 @@ export type Database = {
           is_map_promoted?: boolean | null
           is_user_submitted?: boolean | null
           lat: number
+          leaderboard_promo_order?: number | null
           lng: number
           name: string
           neighborhood: string
@@ -1884,6 +1886,7 @@ export type Database = {
           is_map_promoted?: boolean | null
           is_user_submitted?: boolean | null
           lat?: number
+          leaderboard_promo_order?: number | null
           lng?: number
           name?: string
           neighborhood?: string
