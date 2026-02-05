@@ -157,6 +157,14 @@ export default function Map() {
           debouncedFetchFriendsLocations();
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'venues' },
+        (payload) => {
+          console.log('Venue promotion updated:', payload);
+          debouncedFetchFriendsLocations();
+        }
+      )
       .subscribe();
 
     return () => {
