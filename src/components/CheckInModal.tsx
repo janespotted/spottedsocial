@@ -239,10 +239,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     setShowNeighborhoodManualSelect(false);
     setShowPrivatePartyNeighborhood(true);
     
+    // Refresh city detection based on current GPS before detecting neighborhood
+    const detectedCity = await refreshCity();
+    
     // Auto-detect neighborhood from GPS
     setIsDetectingNeighborhood(true);
     try {
-      const detectedNeighborhood = await detectNeighborhoodFromGPS(city);
+      const detectedNeighborhood = await detectNeighborhoodFromGPS(detectedCity);
       if (detectedNeighborhood) {
         setPrivatePartyNeighborhood(detectedNeighborhood);
       } else {
