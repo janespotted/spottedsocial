@@ -1,108 +1,107 @@
 
-## Fix Map Promoted Venue Display + Clarify Leaderboard Limit
 
-### Issues Found
+## Improve Promoted Venues Management System
 
-| Issue | Root Cause | Status |
-|-------|-----------|--------|
-| **Spotlight LA not showing special on map** | The venue **does** have `is_map_promoted: true` in the database. However, the map doesn't auto-refresh when promotions change in Admin. | **Needs fresh page load** |
-| **Only 2 promoted spots on leaderboard (not 8)** | This is **intentional**. Line 333 in Leaderboard.tsx: `const topPromotedVenues = allPromotedVenues.slice(0, 2)` explicitly limits to 2 spots. | **By design** |
+### The Problem
 
----
+Currently there's a disconnect between Admin and Leaderboard:
+- **Admin** lets you mark unlimited venues as "Leaderboard Promoted"
+- **Leaderboard** only shows the top 2 promoted spots
 
-### Issue 1: Map Not Showing Promoted Styling
-
-**Verified Data:**
-- Database confirms `Spotlight LA` has `is_map_promoted: true` ✓
-- Map fetch logic correctly reads `venue.is_map_promoted || false` ✓
-- Marker styling correctly applies glow + star when `isMapPromoted = true` ✓
-
-**Problem:**
-The map fetches venue data once when the page loads. When you add a venue to "Map Promoted" in Admin:
-1. Database is updated immediately
-2. BUT the map page (in a different tab/browser) doesn't re-fetch venues
-3. User sees old styling until they refresh the page
-
-**Solution Options:**
-
-| Option | Effort | User Experience |
-|--------|--------|-----------------|
-| A. Manual refresh required | None | User must refresh to see changes |
-| B. Add realtime subscription for venue promotions | Medium | Auto-update when promotions change |
-| C. Add pull-to-refresh on map | Low | User can swipe down to refresh |
-
-**Recommended: Option B** - Add realtime subscription for venue updates, specifically listening for `is_map_promoted` changes.
+This creates confusion: you see 6 promoted venues in Admin, but only 2 appear on the leaderboard. The other 4 are "promoted" in the database but invisible to users.
 
 ---
 
-### Issue 2: Leaderboard Shows Only 2 Promoted Spots
+### Recommended Approach: "Active" vs "Waitlist" System
 
-**Current Behavior (Intentional):**
-```typescript
-// Line 333-334 in Leaderboard.tsx
-// Get top 2 promoted venues only
-const topPromotedVenues = allPromotedVenues.slice(0, 2);
-```
+Instead of letting unlimited venues be marked promoted, add a clear distinction:
 
-The leaderboard is designed to show **exactly 2 promoted spots** to:
-- Keep the promoted section focused
-- Prevent promoted venues from dominating the view
-- Create scarcity for the paid placement product
-
-**Your Options:**
-
-| Change | Impact |
-|--------|--------|
-| Keep at 2 | Original design - 2 premium spots |
-| Increase to 4 | Show 4 promoted spots |
-| Show all | All 6+ promoted venues visible in LA |
+| Status | Description | Visible on Leaderboard |
+|--------|-------------|------------------------|
+| **Active** (max 2) | Currently displayed in promoted section | Yes |
+| **Waitlist** | Queued for future promotion | No |
 
 ---
 
-### Recommended Plan
+### How It Would Work
 
-1. **For Map Promotion Visibility:**
-   - Add realtime subscription to detect when `venues` table changes
-   - Re-fetch venues when `is_map_promoted` is updated
-   - Existing marker diffing logic will auto-recreate promoted markers with correct styling
-
-2. **For Leaderboard Limit:**
-   - Clarify: Do you want to increase the promoted spots limit from 2 to something higher?
-
----
-
-### Code Changes for Map Realtime Fix
-
-**File: `src/pages/Map.tsx`**
-
-Add subscription for venue promotion changes in the existing realtime channel:
+**In Admin Panel:**
 
 ```text
-Current realtime subscriptions:
-- profiles table (friend locations)
-- night_statuses table (check-ins)
-- checkins table
-
-Add:
-- venues table (specifically for is_map_promoted changes)
+┌─────────────────────────────────────────┐
+│ Leaderboard Promoted                    │
+├─────────────────────────────────────────┤
+│ ACTIVE SPOTS (2/2)                      │
+│ ┌─────────────────────────────────────┐ │
+│ │ 1. Venue A          [↓ Move Down]   │ │
+│ │ 2. Venue B          [Remove]        │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ WAITLIST (4 venues)                     │
+│ ┌─────────────────────────────────────┐ │
+│ │ 3. Venue C          [↑ Activate]    │ │
+│ │ 4. Venue D          [Remove]        │ │
+│ │ 5. Venue E          [Remove]        │ │
+│ │ 6. Venue F          [Remove]        │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ [+ Search to add to waitlist...]        │
+└─────────────────────────────────────────┘
 ```
 
-This will trigger `debouncedFetchFriendsLocations()` which calls `fetchVenuesWithHeatScores()`, fetching fresh venue data including promotion status.
+**User Flow:**
+1. When you add a venue, it goes to the waitlist
+2. You can drag/reorder the waitlist
+3. To show a venue on the leaderboard, you either:
+   - Remove one of the 2 active spots, OR
+   - Click "Activate" which swaps it with the last active venue
+
+---
+
+### Alternative Approaches
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **A. Waitlist (recommended)** | Clear distinction, intuitive queue | Slightly more complex UI |
+| **B. Hard limit of 2** | Simple - can't add more than 2 | Less flexibility for future planning |
+| **C. Show warning only** | Minimal code change | Still confusing - doesn't solve the core issue |
+
+---
+
+### Implementation Details
+
+**Database Change:**
+Add a `promotion_order` integer column to `venues` table (or use existing `popularity_rank`):
+- Order 1-2 = Active (shown on leaderboard)
+- Order 3+ = Waitlist (not shown)
+
+**Admin Panel Changes:**
+1. Split the promoted venues list into "Active" and "Waitlist" sections
+2. Show "2/2 spots filled" indicator
+3. Add reorder/swap functionality
+4. Prevent adding to Active if 2 spots filled (auto-add to waitlist)
+
+**Leaderboard Changes:**
+None needed - already only shows top 2 via `.slice(0, 2)`
 
 ---
 
 ### Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/pages/Map.tsx` | Add venues table to realtime subscription for promotion updates |
-| `src/pages/Leaderboard.tsx` | *Optional*: Change `slice(0, 2)` to show more promoted spots if desired |
+| File | Changes |
+|------|---------|
+| Database migration | Add `leaderboard_promo_order` column to venues |
+| `src/pages/Admin.tsx` | Redesign promoted section with Active/Waitlist split, add reorder controls |
+| `src/pages/Leaderboard.tsx` | Query by `leaderboard_promo_order` instead of just filtering by `is_leaderboard_promoted` |
 
 ---
 
-### Testing After Fix
+### Quick Alternative: Just Enforce Limit
 
-1. Open Map page in one tab
-2. Open Admin in another tab
-3. Add a venue to Map Promoted
-4. Map should auto-update within a few seconds with the special promoted styling (glow + star)
+If you want a simpler solution, I can just:
+1. Limit Admin to only allow 2 leaderboard-promoted venues at a time
+2. Show "2/2 spots filled - remove one to add another"
+3. No waitlist, just a hard cap
+
+Which approach do you prefer?
+
