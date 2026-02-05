@@ -9,7 +9,6 @@ import { ArrowLeft, Copy, Users, Search, UserPlus, QrCode, Check, Loader2, Clock
  import { toast } from 'sonner';
  import { haptic } from '@/lib/haptics';
  import { QRCodeModal } from '@/components/QRCodeModal';
- import { useCheckIn } from '@/contexts/CheckInContext';
  
  interface SearchResult {
    id: string;
@@ -31,7 +30,6 @@ interface SuggestedFriend {
  export default function Friends() {
    const navigate = useNavigate();
    const { user } = useAuth();
-   const { openCheckIn } = useCheckIn();
    
    // Invite link state
    const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -315,13 +313,6 @@ interface SuggestedFriend {
              </button>
              <h1 className="text-lg font-semibold text-white">Find Friends</h1>
            </div>
-           <Button
-             onClick={openCheckIn}
-             size="sm"
-             className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white"
-           >
-             Check In
-           </Button>
          </div>
        </header>
  
