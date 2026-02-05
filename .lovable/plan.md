@@ -1,398 +1,210 @@
 
 
-## Business Dashboard - Venue Owner Portal (Revised)
+## Enhance Find Friends Page Aesthetics
 
 ### Overview
-Create a complete business-side interface for bars and venue owners. This revision incorporates all feedback for a cleaner, more maintainable approach.
+Improve the visual design of the Find Friends page to match the premium, polished aesthetic of other pages in the app while maintaining functionality.
 
 ---
 
-### Key Changes from Original Plan
+### Current Issues Identified
 
-| Area | Original | Revised |
-|------|----------|---------|
-| Role detection | New `venue_owner` app_role enum | `EXISTS (SELECT 1 FROM venue_owners WHERE user_id = auth.uid())` |
-| Venue claiming | Direct creation | `venue_claim_requests` table with admin approval |
-| Promotions | Missing status/FK | Added `status` column + proper `created_by` FK |
-| Yap messages | Just `user_id` | Added `posted_by`, `display_as`, nullable `expires_at` |
-| Analytics | Heatmaps, charts | MVP: today/7d/30d counts + peak hour |
-| RLS | Incomplete | Full policies for all tables |
-
----
-
-### Database Schema
-
-#### 1. Table: `venue_claim_requests`
-Handles verification workflow before granting ownership:
-
-```sql
-CREATE TABLE venue_claim_requests (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  venue_id uuid REFERENCES venues(id) ON DELETE CASCADE,
-  venue_name text, -- if venue doesn't exist yet
-  business_email text NOT NULL,
-  business_phone text,
-  verification_notes text,
-  status text DEFAULT 'pending', -- 'pending' | 'approved' | 'rejected'
-  reviewed_by uuid REFERENCES auth.users(id),
-  reviewed_at timestamptz,
-  created_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE venue_claim_requests ENABLE ROW LEVEL SECURITY;
-```
-
-#### 2. Table: `venue_owners`
-Links users to venues they manage (created after claim approval):
-
-```sql
-CREATE TABLE venue_owners (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  venue_id uuid REFERENCES venues(id) ON DELETE CASCADE NOT NULL,
-  role text DEFAULT 'owner', -- 'owner' | 'manager' | 'staff'
-  verified_at timestamptz DEFAULT now(),
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(user_id, venue_id)
-);
-
-ALTER TABLE venue_owners ENABLE ROW LEVEL SECURITY;
-```
-
-#### 3. Table: `venue_promotions`
-Tracks paid promotions with proper status tracking:
-
-```sql
-CREATE TABLE venue_promotions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  venue_id uuid REFERENCES venues(id) ON DELETE CASCADE NOT NULL,
-  promotion_type text NOT NULL, -- 'leaderboard' | 'map'
-  status text DEFAULT 'pending', -- 'pending' | 'active' | 'expired' | 'canceled'
-  starts_at timestamptz NOT NULL,
-  ends_at timestamptz NOT NULL,
-  amount_paid integer, -- in cents
-  stripe_payment_id text,
-  stripe_subscription_id text, -- for recurring
-  created_by uuid REFERENCES auth.users(id) NOT NULL,
-  created_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE venue_promotions ENABLE ROW LEVEL SECURITY;
-```
-
-#### 4. Table: `venue_yap_messages`
-Venue announcements with proper identity handling:
-
-```sql
-CREATE TABLE venue_yap_messages (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  venue_id uuid REFERENCES venues(id) ON DELETE CASCADE NOT NULL,
-  posted_by uuid REFERENCES auth.users(id) NOT NULL, -- actual user who posted
-  display_as text DEFAULT 'venue', -- 'venue' | 'personal' (future-proof)
-  text text NOT NULL,
-  is_pinned boolean DEFAULT false,
-  created_at timestamptz DEFAULT now(),
-  expires_at timestamptz -- nullable for evergreen posts
-);
-
-ALTER TABLE venue_yap_messages ENABLE ROW LEVEL SECURITY;
-```
-
-#### 5. Helper Function: `is_venue_owner`
-
-```sql
-CREATE OR REPLACE FUNCTION is_venue_owner(check_user_id uuid, check_venue_id uuid)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM venue_owners
-    WHERE user_id = check_user_id
-    AND venue_id = check_venue_id
-  )
-$$;
-```
-
-#### 6. Helper Function: `is_any_venue_owner`
-
-```sql
-CREATE OR REPLACE FUNCTION is_any_venue_owner(check_user_id uuid)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM venue_owners
-    WHERE user_id = check_user_id
-  )
-$$;
-```
+| Issue | Description |
+|-------|-------------|
+| Cards look flat | Minimal visual depth, lack of glow effects |
+| Icon circles inconsistent | Mix of solid and transparent backgrounds |
+| URL display unappealing | Long URL in mono font looks cluttered |
+| No visual hierarchy | All sections look the same weight |
+| Missing premium touches | No gradients, glows, or subtle animations |
+| Spacing feels cramped | Cards could breathe more |
 
 ---
 
-### Complete RLS Policies
+### Proposed Design Improvements
 
-#### For `venue_claim_requests`:
-```sql
--- Users can submit their own claims
-CREATE POLICY "Users can create own claim requests"
-ON venue_claim_requests FOR INSERT TO public
-WITH CHECK (auth.uid() = user_id);
+#### 1. Enhanced Card Styling
+Add glassmorphism effects and subtle glows matching Home/Profile pages:
 
--- Users can view their own claims
-CREATE POLICY "Users can view own claim requests"
-ON venue_claim_requests FOR SELECT TO public
-USING (auth.uid() = user_id);
-
--- Admins can view all claims
-CREATE POLICY "Admins can view all claim requests"
-ON venue_claim_requests FOR SELECT TO public
-USING (has_role(auth.uid(), 'admin'));
-
--- Admins can update claims (approve/reject)
-CREATE POLICY "Admins can update claim requests"
-ON venue_claim_requests FOR UPDATE TO public
-USING (has_role(auth.uid(), 'admin'));
+```text
+Before: bg-[#2d1b4e]/60 border border-white/20
+After:  bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 
+        shadow-[0_0_30px_rgba(168,85,247,0.15)]
 ```
 
-#### For `venue_owners`:
-```sql
--- Users can view their own venue ownerships
-CREATE POLICY "Users can view own venue ownerships"
-ON venue_owners FOR SELECT TO public
-USING (auth.uid() = user_id);
-
--- Admins can manage all venue owners
-CREATE POLICY "Admins can manage venue owners"
-ON venue_owners FOR ALL TO public
-USING (has_role(auth.uid(), 'admin'));
-```
-
-#### For `venue_promotions`:
-```sql
--- Venue owners can view their promotions
-CREATE POLICY "Venue owners can view their promotions"
-ON venue_promotions FOR SELECT TO public
-USING (is_venue_owner(auth.uid(), venue_id));
-
--- Venue owners can create promotions for their venues
-CREATE POLICY "Venue owners can create promotions"
-ON venue_promotions FOR INSERT TO public
-WITH CHECK (
-  is_venue_owner(auth.uid(), venue_id)
-  AND auth.uid() = created_by
-);
-
--- Admins can manage all promotions
-CREATE POLICY "Admins can manage all promotions"
-ON venue_promotions FOR ALL TO public
-USING (has_role(auth.uid(), 'admin'));
-```
-
-#### For `venue_yap_messages`:
-```sql
--- Venue owners can insert messages for their venues
-CREATE POLICY "Venue owners can create yap messages"
-ON venue_yap_messages FOR INSERT TO public
-WITH CHECK (
-  is_venue_owner(auth.uid(), venue_id)
-  AND auth.uid() = posted_by
-);
-
--- Venue owners can update their venue's messages
-CREATE POLICY "Venue owners can update their venue yap messages"
-ON venue_yap_messages FOR UPDATE TO public
-USING (is_venue_owner(auth.uid(), venue_id));
-
--- Venue owners can delete their venue's messages
-CREATE POLICY "Venue owners can delete their venue yap messages"
-ON venue_yap_messages FOR DELETE TO public
-USING (is_venue_owner(auth.uid(), venue_id));
-
--- Authenticated users can read venue yap messages (not expired)
-CREATE POLICY "Authenticated users can view venue yap messages"
-ON venue_yap_messages FOR SELECT TO public
-USING (
-  auth.uid() IS NOT NULL
-  AND (expires_at IS NULL OR expires_at > now())
-);
-```
-
-#### For `checkins` (add policy for venue owners):
-```sql
--- Venue owners can read check-ins for their venues
-CREATE POLICY "Venue owners can view checkins for their venues"
-ON checkins FOR SELECT TO public
-USING (is_venue_owner(auth.uid(), venue_id));
-```
-
----
-
-### MVP Analytics (Simplified)
-
-Instead of complex heatmaps and charts, the dashboard will show:
+#### 2. Hero Section at Top
+Add a welcoming visual header with the user's avatar and friend count:
 
 ```text
 +------------------------------------------+
-| 📊 Your Venue Analytics                  |
-+------------------------------------------+
 |                                          |
-|  Check-ins                               |
-|  ┌──────────┬──────────┬──────────┐      |
-|  │  Today   │  7 Days  │ 30 Days  │      |
-|  │    42    │   287    │  1,203   │      |
-|  └──────────┴──────────┴──────────┘      |
-|                                          |
-|  ⏰ Peak Hour: 11pm - 12am               |
-|     (based on last 7 days)               |
-|                                          |
-|  📈 vs Last Week: +15%                   |
+|  ┌──────┐   Grow Your Circle             |
+|  │ 👤   │   You have 12 friends          |
+|  └──────┘   Invite more to see where     |
+|             they're going tonight        |
 |                                          |
 +------------------------------------------+
 ```
 
-SQL for analytics (simple, efficient):
-
-```sql
--- Today's check-ins
-SELECT COUNT(*) FROM checkins 
-WHERE venue_id = $1 AND created_at >= CURRENT_DATE;
-
--- Last 7 days
-SELECT COUNT(*) FROM checkins 
-WHERE venue_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '7 days';
-
--- Last 30 days
-SELECT COUNT(*) FROM checkins 
-WHERE venue_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '30 days';
-
--- Peak hour (simple group by)
-SELECT EXTRACT(HOUR FROM created_at) as hour, COUNT(*) as count
-FROM checkins
-WHERE venue_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '7 days'
-GROUP BY hour
-ORDER BY count DESC
-LIMIT 1;
-```
-
----
-
-### Claim Verification Workflow
+#### 3. Improved Link Display
+Instead of showing the full ugly URL, show a shortened, cleaner version:
 
 ```text
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  User submits   │     │  Admin reviews   │     │  Claim approved │
-│  claim request  │ ──> │  in admin panel  │ ──> │  venue_owners   │
-│  (pending)      │     │                  │     │  row created    │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-                              │
-                              ▼
-                        ┌──────────────────┐
-                        │  Claim rejected  │
-                        │  (user notified) │
-                        └──────────────────┘
+Before: https://92205838-7a85-43c9-9804-...
+After:  spotted.app/invite/XPPB5CNM  (or just the code)
+```
+
+With a prominent "Tap to copy" indicator.
+
+#### 4. Icon Circle Consistency
+All icon circles use the same gradient glow style:
+
+```text
+w-14 h-14 rounded-full 
+bg-gradient-to-br from-[#a855f7] to-[#7c3aed]
+shadow-[0_0_20px_rgba(168,85,247,0.5)]
+flex items-center justify-center
+```
+
+#### 5. Section Badges/Labels
+Add small labels to make sections more scannable:
+
+```text
+┌────────────────────────────────────┐
+│ 🔗 INVITE                          │
+│                                    │
+│    Share Your Link                 │
+│    ...                             │
+└────────────────────────────────────┘
+```
+
+#### 6. Animated Elements
+Add subtle animations for polish:
+- Gentle pulse on the share button
+- Hover lift effect on cards
+- Icon rotation on refresh button when idle
+
+---
+
+### Visual Mockup
+
+```text
++------------------------------------------+
+| ←  Find Friends                  [Check] |
++------------------------------------------+
+|                                          |
+|      ┌─────────────────────────┐         |
+|      │    ✨ Grow Your Squad   │         |
+|      │    12 friends on Spotted│         |
+|      └─────────────────────────┘         |
+|                                          |
+|  ┌─────────────────────────────────────┐ |
+|  │ 🔗 Share Your Link                  │ |
+|  │ ────────────────────────────────────│ |
+|  │                                     │ |
+|  │   Your invite code:                 │ |
+|  │   ┌─────────────────────────────┐   │ |
+|  │   │   XPPB5CNM            📋    │   │ |
+|  │   └─────────────────────────────┘   │ |
+|  │                                     │ |
+|  │   ┌─────────────────────────────┐   │ |
+|  │   │     ✨ Share Invite ✨      │   │ |
+|  │   └─────────────────────────────┘   │ |
+|  │                                     │ |
+|  │   👥 3 friends joined via link      │ |
+|  │                                     │ |
+|  └─────────────────────────────────────┘ |
+|                                          |
+|  ┌─────────────────────────────────────┐ |
+|  │ 🔍 Find on Spotted                  │ |
+|  │ ────────────────────────────────────│ |
+|  │   Search username or name...        │ |
+|  └─────────────────────────────────────┘ |
+|                                          |
+|  ┌─────────────────────────────────────┐ |
+|  │ 📱 Show My QR Code                → │ |
+|  │    For adding friends in person     │ |
+|  └─────────────────────────────────────┘ |
+|                                          |
++------------------------------------------+
 ```
 
 ---
 
-### Files to Create
+### Technical Implementation
 
-| File | Purpose |
-|------|---------|
-| `src/pages/business/BusinessLanding.tsx` | Marketing landing + sign up CTA |
-| `src/pages/business/BusinessAuth.tsx` | Auth + claim venue flow |
-| `src/pages/business/BusinessDashboard.tsx` | Main dashboard with MVP analytics |
-| `src/pages/business/BusinessPromote.tsx` | Purchase promotions |
-| `src/pages/business/BusinessYap.tsx` | Post venue announcements |
-| `src/components/business/BusinessRoute.tsx` | Route guard using `is_any_venue_owner()` |
-| `src/components/business/BusinessLayout.tsx` | Shared layout for business pages |
-| `src/components/business/VenueSelector.tsx` | Switch between owned venues |
-| `src/components/business/ClaimVenueForm.tsx` | Venue search + claim submission |
+#### File to Modify
+`src/pages/Friends.tsx`
 
-### Files to Modify
+#### Key Style Changes
 
-| File | Changes |
-|------|---------|
-| `src/App.tsx` | Add `/business/*` routes |
-| `src/pages/Admin.tsx` | Add claim requests approval panel |
-| `src/pages/Leaderboard.tsx` | Check `venue_promotions` for active promos |
-| `src/pages/Map.tsx` | Highlight promoted venues |
-| `src/components/messages/YapTab.tsx` | Show venue messages with @VenueName badge |
-
----
-
-### Implementation Phases
-
-**Phase 1 - Foundation (This PR)**
-- Database migrations (all 4 tables + functions + RLS)
-- Business auth page with claim submission
-- Admin panel for reviewing claims
-- Basic dashboard with MVP analytics
-
-**Phase 2 - Yap Integration**
-- Venue owner posting to Yap
-- @VenueName display rendering
-- Pinned messages in consumer feed
-
-**Phase 3 - Promotions (Stripe)**
-- Enable Stripe integration
-- Promotion purchase flow
-- Webhook to activate/expire promotions
-- Connect to leaderboard/map display
-
----
-
-### Consumer-Side Yap Rendering
-
-When displaying venue yap messages in the consumer feed:
-
+**Card Container:**
 ```typescript
-// In YapTab.tsx
-const isVenueMessage = message.venue_id && message.display_as === 'venue';
+className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 
+           rounded-3xl p-5 space-y-4 
+           shadow-[0_0_30px_rgba(168,85,247,0.15)]
+           hover:shadow-[0_0_40px_rgba(168,85,247,0.25)] 
+           transition-all duration-300"
+```
 
-return (
-  <div className="yap-message">
-    {isVenueMessage ? (
-      <span className="venue-badge">
-        🏪 @{venueName} <VerifiedBadge />
-      </span>
-    ) : (
-      <span>@{username}</span>
-    )}
-    <p>{message.text}</p>
+**Icon Circles:**
+```typescript
+className="w-14 h-14 rounded-full 
+           bg-gradient-to-br from-[#a855f7] to-[#7c3aed]
+           shadow-[0_0_20px_rgba(168,85,247,0.5)]
+           flex items-center justify-center"
+```
+
+**Invite Code Display (cleaner):**
+```typescript
+// Show just the code with a subtle label
+<div className="text-center">
+  <span className="text-white/50 text-xs uppercase tracking-wider">
+    Your invite code
+  </span>
+  <div className="text-2xl font-bold text-white tracking-widest mt-1">
+    {inviteCode}
   </div>
-);
+</div>
 ```
 
----
-
-### Route Guard Implementation
-
+**Share Button with Glow:**
 ```typescript
-// BusinessRoute.tsx
-export function BusinessRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const [isVenueOwner, setIsVenueOwner] = useState<boolean | null>(null);
+className="w-full bg-gradient-to-r from-[#a855f7] to-[#7c3aed] 
+           hover:from-[#9333ea] hover:to-[#6b21a8]
+           shadow-[0_0_25px_rgba(168,85,247,0.6)]
+           text-white font-semibold py-3 rounded-2xl
+           transition-all duration-300 hover:scale-[1.02]"
+```
 
-  useEffect(() => {
-    if (user) {
-      supabase.rpc('is_any_venue_owner', { check_user_id: user.id })
-        .then(({ data }) => setIsVenueOwner(data ?? false));
-    }
-  }, [user]);
-
-  if (isVenueOwner === null) return <Loading />;
-  if (!isVenueOwner) return <Navigate to="/business" replace />;
-  
-  return <>{children}</>;
-}
+**QR Code Button with Chevron:**
+```typescript
+// Add ChevronRight icon at the end for better affordance
+<div className="flex items-center justify-between">
+  <div>...</div>
+  <ChevronRight className="h-5 w-5 text-white/40" />
+</div>
 ```
 
 ---
 
-### Ready to implement Phase 1?
+### Additional Enhancements
 
-This will create the database schema, claim workflow, and basic dashboard with the simplified analytics approach.
+1. **Add friend count to header context** - Fetch and display how many friends the user currently has
+2. **Subtle gradient dividers** between sections instead of hard borders
+3. **Empty state for search** - Add a friendly illustration when no search has been performed
+4. **Success animation** - When copying link, show a brief checkmark animation
+
+---
+
+### Summary of Changes
+
+| Element | Change |
+|---------|--------|
+| Cards | Glassmorphism, glow shadows, rounded-3xl |
+| Icons | Gradient backgrounds with glow |
+| URL display | Show just invite code with label |
+| Share button | Gradient with prominent glow |
+| QR button | Add chevron, improve hover state |
+| Spacing | Increase padding (p-5), add more vertical rhythm |
+| Overall | More premium, matches Home/Profile aesthetic |
 
