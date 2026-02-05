@@ -1,14 +1,17 @@
 
 
-## Remove Duplicate Like Count on Posts
+## Fix Post Header Text Alignment
 
 ### Problem
-The post interaction area shows the like count twice:
-1. In the action row: `❤️ 1 like 💬 0`
-2. Below it again: `1 like`
+When venue names are long (like "The Townhouse & Del Monte Speakeasy"), the text wraps and appears misaligned or centered instead of being consistently left-aligned.
+
+### Root Cause
+The header layout uses flexbox with `items-center` which vertically centers children. When text wraps, this can cause visual misalignment. The text container needs explicit width constraints to prevent awkward wrapping.
 
 ### Solution
-Remove the redundant paragraph that duplicates the like count below the interaction row.
+1. Add `min-w-0` to the text container to allow proper text truncation in flex layouts
+2. Add `flex-1` to let it take available space without overflowing
+3. Keep the `text-left` class for alignment
 
 ---
 
@@ -16,19 +19,28 @@ Remove the redundant paragraph that duplicates the like count below the interact
 
 **File:** `src/pages/Home.tsx`
 
-**Remove lines 551-555:**
+**Current (line 434):**
 ```tsx
-{(post.likes_count || 0) > 0 && (
-  <p className="text-white/80 text-sm">
-    {post.likes_count} {post.likes_count === 1 ? 'like' : 'likes'}
-  </p>
-)}
+<div className="text-left">
 ```
 
-**Reason:** The like count is already displayed at line 515 in the interaction bar as a clickable button: `{post.likes_count || 0} {post.likes_count === 1 ? 'like' : 'likes'}`
+**Updated:**
+```tsx
+<div className="text-left min-w-0 flex-1">
+```
+
+This ensures:
+- Text stays left-aligned
+- Long venue names don't break the layout
+- Proper text wrapping within the available space
 
 ---
 
-### Result
-Posts will show the like count only once, in the interaction row alongside the heart icon.
+### Technical Details
+
+| Property | Purpose |
+|----------|---------|
+| `text-left` | Keeps text left-aligned |
+| `min-w-0` | Allows flex child to shrink below content size (prevents overflow) |
+| `flex-1` | Takes remaining space in the flex container |
 
