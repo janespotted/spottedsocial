@@ -207,6 +207,52 @@ const DEMO_BUZZ_MEDIA = [
   "https://images.unsplash.com/photo-1571266028243-d220c6563ccc?w=800&h=800&fit=crop",
 ];
 
+// Demo plan descriptions for Plans Feed
+const DEMO_PLAN_DESCRIPTIONS = [
+  "Who's trying to go out tonight?",
+  "Looking for a chill spot to start the night",
+  "Birthday celebration! Come through 🎂",
+  "Need a dance floor ASAP",
+  "Pregaming at mine then hitting this place",
+  "Heard the DJ tonight is insane",
+  "Anyone down for a lowkey night?",
+  "It's been too long, we're going OUT",
+  "Rooftop vibes only 🌆",
+  "Spontaneous night out, who's in?",
+];
+
+// Helper to generate upcoming weekend dates (Fri/Sat/Sun)
+function getWeekendPlanDates(): string[] {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = Sunday
+  const dates: string[] = [];
+  
+  // Calculate days until next Friday (or today if already Fri/Sat/Sun)
+  let daysUntilFriday: number;
+  if (dayOfWeek === 0) {
+    // Sunday - use this weekend (go back to Friday)
+    daysUntilFriday = -2;
+  } else if (dayOfWeek === 6) {
+    // Saturday - use this weekend
+    daysUntilFriday = -1;
+  } else if (dayOfWeek === 5) {
+    // Friday - use today
+    daysUntilFriday = 0;
+  } else {
+    // Mon-Thu - use upcoming Friday
+    daysUntilFriday = 5 - dayOfWeek;
+  }
+  
+  // Add Friday, Saturday, Sunday
+  for (let i = 0; i < 3; i++) {
+    const planDate = new Date(today);
+    planDate.setDate(today.getDate() + daysUntilFriday + i);
+    dates.push(planDate.toISOString().split('T')[0]); // YYYY-MM-DD format
+  }
+  
+  return dates;
+}
+
 // Venue-specific reviews with accurate details from real-world research
 const VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | null; rating: number }> }> = {
   "Le Bain": {
@@ -1756,6 +1802,93 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('stories').insert(buzzStories);
       }
 
+      // 11. Create demo plans for Plans Feed
+      console.log('Creating demo plans...');
+      const weekendDates = getWeekendPlanDates();
+      const planTimes = ['20:00', '21:00', '21:30', '22:00', '22:30', '23:00'];
+      const demoPlans = [];
+
+      // Create 10 plans from random demo users
+      const planCreators = getRandomItems(demoUserIds, 10);
+      for (let i = 0; i < planCreators.length; i++) {
+        const creatorId = planCreators[i];
+        const venue = SELECTED_VENUES[Math.floor(Math.random() * Math.min(20, SELECTED_VENUES.length))];
+        const venueId = venueIdMap.get(venue.name);
+        const planDate = weekendDates[Math.floor(Math.random() * weekendDates.length)];
+        const planTime = planTimes[Math.floor(Math.random() * planTimes.length)];
+        const description = DEMO_PLAN_DESCRIPTIONS[Math.floor(Math.random() * DEMO_PLAN_DESCRIPTIONS.length)];
+        
+        // Calculate expires_at (end of plan_date day at 5am next morning)
+        const expiresAt = new Date(planDate + 'T05:00:00');
+        expiresAt.setDate(expiresAt.getDate() + 1);
+        
+        demoPlans.push({
+          user_id: creatorId,
+          venue_id: venueId,
+          venue_name: venue.name,
+          plan_date: planDate,
+          plan_time: planTime,
+          description: description,
+          visibility: Math.random() > 0.3 ? 'friends' : 'close_friends',
+          expires_at: expiresAt.toISOString(),
+          created_at: getRecentTimestamp(12), // Within last 12 hours
+          is_demo: true,
+          score: 0,
+          comments_count: 0,
+        });
+      }
+
+      let plansCreated = 0;
+      let planDownsCreated = 0;
+
+      if (demoPlans.length > 0) {
+        const { data: insertedPlans, error: plansError } = await supabaseAdmin
+          .from('plans')
+          .insert(demoPlans)
+          .select('id, user_id');
+
+        if (plansError) {
+          console.error('Error inserting plans:', plansError);
+        } else {
+          plansCreated = insertedPlans?.length || 0;
+          console.log(`Created ${plansCreated} demo plans`);
+
+          // Add "I'm Down" reactions to plans
+          if (insertedPlans && insertedPlans.length > 0) {
+            const planDowns = [];
+            
+            for (const plan of insertedPlans) {
+              // 60% of plans get 1-4 "I'm Down" reactions
+              if (Math.random() < 0.6) {
+                const numDowns = 1 + Math.floor(Math.random() * 4);
+                const downUsers = getRandomItems(
+                  demoUserIds.filter(id => id !== plan.user_id),
+                  numDowns
+                );
+                
+                for (const downUserId of downUsers) {
+                  planDowns.push({
+                    plan_id: plan.id,
+                    user_id: downUserId,
+                    created_at: getRecentTimestamp(6),
+                  });
+                }
+              }
+            }
+            
+            if (planDowns.length > 0) {
+              const { error: downsError } = await supabaseAdmin.from('plan_downs').insert(planDowns);
+              if (downsError) {
+                console.error('Error inserting plan_downs:', downsError);
+              } else {
+                planDownsCreated = planDowns.length;
+                console.log(`Created ${planDownsCreated} "I'm Down" reactions`);
+              }
+            }
+          }
+        }
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
@@ -1768,6 +1901,8 @@ Deno.serve(async (req) => {
             venues: SELECTED_VENUES.length,
             activeUsers: nightStatuses.length,
             buzzMessages: buzzMessages.length,
+            plans: plansCreated,
+            planDowns: planDownsCreated,
             city: city,
           }
         }),
@@ -1824,6 +1959,21 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from('posts').delete().eq('is_demo', true);
       await supabaseAdmin.from('checkins').delete().eq('is_demo', true);
       await supabaseAdmin.from('night_statuses').delete().eq('is_demo', true);
+      
+      // Delete demo plans and related data
+      const { data: demoPlans } = await supabaseAdmin
+        .from('plans')
+        .select('id')
+        .eq('is_demo', true);
+      const planIds = demoPlans?.map(p => p.id) || [];
+      
+      if (planIds.length > 0) {
+        await supabaseAdmin.from('plan_downs').delete().in('plan_id', planIds);
+        await supabaseAdmin.from('plan_comments').delete().in('plan_id', planIds);
+        await supabaseAdmin.from('plan_votes').delete().in('plan_id', planIds);
+        await supabaseAdmin.from('plan_participants').delete().in('plan_id', planIds);
+      }
+      await supabaseAdmin.from('plans').delete().eq('is_demo', true);
       
       // Delete venue reviews (via demo user IDs since no is_demo column)
       if (demoIds.length > 0) {
