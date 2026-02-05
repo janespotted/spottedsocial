@@ -410,6 +410,17 @@ export default function Auth() {
             </Button>
           </form>
         </CardContent>
+        
+        {/* Business Portal Link */}
+        <div className="text-center pb-6">
+          <Link 
+            to="/business/auth" 
+            className="text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            Own a venue?{' '}
+            <span className="text-primary hover:underline">Sign in for Business</span>
+          </Link>
+        </div>
       </Card>
     </div>
   );
