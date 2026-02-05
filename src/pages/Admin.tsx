@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { ArrowLeft, Lock, Search, Plus, X, MapPin, Star, FileText, BarChart3, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Lock, Search, Plus, X, MapPin, Star, FileText, BarChart3, ArrowUp, ArrowDown, Calendar } from 'lucide-react';
  import { Building2 } from 'lucide-react';
 import { VenueReportsPanel } from '@/components/admin/VenueReportsPanel';
 import { DetectionAnalyticsPanel } from '@/components/admin/DetectionAnalyticsPanel';
  import { ClaimRequestsPanel } from '@/components/admin/ClaimRequestsPanel';
+import { EventsPanel } from '@/components/admin/EventsPanel';
 
 interface Venue {
   id: string;
@@ -304,10 +305,14 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="promoted" className="w-full">
-           <TabsList className="w-full bg-white/5 border border-white/10 grid grid-cols-5">
+           <TabsList className="w-full bg-white/5 border border-white/10 grid grid-cols-6">
             <TabsTrigger value="promoted" className="data-[state=active]:bg-primary text-xs">
               <Star className="h-3 w-3 mr-1" />
               Promoted
+            </TabsTrigger>
+            <TabsTrigger value="events" className="data-[state=active]:bg-primary text-xs">
+              <Calendar className="h-3 w-3 mr-1" />
+              Events
             </TabsTrigger>
             <TabsTrigger value="all" className="data-[state=active]:bg-primary text-xs">
               <MapPin className="h-3 w-3 mr-1" />
@@ -693,6 +698,11 @@ export default function Admin() {
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="mt-4 space-y-4">
             <DetectionAnalyticsPanel />
+          </TabsContent>
+
+          {/* Events Tab */}
+          <TabsContent value="events" className="mt-4 space-y-4">
+            <EventsPanel selectedCity={selectedCity} />
           </TabsContent>
         </Tabs>
       </div>

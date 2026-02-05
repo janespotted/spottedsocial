@@ -348,11 +348,13 @@ export type Database = {
           city: string | null
           cover_image_url: string | null
           created_at: string
+          created_by: string | null
           description: string | null
           end_time: string | null
           event_date: string
           expires_at: string
           id: string
+          is_demo: boolean | null
           neighborhood: string | null
           start_time: string
           ticket_url: string | null
@@ -364,11 +366,13 @@ export type Database = {
           city?: string | null
           cover_image_url?: string | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           end_time?: string | null
           event_date: string
           expires_at: string
           id?: string
+          is_demo?: boolean | null
           neighborhood?: string | null
           start_time: string
           ticket_url?: string | null
@@ -380,11 +384,13 @@ export type Database = {
           city?: string | null
           cover_image_url?: string | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           end_time?: string | null
           event_date?: string
           expires_at?: string
           id?: string
+          is_demo?: boolean | null
           neighborhood?: string | null
           start_time?: string
           ticket_url?: string | null
