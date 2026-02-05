@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { haptic } from '@/lib/haptics';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useUserCity } from '@/hooks/useUserCity';
+ import { EventCard } from './EventCard';
 
 interface Plan {
   id: string;
@@ -32,12 +33,43 @@ interface Plan {
   };
 }
 
+ interface Event {
+   id: string;
+   venue_id: string | null;
+   venue_name: string;
+   title: string;
+   description: string | null;
+   event_date: string;
+   start_time: string;
+   end_time: string | null;
+   cover_image_url: string | null;
+   ticket_url: string | null;
+   city: string | null;
+   neighborhood: string | null;
+ }
+ 
+ interface FriendRsvp {
+   id: string;
+   display_name: string;
+   avatar_url: string | null;
+   rsvp_type: 'interested' | 'going';
+ }
+ 
+ interface EventWithFriends extends Event {
+   friendsInterested: FriendRsvp[];
+ }
+ 
+ type FeedItem = 
+   | { type: 'plan'; data: Plan }
+   | { type: 'event'; data: EventWithFriends };
+ 
 interface PlansFeedProps {
   userId: string;
 }
 
 export function PlansFeed({ userId }: PlansFeedProps) {
   const [plans, setPlans] = useState<Plan[]>([]);
+   const [events, setEvents] = useState<EventWithFriends[]>([]);
   const [userVotes, setUserVotes] = useState<Record<string, 'up' | 'down'>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -129,6 +161,107 @@ export function PlansFeed({ userId }: PlansFeedProps) {
     }
   };
 
+   const fetchEvents = async () => {
+     if (!userId) return;
+     
+     try {
+       // Get user's friends
+       const { data: friendships } = await supabase
+         .from('friendships')
+         .select('friend_id, user_id')
+         .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+         .eq('status', 'accepted');
+ 
+       if (!friendships || friendships.length === 0) {
+         setEvents([]);
+         return;
+       }
+ 
+       const friendIds = friendships.map(f => f.user_id === userId ? f.friend_id : f.user_id);
+ 
+       // Fetch upcoming events (today and future)
+       const today = new Date().toISOString().split('T')[0];
+       const { data: eventsData } = await supabase
+         .from('events')
+         .select('*')
+         .gte('event_date', today)
+         .gt('expires_at', new Date().toISOString())
+         .order('event_date', { ascending: true });
+ 
+       if (!eventsData || eventsData.length === 0) {
+         setEvents([]);
+         return;
+       }
+ 
+       // Get RSVPs for these events
+       const eventIds = eventsData.map(e => e.id);
+       const { data: rsvps } = await supabase
+         .from('event_rsvps')
+         .select('event_id, user_id, rsvp_type')
+         .in('event_id', eventIds);
+ 
+       if (!rsvps || rsvps.length === 0) {
+         setEvents([]);
+         return;
+       }
+ 
+       // Filter to friend RSVPs only
+       const friendRsvps = rsvps.filter(r => friendIds.includes(r.user_id));
+       
+       if (friendRsvps.length === 0) {
+         setEvents([]);
+         return;
+       }
+ 
+       // Get profiles for friends who RSVP'd
+       const rsvpUserIds = [...new Set(friendRsvps.map(r => r.user_id))];
+       const { data: profiles } = await supabase
+         .rpc('get_profiles_safe')
+         .in('id', rsvpUserIds);
+ 
+       const profileMap = new Map(
+         (profiles || []).map((p: { id: string; display_name: string; avatar_url: string | null }) => [p.id, p])
+       );
+ 
+       // Build events with friend data, only include events with friend RSVPs
+       const eventsWithFriends: EventWithFriends[] = [];
+       
+       for (const event of eventsData) {
+         const eventFriendRsvps = friendRsvps.filter(r => r.event_id === event.id);
+         
+         if (eventFriendRsvps.length > 0) {
+           const friendsInterested: FriendRsvp[] = eventFriendRsvps
+             .map(r => {
+               const profile = profileMap.get(r.user_id);
+               if (!profile) return null;
+               return {
+                 id: r.user_id,
+                 display_name: profile.display_name,
+                 avatar_url: profile.avatar_url,
+                 rsvp_type: r.rsvp_type as 'interested' | 'going',
+               };
+             })
+             .filter((f): f is FriendRsvp => f !== null);
+ 
+           if (friendsInterested.length > 0) {
+             eventsWithFriends.push({
+               ...event,
+               friendsInterested,
+             });
+           }
+         }
+       }
+ 
+       // Sort by friend count (desc)
+       eventsWithFriends.sort((a, b) => b.friendsInterested.length - a.friendsInterested.length);
+       
+       setEvents(eventsWithFriends);
+     } catch (error) {
+       console.error('Error fetching events:', error);
+       setEvents([]);
+     }
+   };
+ 
   const handleChangeNeighborhood = async (neighborhood: string) => {
     if (!userId) return;
     
@@ -280,6 +413,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
   useEffect(() => {
     fetchPlans();
     fetchPlanningFriends();
+     fetchEvents();
   }, [userId, demoEnabled]);
 
   const handlePlanCreated = () => {
@@ -300,6 +434,35 @@ export function PlansFeed({ userId }: PlansFeedProps) {
     fetchPlans();
   };
 
+   const handleEventRsvpChange = () => {
+     fetchEvents();
+   };
+ 
+   // Build merged feed items
+   const feedItems: FeedItem[] = [
+     ...plans.map(plan => ({ type: 'plan' as const, data: plan })),
+     ...events.map(event => ({ type: 'event' as const, data: event })),
+   ];
+ 
+   // Sort: events by friend count, plans by score, interleave naturally
+   feedItems.sort((a, b) => {
+     // Events with more friends first
+     if (a.type === 'event' && b.type === 'event') {
+       return b.data.friendsInterested.length - a.data.friendsInterested.length;
+     }
+     if (a.type === 'plan' && b.type === 'plan') {
+       return b.data.score - a.data.score;
+     }
+     // Mix events with plans - events with 2+ friends go higher
+     if (a.type === 'event' && b.type === 'plan') {
+       return a.data.friendsInterested.length >= 2 ? -1 : 1;
+     }
+     if (a.type === 'plan' && b.type === 'event') {
+       return b.data.friendsInterested.length >= 2 ? 1 : -1;
+     }
+     return 0;
+   });
+ 
   if (isLoading) {
     return (
       <div className="space-y-5 px-4">
@@ -358,7 +521,7 @@ export function PlansFeed({ userId }: PlansFeedProps) {
         </button>
       </div>
 
-      {plans.length === 0 ? (
+       {feedItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center mb-5">
             <Calendar className="w-10 h-10 text-primary" />
@@ -369,17 +532,27 @@ export function PlansFeed({ userId }: PlansFeedProps) {
           </p>
         </div>
       ) : (
-        plans.map(plan => (
-          <PlanItem
-            key={plan.id}
-            plan={plan}
-            currentUserId={userId}
-            userVote={userVotes[plan.id] || null}
-            onVoteChange={fetchPlans}
-            onEdit={handleEditPlan}
-            onDelete={handleDeletePlan}
-          />
-        ))
+         feedItems.map(item => 
+           item.type === 'plan' ? (
+             <PlanItem
+               key={`plan-${item.data.id}`}
+               plan={item.data}
+               currentUserId={userId}
+               userVote={userVotes[item.data.id] || null}
+               onVoteChange={fetchPlans}
+               onEdit={handleEditPlan}
+               onDelete={handleDeletePlan}
+             />
+           ) : (
+             <EventCard
+               key={`event-${item.data.id}`}
+               event={item.data}
+               currentUserId={userId}
+               friendsInterested={item.data.friendsInterested}
+               onRsvpChange={handleEventRsvpChange}
+             />
+           )
+         )
       )}
 
       <CreatePlanDialog
