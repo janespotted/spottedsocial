@@ -1,164 +1,181 @@
 
 
-## Friend-Filtered Events Integration (B + C)
+## Auth Page Visual Enhancement
 
-### Core Principle
-Events only surface when friends are interested - no event discovery, only social signals.
-
----
-
-### Phase 1: Database Schema
-
-Create two new tables:
-
-**`events` table:**
-| Column | Type | Purpose |
-|--------|------|---------|
-| id | UUID | Primary key |
-| venue_id | UUID | Links to venues table |
-| venue_name | TEXT | Venue display name |
-| title | TEXT | Event name |
-| description | TEXT | Optional details |
-| event_date | DATE | When it happens |
-| start_time | TIME | Start time |
-| end_time | TIME | Optional end time |
-| cover_image_url | TEXT | Event image |
-| ticket_url | TEXT | External ticketing link |
-| city | TEXT | For filtering |
-| neighborhood | TEXT | For filtering |
-| created_at | TIMESTAMPTZ | Creation timestamp |
-| expires_at | TIMESTAMPTZ | Auto-cleanup |
-
-**`event_rsvps` table:**
-| Column | Type | Purpose |
-|--------|------|---------|
-| id | UUID | Primary key |
-| event_id | UUID | Foreign key to events |
-| user_id | UUID | Who RSVP'd |
-| rsvp_type | TEXT | 'interested' or 'going' |
-| created_at | TIMESTAMPTZ | When they RSVP'd |
-| UNIQUE(event_id, user_id) | | One RSVP per user per event |
-
-**RLS Policies:**
-- Events: readable by all authenticated users
-- RSVPs: users can manage own, read friends'
+### Overview
+Upgrade the Auth page to feel more premium and visually engaging while maintaining the app's signature aesthetic (deep purple gradients, neon glow effects, glassmorphism).
 
 ---
 
-### Phase 2: EventCard Component
+### Current Issues
+- No logo or visual anchor at the top
+- Card feels flat despite having glow effects
+- Plain text "Spotted" title without visual hierarchy
+- Input fields lack premium feel
+- No ambient visual elements to create depth
+- Divider line is too subtle
 
-Create `src/components/EventCard.tsx` - visually distinct from PlanItem:
+---
 
-**Visual Design:**
-- Subtle gradient background (different from plan cards)
-- Small "EVENT" pill/tag in corner
-- Cover image with overlay
-- Friend avatars prominently displayed (same pattern as plans)
-- "I'm Down" button (same UX as plans for consistency)
+### Proposed Changes
 
-**Layout:**
-```
+#### 1. Add Spotted Logo
+Import and display the yellow "S" logo above the title to create a strong visual anchor:
+- Logo size: 56x56px with subtle glow
+- Animate in with fade-in effect on load
+
+#### 2. Enhanced Card Styling
+Apply glassmorphism effect consistent with the rest of the app:
+- Use `glass-card` utility class pattern
+- Add inner glow and improved border gradients
+- Subtle background pattern or noise texture
+
+#### 3. Animated Background Elements
+Add floating ambient elements behind the card to create depth:
+- 2-3 large blurred purple/pink gradient orbs
+- Subtle slow-moving animation (floating effect)
+- Creates the "nightlife" atmosphere
+
+#### 4. Improved Input Styling
+Upgrade input fields to match premium feel:
+- Add subtle inner shadow
+- Improve placeholder text color
+- Add icon prefixes (envelope for email, lock for password)
+- Smooth focus transitions with glow
+
+#### 5. Better Visual Hierarchy
+- Smaller, more refined "Spotted" wordmark
+- Add subtle tagline styling
+- Improved spacing throughout
+
+#### 6. Enhanced Divider
+- Gradient line instead of solid
+- Larger "or" with subtle background
+
+---
+
+### Visual Layout (After Changes)
+
+```text
 +------------------------------------------+
-| EVENT                    [Share] [Ticket]|
-| [Cover Image with gradient overlay]      |
-| "DJ Night at The Rooftop"                |
-| Sat, Jan 27 at 10PM                      |
-| (avatar)(avatar)(avatar) 3 friends going |
-| [I'm Down]                               |
+|        (floating gradient orbs)          |
+|                                          |
+|     +------------------------------+     |
+|     |                              |     |
+|     |           [S Logo]           |     |
+|     |           Spotted            |     |
+|     |                              |     |
+|     |  "Welcome back! Sign in..."  |     |
+|     |                              |     |
+|     | +--[G]-- Continue with --+   |     |
+|     |                              |     |
+|     | ╌╌╌╌╌╌╌╌ or ╌╌╌╌╌╌╌╌╌╌╌╌    |     |
+|     |                              |     |
+|     |  [mail] Email                |     |
+|     |  ┌────────────────────────┐  |     |
+|     |  │ you@example.com        │  |     |
+|     |  └────────────────────────┘  |     |
+|     |                              |     |
+|     |  [lock] Password             |     |
+|     |  ┌────────────────────────┐  |     |
+|     |  │ ••••••••               │  |     |
+|     |  └────────────────────────┘  |     |
+|     |                              |     |
+|     |      Forgot password?        |     |
+|     |                              |     |
+|     |  ╭──────────────────────╮    |     |
+|     |  │      Sign In         │    |     |
+|     |  ╰──────────────────────╯    |     |
+|     |                              |     |
+|     |  Don't have an account?      |     |
+|     |                              |     |
+|     +------------------------------+     |
+|                                          |
 +------------------------------------------+
 ```
 
-**Key behavior:**
-- Venue name tappable (opens VenueIdCard)
-- Friend avatars tappable (opens FriendIdCard)
-- "I'm Down" triggers same haptic/confetti as plans
-
 ---
 
-### Phase 3: Integrate Events into PlansFeed
+### Technical Implementation
 
-Modify `src/components/PlansFeed.tsx`:
+#### File Changes
 
-1. **Fetch events with friend RSVPs:**
-   - Query events for today/upcoming
-   - Join with event_rsvps to count friend interest
-   - Only include events where >= 1 friend has RSVP'd
+| File | Changes |
+|------|---------|
+| `src/pages/Auth.tsx` | Add logo, animated orbs, improve styling |
+| `src/index.css` | Add floating orb animation keyframes |
 
-2. **Merge and sort:**
-   - Combine plans and friend-filtered events
-   - Sort by: friend count (desc), then date (asc)
-   - Events interleave naturally with plans
+#### New CSS Animations (in `src/index.css`)
 
-3. **Empty state unchanged:**
-   - If no plans AND no friend-attended events, show current empty state
-   - Events alone don't trigger display (no discovery mode)
+```css
+@keyframes float-slow {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(10px, -15px) scale(1.05);
+  }
+}
 
-**Feed items array becomes:**
-```typescript
-type FeedItem = 
-  | { type: 'plan'; data: Plan }
-  | { type: 'event'; data: Event; friendsInterested: number };
+.animate-float-slow {
+  animation: float-slow 8s ease-in-out infinite;
+}
 
-// Render logic
-feedItems.map(item => 
-  item.type === 'plan' 
-    ? <PlanItem ... />
-    : <EventCard ... />
-)
+.animate-float-slow-reverse {
+  animation: float-slow 10s ease-in-out infinite reverse;
+}
+```
+
+#### Component Structure Updates
+
+```tsx
+// Floating background orbs
+<div className="fixed inset-0 overflow-hidden pointer-events-none">
+  <div className="absolute -top-20 -left-20 w-64 h-64 bg-[#a855f7]/20 
+    rounded-full blur-3xl animate-float-slow" />
+  <div className="absolute -bottom-32 -right-20 w-80 h-80 bg-[#ec4899]/15 
+    rounded-full blur-3xl animate-float-slow-reverse" />
+</div>
+
+// Logo section
+<img 
+  src={spottedLogo} 
+  alt="Spotted" 
+  className="w-14 h-14 mx-auto mb-4 drop-shadow-[0_0_15px_rgba(212,255,0,0.5)]"
+/>
+
+// Enhanced card class
+className="w-full max-w-[430px] mx-auto glass-card rounded-3xl 
+  border border-[#a855f7]/30 shadow-[0_0_60px_rgba(168,85,247,0.3)]"
+```
+
+#### Input Enhancement with Icons
+
+```tsx
+<div className="relative">
+  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 
+    h-4 w-4 text-white/40" />
+  <Input
+    className="pl-10 ..."
+  />
+</div>
 ```
 
 ---
 
-### Phase 4: Events in VenueIdCard More Info
+### Summary of Changes
 
-Add "Upcoming Events" section in the More Info collapsible:
-
-**Location:** Inside `CollapsibleContent`, after "Tonight's Buzz"
-
-**Display logic:**
-1. Query events for this venue_id
-2. Show only if events exist
-3. Friend-first display: "2 friends interested" with avatars
-4. Minimal event info: title, date, time
-
-**UI snippet:**
-```
-+----------------------------------+
-| Upcoming Events                  |
-| +------------------------------+ |
-| | "DJ Night"                   | |
-| | Sat 10PM                     | |
-| | (av)(av) 2 friends interested| |
-| | [I'm Down]                   | |
-| +------------------------------+ |
-+----------------------------------+
-```
+1. **Logo**: Yellow "S" logo with glow effect above title
+2. **Background**: Floating gradient orbs with slow animation
+3. **Card**: Glass-card effect with enhanced shadows
+4. **Inputs**: Icon prefixes (Mail, Lock) for visual clarity
+5. **Divider**: Gradient line with styled "or" badge
+6. **Animations**: Subtle fade-in on card mount
+7. **Spacing**: Refined padding and margins for better balance
 
 ---
 
-### Files to Create/Modify
-
-| File | Action |
-|------|--------|
-| Database migration | Create `events` and `event_rsvps` tables |
-| `src/components/EventCard.tsx` | NEW - Event card component |
-| `src/components/PlansFeed.tsx` | Fetch and merge events, render EventCard |
-| `src/components/VenueIdCard.tsx` | Add "Upcoming Events" in More Info |
-
----
-
-### What This Avoids
-
-- No new navigation tab (keeps 5-tab nav clean)
-- No Eventbrite-style discovery browse
-- No events without friend context
-- Maintains spontaneous feel - events surface because friends are interested, not because algorithm recommends them
-
----
-
-### Future Considerations (Not in This Phase)
-
-- Notifications when friends RSVP to events
-- Weekend nudge: "3 events your friends are eyeing this weekend"
-- Event creation by users (currently assumes events are seeded/imported)
+### Files to Modify
+- `src/pages/Auth.tsx` - Main visual updates
+- `src/index.css` - Add floating animation keyframes
 
