@@ -604,7 +604,7 @@ export function ActivityTab() {
     <div className="space-y-4">
       {/* Friend Requests - Always at top */}
       <div
-        onClick={() => navigate('/friend-requests')}
+        onClick={() => navigate('/friends', { state: { tab: 'requests' } })}
         className="bg-gradient-to-r from-[#2d1b4e]/80 to-[#3d1b5e]/60 border border-[#a855f7]/30 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-[#2d1b4e]/80 transition-all hover:border-[#a855f7]/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
       >
         <div className="flex items-center gap-3">
