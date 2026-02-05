@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { ArrowLeft, Lock, Search, Plus, X, MapPin, Star, FileText, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Lock, Search, Plus, X, MapPin, Star, FileText, BarChart3, ArrowUp, ArrowDown } from 'lucide-react';
  import { Building2 } from 'lucide-react';
 import { VenueReportsPanel } from '@/components/admin/VenueReportsPanel';
 import { DetectionAnalyticsPanel } from '@/components/admin/DetectionAnalyticsPanel';
@@ -22,9 +22,12 @@ interface Venue {
   is_leaderboard_promoted: boolean;
   is_map_promoted: boolean;
   popularity_rank: number | null;
+  leaderboard_promo_order: number | null;
   lat: number;
   lng: number;
 }
+
+const MAX_ACTIVE_SPOTS = 2;
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -57,7 +60,11 @@ export default function Admin() {
 
       const venues = data as Venue[];
       setAllVenues(venues);
-      setLeaderboardPromotedVenues(venues.filter(v => v.is_leaderboard_promoted));
+      // Sort by leaderboard_promo_order for proper Active/Waitlist display
+      const promotedVenues = venues
+        .filter(v => v.is_leaderboard_promoted)
+        .sort((a, b) => (a.leaderboard_promo_order || 999) - (b.leaderboard_promo_order || 999));
+      setLeaderboardPromotedVenues(promotedVenues);
       setMapPromotedVenues(venues.filter(v => v.is_map_promoted));
     } catch (err) {
       console.error('Error fetching venues:', err);
@@ -66,6 +73,14 @@ export default function Admin() {
       setLoading(false);
     }
   };
+
+  // Split promoted venues into Active (order 1-2) and Waitlist (order 3+)
+  const activeVenues = leaderboardPromotedVenues.filter(v => 
+    v.leaderboard_promo_order && v.leaderboard_promo_order <= MAX_ACTIVE_SPOTS
+  );
+  const waitlistVenues = leaderboardPromotedVenues.filter(v => 
+    !v.leaderboard_promo_order || v.leaderboard_promo_order > MAX_ACTIVE_SPOTS
+  );
 
   const handleLeaderboardSearch = (query: string, searchState: string, setResults: (venues: Venue[]) => void) => {
     if (query.trim().length < 2) {
@@ -95,14 +110,22 @@ export default function Admin() {
 
   const addToLeaderboardPromoted = async (venue: Venue) => {
     try {
+      // Get next order number (add to waitlist by default)
+      const maxOrder = Math.max(0, ...leaderboardPromotedVenues.map(v => v.leaderboard_promo_order || 0));
+      const newOrder = maxOrder + 1;
+      
       const { error } = await supabase
         .from('venues')
-        .update({ is_leaderboard_promoted: true })
+        .update({ 
+          is_leaderboard_promoted: true,
+          leaderboard_promo_order: newOrder
+        })
         .eq('id', venue.id);
 
       if (error) throw error;
 
-      toast.success(`${venue.name} added to leaderboard promoted`);
+      const isActive = newOrder <= MAX_ACTIVE_SPOTS;
+      toast.success(`${venue.name} added to ${isActive ? 'active spots' : 'waitlist'}`);
       fetchVenues();
     } catch (err) {
       console.error('Error promoting venue:', err);
@@ -112,18 +135,118 @@ export default function Admin() {
 
   const removeFromLeaderboardPromoted = async (venue: Venue) => {
     try {
+      const removedOrder = venue.leaderboard_promo_order || 0;
+      
       const { error } = await supabase
         .from('venues')
-        .update({ is_leaderboard_promoted: false })
+        .update({ 
+          is_leaderboard_promoted: false,
+          leaderboard_promo_order: null
+        })
         .eq('id', venue.id);
 
       if (error) throw error;
+
+      // Reorder remaining venues to fill the gap
+      if (removedOrder > 0) {
+        const venuesToUpdate = leaderboardPromotedVenues
+          .filter(v => v.id !== venue.id && v.leaderboard_promo_order && v.leaderboard_promo_order > removedOrder);
+        
+        for (const v of venuesToUpdate) {
+          await supabase
+            .from('venues')
+            .update({ leaderboard_promo_order: (v.leaderboard_promo_order || 0) - 1 })
+            .eq('id', v.id);
+        }
+      }
 
       toast.success(`${venue.name} removed from leaderboard promoted`);
       fetchVenues();
     } catch (err) {
       console.error('Error removing promoted venue:', err);
       toast.error('Failed to remove venue from leaderboard promoted');
+    }
+  };
+
+  const activateVenue = async (venue: Venue) => {
+    try {
+      // Move this venue to active spot 2, pushing others down
+      const currentActiveVenues = activeVenues.filter(v => v.id !== venue.id);
+      
+      // If both active spots are full, demote the second one to waitlist
+      if (currentActiveVenues.length >= MAX_ACTIVE_SPOTS) {
+        const venueTodemote = currentActiveVenues[MAX_ACTIVE_SPOTS - 1];
+        // Move it to position 3 (first waitlist position)
+        await supabase
+          .from('venues')
+          .update({ leaderboard_promo_order: MAX_ACTIVE_SPOTS + 1 })
+          .eq('id', venueTodemote.id);
+      }
+      
+      // Set the new venue to position 2 (or 1 if only one active)
+      const newOrder = Math.min(currentActiveVenues.length + 1, MAX_ACTIVE_SPOTS);
+      await supabase
+        .from('venues')
+        .update({ leaderboard_promo_order: newOrder })
+        .eq('id', venue.id);
+
+      toast.success(`${venue.name} activated! Now showing on leaderboard.`);
+      fetchVenues();
+    } catch (err) {
+      console.error('Error activating venue:', err);
+      toast.error('Failed to activate venue');
+    }
+  };
+
+  const moveVenueDown = async (venue: Venue) => {
+    try {
+      const currentOrder = venue.leaderboard_promo_order || 0;
+      const nextVenue = leaderboardPromotedVenues.find(v => v.leaderboard_promo_order === currentOrder + 1);
+      
+      if (!nextVenue) return;
+      
+      // Swap positions
+      await supabase
+        .from('venues')
+        .update({ leaderboard_promo_order: currentOrder + 1 })
+        .eq('id', venue.id);
+        
+      await supabase
+        .from('venues')
+        .update({ leaderboard_promo_order: currentOrder })
+        .eq('id', nextVenue.id);
+
+      toast.success(`${venue.name} moved down`);
+      fetchVenues();
+    } catch (err) {
+      console.error('Error moving venue:', err);
+      toast.error('Failed to move venue');
+    }
+  };
+
+  const moveVenueUp = async (venue: Venue) => {
+    try {
+      const currentOrder = venue.leaderboard_promo_order || 0;
+      const prevVenue = leaderboardPromotedVenues.find(v => v.leaderboard_promo_order === currentOrder - 1);
+      
+      if (!prevVenue) return;
+      
+      // Swap positions
+      await supabase
+        .from('venues')
+        .update({ leaderboard_promo_order: currentOrder - 1 })
+        .eq('id', venue.id);
+        
+      await supabase
+        .from('venues')
+        .update({ leaderboard_promo_order: currentOrder })
+        .eq('id', prevVenue.id);
+
+      toast.success(`${venue.name} moved up`);
+      fetchVenues();
+    } catch (err) {
+      console.error('Error moving venue:', err);
+      toast.error('Failed to move venue');
     }
   };
 
@@ -235,40 +358,124 @@ export default function Admin() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-white text-sm flex items-center gap-2">
                   <Star className="h-4 w-4 text-primary" />
-                  Leaderboard Promoted ({leaderboardPromotedVenues.length})
+                  Leaderboard Promoted
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {loading ? (
-                  <div className="text-white/50 text-sm">Loading...</div>
-                ) : leaderboardPromotedVenues.length === 0 ? (
-                  <div className="text-white/50 text-sm">No leaderboard promoted venues in {selectedCity.toUpperCase()}</div>
-                ) : (
-                  leaderboardPromotedVenues.map(venue => (
-                    <div
-                      key={venue.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10"
-                    >
-                      <div>
-                        <div className="text-white font-medium">{venue.name}</div>
-                        <div className="text-white/50 text-xs flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {venue.neighborhood}
+                {/* Active Spots Section */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="default" className="bg-green-600 text-white">
+                      ACTIVE SPOTS ({activeVenues.length}/{MAX_ACTIVE_SPOTS})
+                    </Badge>
+                    <span className="text-white/50 text-xs">Visible on leaderboard</span>
+                  </div>
+                  
+                  {loading ? (
+                    <div className="text-white/50 text-sm">Loading...</div>
+                  ) : activeVenues.length === 0 ? (
+                    <div className="text-white/40 text-sm p-3 rounded-lg bg-white/5 border border-dashed border-white/20">
+                      No active promoted venues. Add from waitlist or search below.
+                    </div>
+                  ) : (
+                    activeVenues.map((venue, index) => (
+                      <div
+                        key={venue.id}
+                        className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/30"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-green-400 font-bold text-lg">{venue.leaderboard_promo_order}</span>
+                          <div>
+                            <div className="text-white font-medium">{venue.name}</div>
+                            <div className="text-white/50 text-xs flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {venue.neighborhood}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {index < activeVenues.length - 1 && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => moveVenueDown(venue)}
+                              className="text-white/50 hover:text-white hover:bg-white/10 h-8 w-8"
+                              title="Move down"
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeFromLeaderboardPromoted(venue)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8"
+                            title="Remove"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeFromLeaderboardPromoted(venue)}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    ))
+                  )}
+                </div>
+
+                {/* Waitlist Section */}
+                <div className="space-y-2 pt-3 border-t border-white/10">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="secondary" className="bg-white/10 text-white/70">
+                      WAITLIST ({waitlistVenues.length})
+                    </Badge>
+                    <span className="text-white/40 text-xs">Not visible until activated</span>
+                  </div>
+                  
+                  {waitlistVenues.length === 0 ? (
+                    <div className="text-white/40 text-sm p-2">No venues in waitlist</div>
+                  ) : (
+                    waitlistVenues.map((venue, index) => (
+                      <div
+                        key={venue.id}
+                        className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10"
                       >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))
-                )}
-                {/* Add to Leaderboard Promoted Search */}
+                        <div className="flex items-center gap-3">
+                          <span className="text-white/40 font-medium">{venue.leaderboard_promo_order}</span>
+                          <div>
+                            <div className="text-white font-medium">{venue.name}</div>
+                            <div className="text-white/50 text-xs flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {venue.neighborhood}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => activateVenue(venue)}
+                            className="text-green-400 hover:text-green-300 hover:bg-green-500/10 h-8 px-2"
+                            title="Activate (move to active spot)"
+                          >
+                            <ArrowUp className="h-3 w-3 mr-1" />
+                            Activate
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeFromLeaderboardPromoted(venue)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8"
+                            title="Remove"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add to Waitlist Search */}
                 <div className="pt-3 border-t border-white/10">
+                  <div className="text-white/50 text-xs mb-2">Add venue to waitlist:</div>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
                     <Input
