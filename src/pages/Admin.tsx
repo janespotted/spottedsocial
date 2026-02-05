@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,8 @@ interface Venue {
   neighborhood: string;
   city: string;
   type: string;
-  is_promoted: boolean;
+  is_leaderboard_promoted: boolean;
+  is_map_promoted: boolean;
   popularity_rank: number | null;
   lat: number;
   lng: number;
@@ -28,11 +29,16 @@ interface Venue {
 export default function Admin() {
   const navigate = useNavigate();
   const [selectedCity, setSelectedCity] = useState<'nyc' | 'la' | 'pb'>('nyc');
-  const [promotedVenues, setPromotedVenues] = useState<Venue[]>([]);
+  const [leaderboardPromotedVenues, setLeaderboardPromotedVenues] = useState<Venue[]>([]);
+  const [mapPromotedVenues, setMapPromotedVenues] = useState<Venue[]>([]);
   const [allVenues, setAllVenues] = useState<Venue[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [leaderboardSearchQuery, setLeaderboardSearchQuery] = useState('');
+  const [leaderboardSearchResults, setLeaderboardSearchResults] = useState<Venue[]>([]);
+  const [mapSearchQuery, setMapSearchQuery] = useState('');
+  const [mapSearchResults, setMapSearchResults] = useState<Venue[]>([]);
 
   useEffect(() => {
     fetchVenues();
@@ -51,7 +57,8 @@ export default function Admin() {
 
       const venues = data as Venue[];
       setAllVenues(venues);
-      setPromotedVenues(venues.filter(v => v.is_promoted));
+      setLeaderboardPromotedVenues(venues.filter(v => v.is_leaderboard_promoted));
+      setMapPromotedVenues(venues.filter(v => v.is_map_promoted));
     } catch (err) {
       console.error('Error fetching venues:', err);
       toast.error('Failed to load venues');
@@ -60,53 +67,97 @@ export default function Admin() {
     }
   };
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
+  const handleLeaderboardSearch = (query: string, searchState: string, setResults: (venues: Venue[]) => void) => {
     if (query.trim().length < 2) {
-      setSearchResults([]);
+      setResults([]);
       return;
     }
 
     const results = allVenues.filter(v => 
-      !v.is_promoted && 
+      !v.is_leaderboard_promoted && 
       v.name.toLowerCase().includes(query.toLowerCase())
     );
-    setSearchResults(results.slice(0, 10));
+    setResults(results.slice(0, 10));
   };
 
-  const addToPromoted = async (venue: Venue) => {
+  const handleMapSearch = (query: string, setResults: (venues: Venue[]) => void) => {
+    if (query.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+
+    const results = allVenues.filter(v => 
+      !v.is_map_promoted && 
+      v.name.toLowerCase().includes(query.toLowerCase())
+    );
+    setResults(results.slice(0, 10));
+  };
+
+  const addToLeaderboardPromoted = async (venue: Venue) => {
     try {
       const { error } = await supabase
         .from('venues')
-        .update({ is_promoted: true })
+        .update({ is_leaderboard_promoted: true })
         .eq('id', venue.id);
 
       if (error) throw error;
 
-      toast.success(`${venue.name} added to promoted venues`);
+      toast.success(`${venue.name} added to leaderboard promoted`);
       fetchVenues();
-      setSearchQuery('');
-      setSearchResults([]);
     } catch (err) {
       console.error('Error promoting venue:', err);
-      toast.error('Failed to add venue to promoted');
+      toast.error('Failed to add venue to leaderboard promoted');
     }
   };
 
-  const removeFromPromoted = async (venue: Venue) => {
+  const removeFromLeaderboardPromoted = async (venue: Venue) => {
     try {
       const { error } = await supabase
         .from('venues')
-        .update({ is_promoted: false })
+        .update({ is_leaderboard_promoted: false })
         .eq('id', venue.id);
 
       if (error) throw error;
 
-      toast.success(`${venue.name} removed from promoted venues`);
+      toast.success(`${venue.name} removed from leaderboard promoted`);
       fetchVenues();
     } catch (err) {
       console.error('Error removing promoted venue:', err);
-      toast.error('Failed to remove venue from promoted');
+      toast.error('Failed to remove venue from leaderboard promoted');
+    }
+  };
+
+  const addToMapPromoted = async (venue: Venue) => {
+    try {
+      const { error } = await supabase
+        .from('venues')
+        .update({ is_map_promoted: true })
+        .eq('id', venue.id);
+
+      if (error) throw error;
+
+      toast.success(`${venue.name} added to map promoted`);
+      fetchVenues();
+    } catch (err) {
+      console.error('Error promoting venue:', err);
+      toast.error('Failed to add venue to map promoted');
+    }
+  };
+
+  const removeFromMapPromoted = async (venue: Venue) => {
+    try {
+      const { error } = await supabase
+        .from('venues')
+        .update({ is_map_promoted: false })
+        .eq('id', venue.id);
+
+      if (error) throw error;
+
+      toast.success(`${venue.name} removed from map promoted`);
+      fetchVenues();
+    } catch (err) {
+      console.error('Error removing promoted venue:', err);
+      toast.error('Failed to remove venue from map promoted');
     }
   };
 
@@ -179,21 +230,21 @@ export default function Admin() {
               </Button>
             </div>
 
-            {/* Currently Promoted */}
+            {/* Leaderboard Promotions Section */}
             <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
                 <CardTitle className="text-white text-sm flex items-center gap-2">
-                  <Star className="h-4 w-4 text-yellow-400" />
-                  Currently Promoted ({promotedVenues.length})
+                  <Star className="h-4 w-4 text-primary" />
+                  Leaderboard Promoted ({leaderboardPromotedVenues.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {loading ? (
                   <div className="text-white/50 text-sm">Loading...</div>
-                ) : promotedVenues.length === 0 ? (
-                  <div className="text-white/50 text-sm">No promoted venues in {selectedCity.toUpperCase()}</div>
+                ) : leaderboardPromotedVenues.length === 0 ? (
+                  <div className="text-white/50 text-sm">No leaderboard promoted venues in {selectedCity.toUpperCase()}</div>
                 ) : (
-                  promotedVenues.map(venue => (
+                  leaderboardPromotedVenues.map(venue => (
                     <div
                       key={venue.id}
                       className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10"
@@ -208,7 +259,7 @@ export default function Admin() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeFromPromoted(venue)}
+                        onClick={() => removeFromLeaderboardPromoted(venue)}
                         className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                       >
                         <X className="h-4 w-4" />
@@ -216,56 +267,122 @@ export default function Admin() {
                     </div>
                   ))
                 )}
+                {/* Add to Leaderboard Promoted Search */}
+                <div className="pt-3 border-t border-white/10">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+                    <Input
+                      placeholder="Search to add..."
+                      value={leaderboardSearchQuery}
+                      onChange={(e) => {
+                        setLeaderboardSearchQuery(e.target.value);
+                        handleLeaderboardSearch(e.target.value, leaderboardSearchQuery, setLeaderboardSearchResults);
+                      }}
+                      className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                    />
+                  </div>
+                  {leaderboardSearchResults.length > 0 && (
+                    <div className="space-y-2 mt-2 max-h-[200px] overflow-y-auto">
+                      {leaderboardSearchResults.map(venue => (
+                        <div
+                          key={venue.id}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white/5"
+                        >
+                          <div className="text-white text-sm">{venue.name}</div>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              addToLeaderboardPromoted(venue);
+                              setLeaderboardSearchQuery('');
+                              setLeaderboardSearchResults([]);
+                            }}
+                            className="bg-primary hover:bg-primary/80 h-7 text-xs"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
-            {/* Add to Promoted */}
+            {/* Map Promotions Section */}
             <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
                 <CardTitle className="text-white text-sm flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add Venue to Promoted
+                  <MapPin className="h-4 w-4 text-primary" />
+                  Map Promoted ({mapPromotedVenues.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
-                  <Input
-                    placeholder="Search venues..."
-                    value={searchQuery}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/40"
-                  />
-                </div>
-
-                {searchResults.length > 0 && (
-                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                    {searchResults.map(venue => (
-                      <div
-                        key={venue.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10"
-                      >
-                        <div>
-                          <div className="text-white font-medium">{venue.name}</div>
-                          <div className="text-white/50 text-xs flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {venue.neighborhood}
-                            <Badge variant="outline" className="ml-2 text-[10px] border-white/20 text-white/60">
-                              {venue.type}
-                            </Badge>
-                          </div>
+              <CardContent className="space-y-2">
+                {loading ? (
+                  <div className="text-white/50 text-sm">Loading...</div>
+                ) : mapPromotedVenues.length === 0 ? (
+                  <div className="text-white/50 text-sm">No map promoted venues in {selectedCity.toUpperCase()}</div>
+                ) : (
+                  mapPromotedVenues.map(venue => (
+                    <div
+                      key={venue.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10"
+                    >
+                      <div>
+                        <div className="text-white font-medium">{venue.name}</div>
+                        <div className="text-white/50 text-xs flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {venue.neighborhood}
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => addToPromoted(venue)}
-                          className="bg-primary hover:bg-primary/80"
-                        >
-                          Add
-                        </Button>
                       </div>
-                    ))}
-                  </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeFromMapPromoted(venue)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))
                 )}
+                {/* Add to Map Promoted Search */}
+                <div className="pt-3 border-t border-white/10">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+                    <Input
+                      placeholder="Search to add..."
+                      value={mapSearchQuery}
+                      onChange={(e) => {
+                        setMapSearchQuery(e.target.value);
+                        handleMapSearch(e.target.value, setMapSearchResults);
+                      }}
+                      className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                    />
+                  </div>
+                  {mapSearchResults.length > 0 && (
+                    <div className="space-y-2 mt-2 max-h-[200px] overflow-y-auto">
+                      {mapSearchResults.map(venue => (
+                        <div
+                          key={venue.id}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white/5"
+                        >
+                          <div className="text-white text-sm">{venue.name}</div>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              addToMapPromoted(venue);
+                              setMapSearchQuery('');
+                              setMapSearchResults([]);
+                            }}
+                            className="bg-primary hover:bg-primary/80 h-7 text-xs"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -316,8 +433,11 @@ export default function Admin() {
                         <div className="flex-1 min-w-0">
                           <div className="text-white font-medium flex items-center gap-2">
                             {venue.name}
-                            {venue.is_promoted && (
-                              <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                            {venue.is_leaderboard_promoted && (
+                              <Star className="h-3 w-3 text-primary fill-primary" />
+                            )}
+                            {venue.is_map_promoted && (
+                              <MapPin className="h-3 w-3 text-primary fill-primary" />
                             )}
                           </div>
                           <div className="text-white/50 text-xs flex items-center gap-1">
@@ -327,14 +447,24 @@ export default function Admin() {
                             <span className="capitalize">{venue.type.replace('_', ' ')}</span>
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant={venue.is_promoted ? 'destructive' : 'outline'}
-                          onClick={() => venue.is_promoted ? removeFromPromoted(venue) : addToPromoted(venue)}
-                          className={!venue.is_promoted ? 'border-white/20 text-white hover:bg-white/10' : ''}
-                        >
-                          {venue.is_promoted ? 'Remove' : 'Promote'}
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant={venue.is_leaderboard_promoted ? 'destructive' : 'outline'}
+                            onClick={() => venue.is_leaderboard_promoted ? removeFromLeaderboardPromoted(venue) : addToLeaderboardPromoted(venue)}
+                            className={!venue.is_leaderboard_promoted ? 'border-white/20 text-white hover:bg-white/10 text-xs h-7' : 'text-xs h-7'}
+                          >
+                            {venue.is_leaderboard_promoted ? '−LB' : '+LB'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={venue.is_map_promoted ? 'destructive' : 'outline'}
+                            onClick={() => venue.is_map_promoted ? removeFromMapPromoted(venue) : addToMapPromoted(venue)}
+                            className={!venue.is_map_promoted ? 'border-white/20 text-white hover:bg-white/10 text-xs h-7' : 'text-xs h-7'}
+                          >
+                            {venue.is_map_promoted ? '−Map' : '+Map'}
+                          </Button>
+                        </div>
                       </div>
                     ))
                   )}

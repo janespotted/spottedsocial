@@ -46,6 +46,7 @@ interface Venue {
   lng: number;
   is_demo: boolean;
   heatScore: number;
+  is_map_promoted?: boolean;
 }
 
 export default function Map() {
@@ -446,6 +447,7 @@ export default function Map() {
         return {
           ...venue,
           heatScore,
+          is_map_promoted: venue.is_map_promoted || false,
         };
       });
 
@@ -791,9 +793,10 @@ export default function Map() {
       } else {
         // Create new marker only if doesn't exist
         const isTopHot = index < 3 && venue.heatScore > 0;
+        const isMapPromoted = venue.is_map_promoted || false;
         // Balanced pin sizes - visible but smaller than friends
-        const containerSize = 50;
-        const pinSize = 38;
+        const containerSize = isMapPromoted ? 60 : 50;
+        const pinSize = isMapPromoted ? 46 : 38;
         const opacity = venue.heatScore > 0 ? 1 : 0.5;
 
         const el = document.createElement('div');
@@ -801,16 +804,17 @@ export default function Map() {
         el.style.width = `${containerSize}px`;
         el.style.height = `${containerSize}px`;
         el.style.cursor = 'pointer';
-        el.style.zIndex = '5';
+        el.style.zIndex = isMapPromoted ? '8' : '5';
         
         el.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-            ${isTopHot ? `<div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.3) 0%, transparent 70%); animation: pulse 2s infinite;"></div>` : ''}
-            <div style="width: ${pinSize}px; height: ${pinSize}px; background: #a855f7; border-radius: 50%; opacity: ${opacity}; box-shadow: 0 0 ${isTopHot ? '6px' : '3px'} rgba(168, 85, 247, ${isTopHot ? '0.5' : '0.3'}); display: flex; align-items: center; justify-content: center; border: 1.5px solid rgba(255, 255, 255, 0.8);">
+            ${isMapPromoted || isTopHot ? `<div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, ${isMapPromoted ? 'rgba(212, 255, 0, 0.4)' : 'rgba(168, 85, 247, 0.3)'} 0%, transparent 70%); animation: pulse ${isMapPromoted ? '1.5s' : '2s'} infinite;"></div>` : ''}
+            <div style="width: ${pinSize}px; height: ${pinSize}px; background: ${isMapPromoted ? 'linear-gradient(135deg, #a855f7, #d4ff00)' : '#a855f7'}; border-radius: 50%; opacity: ${isMapPromoted ? 1 : opacity}; box-shadow: 0 0 ${isMapPromoted ? '12px' : (isTopHot ? '6px' : '3px')} ${isMapPromoted ? 'rgba(212, 255, 0, 0.6)' : `rgba(168, 85, 247, ${isTopHot ? '0.5' : '0.3'})`}; display: flex; align-items: center; justify-content: center; border: ${isMapPromoted ? '2px' : '1.5px'} solid ${isMapPromoted ? '#d4ff00' : 'rgba(255, 255, 255, 0.8)'};">
               <svg width="${pinSize * 0.5}" height="${pinSize * 0.5}" viewBox="0 0 24 24" fill="white">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
               </svg>
             </div>
+            ${isMapPromoted ? `<div style="position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; background: #d4ff00; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 1.5px solid #1a0f2e;">⭐</div>` : ''}
           </div>
         `;
 

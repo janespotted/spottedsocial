@@ -130,7 +130,7 @@ export default function Leaderboard() {
             avatar_url,
             is_demo
           ),
-          venues!inner(popularity_rank, is_promoted, city, opened_at, operating_hours)
+          venues!inner(popularity_rank, is_leaderboard_promoted, city, opened_at, operating_hours)
         `)
         .eq('venues.city', city)
         .not('venue_name', 'is', null)
@@ -155,7 +155,7 @@ export default function Leaderboard() {
       // If demoEnabled is true, show everything (no filter)
 
       // Parallelize: fetch promoted venues AND night statuses at the same time
-      let promotedQuery = supabase.from('venues').select('id, name, popularity_rank, is_promoted, opened_at, neighborhood, operating_hours').eq('is_promoted', true).eq('city', city);
+      let promotedQuery = supabase.from('venues').select('id, name, popularity_rank, is_leaderboard_promoted, opened_at, neighborhood, operating_hours').eq('is_leaderboard_promoted', true).eq('city', city);
       if (selectedNeighborhood) {
         promotedQuery = promotedQuery.eq('neighborhood', selectedNeighborhood);
       }
@@ -167,7 +167,7 @@ export default function Leaderboard() {
           // Fetch ALL venues in the selected neighborhood
           topVenuesQuery = supabase
             .from('venues')
-            .select('id, name, neighborhood, popularity_rank, is_promoted, opened_at, operating_hours')
+            .select('id, name, neighborhood, popularity_rank, is_leaderboard_promoted, opened_at, operating_hours')
             .eq('city', city)
             .eq('neighborhood', selectedNeighborhood)
             .order('popularity_rank', { ascending: true });
@@ -175,7 +175,7 @@ export default function Leaderboard() {
           // Fetch top 30 venues city-wide by popularity_rank (ensures 20 always show)
           topVenuesQuery = supabase
             .from('venues')
-            .select('id, name, neighborhood, popularity_rank, is_promoted, opened_at, operating_hours')
+            .select('id, name, neighborhood, popularity_rank, is_leaderboard_promoted, opened_at, operating_hours')
             .eq('city', city)
             .order('popularity_rank', { ascending: true })
             .limit(30);
@@ -224,7 +224,7 @@ export default function Leaderboard() {
           movement: 'same',
           friends: [],
           energyLevel,
-          isPromoted: venue.is_promoted,
+          isPromoted: venue.is_leaderboard_promoted,
           isNewlyOpened,
           popularity_rank: venue.popularity_rank || 999,
           operatingHours: (venue as any).operating_hours as VenueHours | null,
@@ -261,7 +261,7 @@ export default function Leaderboard() {
     statuses?.forEach((status: any) => {
       const venueName = status.venue_name;
       const venueId = status.venue_id;
-      const isPromoted = status.venues?.is_promoted || false;
+      const isPromoted = status.venues?.is_leaderboard_promoted || false;
       const popularityRank = status.venues?.popularity_rank || 999;
       const openedAt = status.venues?.opened_at;
       const operatingHours = status.venues?.operating_hours as VenueHours | null;
