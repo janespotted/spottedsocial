@@ -330,7 +330,10 @@ export default function Leaderboard() {
     const venueArray = Array.from(venueMap.values());
     
     // Filter out closed venues - only show open venues on leaderboard
+    // EXCEPT promoted venues which always appear (paid placement guarantee)
     const openVenueArray = venueArray.filter(v => {
+      // Promoted venues always appear regardless of operating hours
+      if (v.isPromoted) return true;
       // If no operating hours data, only show during nightlife hours (11am-5am)
       if (!v.operatingHours) return isNightlifeHours();
       return isVenueOpen(v.operatingHours);
