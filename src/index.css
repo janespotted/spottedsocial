@@ -288,6 +288,18 @@ All colors MUST be HSL.
    .animate-float-slow-reverse {
      animation: float-slow 10s ease-in-out infinite reverse;
    }
+
+  /* Map venue promoted pulse animation */
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    50% {
+      transform: scale(1.15);
+      opacity: 1;
+    }
+  }
 }
 
 /* iOS Safe Area Insets for notched devices */
