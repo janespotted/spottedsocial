@@ -1,8 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-// Real NYC top-tier venues (scraped from top rankings) - ordered by popularity with granular neighborhoods
+// Real NYC top-tier venues - Top 20 only
 const NYC_VENUES = [
-  // TOP 20 - Most popular venues (will be shown in leaderboard)
   { name: "Le Bain", lat: 40.7414, lng: -74.0078, rank: 1, neighborhood: "Meatpacking" },
   { name: "House of Yes", lat: 40.7089, lng: -73.9332, rank: 2, neighborhood: "Bushwick" },
   { name: "The Box", lat: 40.7216, lng: -73.9935, rank: 3, neighborhood: "Lower East Side" },
@@ -23,38 +22,20 @@ const NYC_VENUES = [
   { name: "Public Hotel Rooftop", lat: 40.7252, lng: -73.9881, rank: 18, neighborhood: "Lower East Side" },
   { name: "Jean's", lat: 40.7251, lng: -73.9988, rank: 19, neighborhood: "SoHo" },
   { name: "The Campbell", lat: 40.7527, lng: -73.9772, rank: 20, neighborhood: "Midtown" },
-  
-  // REMAINING 19 - Less popular, may not appear in demo leaderboard
-  { name: "Bar Snack", lat: 40.7258, lng: -73.9874, rank: 21, neighborhood: "East Village" },
-  { name: "Saint Tuesday", lat: 40.7169, lng: -73.9982, rank: 22, neighborhood: "SoHo" },
-  { name: "Sunn's", lat: 40.7161, lng: -73.9977, rank: 23, neighborhood: "SoHo" },
-  { name: "The Mulberry", lat: 40.7221, lng: -73.9951, rank: 24, neighborhood: "SoHo" },
-  { name: "Amber Room", lat: 40.7198, lng: -73.9891, rank: 25, neighborhood: "Lower East Side" },
-  { name: "Patent Pending", lat: 40.7234, lng: -73.9914, rank: 26, neighborhood: "Lower East Side" },
-  { name: "Ketchy Shuby", lat: 40.7231, lng: -73.9969, rank: 27, neighborhood: "SoHo" },
-  { name: "Gospël", lat: 40.7241, lng: -73.9977, rank: 28, neighborhood: "SoHo" },
-  { name: "Paul's Casablanca", lat: 40.7235, lng: -73.9969, rank: 29, neighborhood: "SoHo" },
-  { name: "Paul's Cocktail Lounge", lat: 40.7171, lng: -74.0089, rank: 30, neighborhood: "West Village" },
-  { name: "The Nines", lat: 40.7268, lng: -73.9945, rank: 31, neighborhood: "East Village" },
-  { name: "Little Sister Lounge", lat: 40.7267, lng: -73.9857, rank: 32, neighborhood: "East Village" },
-  { name: "Unveiled", lat: 40.7106, lng: -73.9638, rank: 33, neighborhood: "Williamsburg" },
-  { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529, rank: 34, neighborhood: "Bushwick" },
 ];
 
-// LA venues - ordered by popularity (40 venues - includes westside + eastside)
+// LA venues - Top 25 only
 const LA_VENUES = [
-  // Hollywood / West Hollywood / Downtown (ranks 1-10)
   { name: "Academy LA", lat: 34.0479, lng: -118.2565, rank: 1, neighborhood: "Downtown LA" },
   { name: "Sound Nightclub", lat: 34.0412, lng: -118.2468, rank: 2, neighborhood: "Hollywood" },
   { name: "Exchange LA", lat: 34.0441, lng: -118.2504, rank: 3, neighborhood: "Downtown LA" },
   { name: "The Mayan", lat: 34.0493, lng: -118.2577, rank: 4, neighborhood: "Downtown LA" },
-  { name: "Tenants of the Trees", lat: 34.0826, lng: -118.2690, rank: 5, neighborhood: "Silver Lake" }, // Major Silver Lake club
+  { name: "Tenants of the Trees", lat: 34.0826, lng: -118.2690, rank: 5, neighborhood: "Silver Lake" },
   { name: "Catch One", lat: 34.0352, lng: -118.3085, rank: 6, neighborhood: "Mid-Wilshire" },
   { name: "Avalon Hollywood", lat: 34.1020, lng: -118.3268, rank: 7, neighborhood: "Hollywood" },
-  { name: "The Echoplex", lat: 34.0775, lng: -118.2607, rank: 8, neighborhood: "Echo Park" }, // Major Echo Park venue
+  { name: "The Echoplex", lat: 34.0775, lng: -118.2607, rank: 8, neighborhood: "Echo Park" },
   { name: "No Vacancy", lat: 34.0989, lng: -118.3267, rank: 9, neighborhood: "Hollywood" },
   { name: "Break Room 86", lat: 34.0781, lng: -118.3650, rank: 10, neighborhood: "Koreatown" },
-  // Santa Monica / Venice / Westside (ranks 11-18)
   { name: "The Bungalow", lat: 34.0062, lng: -118.4715, rank: 11, neighborhood: "Santa Monica" },
   { name: "The Galley", lat: 34.0082, lng: -118.4889, rank: 12, neighborhood: "Santa Monica" },
   { name: "Finn McCool's", lat: 34.0057, lng: -118.4799, rank: 13, neighborhood: "Santa Monica" },
@@ -63,41 +44,21 @@ const LA_VENUES = [
   { name: "The Townhouse & Del Monte Speakeasy", lat: 33.9934, lng: -118.4701, rank: 16, neighborhood: "Venice" },
   { name: "High Rooftop Lounge", lat: 33.9913, lng: -118.4660, rank: 17, neighborhood: "Venice" },
   { name: "Simmzy's Manhattan Beach", lat: 33.8846, lng: -118.4094, rank: 18, neighborhood: "Manhattan Beach" },
-  // Silver Lake / Echo Park / Los Feliz / Highland Park (ranks 19-26)
-  { name: "Akbar", lat: 34.0894, lng: -118.2714, rank: 19, neighborhood: "Silver Lake" }, // Legendary bar
-  { name: "The Short Stop", lat: 34.0782, lng: -118.2618, rank: 20, neighborhood: "Echo Park" }, // Dive bar institution
-  { name: "The Black Cat", lat: 34.0841, lng: -118.2689, rank: 21, neighborhood: "Silver Lake" }, // Historic bar
-  { name: "The Dresden", lat: 34.1055, lng: -118.2891, rank: 22, neighborhood: "Los Feliz" }, // Classic lounge
-  { name: "1642", lat: 34.0783, lng: -118.2609, rank: 23, neighborhood: "Echo Park" }, // Cocktail bar
-  { name: "Covell", lat: 34.1045, lng: -118.2859, rank: 24, neighborhood: "Los Feliz" }, // Wine bar
-  { name: "Highland Park Bowl", lat: 34.1118, lng: -118.1924, rank: 25, neighborhood: "Highland Park" }, // Bowling/bar
-  { name: "The York", lat: 34.1089, lng: -118.1916, rank: 26, neighborhood: "Highland Park" }, // Gastropub
-  // More Hollywood / DTLA / WeHo (ranks 27-40)
-  { name: "EP & LP", lat: 34.0789, lng: -118.3661, rank: 27, neighborhood: "West Hollywood" },
-  { name: "Warwick", lat: 34.1019, lng: -118.3277, rank: 28, neighborhood: "Hollywood" },
-  { name: "Nightingale Plaza", lat: 34.0789, lng: -118.3628, rank: 29, neighborhood: "West Hollywood" },
-  { name: "Spotlight LA", lat: 34.0478, lng: -118.2505, rank: 30, neighborhood: "Downtown LA" },
-  { name: "Resident", lat: 34.0488, lng: -118.2518, rank: 31, neighborhood: "Downtown LA" },
-  { name: "Skybar", lat: 34.0949, lng: -118.3853, rank: 32, neighborhood: "West Hollywood" },
-  { name: "Good Times at Davey Wayne's", lat: 34.0990, lng: -118.3855, rank: 33, neighborhood: "Hollywood" },
-  { name: "Seven Grand", lat: 34.0465, lng: -118.2508, rank: 34, neighborhood: "Downtown LA" },
-  { name: "The Edison", lat: 34.0483, lng: -118.2513, rank: 35, neighborhood: "Downtown LA" },
-  { name: "The Roger Room", lat: 34.0810, lng: -118.3700, rank: 36, neighborhood: "West Hollywood" },
-  { name: "Dirty Laundry", lat: 34.0992, lng: -118.3291, rank: 37, neighborhood: "Hollywood" },
-  { name: "Clifton's Republic", lat: 34.0466, lng: -118.2507, rank: 38, neighborhood: "Downtown LA" },
-  { name: "The Argyle", lat: 34.0985, lng: -118.3856, rank: 39, neighborhood: "West Hollywood" },
-  { name: "The Escondite", lat: 34.0488, lng: -118.2506, rank: 40, neighborhood: "Downtown LA" },
+  { name: "Akbar", lat: 34.0894, lng: -118.2714, rank: 19, neighborhood: "Silver Lake" },
+  { name: "The Short Stop", lat: 34.0782, lng: -118.2618, rank: 20, neighborhood: "Echo Park" },
+  { name: "The Black Cat", lat: 34.0841, lng: -118.2689, rank: 21, neighborhood: "Silver Lake" },
+  { name: "The Dresden", lat: 34.1055, lng: -118.2891, rank: 22, neighborhood: "Los Feliz" },
+  { name: "Highland Park Bowl", lat: 34.1118, lng: -118.1924, rank: 23, neighborhood: "Highland Park" },
+  { name: "EP & LP", lat: 34.0789, lng: -118.3661, rank: 24, neighborhood: "West Hollywood" },
+  { name: "Warwick", lat: 34.1019, lng: -118.3277, rank: 25, neighborhood: "Hollywood" },
 ];
 
-// Palm Beach / West Palm Beach venues - Nightlife focused only (party restaurants & bars)
+// Palm Beach venues - Top 15 only
 const PB_VENUES = [
-  // TOP TIER - Palm Beach Island (actual coordinates verified)
   { name: "Cucina", lat: 26.7056, lng: -80.0364, rank: 1, neighborhood: "Royal Poinciana Way", type: "restaurant" },
   { name: "HMF at The Breakers", lat: 26.7060, lng: -80.0341, rank: 2, neighborhood: "Palm Beach Island", type: "lounge" },
   { name: "Lola 41", lat: 26.7050, lng: -80.0378, rank: 3, neighborhood: "Worth Avenue", type: "restaurant" },
   { name: "Imoto", lat: 26.7055, lng: -80.0365, rank: 4, neighborhood: "Royal Poinciana Way", type: "lounge" },
-  
-  // Clematis Street - Spread coordinates properly (actual street addresses)
   { name: "ER Bradley's Saloon", lat: 26.7153, lng: -80.0525, rank: 5, neighborhood: "Clematis Street", type: "bar" },
   { name: "Mary Lou's", lat: 26.7151, lng: -80.0530, rank: 6, neighborhood: "Clematis Street", type: "lounge" },
   { name: "Respectable Street", lat: 26.7140, lng: -80.0555, rank: 7, neighborhood: "Clematis Street", type: "club" },
@@ -106,21 +67,10 @@ const PB_VENUES = [
   { name: "O'Shea's Irish Pub", lat: 26.7143, lng: -80.0550, rank: 10, neighborhood: "Clematis Street", type: "bar" },
   { name: "Rocco's Tacos", lat: 26.7148, lng: -80.0538, rank: 11, neighborhood: "Clematis Street", type: "bar" },
   { name: "Lost Weekend", lat: 26.7138, lng: -80.0558, rank: 12, neighborhood: "Clematis Street", type: "bar" },
-  { name: "Camelot", lat: 26.7135, lng: -80.0560, rank: 13, neighborhood: "Clematis Street", type: "bar" },
-  { name: "Pawn Shop Lounge", lat: 26.7145, lng: -80.0545, rank: 14, neighborhood: "Clematis Street", type: "speakeasy" },
-  
-  // Downtown WPB (off Clematis)
-  { name: "123 Datura", lat: 26.7130, lng: -80.0540, rank: 15, neighborhood: "Downtown WPB", type: "bar" },
-  { name: "Four", lat: 26.7128, lng: -80.0538, rank: 16, neighborhood: "Downtown WPB", type: "lounge" },
-  { name: "Hullabaloo", lat: 26.7125, lng: -80.0545, rank: 17, neighborhood: "Downtown WPB", type: "bar" },
-  { name: "Topside at The Beacon", lat: 26.7155, lng: -80.0520, rank: 18, neighborhood: "Downtown WPB", type: "rooftop" },
-  
-  // Rosemary Square
-  { name: "Blue Martini", lat: 26.7110, lng: -80.0623, rank: 19, neighborhood: "Rosemary Square", type: "lounge" },
+  { name: "123 Datura", lat: 26.7130, lng: -80.0540, rank: 13, neighborhood: "Downtown WPB", type: "bar" },
+  { name: "Four", lat: 26.7128, lng: -80.0538, rank: 14, neighborhood: "Downtown WPB", type: "lounge" },
+  { name: "Blue Martini", lat: 26.7110, lng: -80.0623, rank: 15, neighborhood: "Rosemary Square", type: "lounge" },
 ];
-
-// REMOVED: DEMO_VENUES - these don't exist in the database
-// All posts/stories/yaps now use only SELECTED_VENUES (real DB venues) for proper city filtering
 
 const DEMO_USERS = [
   { display_name: 'Alex Rivera', username: 'alex_spotted', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex', bio: 'NYC nightlife enthusiast 🌃' },
@@ -164,25 +114,15 @@ const DEMO_POST_IMAGES = [
   "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&h=800&fit=crop",
   "https://images.unsplash.com/photo-1571266028243-d220c6563ccc?w=800&h=800&fit=crop",
   "https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=800&h=800&fit=crop",
-  "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&h=800&fit=crop",
-  "https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?w=800&h=800&fit=crop",
-  "https://images.unsplash.com/photo-1519167758481-83f29da8a97e?w=800&h=800&fit=crop",
-  "https://images.unsplash.com/photo-1504309092620-4d0ec726efa4?w=800&h=800&fit=crop",
-  "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&h=800&fit=crop",
 ];
 
 const DEMO_REVIEW_IMAGES = [
-  "https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=600&h=400&fit=crop", // bar interior
-  "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=600&h=400&fit=crop", // drinks
-  "https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=600&h=400&fit=crop", // cocktails
-  "https://images.unsplash.com/photo-1587574293340-e0011c4e8ecf?w=600&h=400&fit=crop", // club lights
-  "https://images.unsplash.com/photo-1604882737321-e781f3cde3a5?w=600&h=400&fit=crop", // bar counter
-  "https://images.unsplash.com/photo-1545128485-c400e7702796?w=600&h=400&fit=crop", // drinks neon
-  "https://images.unsplash.com/photo-1560148271-00b5e5850812?w=600&h=400&fit=crop", // club vibe
-  "https://images.unsplash.com/photo-1563841930606-67e2bce48b78?w=600&h=400&fit=crop", // venue interior
+  "https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=600&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=600&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=600&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1587574293340-e0011c4e8ecf?w=600&h=400&fit=crop",
 ];
 
-// Demo buzz messages for Tonight's Buzz (Quick Vibes)
 const DEMO_BUZZ_MESSAGES = [
   { text: "DJ is absolutely killing it right now 🔥", emoji_vibe: "🔥" },
   { text: "Line was long but SO worth it", emoji_vibe: "💃" },
@@ -190,24 +130,14 @@ const DEMO_BUZZ_MESSAGES = [
   { text: "The sound system here is insane", emoji_vibe: "🎵" },
   { text: "Crowd is perfect tonight ✨", emoji_vibe: "✨" },
   { text: "Just vibing", emoji_vibe: "💃" },
-  { text: "This place never disappoints", emoji_vibe: "🔥" },
-  { text: "Who else is here? The rooftop is packed!", emoji_vibe: "✨" },
-  { text: "Energy is unmatched rn", emoji_vibe: "⚡" },
-  { text: "3am and we're not leaving anytime soon", emoji_vibe: "🌙" },
-  { text: "Bartender just made me something off menu 👀", emoji_vibe: "🍸" },
-  { text: "Finally found my people here", emoji_vibe: "💜" },
 ];
 
-// Demo media for buzz clips (stories with is_public_buzz = true)
 const DEMO_BUZZ_MEDIA = [
   "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&h=800&fit=crop",
   "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=600&h=400&fit=crop",
   "https://images.unsplash.com/photo-1587574293340-e0011c4e8ecf?w=600&h=400&fit=crop",
-  "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&h=800&fit=crop",
-  "https://images.unsplash.com/photo-1571266028243-d220c6563ccc?w=800&h=800&fit=crop",
 ];
 
-// Demo plan descriptions for Plans Feed
 const DEMO_PLAN_DESCRIPTIONS = [
   "Who's trying to go out tonight?",
   "Looking for a chill spot to start the night",
@@ -221,683 +151,104 @@ const DEMO_PLAN_DESCRIPTIONS = [
   "Spontaneous night out, who's in?",
 ];
 
-// Helper to generate upcoming weekend dates (Fri/Sat/Sun)
 function getWeekendPlanDates(): string[] {
   const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 = Sunday
+  const dayOfWeek = today.getDay();
   const dates: string[] = [];
-  
-  // Calculate days until next Friday (or today if already Fri/Sat/Sun)
   let daysUntilFriday: number;
-  if (dayOfWeek === 0) {
-    // Sunday - use this weekend (go back to Friday)
-    daysUntilFriday = -2;
-  } else if (dayOfWeek === 6) {
-    // Saturday - use this weekend
-    daysUntilFriday = -1;
-  } else if (dayOfWeek === 5) {
-    // Friday - use today
-    daysUntilFriday = 0;
-  } else {
-    // Mon-Thu - use upcoming Friday
-    daysUntilFriday = 5 - dayOfWeek;
-  }
-  
-  // Add Friday, Saturday, Sunday
+  if (dayOfWeek === 0) { daysUntilFriday = -2; }
+  else if (dayOfWeek === 6) { daysUntilFriday = -1; }
+  else if (dayOfWeek === 5) { daysUntilFriday = 0; }
+  else { daysUntilFriday = 5 - dayOfWeek; }
   for (let i = 0; i < 3; i++) {
     const planDate = new Date(today);
     planDate.setDate(today.getDate() + daysUntilFriday + i);
-    dates.push(planDate.toISOString().split('T')[0]); // YYYY-MM-DD format
+    dates.push(planDate.toISOString().split('T')[0]);
   }
-  
   return dates;
 }
 
-// Venue-specific reviews with accurate details from real-world research
+// Condensed venue reviews - only for venues that exist in arrays
 const VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | null; rating: number }> }> = {
-  "Le Bain": {
-    reviews: [
-      { text: "The rooftop views of the Hudson are incredible! Danced in the pool area until 3am. The DJs always deliver deep house vibes.", rating: 4 },
-      { text: "Great vibes but it gets PACKED. Come early or expect a long wait. Worth it for the Standard views though.", rating: 3 },
-      { text: "One of NYC's most iconic clubs. The sunset from up here is unmatched. Pool parties in summer are legendary.", rating: 5 },
-      { text: "Door can be tough but once you're in, the energy is unreal. Rooftop dance floor with skyline views - can't beat it.", rating: 4 },
-      { text: "A bit pretentious crowd sometimes but the music selection is always on point. Industrial chic aesthetic.", rating: 3 },
-    ]
-  },
-  "House of Yes": {
-    reviews: [
-      { text: "If you want weird and wonderful, this is your spot. The aerial performances are mind-blowing! Most creative crowd in Brooklyn.", rating: 5 },
-      { text: "Dress code is serious - costumes encouraged! Came as a disco ball and fit right in. Immersive shows are incredible.", rating: 5 },
-      { text: "The circus performances during sets are like nothing else in NYC. Truly an experience, not just a club.", rating: 5 },
-      { text: "Body positive, queer-friendly, and pure creative chaos. Everyone should experience this place at least once.", rating: 5 },
-      { text: "Theme nights are insane - went to Dirty Circus and my mind was blown. Acrobats on the ceiling!", rating: 4 },
-    ]
-  },
-  "The Box": {
-    reviews: [
-      { text: "The most provocative, boundary-pushing performances in NYC. Not for the faint of heart but absolutely unforgettable.", rating: 5 },
-      { text: "Burlesque, variety acts, and pure debauchery. The shows are shocking in the best way. Very exclusive door.", rating: 4 },
-      { text: "If you can get in, prepare for a wild ride. The performers are world-class and the crowd is A-list.", rating: 5 },
-      { text: "Expensive but worth it for special occasions. The theatrical performances are truly one of a kind.", rating: 4 },
-      { text: "Old school NYC nightlife energy. Dark, mysterious, and absolutely wild. Not your average night out.", rating: 5 },
-    ]
-  },
-  "Elsewhere": {
-    reviews: [
-      { text: "Three floors of different vibes! The rooftop is perfect for breaks between dancing. Best sound system in Brooklyn.", rating: 5 },
-      { text: "Zone One gets the best DJs. Saw a 6-hour set here that changed my life. True techno temple.", rating: 5 },
-      { text: "Love that you can escape to the Hall or Loft when Zone One gets too intense. Something for everyone.", rating: 4 },
-      { text: "The lineups are consistently incredible. From techno to indie, they book quality acts across genres.", rating: 5 },
-      { text: "Industrial warehouse vibes done right. Good crowd, reasonable drinks, and dancing until sunrise.", rating: 4 },
-    ]
-  },
-  "TBA Brooklyn": {
-    reviews: [
-      { text: "Warehouse vibes with amazing sound. The courtyard is perfect for summer nights. Real underground energy.", rating: 5 },
-      { text: "Gets some of the best techno acts in the city. No frills, just great music and people who love to dance.", rating: 4 },
-      { text: "Love the outdoor space. Perfect for those 4am breaks when you need fresh air before diving back in.", rating: 5 },
-      { text: "Raw, industrial, and exactly what Brooklyn nightlife should be. Come for the music, stay for the vibes.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Nowadays": {
-    reviews: [
-      { text: "The outdoor space is HUGE! Perfect for summer day parties. Great food vendors and chill daytime vibes.", rating: 5 },
-      { text: "Love that it works both as a day party spot and late night club. The garden area is magical.", rating: 5 },
-      { text: "Best sound system for an outdoor venue. They really care about the music quality here.", rating: 4 },
-      { text: "Ridgewood gem! More relaxed than Williamsburg spots but still gets great DJs.", rating: 4 },
-      { text: "Day parties here are legendary. BBQ, good tunes, and dancing in the sun. What more could you want?", rating: 5 },
-    ]
-  },
-  "Double Chicken Please": {
-    reviews: [
-      { text: "Ranked #2 bar in North America for a reason. The cocktails are literal art. Try the off-menu specials!", rating: 5 },
-      { text: "Best fried chicken sandwich in NYC, hands down. And the drinks are next level creative. Design-forward everything.", rating: 5 },
-      { text: "Hard to get a reservation but SO worth it. Every cocktail tells a story. The presentation is insane.", rating: 5 },
-      { text: "The upstairs speakeasy vibe is even better than downstairs. Ask about the secret menu!", rating: 5 },
-      { text: "Innovative cocktails that actually taste amazing, not just look cool. Bartenders are true artists.", rating: 4 },
-    ]
-  },
-  "The Dead Rabbit": {
-    reviews: [
-      { text: "Best Irish bar in America, full stop. The whiskey selection is unmatched and the cocktails are perfection.", rating: 5 },
-      { text: "Three floors of different vibes - pub downstairs, cocktail parlor upstairs. The Irish coffee is legendary.", rating: 5 },
-      { text: "Won World's Best Bar for good reason. Every drink is crafted with incredible attention to detail.", rating: 5 },
-      { text: "The historical cocktail menu is fascinating. Like drinking through time. Staff really knows their stuff.", rating: 4 },
-      { text: "Come early or wait forever. Worth the hype though - best cocktails in the Financial District.", rating: 4 },
-    ]
-  },
-  "Dante NYC": {
-    reviews: [
-      { text: "World's Best Bar vibes! The Negronis here are perfection. Italian aperitivo culture done right in the Village.", rating: 5 },
-      { text: "Garibaldi is their signature and it's incredible - fluffy orange juice with Campari. Brunch here is elite.", rating: 5 },
-      { text: "Been around since 1915 and still killing it. Classic NYC institution with modern cocktail excellence.", rating: 5 },
-      { text: "Outdoor seating on MacDougal is perfect for people watching. Spritz game is unmatched.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Attaboy": {
-    reviews: [
-      { text: "No menu - just tell them what you like and they'll make magic. The bartenders here are true artists.", rating: 5 },
-      { text: "Speakeasy vibes done right. Tiny space, incredible drinks, zero pretension. Just good conversation and great cocktails.", rating: 5 },
-      { text: "From the Milk & Honey family. If you trust them, they'll make exactly what you didn't know you wanted.", rating: 5 },
-      { text: "Best bespoke cocktail experience in NYC. Come with an open mind and let them surprise you.", rating: 4 },
-      { text: "Intimate, personal, and genuinely great service. Worth the wait to get in.", rating: 5 },
-    ]
-  },
-  "PHD Rooftop": {
-    reviews: [
-      { text: "Dream Hotel's crown jewel. The terrace views are stunning. Gets a bottle service crowd but the vibes are fun.", rating: 4 },
-      { text: "Perfect for special occasions. Dress up, bring your credit card, and enjoy the skyline.", rating: 4 },
-      { text: "Penthouse House vibes - literally. Great for impressing a date or celebrating with friends.", rating: 4 },
-      { text: "Can be douchey on weekends but weeknight views are worth it. Sunset cocktails are magical.", rating: 3 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "230 Fifth": {
-    reviews: [
-      { text: "Biggest rooftop in NYC! Empire State Building views are unreal. The robes in winter are iconic.", rating: 4 },
-      { text: "Tourist trap? Maybe. But the views are genuinely incredible and the space is massive.", rating: 3 },
-      { text: "Come for the views, not the drinks. Great for out-of-town guests who want the NYC experience.", rating: 3 },
-      { text: "The heated rooftop garden in winter with the red robes is actually really fun.", rating: 4 },
-      { text: "Basic but beautiful. Sometimes you just want to sip a drink with the Empire State Building in front of you.", rating: 4 },
-    ]
-  },
-  "Schimanski": {
-    reviews: [
-      { text: "Williamsburg's best club for serious techno and house. The Funktion-One sound system hits different.", rating: 5 },
-      { text: "Gets great international DJs. The room isn't huge but that makes it more intimate.", rating: 4 },
-      { text: "Finally a club in Brooklyn that focuses on the music. None of the Manhattan pretension.", rating: 4 },
-      { text: "Late night vibes only. Don't show up before 1am if you want to see it at its best.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Good Room": {
-    reviews: [
-      { text: "Two rooms, two vibes! Front room for disco and funk, back room for deeper cuts. Perfect setup.", rating: 5 },
-      { text: "Greenpoint's best kept secret. The sound is incredible and the crowd actually dances.", rating: 5 },
-      { text: "Love the DJ booth in the middle of the dance floor. Real connection between artist and crowd.", rating: 4 },
-      { text: "Not too big, not too small. Just the right size for a proper dance party.", rating: 4 },
-      { text: "The outdoor back patio is clutch for breaks. Great programming across genres.", rating: 5 },
-    ]
-  },
-  "Superbueno": {
-    reviews: [
-      { text: "East Village gem! Mezcal cocktails and late night dancing. The back room gets sweaty in the best way.", rating: 4 },
-      { text: "Love the Mexican-inspired drinks. The vibe shifts from chill bar to dance party as the night goes on.", rating: 4 },
-      { text: "No cover, great drinks, and actual dancing. What more could you want from an East Village spot?", rating: 5 },
-      { text: "Neighborhood bar energy that transforms into a proper party. Love the unpretentious crowd.", rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Sunken Harbor Club": {
-    reviews: [
-      { text: "Tiki heaven in Carroll Gardens! The rum cocktails are legit and the tropical vibes transport you.", rating: 5 },
-      { text: "Best tiki bar in Brooklyn. The attention to detail in the decor and drinks is impressive.", rating: 5 },
-      { text: "Escape NYC without leaving. Every drink comes in beautiful vintage glassware.", rating: 4 },
-      { text: "The Leyenda team knows their rum. Complex, balanced tiki drinks - not just sugar bombs.", rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "schmuck.": {
-    reviews: [
-      { text: "Jewish deli meets cocktail bar and it works! The pastrami is incredible and the drinks are creative.", rating: 4 },
-      { text: "Only in NYC would a deli-bar concept work this well. Late night pastrami sandwiches hit different.", rating: 4 },
-      { text: "Love the irreverent vibe. Great for a weird date or hanging with friends who appreciate the absurd.", rating: 4 },
-      { text: "The cocktail menu is genuinely good, not just a gimmick. Plus midnight deli food.", rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Public Hotel Rooftop": {
-    reviews: [
-      { text: "Ian Schrager's latest. The views are gorgeous and the design is impeccable. Very scene-y on weekends.", rating: 4 },
-      { text: "Downtown views from above. The indoor/outdoor flow is great. Expect a fashionable crowd.", rating: 4 },
-      { text: "Beautiful space, pricey drinks, but worth it for the atmosphere. Best at sunset.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: "The rooftop pool scene in summer is legendary. Very European Riviera vibes.", rating: 5 },
-    ]
-  },
-  "Jean's": {
-    reviews: [
-      { text: "NoMad hotel's hidden gem. Feels like a Parisian salon. The cocktails and small plates are refined.", rating: 5 },
-      { text: "Sophisticated without being stuffy. Perfect for a grown-up night out in Midtown.", rating: 4 },
-      { text: "Love the intimate booths. Great for conversation and actually being able to hear your friends.", rating: 4 },
-      { text: "Daniel Boulud quality extends to the bar. Every cocktail is perfectly balanced.", rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "The Campbell": {
-    reviews: [
-      { text: "Grand Central's secret! The Jazz Age architecture is stunning. Feel like you're in The Great Gatsby.", rating: 5 },
-      { text: "Historic space that was once a 1920s mogul's office. The hand-painted ceiling is jaw-dropping.", rating: 5 },
-      { text: "Perfect pre-train cocktail spot. Classic drinks in an incomparable setting.", rating: 4 },
-      { text: "Touristy but worth it. The room itself is the star - one of NYC's most beautiful bars.", rating: 4 },
-      { text: "Old money vibes in the best way. Dress up and sip a martini like it's 1929.", rating: 5 },
-    ]
-  },
-  "Bar Snack": {
-    reviews: [
-      { text: "Natural wines and creative small plates. The perfect neighborhood spot for East Village locals.", rating: 4 },
-      { text: "Love the casual wine bar energy. Knowledgeable staff and interesting, affordable bottles.", rating: 4 },
-      { text: "Great first date spot - intimate, not too loud, and the wine selection is curated.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: "Finally a wine bar that doesn't feel pretentious. Just good juice and good vibes.", rating: 5 },
-    ]
-  },
-  "Saint Tuesday": {
-    reviews: [
-      { text: "Speakeasy hidden in a taco shop! The cocktails are strong and the vibe is mysterious.", rating: 4 },
-      { text: "The reveal when you walk through the back is so fun. Great for impressing a date.", rating: 4 },
-      { text: "Dark, moody, and the drinks pack a punch. Perfect LES late night spot.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: "One of the few speakeasies that's actually hard to find. Worth the hunt.", rating: 5 },
-    ]
-  },
-  "Sunn's": {
-    reviews: [
-      { text: "Filipino flavors meet craft cocktails. The lumpia and drinks pairing is chef's kiss.", rating: 4 },
-      { text: "Finally representation in the cocktail scene! The ube cocktail is beautiful and delicious.", rating: 5 },
-      { text: "Small but mighty. The bartenders really care about what they're making.", rating: 4 },
-      { text: "Love supporting this spot. Creative drinks with ingredients you don't see elsewhere.", rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "The Mulberry": {
-    reviews: [
-      { text: "Little Italy charm with solid cocktails. The outdoor seating on Mulberry is perfect for summer.", rating: 4 },
-      { text: "Old school neighborhood bar energy. Nothing fancy but consistently good times.", rating: 4 },
-      { text: "Great for pregaming before dinner in Little Italy. Classic drinks, friendly bartenders.", rating: 4 },
-      { text: null, rating: 3 },
-      { text: "Unpretentious spot in an increasingly touristy neighborhood. The locals still love it.", rating: 4 },
-    ]
-  },
-  "Amber Room": {
-    reviews: [
-      { text: "Cozy cocktail lounge with vintage vibes. The amber lighting creates such a warm atmosphere.", rating: 4 },
-      { text: "Great for intimate conversations. The seating is comfortable and drinks are well-crafted.", rating: 4 },
-      { text: "Hidden gem in the neighborhood. Not trying to be anything other than a solid bar.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: "The whiskey selection is impressive for such a small spot. Bartender knows their stuff.", rating: 4 },
-    ]
-  },
-  "Patent Pending": {
-    reviews: [
-      { text: "Science-themed cocktails in NoMad! The presentation is wild - smoking beakers and all.", rating: 4 },
-      { text: "More than a gimmick - the drinks actually taste great. Fun for groups.", rating: 4 },
-      { text: "The laboratory aesthetic is Instagram gold. Come for the photos, stay for the cocktails.", rating: 4 },
-      { text: "Creative and playful without being cheesy. Each drink is a little experiment.", rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Ketchy Shuby": {
-    reviews: [
-      { text: "NYC's only ski lodge bar! The apres-ski vibes are so fun, especially in winter.", rating: 4 },
-      { text: "Raclette and mulled wine in Manhattan. The theme is committed and charming.", rating: 4 },
-      { text: "Like being transported to the Alps. Cozy, kitschy, and genuinely enjoyable.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: "Perfect for escaping the cold. The fondue and hot cocktails warm you right up.", rating: 5 },
-    ]
-  },
-  "Gospël": {
-    reviews: [
-      { text: "Cajun brunch cocktails and Southern hospitality! The beignets are addictive.", rating: 4 },
-      { text: "New Orleans vibes in NYC. The jazz brunch is a proper party.", rating: 4 },
-      { text: "Strong drinks and bold flavors. Come hungry and thirsty.", rating: 4 },
-      { text: "The Southern-inspired cocktails are creative and delicious. Great for groups.", rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Paul's Casablanca": {
-    reviews: [
-      { text: "Dive bar meets dance floor. The karaoke nights are legendary and the drinks are cheap.", rating: 4 },
-      { text: "No pretense, just fun. This is what NYC nightlife used to be before everything got fancy.", rating: 4 },
-      { text: "Late night chaos in the best way. The crowd is always down to party.", rating: 4 },
-      { text: "Classic LES energy. Come after midnight when things really get going.", rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Paul's Cocktail Lounge": {
-    reviews: [
-      { text: "More refined than its sister spot but still fun. Great cocktails in a swanky setting.", rating: 4 },
-      { text: "The velvet booths and disco ball give retro glam vibes. Perfect for date night.", rating: 4 },
-      { text: "A little bit disco, a little bit lounge. The DJ sets are surprisingly good.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: "Elevated without being pretentious. The sweet spot between dive bar and fancy cocktail spot.", rating: 4 },
-    ]
-  },
-  "The Nines": {
-    reviews: [
-      { text: "Classic cocktails done right. The bartenders here really know their craft.", rating: 4 },
-      { text: "Old fashioned specialists. If brown spirits are your thing, this is your spot.", rating: 4 },
-      { text: "Intimate and sophisticated. Great for a nightcap after dinner.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: "No frills, just excellent drinks. The kind of bar every neighborhood needs.", rating: 4 },
-    ]
-  },
-  "Little Sister Lounge": {
-    reviews: [
-      { text: "Asian-inspired cocktails with a clubby vibe. The lychee martini is dangerously good.", rating: 4 },
-      { text: "Late night spot that actually has good drinks. The crowd is fun and the music is decent.", rating: 4 },
-      { text: "Great for groups who want to drink and dance. More lounge than club but gets going late.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: "The Pan-Asian cocktails are creative and strong. Perfect LES after hours spot.", rating: 4 },
-    ]
-  },
-  "Unveiled": {
-    reviews: [
-      { text: "Bushwick underground vibes! The warehouse setting is authentic and the music is always fire.", rating: 4 },
-      { text: "Real Brooklyn nightlife energy. Come for the late night sets and stay till sunrise.", rating: 4 },
-      { text: "No fancy bottle service, just good DJs and people who love to dance.", rating: 5 },
-      { text: "The outdoor area is perfect for Brooklyn summer nights. Great local scene.", rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Studio Maison Nur": {
-    reviews: [
-      { text: "Bed-Stuy's best kept secret! The space is beautiful and the vibe is inclusive.", rating: 5 },
-      { text: "Black-owned and community-focused. The events here celebrate culture and creativity.", rating: 5 },
-      { text: "More than a bar - it's a creative space. The programming is always interesting.", rating: 4 },
-      { text: "Love the intimate setting. Great for actually connecting with people.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
+  "Le Bain": { reviews: [{ text: "Rooftop views of the Hudson are incredible! Deep house vibes.", rating: 4 }, { text: "Great vibes but gets PACKED. Worth it for the Standard views.", rating: 3 }, { text: null, rating: 5 }] },
+  "House of Yes": { reviews: [{ text: "Weird and wonderful! Aerial performances are mind-blowing.", rating: 5 }, { text: "Dress code is serious - costumes encouraged!", rating: 5 }, { text: null, rating: 5 }] },
+  "The Box": { reviews: [{ text: "Most provocative performances in NYC. Not for the faint of heart.", rating: 5 }, { text: "Expensive but worth it. Theatrical performances are one of a kind.", rating: 4 }, { text: null, rating: 5 }] },
+  "Elsewhere": { reviews: [{ text: "Three floors of different vibes! Best sound system in Brooklyn.", rating: 5 }, { text: "Zone One gets the best DJs. True techno temple.", rating: 5 }, { text: null, rating: 4 }] },
+  "TBA Brooklyn": { reviews: [{ text: "Warehouse vibes with amazing sound. Real underground energy.", rating: 5 }, { text: "Gets some of the best techno acts in the city.", rating: 4 }, { text: null, rating: 5 }] },
+  "Nowadays": { reviews: [{ text: "Outdoor space is HUGE! Perfect for summer day parties.", rating: 5 }, { text: "Best sound system for an outdoor venue.", rating: 4 }, { text: null, rating: 5 }] },
+  "Double Chicken Please": { reviews: [{ text: "Ranked #2 bar in North America. Cocktails are literal art.", rating: 5 }, { text: "Best fried chicken sandwich and next level drinks.", rating: 5 }, { text: null, rating: 5 }] },
+  "The Dead Rabbit": { reviews: [{ text: "Best Irish bar in America. Whiskey selection is unmatched.", rating: 5 }, { text: "Three floors of different vibes. Irish coffee is legendary.", rating: 5 }, { text: null, rating: 4 }] },
+  "Dante NYC": { reviews: [{ text: "World's Best Bar vibes! Negronis here are perfection.", rating: 5 }, { text: "Garibaldi is incredible - fluffy orange juice with Campari.", rating: 5 }, { text: null, rating: 4 }] },
+  "Attaboy": { reviews: [{ text: "No menu - tell them what you like and they'll make magic.", rating: 5 }, { text: "Speakeasy vibes done right. Zero pretension.", rating: 5 }, { text: null, rating: 4 }] },
+  "PHD Rooftop": { reviews: [{ text: "Dream Hotel's crown jewel. Terrace views are stunning.", rating: 4 }, { text: "Perfect for special occasions. Dress up and enjoy.", rating: 4 }, { text: null, rating: 3 }] },
+  "230 Fifth": { reviews: [{ text: "Biggest rooftop in NYC! Empire State Building views.", rating: 4 }, { text: "Come for the views, not the drinks.", rating: 3 }, { text: null, rating: 4 }] },
+  "Schimanski": { reviews: [{ text: "Williamsburg's best club for serious techno and house.", rating: 5 }, { text: "Gets great international DJs.", rating: 4 }, { text: null, rating: 5 }] },
+  "Good Room": { reviews: [{ text: "Two rooms, two vibes! Front for disco, back for deeper cuts.", rating: 5 }, { text: "Greenpoint's best kept secret.", rating: 5 }, { text: null, rating: 4 }] },
+  "Superbueno": { reviews: [{ text: "East Village gem! Mezcal cocktails and late night dancing.", rating: 4 }, { text: "No cover, great drinks, and actual dancing.", rating: 5 }, { text: null, rating: 4 }] },
+  "Sunken Harbor Club": { reviews: [{ text: "Tiki heaven in Carroll Gardens! Rum cocktails are legit.", rating: 5 }, { text: "Best tiki bar in Brooklyn.", rating: 5 }, { text: null, rating: 4 }] },
+  "schmuck.": { reviews: [{ text: "Jewish deli meets cocktail bar and it works!", rating: 4 }, { text: "Late night pastrami sandwiches hit different.", rating: 4 }, { text: null, rating: 5 }] },
+  "Public Hotel Rooftop": { reviews: [{ text: "Ian Schrager's latest. Views are gorgeous.", rating: 4 }, { text: "Beautiful space, pricey drinks, worth it.", rating: 4 }, { text: null, rating: 5 }] },
+  "Jean's": { reviews: [{ text: "NoMad hotel's hidden gem. Feels like a Parisian salon.", rating: 5 }, { text: "Sophisticated without being stuffy.", rating: 4 }, { text: null, rating: 4 }] },
+  "The Campbell": { reviews: [{ text: "Grand Central's secret! Jazz Age architecture is stunning.", rating: 5 }, { text: "Historic space with hand-painted ceiling.", rating: 5 }, { text: null, rating: 4 }] },
 };
 
-// LA venue-specific reviews (including Silver Lake / Echo Park / Los Feliz / Highland Park)
 const LA_VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | null; rating: number }> }> = {
-  "Academy LA": {
-    reviews: [
-      { text: "Best sound system in LA! The DJ lineups are insane. True underground vibe.", rating: 5 },
-      { text: "DTLA's premier techno spot. Gets packed but the energy is worth it.", rating: 4 },
-      { text: "No frills, just great music and people who actually love to dance.", rating: 5 },
-      { text: null, rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Sound Nightclub": {
-    reviews: [
-      { text: "Massive club with incredible production. The light shows are next level.", rating: 4 },
-      { text: "Gets the biggest EDM acts. If you want the LA mega-club experience, this is it.", rating: 4 },
-      { text: "Three floors of different vibes. Sound quality lives up to the name.", rating: 5 },
-      { text: null, rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Exchange LA": {
-    reviews: [
-      { text: "The old stock exchange building is stunning! Historic LA architecture meets modern clubbing.", rating: 5 },
-      { text: "World-class DJs in a gorgeous space. One of LA's most iconic venues.", rating: 5 },
-      { text: "The main room is breathtaking. Multiple floors and spaces to explore.", rating: 4 },
-      { text: null, rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "The Mayan": {
-    reviews: [
-      { text: "The Mayan temple decor is wild! Unique atmosphere you won't find anywhere else.", rating: 4 },
-      { text: "Gets great Latin music nights. The architecture alone is worth the visit.", rating: 4 },
-      { text: "Historic venue with character. Multiple levels and balconies.", rating: 4 },
-      { text: null, rating: 3 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Tenants of the Trees": {
-    reviews: [
-      { text: "Silver Lake's best kept secret! The outdoor patio is magical. Killer DJs every weekend.", rating: 5 },
-      { text: "Love the tiki bar vibes mixed with warehouse techno. Uniquely LA.", rating: 5 },
-      { text: "The dance floor in the trees is literally in the trees. So cool!", rating: 5 },
-      { text: "Great sound system, friendly crowd, actual dancing. Everything you want.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "The Echoplex": {
-    reviews: [
-      { text: "Best live music venue in Echo Park! The sound is incredible and the crowds know how to party.", rating: 5 },
-      { text: "Seen some legendary shows here. Intimate venue with big energy.", rating: 5 },
-      { text: "The back patio is great for between-set hangs. Real LA music scene vibes.", rating: 4 },
-      { text: "From indie to electronic, they book quality acts. Never disappointed.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Akbar": {
-    reviews: [
-      { text: "Legendary Silver Lake bar! The karaoke nights are iconic. Everyone is welcome.", rating: 5 },
-      { text: "Old school queer bar energy. No pretense, just good vibes and strong drinks.", rating: 5 },
-      { text: "Been coming here for years. It's a community institution.", rating: 5 },
-      { text: "The jukebox is fire and the bartenders know everyone. Classic dive bar.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "The Short Stop": {
-    reviews: [
-      { text: "Echo Park institution! Cheap drinks, great DJ nights, no attitude.", rating: 5 },
-      { text: "Dodgers games on the TVs, hip hop on the speakers. Perfect neighborhood bar.", rating: 4 },
-      { text: "It's a scene without being sceney. Mixed crowd of locals and industry folks.", rating: 4 },
-      { text: "The patio is clutch on hot nights. Strong drinks at fair prices.", rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "The Black Cat": {
-    reviews: [
-      { text: "Historic Silver Lake bar with great cocktails. The live music nights are excellent.", rating: 4 },
-      { text: "Beautiful space with so much history. The food is surprisingly good too.", rating: 4 },
-      { text: "Great date spot with character. The murals and decor tell LA stories.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "The Dresden": {
-    reviews: [
-      { text: "Marty and Elayne are LA legends! Classic lounge vibes from another era.", rating: 5 },
-      { text: "Go for the live music duo, stay for the martinis. Old Hollywood glamour.", rating: 5 },
-      { text: "Featured in Swingers for a reason. Timeless Los Feliz institution.", rating: 4 },
-      { text: "The cocktails are strong and the atmosphere is unmatched. True LA classic.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Highland Park Bowl": {
-    reviews: [
-      { text: "Bowling, pizza, and craft cocktails in a restored 1927 building. Perfect combo!", rating: 5 },
-      { text: "The lanes are fun but the bar is even better. Great date spot.", rating: 4 },
-      { text: "Historic space with modern touches. The ambiance is incredible.", rating: 4 },
-      { text: "Gets packed on weekends but worth the wait. Try the sourdough pizza.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "EP & LP": {
-    reviews: [
-      { text: "Best rooftop bar in West Hollywood! The Asian fusion food is actually good.", rating: 5 },
-      { text: "Upstairs EP has stunning views, downstairs LP has the party vibe. Love both.", rating: 5 },
-      { text: "Great for sunset drinks before hitting the clubs. The cocktails are top tier.", rating: 4 },
-      { text: null, rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "The Bungalow": {
-    reviews: [
-      { text: "Santa Monica beach vibes! Perfect day-to-night spot with ocean breeze.", rating: 5 },
-      { text: "Feels like a beachside house party. More relaxed than Hollywood spots.", rating: 4 },
-      { text: "Great cocktails and the patio is amazing. Worth the drive to the beach.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
+  "Academy LA": { reviews: [{ text: "Best sound system in LA! True underground vibe.", rating: 5 }, { text: "DTLA's premier techno spot.", rating: 4 }, { text: null, rating: 5 }] },
+  "Sound Nightclub": { reviews: [{ text: "Massive club with incredible production.", rating: 4 }, { text: "Gets the biggest EDM acts.", rating: 4 }, { text: null, rating: 5 }] },
+  "Exchange LA": { reviews: [{ text: "Old stock exchange building is stunning!", rating: 5 }, { text: "World-class DJs in a gorgeous space.", rating: 5 }, { text: null, rating: 4 }] },
+  "The Mayan": { reviews: [{ text: "Mayan temple decor is wild!", rating: 4 }, { text: "Great Latin music nights.", rating: 4 }, { text: null, rating: 4 }] },
+  "Tenants of the Trees": { reviews: [{ text: "Silver Lake's best kept secret! Killer DJs.", rating: 5 }, { text: "Tiki bar vibes mixed with warehouse techno.", rating: 5 }, { text: null, rating: 5 }] },
+  "Catch One": { reviews: [{ text: "Historic venue with incredible energy.", rating: 5 }, { text: "Great programming across genres.", rating: 4 }, { text: null, rating: 5 }] },
+  "Avalon Hollywood": { reviews: [{ text: "Classic Hollywood venue.", rating: 4 }, { text: "Gets great DJs.", rating: 4 }, { text: null, rating: 4 }] },
+  "The Echoplex": { reviews: [{ text: "Best live music venue in Echo Park!", rating: 5 }, { text: "Seen some legendary shows here.", rating: 5 }, { text: null, rating: 4 }] },
+  "No Vacancy": { reviews: [{ text: "Hidden entrance is so fun!", rating: 4 }, { text: "Speakeasy vibes in Hollywood.", rating: 4 }, { text: null, rating: 4 }] },
+  "Break Room 86": { reviews: [{ text: "80s nostalgia done right!", rating: 4 }, { text: "Karaoke is a blast.", rating: 4 }, { text: null, rating: 4 }] },
+  "The Bungalow": { reviews: [{ text: "Santa Monica beach vibes! Perfect day-to-night spot.", rating: 5 }, { text: "Feels like a beachside house party.", rating: 4 }, { text: null, rating: 5 }] },
+  "The Galley": { reviews: [{ text: "Classic Santa Monica spot.", rating: 4 }, { text: "Good drinks, friendly crowd.", rating: 4 }, { text: null, rating: 4 }] },
+  "Finn McCool's": { reviews: [{ text: "Great Irish pub near the beach.", rating: 4 }, { text: "Good for sports and cold beers.", rating: 4 }, { text: null, rating: 4 }] },
+  "The Basement Tavern": { reviews: [{ text: "Solid Santa Monica bar.", rating: 4 }, { text: "Good vibes, decent drinks.", rating: 4 }, { text: null, rating: 4 }] },
+  "The Roosterfish": { reviews: [{ text: "Venice institution!", rating: 4 }, { text: "Great community bar.", rating: 4 }, { text: null, rating: 4 }] },
+  "The Townhouse & Del Monte Speakeasy": { reviews: [{ text: "Two bars in one! Speakeasy is great.", rating: 4 }, { text: "Venice landmark.", rating: 4 }, { text: null, rating: 4 }] },
+  "High Rooftop Lounge": { reviews: [{ text: "Venice rooftop with great views.", rating: 4 }, { text: "Perfect for sunset drinks.", rating: 4 }, { text: null, rating: 4 }] },
+  "Simmzy's Manhattan Beach": { reviews: [{ text: "Beach town vibes.", rating: 4 }, { text: "Good craft beer selection.", rating: 4 }, { text: null, rating: 4 }] },
+  "Akbar": { reviews: [{ text: "Legendary Silver Lake bar! Karaoke nights are iconic.", rating: 5 }, { text: "Old school queer bar energy. No pretense.", rating: 5 }, { text: null, rating: 5 }] },
+  "The Short Stop": { reviews: [{ text: "Echo Park institution! Cheap drinks, great DJ nights.", rating: 5 }, { text: "Dodgers games and hip hop.", rating: 4 }, { text: null, rating: 4 }] },
+  "The Black Cat": { reviews: [{ text: "Historic Silver Lake bar with great cocktails.", rating: 4 }, { text: "Beautiful space with history.", rating: 4 }, { text: null, rating: 4 }] },
+  "The Dresden": { reviews: [{ text: "Marty and Elayne are LA legends!", rating: 5 }, { text: "Old Hollywood glamour.", rating: 5 }, { text: null, rating: 4 }] },
+  "Highland Park Bowl": { reviews: [{ text: "Bowling, pizza, and craft cocktails!", rating: 5 }, { text: "Historic space with modern touches.", rating: 4 }, { text: null, rating: 5 }] },
+  "EP & LP": { reviews: [{ text: "Best rooftop bar in West Hollywood!", rating: 5 }, { text: "Great for sunset drinks.", rating: 4 }, { text: null, rating: 5 }] },
+  "Warwick": { reviews: [{ text: "Hollywood club with good energy.", rating: 4 }, { text: "Gets busy on weekends.", rating: 4 }, { text: null, rating: 4 }] },
 };
 
-// Palm Beach venue-specific reviews (nightlife focused)
 const PB_VENUE_SPECIFIC_REVIEWS: Record<string, { reviews: Array<{ text: string | null; rating: number }> }> = {
-  "Cucina": {
-    reviews: [
-      { text: "THE party spot on Palm Beach Island. DJ starts at 10pm and the dance floor gets PACKED. Bottle service is the move.", rating: 5 },
-      { text: "Palm Beach's playground - came for dinner, stayed until 2am dancing. The crowd is gorgeous and the vibe is electric.", rating: 5 },
-      { text: "Selective door but once inside it's incredible. The lights sync with the DJ beats. This is where the money parties.", rating: 4 },
-      { text: "Every Saturday night the place transforms. One of the only real late-night party scenes on the island.", rating: 5 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Mary Lou's": {
-    reviews: [
-      { text: "The HOTTEST new spot in WPB. Dark, sultry, massive disco ball. Saw a few celebs in the banquettes last weekend.", rating: 5 },
-      { text: "Reimagining the lavish parties of 70's and 80's Palm Beach. Champagne flowing, DJs spinning. An absolute must.", rating: 5 },
-      { text: "Finally a real nightlife spot downtown. The speakeasy entrance adds to the vibe. Gets packed after 11.", rating: 5 },
-      { text: "The cocktails are incredible and the music is always on point. This is what Clematis needed.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Lola 41": {
-    reviews: [
-      { text: "Came for dinner, stayed for the DJ. Worth Ave goes OFF after midnight here. Super chic crowd.", rating: 5 },
-      { text: "The sushi is amazing but the late-night scene is the real draw. One of the few places on Worth with energy.", rating: 5 },
-      { text: "Dress code is strict but the party is worth it. Beautiful people, great music, strong drinks.", rating: 4 },
-      { text: "Perfect Palm Beach scene - upscale but fun. The patio is stunning.", rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "ER Bradley's Saloon": {
-    reviews: [
-      { text: "The OG Clematis bar since 1995! Live music every night, always packed. This is WPB's heartbeat.", rating: 5 },
-      { text: "Been coming here for 20 years and it never disappoints. Real local vibes, great bands, cold drinks.", rating: 5 },
-      { text: "If you want to know what WPB nightlife is about, start here. The outdoor area is always bumping.", rating: 4 },
-      { text: "Best live music venue on Clematis. No pretense, just good times.", rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "123 Datura": {
-    reviews: [
-      { text: "The perfect neighborhood bar! Craft cocktails, late night pizza, and a great crowd. Open til 2am.", rating: 5 },
-      { text: "Love the rustic-modern vibe. Great for private events but also chill enough to pop in after work.", rating: 5 },
-      { text: "Finally a real downtown WPB bar that isn't trying too hard. Good drinks, good people.", rating: 4 },
-      { text: "The pizza is surprisingly amazing. Come for drinks, stay for the pepperoni.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Four": {
-    reviews: [
-      { text: "Best speakeasy in WPB! 23+ only keeps it sophisticated. The bottle service is worth it.", rating: 5 },
-      { text: "Old NY cocktail bar vibes in downtown WPB. The mixology is next level.", rating: 5 },
-      { text: "Intimate and upscale. The DJ sets the mood perfectly. Feels like a hidden gem.", rating: 5 },
-      { text: "Dark, moody, sexy. This is where you go when you're done with the basic bars.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "HMF at The Breakers": {
-    reviews: [
-      { text: "The Breakers' hidden gem. Upscale lounge vibes, great cocktails, DJ on weekends. Hotel crowd keeps it interesting.", rating: 5 },
-      { text: "Best spot on the island for a proper night out. The crowd is older and well-dressed. Order the truffle fries.", rating: 4 },
-      { text: "Palm Beach elegance with actual nightlife energy. Perfect for date night that turns into a late night.", rating: 5 },
-      { text: "The cocktail program is seriously impressive. Gets livelier as the night goes on.", rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Imoto": {
-    reviews: [
-      { text: "Late-night sushi and sake in the cutest space. The trendy Royal Poinciana crowd hangs here after dinner.", rating: 5 },
-      { text: "Buccan's sister spot and just as good for a night out. Order the Imoto roll and stick around for drinks.", rating: 4 },
-      { text: "Intimate but lively. Great for starting the night before heading somewhere louder.", rating: 4 },
-      { text: null, rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Respectable Street": {
-    reviews: [
-      { text: "LEGENDARY venue! Been coming here since the 80s. The alt/punk vibes are unmatched in South Florida.", rating: 5 },
-      { text: "Amazing live music scene since 1987. The checkerboard dance floor and psychedelic murals are iconic.", rating: 5 },
-      { text: "If you want real underground music and culture, this is the only spot. Not fancy but AUTHENTIC.", rating: 5 },
-      { text: "National touring acts in an intimate setting. This place is a Palm Beach County treasure.", rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Roxy's Pub": {
-    reviews: [
-      { text: "Best rooftop in downtown WPB! The new renovation is incredible. 64 beers on tap.", rating: 5 },
-      { text: "Irish pub atmosphere downstairs, rooftop party upstairs. St. Paddy's Day here is legendary.", rating: 4 },
-      { text: "The rooftop views of Clematis are unbeatable. Gets packed on weekends but worth it.", rating: 4 },
-      { text: null, rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Hullabaloo": {
-    reviews: [
-      { text: "Gastropub with actual nightlife energy. The bar scene here is underrated. Great cocktails.", rating: 4 },
-      { text: "Food is fantastic and it gets lively late. One of the few places on Clematis with sophistication.", rating: 4 },
-      { text: "Perfect for dinner that turns into drinks that turns into a night out.", rating: 4 },
-      { text: null, rating: 5 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Blue Martini": {
-    reviews: [
-      { text: "The spot for the 30+ crowd! Live music, dancing, great martinis. Rosemary Square's best nightlife.", rating: 5 },
-      { text: "Gets packed Thursday through Saturday. The dance floor is legit. Dress code enforced.", rating: 4 },
-      { text: "Multiple rooms with different vibes. Can actually dance here unlike most WPB spots.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 5 },
-    ]
-  },
-  "Clematis Social": {
-    reviews: [
-      { text: "Solid bar for starting the night. Good drinks, friendly crowd, central location on Clematis.", rating: 4 },
-      { text: "The outdoor area is great for people watching. Gets busier as the night goes on.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 3 },
-    ]
-  },
-  "O'Shea's Irish Pub": {
-    reviews: [
-      { text: "Classic Irish pub vibes! Great for sports, cold beers, and a rowdy good time.", rating: 4 },
-      { text: "The outdoor patio is prime real estate on Clematis. Reliable spot for any night.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 3 },
-    ]
-  },
-  "Rocco's Tacos": {
-    reviews: [
-      { text: "The tableside guac is fire and the margaritas hit HARD. Gets rowdy late night.", rating: 4 },
-      { text: "Great for groups. The energy picks up after 10pm when people finish dinner.", rating: 4 },
-      { text: "Not just a restaurant - it's a party. The tequila selection is insane.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "The Blind Monk": {
-    reviews: [
-      { text: "Best wine bar in WPB. Intimate, romantic, great for late night. The cheese board is a must.", rating: 5 },
-      { text: "Hidden speakeasy vibes in Rosemary Square. Perfect for a more sophisticated night out.", rating: 4 },
-      { text: null, rating: 5 },
-      { text: null, rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Lost Weekend": {
-    reviews: [
-      { text: "Dive bar energy on Clematis! Cheap drinks, no attitude, just good times. Cash only adds to the charm.", rating: 4 },
-      { text: "The kind of bar where you end up at 2am. No frills, just fun.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 3 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Camelot": {
-    reviews: [
-      { text: "Late night spot that gets wild. Not fancy but always a party. Clematis staple.", rating: 4 },
-      { text: "When everywhere else closes, Camelot keeps going. True late-night energy.", rating: 4 },
-      { text: null, rating: 3 },
-      { text: null, rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "City Cellar Wine Bar": {
-    reviews: [
-      { text: "Upscale wine bar with energy. Great for starting the night in Rosemary Square.", rating: 4 },
-      { text: "The wine list is extensive and the patio is lovely. Gets busy on weekends.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 3 },
-    ]
-  },
-  "Pawn Shop Lounge": {
-    reviews: [
-      { text: "Speakeasy vibes on Clematis! Great cocktails, moody lighting, intimate space.", rating: 4 },
-      { text: "The craft cocktail program is legit. Perfect for a more refined night out.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 4 },
-    ]
-  },
-  "Grandview Public Market": {
-    reviews: [
-      { text: "The Warehouse District's hangout! Multiple vendors, great bar, chill vibes. Perfect for groups.", rating: 4 },
-      { text: "Not a traditional bar but great for drinks and hanging out. Very WPB.", rating: 4 },
-      { text: null, rating: 4 },
-      { text: null, rating: 3 },
-      { text: null, rating: 4 },
-    ]
-  },
+  "Cucina": { reviews: [{ text: "THE party spot on Palm Beach Island. DJ starts at 10pm!", rating: 5 }, { text: "Palm Beach's playground - dinner to dancing.", rating: 5 }, { text: null, rating: 5 }] },
+  "HMF at The Breakers": { reviews: [{ text: "The Breakers' hidden gem. Upscale lounge vibes.", rating: 5 }, { text: "Best spot on the island.", rating: 4 }, { text: null, rating: 5 }] },
+  "Lola 41": { reviews: [{ text: "Came for dinner, stayed for the DJ.", rating: 5 }, { text: "Worth Ave goes OFF after midnight.", rating: 5 }, { text: null, rating: 4 }] },
+  "Imoto": { reviews: [{ text: "Late-night sushi and sake in the cutest space.", rating: 5 }, { text: "Great for starting the night.", rating: 4 }, { text: null, rating: 4 }] },
+  "ER Bradley's Saloon": { reviews: [{ text: "The OG Clematis bar since 1995!", rating: 5 }, { text: "Real local vibes, great bands.", rating: 5 }, { text: null, rating: 4 }] },
+  "Mary Lou's": { reviews: [{ text: "HOTTEST new spot in WPB. Dark, sultry, massive disco ball.", rating: 5 }, { text: "Finally a real nightlife spot downtown.", rating: 5 }, { text: null, rating: 5 }] },
+  "Respectable Street": { reviews: [{ text: "LEGENDARY venue since the 80s!", rating: 5 }, { text: "Amazing live music scene.", rating: 5 }, { text: null, rating: 5 }] },
+  "Roxy's Pub": { reviews: [{ text: "Best rooftop in downtown WPB!", rating: 5 }, { text: "Irish pub downstairs, rooftop party upstairs.", rating: 4 }, { text: null, rating: 4 }] },
+  "Clematis Social": { reviews: [{ text: "Solid bar for starting the night.", rating: 4 }, { text: "Good drinks, friendly crowd.", rating: 4 }, { text: null, rating: 4 }] },
+  "O'Shea's Irish Pub": { reviews: [{ text: "Classic Irish pub vibes!", rating: 4 }, { text: "Great for sports and cold beers.", rating: 4 }, { text: null, rating: 3 }] },
+  "Rocco's Tacos": { reviews: [{ text: "Tableside guac is fire and margaritas hit HARD.", rating: 4 }, { text: "Gets rowdy late night.", rating: 4 }, { text: null, rating: 4 }] },
+  "Lost Weekend": { reviews: [{ text: "Dive bar energy on Clematis!", rating: 4 }, { text: "Cheap drinks, no attitude.", rating: 4 }, { text: null, rating: 4 }] },
+  "123 Datura": { reviews: [{ text: "Perfect neighborhood bar!", rating: 5 }, { text: "Craft cocktails and late night pizza.", rating: 5 }, { text: null, rating: 4 }] },
+  "Four": { reviews: [{ text: "Best speakeasy in WPB! 23+ only.", rating: 5 }, { text: "Old NY cocktail bar vibes.", rating: 5 }, { text: null, rating: 5 }] },
+  "Blue Martini": { reviews: [{ text: "The spot for the 30+ crowd!", rating: 5 }, { text: "Live music and dancing.", rating: 4 }, { text: null, rating: 5 }] },
 };
 
 const DEMO_YAP_MESSAGES = [
-  { text: "Pretty sure Justin Bieber just walked in...", score: 78, comments: 9 },
-  { text: "This music is awesome who's the DJ right now", score: 50, comments: 9 },
-  { text: "What's the story with this couple at the bar they've been fighting for the past hr", score: 45, comments: 9 },
-  { text: "What's everyone's move after close?", score: 5, comments: 9 },
-  { text: "The bouncer is a douche!", score: 9, comments: 9 },
-  { text: "Anyone here? Looking for my friends 👀", score: 12, comments: 3 },
-  { text: "This DJ set is unreal!!!", score: 67, comments: 12 },
-  { text: "Line is crazy long outside", score: 23, comments: 6 },
-  { text: "Just got here, who's around?", score: 8, comments: 2 },
-  { text: "The energy is INSANE right now", score: 89, comments: 15 },
-  { text: "Best spot in Brooklyn hands down", score: 42, comments: 7 },
-  { text: "Dance floor is PACKED", score: 34, comments: 5 },
-  { text: "Where's the after party at?", score: 19, comments: 11 },
-  { text: "This place never disappoints", score: 56, comments: 4 },
-  { text: "Lost my friend, if you see them tell them I'm by the bar", score: 15, comments: 8 },
-  { text: "Bartender hooked it up 🍹", score: 31, comments: 6 },
-  { text: "This lineup is fire", score: 72, comments: 10 },
-  { text: "Why is everyone so good looking here??", score: 93, comments: 18 },
-  { text: "Sound system goes crazy", score: 61, comments: 7 },
-  { text: "Cover was worth it", score: 27, comments: 4 },
+  { text: "Pretty sure Justin Bieber just walked in...", score: 78, comments: 5 },
+  { text: "This music is awesome who's the DJ right now", score: 50, comments: 4 },
+  { text: "What's everyone's move after close?", score: 5, comments: 3 },
+  { text: "Anyone here? Looking for my friends 👀", score: 12, comments: 2 },
+  { text: "This DJ set is unreal!!!", score: 67, comments: 6 },
+  { text: "Line is crazy long outside", score: 23, comments: 3 },
+  { text: "The energy is INSANE right now", score: 89, comments: 8 },
+  { text: "Best spot in Brooklyn hands down", score: 42, comments: 4 },
+  { text: "Where's the after party at?", score: 19, comments: 5 },
+  { text: "Why is everyone so good looking here??", score: 93, comments: 9 },
 ];
 
 function calculateExpiryTime(): string {
@@ -918,6 +269,64 @@ function getRandomItems<T>(array: T[], count: number): T[] {
   return shuffled.slice(0, count);
 }
 
+// Helper to delete demo data by type
+async function cleanupDemoData(supabaseAdmin: any, existingDemoIds: string[]) {
+  if (existingDemoIds.length === 0) return;
+  
+  // DM threads
+  const { data: demoThreads } = await supabaseAdmin.from('dm_thread_members').select('thread_id').in('user_id', existingDemoIds);
+  const threadIds = [...new Set(demoThreads?.map((t: any) => t.thread_id) || [])];
+  if (threadIds.length > 0) {
+    await supabaseAdmin.from('dm_messages').delete().in('thread_id', threadIds);
+    await supabaseAdmin.from('dm_thread_members').delete().in('thread_id', threadIds);
+    await supabaseAdmin.from('dm_threads').delete().in('id', threadIds);
+  }
+
+  // Posts
+  const { data: demoPosts } = await supabaseAdmin.from('posts').select('id').eq('is_demo', true);
+  const postIds = demoPosts?.map((p: any) => p.id) || [];
+  if (postIds.length > 0) {
+    await supabaseAdmin.from('post_likes').delete().in('post_id', postIds);
+    await supabaseAdmin.from('post_comments').delete().in('post_id', postIds);
+  }
+  await supabaseAdmin.from('posts').delete().eq('is_demo', true);
+
+  // Yaps
+  const { data: demoYaps } = await supabaseAdmin.from('yap_messages').select('id').eq('is_demo', true);
+  const yapIds = demoYaps?.map((y: any) => y.id) || [];
+  if (yapIds.length > 0) {
+    const { data: demoYapComments } = await supabaseAdmin.from('yap_comments').select('id').eq('is_demo', true);
+    const yapCommentIds = demoYapComments?.map((c: any) => c.id) || [];
+    if (yapCommentIds.length > 0) {
+      await supabaseAdmin.from('yap_comment_votes').delete().in('comment_id', yapCommentIds);
+    }
+    await supabaseAdmin.from('yap_comments').delete().eq('is_demo', true);
+    await supabaseAdmin.from('yap_votes').delete().in('yap_id', yapIds);
+  }
+  await supabaseAdmin.from('yap_messages').delete().eq('is_demo', true);
+
+  // Stories & Reviews
+  await supabaseAdmin.from('story_views').delete().in('user_id', existingDemoIds);
+  await supabaseAdmin.from('stories').delete().eq('is_demo', true);
+  
+  const { data: demoReviews } = await supabaseAdmin.from('venue_reviews').select('id').in('user_id', existingDemoIds);
+  const reviewIds = demoReviews?.map((r: any) => r.id) || [];
+  if (reviewIds.length > 0) {
+    await supabaseAdmin.from('review_votes').delete().in('review_id', reviewIds);
+  }
+  await supabaseAdmin.from('venue_reviews').delete().in('user_id', existingDemoIds);
+
+  // Location data
+  await supabaseAdmin.from('checkins').delete().eq('is_demo', true);
+  await supabaseAdmin.from('night_statuses').delete().eq('is_demo', true);
+
+  // Friendships
+  await supabaseAdmin.from('close_friends').delete().in('user_id', existingDemoIds);
+  await supabaseAdmin.from('close_friends').delete().in('close_friend_id', existingDemoIds);
+  await supabaseAdmin.from('friendships').delete().in('user_id', existingDemoIds);
+  await supabaseAdmin.from('friendships').delete().in('friend_id', existingDemoIds);
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -932,23 +341,15 @@ Deno.serve(async (req) => {
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
+      { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Allow unauthenticated seeding for admin purposes (function uses service role)
     const { action, city = 'nyc', userId } = await req.json();
-    
     console.log(`Seed demo data called with action: ${action}, city: ${city}`);
 
     if (action === 'seed') {
-      // Select venues based on city (defaults to NYC)
-      let SELECTED_VENUES;
-      let SELECTED_REVIEWS;
+      let SELECTED_VENUES: typeof NYC_VENUES;
+      let SELECTED_REVIEWS: typeof VENUE_SPECIFIC_REVIEWS;
       
       if (city === 'la') {
         SELECTED_VENUES = LA_VENUES;
@@ -961,192 +362,88 @@ Deno.serve(async (req) => {
         SELECTED_REVIEWS = VENUE_SPECIFIC_REVIEWS;
       }
       
-      // Clean up existing demo data before seeding
+      // Cleanup existing demo data
       console.log('Cleaning up existing demo data...');
-      const { data: existingDemoProfiles } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('is_demo', true);
-      const existingDemoIds = existingDemoProfiles?.map(p => p.id) || [];
-
-      if (existingDemoIds.length > 0) {
-        // Delete DM-related data first
-        const { data: demoThreads } = await supabaseAdmin
-          .from('dm_thread_members')
-          .select('thread_id')
-          .in('user_id', existingDemoIds);
-        const threadIds = [...new Set(demoThreads?.map(t => t.thread_id) || [])];
-        
-        if (threadIds.length > 0) {
-          await supabaseAdmin.from('dm_messages').delete().in('thread_id', threadIds);
-          await supabaseAdmin.from('dm_thread_members').delete().in('thread_id', threadIds);
-          await supabaseAdmin.from('dm_threads').delete().in('id', threadIds);
-        }
-
-        // Delete post-related data
-        const { data: demoPosts } = await supabaseAdmin
-          .from('posts')
-          .select('id')
-          .eq('is_demo', true);
-        const postIds = demoPosts?.map(p => p.id) || [];
-        
-        if (postIds.length > 0) {
-          await supabaseAdmin.from('post_likes').delete().in('post_id', postIds);
-          await supabaseAdmin.from('post_comments').delete().in('post_id', postIds);
-        }
-        await supabaseAdmin.from('posts').delete().eq('is_demo', true);
-
-        // Delete yap-related data
-        const { data: demoYaps } = await supabaseAdmin
-          .from('yap_messages')
-          .select('id')
-          .eq('is_demo', true);
-        const yapIds = demoYaps?.map(y => y.id) || [];
-        
-        if (yapIds.length > 0) {
-          const { data: demoYapComments } = await supabaseAdmin
-            .from('yap_comments')
-            .select('id')
-            .eq('is_demo', true);
-          const yapCommentIds = demoYapComments?.map(c => c.id) || [];
-          
-          if (yapCommentIds.length > 0) {
-            await supabaseAdmin.from('yap_comment_votes').delete().in('comment_id', yapCommentIds);
-          }
-          await supabaseAdmin.from('yap_comments').delete().eq('is_demo', true);
-          await supabaseAdmin.from('yap_votes').delete().in('yap_id', yapIds);
-        }
-        await supabaseAdmin.from('yap_messages').delete().eq('is_demo', true);
-
-        // Delete story-related data
-        await supabaseAdmin.from('story_views').delete().in('user_id', existingDemoIds);
-        await supabaseAdmin.from('stories').delete().eq('is_demo', true);
-
-        // Delete venue reviews
-        const { data: demoReviews } = await supabaseAdmin
-          .from('venue_reviews')
-          .select('id')
-          .in('user_id', existingDemoIds);
-        const reviewIds = demoReviews?.map(r => r.id) || [];
-        
-        if (reviewIds.length > 0) {
-          await supabaseAdmin.from('review_votes').delete().in('review_id', reviewIds);
-        }
-        await supabaseAdmin.from('venue_reviews').delete().in('user_id', existingDemoIds);
-
-        // Delete location-related data
-        await supabaseAdmin.from('checkins').delete().eq('is_demo', true);
-        await supabaseAdmin.from('night_statuses').delete().eq('is_demo', true);
-
-        // Delete friendships
-        await supabaseAdmin.from('close_friends').delete().in('user_id', existingDemoIds);
-        await supabaseAdmin.from('close_friends').delete().in('close_friend_id', existingDemoIds);
-        await supabaseAdmin.from('friendships').delete().in('user_id', existingDemoIds);
-        await supabaseAdmin.from('friendships').delete().in('friend_id', existingDemoIds);
-      }
-
-      // Delete demo venues and profiles last
+      const { data: existingDemoProfiles } = await supabaseAdmin.from('profiles').select('id').eq('is_demo', true);
+      const existingDemoIds = existingDemoProfiles?.map((p: any) => p.id) || [];
+      await cleanupDemoData(supabaseAdmin, existingDemoIds);
       await supabaseAdmin.from('venues').delete().eq('is_demo', true);
+      await supabaseAdmin.from('notifications').delete().eq('is_demo', true);
       await supabaseAdmin.from('profiles').delete().eq('is_demo', true);
+      
+      // Delete demo plans
+      const { data: demoPlansExisting } = await supabaseAdmin.from('plans').select('id').eq('is_demo', true);
+      const planIdsExisting = demoPlansExisting?.map((p: any) => p.id) || [];
+      if (planIdsExisting.length > 0) {
+        await supabaseAdmin.from('plan_downs').delete().in('plan_id', planIdsExisting);
+        await supabaseAdmin.from('plan_comments').delete().in('plan_id', planIdsExisting);
+        await supabaseAdmin.from('plan_votes').delete().in('plan_id', planIdsExisting);
+        await supabaseAdmin.from('plan_participants').delete().in('plan_id', planIdsExisting);
+      }
+      await supabaseAdmin.from('plans').delete().eq('is_demo', true);
       
       console.log('Cleanup complete. Starting fresh seed...');
       
       const demoUserIds: string[] = [];
-      const DEMO_USER_COUNT = 50; // Create 50 users for better venue distribution
+      const DEMO_USER_COUNT = 30; // Reduced from 50
 
       // 1. Create demo profiles
-      console.log('Creating 50 demo users...');
+      console.log('Creating demo users...');
       const timestamp = Date.now();
       for (let i = 0; i < DEMO_USER_COUNT; i++) {
-        // Cycle through the 20 base demo users, repeating as needed
         const demoUser = DEMO_USERS[i % DEMO_USERS.length];
-        const userId = crypto.randomUUID();
-        demoUserIds.push(userId);
-
-        const { error } = await supabaseAdmin.from('profiles').insert({
-          id: userId,
+        const newUserId = crypto.randomUUID();
+        demoUserIds.push(newUserId);
+        await supabaseAdmin.from('profiles').insert({
+          id: newUserId,
           display_name: demoUser.display_name,
           username: `${demoUser.username}_${timestamp}_${i}`,
           avatar_url: demoUser.avatar_url,
           bio: demoUser.bio,
           is_demo: true,
         });
-
-        if (error) {
-          console.error(`Error creating demo user ${i}:`, error);
-          throw error;
-        }
       }
 
-      // 2. Get ALL real (non-demo) users and create friendships with demo users
-      const { data: realUsers } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('is_demo', false);
-
-      const realUserIds = realUsers?.map(u => u.id) || [];
-      console.log(`Found ${realUserIds.length} real users to befriend demo users`);
-
-      // Create friendships between ALL real users and ALL demo users
+      // 2. Friendships with real users
+      const { data: realUsers } = await supabaseAdmin.from('profiles').select('id').eq('is_demo', false);
+      const realUserIds = realUsers?.map((u: any) => u.id) || [];
       const allFriendships: Array<{ user_id: string; friend_id: string; status: string }> = [];
       for (const realUserId of realUserIds) {
         for (const demoUserId of demoUserIds) {
-          allFriendships.push({
-            user_id: realUserId,
-            friend_id: demoUserId,
-            status: 'accepted',
-          });
+          allFriendships.push({ user_id: realUserId, friend_id: demoUserId, status: 'accepted' });
         }
       }
-
       if (allFriendships.length > 0) {
         await supabaseAdmin.from('friendships').insert(allFriendships);
-        console.log(`Created ${allFriendships.length} friendships for ${realUserIds.length} real users`);
       }
 
-      // 3. Create friendships between demo users
+      // 3. Demo friendships
       const demoFriendships: Array<{ user_id: string; friend_id: string; status: string }> = [];
       for (let i = 0; i < demoUserIds.length; i++) {
-        const numFriends = 5 + Math.floor(Math.random() * 4);
-        const potentialFriends = demoUserIds.filter((_, idx) => idx !== i);
-        const friends = getRandomItems(potentialFriends, numFriends);
-
+        const friends = getRandomItems(demoUserIds.filter((_, idx) => idx !== i), 4);
         for (const friendId of friends) {
-          const exists = demoFriendships.some(
-            f => (f.user_id === demoUserIds[i] && f.friend_id === friendId) ||
-                 (f.user_id === friendId && f.friend_id === demoUserIds[i])
-          );
-          if (!exists) {
-            demoFriendships.push({
-              user_id: demoUserIds[i],
-              friend_id: friendId,
-              status: 'accepted',
-            });
+          if (!demoFriendships.some(f => (f.user_id === demoUserIds[i] && f.friend_id === friendId) || (f.user_id === friendId && f.friend_id === demoUserIds[i]))) {
+            demoFriendships.push({ user_id: demoUserIds[i], friend_id: friendId, status: 'accepted' });
           }
         }
       }
-
       if (demoFriendships.length > 0) {
         await supabaseAdmin.from('friendships').insert(demoFriendships);
       }
 
-      // 4. Insert all venues into venues table first (city-specific)
+      // 4. Insert venues
       console.log(`Inserting ${city.toUpperCase()} venues...`);
-      
-      // Define promoted venues per city
-      const NYC_PROMOTED_NAMES = ['Unveiled', 'Studio Maison Nur', 'Little Sister Lounge', 'Patent Pending'];
-      const LA_PROMOTED_NAMES = ['Highland Park Bowl', 'The York', 'The Dresden', 'Covell'];
+      const NYC_PROMOTED_NAMES = ['PHD Rooftop', '230 Fifth', 'Good Room'];
+      const LA_PROMOTED_NAMES = ['Highland Park Bowl', 'The Dresden', 'EP & LP'];
       const PROMOTED_VENUE_NAMES = city === 'la' ? LA_PROMOTED_NAMES : NYC_PROMOTED_NAMES;
       
       const venuesToInsert = SELECTED_VENUES.map(v => ({
-        name: v.name,
-        lat: v.lat,
-        lng: v.lng,
+        name: v.name, lat: v.lat, lng: v.lng,
         neighborhood: (v as any).neighborhood || 'Unknown',
         type: (v as any).type || 'bar',
         is_demo: true,
-       is_leaderboard_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
-       is_map_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
+        is_leaderboard_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
+        is_map_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
         popularity_rank: v.rank,
         city: city,
       }));
@@ -1156,672 +453,231 @@ Deno.serve(async (req) => {
         .upsert(venuesToInsert, { onConflict: 'name', ignoreDuplicates: false })
         .select('id, name');
 
-      if (venuesError) {
-        console.error('Error inserting venues:', venuesError);
-        throw venuesError;
-      }
-
-      // Create lookup map: venue name -> venue ID
-      const venueIdMap = new Map(insertedVenues.map(v => [v.name, v.id]));
+      if (venuesError) throw venuesError;
+      const venueIdMap = new Map(insertedVenues.map((v: any) => [v.name, v.id]));
       console.log(`Inserted ${insertedVenues.length} venues`);
 
-      // 5. Create night statuses - distributed across ALL neighborhoods
-      console.log('Creating night statuses distributed across all neighborhoods...');
-      
+      // 5. Night statuses
+      console.log('Creating night statuses...');
       const nightStatuses = [];
-      const PROMOTED_VENUES = SELECTED_VENUES.filter(v => PROMOTED_VENUE_NAMES.includes(v.name));
-      
-      // Group venues by neighborhood for even distribution
-      const venuesByNeighborhood = new Map<string, typeof SELECTED_VENUES>();
-      for (const venue of SELECTED_VENUES) {
-        const neighborhood = (venue as any).neighborhood || 'Unknown';
-        if (!venuesByNeighborhood.has(neighborhood)) {
-          venuesByNeighborhood.set(neighborhood, []);
-        }
-        venuesByNeighborhood.get(neighborhood)!.push(venue);
-      }
-      
-      const neighborhoods = Array.from(venuesByNeighborhood.keys());
-      console.log(`Found ${neighborhoods.length} neighborhoods: ${neighborhoods.join(', ')}`);
-      
-      // City-specific neighborhoods for planning users
       const PLANNING_NEIGHBORHOODS: Record<string, string[]> = {
-        'la': ['West Hollywood', 'Hollywood', 'Venice', 'Santa Monica', 'Silver Lake', 'Downtown LA', 'Echo Park', 'Los Feliz'],
-        'nyc': ['West Village', 'Lower East Side', 'SoHo', 'Williamsburg', 'East Village', 'Bushwick', 'Greenpoint', 'Nolita']
+        'la': ['West Hollywood', 'Hollywood', 'Venice', 'Santa Monica', 'Silver Lake'],
+        'nyc': ['West Village', 'Lower East Side', 'SoHo', 'Williamsburg', 'East Village']
       };
-      
-      // Reserve last 4 demo users for promoted venues, and 6 before that for planning
-      const promotedUserStartIndex = demoUserIds.length - 4;
-      const planningUserStartIndex = promotedUserStartIndex - 6;
-      
-      // Distribute users across neighborhoods evenly, with bias toward top venues in each
-      let userIndex = 0;
-      const usersPerNeighborhood = Math.floor(planningUserStartIndex / neighborhoods.length);
-      const extraUsers = planningUserStartIndex % neighborhoods.length;
-      
-      for (let n = 0; n < neighborhoods.length; n++) {
-        const neighborhood = neighborhoods[n];
-        const neighborhoodVenues = venuesByNeighborhood.get(neighborhood)!;
-        // Sort by rank (lower rank = more popular)
-        neighborhoodVenues.sort((a, b) => a.rank - b.rank);
-        
-        // Assign users to this neighborhood
-        const usersForThisNeighborhood = usersPerNeighborhood + (n < extraUsers ? 1 : 0);
-        
-        for (let i = 0; i < usersForThisNeighborhood && userIndex < planningUserStartIndex; i++) {
-          // Bias toward top venues in neighborhood (first venue gets more users)
-          const venueIndex = Math.min(
-            Math.floor(Math.random() * Math.random() * neighborhoodVenues.length),
-            neighborhoodVenues.length - 1
-          );
-          const selectedVenue = neighborhoodVenues[venueIndex];
-          const venueId = venueIdMap.get(selectedVenue.name);
-          
-          nightStatuses.push({
-            user_id: demoUserIds[userIndex],
-            status: 'out',
-            venue_id: venueId,
-            venue_name: selectedVenue.name,
-            lat: selectedVenue.lat,
-            lng: selectedVenue.lng,
-            expires_at: calculateExpiryTime(),
-            updated_at: getRecentTimestamp(),
-            is_demo: true,
-            is_promoted: false,
-          });
-          
-          userIndex++;
-        }
-      }
-      
-      // Create 6 planning users (index 40-45): set to "planning" status with varying neighborhoods
-      console.log('Creating planning mode demo users...');
-      const planningNeighborhoods = PLANNING_NEIGHBORHOODS[city] || PLANNING_NEIGHBORHOODS['la'];
-      
-      for (let i = 0; i < 6; i++) {
-        const userId = demoUserIds[planningUserStartIndex + i];
-        // 60% have a neighborhood hint, 40% don't (to show both variants)
-        const hasNeighborhood = i < 4; // First 4 have neighborhoods, last 2 don't
-        const neighborhood = hasNeighborhood 
-          ? planningNeighborhoods[i % planningNeighborhoods.length]
-          : null;
-        
-        nightStatuses.push({
-          user_id: userId,
-          status: 'planning',
-          venue_id: null,
-          venue_name: null,
-          lat: null,
-          lng: null,
-          planning_neighborhood: neighborhood,
-          expires_at: calculateExpiryTime(),
-          updated_at: getRecentTimestamp(),
-          is_demo: true,
-          is_promoted: false,
-        });
-      }
-      console.log(`Created 6 planning mode users (4 with neighborhoods, 2 without)`);
-      
-      // Last 4 users (index 46-49): assign to promoted venues (ensures they have activity)
-      console.log('Adding demo users to promoted venues...');
-      for (let i = 0; i < PROMOTED_VENUES.length && i < 4; i++) {
-        const venue = PROMOTED_VENUES[i];
+
+      for (let i = 0; i < demoUserIds.length - 4; i++) {
+        const venue = SELECTED_VENUES[i % SELECTED_VENUES.length];
         const venueId = venueIdMap.get(venue.name);
-        const userId = demoUserIds[promotedUserStartIndex + i];
-        
         nightStatuses.push({
-          user_id: userId,
+          user_id: demoUserIds[i],
           status: 'out',
           venue_id: venueId,
           venue_name: venue.name,
           lat: venue.lat,
           lng: venue.lng,
           expires_at: calculateExpiryTime(),
-          updated_at: getRecentTimestamp(),
+          updated_at: getRecentTimestamp(2),
           is_demo: true,
-          is_promoted: true,
         });
       }
-      
-      console.log(`Created ${nightStatuses.length} night statuses across ${neighborhoods.length} neighborhoods`);
-      await supabaseAdmin.from('night_statuses').insert(nightStatuses);
 
-      // 6. Create check-ins matching the night statuses
+      // Planning users
+      for (let i = demoUserIds.length - 4; i < demoUserIds.length; i++) {
+        const neighborhoods = PLANNING_NEIGHBORHOODS[city] || PLANNING_NEIGHBORHOODS['nyc'];
+        nightStatuses.push({
+          user_id: demoUserIds[i],
+          status: 'planning',
+          planning_neighborhood: neighborhoods[i % neighborhoods.length],
+          planning_visibility: 'friends',
+          expires_at: calculateExpiryTime(),
+          updated_at: getRecentTimestamp(1),
+          is_demo: true,
+        });
+      }
+
+      if (nightStatuses.length > 0) {
+        await supabaseAdmin.from('night_statuses').insert(nightStatuses);
+      }
+
+      // 6. Check-ins
       console.log('Creating check-ins...');
       const checkins = [];
-      for (const status of nightStatuses) {
-        checkins.push({
-          user_id: status.user_id,
-          venue_id: status.venue_id,
-          venue_name: status.venue_name,
-          lat: status.lat,
-          lng: status.lng,
-          created_at: getRecentTimestamp(),
-          is_demo: true,
-          is_promoted: false,
-        });
-      }
-
-      await supabaseAdmin.from('checkins').insert(checkins);
-
-      // 7. Create posts with real venues from database
-      const posts = [];
-      for (let i = 0; i < 60; i++) {
-        const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
-        // Always use SELECTED_VENUES (real DB venues) for proper city filtering
-        const venue = SELECTED_VENUES[Math.floor(Math.random() * SELECTED_VENUES.length)];
+      for (let i = 0; i < Math.min(15, demoUserIds.length); i++) {
+        const venue = SELECTED_VENUES[i % SELECTED_VENUES.length];
         const venueId = venueIdMap.get(venue.name);
-        const caption = DEMO_CAPTIONS[Math.floor(Math.random() * DEMO_CAPTIONS.length)];
-        
-        // 60% of posts have images
-        const hasImage = Math.random() < 0.6;
-        const imageUrl = hasImage ? DEMO_POST_IMAGES[Math.floor(Math.random() * DEMO_POST_IMAGES.length)] : null;
-
-        posts.push({
-          user_id: userId,
-          text: caption,
-          image_url: imageUrl,
+        checkins.push({
+          user_id: demoUserIds[i],
           venue_id: venueId,
           venue_name: venue.name,
+          lat: venue.lat,
+          lng: venue.lng,
+          created_at: getRecentTimestamp(3),
+          is_demo: true,
+        });
+      }
+      if (checkins.length > 0) {
+        await supabaseAdmin.from('checkins').insert(checkins);
+      }
+
+      // 7. Posts
+      console.log('Creating demo posts...');
+      const posts = [];
+      for (let i = 0; i < 40; i++) {
+        const postUserId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
+        const venue = SELECTED_VENUES[Math.floor(Math.random() * SELECTED_VENUES.length)];
+        const venueId = venueIdMap.get(venue.name);
+        const hasImage = Math.random() > 0.3;
+        posts.push({
+          user_id: postUserId,
+          text: DEMO_CAPTIONS[Math.floor(Math.random() * DEMO_CAPTIONS.length)],
+          venue_id: venueId,
+          venue_name: venue.name,
+          image_url: hasImage ? DEMO_POST_IMAGES[Math.floor(Math.random() * DEMO_POST_IMAGES.length)] : null,
           expires_at: calculateExpiryTime(),
           created_at: getRecentTimestamp(4),
           is_demo: true,
-          is_promoted: false,
+          visibility: 'friends',
         });
       }
-      await supabaseAdmin.from('posts').insert(posts);
+      const { data: insertedPosts } = await supabaseAdmin.from('posts').insert(posts).select('id');
 
-      // 6.5 Create post comments
-      const postComments = [];
-      const postsWithComments = getRandomItems(posts, 30); // Add comments to ~30 posts
-      
-      for (const post of postsWithComments) {
-        const numComments = 1 + Math.floor(Math.random() * 4); // 1-4 comments per post
-        const commenters = getRandomItems(demoUserIds, numComments);
-        
-        for (const commenterId of commenters) {
-          const commentTexts = [
-            "Looks amazing! 🔥",
-            "Wish I was there!",
-            "So jealous rn 😭",
-            "See you there!",
-            "On my way!",
-            "This place is fire",
-            "Need to check this out",
-            "Vibes look incredible",
-            "Best spot ever",
-            "Let's go there next weekend!",
-          ];
-          
-          const commentText = commentTexts[Math.floor(Math.random() * commentTexts.length)];
-          
-          postComments.push({
-            post_id: posts.indexOf(post), // This will be fixed below
-            user_id: commenterId,
-            text: commentText,
-            created_at: new Date(new Date(post.created_at).getTime() + Math.random() * 2 * 60 * 60 * 1000).toISOString(),
-          });
-        }
-      }
-
-      // We need to insert posts first to get their IDs, then insert comments
-      // So we'll do this differently
-      const { data: insertedPosts } = await supabaseAdmin.from('posts').select('id').order('created_at', { ascending: false }).limit(60);
-      
-      if (insertedPosts && insertedPosts.length > 0) {
-        const postCommentsWithIds = [];
-        const randomPosts = getRandomItems(insertedPosts, 30);
-        
-        for (const post of randomPosts) {
-          const numComments = 1 + Math.floor(Math.random() * 4);
-          const commenters = getRandomItems(demoUserIds, numComments);
-          
-          for (const commenterId of commenters) {
-            const commentTexts = [
-              "Looks amazing! 🔥",
-              "Wish I was there!",
-              "So jealous rn 😭",
-              "See you there!",
-              "On my way!",
-              "This place is fire",
-              "Need to check this out",
-              "Vibes look incredible",
-              "Best spot ever",
-              "Let's go there next weekend!",
-            ];
-            
-            postCommentsWithIds.push({
-              post_id: post.id,
-              user_id: commenterId,
-              text: commentTexts[Math.floor(Math.random() * commentTexts.length)],
-              created_at: getRecentTimestamp(3),
-            });
-          }
-        }
-        
-        if (postCommentsWithIds.length > 0) {
-          await supabaseAdmin.from('post_comments').insert(postCommentsWithIds);
-        }
-      }
-
-      // 6.5 Create post likes
-      console.log('Creating demo post likes...');
+      // 8. Post likes
       const postLikes = [];
-      const postsToLike = getRandomItems(insertedPosts || [], 40);
-
-      for (const post of postsToLike) {
-        const numLikes = 1 + Math.floor(Math.random() * 5);
-        const likers = getRandomItems(demoUserIds, numLikes);
-        
+      for (const post of getRandomItems(insertedPosts || [], 25)) {
+        const likers = getRandomItems(demoUserIds, 1 + Math.floor(Math.random() * 3));
         for (const likerId of likers) {
-          postLikes.push({
-            post_id: post.id,
-            user_id: likerId,
-            created_at: getRecentTimestamp(2),
-          });
+          postLikes.push({ post_id: post.id, user_id: likerId, created_at: getRecentTimestamp(2) });
         }
       }
-
       if (postLikes.length > 0) {
         await supabaseAdmin.from('post_likes').insert(postLikes);
-        console.log(`Created ${postLikes.length} demo post likes`);
       }
 
-      // 6.6 Create demo notifications for current user (likes & comments)
-      console.log('Creating demo activity notifications...');
-      const demoNotifications = [];
-      const commentPreviews = [
-        "Looks amazing! 🔥",
-        "So jealous rn 😭",
-        "On my way!",
-        "Best spot ever",
-        "This is fire 🔥",
-        "Need to check this out",
-      ];
-
-      // Get profiles for demo users to use their names
-      const { data: demoProfilesForNotifs } = await supabaseAdmin
-        .from('profiles')
-        .select('id, display_name')
-        .in('id', demoUserIds);
-
-      const profileMap = new Map(demoProfilesForNotifs?.map(p => [p.id, p.display_name]) || []);
-
-      // Create 8-12 like/comment notifications for the current user (if userId provided)
+      // 9. Notifications
       if (userId) {
-        const notifUsers = getRandomItems(demoUserIds, 10);
-        for (let i = 0; i < notifUsers.length; i++) {
-          const demoUserId = notifUsers[i];
-          const displayName = profileMap.get(demoUserId) || 'Someone';
-          
-          if (i % 2 === 0) {
-            demoNotifications.push({
-              sender_id: demoUserId,
-              receiver_id: userId,
-              type: 'post_like',
-              message: `${displayName} liked your post ❤️`,
-              created_at: getRecentTimestamp(1),
-              is_demo: true,
-            });
-          } else {
-            const preview = commentPreviews[Math.floor(Math.random() * commentPreviews.length)];
-            demoNotifications.push({
-              sender_id: demoUserId,
-              receiver_id: userId,
-              type: 'post_comment',
-              message: `${displayName} commented: "${preview}"`,
-              created_at: getRecentTimestamp(1),
-              is_demo: true,
-            });
-          }
+        const demoNotifications = [];
+        const { data: demoProfilesForNotifs } = await supabaseAdmin.from('profiles').select('id, display_name').in('id', demoUserIds.slice(0, 6));
+        for (const profile of demoProfilesForNotifs || []) {
+          demoNotifications.push({
+            sender_id: profile.id,
+            receiver_id: userId,
+            type: 'post_like',
+            message: `${profile.display_name} liked your post ❤️`,
+            created_at: getRecentTimestamp(1),
+            is_demo: true,
+          });
+        }
+        if (demoNotifications.length > 0) {
+          await supabaseAdmin.from('notifications').insert(demoNotifications);
         }
       }
 
-      if (demoNotifications.length > 0) {
-        await supabaseAdmin.from('notifications').insert(demoNotifications);
-        console.log(`Created ${demoNotifications.length} demo activity notifications`);
-      }
-
-      // 7. Create yap messages with scores and handles
-      const hottestVenues = getRandomItems([...SELECTED_VENUES], 10);
+      // 10. Yap messages
+      console.log('Creating yap messages...');
       const yapMessages = [];
-
-      for (let i = 0; i < 40; i++) {
-        const userId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
-        const venue = hottestVenues[i % hottestVenues.length];
+      for (let i = 0; i < 20; i++) {
+        const yapUserId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
+        const venue = SELECTED_VENUES[i % SELECTED_VENUES.length];
         const yapData = DEMO_YAP_MESSAGES[i % DEMO_YAP_MESSAGES.length];
-        const isPromotedVenue = SELECTED_VENUES.some((v: any) => v.name === venue.name);
-        
-        // Generate anonymous handle
-        const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
-        
-        // Calculate time ago (2m, 4m, 7m, 9m, 13m pattern)
-        const minutesAgo = [2, 4, 7, 9, 13, 18, 25, 32, 45, 62][i % 10];
-        const timestamp = new Date(Date.now() - minutesAgo * 60000);
-
         yapMessages.push({
-          user_id: userId,
+          user_id: yapUserId,
           text: yapData.text,
           venue_name: venue.name,
           expires_at: calculateExpiryTime(),
-          created_at: timestamp.toISOString(),
+          created_at: getRecentTimestamp(2),
           is_anonymous: true,
-          author_handle: handle,
+          author_handle: `User${Math.floor(100000 + Math.random() * 900000)}`,
           score: yapData.score,
           comments_count: yapData.comments,
           is_demo: true,
-          is_promoted: isPromotedVenue,
         });
       }
-      
-      // Insert yap messages and get their IDs back
-      const { data: insertedYaps } = await supabaseAdmin
-        .from('yap_messages')
-        .insert(yapMessages)
-        .select('id, comments_count');
+      await supabaseAdmin.from('yap_messages').insert(yapMessages);
 
-      // 7.5 Create demo comments for yap messages
-      console.log('Creating demo yap comments...');
-      const yapCommentTemplates = [
-        "lmaooo no way 💀",
-        "fr fr",
-        "I saw that too!!",
-        "who?? 👀",
-        "nah you're lying",
-        "this is wild",
-        "deadass",
-        "omg same",
-        "where exactly?",
-        "let's gooo",
-        "I'm dying 😂",
-        "facts",
-        "wait which one",
-        "no shot",
-        "for real though",
-        "bruh moment",
-        "I can't 😭",
-        "tell me more",
-        "need context",
-        "spill the tea ☕",
-      ];
-
-      const yapComments = [];
-      for (const yap of insertedYaps || []) {
-        const commentCount = yap.comments_count || 0;
-        for (let i = 0; i < commentCount; i++) {
-          const commentUserId = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
-          const commentHandle = `User${Math.floor(100000 + Math.random() * 900000)}`;
-          const commentMinutesAgo = Math.floor(Math.random() * 25) + 1;
-          
-          yapComments.push({
-            yap_id: yap.id,
-            user_id: commentUserId,
-            text: yapCommentTemplates[Math.floor(Math.random() * yapCommentTemplates.length)],
-            is_anonymous: true,
-            author_handle: commentHandle,
-            score: Math.floor(Math.random() * 15) - 3, // -3 to 11 range
-            is_demo: true,
-            created_at: new Date(Date.now() - commentMinutesAgo * 60000).toISOString(),
-          });
-        }
-      }
-
-      if (yapComments.length > 0) {
-        await supabaseAdmin.from('yap_comments').insert(yapComments);
-        console.log(`Created ${yapComments.length} demo yap comments`);
-      }
-
-      // 8. Create stories for demo users
-      const storyUsers = getRandomItems(demoUserIds, 15); // 15 users with stories
+      // 11. Stories
       const stories = [];
-      const storyVenues = getRandomItems([...SELECTED_VENUES], 10);
-      
-      for (const userId of storyUsers) {
-        const numStories = 1 + Math.floor(Math.random() * 3); // 1-3 stories per user
-        
-        for (let i = 0; i < numStories; i++) {
-          const venue = storyVenues[Math.floor(Math.random() * storyVenues.length)];
-          stories.push({
-            user_id: userId,
-            media_url: DEMO_POST_IMAGES[Math.floor(Math.random() * DEMO_POST_IMAGES.length)],
-            media_type: 'image',
-            venue_name: venue.name,
-            created_at: getRecentTimestamp(12), // Stories from last 12 hours
-            expires_at: calculateExpiryTime(),
-            is_demo: true,
+      for (const storyUserId of getRandomItems(demoUserIds, 8)) {
+        const venue = SELECTED_VENUES[Math.floor(Math.random() * SELECTED_VENUES.length)];
+        stories.push({
+          user_id: storyUserId,
+          media_url: DEMO_POST_IMAGES[Math.floor(Math.random() * DEMO_POST_IMAGES.length)],
+          media_type: 'image',
+          venue_name: venue.name,
+          created_at: getRecentTimestamp(8),
+          expires_at: calculateExpiryTime(),
+          is_demo: true,
         });
-        }
       }
-      
       if (stories.length > 0) {
         await supabaseAdmin.from('stories').insert(stories);
       }
 
-      // 9. Create venue reviews with real-world accurate data
-      console.log('Creating demo venue reviews with accurate data...');
+      // 12. Reviews
+      console.log('Creating venue reviews...');
       const venueReviews = [];
-      
-      // Create reviews for all selected city venues using venue-specific data
-      for (const venue of SELECTED_VENUES) {
+      for (const venue of SELECTED_VENUES.slice(0, 15)) {
         const venueId = venueIdMap.get(venue.name);
         if (!venueId) continue;
-        
         const venueReviewData = SELECTED_REVIEWS[venue.name];
         if (!venueReviewData) continue;
-        
         const reviewers = getRandomItems(demoUserIds, venueReviewData.reviews.length);
-        
         for (let i = 0; i < venueReviewData.reviews.length; i++) {
           const review = venueReviewData.reviews[i];
-          const hasImage = Math.random() < 0.4; // 40% have images
-          const imageUrl = hasImage ? DEMO_REVIEW_IMAGES[Math.floor(Math.random() * DEMO_REVIEW_IMAGES.length)] : null;
-          const isAnonymous = Math.random() < 0.3; // 30% anonymous
-          const score = Math.floor(Math.random() * 20) - 3; // -3 to 16 score range
-          
           venueReviews.push({
             venue_id: venueId,
             user_id: reviewers[i],
             rating: review.rating,
             review_text: review.text,
-            is_anonymous: isAnonymous,
-            image_url: imageUrl,
-            score,
-            created_at: getRecentTimestamp(168), // Reviews from last 7 days
+            is_anonymous: Math.random() < 0.3,
+            image_url: Math.random() < 0.3 ? DEMO_REVIEW_IMAGES[Math.floor(Math.random() * DEMO_REVIEW_IMAGES.length)] : null,
+            score: Math.floor(Math.random() * 15),
+            created_at: getRecentTimestamp(168),
           });
         }
       }
-      
       if (venueReviews.length > 0) {
-        // Use upsert to handle potential duplicates
-        const { error: reviewsError } = await supabaseAdmin
-          .from('venue_reviews')
-          .insert(venueReviews);
-          
-        if (reviewsError) {
-          console.error('Error inserting reviews:', reviewsError);
-        } else {
-          console.log(`Created ${venueReviews.length} demo venue reviews`);
-        }
+        await supabaseAdmin.from('venue_reviews').insert(venueReviews);
       }
 
-      // 10. Create demo message threads between demo users
-      console.log('Creating demo message threads between demo users...');
-      const messageThreadUsers = getRandomItems(demoUserIds, 6); // 6 conversations
-      
-      // Pick venues from the selected city for message threads
-      const topVenues = SELECTED_VENUES.slice(0, 3); // Use top 3 venues from city
-      const threadConfigs = [
-        { venue: topVenues[0].name, lastMessage: "Yeah I'm heading there now!", minutesAgo: 4, hasMultiple: true },
-        { venue: topVenues[1].name, lastMessage: "Come it's popping off...", minutesAgo: 5, hasMultiple: false },
-        { venue: topVenues[1].name, lastMessage: "See you soon!", minutesAgo: 10, hasMultiple: false },
-        { venue: topVenues[2].name, lastMessage: "Just got here!", minutesAgo: 12, hasMultiple: false },
-        { venue: topVenues[0].name, lastMessage: "Where are you?", minutesAgo: 15, hasMultiple: true },
-        { venue: topVenues[0].name, lastMessage: "This place is amazing!", minutesAgo: 20, hasMultiple: true },
-      ];
-      
-      let threadCount = 0;
-      // Create threads between pairs of demo users
-      for (let i = 0; i < messageThreadUsers.length - 1; i += 2) {
-        const demoUserId1 = messageThreadUsers[i];
-        const demoUserId2 = messageThreadUsers[i + 1];
-        const config = threadConfigs[i];
-        
-        // Create thread
-        const { data: newThread, error: threadError } = await supabaseAdmin
-          .from('dm_threads')
-          .insert({})
-          .select()
-          .single();
-          
-        if (threadError || !newThread) {
-          console.error('Error creating thread:', threadError);
-          continue;
-        }
-        
-        // Add thread members (both demo users)
-        const { error: membersError } = await supabaseAdmin
-          .from('dm_thread_members')
-          .insert([
-            { thread_id: newThread.id, user_id: demoUserId1 },
-            { thread_id: newThread.id, user_id: demoUserId2 },
-          ]);
-          
-        if (membersError) {
-          console.error('Error adding thread members:', membersError);
-          continue;
-        }
-        
-        // Create messages in thread
-        const messageTimestamp = new Date(Date.now() - config.minutesAgo * 60000);
-        const messages = [];
-        
-        if (config.hasMultiple) {
-          // Create 2-3 recent messages for threads with multiple messages
-          messages.push({
-            thread_id: newThread.id,
-            sender_id: demoUserId1,
-            text: config.lastMessage,
-            created_at: messageTimestamp.toISOString(),
-          });
-          messages.push({
-            thread_id: newThread.id,
-            sender_id: demoUserId2,
-            text: "Nice! What's the vibe?",
-            created_at: new Date(messageTimestamp.getTime() - 60000).toISOString(),
-          });
-        } else {
-          // Single message for simpler threads
-          messages.push({
-            thread_id: newThread.id,
-            sender_id: demoUserId1,
-            text: config.lastMessage,
-            created_at: messageTimestamp.toISOString(),
-          });
-        }
-        
-        await supabaseAdmin.from('dm_messages').insert(messages);
-        
-        // Update demo user's venue in night_statuses
-        const venueData = SELECTED_VENUES.find((v: any) => v.name === config.venue) || SELECTED_VENUES[0];
-        const venueId = venueIdMap.get(venueData.name);
-        
-        await supabaseAdmin.from('night_statuses').upsert({
-          user_id: demoUserId1,
-          status: 'out',
-          venue_id: venueId,
-          venue_name: venueData.name,
-          lat: venueData.lat,
-          lng: venueData.lng,
-          expires_at: calculateExpiryTime(),
-          updated_at: messageTimestamp.toISOString(),
-          is_demo: true,
-          is_promoted: true,
-        });
-        
-        threadCount++;
-      }
-
-      // Create demo buzz data for Tonight's Buzz
+      // 13. Buzz messages
       const buzzMessages = [];
-      const buzzStories = [];
-      const buzzVenues = SELECTED_VENUES.slice(0, 10); // Top 10 venues get buzz data
-
-      for (const venue of buzzVenues) {
+      for (const venue of SELECTED_VENUES.slice(0, 8)) {
         const venueId = venueIdMap.get(venue.name);
         if (!venueId) continue;
-
-        // Add 3-5 text buzz messages per venue
-        const numMessages = 3 + Math.floor(Math.random() * 3);
-        for (let i = 0; i < numMessages; i++) {
+        for (let i = 0; i < 3; i++) {
           const buzz = DEMO_BUZZ_MESSAGES[Math.floor(Math.random() * DEMO_BUZZ_MESSAGES.length)];
-          const randomUser = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
-          const minutesAgo = Math.floor(Math.random() * 180); // Within last 3 hours
-          
           buzzMessages.push({
-            user_id: randomUser,
+            user_id: demoUserIds[Math.floor(Math.random() * demoUserIds.length)],
             venue_id: venueId,
             venue_name: venue.name,
             text: buzz.text,
             emoji_vibe: buzz.emoji_vibe,
-            is_anonymous: Math.random() > 0.3, // 70% anonymous
+            is_anonymous: true,
             expires_at: calculateExpiryTime(),
-            created_at: new Date(Date.now() - minutesAgo * 60000).toISOString(),
+            created_at: getRecentTimestamp(2),
             is_demo: true,
           });
         }
-
-        // Add 1-2 media clips (stories with is_public_buzz) per top 5 venues
-        if (buzzVenues.indexOf(venue) < 5) {
-          const numClips = 1 + Math.floor(Math.random() * 2);
-          for (let i = 0; i < numClips; i++) {
-            const mediaUrl = DEMO_BUZZ_MEDIA[Math.floor(Math.random() * DEMO_BUZZ_MEDIA.length)];
-            const randomUser = demoUserIds[Math.floor(Math.random() * demoUserIds.length)];
-            const minutesAgo = Math.floor(Math.random() * 120); // Within last 2 hours
-            
-            buzzStories.push({
-              user_id: randomUser,
-              venue_id: venueId,
-              venue_name: venue.name,
-              media_url: mediaUrl,
-              media_type: 'image',
-              is_public_buzz: true,
-              is_anonymous: Math.random() > 0.7, // 30% anonymous for clips
-              expires_at: calculateExpiryTime(),
-              created_at: new Date(Date.now() - minutesAgo * 60000).toISOString(),
-              is_demo: true,
-            });
-          }
-        }
       }
-
-      // Insert buzz data
       if (buzzMessages.length > 0) {
         await supabaseAdmin.from('venue_buzz_messages').insert(buzzMessages);
       }
-      if (buzzStories.length > 0) {
-        await supabaseAdmin.from('stories').insert(buzzStories);
-      }
 
-      // 11. Create demo plans for Plans Feed
+      // 14. Plans
       console.log('Creating demo plans...');
       const weekendDates = getWeekendPlanDates();
-      const planTimes = ['20:00', '21:00', '21:30', '22:00', '22:30', '23:00'];
+      const planTimes = ['20:00', '21:00', '22:00', '23:00'];
       const demoPlans = [];
-
-      // Create 10 plans from random demo users
       const planCreators = getRandomItems(demoUserIds, 10);
       for (let i = 0; i < planCreators.length; i++) {
         const creatorId = planCreators[i];
-        const venue = SELECTED_VENUES[Math.floor(Math.random() * Math.min(20, SELECTED_VENUES.length))];
+        const venue = SELECTED_VENUES[Math.floor(Math.random() * Math.min(15, SELECTED_VENUES.length))];
         const venueId = venueIdMap.get(venue.name);
         const planDate = weekendDates[Math.floor(Math.random() * weekendDates.length)];
         const planTime = planTimes[Math.floor(Math.random() * planTimes.length)];
         const description = DEMO_PLAN_DESCRIPTIONS[Math.floor(Math.random() * DEMO_PLAN_DESCRIPTIONS.length)];
-        
-        // Calculate expires_at (end of plan_date day at 5am next morning)
         const expiresAt = new Date(planDate + 'T05:00:00');
         expiresAt.setDate(expiresAt.getDate() + 1);
-        
         demoPlans.push({
           user_id: creatorId,
           venue_id: venueId,
@@ -1831,7 +687,7 @@ Deno.serve(async (req) => {
           description: description,
           visibility: Math.random() > 0.3 ? 'friends' : 'close_friends',
           expires_at: expiresAt.toISOString(),
-          created_at: getRecentTimestamp(12), // Within last 12 hours
+          created_at: getRecentTimestamp(12),
           is_demo: true,
           score: 0,
           comments_count: 0,
@@ -1840,66 +696,36 @@ Deno.serve(async (req) => {
 
       let plansCreated = 0;
       let planDownsCreated = 0;
-
       if (demoPlans.length > 0) {
-        const { data: insertedPlans, error: plansError } = await supabaseAdmin
-          .from('plans')
-          .insert(demoPlans)
-          .select('id, user_id');
-
-        if (plansError) {
-          console.error('Error inserting plans:', plansError);
-        } else {
-          plansCreated = insertedPlans?.length || 0;
-          console.log(`Created ${plansCreated} demo plans`);
-
-          // Add "I'm Down" reactions to plans
-          if (insertedPlans && insertedPlans.length > 0) {
-            const planDowns = [];
-            
-            for (const plan of insertedPlans) {
-              // 60% of plans get 1-4 "I'm Down" reactions
-              if (Math.random() < 0.6) {
-                const numDowns = 1 + Math.floor(Math.random() * 4);
-                const downUsers = getRandomItems(
-                  demoUserIds.filter(id => id !== plan.user_id),
-                  numDowns
-                );
-                
-                for (const downUserId of downUsers) {
-                  planDowns.push({
-                    plan_id: plan.id,
-                    user_id: downUserId,
-                    created_at: getRecentTimestamp(6),
-                  });
-                }
+        const { data: insertedPlans, error: plansError } = await supabaseAdmin.from('plans').insert(demoPlans).select('id, user_id');
+        if (!plansError && insertedPlans) {
+          plansCreated = insertedPlans.length;
+          const planDowns = [];
+          for (const plan of insertedPlans) {
+            if (Math.random() < 0.6) {
+              const downUsers = getRandomItems(demoUserIds.filter(id => id !== plan.user_id), 1 + Math.floor(Math.random() * 3));
+              for (const downUserId of downUsers) {
+                planDowns.push({ plan_id: plan.id, user_id: downUserId, created_at: getRecentTimestamp(6) });
               }
             }
-            
-            if (planDowns.length > 0) {
-              const { error: downsError } = await supabaseAdmin.from('plan_downs').insert(planDowns);
-              if (downsError) {
-                console.error('Error inserting plan_downs:', downsError);
-              } else {
-                planDownsCreated = planDowns.length;
-                console.log(`Created ${planDownsCreated} "I'm Down" reactions`);
-              }
-            }
+          }
+          if (planDowns.length > 0) {
+            await supabaseAdmin.from('plan_downs').insert(planDowns);
+            planDownsCreated = planDowns.length;
           }
         }
       }
 
+      console.log('Seed complete!');
       return new Response(
         JSON.stringify({
           success: true,
           stats: {
             users: demoUserIds.length,
-            posts: 60,
-            stories: stories.length + buzzStories.length,
+            posts: posts.length,
+            stories: stories.length,
             yaps: yapMessages.length,
-            threads: threadCount,
             venues: SELECTED_VENUES.length,
-            activeUsers: nightStatuses.length,
             buzzMessages: buzzMessages.length,
             plans: plansCreated,
             planDowns: planDownsCreated,
@@ -1909,28 +735,14 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'clear') {
-      // Get demo profile IDs first
-      const { data: demoProfiles } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('is_demo', true);
-      const demoIds = demoProfiles?.map(p => p.id) || [];
+      const { data: demoProfiles } = await supabaseAdmin.from('profiles').select('id').eq('is_demo', true);
+      const demoIds = demoProfiles?.map((p: any) => p.id) || [];
       
-      // Get demo post IDs
-      const { data: demoPosts } = await supabaseAdmin
-        .from('posts')
-        .select('id')
-        .eq('is_demo', true);
-      const postIds = demoPosts?.map(p => p.id) || [];
+      const { data: demoPosts } = await supabaseAdmin.from('posts').select('id').eq('is_demo', true);
+      const postIds = demoPosts?.map((p: any) => p.id) || [];
+      const { data: demoThreads } = await supabaseAdmin.from('dm_thread_members').select('thread_id').in('user_id', demoIds);
+      const threadIds = demoThreads?.map((t: any) => t.thread_id) || [];
       
-      // Get threads involving demo users
-      const { data: demoThreads } = await supabaseAdmin
-        .from('dm_thread_members')
-        .select('thread_id')
-        .in('user_id', demoIds);
-      const threadIds = demoThreads?.map(t => t.thread_id) || [];
-      
-      // Delete in correct order (respecting foreign keys)
       if (postIds.length > 0) {
         await supabaseAdmin.from('post_comments').delete().in('post_id', postIds);
         await supabaseAdmin.from('post_likes').delete().in('post_id', postIds);
@@ -1940,13 +752,9 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('dm_thread_members').delete().in('thread_id', threadIds);
         await supabaseAdmin.from('dm_threads').delete().in('id', threadIds);
       }
-      // Get demo yap comment IDs for deleting related votes
-      const { data: demoYapComments } = await supabaseAdmin
-        .from('yap_comments')
-        .select('id')
-        .eq('is_demo', true);
-      const yapCommentIds = demoYapComments?.map(c => c.id) || [];
       
+      const { data: demoYapComments } = await supabaseAdmin.from('yap_comments').select('id').eq('is_demo', true);
+      const yapCommentIds = demoYapComments?.map((c: any) => c.id) || [];
       if (yapCommentIds.length > 0) {
         await supabaseAdmin.from('yap_comment_votes').delete().in('comment_id', yapCommentIds);
       }
@@ -1960,13 +768,8 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from('checkins').delete().eq('is_demo', true);
       await supabaseAdmin.from('night_statuses').delete().eq('is_demo', true);
       
-      // Delete demo plans and related data
-      const { data: demoPlans } = await supabaseAdmin
-        .from('plans')
-        .select('id')
-        .eq('is_demo', true);
-      const planIds = demoPlans?.map(p => p.id) || [];
-      
+      const { data: demoPlansData } = await supabaseAdmin.from('plans').select('id').eq('is_demo', true);
+      const planIds = demoPlansData?.map((p: any) => p.id) || [];
       if (planIds.length > 0) {
         await supabaseAdmin.from('plan_downs').delete().in('plan_id', planIds);
         await supabaseAdmin.from('plan_comments').delete().in('plan_id', planIds);
@@ -1975,15 +778,9 @@ Deno.serve(async (req) => {
       }
       await supabaseAdmin.from('plans').delete().eq('is_demo', true);
       
-      // Delete venue reviews (via demo user IDs since no is_demo column)
       if (demoIds.length > 0) {
-        // First get review IDs to delete related votes
-        const { data: demoReviews } = await supabaseAdmin
-          .from('venue_reviews')
-          .select('id')
-          .in('user_id', demoIds);
-        const reviewIds = demoReviews?.map(r => r.id) || [];
-        
+        const { data: demoReviews } = await supabaseAdmin.from('venue_reviews').select('id').in('user_id', demoIds);
+        const reviewIds = demoReviews?.map((r: any) => r.id) || [];
         if (reviewIds.length > 0) {
           await supabaseAdmin.from('review_votes').delete().in('review_id', reviewIds);
         }
@@ -2000,21 +797,12 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from('notifications').delete().eq('is_demo', true);
       await supabaseAdmin.from('profiles').delete().eq('is_demo', true);
 
-      return new Response(
-        JSON.stringify({ success: true }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    return new Response(
-      JSON.stringify({ error: 'Invalid action' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error) {
     console.error('Error:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
