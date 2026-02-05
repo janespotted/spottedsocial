@@ -1509,6 +1509,56 @@ export type Database = {
           },
         ]
       }
+      venue_claim_requests: {
+        Row: {
+          business_email: string
+          business_phone: string | null
+          created_at: string | null
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          user_id: string
+          venue_id: string | null
+          venue_name: string | null
+          verification_notes: string | null
+        }
+        Insert: {
+          business_email: string
+          business_phone?: string | null
+          created_at?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          user_id: string
+          venue_id?: string | null
+          venue_name?: string | null
+          verification_notes?: string | null
+        }
+        Update: {
+          business_email?: string
+          business_phone?: string | null
+          created_at?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          user_id?: string
+          venue_id?: string | null
+          venue_name?: string | null
+          verification_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_claim_requests_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venue_location_reports: {
         Row: {
           auto_corrected_at: string | null
@@ -1605,6 +1655,91 @@ export type Database = {
           },
         ]
       }
+      venue_owners: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: string | null
+          user_id: string
+          venue_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: string | null
+          user_id: string
+          venue_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: string | null
+          user_id?: string
+          venue_id?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_owners_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venue_promotions: {
+        Row: {
+          amount_paid: number | null
+          created_at: string | null
+          created_by: string
+          ends_at: string
+          id: string
+          promotion_type: string
+          starts_at: string
+          status: string | null
+          stripe_payment_id: string | null
+          stripe_subscription_id: string | null
+          venue_id: string
+        }
+        Insert: {
+          amount_paid?: number | null
+          created_at?: string | null
+          created_by: string
+          ends_at: string
+          id?: string
+          promotion_type: string
+          starts_at: string
+          status?: string | null
+          stripe_payment_id?: string | null
+          stripe_subscription_id?: string | null
+          venue_id: string
+        }
+        Update: {
+          amount_paid?: number | null
+          created_at?: string | null
+          created_by?: string
+          ends_at?: string
+          id?: string
+          promotion_type?: string
+          starts_at?: string
+          status?: string | null
+          stripe_payment_id?: string | null
+          stripe_subscription_id?: string | null
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_promotions_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venue_reviews: {
         Row: {
           created_at: string
@@ -1642,6 +1777,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "venue_reviews_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venue_yap_messages: {
+        Row: {
+          created_at: string | null
+          display_as: string | null
+          expires_at: string | null
+          id: string
+          is_pinned: boolean | null
+          posted_by: string
+          text: string
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_as?: string | null
+          expires_at?: string | null
+          id?: string
+          is_pinned?: boolean | null
+          posted_by: string
+          text: string
+          venue_id: string
+        }
+        Update: {
+          created_at?: string | null
+          display_as?: string | null
+          expires_at?: string | null
+          id?: string
+          is_pinned?: boolean | null
+          posted_by?: string
+          text?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_yap_messages_venue_id_fkey"
             columns: ["venue_id"]
             isOneToOne: false
             referencedRelation: "venues"
@@ -2103,6 +2279,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_any_venue_owner: { Args: { check_user_id: string }; Returns: boolean }
       is_close_friend: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
@@ -2117,6 +2294,10 @@ export type Database = {
       }
       is_mutual_friend: {
         Args: { target_user_id: string; viewer_id: string }
+        Returns: boolean
+      }
+      is_venue_owner: {
+        Args: { check_user_id: string; check_venue_id: string }
         Returns: boolean
       }
       process_invite_code: {
