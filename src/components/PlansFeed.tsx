@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Plus } from 'lucide-react';
+import { Calendar, Plus, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PlanItem } from './PlanItem';
 import { CreatePlanDialog } from './CreatePlanDialog';
@@ -12,8 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 import { haptic } from '@/lib/haptics';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useUserCity } from '@/hooks/useUserCity';
- import { EventCard } from './EventCard';
-
+import { EventCard } from './EventCard';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { isWeekendDate, getWeekendDateRange } from '@/hooks/useWeekendRally';
 interface Plan {
   id: string;
   user_id: string;
@@ -65,9 +66,11 @@ interface Plan {
  
 interface PlansFeedProps {
   userId: string;
+  weekendFilter?: boolean;
+  onClearWeekendFilter?: () => void;
 }
 
-export function PlansFeed({ userId }: PlansFeedProps) {
+export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter }: PlansFeedProps) {
   const [plans, setPlans] = useState<Plan[]>([]);
    const [events, setEvents] = useState<EventWithFriends[]>([]);
   const [userVotes, setUserVotes] = useState<Record<string, 'up' | 'down'>>({});
@@ -438,11 +441,22 @@ export function PlansFeed({ userId }: PlansFeedProps) {
      fetchEvents();
    };
  
-   // Build merged feed items
-   const feedItems: FeedItem[] = [
+   // Build merged feed items with optional weekend filtering
+   let feedItems: FeedItem[] = [
      ...plans.map(plan => ({ type: 'plan' as const, data: plan })),
      ...events.map(event => ({ type: 'event' as const, data: event })),
    ];
+
+   // Apply weekend filter if active
+   if (weekendFilter) {
+     feedItems = feedItems.filter(item => {
+       if (item.type === 'plan') {
+         return isWeekendDate(item.data.plan_date);
+       } else {
+         return isWeekendDate(item.data.event_date);
+       }
+     });
+   }
  
    // Sort: events by friend count, plans by score, interleave naturally
    feedItems.sort((a, b) => {
@@ -462,6 +476,9 @@ export function PlansFeed({ userId }: PlansFeedProps) {
      }
      return 0;
    });
+
+   // Count friends planning for this weekend
+   const weekendPlanningFriendsCount = planningFriends.length;
  
   if (isLoading) {
     return (
@@ -484,30 +501,88 @@ export function PlansFeed({ userId }: PlansFeedProps) {
 
   return (
     <div className="space-y-7 px-4 pb-24">
-      {/* Friends Thinking About Going Out Section - always show for join option */}
-      <FriendsPlanning 
-        friends={planningFriends} 
-        variant="card" 
-        isUserPlanning={isUserPlanning}
-        onJoinPlanning={handleJoinPlanning}
-        onLeavePlanning={handleLeavePlanning}
-        showJoinOption={true}
-        userProfile={userProfile}
-        userPlanningNeighborhood={userPlanningNeighborhood}
-        userPlanningVisibility={userPlanningVisibility}
-        onChangeNeighborhood={handleChangeNeighborhood}
-        onSwitchToOut={handleSwitchToOut}
-        city={city || 'la'}
-      />
+      {/* Weekend Rally Header - shown when activated via push notification */}
+      {weekendFilter && (
+        <div className="bg-gradient-to-br from-[#a855f7]/20 to-[#7c3aed]/10 border border-[#a855f7]/30 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-[#d4ff00]" />
+              <h3 className="text-white font-semibold text-lg">This Weekend</h3>
+            </div>
+            <button
+              onClick={onClearWeekendFilter}
+              className="text-white/50 hover:text-white text-sm transition-colors"
+            >
+              Show all
+            </button>
+          </div>
+          
+          {weekendPlanningFriendsCount > 0 ? (
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex -space-x-2">
+                {planningFriends.slice(0, 4).map((friend, i) => (
+                  <Avatar key={friend.user_id} className="h-8 w-8 border-2 border-[#1a0f2e]">
+                    <AvatarImage src={friend.avatar_url || undefined} />
+                    <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                      {friend.display_name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+                {planningFriends.length > 4 && (
+                  <div className="h-8 w-8 rounded-full bg-[#2d1b4e] border-2 border-[#1a0f2e] flex items-center justify-center">
+                    <span className="text-white/70 text-xs">+{planningFriends.length - 4}</span>
+                  </div>
+                )}
+              </div>
+              <span className="text-white/70 text-sm">
+                {weekendPlanningFriendsCount} friend{weekendPlanningFriendsCount !== 1 ? 's' : ''} making plans
+              </span>
+            </div>
+          ) : (
+            <p className="text-white/50 text-sm mb-4">No friends planning yet — be the first!</p>
+          )}
+          
+          {!isUserPlanning && (
+            <button
+              onClick={handleJoinPlanning}
+              className="w-full flex items-center justify-center gap-2 bg-[#a855f7] hover:bg-[#9333ea] text-white py-3 rounded-xl font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              I'm thinking too
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Friends Thinking About Going Out Section - hide in weekend mode */}
+      {!weekendFilter && (
+        <FriendsPlanning 
+          friends={planningFriends} 
+          variant="card" 
+          isUserPlanning={isUserPlanning}
+          onJoinPlanning={handleJoinPlanning}
+          onLeavePlanning={handleLeavePlanning}
+          showJoinOption={true}
+          userProfile={userProfile}
+          userPlanningNeighborhood={userPlanningNeighborhood}
+          userPlanningVisibility={userPlanningVisibility}
+          onChangeNeighborhood={handleChangeNeighborhood}
+          onSwitchToOut={handleSwitchToOut}
+          city={city || 'la'}
+        />
+      )}
+      
       {/* Subtle separator */}
-      <div className="h-px bg-white/10" />
+      {!weekendFilter && <div className="h-px bg-white/10" />}
 
       {/* Drop a Plan Section */}
       <div className="space-y-3">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-lg">📝</span>
-            <h3 className="text-white font-semibold text-base">Drop a Plan</h3>
+            <h3 className="text-white font-semibold text-base">
+              {weekendFilter ? 'Make Weekend Plans' : 'Drop a Plan'}
+            </h3>
           </div>
           <p className="text-white/50 text-xs mt-1 ml-7">Share a plan your friends can join</p>
         </div>
@@ -526,9 +601,14 @@ export function PlansFeed({ userId }: PlansFeedProps) {
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center mb-5">
             <Calendar className="w-10 h-10 text-primary" />
           </div>
-          <h3 className="text-xl font-semibold text-foreground mb-2">Tonight's a blank canvas</h3>
+          <h3 className="text-xl font-semibold text-foreground mb-2">
+            {weekendFilter ? 'No weekend plans yet' : "Tonight's a blank canvas"}
+          </h3>
           <p className="text-muted-foreground text-sm max-w-[280px] leading-relaxed">
-            Drop a plan and see who's down to join.
+            {weekendFilter 
+              ? 'Be the first to share what you\'re up to this weekend!'
+              : 'Drop a plan and see who\'s down to join.'
+            }
           </p>
         </div>
       ) : (

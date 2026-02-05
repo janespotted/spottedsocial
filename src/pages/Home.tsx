@@ -11,6 +11,7 @@ import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
 import { useUserCity } from '@/hooks/useUserCity';
 import { useDailyNudge } from '@/hooks/useDailyNudge';
+import { useWeekendRally } from '@/hooks/useWeekendRally';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search } from 'lucide-react';
@@ -51,6 +52,7 @@ export default function Home() {
   const { unreadCount } = useNotifications();
   const { city } = useUserCity();
   const { showNudgeModal, nudgeType, closeNudgeModal } = useDailyNudge();
+  const { isWeekendRally, clearRally } = useWeekendRally();
   useAutoVenueTracking();
 
   const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends, cacheStories, getCachedStories } = useOfflineCache();
@@ -206,6 +208,13 @@ export default function Home() {
       ]).finally(() => setIsLoading(false));
     }
   }, [user, demoEnabled, city]);
+
+  // Auto-switch to Plans tab when weekend rally is active
+  useEffect(() => {
+    if (isWeekendRally) {
+      setFeedMode('plans');
+    }
+  }, [isWeekendRally]);
 
   // Handle new post incrementally
   const handleNewPost = useCallback((payload: any) => {
@@ -366,7 +375,11 @@ export default function Home() {
       {/* Feed Content */}
       {feedMode === 'plans' ? (
         <div className="py-4">
-          <PlansFeed userId={user?.id || ''} />
+          <PlansFeed 
+            userId={user?.id || ''} 
+            weekendFilter={isWeekendRally}
+            onClearWeekendFilter={clearRally}
+          />
         </div>
       ) : (
       <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); await fetchPlanningFriends(); }}>
