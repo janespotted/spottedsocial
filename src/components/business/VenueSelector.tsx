@@ -22,7 +22,7 @@
  
  interface VenueSelectorProps {
    selectedVenueId: string | null;
-   onVenueChange: (venueId: string) => void;
+  onVenueChange: (venueId: string, venueName?: string) => void;
  }
  
  export function VenueSelector({ selectedVenueId, onVenueChange }: VenueSelectorProps) {
@@ -55,7 +55,7 @@
  
          // Auto-select first venue if none selected
          if (!selectedVenueId && ownedVenues.length > 0) {
-           onVenueChange(ownedVenues[0].venue_id);
+          onVenueChange(ownedVenues[0].venue_id, ownedVenues[0].venue.name);
          }
        } catch (err) {
          console.error('Error fetching owned venues:', err);
@@ -80,6 +80,10 @@
    }
  
    if (venues.length === 1) {
+    // Auto-select the single venue if not already selected
+    if (!selectedVenueId) {
+      onVenueChange(venues[0].venue_id, venues[0].venue.name);
+    }
      return (
        <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
          <Building2 className="h-4 w-4 text-primary" />
@@ -88,8 +92,13 @@
      );
    }
  
+  const handleValueChange = (venueId: string) => {
+    const venue = venues.find(v => v.venue_id === venueId);
+    onVenueChange(venueId, venue?.venue.name);
+  };
+
    return (
-     <Select value={selectedVenueId || ''} onValueChange={onVenueChange}>
+    <Select value={selectedVenueId || ''} onValueChange={handleValueChange}>
        <SelectTrigger className="bg-white/5 border-white/10 text-white">
          <SelectValue placeholder="Select venue" />
        </SelectTrigger>
