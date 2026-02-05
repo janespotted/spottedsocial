@@ -6,6 +6,13 @@ export interface CapturedMedia {
   preview: string;
 }
 
+// Check if EXIF orientation indicates image is already mirrored
+// Mirrored orientations: 2 (flipped horizontal), 4 (flipped vertical + 180), 5, 7
+function isExifMirrored(exif: any): boolean {
+  if (!exif || typeof exif.Orientation !== 'number') return false;
+  return [2, 4, 5, 7].includes(exif.Orientation);
+}
+
 // Mirror image horizontally (for front camera selfies)
 async function mirrorImage(base64: string, format: string): Promise<string> {
   return new Promise((resolve) => {
@@ -43,16 +50,44 @@ export async function capturePhoto(): Promise<CapturedMedia | null> {
     if (!photo.base64String) return null;
 
     const originalBase64 = `data:image/${photo.format};base64,${photo.base64String}`;
+    const platform = Capacitor.getPlatform();
     
-    // Mirror the image to match what user saw in viewfinder
-    const mirroredBase64 = await mirrorImage(originalBase64, photo.format);
+    // Determine whether to mirror based on platform and EXIF
+    // iOS typically returns already-mirrored selfies, so skip mirroring
+    // Android/web typically return un-mirrored, so we mirror to match viewfinder
+    let shouldMirror = false;
     
-    const blob = await (await fetch(mirroredBase64)).blob();
+    if (isExifMirrored(photo.exif)) {
+      // EXIF says it's already mirrored - don't double-mirror
+      shouldMirror = false;
+    } else if (platform === 'ios') {
+      // iOS returns mirrored selfies by default - don't mirror again
+      shouldMirror = false;
+    } else {
+      // Android/web: mirror to match the viewfinder preview
+      shouldMirror = true;
+    }
+    
+    // Debug logging (temporary - helps troubleshoot device variations)
+    console.log('[camera-service] capturePhoto:', {
+      platform,
+      format: photo.format,
+      hasExif: !!photo.exif,
+      exifOrientation: photo.exif?.Orientation,
+      shouldMirror,
+    });
+    
+    let finalBase64 = originalBase64;
+    if (shouldMirror) {
+      finalBase64 = await mirrorImage(originalBase64, photo.format);
+    }
+    
+    const blob = await (await fetch(finalBase64)).blob();
     const file = new File([blob], `capture-${Date.now()}.${photo.format}`, {
       type: `image/${photo.format}`,
     });
 
-    return { file, preview: mirroredBase64 };
+    return { file, preview: finalBase64 };
   } catch (error) {
     console.error('Error capturing photo:', error);
     return null;
