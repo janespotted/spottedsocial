@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { loginSchema, signupSchema } from '@/lib/auth-validation';
+ import { Mail, Lock, User, AtSign } from 'lucide-react';
+ import spottedLogo from '@/assets/spotted-s-logo.png';
 
 interface InviterInfo {
   display_name: string;
@@ -194,29 +196,45 @@ export default function Auth() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
-      <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#0a0118] rounded-3xl">
-        <CardHeader className="space-y-2 text-center pt-8">
-          <CardTitle className="text-5xl font-light tracking-[0.3em] text-white">
+     <div className="relative flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] overflow-hidden">
+       {/* Animated floating orbs for ambient depth */}
+       <div className="fixed inset-0 overflow-hidden pointer-events-none">
+         <div className="absolute -top-20 -left-20 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-float-slow" />
+         <div className="absolute top-1/4 -right-32 w-80 h-80 bg-accent/15 rounded-full blur-3xl animate-float-slow-reverse" />
+         <div className="absolute -bottom-32 left-1/4 w-72 h-72 bg-primary/15 rounded-full blur-3xl animate-float-slow" />
+       </div>
+ 
+       <Card className="relative z-10 w-full max-w-[430px] mx-auto glass-card rounded-3xl border border-primary/30 shadow-[0_0_60px_rgba(168,85,247,0.3)] animate-fade-in">
+         <CardHeader className="space-y-3 text-center pt-8 pb-4">
+           {/* Logo with glow effect */}
+           <div className="flex justify-center mb-2">
+             <img 
+               src={spottedLogo} 
+               alt="Spotted" 
+               className="w-14 h-14 object-contain drop-shadow-[0_0_15px_rgba(212,255,0,0.5)]"
+             />
+           </div>
+           
+           <CardTitle className="text-4xl font-light tracking-[0.25em] text-foreground">
             Spotted
           </CardTitle>
           
           {/* Inviter Badge */}
           {inviter && !isLogin && (
-            <div className="flex items-center justify-center gap-2 bg-[#a855f7]/20 border border-[#a855f7]/40 rounded-full px-4 py-2 mx-auto">
-              <Avatar className="h-6 w-6 border border-[#a855f7]/60">
+             <div className="flex items-center justify-center gap-2 bg-primary/20 border border-primary/40 rounded-full px-4 py-2 mx-auto">
+               <Avatar className="h-6 w-6 border border-primary/60">
                 <AvatarImage src={inviter.avatar_url || undefined} />
-                <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                 <AvatarFallback className="bg-card text-foreground text-xs">
                   {inviter.display_name?.[0] || 'U'}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-white/80 text-sm">
+               <span className="text-foreground/80 text-sm">
                 Invited by {inviter.display_name}
               </span>
             </div>
           )}
           
-          <CardDescription className="text-base text-white/60">
+           <CardDescription className="text-base text-muted-foreground">
             {isLogin 
               ? 'Welcome back! Sign in to see who\'s out tonight.' 
               : inviteCode 
@@ -225,13 +243,13 @@ export default function Auth() {
             }
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+         <CardContent className="space-y-5 px-6 pb-8">
           {/* Google Sign-In Button */}
-          <div className="space-y-2">
+           <div className="space-y-3">
             <Button
               type="button"
               variant="outline"
-              className="w-full bg-white hover:bg-gray-100 text-gray-800 border-gray-300 font-medium flex items-center justify-center gap-3"
+               className="w-full h-12 bg-white hover:bg-gray-100 text-gray-800 border-gray-200 font-medium flex items-center justify-center gap-3 rounded-xl shadow-sm transition-all hover:shadow-md"
               onClick={handleGoogleSignIn}
               disabled={googleLoading}
             >
@@ -267,72 +285,84 @@ export default function Auth() {
           </div>
 
           {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-white/20" />
-            <span className="text-white/50 text-sm">or</span>
-            <div className="flex-1 h-px bg-white/20" />
+           <div className="flex items-center gap-4 py-1">
+             <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+             <span className="text-muted-foreground text-sm font-medium px-2">or</span>
+             <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
           </div>
 
           <form onSubmit={handleAuth} className="space-y-4">
             {!isLogin && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="displayName" className="text-white">Display Name</Label>
-                  <Input
-                    id="displayName"
-                    type="text"
-                    placeholder="Your name"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    required={!isLogin}
-                    className="border-[#a855f7]/40 focus:border-[#a855f7] focus:shadow-[0_0_15px_rgba(168,85,247,0.4)] bg-[#1a0f2e] text-white"
-                  />
+                   <Label htmlFor="displayName" className="text-foreground text-sm font-medium">Display Name</Label>
+                   <div className="relative">
+                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                     <Input
+                       id="displayName"
+                       type="text"
+                       placeholder="Your name"
+                       value={displayName}
+                       onChange={(e) => setDisplayName(e.target.value)}
+                       required={!isLogin}
+                       className="pl-10 h-11 border-border/60 focus:border-primary focus:shadow-[0_0_15px_hsl(var(--primary)/0.3)] bg-card/50 text-foreground rounded-xl transition-all"
+                     />
+                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="username" className="text-white">Username</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="@username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required={!isLogin}
-                    className="border-[#a855f7]/40 focus:border-[#a855f7] focus:shadow-[0_0_15px_rgba(168,85,247,0.4)] bg-[#1a0f2e] text-white"
-                  />
+                   <Label htmlFor="username" className="text-foreground text-sm font-medium">Username</Label>
+                   <div className="relative">
+                     <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                     <Input
+                       id="username"
+                       type="text"
+                       placeholder="username"
+                       value={username}
+                       onChange={(e) => setUsername(e.target.value)}
+                       required={!isLogin}
+                       className="pl-10 h-11 border-border/60 focus:border-primary focus:shadow-[0_0_15px_hsl(var(--primary)/0.3)] bg-card/50 text-foreground rounded-xl transition-all"
+                     />
+                   </div>
                 </div>
               </>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-white">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="border-[#a855f7]/40 focus:border-[#a855f7] focus:shadow-[0_0_15px_rgba(168,85,247,0.4)] bg-[#1a0f2e] text-white"
-              />
+               <Label htmlFor="email" className="text-foreground text-sm font-medium">Email</Label>
+               <div className="relative">
+                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                 <Input
+                   id="email"
+                   type="email"
+                   placeholder="you@example.com"
+                   value={email}
+                   onChange={(e) => setEmail(e.target.value)}
+                   required
+                   className="pl-10 h-11 border-border/60 focus:border-primary focus:shadow-[0_0_15px_hsl(var(--primary)/0.3)] bg-card/50 text-foreground rounded-xl transition-all"
+                 />
+               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-white">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="border-[#a855f7]/40 focus:border-[#a855f7] focus:shadow-[0_0_15px_rgba(168,85,247,0.4)] bg-[#1a0f2e] text-white"
-              />
+               <Label htmlFor="password" className="text-foreground text-sm font-medium">Password</Label>
+               <div className="relative">
+                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                 <Input
+                   id="password"
+                   type="password"
+                   placeholder="••••••••"
+                   value={password}
+                   onChange={(e) => setPassword(e.target.value)}
+                   required
+                   minLength={6}
+                   className="pl-10 h-11 border-border/60 focus:border-primary focus:shadow-[0_0_15px_hsl(var(--primary)/0.3)] bg-card/50 text-foreground rounded-xl transition-all"
+                 />
+               </div>
             </div>
             
             {isLogin && (
               <div className="text-right">
                 <Link 
                   to="/reset-password" 
-                  className="text-sm text-[#a855f7] hover:text-[#a855f7]/80 transition-colors"
+                   className="text-sm text-primary hover:text-primary/80 transition-colors"
                 >
                   Forgot password?
                 </Link>
@@ -340,20 +370,20 @@ export default function Auth() {
             )}
 
             {!isLogin && (
-              <div className="flex items-start space-x-3 py-2">
+               <div className="flex items-start space-x-3 py-1">
                 <Checkbox
                   id="terms"
                   checked={agreedToTerms}
                   onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
-                  className="border-[#a855f7]/40 data-[state=checked]:bg-[#a855f7] data-[state=checked]:border-[#a855f7] mt-0.5"
+                   className="border-primary/40 data-[state=checked]:bg-primary data-[state=checked]:border-primary mt-0.5"
                 />
-                <label htmlFor="terms" className="text-sm text-white/80 leading-tight cursor-pointer">
+                 <label htmlFor="terms" className="text-sm text-muted-foreground leading-tight cursor-pointer">
                   I agree to the{' '}
-                  <Link to="/terms" className="text-[#a855f7] hover:underline">
+                   <Link to="/terms" className="text-primary hover:underline">
                     Terms of Service
                   </Link>{' '}
                   and{' '}
-                  <Link to="/privacy" className="text-[#a855f7] hover:underline">
+                   <Link to="/privacy" className="text-primary hover:underline">
                     Privacy Policy
                   </Link>
                 </label>
@@ -362,7 +392,7 @@ export default function Auth() {
 
             <Button
               type="submit"
-              className="w-full bg-[#a855f7] hover:bg-[#a855f7]/90 shadow-[0_0_15px_rgba(168,85,247,0.6)] hover:shadow-[0_0_25px_rgba(168,85,247,0.8)] transition-all text-white font-semibold"
+               className="w-full h-12 bg-primary hover:bg-primary/90 shadow-[0_0_20px_hsl(var(--primary)/0.5)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.7)] transition-all text-primary-foreground font-semibold rounded-xl"
               disabled={loading}
             >
               {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Sign Up'}
@@ -370,7 +400,7 @@ export default function Auth() {
             <Button
               type="button"
               variant="ghost"
-              className="w-full text-white/80 hover:text-white hover:bg-[#a855f7]/20"
+               className="w-full text-muted-foreground hover:text-foreground hover:bg-primary/10"
               onClick={() => {
                 setIsLogin(!isLogin);
                 setAgreedToTerms(false);
