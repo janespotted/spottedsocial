@@ -1,86 +1,119 @@
 
 
-## Fix Venue Detection & Database Accuracy for Venice Beach
+## LA Venue Database Audit & Fix Location Detection
 
-### Problem Summary
+### Part 1: Detection Threshold (Answering Your Question)
 
-You're at **523 Ocean Front Walk** near Dudley Market, but the app detected "High Venice Rooftop" instead. This happened because:
+The venue detection uses these thresholds (in `src/lib/venue-arrival-nudge/trigger.ts`):
 
-1. **Dudley Market is NOT in the venue database** - It needs to be added
-2. **High Rooftop Lounge** is an old/duplicate entry that should be renamed to **Kassi Rooftop** (they are the same venue at Hotel Erwin)
-3. We already have a separate "Kassi Rooftop" entry, so "High Rooftop Lounge" should be deleted
+| Threshold | Meters | Feet |
+|-----------|--------|------|
+| **Venue Trigger Radius** | 200m | ~656 feet |
+| **Max Detection Distance** | 500m | ~1,640 feet |
+| **GPS Accuracy Required** | ≤50m | ~164 feet |
+| **Dwell Time** | 45 seconds | - |
 
-The venue dropdown feature already exists in the app - when you're prompted "Are you out?", there's a dropdown showing nearby venues. However, it only works when there are actually multiple venues detected nearby.
+So when you're at 523 Ocean Front Walk, the app will detect any venue within **656 feet (200m)** and prompt you. The dropdown shows venues within **1,640 feet (500m)**.
 
 ---
 
-### Database Fixes
+### Part 2: Coordinate Issue Found
 
-**Step 1: Add Dudley Market**
-```sql
-INSERT INTO venues (name, lat, lng, neighborhood, type)
-VALUES ('Dudley Market', 33.9941928, -118.4796515, 'Venice', 'wine_bar');
-```
-- Location: 9 Dudley Ave (near 523 Ocean Front Walk)
-- Seafood restaurant and natural wine bar
+**The Problem:** The current coordinates for **Venice Beach Bar & Kitchen** in the database are wrong:
+- Database coords: `33.9859, -118.4712` (this is ~1km inland!)  
+- Actual location: `33.9941, -118.4799` (323 Ocean Front Walk)
 
-**Step 2: Delete Duplicate "High Rooftop Lounge"**
-```sql
-DELETE FROM venues WHERE name = 'High Rooftop Lounge' AND neighborhood = 'Venice';
-```
-- This is the old name for Kassi Rooftop
-- We already have "Kassi Rooftop" in the database at the correct Hotel Erwin location
+Since you're at **523 Ocean Front Walk**, Venice Beach Bar & Kitchen (at 323 Ocean Front Walk) should be the closest venue - just ~200 meters north of you along the boardwalk. But the wrong coordinates made the system skip it.
 
-**Step 3: Verify Other Venice Venues**
+**Dudley Market** is at `33.9942, -118.4797` (9 Dudley Ave, slightly inland from boardwalk), which is why it detected that after we added it.
 
-Based on research, the following venues in the database are accurate:
-- Kassi Rooftop (Hotel Erwin) 
+---
+
+### Part 3: Venice Venues Audit
+
+**Venues to UPDATE (Wrong Coordinates or Rebranded):**
+
+| Current Name | Issue | Fix |
+|--------------|-------|-----|
+| Venice Beach Bar & Kitchen | Wrong coordinates (1km off) | Update to `33.9941, -118.4799` |
+| Venice Ale House Bar | **Rebranded to "Venice Beach Club"** in July 2025 | Rename + update coords to `33.9930, -118.4736` |
+| Kassi Rooftop | Verify coords are correct for Hotel Erwin | Update to `33.9935, -118.4800` |
+| Wurstkuche Arts District | **Wrong neighborhood** - it's in Arts District DTLA, not Venice | Remove from Venice OR update to Venice location at 625 Lincoln Blvd |
+
+**Venues to REMOVE (Not Nightlife per Quality Standards):**
+
+| Venue | Reason |
+|-------|--------|
+| Butcher's Daughter Venice | Daytime cafe, closes 9-10pm, not nightlife |
+| Gjelina Venice | Restaurant (no bar scene), closes 10:30pm |
+| Sunny Spot Venice | Now a different restaurant "Nueva" |
+
+**Venues Currently Good:**
 - The Brig Venice
 - Venice Whaler
+- Hinano Cafe Venice
 - Townhouse Del Monte
+- The Otheroom Venice
 - The Roosterfish
-- Gjelina Venice
-- Canal Club Venice
 - James Beach Venice
+- Larry's Venice Beach
+- Canal Club Venice
+- Scopa Italian Venice (still open as wine bar/cocktail bar)
+- Dudley Market (just added)
+- Waterfront Venice
+- Tasting Kitchen Venice
 
 ---
 
-### How the Venue Dropdown Works (Already Implemented)
+### Part 4: Database Updates Required
 
-The app already has this feature. When the "Are you out?" prompt appears:
+```sql
+-- Fix Venice Beach Bar & Kitchen coordinates
+UPDATE venues 
+SET lat = 33.9941, lng = -118.4799 
+WHERE name = 'Venice Beach Bar & Kitchen';
 
+-- Rename Venice Ale House to Venice Beach Club
+UPDATE venues 
+SET name = 'Venice Beach Club', 
+    lat = 33.9930, 
+    lng = -118.4736 
+WHERE name = 'Venice Ale House Bar';
+
+-- Fix Kassi Rooftop coordinates (Hotel Erwin)
+UPDATE venues 
+SET lat = 33.9935, lng = -118.4800 
+WHERE name = 'Kassi Rooftop';
+
+-- Fix Wurstkuche - update to correct Venice location
+UPDATE venues 
+SET lat = 33.9913, lng = -118.4628, neighborhood = 'Venice'
+WHERE name = 'Wurstkuche Arts District' AND neighborhood = 'Venice';
+
+-- Rename to just Wurstkuche Venice
+UPDATE venues 
+SET name = 'Wurstkuche Venice'
+WHERE name = 'Wurstkuche Arts District' AND neighborhood = 'Venice';
+
+-- Remove non-nightlife venues
+DELETE FROM venues WHERE name = 'Butcher''s Daughter Venice';
+DELETE FROM venues WHERE name = 'Sunny Spot Venice';
 ```
-┌────────────────────────────────────┐
-│     📍 You're near Dudley Market   │
-│        Are you out?                │
-│                                    │
-│  Not right? Select another:        │
-│  ┌────────────────────────────┐    │
-│  │ 📍 Dudley Market (45m)   ▼ │    │  ← Dropdown
-│  └────────────────────────────┘    │
-│                                    │
-│     [ Yes, I'm here! 🎉 ]          │
-│                                    │
-│       I'm somewhere else           │
-│        Not yet • Dismiss           │
-└────────────────────────────────────┘
-```
 
-The dropdown shows all venues within 500m, ordered by distance. Users can select a different venue if the auto-detected one is wrong.
+---
+
+### Part 5: After Fix - Expected Behavior
+
+When you're at **523 Ocean Front Walk**, the detection order should be:
+
+1. **Venice Beach Bar & Kitchen** (~200m north) - Primary detection
+2. **Dudley Market** (~50m inland) - In dropdown
+3. **Kassi Rooftop** (~250m) - In dropdown
+4. Other nearby boardwalk venues in dropdown
 
 ---
 
 ### Files Changed
-
-- **Database only** - No code changes needed
-- The venue dropdown in `VenueArrivalPrompt.tsx` already works correctly
-
----
-
-### Verification
-
-After the database update, when you're at 523 Ocean Front Walk:
-1. Dudley Market should be detected as the nearest venue (approximately 45m away)
-2. The dropdown will show other nearby Venice venues (Kassi Rooftop, The Roosterfish, etc.)
-3. "High Rooftop Lounge" will no longer appear (deleted duplicate)
+- Database updates only (no code changes needed)
+- Dropdown feature already exists in `VenueArrivalPrompt.tsx`
 
