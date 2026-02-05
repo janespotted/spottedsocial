@@ -789,6 +789,12 @@ export default function Map() {
   useEffect(() => {
     if (!map.current) return;
 
+    // Debug log promoted venues
+    const promotedVenues = filteredVenues.filter(v => v.is_map_promoted);
+    if (promotedVenues.length > 0) {
+      console.log(`[map:promoted] Rendering ${promotedVenues.length} promoted venue(s):`, promotedVenues.map(v => v.name));
+    }
+
     // Get current venue IDs from the filtered venues array
     const currentVenueIds = new Set(filteredVenues.map(v => v.id));
 
@@ -831,7 +837,8 @@ export default function Map() {
         el.style.width = `${containerSize}px`;
         el.style.height = `${containerSize}px`;
         el.style.cursor = 'pointer';
-        el.style.zIndex = isMapPromoted ? '8' : '5';
+        el.style.position = 'relative';
+        el.style.zIndex = isMapPromoted ? '30' : '12';
         el.dataset.promoted = String(isMapPromoted);
         
         el.innerHTML = `
@@ -856,6 +863,14 @@ export default function Map() {
         })
           .setLngLat([venue.lng, venue.lat])
           .addTo(map.current!);
+
+        // Force wrapper z-index for promoted venues to ensure they render above friend markers
+        if (isMapPromoted) {
+          const wrapper = marker.getElement()?.parentElement;
+          if (wrapper) {
+            wrapper.style.zIndex = '30';
+          }
+        }
 
         venueMarkersRef.current.set(venue.id, marker);
       }
