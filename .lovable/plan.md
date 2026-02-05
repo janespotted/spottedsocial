@@ -1,95 +1,32 @@
 
 
-## Consolidate Friends Buttons on Profile
+## Fix Friend Requests Button in Activity Tab
 
 ### Problem
-Two separate friend-related buttons in close proximity:
-1. Small `UserPlus` icon next to stats → goes to Requests tab
-2. Large "Invite Friends" button → goes to Invite tab
-
-This is confusing and takes up unnecessary space.
+The "Friend Requests" card in the Activity tab (Messages page) still navigates to the old `/friend-requests` route which was removed during the unification. This causes navigation to fail.
 
 ---
 
 ### Solution
-Consolidate into a **single unified button** that goes to the Friends page with smart defaults.
-
----
-
-### Proposed Layout
-
-```text
-Current:
-+------------------+  +------------------+
-|   50    |   2    | [+] ← small icon
-| Friends | Places |
-+------------------+------------------+
-| [👥 Invite Friends]  [QR] [Edit] |
-+-------------------------------------+
-
-After:
-+------------------+  +------------------+
-|   50    |   2    |
-| Friends | Places |
-+------------------+------------------+
-| [👥 Friends]         [QR]   [Edit] |
-+-------------------------------------+
-```
+Update the navigation to go to `/friends` instead, which now contains the unified friend management interface with the Requests tab.
 
 ---
 
 ### Implementation
 
-#### File: `src/pages/Profile.tsx`
+#### File: `src/components/messages/ActivityTab.tsx`
 
-**Remove**: The small UserPlus icon button (lines 467-473)
-
-**Update**: The "Invite Friends" button to become a general "Friends" button:
+Change line 607 from:
 ```tsx
-<Button
-  onClick={() => navigate('/friends')}
-  className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full"
->
-  <Users className="h-4 w-4 mr-2" />
-  Friends
-</Button>
+onClick={() => navigate('/friend-requests')}
 ```
 
-This single button takes users to `/friends` where they can access all tabs:
-- Requests (with pending count badge)
-- Find (search existing users)
-- Invite (share link/QR)
-
----
-
-### Benefits
-
-| Before | After |
-|--------|-------|
-| 2 friend buttons | 1 unified button |
-| Confusing entry points | Single clear entry point |
-| Redundant UI | Cleaner profile layout |
-| Different icons (UserPlus x2) | Single Users icon |
-
----
-
-### Alternative Consideration
-
-If you want to keep requests prominent, we could add a notification badge to the single button when there are pending requests:
-
+To:
 ```tsx
-<Button onClick={() => navigate('/friends')} className="...">
-  <Users className="h-4 w-4 mr-2" />
-  Friends
-  {pendingRequestsCount > 0 && (
-    <span className="ml-2 bg-red-500 text-white text-xs px-1.5 rounded-full">
-      {pendingRequestsCount}
-    </span>
-  )}
-</Button>
+onClick={() => navigate('/friends', { state: { tab: 'requests' } })}
 ```
 
-This way users still see pending requests at a glance.
+This navigates to the Friends page and opens directly on the Requests tab, matching the expected user flow.
 
 ---
 
@@ -97,5 +34,5 @@ This way users still see pending requests at a glance.
 
 | File | Change |
 |------|--------|
-| `src/pages/Profile.tsx` | Remove small UserPlus button, update main button to "Friends" |
+| `src/components/messages/ActivityTab.tsx` | Update navigation from `/friend-requests` to `/friends` with tab state |
 
