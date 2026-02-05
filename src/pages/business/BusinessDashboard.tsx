@@ -188,7 +188,7 @@
                  <div className="text-white font-semibold">
                    {loading ? (
                      <div className="h-5 w-20 bg-white/10 rounded animate-pulse" />
-                   ) : analytics?.peakHour !== null ? (
+                   ) : analytics && analytics.peakHour !== null ? (
                      formatHour(analytics.peakHour)
                    ) : (
                      'No data'

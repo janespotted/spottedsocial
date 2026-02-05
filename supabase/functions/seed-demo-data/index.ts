@@ -1099,7 +1099,8 @@ Deno.serve(async (req) => {
         neighborhood: (v as any).neighborhood || 'Unknown',
         type: (v as any).type || 'bar',
         is_demo: true,
-        is_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
+       is_leaderboard_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
+       is_map_promoted: PROMOTED_VENUE_NAMES.includes(v.name),
         popularity_rank: v.rank,
         city: city,
       }));
