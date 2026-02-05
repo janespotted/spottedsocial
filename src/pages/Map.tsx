@@ -87,6 +87,7 @@ export default function Map() {
   const [searchQuery, setSearchQuery] = useState('');
   const [focusMode, setFocusMode] = useState(false);
   const [showVenueList, setShowVenueList] = useState(false);
+  const [layerVisibility, setLayerVisibility] = useState<'both' | 'friends' | 'venues'>('both');
   const friendsListRef = useRef<HTMLDivElement>(null);
   const venueFilterRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -609,6 +610,11 @@ export default function Map() {
     friendMarkersRef.current.forEach(marker => marker.remove());
     friendMarkersRef.current.clear();
 
+    // If venues-only mode, don't render friend markers
+    if (layerVisibility === 'venues') {
+      return;
+    }
+
     // At high zoom (18+), don't cluster - show all individual avatars
     const shouldCluster = currentZoom < 18;
 
@@ -756,7 +762,7 @@ export default function Map() {
         });
       }
     });
-  }, [friends, isLoadingFriends, currentZoom]);
+  }, [friends, isLoadingFriends, currentZoom, layerVisibility]);
 
   // Determine how many venues to show based on zoom level
   const getVisibleVenueCount = (zoom: number): number => {
@@ -788,6 +794,13 @@ export default function Map() {
   // Render venue markers with smart diffing (like friend avatars)
   useEffect(() => {
     if (!map.current) return;
+
+    // If friends-only mode, clear venue markers and don't render
+    if (layerVisibility === 'friends') {
+      venueMarkersRef.current.forEach(marker => marker.remove());
+      venueMarkersRef.current.clear();
+      return;
+    }
 
     // Debug log promoted venues
     const promotedVenues = filteredVenues.filter(v => v.is_map_promoted);
@@ -874,7 +887,7 @@ export default function Map() {
         venueMarkersRef.current.set(venue.id, marker);
       }
     });
-  }, [filteredVenues, friends]);
+  }, [filteredVenues, friends, layerVisibility]);
 
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
     const R = 3959; // Earth's radius in miles
@@ -1179,6 +1192,55 @@ export default function Map() {
         )}
       </div>
 
+      {/* Layer Visibility Toggle - Below Venue Filter on Right */}
+      <div 
+        className={`absolute right-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        style={{ top: 'calc(9.5rem + env(safe-area-inset-top, 0px))' }}
+      >
+        <div className="flex bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl overflow-hidden">
+          <button
+            onClick={() => {
+              setLayerVisibility('both');
+              setSelectedCluster(null);
+            }}
+            className={`px-3 py-2 text-sm transition-colors ${
+              layerVisibility === 'both' 
+                ? 'bg-[#a855f7]/30 text-[#d4ff00]' 
+                : 'text-white/70 hover:bg-[#a855f7]/15'
+            }`}
+          >
+            Both
+          </button>
+          <button
+            onClick={() => {
+              setLayerVisibility('friends');
+              setSelectedCluster(null);
+            }}
+            className={`px-3 py-2 text-sm transition-colors ${
+              layerVisibility === 'friends' 
+                ? 'bg-[#a855f7]/30 text-[#d4ff00]' 
+                : 'text-white/70 hover:bg-[#a855f7]/15'
+            }`}
+          >
+            👤
+          </button>
+          <button
+            onClick={() => {
+              setLayerVisibility('venues');
+              setSelectedCluster(null);
+              setShowFriendsList(false);
+            }}
+            className={`px-3 py-2 text-sm transition-colors ${
+              layerVisibility === 'venues' 
+                ? 'bg-[#a855f7]/30 text-[#d4ff00]' 
+                : 'text-white/70 hover:bg-[#a855f7]/15'
+            }`}
+          >
+            📍
+          </button>
+        </div>
+      </div>
+
       {/* Explore Venues Button + List - Below Search on Left */}
       <div 
         ref={venueListRef}
@@ -1269,8 +1331,8 @@ export default function Map() {
         )}
       </div>
 
-      {/* Friends Out Pill + List - Bottom Left */}
-      {friends.length > 0 ? (
+      {/* Friends Out Pill + List - Bottom Left - Hidden in venues-only mode */}
+      {layerVisibility !== 'venues' && friends.length > 0 ? (
         <div ref={friendsListRef} className={`absolute left-6 z-[200] max-w-sm transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: bottomOffset }}>
           {/* Expanded Friends List - Opens Upward */}
           {showFriendsList && (
@@ -1393,7 +1455,7 @@ export default function Map() {
             </div>
           </button>
         </div>
-      ) : !demoEnabled ? (
+      ) : layerVisibility !== 'venues' && !demoEnabled ? (
         <div className={`absolute left-6 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-20 transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: bottomOffset }}>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#a855f7]/30 rounded-full"></div>
@@ -1413,8 +1475,9 @@ export default function Map() {
         <Crosshair className="w-5 h-5 text-white" />
       </button>
 
-      {/* Legend */}
-      <div className={`absolute right-6 bg-[#2d1b4e]/95 backdrop-blur-sm border border-[#a855f7]/20 rounded-md p-2 z-20 shadow-[0_0_8px_rgba(168,85,247,0.2)] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: legendBottomOffset }}>
+      {/* Legend - Hidden in venues-only mode */}
+      {layerVisibility !== 'venues' && (
+        <div className={`absolute right-6 bg-[#2d1b4e]/95 backdrop-blur-sm border border-[#a855f7]/20 rounded-md p-2 z-20 shadow-[0_0_8px_rgba(168,85,247,0.2)] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: legendBottomOffset }}>
         <p className="text-white/70 text-[10px] font-medium mb-1.5">Relationship</p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">
@@ -1434,7 +1497,8 @@ export default function Map() {
             <span className="text-white/60 text-[10px]">Mutual</span>
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Cluster Friends Popover */}
       {selectedCluster && (
