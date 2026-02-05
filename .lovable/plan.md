@@ -1,107 +1,83 @@
 
 
-## Improve Promoted Venues Management System
+## Fix Map Promoted Venue Styling
 
 ### The Problem
 
-Currently there's a disconnect between Admin and Leaderboard:
-- **Admin** lets you mark unlimited venues as "Leaderboard Promoted"
-- **Leaderboard** only shows the top 2 promoted spots
+"Spotlight LA" is marked as `is_map_promoted = true` in the database, but it doesn't visually stand out on the map because:
 
-This creates confusion: you see 6 promoted venues in Admin, but only 2 appear on the leaderboard. The other 4 are "promoted" in the database but invisible to users.
+**The pulsing glow animation is broken** - The marker HTML references `animation: pulse 1.5s infinite` but there's no `@keyframes pulse` defined anywhere in the CSS.
 
----
+### Current Styling (What Should Happen)
 
-### Recommended Approach: "Active" vs "Waitlist" System
+The promoted marker styling code in `Map.tsx` includes these special effects:
 
-Instead of letting unlimited venues be marked promoted, add a clear distinction:
+| Feature | Promoted Venue | Regular Venue |
+|---------|---------------|---------------|
+| Size | 60px container, 46px pin | 50px container, 38px pin |
+| Background | Gradient (purple → neon yellow) | Solid purple |
+| Border | 2px neon yellow | 1.5px white |
+| Glow | 12px neon yellow shadow | 3px purple shadow |
+| Star badge | Yes (top-right corner) | No |
+| Pulsing aura | **BROKEN** (animation: pulse doesn't exist) | N/A |
+| Z-index | 8 (above others) | 5 |
 
-| Status | Description | Visible on Leaderboard |
-|--------|-------------|------------------------|
-| **Active** (max 2) | Currently displayed in promoted section | Yes |
-| **Waitlist** | Queued for future promotion | No |
+### Root Cause
 
----
-
-### How It Would Work
-
-**In Admin Panel:**
-
-```text
-┌─────────────────────────────────────────┐
-│ Leaderboard Promoted                    │
-├─────────────────────────────────────────┤
-│ ACTIVE SPOTS (2/2)                      │
-│ ┌─────────────────────────────────────┐ │
-│ │ 1. Venue A          [↓ Move Down]   │ │
-│ │ 2. Venue B          [Remove]        │ │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│ WAITLIST (4 venues)                     │
-│ ┌─────────────────────────────────────┐ │
-│ │ 3. Venue C          [↑ Activate]    │ │
-│ │ 4. Venue D          [Remove]        │ │
-│ │ 5. Venue E          [Remove]        │ │
-│ │ 6. Venue F          [Remove]        │ │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│ [+ Search to add to waitlist...]        │
-└─────────────────────────────────────────┘
+Line 839 in `Map.tsx`:
+```javascript
+animation: pulse ${isMapPromoted ? '1.5s' : '2s'} infinite;
 ```
 
-**User Flow:**
-1. When you add a venue, it goes to the waitlist
-2. You can drag/reorder the waitlist
-3. To show a venue on the leaderboard, you either:
-   - Remove one of the 2 active spots, OR
-   - Click "Activate" which swaps it with the last active venue
+But `@keyframes pulse` is never defined in the CSS. The animation silently fails.
 
 ---
 
-### Alternative Approaches
+### Solution
 
-| Approach | Pros | Cons |
-|----------|------|------|
-| **A. Waitlist (recommended)** | Clear distinction, intuitive queue | Slightly more complex UI |
-| **B. Hard limit of 2** | Simple - can't add more than 2 | Less flexibility for future planning |
-| **C. Show warning only** | Minimal code change | Still confusing - doesn't solve the core issue |
+Add the missing `@keyframes pulse` animation to `src/index.css`:
+
+```css
+/* Map venue promoted pulse animation */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+```
+
+This will create a breathing/pulsing effect that makes the neon yellow glow around promoted venues animate smoothly.
 
 ---
 
-### Implementation Details
+### Additional Enhancement (Optional)
 
-**Database Change:**
-Add a `promotion_order` integer column to `venues` table (or use existing `popularity_rank`):
-- Order 1-2 = Active (shown on leaderboard)
-- Order 3+ = Waitlist (not shown)
+To make promoted venues even more distinctive, I could also:
 
-**Admin Panel Changes:**
-1. Split the promoted venues list into "Active" and "Waitlist" sections
-2. Show "2/2 spots filled" indicator
-3. Add reorder/swap functionality
-4. Prevent adding to Active if 2 spots filled (auto-add to waitlist)
-
-**Leaderboard Changes:**
-None needed - already only shows top 2 via `.slice(0, 2)`
+1. **Make the glow more intense** - Increase the box-shadow spread
+2. **Add a subtle bounce** - Make the star badge animate
+3. **Increase the gradient contrast** - More vibrant colors
 
 ---
 
 ### Files to Modify
 
-| File | Changes |
-|------|---------|
-| Database migration | Add `leaderboard_promo_order` column to venues |
-| `src/pages/Admin.tsx` | Redesign promoted section with Active/Waitlist split, add reorder controls |
-| `src/pages/Leaderboard.tsx` | Query by `leaderboard_promo_order` instead of just filtering by `is_leaderboard_promoted` |
+| File | Change |
+|------|--------|
+| `src/index.css` | Add `@keyframes pulse` animation for map markers |
 
 ---
 
-### Quick Alternative: Just Enforce Limit
+### Expected Result After Fix
 
-If you want a simpler solution, I can just:
-1. Limit Admin to only allow 2 leaderboard-promoted venues at a time
-2. Show "2/2 spots filled - remove one to add another"
-3. No waitlist, just a hard cap
-
-Which approach do you prefer?
+Spotlight LA (and any other map-promoted venue) will show:
+- Larger neon yellow/purple gradient pin
+- Animated pulsing yellow glow that breathes in and out
+- Star badge in top-right corner
+- Higher z-index (appears above other pins)
 
