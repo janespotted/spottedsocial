@@ -9,7 +9,7 @@ import { CheckInTrendChart } from '@/components/business/CheckInTrendChart';
 import { HourlyDistributionChart } from '@/components/business/HourlyDistributionChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Megaphone, MessageSquare, TrendingUp, TrendingDown, Clock, Users, Calendar, MapPin } from 'lucide-react';
+import { Megaphone, MessageSquare, TrendingUp, TrendingDown, Clock, Users, Calendar as CalendarIcon, MapPin } from 'lucide-react';
 import { format, subDays, startOfDay } from 'date-fns';
 
 interface EnhancedAnalytics {
@@ -300,7 +300,7 @@ export default function BusinessDashboard() {
 
             <Card className="bg-white/5 border-white/10 p-3">
               <div className="flex items-center gap-2 text-white/60 text-xs mb-1">
-                <Calendar className="h-3 w-3" />
+                <CalendarIcon className="h-3 w-3" />
                 Busiest Day
               </div>
               <div className="text-white font-semibold text-sm">
@@ -349,24 +349,33 @@ export default function BusinessDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-white text-sm">Grow Your Venue</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3">
+            <CardContent className="grid grid-cols-3 gap-2">
+              <Button
+                onClick={() => navigate('/business/events')}
+                variant="outline"
+                className="h-auto py-3 flex-col gap-1 border-white/20 text-white hover:bg-white/10"
+              >
+                <CalendarIcon className="h-4 w-4 text-primary" />
+                <span className="text-xs">Events</span>
+                <span className="text-[10px] text-white/50 text-center">Add & manage events</span>
+              </Button>
               <Button
                 onClick={() => navigate('/business/promote')}
                 variant="outline"
-                className="h-auto py-4 flex-col gap-1 border-white/20 text-white hover:bg-white/10"
+                className="h-auto py-3 flex-col gap-1 border-white/20 text-white hover:bg-white/10"
               >
                 <Megaphone className="h-4 w-4 text-primary" />
                 <span className="text-xs">Promote</span>
-                <span className="text-[10px] text-white/50 text-center">Boost visibility on the leaderboard</span>
+                <span className="text-[10px] text-white/50 text-center">Boost visibility</span>
               </Button>
               <Button
                 onClick={() => navigate('/business/yap')}
                 variant="outline"
-                className="h-auto py-4 flex-col gap-1 border-white/20 text-white hover:bg-white/10"
+                className="h-auto py-3 flex-col gap-1 border-white/20 text-white hover:bg-white/10"
               >
                 <MessageSquare className="h-4 w-4 text-primary" />
                 <span className="text-xs">Yap</span>
-                <span className="text-[10px] text-white/50 text-center">Post updates to your guests</span>
+                <span className="text-[10px] text-white/50 text-center">Post updates</span>
               </Button>
             </CardContent>
           </Card>

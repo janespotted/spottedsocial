@@ -52,10 +52,11 @@ import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import Friends from "./pages/Friends";
 import BusinessLanding from "./pages/business/BusinessLanding";
- import BusinessAuth from "./pages/business/BusinessAuth";
- import BusinessDashboard from "./pages/business/BusinessDashboard";
- import BusinessPromote from "./pages/business/BusinessPromote";
- import BusinessYap from "./pages/business/BusinessYap";
+import BusinessAuth from "./pages/business/BusinessAuth";
+import BusinessDashboard from "./pages/business/BusinessDashboard";
+import BusinessPromote from "./pages/business/BusinessPromote";
+import BusinessYap from "./pages/business/BusinessYap";
+import BusinessEvents from "./pages/business/BusinessEvents";
  import { BusinessRoute } from "./components/business/BusinessRoute";
 
 const queryClient = new QueryClient();
@@ -273,6 +274,16 @@ function AppContent() {
              <ProtectedRoute>
                <BusinessRoute>
                  <BusinessYap />
+               </BusinessRoute>
+             </ProtectedRoute>
+           }
+         />
+         <Route
+           path="/business/events"
+           element={
+             <ProtectedRoute>
+               <BusinessRoute>
+                 <BusinessEvents />
                </BusinessRoute>
              </ProtectedRoute>
            }

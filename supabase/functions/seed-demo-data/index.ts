@@ -716,6 +716,66 @@ Deno.serve(async (req) => {
         }
       }
 
+      // 15. Demo Events
+      console.log('Creating demo events...');
+      const DEMO_EVENTS = [
+        { title: "Friday Night DJ Set", description: "House music all night", time: "22:00" },
+        { title: "Industry Night", description: "Free entry for hospitality workers", time: "21:00" },
+        { title: "Saturday Night Live DJ", description: "Special guest DJ set", time: "23:00" },
+        { title: "Rooftop Sessions", description: "Sunset vibes into the night", time: "19:00" },
+        { title: "Disco Sundays", description: "Classic disco and funk", time: "20:00" },
+      ];
+      
+      let eventsCreated = 0;
+      let rsvpsCreated = 0;
+      const eventVenues = SELECTED_VENUES.slice(0, 8);
+      const demoEvents = [];
+      
+      for (let i = 0; i < eventVenues.length; i++) {
+        const venue = eventVenues[i];
+        const venueId = venueIdMap.get(venue.name);
+        const eventTemplate = DEMO_EVENTS[i % DEMO_EVENTS.length];
+        const eventDate = weekendDates[i % weekendDates.length];
+        const expiresAt = new Date(eventDate + 'T05:00:00');
+        expiresAt.setDate(expiresAt.getDate() + 1);
+        
+        demoEvents.push({
+          venue_id: venueId,
+          venue_name: venue.name,
+          title: eventTemplate.title,
+          description: eventTemplate.description,
+          event_date: eventDate,
+          start_time: eventTemplate.time,
+          city: city,
+          neighborhood: venue.neighborhood,
+          expires_at: expiresAt.toISOString(),
+          is_demo: true,
+        });
+      }
+
+      if (demoEvents.length > 0) {
+        const { data: insertedEvents, error: eventsError } = await supabaseAdmin.from('events').insert(demoEvents).select('id');
+        if (!eventsError && insertedEvents) {
+          eventsCreated = insertedEvents.length;
+          // Add RSVPs from demo users so events appear in friend-filtered feed
+          const eventRsvps = [];
+          for (const event of insertedEvents) {
+            const rsvpUsers = getRandomItems(demoUserIds, 2 + Math.floor(Math.random() * 4));
+            for (const userId of rsvpUsers) {
+              eventRsvps.push({
+                event_id: event.id,
+                user_id: userId,
+                rsvp_type: Math.random() > 0.3 ? 'going' : 'interested',
+              });
+            }
+          }
+          if (eventRsvps.length > 0) {
+            await supabaseAdmin.from('event_rsvps').insert(eventRsvps);
+            rsvpsCreated = eventRsvps.length;
+          }
+        }
+      }
+
       console.log('Seed complete!');
       return new Response(
         JSON.stringify({
@@ -729,6 +789,8 @@ Deno.serve(async (req) => {
             buzzMessages: buzzMessages.length,
             plans: plansCreated,
             planDowns: planDownsCreated,
+            events: eventsCreated,
+            eventRsvps: rsvpsCreated,
             city: city,
           }
         }),
@@ -777,6 +839,14 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('plan_participants').delete().in('plan_id', planIds);
       }
       await supabaseAdmin.from('plans').delete().eq('is_demo', true);
+      
+      // Clear demo events
+      const { data: demoEventsData } = await supabaseAdmin.from('events').select('id').eq('is_demo', true);
+      const eventIds = demoEventsData?.map((e: any) => e.id) || [];
+      if (eventIds.length > 0) {
+        await supabaseAdmin.from('event_rsvps').delete().in('event_id', eventIds);
+      }
+      await supabaseAdmin.from('events').delete().eq('is_demo', true);
       
       if (demoIds.length > 0) {
         const { data: demoReviews } = await supabaseAdmin.from('venue_reviews').select('id').in('user_id', demoIds);

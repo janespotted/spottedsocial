@@ -3,6 +3,7 @@ import { Calendar, Plus, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PlanItem } from './PlanItem';
 import { CreatePlanDialog } from './CreatePlanDialog';
+import { CreateEventDialog } from './CreateEventDialog';
 import { EditPlanDialog } from './EditPlanDialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -76,6 +77,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
   const [userVotes, setUserVotes] = useState<Record<string, 'up' | 'down'>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showCreateEventDialog, setShowCreateEventDialog] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
   const [isUserPlanning, setIsUserPlanning] = useState(false);
@@ -587,13 +589,22 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
           <p className="text-white/50 text-xs mt-1 ml-7">Share a plan your friends can join</p>
         </div>
         
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="w-full flex items-center justify-center gap-2 bg-white/[0.06] backdrop-blur-sm hover:bg-white/[0.10] text-white/80 hover:text-white py-3.5 rounded-xl transition-all duration-200 shadow-sm"
-        >
-          <Plus className="w-4 h-4" strokeWidth={1.5} />
-          <span className="text-sm font-medium tracking-tight">Share a plan</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="flex-1 flex items-center justify-center gap-2 bg-white/[0.06] backdrop-blur-sm hover:bg-white/[0.10] text-white/80 hover:text-white py-3.5 rounded-xl transition-all duration-200 shadow-sm"
+          >
+            <Plus className="w-4 h-4" strokeWidth={1.5} />
+            <span className="text-sm font-medium tracking-tight">Share a plan</span>
+          </button>
+          <button
+            onClick={() => setShowCreateEventDialog(true)}
+            className="flex-1 flex items-center justify-center gap-2 bg-white/[0.06] backdrop-blur-sm hover:bg-white/[0.10] text-white/80 hover:text-white py-3.5 rounded-xl transition-all duration-200 shadow-sm"
+          >
+            <Calendar className="w-4 h-4" strokeWidth={1.5} />
+            <span className="text-sm font-medium tracking-tight">Add event</span>
+          </button>
+        </div>
       </div>
 
        {feedItems.length === 0 ? (
@@ -650,6 +661,15 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
           onPlanUpdated={handlePlanUpdated}
         />
       )}
+
+      <CreateEventDialog
+        open={showCreateEventDialog}
+        onOpenChange={setShowCreateEventDialog}
+        onEventCreated={() => {
+          setShowCreateEventDialog(false);
+          fetchEvents();
+        }}
+      />
     </div>
   );
 }
