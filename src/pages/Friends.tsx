@@ -317,118 +317,24 @@ interface SuggestedFriend {
        </header>
  
       <div className="p-4 space-y-5">
-          {/* Invite Friends Section */}
+         {/* Find on Spotted Section - FIRST */}
           <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl p-5 space-y-4">
             <div className="flex items-center gap-4 mb-2">
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center">
-                <Link2 className="h-6 w-6 text-white" />
+               <Search className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className="font-semibold text-white text-lg">Invite Friends</h3>
-                <p className="text-white/50 text-sm">Share your link to grow your squad</p>
+               <h3 className="font-semibold text-white text-lg">Find on Spotted</h3>
+               <p className="text-white/50 text-sm">Search for friends already on the app</p>
               </div>
             </div>
- 
-            {loading ? (
-              <div className="h-24 bg-[#0a0118]/50 rounded-2xl animate-pulse" />
-            ) : (
-              <div className="space-y-3">
-                 <Button
-                    onClick={handleTextFriend}
-                    className="w-full bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white font-semibold py-6 rounded-2xl"
-                 >
-                    <MessageCircle className="h-5 w-5 mr-2" />
-                    Text a Friend
-                 </Button>
-                 <Button
-                    onClick={handleCopyLink}
-                    variant="outline"
-                    className="w-full border-[#a855f7]/40 text-white hover:bg-[#a855f7]/20 py-6 rounded-2xl"
-                 >
-                    {justCopied ? (
-                      <Check className="h-5 w-5 mr-2 text-green-400" />
-                    ) : (
-                      <Copy className="h-5 w-5 mr-2" />
-                    )}
-                    {justCopied ? 'Copied!' : 'Copy Invite Link'}
-                 </Button>
-
-                {usesCount > 0 && (
-                  <div className="flex items-center justify-center gap-2 text-[#a855f7] text-sm pt-2">
-                  <Users className="h-4 w-4" />
-                    <span>{usesCount} friend{usesCount !== 1 ? 's' : ''} joined via your link</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* People You May Know Section */}
-          {(loadingSuggestions || suggestedFriends.length > 0) && (
-            <div className="space-y-3">
-              <h3 className="font-semibold text-white text-lg px-1">People You May Know</h3>
-              
-              {loadingSuggestions ? (
-                <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl p-5">
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-5 w-5 text-[#a855f7] animate-spin" />
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl overflow-hidden">
-                  {suggestedFriends.map((friend, index) => {
-                    const buttonState = getButtonState(friend.id);
-                    const ButtonIcon = buttonState.icon;
-                    
-                    return (
-                      <div
-                        key={friend.id}
-                        className={`flex items-center gap-3 p-4 ${
-                          index !== suggestedFriends.length - 1 ? 'border-b border-white/10' : ''
-                        }`}
-                      >
-                        <Avatar className="h-12 w-12 border-2 border-[#a855f7]/40">
-                          <AvatarImage src={friend.avatar_url || undefined} />
-                          <AvatarFallback className="bg-[#2d1b4e] text-white">
-                            {friend.display_name?.[0] || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-white truncate">{friend.display_name}</p>
-                          <p className="text-white/50 text-sm flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {friend.mutual_count} mutual friend{friend.mutual_count !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => sendFriendRequest(friend.id)}
-                          size="sm"
-                          disabled={buttonState.disabled}
-                          variant={buttonState.variant}
-                          className={buttonState.disabled 
-                            ? "border-[#a855f7]/40 text-white/60 rounded-xl"
-                            : "bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl"
-                          }
-                        >
-                          <ButtonIcon className="h-4 w-4 mr-1" />
-                          {buttonState.label}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
- 
-         {/* Find on Spotted Section */}
-          <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl p-5 space-y-4">
+           
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by username..."
+               placeholder="Search by name or username..."
                 className="pl-11 py-5 bg-[#0a0118]/50 border-[#a855f7]/20 rounded-2xl text-white placeholder:text-white/40 focus:border-[#a855f7]/50"
               />
            </div>
@@ -483,6 +389,110 @@ interface SuggestedFriend {
               <p className="text-white/50 text-sm text-center py-4">
                No users found. Invite them with your link!
              </p>
+           )}
+         </div>
+
+         {/* People You May Know Section */}
+         {(loadingSuggestions || suggestedFriends.length > 0) && (
+           <div className="space-y-3">
+             <h3 className="font-semibold text-white text-lg px-1">People You May Know</h3>
+             
+             {loadingSuggestions ? (
+               <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl p-5">
+                 <div className="flex items-center justify-center py-4">
+                   <Loader2 className="h-5 w-5 text-[#a855f7] animate-spin" />
+                 </div>
+               </div>
+             ) : (
+               <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl overflow-hidden">
+                 {suggestedFriends.map((friend, index) => {
+                   const buttonState = getButtonState(friend.id);
+                   const ButtonIcon = buttonState.icon;
+                   
+                   return (
+                     <div
+                       key={friend.id}
+                       className={`flex items-center gap-3 p-4 ${
+                         index !== suggestedFriends.length - 1 ? 'border-b border-white/10' : ''
+                       }`}
+                     >
+                       <Avatar className="h-12 w-12 border-2 border-[#a855f7]/40">
+                         <AvatarImage src={friend.avatar_url || undefined} />
+                         <AvatarFallback className="bg-[#2d1b4e] text-white">
+                           {friend.display_name?.[0] || 'U'}
+                         </AvatarFallback>
+                       </Avatar>
+                       <div className="flex-1 min-w-0">
+                         <p className="font-medium text-white truncate">{friend.display_name}</p>
+                         <p className="text-white/50 text-sm flex items-center gap-1">
+                           <Users className="h-3 w-3" />
+                           {friend.mutual_count} mutual friend{friend.mutual_count !== 1 ? 's' : ''}
+                         </p>
+                       </div>
+                       <Button
+                         onClick={() => sendFriendRequest(friend.id)}
+                         size="sm"
+                         disabled={buttonState.disabled}
+                         variant={buttonState.variant}
+                         className={buttonState.disabled 
+                           ? "border-[#a855f7]/40 text-white/60 rounded-xl"
+                           : "bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl"
+                         }
+                       >
+                         <ButtonIcon className="h-4 w-4 mr-1" />
+                         {buttonState.label}
+                       </Button>
+                     </div>
+                   );
+                 })}
+               </div>
+             )}
+           </div>
+         )}
+
+         {/* Invite Friends Section */}
+         <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl p-5 space-y-4">
+           <div className="flex items-center gap-4 mb-2">
+             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center">
+               <Link2 className="h-6 w-6 text-white" />
+             </div>
+             <div>
+               <h3 className="font-semibold text-white text-lg">Invite Friends</h3>
+               <p className="text-white/50 text-sm">Share your link to grow your squad</p>
+             </div>
+           </div>
+
+           {loading ? (
+             <div className="h-24 bg-[#0a0118]/50 rounded-2xl animate-pulse" />
+           ) : (
+             <div className="space-y-3">
+               <Button
+                 onClick={handleTextFriend}
+                 className="w-full bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white font-semibold py-6 rounded-2xl"
+               >
+                 <MessageCircle className="h-5 w-5 mr-2" />
+                 Text a Friend
+               </Button>
+               <Button
+                 onClick={handleCopyLink}
+                 variant="outline"
+                 className="w-full border-[#a855f7]/40 text-white hover:bg-[#a855f7]/20 py-6 rounded-2xl"
+               >
+                 {justCopied ? (
+                   <Check className="h-5 w-5 mr-2 text-green-400" />
+                 ) : (
+                   <Copy className="h-5 w-5 mr-2" />
+                 )}
+                 {justCopied ? 'Copied!' : 'Copy Invite Link'}
+               </Button>
+
+               {usesCount > 0 && (
+                 <div className="flex items-center justify-center gap-2 text-[#a855f7] text-sm pt-2">
+                   <Users className="h-4 w-4" />
+                   <span>{usesCount} friend{usesCount !== 1 ? 's' : ''} joined via your link</span>
+                 </div>
+               )}
+             </div>
            )}
          </div>
  
