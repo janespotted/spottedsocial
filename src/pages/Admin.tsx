@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { ArrowLeft, Lock, Search, Plus, X, MapPin, Star, FileText, BarChart3 } from 'lucide-react';
+ import { Building2 } from 'lucide-react';
 import { VenueReportsPanel } from '@/components/admin/VenueReportsPanel';
 import { DetectionAnalyticsPanel } from '@/components/admin/DetectionAnalyticsPanel';
+ import { ClaimRequestsPanel } from '@/components/admin/ClaimRequestsPanel';
 
 interface Venue {
   id: string;
@@ -128,7 +130,7 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="promoted" className="w-full">
-          <TabsList className="w-full bg-white/5 border border-white/10 grid grid-cols-4">
+           <TabsList className="w-full bg-white/5 border border-white/10 grid grid-cols-5">
             <TabsTrigger value="promoted" className="data-[state=active]:bg-primary text-xs">
               <Star className="h-3 w-3 mr-1" />
               Promoted
@@ -137,6 +139,10 @@ export default function Admin() {
               <MapPin className="h-3 w-3 mr-1" />
               Venues
             </TabsTrigger>
+             <TabsTrigger value="claims" className="data-[state=active]:bg-primary text-xs">
+               <Building2 className="h-3 w-3 mr-1" />
+               Claims
+             </TabsTrigger>
             <TabsTrigger value="reports" className="data-[state=active]:bg-primary text-xs">
               <FileText className="h-3 w-3 mr-1" />
               Reports
@@ -337,6 +343,11 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
+           {/* Claims Tab */}
+           <TabsContent value="claims" className="mt-4 space-y-4">
+             <ClaimRequestsPanel />
+           </TabsContent>
+ 
           {/* Reports Tab */}
           <TabsContent value="reports" className="mt-4 space-y-4">
             <VenueReportsPanel />
