@@ -27,6 +27,7 @@ import { DropVibeDialog } from './DropVibeDialog';
 import { ReportDialog } from './ReportDialog';
 import { VenueHoursDisplay, getHoursDisplayString } from '@/lib/venue-hours';
 import type { VenueHours } from '@/lib/venue-hours';
+ import { VenueEventsSection } from './VenueEventsSection';
 
 interface VenueData {
   id: string;
@@ -923,6 +924,9 @@ export function VenueIdCard() {
                     </div>
                   </div>
 
+                   {/* Upcoming Events sub-section */}
+                   {selectedVenueId && <VenueEventsSection venueId={selectedVenueId} />}
+ 
                   {/* Trending Nearby sub-section */}
                   {similarVenues.length > 0 && (
                     <div className="mb-4">
