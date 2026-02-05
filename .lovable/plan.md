@@ -1,72 +1,118 @@
 
 
-## Fix: Refresh City Detection on Private Party Check-in
+## Create Dedicated Friends Page
 
-### Problem
-When a user checks into a private party, the city badge in the header shows the cached city (NYC) instead of detecting their actual location (LA/Santa Monica). 
-
-The planning flow correctly calls `refreshCity()` before showing neighborhoods, but the private party flow skips this step.
-
-### Root Cause
-In `CheckInModal.tsx`:
-- **Planning flow** (line 329-332): Calls `await refreshCity()` before showing neighborhood options
-- **Private party flow** (line 236-258): Does NOT call `refreshCity()` - uses stale cached city value
-
-### Solution
-Add `refreshCity()` call to the private party flow, matching the planning flow pattern.
+### Overview
+Create a new `/friends` page combining friend discovery, username search, invite link sharing, and QR code functionality. This will fix the broken "Invite Friends" button on the Profile page.
 
 ---
 
-### File to Modify
+### Page Structure (Updated Order)
 
-**`src/components/CheckInModal.tsx`**
-
-Update `handlePrivatePartyPrivacyConfirm` function:
-
-```typescript
-const handlePrivatePartyPrivacyConfirm = async () => {
-  setShowPrivatePartyPrivacy(false);
-  setPrivatePartyNeighborhood('');
-  setShowNeighborhoodManualSelect(false);
-  setShowPrivatePartyNeighborhood(true);
-  
-  // NEW: Refresh city detection based on current GPS before detecting neighborhood
-  const detectedCity = await refreshCity();
-  
-  // Auto-detect neighborhood from GPS
-  setIsDetectingNeighborhood(true);
-  try {
-    // Use the freshly detected city
-    const detectedNeighborhood = await detectNeighborhoodFromGPS(detectedCity);
-    if (detectedNeighborhood) {
-      setPrivatePartyNeighborhood(detectedNeighborhood);
-    } else {
-      setShowNeighborhoodManualSelect(true);
-    }
-  } catch (error) {
-    console.error('Failed to detect neighborhood:', error);
-    setShowNeighborhoodManualSelect(true);
-  } finally {
-    setIsDetectingNeighborhood(false);
-  }
-};
+```text
++------------------------------------------+
+| ←  Find Friends              [Check-in]  |
++------------------------------------------+
+|                                          |
+|        ┌─────────────────────┐           |
+|        │   Share Your Link   │           |
+|        │  ┌───────────────┐  │           |
+|        │  │ spotted.../AB │  │           |
+|        │  └───────────────┘  │           |
+|        │  [  Share Link  🔗 ]│           |
+|        │  👥 [X] joined via  │           |
+|        │     your link       │           |
+|        └─────────────────────┘           |
+|                                          |
+|        ┌─────────────────────┐           |
+|        │  Find on Spotted    │           |
+|        │  🔍 Search username │           |
+|        │  ┌─────────────────┐│           |
+|        │  │ Alex   @alex123 ││           |
+|        │  │ Sam    @samm    ││           |
+|        │  └─────────────────┘│           |
+|        └─────────────────────┘           |
+|                                          |
+|        ┌─────────────────────┐           |
+|        │ 📲 Show My QR Code  │           |
+|        └─────────────────────┘           |
+|                                          |
++------------------------------------------+
 ```
 
 ---
 
-### What This Fixes
+### Section Order
 
-| Scenario | Before | After |
-|----------|--------|-------|
-| User cached as NYC, physically in LA | City badge shows "NYC", neighborhoods show NYC list | City badge updates to "LA", neighborhoods show LA list |
-| Private party check-in | Uses stale cached city | Fresh GPS detection, updates city badge |
+| Position | Section | Description |
+|----------|---------|-------------|
+| 1 | **Share Your Link** | Invite URL with copy/share, regenerate, and stats |
+| 2 | **Find on Spotted** | Username search with real-time results and add buttons |
+| 3 | **Show My QR Code** | Button opens QRCodeModal for in-person adds |
 
 ---
 
-### Impact
+### Implementation Details
 
-- Single function change in `CheckInModal.tsx`
-- Matches existing pattern from planning flow
-- CityBadge automatically updates via `cityChanged` event listener
-- Neighborhoods dropdown shows correct city's neighborhoods
+#### 1. Create New Page: `src/pages/Friends.tsx`
+
+Layout sections in order:
+- **Header**: Back navigation + "Find Friends" title + check-in button
+- **Share Your Link Card**: Invite URL, share button, regenerate, inline stats
+- **Find on Spotted Card**: Search input with results list below
+- **QR Code Button**: Full-width button at bottom
+
+#### 2. Add Route in `src/App.tsx`
+
+```typescript
+import Friends from "./pages/Friends";
+
+<Route
+  path="/friends"
+  element={
+    <ProtectedRoute>
+      <Friends />
+    </ProtectedRoute>
+  }
+/>
+```
+
+---
+
+### Component Structure
+
+```text
+Friends Page
+├── Header (← back, "Find Friends", check-in button)
+├── Share Your Link Card
+│   ├── URL display with copy button
+│   ├── Share Link button (primary CTA)
+│   ├── Regenerate button
+│   └── Stats: "[X] friends joined via your link"
+├── Find on Spotted Card
+│   ├── Search input
+│   ├── Results list with Add/Pending/Friends buttons
+│   └── Empty/loading states
+└── Show My QR Code Button
+    └── Opens QRCodeModal on tap
+```
+
+---
+
+### Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/pages/Friends.tsx` | **Create** | New friends page with reordered sections |
+| `src/App.tsx` | **Modify** | Add `/friends` route |
+
+---
+
+### Technical Notes
+
+1. **Invite Code Logic**: Reuse pattern from `InviteFriendsSection` for fetching/creating invite codes
+2. **Search Logic**: Use `get_profiles_safe` RPC like `FindFriendsOnboarding`
+3. **Friend Requests**: Insert into `friendships` table with status 'pending'
+4. **QR Modal**: Reuse existing `QRCodeModal` component
+5. **Styling**: Purple gradients, glass cards, rounded corners matching app aesthetic
 
