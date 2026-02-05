@@ -548,12 +548,6 @@ export default function Home() {
                   </button>
                 </div>
 
-                {(post.likes_count || 0) > 0 && (
-                  <p className="text-white/80 text-sm">
-                    {post.likes_count} {post.likes_count === 1 ? 'like' : 'likes'}
-                  </p>
-                )}
-
                 {/* Image posts with captions - Instagram style */}
                 {post.image_url && post.text && (
                   <div className="text-white/90 text-sm">
