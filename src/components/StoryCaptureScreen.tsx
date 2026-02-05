@@ -1,6 +1,7 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { X, Camera, Image as ImageIcon } from 'lucide-react';
-import { capturePhoto, pickFromGallery, isNativePlatform } from '@/lib/camera-service';
+import { captureSelfie, pickFromGallery, isNativePlatform } from '@/lib/camera-service';
+import { PhotoFilterScreen } from './PhotoFilterScreen';
 import { toast } from 'sonner';
 
 interface StoryCaptureScreenProps {
@@ -12,18 +13,29 @@ interface StoryCaptureScreenProps {
 export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: StoryCaptureScreenProps) {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  
+  // Filter screen state
+  const [showFilterScreen, setShowFilterScreen] = useState(false);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+  const [pendingSource, setPendingSource] = useState<'camera' | 'gallery'>('camera');
 
   const handleNativeCapture = async () => {
-    const result = await capturePhoto();
+    const result = await captureSelfie();
     if (result) {
-      onCapture(result.file);
+      // Show filter screen before proceeding
+      setPendingImagePreview(result.preview);
+      setPendingSource('camera');
+      setShowFilterScreen(true);
     }
   };
 
   const handleNativeGallery = async () => {
     const result = await pickFromGallery();
     if (result) {
-      onGallerySelect(result.file);
+      // Show filter screen before proceeding
+      setPendingImagePreview(result.preview);
+      setPendingSource('gallery');
+      setShowFilterScreen(true);
     }
   };
 
@@ -43,7 +55,20 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
       return;
     }
 
-    onGallerySelect(file);
+    // For videos, skip filter screen
+    if (file.type.startsWith('video/')) {
+      onGallerySelect(file);
+      return;
+    }
+
+    // For images, show filter screen
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPendingImagePreview(reader.result as string);
+      setPendingSource('gallery');
+      setShowFilterScreen(true);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleCameraChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,7 +80,30 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
       return;
     }
 
-    onCapture(file);
+    // Show filter screen
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPendingImagePreview(reader.result as string);
+      setPendingSource('camera');
+      setShowFilterScreen(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFilterConfirm = (filteredFile: File, _filteredPreview: string) => {
+    setShowFilterScreen(false);
+    setPendingImagePreview(null);
+    
+    if (pendingSource === 'camera') {
+      onCapture(filteredFile);
+    } else {
+      onGallerySelect(filteredFile);
+    }
+  };
+
+  const handleFilterCancel = () => {
+    setShowFilterScreen(false);
+    setPendingImagePreview(null);
   };
 
   const openGallery = () => {
@@ -74,6 +122,17 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
     }
   };
 
+  // Show filter screen if we have a pending image
+  if (showFilterScreen && pendingImagePreview) {
+    return (
+      <PhotoFilterScreen
+        imagePreview={pendingImagePreview}
+        onConfirm={handleFilterConfirm}
+        onCancel={handleFilterCancel}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       {/* Hidden file inputs for web fallback */}
@@ -88,7 +147,7 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
         type="file"
         ref={cameraInputRef}
         accept="image/*"
-        capture="environment"
+        capture="user"
         onChange={handleCameraChange}
         className="hidden"
       />
