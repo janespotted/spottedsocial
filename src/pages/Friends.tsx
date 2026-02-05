@@ -464,7 +464,7 @@ export default function Friends() {
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => navigate('/profile')}
                 className="p-2 -ml-2 text-white/80 hover:text-white"
               >
                 <ArrowLeft className="h-5 w-5" />
