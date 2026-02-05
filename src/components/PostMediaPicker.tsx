@@ -1,6 +1,7 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { X, Camera, Image } from 'lucide-react';
-import { capturePhoto, pickFromGallery, isNativePlatform } from '@/lib/camera-service';
+import { captureSelfie, pickFromGallery, isNativePlatform } from '@/lib/camera-service';
+import { PhotoFilterScreen } from './PhotoFilterScreen';
 import { toast } from 'sonner';
 
 interface PostMediaPickerProps {
@@ -11,18 +12,26 @@ interface PostMediaPickerProps {
 export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  
+  // Filter screen state
+  const [showFilterScreen, setShowFilterScreen] = useState(false);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
 
   const handleNativeCapture = async () => {
-    const result = await capturePhoto();
+    const result = await captureSelfie();
     if (result) {
-      onMediaSelect(result.file, result.preview);
+      // Show filter screen before proceeding
+      setPendingImagePreview(result.preview);
+      setShowFilterScreen(true);
     }
   };
 
   const handleNativeGallery = async () => {
     const result = await pickFromGallery();
     if (result) {
-      onMediaSelect(result.file, result.preview);
+      // Show filter screen before proceeding
+      setPendingImagePreview(result.preview);
+      setShowFilterScreen(true);
     }
   };
 
@@ -35,10 +44,22 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        onMediaSelect(file, reader.result as string);
+        setPendingImagePreview(reader.result as string);
+        setShowFilterScreen(true);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleFilterConfirm = (filteredFile: File, filteredPreview: string) => {
+    setShowFilterScreen(false);
+    setPendingImagePreview(null);
+    onMediaSelect(filteredFile, filteredPreview);
+  };
+
+  const handleFilterCancel = () => {
+    setShowFilterScreen(false);
+    setPendingImagePreview(null);
   };
 
   const openGallery = () => {
@@ -57,6 +78,17 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
     }
   };
 
+  // Show filter screen if we have a pending image
+  if (showFilterScreen && pendingImagePreview) {
+    return (
+      <PhotoFilterScreen
+        imagePreview={pendingImagePreview}
+        onConfirm={handleFilterConfirm}
+        onCancel={handleFilterCancel}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       {/* Hidden file inputs for web fallback */}
@@ -71,7 +103,7 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
         ref={cameraInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
+        capture="user"
         onChange={handleFileSelect}
         className="hidden"
       />
