@@ -766,7 +766,16 @@ export default function Map() {
     : venues.filter(v => v.type === venueFilter);
   
   const visibleCount = getVisibleVenueCount(currentZoom);
-  const filteredVenues = typeFilteredVenues.slice(0, visibleCount);
+  
+  // Separate promoted venues - they're always visible
+  const mapPromotedVenues = typeFilteredVenues.filter(v => v.is_map_promoted);
+  const nonPromotedVenues = typeFilteredVenues.filter(v => !v.is_map_promoted);
+  
+  // Combine: promoted venues first (always shown), then top non-promoted by heat
+  const filteredVenues = [
+    ...mapPromotedVenues,
+    ...nonPromotedVenues.slice(0, Math.max(0, visibleCount - mapPromotedVenues.length))
+  ];
 
   // Render venue markers with smart diffing (like friend avatars)
   useEffect(() => {
@@ -786,11 +795,21 @@ export default function Map() {
     // Add or update markers for current filtered venues
     filteredVenues.forEach((venue, index) => {
       const existingMarker = venueMarkersRef.current.get(venue.id);
+      
+      // Check if marker needs visual update (promotion status changed)
+      const markerNeedsRestyle = existingMarker && 
+        existingMarker.getElement().dataset.promoted !== String(venue.is_map_promoted || false);
 
-      if (existingMarker) {
+      if (existingMarker && !markerNeedsRestyle) {
         // Update existing marker position only (no recreation)
         existingMarker.setLngLat([venue.lng, venue.lat]);
       } else {
+        // Remove old marker if it needs restyling
+        if (existingMarker) {
+          existingMarker.remove();
+          venueMarkersRef.current.delete(venue.id);
+        }
+        
         // Create new marker only if doesn't exist
         const isTopHot = index < 3 && venue.heatScore > 0;
         const isMapPromoted = venue.is_map_promoted || false;
@@ -805,6 +824,7 @@ export default function Map() {
         el.style.height = `${containerSize}px`;
         el.style.cursor = 'pointer';
         el.style.zIndex = isMapPromoted ? '8' : '5';
+        el.dataset.promoted = String(isMapPromoted);
         
         el.innerHTML = `
           <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
