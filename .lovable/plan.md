@@ -1,92 +1,87 @@
 
 
-## Add Apple Sign-In to Auth Page
+## Make Email/Password Section Collapsible
 
 ### Overview
-Add Apple Sign-In as a second OAuth option alongside Google. Lovable Cloud natively supports Apple authentication with automatic managed credentials - no additional setup required from you.
+Transform the email/password form into a collapsible section, making the OAuth buttons (Google, Apple) the primary focus. Users can click to expand the email form if they prefer traditional login. This follows modern auth UX patterns.
 
-### Implementation Steps
+### Design
+The "or" divider will become a clickable trigger that expands/collapses the email form:
 
-**Step 1: Configure Apple OAuth Provider**
-- Use the `supabase--configure-social-auth` tool to set up Apple authentication
-- This will generate the Lovable integration module at `src/integrations/lovable/`
-
-**Step 2: Update Auth.tsx**
-
-Add Apple sign-in state and handler:
-```tsx
-const [appleLoading, setAppleLoading] = useState(false);
-const [appleError, setAppleError] = useState<string | null>(null);
-
-const handleAppleSignIn = async () => {
-  setAppleLoading(true);
-  setAppleError(null);
-
-  try {
-    const { error } = await lovable.auth.signInWithOAuth("apple", {
-      redirect_uri: window.location.origin,
-    });
-
-    if (error) throw error;
-  } catch (error: any) {
-    setAppleError('Apple sign-in failed, please try again');
-    setAppleLoading(false);
-  }
-};
-```
-
-Add Apple button below Google button:
-```tsx
-{/* Apple Sign-In Button */}
-<Button
-  type="button"
-  variant="outline"
-  className="w-full h-12 bg-black hover:bg-gray-900 text-white border-gray-800 font-medium flex items-center justify-center gap-3 rounded-xl shadow-sm transition-all hover:shadow-md"
-  onClick={handleAppleSignIn}
-  disabled={appleLoading}
->
-  {appleLoading ? (
-    <span>Signing in…</span>
-  ) : (
-    <>
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-      </svg>
-      <span>Continue with Apple</span>
-    </>
-  )}
-</Button>
-{appleError && (
-  <p className="text-red-400 text-sm text-center">{appleError}</p>
-)}
-```
-
-### Visual Layout
 ```
 ┌────────────────────────────────────┐
 │             [S Logo]               │
 │             Spotted                │
 │                                    │
 │    [  Continue with Google  ]      │
-│    [  Continue with Apple   ]      │  ← NEW (black button)
-│           ─── or ───               │
+│    [  Continue with Apple   ]      │
 │                                    │
-│   Email: [________________]        │
-│   Password: [_____________]        │
+│    ─── or use email ▼ ───          │  ← Clickable trigger
 │                                    │
-│         [ Sign In ]                │
+│   (collapsed by default)           │
 │                                    │
 │   Own a venue? Sign in for Business │
 └────────────────────────────────────┘
 ```
 
-### Styling
-- Black background with white text (Apple's brand guidelines)
-- Apple logo SVG icon
-- Same height and border-radius as Google button for consistency
-- Matches the glassmorphism aesthetic of the page
+When expanded:
+```
+│    ─── or use email ▲ ───          │  ← Shows chevron up
+│                                    │
+│   Email: [________________]        │
+│   Password: [_____________]        │
+│                  Forgot password?  │
+│         [ Sign In ]                │
+│   Don't have an account? Sign up   │
+```
+
+### Implementation
+
+**File: `src/pages/Auth.tsx`**
+
+1. **Add imports:**
+   - Import `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` from `@/components/ui/collapsible`
+   - Import `ChevronDown` from `lucide-react`
+
+2. **Add state:**
+   ```tsx
+   const [emailFormOpen, setEmailFormOpen] = useState(false);
+   ```
+
+3. **Wrap the email form section:**
+   - Replace the static "or" divider with a `CollapsibleTrigger`
+   - Wrap the `<form>` inside `CollapsibleContent`
+   - The trigger will show "or use email" with a rotating chevron icon
+
+4. **Styling:**
+   - Clickable divider with hover effect
+   - Smooth animation for expand/collapse (already built into Collapsible component)
+   - ChevronDown rotates 180° when open
+
+### Technical Details
+
+```tsx
+<Collapsible open={emailFormOpen} onOpenChange={setEmailFormOpen}>
+  {/* Clickable Divider */}
+  <CollapsibleTrigger asChild>
+    <button className="flex items-center gap-4 py-3 w-full group cursor-pointer">
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+      <span className="text-muted-foreground text-sm font-medium px-2 flex items-center gap-1 group-hover:text-primary transition-colors">
+        or use email
+        <ChevronDown className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
+      </span>
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+    </button>
+  </CollapsibleTrigger>
+
+  <CollapsibleContent>
+    <form onSubmit={handleAuth} className="space-y-4 pt-2">
+      {/* ... existing form fields ... */}
+    </form>
+  </CollapsibleContent>
+</Collapsible>
+```
 
 ### Files Changed
-1. `src/integrations/lovable/index.ts` - Auto-generated by configure tool
-2. `src/pages/Auth.tsx` - Add Apple sign-in button and handler
+- `src/pages/Auth.tsx` - Add collapsible wrapper around email form
 
