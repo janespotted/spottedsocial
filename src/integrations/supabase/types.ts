@@ -1836,7 +1836,8 @@ export type Database = {
           hours_last_updated: string | null
           id: string
           is_demo: boolean | null
-          is_promoted: boolean | null
+          is_leaderboard_promoted: boolean | null
+          is_map_promoted: boolean | null
           is_user_submitted: boolean | null
           lat: number
           lng: number
@@ -1857,7 +1858,8 @@ export type Database = {
           hours_last_updated?: string | null
           id?: string
           is_demo?: boolean | null
-          is_promoted?: boolean | null
+          is_leaderboard_promoted?: boolean | null
+          is_map_promoted?: boolean | null
           is_user_submitted?: boolean | null
           lat: number
           lng: number
@@ -1878,7 +1880,8 @@ export type Database = {
           hours_last_updated?: string | null
           id?: string
           is_demo?: boolean | null
-          is_promoted?: boolean | null
+          is_leaderboard_promoted?: boolean | null
+          is_map_promoted?: boolean | null
           is_user_submitted?: boolean | null
           lat?: number
           lng?: number
