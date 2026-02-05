@@ -43,7 +43,6 @@ import Leaderboard from "./pages/Leaderboard";
 import Feed from "./pages/Feed";
 import Messages from "./pages/Messages";
 import Thread from "./pages/Thread";
-import FriendRequests from "./pages/FriendRequests";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import CloseFriends from "./pages/CloseFriends";
@@ -52,7 +51,7 @@ import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import Friends from "./pages/Friends";
- import BusinessLanding from "./pages/business/BusinessLanding";
+import BusinessLanding from "./pages/business/BusinessLanding";
  import BusinessAuth from "./pages/business/BusinessAuth";
  import BusinessDashboard from "./pages/business/BusinessDashboard";
  import BusinessPromote from "./pages/business/BusinessPromote";
@@ -174,14 +173,6 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Thread />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/friend-requests"
-          element={
-            <ProtectedRoute>
-              <FriendRequests />
             </ProtectedRoute>
           }
         />

@@ -465,7 +465,7 @@ export default function Profile() {
                 <div className="text-white/60 text-sm">Places</div>
               </div>
               <button
-                onClick={() => navigate('/friend-requests')}
+                onClick={() => navigate('/friends', { state: { tab: 'requests' } })}
                 className="w-9 h-9 rounded-full bg-[#2d1b4e] border border-[#a855f7]/40 flex items-center justify-center text-white hover:bg-[#a855f7]/20 transition-colors ml-3"
                 aria-label="Friend Requests"
               >
@@ -478,7 +478,7 @@ export default function Profile() {
         {/* Quick Action Buttons - Prominent placement */}
         <div className="flex gap-2">
           <Button
-            onClick={() => navigate('/friends')}
+            onClick={() => navigate('/friends', { state: { tab: 'invite' } })}
             className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full"
           >
             <UserPlus className="h-4 w-4 mr-2" />
