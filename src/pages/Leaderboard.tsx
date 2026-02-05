@@ -158,7 +158,7 @@ export default function Leaderboard() {
       // Fetch promoted venues ordered by leaderboard_promo_order (active spots are order 1-2)
       let promotedQuery = supabase
         .from('venues')
-        .select('id, name, popularity_rank, is_leaderboard_promoted, leaderboard_promo_order, opened_at, neighborhood, operating_hours')
+        .select('id, name, popularity_rank, is_leaderboard_promoted, leaderboard_promo_order, opened_at, neighborhood, operating_hours, city')
         .eq('is_leaderboard_promoted', true)
         .eq('city', city)
         .not('leaderboard_promo_order', 'is', null)
@@ -199,6 +199,9 @@ export default function Leaderboard() {
       const promotedVenues = promotedVenuesResult.data;
       const statuses = statusesResult.data;
       const topVenues = topVenuesResult?.data;
+      
+    // Build a set of active promoted venue IDs (only order 1-2)
+    const activePromotedIds = new Set(promotedVenues?.map(v => v.id) || []);
 
     // Calculate if venue is newly opened (within last 3 months)
     const threeMonthsAgo = new Date();
@@ -241,8 +244,8 @@ export default function Leaderboard() {
       });
     }
     
-    // Add promoted venues to ensure they always appear (even with 0 check-ins)
-    promotedVenues?.forEach((venue) => {
+    // Add ONLY active promoted venues (order 1-2) to ensure they appear
+    promotedVenues?.forEach((venue: any) => {
       if (venueMap.has(venue.name)) return; // Skip if already added from neighborhood venues
       
       const isNewlyOpened = venue.opened_at 
@@ -271,6 +274,8 @@ export default function Leaderboard() {
       const venueId = status.venue_id;
       const isPromoted = status.venues?.is_leaderboard_promoted || false;
       const popularityRank = status.venues?.popularity_rank || 999;
+      // Only mark as promoted if it's in the active spots (order 1-2)
+      const isActivelyPromoted = activePromotedIds.has(venueId);
       const openedAt = status.venues?.opened_at;
       const operatingHours = status.venues?.operating_hours as VenueHours | null;
       const isNewlyOpened = openedAt 
@@ -289,7 +294,7 @@ export default function Leaderboard() {
           movement: 'same',
           friends: [],
           energyLevel: 0,
-          isPromoted,
+          isPromoted: isActivelyPromoted,
           isNewlyOpened,
           popularity_rank: popularityRank,
           operatingHours,
