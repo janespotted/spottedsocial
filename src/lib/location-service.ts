@@ -270,7 +270,8 @@ export const createNewVenue = async (
         lng,
         neighborhood,
         type,
-        is_promoted: false,
+       is_leaderboard_promoted: false,
+       is_map_promoted: false,
         is_demo: false,
       })
       .select('id')
