@@ -51,6 +51,7 @@ import DemoSettings from "./pages/DemoSettings";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import Friends from "./pages/Friends";
 
 const queryClient = new QueryClient();
 
@@ -225,6 +226,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Notifications />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/friends"
+          element={
+            <ProtectedRoute>
+              <Friends />
             </ProtectedRoute>
           }
         />
