@@ -1,6 +1,9 @@
 
 
-# Weekend Rally: Thursday Ritual Implementation
+# Weekend Rally: Thursday Ritual ✅ IMPLEMENTED
+
+## Summary
+Added a "Weekend Rally" feature that sends a Thursday push notification asking "What's the move this weekend?" When tapped, it opens the Plans Feed filtered to show only weekend plans with a special header UI.
 
 ## Overview
 Add a recurring Thursday push notification ("What's the move this weekend?") that creates a predictable weekly engagement moment, driving anticipation and coordination for the weekend.

@@ -32,6 +32,8 @@ self.addEventListener('notificationclick', (event) => {
     urlToOpen = '/?nudge=first';
   } else if (notificationType === 'daily_nudge_second') {
     urlToOpen = '/?nudge=second';
+  } else if (notificationType === 'weekend_rally') {
+    urlToOpen = '/?rally=weekend';
   }
   
   event.waitUntil(
