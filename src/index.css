@@ -290,15 +290,17 @@ All colors MUST be HSL.
    }
 
   /* Map venue promoted pulse animation */
-  @keyframes pulse {
-    0%, 100% {
-      transform: scale(1);
-      opacity: 0.6;
-    }
-    50% {
-      transform: scale(1.15);
-      opacity: 1;
-    }
+}
+
+/* Map venue promoted pulse animation - must be at global scope */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
   }
 }
 
