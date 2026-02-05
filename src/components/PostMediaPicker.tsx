@@ -91,24 +91,24 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center overflow-hidden">
         <div className="flex flex-col items-center gap-8 px-6">
-          {/* Gallery Option - Primary */}
+          {/* Camera Option - Primary */}
           <button
-            onClick={openGallery}
+            onClick={openCamera}
             className="flex flex-col items-center gap-4 p-8 rounded-3xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
           >
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#a855f7] to-[#d4ff00] flex items-center justify-center">
-              <Image className="h-10 w-10 text-black" />
+              <Camera className="h-10 w-10 text-black" />
             </div>
-            <span className="text-white text-lg font-medium">Choose from Gallery</span>
+            <span className="text-white text-lg font-medium">Take a Photo</span>
           </button>
 
-          {/* Camera Option - Secondary */}
+          {/* Gallery Option - Secondary */}
           <button
-            onClick={openCamera}
+            onClick={openGallery}
             className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
           >
-            <Camera className="h-5 w-5 text-white" />
-            <span className="text-white/80">Take a Photo</span>
+            <Image className="h-5 w-5 text-white" />
+            <span className="text-white/80">Choose from Gallery</span>
           </button>
         </div>
       </div>
