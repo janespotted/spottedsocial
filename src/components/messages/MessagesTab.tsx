@@ -291,18 +291,15 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
               <h3 className="text-xl font-semibold text-white mb-2">
                 Your inbox is ready
               </h3>
-              <p className="text-white/50 text-sm max-w-xs mb-4">
-                When you message friends or they message you, conversations live here.
+              <p className="text-white/50 text-sm max-w-xs mb-6">
+                Start a conversation with friends
               </p>
               <button
                 onClick={() => setShowNewChat(true)}
-                className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6 py-2.5 font-medium transition-colors mb-4"
+                className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6 py-2.5 font-medium transition-colors"
               >
                 Start a Chat
               </button>
-              <p className="text-white/30 text-xs">
-                💡 Message close friends, friends, and mutuals anytime
-              </p>
             </div>
           ) : (
             filteredThreads.map((thread) => (
