@@ -204,9 +204,12 @@ export function FriendsPlanning({
     <div className={`bg-[#1a0f2e]/80 backdrop-blur border border-[#a855f7]/20 rounded-2xl p-4 shadow-[0_0_20px_rgba(168,85,247,0.15)] ${className}`}>
       {/* Header with stacked avatars */}
       <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">👀</span>
-          <h3 className="text-white font-semibold text-sm">Who's Out Tonight?</h3>
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">👀</span>
+            <h3 className="text-white font-semibold text-sm">Thinking About Tonight?</h3>
+          </div>
+          <p className="text-white/50 text-xs mt-0.5 ml-7">Friends who might go out tonight</p>
         </div>
         
         {/* Stacked avatar preview */}
