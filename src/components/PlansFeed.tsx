@@ -583,10 +583,10 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
           <div className="flex items-center gap-2">
             <span className="text-lg">📝</span>
             <h3 className="text-white font-semibold text-base">
-              {weekendFilter ? 'Make Weekend Plans' : 'Drop a Plan'}
+              {weekendFilter ? 'Make Weekend Plans' : 'Share Plans'}
             </h3>
           </div>
-          <p className="text-white/50 text-xs mt-1 ml-7">Share a plan your friends can join</p>
+          <p className="text-white/50 text-xs mt-1 ml-7">Post a specific plan or event your friends can join</p>
         </div>
         
         <div className="flex gap-2">
@@ -618,7 +618,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
           <p className="text-muted-foreground text-sm max-w-[280px] leading-relaxed">
             {weekendFilter 
               ? 'Be the first to share what you\'re up to this weekend!'
-              : 'Drop a plan and see who\'s down to join.'
+              : 'Share a plan and see who\'s down to join.'
             }
           </p>
         </div>
