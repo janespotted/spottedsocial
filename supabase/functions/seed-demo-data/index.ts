@@ -6,6 +6,7 @@ const PB = [["Cucina",26.7056,-80.0364,"Royal Poinciana"],["Mary Lou's",26.7151,
 
 const USERS = [["Alex","alex"],["Sam","sam"],["Jordan","jordan"],["Taylor","taylor"],["Morgan","morgan"],["Casey","casey"],["Riley","riley"],["Jamie","jamie"]];
 const CAPTIONS = ["Amazing! 🔥","Best night 💯","Vibes ✨","So packed!","DJ killing it 🎵"];
+const YAP_TEXTS = ["Pretty sure Justin Bieber just walked in...","This music is awesome who's the DJ right now","What's everyone's move after close?","Anyone here? Looking for my friends","This DJ set is unreal!!!","Line is crazy long outside","The energy is INSANE right now","Dance floor is PACKED","Where's the after party at?","Bartender hooked it up"];
 const IMG = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&h=800&fit=crop";
 
 const toV = (a: any[]) => a.map((v,i)=>({name:v[0],lat:v[1],lng:v[2],hood:v[3],rank:i+1}));
@@ -29,6 +30,7 @@ Deno.serve(async (req) => {
       await sb.from('events').delete().eq('is_demo',true);
       await sb.from('plans').delete().eq('is_demo',true);
       await sb.from('posts').delete().eq('is_demo',true);
+      await sb.from('yap_messages').delete().eq('is_demo',true);
       await sb.from('night_statuses').delete().eq('is_demo',true);
       await sb.from('venues').delete().eq('is_demo',true);
       await sb.from('profiles').delete().eq('is_demo',true);
@@ -55,6 +57,9 @@ Deno.serve(async (req) => {
       // Posts
       await sb.from('posts').insert(Array.from({length:15},()=>{const v=V[Math.floor(Math.random()*V.length)];return{user_id:uids[Math.floor(Math.random()*uids.length)],text:CAPTIONS[Math.floor(Math.random()*5)],venue_id:vm.get(v.name),venue_name:v.name,image_url:Math.random()>0.4?IMG:null,expires_at:exp(),created_at:rec(4),is_demo:true,visibility:'friends'};}));
       
+      // Yap messages - 10 anonymous messages spread across venues
+      await sb.from('yap_messages').insert(YAP_TEXTS.map((text,i)=>{const v=V[i%V.length];return{user_id:uids[i%uids.length],text,venue_name:v.name,is_anonymous:true,author_handle:`User${Math.floor(100000+Math.random()*900000)}`,score:Math.floor(Math.random()*80)+5,comments_count:Math.floor(Math.random()*10),expires_at:exp(),is_demo:true};}));
+      
       // Plans
       const wd=wknd();
       const {data:pls}=await sb.from('plans').insert(pick(uids,4).map((u,i)=>{const v=V[i%V.length],d=wd[i%3],ex=new Date(d+'T05:00:00');ex.setDate(ex.getDate()+1);return{user_id:u,venue_id:vm.get(v.name),venue_name:v.name,plan_date:d,plan_time:'21:00',description:'Who\'s down?',visibility:'friends',expires_at:ex.toISOString(),is_demo:true};})).select('id,user_id');
@@ -71,6 +76,7 @@ Deno.serve(async (req) => {
       await sb.from('events').delete().eq('is_demo',true);
       await sb.from('plans').delete().eq('is_demo',true);
       await sb.from('posts').delete().eq('is_demo',true);
+      await sb.from('yap_messages').delete().eq('is_demo',true);
       await sb.from('night_statuses').delete().eq('is_demo',true);
       await sb.from('venues').delete().eq('is_demo',true);
       const {data:d}=await sb.from('profiles').select('id').eq('is_demo',true);
