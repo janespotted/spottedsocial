@@ -204,12 +204,9 @@ export function FriendsPlanning({
     <div className={`bg-[#1a0f2e]/80 backdrop-blur border border-[#a855f7]/20 rounded-2xl p-4 shadow-[0_0_20px_rgba(168,85,247,0.15)] ${className}`}>
       {/* Header with stacked avatars */}
       <div className="flex items-center justify-between gap-3 mb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">👀</span>
-            <h3 className="text-white font-semibold text-sm">Thinking About Tonight?</h3>
-          </div>
-          <p className="text-white/50 text-xs mt-0.5 ml-7">Friends who might go out tonight</p>
+        <div className="flex items-center gap-2">
+          <span className="text-lg">👀</span>
+          <h3 className="text-white font-semibold text-sm">Who's Going Out Tonight</h3>
         </div>
         
         {/* Stacked avatar preview */}
@@ -237,7 +234,7 @@ export function FriendsPlanning({
       {/* Empty state when no friends */}
       {friends.length === 0 && !isUserPlanning && (
         <p className="text-white/40 text-xs text-center py-2">
-          No friends thinking about tonight yet. Be the first?
+          No one yet. Be first.
         </p>
       )}
       
@@ -408,7 +405,7 @@ export function FriendsPlanning({
             className="w-full h-[38px] bg-[#a855f7]/15 hover:bg-[#a855f7]/25 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 border border-[#a855f7]/50 shadow-[0_2px_6px_rgba(0,0,0,0.25)] transition-all px-3"
           >
             <Plus className="w-4 h-4" />
-            I'm thinking too
+            I'm in
           </button>
         </div>
       )}
