@@ -1,233 +1,126 @@
 
-# Complete Events Ecosystem Implementation
+# Rename and Clarify Feed Sections
 
 ## Overview
-Build out a full events system with four entry points for adding events:
-1. **Demo Seeding** - Automated test data with friend RSVPs
-2. **Business Dashboard** - Venue owners can add their events
-3. **Admin Panel** - Curated events for any venue
-4. **User-Generated** - Let users add events they're going to
+Update the copy in both sections to make their purposes distinct:
+- **"Planning Tonight"** → **"Who's Out Tonight?"** (status signal - friends thinking about going out)
+- **"Drop a Plan"** → **"Share Plans"** (content creation - specific plans and events)
 
 ---
 
-## Current State
+## Changes
 
-**Database is Ready:**
-- `events` table exists with all needed columns: id, venue_id, venue_name, title, description, event_date, start_time, end_time, cover_image_url, ticket_url, city, neighborhood, expires_at
-- `event_rsvps` table tracks user RSVPs with type (interested | going)
+### 1. FriendsPlanning.tsx (Status Signal Section)
 
-**UI Components Exist:**
-- `EventCard.tsx` - Displays events with friend RSVPs and "I'm Down" button
-- `PlansFeed.tsx` - Integrates events into the feed (friend-filtered)
-
-**The Gap:**
-- Events table is empty (0 rows)
-- No way to create events in the app
-- Not included in demo data seeding
-
----
-
-## Implementation Plan
-
-### Phase 1: Demo Event Seeding
-
-**File:** `supabase/functions/seed-demo-data/index.ts`
-
-Add event seeding with these realistic templates:
-
-```typescript
-const DEMO_EVENTS = [
-  { title: "Friday Night DJ Set", description: "House music all night", time: "22:00" },
-  { title: "Industry Night", description: "Free entry for hospitality workers", time: "21:00" },
-  { title: "Saturday Night Live DJ", description: "Special guest DJ set", time: "23:00" },
-  { title: "Rooftop Sessions", description: "Sunset vibes into the night", time: "19:00" },
-  { title: "Disco Sundays", description: "Classic disco and funk", time: "20:00" },
-];
-```
-
-**Logic:**
-1. Generate weekend dates (Fri/Sat/Sun)
-2. Create ~8 events at top venues
-3. Add demo user RSVPs so events surface in friend-filtered feed
-4. Include cleanup for `is_demo` events on re-seed
-
-**Schema Update Required:**
-Add `is_demo` column to events table for cleanup:
-```sql
-ALTER TABLE events ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT false;
-```
-
----
-
-### Phase 2: Business Event Creation
-
-**New File:** `src/pages/business/BusinessEvents.tsx`
-
-Create an events management page for venue owners:
-- List of their venue's events
-- "Add Event" button opens a creation form
-- Edit/delete existing events
-
-**New File:** `src/components/business/CreateEventDialog.tsx`
-
-Event creation form with:
-- Title (required)
-- Date picker (required)
-- Start time (required)
-- End time (optional)
-- Description (optional)
-- Cover image upload (optional)
-- Ticket URL (optional)
-
-**Update:** `src/pages/business/BusinessDashboard.tsx`
-
-Add "Events" button to "Grow Your Venue" section:
+**Line 208-209** - Update header:
 ```tsx
-<Button onClick={() => navigate('/business/events')}>
-  <Calendar className="h-4 w-4 text-primary" />
-  <span>Events</span>
-  <span>Add & manage your venue events</span>
-</Button>
+// Before:
+<span className="text-lg">🎯</span>
+<h3 className="text-white font-semibold text-sm">Planning Tonight</h3>
+
+// After:
+<span className="text-lg">👀</span>
+<h3 className="text-white font-semibold text-sm">Who's Out Tonight?</h3>
 ```
 
-**Update:** `src/App.tsx`
-
-Add route: `/business/events` -> `BusinessEvents.tsx`
-
----
-
-### Phase 3: Admin Events Panel
-
-**New File:** `src/components/admin/EventsPanel.tsx`
-
-Admin panel for curating events across all venues:
-- Search and select any venue
-- Create events for any venue (curation)
-- List all events with edit/delete
-- Filter by city (NYC/LA/PB)
-
-**Update:** `src/pages/Admin.tsx`
-
-Add "Events" tab to the existing tabs:
+**Line 236-238** - Update empty state copy:
 ```tsx
-<TabsTrigger value="events">
-  <Calendar className="h-3 w-3 mr-1" />
-  Events
-</TabsTrigger>
+// Before:
+<p className="text-white/40 text-xs text-center py-2">
+  No one's started planning yet. Kick things off?
+</p>
 
-<TabsContent value="events">
-  <EventsPanel />
-</TabsContent>
+// After:
+<p className="text-white/40 text-xs text-center py-2">
+  No friends thinking about tonight yet. Be the first?
+</p>
+```
+
+**Line 330** - Update friend row subtitle:
+```tsx
+// Before:
+<span className="text-white/50 text-xs">Planning to go out</span>
+
+// After:
+<span className="text-white/50 text-xs">Thinking about going out</span>
+```
+
+**Line 380** - Same update in expanded view:
+```tsx
+// Before:
+<span className="text-white/50 text-xs">Planning to go out</span>
+
+// After:
+<span className="text-white/50 text-xs">Thinking about going out</span>
+```
+
+**Line 407-408** - Update CTA button:
+```tsx
+// Before:
+<Plus className="w-4 h-4" />
+I'm planning too
+
+// After:
+<Plus className="w-4 h-4" />
+I'm thinking too
 ```
 
 ---
 
-### Phase 4: User-Generated Events
+### 2. PlansFeed.tsx (Content Creation Section)
 
-**New File:** `src/components/CreateEventDialog.tsx`
+**Line 584-589** - Update section header and description:
+```tsx
+// Before:
+<span className="text-lg">📝</span>
+<h3 className="text-white font-semibold text-base">
+  {weekendFilter ? 'Make Weekend Plans' : 'Drop a Plan'}
+</h3>
+<p className="text-white/50 text-xs mt-1 ml-7">Share a plan your friends can join</p>
 
-Allow users to add events they're going to:
-- Similar to CreatePlanDialog flow
-- User selects a venue
-- Fills in event details
-- Automatically RSVPs as "going"
-- Event surfaces to their friends
+// After:
+<span className="text-lg">📝</span>
+<h3 className="text-white font-semibold text-base">
+  {weekendFilter ? 'Make Weekend Plans' : 'Share Plans'}
+</h3>
+<p className="text-white/50 text-xs mt-1 ml-7">Post a specific plan or event your friends can join</p>
+```
 
-**Update:** `src/components/PlansFeed.tsx`
+**Line 621** - Update empty state fallback:
+```tsx
+// Before:
+: 'Drop a plan and see who\'s down to join.'
 
-Add "Add Event" button alongside "Create Plan":
-- Only show when there are few/no events in feed
-- Opens CreateEventDialog
-
-**RLS Policy for User Events:**
-```sql
--- Users can create events (but not is_demo ones)
-CREATE POLICY "Users can create events" ON events
-  FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() IS NOT NULL AND is_demo = false);
+// After:
+: 'Share a plan and see who\'s down to join.'
 ```
 
 ---
 
-## Database Changes
+## Summary of Copy Changes
 
-```sql
--- Add is_demo flag for cleanup
-ALTER TABLE events ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT false;
-
--- Add created_by to track who added the event
-ALTER TABLE events ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth.users(id);
-
--- RLS: Venue owners can manage their events
-CREATE POLICY "Venue owners can manage events" ON events
-  FOR ALL TO authenticated
-  USING (
-    venue_id IS NOT NULL AND 
-    public.is_venue_owner(auth.uid(), venue_id)
-  );
-
--- RLS: Admins can manage all events
-CREATE POLICY "Admins can manage all events" ON events
-  FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'admin'));
-
--- RLS: Users can create events
-CREATE POLICY "Users can create events" ON events
-  FOR INSERT TO authenticated
-  WITH CHECK (
-    auth.uid() IS NOT NULL AND 
-    (is_demo = false OR is_demo IS NULL)
-  );
-
--- RLS: Anyone can view non-expired events
-CREATE POLICY "Anyone can view events" ON events
-  FOR SELECT TO authenticated
-  USING (expires_at > now());
-```
+| Location | Before | After |
+|----------|--------|-------|
+| Status section header | "🎯 Planning Tonight" | "👀 Who's Out Tonight?" |
+| Status empty state | "No one's started planning yet" | "No friends thinking about tonight yet" |
+| Friend status label | "Planning to go out" | "Thinking about going out" |
+| Join button | "I'm planning too" | "I'm thinking too" |
+| Content section header | "📝 Drop a Plan" | "📝 Share Plans" |
+| Content section subtitle | "Share a plan your friends can join" | "Post a specific plan or event your friends can join" |
+| Content empty state | "Drop a plan and see who's down" | "Share a plan and see who's down" |
 
 ---
 
-## File Summary
+## Files Modified
 
-### New Files (6 total)
-| File | Purpose |
-|------|---------|
-| `src/pages/business/BusinessEvents.tsx` | Venue owner events management |
-| `src/components/business/CreateEventDialog.tsx` | Business event creation form |
-| `src/components/admin/EventsPanel.tsx` | Admin event curation panel |
-| `src/components/CreateEventDialog.tsx` | User-generated event creation |
-
-### Modified Files (4 total)
 | File | Changes |
 |------|---------|
-| `supabase/functions/seed-demo-data/index.ts` | Add demo events + RSVPs |
-| `src/pages/business/BusinessDashboard.tsx` | Add Events button |
-| `src/pages/Admin.tsx` | Add Events tab |
-| `src/App.tsx` | Add business events route |
+| `src/components/FriendsPlanning.tsx` | Header, empty state, friend labels, CTA button |
+| `src/components/PlansFeed.tsx` | Section header, subtitle, empty state copy |
 
 ---
 
-## User Flow Summary
-
-```
-Demo Mode:
-Seed Data → Events auto-created → Demo users RSVP → Events appear in Plans Feed
-
-Business Portal:
-Venue Owner → Dashboard → Events → Add Event → Appears in Plans Feed for friends
-
-Admin Panel:
-Admin → Events Tab → Select Venue → Create Event → Curated event appears
-
-User-Generated:
-User → Plans Feed → Add Event → Select Venue → Fill Details → Auto-RSVPs → Friends see event
-```
-
----
-
-## Testing After Implementation
-
-1. **Demo seeding**: Go to Demo Settings → Seed LA Data → Check Plans Feed for events
-2. **Business events**: Log in as venue owner → Dashboard → Events → Add event → Verify in feed
-3. **Admin events**: Go to Admin → Events tab → Create event for venue → Verify in feed
-4. **User events**: Go to Plans Feed → Add Event → Create → Friends should see it
+## Result
+The two sections will now be clearly differentiated:
+- **"Who's Out Tonight?"** - Shows friends signaling intent (status-based)
+- **"Share Plans"** - For posting specific plans/events (content-based)
