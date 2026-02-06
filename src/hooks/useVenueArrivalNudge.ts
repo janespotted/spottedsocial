@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useInputFocus } from '@/contexts/InputFocusContext';
 import { supabase } from '@/integrations/supabase/client';
-import { getCurrentLocation, findNearestVenue, findNearbyVenues, calculateDistance } from '@/lib/location-service';
+import { getAccurateLocation, findNearestVenue, findNearbyVenues, calculateDistance } from '@/lib/location-service';
 import {
   canTriggerVenueArrival,
   isVenueDismissed,
@@ -128,8 +128,8 @@ export function useVenueArrivalNudge() {
       // Track if user is out for polling setup
       setIsOutStatus(nightStatus?.status === 'out');
 
-      // Get location WITH accuracy AND timestamp
-      const location = await getCurrentLocation();
+      // Get location with multi-sample accuracy for best reading
+      const location = await getAccurateLocation();
       
       // Check for departure from previous venue
       const prevVenueId = getPreviousVenueId();
