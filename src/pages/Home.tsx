@@ -405,10 +405,10 @@ export default function Home() {
             ) : (
               <>
                 <h3 className="text-xl font-semibold text-white mb-2">
-                  It's early — you're ahead of the curve
+                  It's early
                 </h3>
                 <p className="text-white/50 text-sm max-w-xs mb-6">
-                  When friends check in, you'll see them here. Why not be the first?
+                  Be the first to check in tonight
                 </p>
                 <button
                   onClick={openCheckIn}
