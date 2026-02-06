@@ -1,98 +1,194 @@
 
-# Add Demo Yap Messages to Seed Data
+
+# Improve Location Detection Accuracy
 
 ## Problem
-The Yap board shows no demo messages because the `seed-demo-data` edge function doesn't create any `yap_messages` records.
 
-## Solution
-Update the seed function to create demo yap messages at various demo venues, using the existing sample messages from `DEMO_YAP_MESSAGES`.
+When you said you were at 523 Ocean Front Walk, the app incorrectly detected Kassi Rooftop as the nearest venue instead of Dudley Market. 
+
+**Root cause**: Your device reported GPS coordinates ~176 meters off from your actual position. Even though the device reported "good accuracy" (under 50m uncertainty), the coordinates themselves were inaccurate.
+
+**Result**:
+- From captured GPS: Kassi = 148m, Dudley = 182m (Kassi detected)
+- From actual location: Dudley = 11m, Kassi = 72m (Dudley should be detected)
 
 ---
 
-## Changes
+## Solution: Multi-Sample GPS with Best-of-Three Selection
 
-### File: `supabase/functions/seed-demo-data/index.ts`
+Replace the single-shot `getCurrentPosition()` with a `watchPosition()` approach that:
+1. Collects multiple GPS readings over 3-5 seconds
+2. Keeps only readings with accuracy ≤30m (stricter than current 50m threshold)
+3. Selects the reading with the best accuracy
+4. Falls back gracefully if no high-accuracy reading arrives
 
-**1. Add Yap messages sample data** (around line 8):
+---
+
+## Technical Changes
+
+### File: `src/lib/location-service.ts`
+
+**New function: `getAccurateLocation()`**
 
 ```typescript
-const YAP_TEXTS = [
-  "Pretty sure Justin Bieber just walked in...",
-  "This music is awesome who's the DJ right now",
-  "What's everyone's move after close?",
-  "Anyone here? Looking for my friends",
-  "This DJ set is unreal!!!",
-  "Line is crazy long outside",
-  "The energy is INSANE right now",
-  "Dance floor is PACKED",
-  "Where's the after party at?",
-  "Bartender hooked it up",
-];
+/**
+ * Get accurate GPS by sampling multiple readings via watchPosition
+ * Collects readings for up to 5 seconds, returning the most accurate one
+ */
+export const getAccurateLocation = (): Promise<{
+  lat: number;
+  lng: number;
+  accuracy: number;
+  timestamp: number;
+}> => {
+  return new Promise((resolve, reject) => {
+    if (!('geolocation' in navigator)) {
+      reject(new Error('Geolocation is not supported'));
+      return;
+    }
+
+    const readings: Array<{
+      lat: number;
+      lng: number;
+      accuracy: number;
+      timestamp: number;
+    }> = [];
+    
+    const MAX_TIME_MS = 5000;      // Max 5 seconds
+    const TARGET_ACCURACY = 30;    // Target 30m accuracy
+    const MIN_READINGS = 2;        // Minimum readings before early exit
+    
+    let watchId: number;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    
+    const cleanup = () => {
+      navigator.geolocation.clearWatch(watchId);
+      clearTimeout(timeoutId);
+    };
+    
+    const selectBestReading = () => {
+      if (readings.length === 0) {
+        reject(new Error('No GPS readings received'));
+        return;
+      }
+      // Return reading with lowest accuracy value (most precise)
+      const best = readings.reduce((a, b) => 
+        a.accuracy < b.accuracy ? a : b
+      );
+      resolve(best);
+    };
+    
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const reading = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
+        };
+        readings.push(reading);
+        
+        // Early exit if we get a very accurate reading
+        if (reading.accuracy <= TARGET_ACCURACY && readings.length >= MIN_READINGS) {
+          cleanup();
+          selectBestReading();
+        }
+      },
+      (error) => {
+        cleanup();
+        if (readings.length > 0) {
+          selectBestReading();
+        } else {
+          reject(error);
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: MAX_TIME_MS,
+        maximumAge: 0,
+      }
+    );
+    
+    // Timeout: resolve with best reading after max time
+    timeoutId = setTimeout(() => {
+      cleanup();
+      selectBestReading();
+    }, MAX_TIME_MS);
+  });
+};
 ```
 
-**2. Add cleanup for yap_messages** (in the cleanup section, around line 29):
+### File: `src/hooks/useVenueArrivalNudge.ts`
+
+**Line 6**: Import the new function
 
 ```typescript
-await sb.from('yap_messages').delete().eq('is_demo',true);
+import { 
+  getCurrentLocation, 
+  getAccurateLocation,  // Add this
+  findNearestVenue, 
+  findNearbyVenues, 
+  calculateDistance 
+} from '@/lib/location-service';
 ```
 
-**3. Add yap messages insertion** (after posts, around line 57):
+**Line 132**: Use `getAccurateLocation` instead of `getCurrentLocation`
 
 ```typescript
-// Yap messages - 10 anonymous messages spread across venues
-await sb.from('yap_messages').insert(YAP_TEXTS.map((text, i) => {
-  const v = V[i % V.length];
-  const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
-  return {
-    user_id: uids[i % uids.length],
-    text,
-    venue_name: v.name,
-    is_anonymous: true,
-    author_handle: handle,
-    score: Math.floor(Math.random() * 80) + 5,
-    comments_count: Math.floor(Math.random() * 10),
-    expires_at: exp(),
-    is_demo: true,
-  };
-}));
+// Before:
+const location = await getCurrentLocation();
+
+// After:
+const location = await getAccurateLocation();
 ```
 
-**4. Add clear for yap_messages** (in the clear section):
+### File: `src/lib/venue-arrival-nudge/trigger.ts`
+
+**Line 12**: Tighten accuracy threshold from 50m to 35m
 
 ```typescript
-await sb.from('yap_messages').delete().eq('is_demo',true);
+// Before:
+const GPS_ACCURACY_THRESHOLD = 50;
+
+// After:
+const GPS_ACCURACY_THRESHOLD = 35;
 ```
 
 ---
 
 ## How It Works
 
-The YapTab already has logic to show demo yaps (line 109-113):
-```typescript
-if (demoMode) {
-  query = query.or(`venue_name.eq.${selectedVenue},is_demo.eq.true`);
-}
+```text
+Current Flow:
+┌─────────────────┐
+│ Single GPS read │ ──> May be inaccurate
+└─────────────────┘
+
+New Flow:
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ GPS read #1     │ ──> │ GPS read #2     │ ──> │ GPS read #3     │
+│ accuracy: 45m   │     │ accuracy: 28m   │     │ accuracy: 22m   │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+                                              ┌─────────────────┐
+                                              │ Select best     │
+                                              │ (22m accuracy)  │
+                                              └─────────────────┘
 ```
 
-This means in demo mode, it shows ALL demo yaps regardless of venue - so users will see activity on the Yap board even if they're not checked in at a specific venue.
-
 ---
 
-## Result
+## Expected Improvements
 
-| Content | Before | After |
-|---------|--------|-------|
-| Demo yap messages | 0 | 10 |
-| Distribution | N/A | Spread across venues |
-| Scores | N/A | Random 5-85 |
+| Metric | Before | After |
+|--------|--------|-------|
+| GPS readings collected | 1 | 2-5 |
+| Accuracy threshold | 50m | 35m |
+| Time to get location | ~1s | 2-5s |
+| False venue detection | Possible | Reduced |
 
----
-
-## Post-Implementation
-
-Re-seed demo data after deploying:
-1. Go to Demo Settings
-2. Toggle demo mode off then on
+The trade-off is slightly longer location acquisition time (up to 5 seconds max) in exchange for significantly better accuracy.
 
 ---
 
@@ -100,4 +196,7 @@ Re-seed demo data after deploying:
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/seed-demo-data/index.ts` | Add yap sample texts, cleanup, and insertion logic |
+| `src/lib/location-service.ts` | Add `getAccurateLocation()` function using watchPosition |
+| `src/hooks/useVenueArrivalNudge.ts` | Use `getAccurateLocation` instead of `getCurrentLocation` |
+| `src/lib/venue-arrival-nudge/trigger.ts` | Reduce accuracy threshold from 50m to 35m |
+
