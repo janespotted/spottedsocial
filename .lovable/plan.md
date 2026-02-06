@@ -1,11 +1,11 @@
 
-# Add Demo Planning Friends to Seed Data
+# Add Demo Yap Messages to Seed Data
 
 ## Problem
-The "Who's Going Out Tonight" section shows no demo friends because the `seed-demo-data` edge function only creates `night_statuses` records with `status: 'out'` - it never creates any with `status: 'planning'`.
+The Yap board shows no demo messages because the `seed-demo-data` edge function doesn't create any `yap_messages` records.
 
 ## Solution
-Update the seed function to create some demo users with `planning` status (in addition to those with `out` status).
+Update the seed function to create demo yap messages at various demo venues, using the existing sample messages from `DEMO_YAP_MESSAGES`.
 
 ---
 
@@ -13,72 +13,86 @@ Update the seed function to create some demo users with `planning` status (in ad
 
 ### File: `supabase/functions/seed-demo-data/index.ts`
 
-**Lines 49-50** - Split demo users between "out" and "planning" statuses:
+**1. Add Yap messages sample data** (around line 8):
 
 ```typescript
-// Before (line 50):
-await sb.from('night_statuses').insert(uids.slice(0,8).map((u,i)=>{
-  const v=V[i%V.length];
-  return{
-    user_id:u,
-    status:'out',
-    venue_id:vm.get(v.name),
-    venue_name:v.name,
-    lat:v.lat,
-    lng:v.lng,
-    expires_at:exp(),
-    is_demo:true
-  };
-}));
+const YAP_TEXTS = [
+  "Pretty sure Justin Bieber just walked in...",
+  "This music is awesome who's the DJ right now",
+  "What's everyone's move after close?",
+  "Anyone here? Looking for my friends",
+  "This DJ set is unreal!!!",
+  "Line is crazy long outside",
+  "The energy is INSANE right now",
+  "Dance floor is PACKED",
+  "Where's the after party at?",
+  "Bartender hooked it up",
+];
+```
 
-// After:
-// First 5 users are "out" at venues
-await sb.from('night_statuses').insert(uids.slice(0,5).map((u,i)=>{
-  const v=V[i%V.length];
-  return{
-    user_id:u,
-    status:'out',
-    venue_id:vm.get(v.name),
-    venue_name:v.name,
-    lat:v.lat,
-    lng:v.lng,
-    expires_at:exp(),
-    is_demo:true
-  };
-}));
+**2. Add cleanup for yap_messages** (in the cleanup section, around line 29):
 
-// Next 3 users are "planning" (thinking about going out)
-await sb.from('night_statuses').insert(uids.slice(5,8).map((u,i)=>{
-  const v=V[i%V.length];
-  return{
-    user_id:u,
-    status:'planning',
-    planning_neighborhood:v.hood,
-    planning_visibility:'all_friends',
-    expires_at:exp(),
-    is_demo:true
+```typescript
+await sb.from('yap_messages').delete().eq('is_demo',true);
+```
+
+**3. Add yap messages insertion** (after posts, around line 57):
+
+```typescript
+// Yap messages - 10 anonymous messages spread across venues
+await sb.from('yap_messages').insert(YAP_TEXTS.map((text, i) => {
+  const v = V[i % V.length];
+  const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
+  return {
+    user_id: uids[i % uids.length],
+    text,
+    venue_name: v.name,
+    is_anonymous: true,
+    author_handle: handle,
+    score: Math.floor(Math.random() * 80) + 5,
+    comments_count: Math.floor(Math.random() * 10),
+    expires_at: exp(),
+    is_demo: true,
   };
 }));
 ```
+
+**4. Add clear for yap_messages** (in the clear section):
+
+```typescript
+await sb.from('yap_messages').delete().eq('is_demo',true);
+```
+
+---
+
+## How It Works
+
+The YapTab already has logic to show demo yaps (line 109-113):
+```typescript
+if (demoMode) {
+  query = query.or(`venue_name.eq.${selectedVenue},is_demo.eq.true`);
+}
+```
+
+This means in demo mode, it shows ALL demo yaps regardless of venue - so users will see activity on the Yap board even if they're not checked in at a specific venue.
 
 ---
 
 ## Result
 
-| Status | Before | After |
-|--------|--------|-------|
-| Demo users with `out` status | 8 | 5 |
-| Demo users with `planning` status | 0 | 3 |
-
-This will populate the "Who's Going Out Tonight" section with 3 demo friends who are "thinking about going out" when demo mode is enabled.
+| Content | Before | After |
+|---------|--------|-------|
+| Demo yap messages | 0 | 10 |
+| Distribution | N/A | Spread across venues |
+| Scores | N/A | Random 5-85 |
 
 ---
 
 ## Post-Implementation
 
-After deploying, the user will need to re-seed demo data:
-1. Go to Demo Settings page
-2. Toggle demo mode off then on, or click "Re-seed" if available
+Re-seed demo data after deploying:
+1. Go to Demo Settings
+2. Toggle demo mode off then on
 
 ---
 
@@ -86,4 +100,4 @@ After deploying, the user will need to re-seed demo data:
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/seed-demo-data/index.ts` | Split night_statuses between 'out' (5 users) and 'planning' (3 users) |
+| `supabase/functions/seed-demo-data/index.ts` | Add yap sample texts, cleanup, and insertion logic |
