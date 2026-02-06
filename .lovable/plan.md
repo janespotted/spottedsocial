@@ -1,61 +1,51 @@
 
 
-# Fix Z-Index: Map Filters Appearing Above CheckIn Modal
+# Reduce Empty State Text on Home Page
 
-## Problem
-On the Map page when you tap the "Are You Out?" button, the CheckIn modal/drawer opens but the map filter elements (search bar, explore bar, venue filter, "4 friends out" pill) appear above it instead of below.
+## Current Copy
+- **Title:** "It's early — you're ahead of the curve"
+- **Description:** "When friends check in, you'll see them here. Why not be the first?"
 
-## Root Cause
-The Drawer component (used on mobile) has `z-50`, but the Map page filter elements have much higher z-indexes:
-- Search bar/input: `z-[200]`
-- Search results dropdown: `z-[250]`
-- Venue filter dropdown: `z-[300]`
-- Explore venues: `z-[200]`
-- Layer visibility toggle: `z-[200]`
-
-The Dialog component (used on desktop) already has `z-[500]`, so this is primarily a mobile issue.
-
-## Solution
-Increase the Drawer component's z-index to `z-[500]` to match the Dialog component, ensuring both modals appear above all Map page UI elements.
+## Proposed Copy (More Concise)
+- **Title:** "It's early"
+- **Description:** "Be the first to check in tonight"
 
 ---
 
 ## Technical Changes
 
-### File: `src/components/ui/drawer.tsx`
+### File: `src/pages/Home.tsx`
 
-**Line 29** - Update DrawerOverlay z-index:
+**Lines 407-412** - Shorten the title and description:
+
 ```typescript
 // Before:
-"fixed inset-0 z-50 bg-black/80"
+<h3 className="text-xl font-semibold text-white mb-2">
+  It's early — you're ahead of the curve
+</h3>
+<p className="text-white/50 text-sm max-w-xs mb-6">
+  When friends check in, you'll see them here. Why not be the first?
+</p>
 
 // After:
-"fixed inset-0 z-[500] bg-black/80"
-```
-
-**Line 42** - Update DrawerContent z-index:
-```typescript
-// Before:
-"fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background"
-
-// After:
-"fixed inset-x-0 bottom-0 z-[500] mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background"
+<h3 className="text-xl font-semibold text-white mb-2">
+  It's early
+</h3>
+<p className="text-white/50 text-sm max-w-xs mb-6">
+  Be the first to check in tonight
+</p>
 ```
 
 ---
 
-## Z-Index Hierarchy After Fix
+## Result
 
-| Element | Z-Index | Layer |
-|---------|---------|-------|
-| Map header | `z-20` | Base UI |
-| Map filter buttons | `z-[200]` | Floating controls |
-| Search results dropdown | `z-[250]` | Dropdowns |
-| Venue filter dropdown | `z-[300]` | Dropdowns |
-| **Drawer/Dialog** | **`z-[500]`** | **Modals** |
-| Select dropdowns inside modals | `z-[600]` | Modal dropdowns |
+| Element | Before | After |
+|---------|--------|-------|
+| Title | 7 words | 2 words |
+| Description | 13 words | 7 words |
 
-This creates a clear layering where all modals (including CheckIn) appear above all map UI elements.
+The empty state will feel cleaner and more glanceable while keeping the encouraging tone.
 
 ---
 
@@ -63,5 +53,5 @@ This creates a clear layering where all modals (including CheckIn) appear above 
 
 | File | Change |
 |------|--------|
-| `src/components/ui/drawer.tsx` | Update overlay and content z-index from `z-50` to `z-[500]` |
+| `src/pages/Home.tsx` | Shorten empty state title and description |
 
