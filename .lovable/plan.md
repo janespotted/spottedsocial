@@ -1,75 +1,84 @@
 
+# Add Demo Planning Friends to Seed Data
 
-# Update "Who's Going Out Tonight?" Section Copy
+## Problem
+The "Who's Going Out Tonight" section shows no demo friends because the `seed-demo-data` edge function only creates `night_statuses` records with `status: 'out'` - it never creates any with `status: 'planning'`.
 
-## Overview
-Simplify the section header, empty state, and CTA button with punchier, more casual copy.
+## Solution
+Update the seed function to create some demo users with `planning` status (in addition to those with `out` status).
 
 ---
 
 ## Changes
 
-### File: `src/components/FriendsPlanning.tsx`
+### File: `supabase/functions/seed-demo-data/index.ts`
 
-**1. Header (Lines 207-212)** - Simplify to single line header, remove subtitle:
+**Lines 49-50** - Split demo users between "out" and "planning" statuses:
 
-```tsx
-// Before:
-<div>
-  <div className="flex items-center gap-2">
-    <span className="text-lg">👀</span>
-    <h3 className="text-white font-semibold text-sm">Thinking About Tonight?</h3>
-  </div>
-  <p className="text-white/50 text-xs mt-0.5 ml-7">Friends who might go out tonight</p>
-</div>
-
-// After:
-<div className="flex items-center gap-2">
-  <span className="text-lg">👀</span>
-  <h3 className="text-white font-semibold text-sm">Who's Going Out Tonight</h3>
-</div>
-```
-
-**2. Empty State (Lines 238-242)** - Shorter, punchier copy:
-
-```tsx
-// Before:
-<p className="text-white/40 text-xs text-center py-2">
-  No friends thinking about tonight yet. Be the first?
-</p>
+```typescript
+// Before (line 50):
+await sb.from('night_statuses').insert(uids.slice(0,8).map((u,i)=>{
+  const v=V[i%V.length];
+  return{
+    user_id:u,
+    status:'out',
+    venue_id:vm.get(v.name),
+    venue_name:v.name,
+    lat:v.lat,
+    lng:v.lng,
+    expires_at:exp(),
+    is_demo:true
+  };
+}));
 
 // After:
-<p className="text-white/40 text-xs text-center py-2">
-  No one yet. Be first.
-</p>
-```
+// First 5 users are "out" at venues
+await sb.from('night_statuses').insert(uids.slice(0,5).map((u,i)=>{
+  const v=V[i%V.length];
+  return{
+    user_id:u,
+    status:'out',
+    venue_id:vm.get(v.name),
+    venue_name:v.name,
+    lat:v.lat,
+    lng:v.lng,
+    expires_at:exp(),
+    is_demo:true
+  };
+}));
 
-**3. CTA Button (Lines 406-412)** - Change to "I'm in":
-
-```tsx
-// Before:
-<button ...>
-  <Plus className="w-4 h-4" />
-  I'm thinking too
-</button>
-
-// After:
-<button ...>
-  <Plus className="w-4 h-4" />
-  I'm in
-</button>
+// Next 3 users are "planning" (thinking about going out)
+await sb.from('night_statuses').insert(uids.slice(5,8).map((u,i)=>{
+  const v=V[i%V.length];
+  return{
+    user_id:u,
+    status:'planning',
+    planning_neighborhood:v.hood,
+    planning_visibility:'all_friends',
+    expires_at:exp(),
+    is_demo:true
+  };
+}));
 ```
 
 ---
 
-## Summary of Copy Changes
+## Result
 
-| Element | Before | After |
-|---------|--------|-------|
-| Header | "Thinking About Tonight?" | "Who's Going Out Tonight" |
-| Subtitle | "Friends who might go out tonight" | (removed) |
-| Empty state | "No friends thinking about tonight yet. Be the first?" | "No one yet. Be first." |
-| CTA button | "I'm thinking too" | "I'm in" |
+| Status | Before | After |
+|--------|--------|-------|
+| Demo users with `out` status | 8 | 5 |
+| Demo users with `planning` status | 0 | 3 |
+
+This will populate the "Who's Going Out Tonight" section with 3 demo friends who are "thinking about going out" when demo mode is enabled.
+
+---
+
+## Post-Implementation
+
+After deploying, the user will need to re-seed demo data:
+1. Go to Demo Settings page
+2. Toggle demo mode off then on, or click "Re-seed" if available
 
 ---
 
@@ -77,5 +86,4 @@ Simplify the section header, empty state, and CTA button with punchier, more cas
 
 | File | Changes |
 |------|---------|
-| `src/components/FriendsPlanning.tsx` | Header simplified, subtitle removed, empty state shortened, CTA updated |
-
+| `supabase/functions/seed-demo-data/index.ts` | Split night_statuses between 'out' (5 users) and 'planning' (3 users) |
