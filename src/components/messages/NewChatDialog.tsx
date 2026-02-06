@@ -107,44 +107,40 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
       return;
     }
 
-    // Get friend profiles using safe RPC (respects location privacy)
-    const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
-    
-    // Filter to only friends and conditionally exclude demo users
-    let profiles = (allProfiles || []).filter((p: any) => friendIds.includes(p.id));
+    // Fetch profiles and venue statuses in parallel (eliminates N+1 queries)
+    const [profilesResult, statusesResult] = await Promise.all([
+      supabase.rpc('get_profiles_safe'),
+      supabase
+        .from('night_statuses')
+        .select('user_id, venue_name')
+        .in('user_id', friendIds)
+    ]);
+
+    let profiles = (profilesResult.data || []).filter((p: any) => friendIds.includes(p.id));
     
     // Only filter out demo users when demo mode is OFF (bootstrap mode)
     if (!demoEnabled) {
       profiles = profiles.filter((p: any) => p.is_demo === false);
     }
 
-    if (!profiles) return;
-
     // Deduplicate by display_name (keeps first occurrence)
     const seenNames = new Set<string>();
     const uniqueProfiles = profiles.filter(profile => {
-      if (seenNames.has(profile.display_name)) {
-        return false;
-      }
+      if (seenNames.has(profile.display_name)) return false;
       seenNames.add(profile.display_name);
       return true;
     });
 
-    // Get their current venues
-    const friendsData = await Promise.all(
-      uniqueProfiles.map(async (profile) => {
-        const { data: status } = await supabase
-          .from('night_statuses')
-          .select('venue_name')
-          .eq('user_id', profile.id)
-          .maybeSingle();
-
-        return {
-          ...profile,
-          venue_name: status?.venue_name || null,
-        };
-      })
+    // Create venue status lookup map for O(1) access
+    const venueMap = new Map(
+      (statusesResult.data || []).map(s => [s.user_id, s.venue_name])
     );
+
+    // Map profiles with venue info (no additional queries needed)
+    const friendsData = uniqueProfiles.map(profile => ({
+      ...profile,
+      venue_name: venueMap.get(profile.id) || null,
+    }));
 
     setFriends(friendsData);
   };
