@@ -9,7 +9,7 @@ import type {
 // ============= CONSTANTS =============
 
 // Hard gates (non-negotiable)
-const GPS_ACCURACY_THRESHOLD = 50; // meters - reject if worse
+const GPS_ACCURACY_THRESHOLD = 35; // meters - reject if worse (tightened from 50m)
 const MAX_DETECTION_DISTANCE_M = 500; // Never process if > 500m
 const VENUE_TRIGGER_RADIUS_M = 200; // Actual trigger radius
 

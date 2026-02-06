@@ -105,6 +105,102 @@ export const getCurrentLocation = (): Promise<{ lat: number; lng: number; accura
 };
 
 /**
+ * Get accurate GPS by sampling multiple readings via watchPosition
+ * Collects readings for up to 5 seconds, returning the most accurate one
+ */
+export const getAccurateLocation = (): Promise<{
+  lat: number;
+  lng: number;
+  accuracy: number;
+  timestamp: number;
+}> => {
+  return new Promise((resolve, reject) => {
+    if (!('geolocation' in navigator)) {
+      reject(new Error('Geolocation is not supported'));
+      return;
+    }
+
+    const readings: Array<{
+      lat: number;
+      lng: number;
+      accuracy: number;
+      timestamp: number;
+    }> = [];
+    
+    const MAX_TIME_MS = 5000;      // Max 5 seconds
+    const TARGET_ACCURACY = 30;    // Target 30m accuracy
+    const MIN_READINGS = 2;        // Minimum readings before early exit
+    
+    let watchId: number;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let resolved = false;
+    
+    const cleanup = () => {
+      if (watchId !== undefined) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      clearTimeout(timeoutId);
+    };
+    
+    const selectBestReading = () => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      
+      if (readings.length === 0) {
+        reject(new Error('No GPS readings received'));
+        return;
+      }
+      // Return reading with lowest accuracy value (most precise)
+      const best = readings.reduce((a, b) => 
+        a.accuracy < b.accuracy ? a : b
+      );
+      console.log(`[getAccurateLocation] Selected best of ${readings.length} readings: ${best.accuracy.toFixed(1)}m accuracy`);
+      resolve(best);
+    };
+    
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        if (resolved) return;
+        
+        const reading = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
+        };
+        readings.push(reading);
+        console.log(`[getAccurateLocation] Reading ${readings.length}: ${reading.accuracy.toFixed(1)}m accuracy`);
+        
+        // Early exit if we get a very accurate reading
+        if (reading.accuracy <= TARGET_ACCURACY && readings.length >= MIN_READINGS) {
+          selectBestReading();
+        }
+      },
+      (error) => {
+        if (resolved) return;
+        cleanup();
+        if (readings.length > 0) {
+          selectBestReading();
+        } else {
+          reject(error);
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: MAX_TIME_MS,
+        maximumAge: 0,
+      }
+    );
+    
+    // Timeout: resolve with best reading after max time
+    timeoutId = setTimeout(() => {
+      selectBestReading();
+    }, MAX_TIME_MS);
+  });
+};
+
+/**
  * Get current location with comprehensive error handling and status
  */
 export const getLocationWithStatus = async (): Promise<LocationResult> => {
