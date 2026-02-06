@@ -1,9 +1,9 @@
 
 
-# Update "Who's Out Tonight?" Section Header
+# Update "Who's Going Out Tonight?" Section Copy
 
 ## Overview
-Simple copy update to the FriendsPlanning component header and add a subtitle.
+Simplify the section header, empty state, and CTA button with punchier, more casual copy.
 
 ---
 
@@ -11,14 +11,10 @@ Simple copy update to the FriendsPlanning component header and add a subtitle.
 
 ### File: `src/components/FriendsPlanning.tsx`
 
-**Line 207-208** - Update header and add subtitle:
+**1. Header (Lines 207-212)** - Simplify to single line header, remove subtitle:
 
 ```tsx
 // Before:
-<span className="text-lg">👀</span>
-<h3 className="text-white font-semibold text-sm">Who's Out Tonight?</h3>
-
-// After:
 <div>
   <div className="flex items-center gap-2">
     <span className="text-lg">👀</span>
@@ -26,16 +22,60 @@ Simple copy update to the FriendsPlanning component header and add a subtitle.
   </div>
   <p className="text-white/50 text-xs mt-0.5 ml-7">Friends who might go out tonight</p>
 </div>
+
+// After:
+<div className="flex items-center gap-2">
+  <span className="text-lg">👀</span>
+  <h3 className="text-white font-semibold text-sm">Who's Going Out Tonight</h3>
+</div>
+```
+
+**2. Empty State (Lines 238-242)** - Shorter, punchier copy:
+
+```tsx
+// Before:
+<p className="text-white/40 text-xs text-center py-2">
+  No friends thinking about tonight yet. Be the first?
+</p>
+
+// After:
+<p className="text-white/40 text-xs text-center py-2">
+  No one yet. Be first.
+</p>
+```
+
+**3. CTA Button (Lines 406-412)** - Change to "I'm in":
+
+```tsx
+// Before:
+<button ...>
+  <Plus className="w-4 h-4" />
+  I'm thinking too
+</button>
+
+// After:
+<button ...>
+  <Plus className="w-4 h-4" />
+  I'm in
+</button>
 ```
 
 ---
 
-## Result
+## Summary of Copy Changes
 
 | Element | Before | After |
 |---------|--------|-------|
-| Header | "Who's Out Tonight?" | "Thinking About Tonight?" |
-| Subtitle | (none) | "Friends who might go out tonight" |
+| Header | "Thinking About Tonight?" | "Who's Going Out Tonight" |
+| Subtitle | "Friends who might go out tonight" | (removed) |
+| Empty state | "No friends thinking about tonight yet. Be the first?" | "No one yet. Be first." |
+| CTA button | "I'm thinking too" | "I'm in" |
 
-This makes the section's purpose crystal clear - it's for friends who are in the "maybe" state, not yet committed to a plan.
+---
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/components/FriendsPlanning.tsx` | Header simplified, subtitle removed, empty state shortened, CTA updated |
 
