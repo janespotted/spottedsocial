@@ -1476,7 +1476,8 @@ export type Database = {
           id: string
           is_anonymous: boolean | null
           is_demo: boolean | null
-          text: string
+          star_rating: number | null
+          text: string | null
           user_id: string
           venue_id: string
           venue_name: string
@@ -1488,7 +1489,8 @@ export type Database = {
           id?: string
           is_anonymous?: boolean | null
           is_demo?: boolean | null
-          text: string
+          star_rating?: number | null
+          text?: string | null
           user_id: string
           venue_id: string
           venue_name: string
@@ -1500,7 +1502,8 @@ export type Database = {
           id?: string
           is_anonymous?: boolean | null
           is_demo?: boolean | null
-          text?: string
+          star_rating?: number | null
+          text?: string | null
           user_id?: string
           venue_id?: string
           venue_name?: string

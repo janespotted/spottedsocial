@@ -6,8 +6,9 @@ import { Camera } from 'lucide-react';
 interface TextBuzzItem {
   type: 'text';
   id: string;
-  text: string;
+  text?: string;
   emoji_vibe: string | null;
+  star_rating?: number | null;
   is_anonymous: boolean;
   created_at: string;
   profile?: {
@@ -53,14 +54,29 @@ export function BuzzItem({ item }: BuzzItemProps) {
     : item.profile?.display_name || 'Someone';
 
   if (item.type === 'text') {
+    const hasStarRating = item.star_rating && item.star_rating >= 1 && item.star_rating <= 5;
+    const hasText = item.text && item.text.trim().length > 0;
+    
+    // Render star rating display
+    const renderStars = (rating: number) => {
+      return (
+        <span className="text-yellow-400 text-lg tracking-tight">
+          {'★'.repeat(rating)}{'☆'.repeat(5 - rating)}
+        </span>
+      );
+    };
+    
     return (
       <div className="p-3 bg-[#2d1b4e]/30 rounded-lg border border-[#a855f7]/10">
         <div className="flex items-start gap-2">
-          {item.emoji_vibe && (
+          {hasStarRating && renderStars(item.star_rating!)}
+          {!hasStarRating && item.emoji_vibe && (
             <span className="text-lg">{item.emoji_vibe}</span>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-white text-sm leading-relaxed">"{item.text}"</p>
+            {hasText && (
+              <p className="text-white text-sm leading-relaxed">"{item.text}"</p>
+            )}
             <p className="text-white/40 text-xs mt-1">
               {displayName} • {shortTime} ago
             </p>

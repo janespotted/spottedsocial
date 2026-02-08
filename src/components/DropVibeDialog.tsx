@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Loader2, Camera, MessageCircle, Upload, ArrowLeft } from 'lucide-react';
+import { Loader2, Camera, MessageCircle, Upload, ArrowLeft, Star } from 'lucide-react';
 import { haptic } from '@/lib/haptics';
 import { validateBuzzText } from '@/lib/validation-schemas';
 
@@ -26,7 +26,7 @@ interface DropVibeDialogProps {
   onVibeSubmitted?: () => void;
 }
 
-type ViewMode = 'select' | 'clip' | 'vibe';
+type ViewMode = 'select' | 'clip' | 'vibe' | 'rate';
 
 const EMOJI_OPTIONS = ['🔥', '💃', '🍸', '🎵', '✨'];
 
@@ -51,6 +51,10 @@ export function DropVibeDialog({
   const [vibeText, setVibeText] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
   const [vibeAnonymous, setVibeAnonymous] = useState(true);
+  
+  // Rating state
+  const [selectedRating, setSelectedRating] = useState<number>(0);
+  const [rateAnonymous, setRateAnonymous] = useState(true);
 
   const resetState = () => {
     setViewMode('select');
@@ -60,6 +64,8 @@ export function DropVibeDialog({
     setVibeText('');
     setSelectedEmoji(null);
     setVibeAnonymous(true);
+    setSelectedRating(0);
+    setRateAnonymous(true);
   };
 
   const handleClose = () => {
@@ -169,6 +175,37 @@ export function DropVibeDialog({
     }
   };
 
+  const handleSubmitRating = async () => {
+    if (selectedRating === 0 || !user) return;
+
+    setUploading(true);
+
+    try {
+      const { error } = await supabase
+        .from('venue_buzz_messages')
+        .insert({
+          user_id: user.id,
+          venue_id: venueId,
+          venue_name: venueName,
+          star_rating: selectedRating,
+          is_anonymous: rateAnonymous,
+          expires_at: calculateExpiryTime(),
+        });
+
+      if (error) throw error;
+
+      haptic.success();
+      toast.success('Rating added to Tonight\'s Buzz! ⭐');
+      onVibeSubmitted?.();
+      handleClose();
+    } catch (error: any) {
+      console.error('Error posting rating:', error);
+      toast.error('Failed to submit rating');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-[#a855f7]/40 text-white max-w-md">
@@ -186,6 +223,7 @@ export function DropVibeDialog({
               {viewMode === 'select' && `Add to Tonight's Buzz`}
               {viewMode === 'clip' && 'Share a Clip'}
               {viewMode === 'vibe' && 'Quick Vibe'}
+              {viewMode === 'rate' && 'Quick Rate'}
             </DialogTitle>
           </div>
         </DialogHeader>
@@ -194,22 +232,30 @@ export function DropVibeDialog({
         {viewMode === 'select' && (
           <div className="space-y-4 py-4">
             <p className="text-white/60 text-sm text-center">Everyone at {venueName} can see this</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={() => setViewMode('clip')}
-                className="flex flex-col items-center justify-center p-6 rounded-2xl bg-[#2d1b4e]/50 border-2 border-[#a855f7]/30 hover:border-[#a855f7] hover:bg-[#2d1b4e] transition-all"
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-[#2d1b4e]/50 border-2 border-[#a855f7]/30 hover:border-[#a855f7] hover:bg-[#2d1b4e] transition-all"
               >
-                <Camera className="w-10 h-10 text-[#a855f7] mb-2" />
-                <span className="text-white font-medium">Share a Clip</span>
-                <span className="text-white/50 text-xs mt-1">Photo or video</span>
+                <Camera className="w-8 h-8 text-[#a855f7] mb-2" />
+                <span className="text-white font-medium text-sm">Share Clip</span>
+                <span className="text-white/50 text-xs mt-1">Photo/video</span>
               </button>
               <button
                 onClick={() => setViewMode('vibe')}
-                className="flex flex-col items-center justify-center p-6 rounded-2xl bg-[#2d1b4e]/50 border-2 border-[#d4ff00]/30 hover:border-[#d4ff00] hover:bg-[#2d1b4e] transition-all"
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-[#2d1b4e]/50 border-2 border-[#d4ff00]/30 hover:border-[#d4ff00] hover:bg-[#2d1b4e] transition-all"
               >
-                <MessageCircle className="w-10 h-10 text-[#d4ff00] mb-2" />
-                <span className="text-white font-medium">Quick Vibe</span>
-                <span className="text-white/50 text-xs mt-1">Text message</span>
+                <MessageCircle className="w-8 h-8 text-[#d4ff00] mb-2" />
+                <span className="text-white font-medium text-sm">Quick Vibe</span>
+                <span className="text-white/50 text-xs mt-1">Text msg</span>
+              </button>
+              <button
+                onClick={() => setViewMode('rate')}
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-[#2d1b4e]/50 border-2 border-yellow-400/30 hover:border-yellow-400 hover:bg-[#2d1b4e] transition-all"
+              >
+                <Star className="w-8 h-8 text-yellow-400 mb-2" />
+                <span className="text-white font-medium text-sm">Quick Rate</span>
+                <span className="text-white/50 text-xs mt-1">1-5 ★</span>
               </button>
             </div>
           </div>
@@ -359,6 +405,69 @@ export function DropVibeDialog({
                   </>
                 ) : (
                   'Add to Buzz'
+                )}
+              </Button>
+            </div>
+
+            <p className="text-white/50 text-xs text-center">
+              Expires at 5am ✨
+            </p>
+          </div>
+        )}
+
+        {/* Quick Rate View */}
+        {viewMode === 'rate' && (
+          <div className="space-y-4">
+            <p className="text-white/60 text-sm text-center">How would you rate it tonight?</p>
+            
+            <div className="flex justify-center gap-2 py-4">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => {
+                    setSelectedRating(star);
+                    haptic.light();
+                  }}
+                  className={`text-4xl transition-all transform ${
+                    star <= selectedRating 
+                      ? 'text-yellow-400 scale-110' 
+                      : 'text-white/30 hover:text-white/50'
+                  }`}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="rate-anonymous" className="text-white/80">Post anonymously</Label>
+              <Switch
+                id="rate-anonymous"
+                checked={rateAnonymous}
+                onCheckedChange={setRateAnonymous}
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={handleClose}
+                variant="outline"
+                className="flex-1 bg-transparent border-yellow-400/40 text-white hover:bg-yellow-400/20"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmitRating}
+                disabled={selectedRating === 0 || uploading}
+                className="flex-1 bg-yellow-400 hover:bg-yellow-400/80 text-[#2d1b4e] font-semibold"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Rating...
+                  </>
+                ) : (
+                  'Rate ★'
                 )}
               </Button>
             </div>

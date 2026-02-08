@@ -51,6 +51,7 @@ interface BuzzItemData {
   id: string;
   text?: string;
   emoji_vibe?: string | null;
+  star_rating?: number | null;
   media_url?: string;
   media_type?: string;
   is_anonymous: boolean;
@@ -462,8 +463,9 @@ export function VenueIdCard() {
       const textItems: BuzzItemData[] = (textVibes || []).map(v => ({
         type: 'text' as const,
         id: v.id,
-        text: v.text,
+        text: v.text || undefined,
         emoji_vibe: v.emoji_vibe,
+        star_rating: (v as any).star_rating,
         is_anonymous: v.is_anonymous || false,
         created_at: v.created_at || '',
         profile: profilesMap[v.user_id],
