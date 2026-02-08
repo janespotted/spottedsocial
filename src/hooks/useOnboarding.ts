@@ -34,14 +34,22 @@ export function useOnboarding() {
 
   const completeOnboarding = async () => {
     try {
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({ has_onboarded: true })
         .eq('id', user?.id);
 
+      if (error) {
+        console.error('Error completing onboarding:', error);
+        throw error;
+      }
+
       setShowOnboarding(false);
     } catch (error) {
       console.error('Error completing onboarding:', error);
+      // Still hide onboarding on error to prevent user from being stuck
+      setShowOnboarding(false);
+      throw error;
     }
   };
 
