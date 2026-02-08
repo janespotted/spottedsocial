@@ -1,168 +1,77 @@
 
 
-# Add Quick Star Rating to Tonight's Buzz
+# Include Tonight's Buzz Media in Venue Photo Carousel
 
-## Overview
-Add a third "Quick Rate" option to the Drop Vibe dialog that lets users rate a venue 1-5 stars with a single tap. This rating is ephemeral (expires at 5am like all buzz content) and provides a fast way for users to indicate venue quality.
+## Current Behavior
+- The venue photo carousel at the top only shows **Google Place photos** (fetched from the `google_photo_refs` field)
+- Tonight's Buzz media clips (user-uploaded photos/videos) are displayed separately as `BuzzItem` cards in the "Tonight's Buzz" section below
 
----
+## Proposed Enhancement
+Merge Tonight's Buzz image/video clips into the carousel so users see both:
+1. Google Place photos (professional/official venue photos)
+2. Tonight's Buzz media (real-time user-generated content from tonight)
 
-## Changes Required
-
-### 1. Database Migration
-Add a `star_rating` column to `venue_buzz_messages` table:
-
-```sql
-ALTER TABLE venue_buzz_messages 
-ADD COLUMN star_rating smallint CHECK (star_rating >= 1 AND star_rating <= 5);
-```
-
-This makes `text` no longer strictly required when a star rating is present (will handle in code by inserting empty string or special marker).
-
-Also need to update the table to allow empty text when star_rating is provided:
-```sql
--- Make text nullable or allow empty string for rating-only submissions
-ALTER TABLE venue_buzz_messages 
-ALTER COLUMN text DROP NOT NULL;
-```
+This creates a more dynamic carousel that shows "what's happening now" alongside standard venue photos.
 
 ---
 
-### 2. Update DropVibeDialog Component
+## Implementation Approach
 
-**File: `src/components/DropVibeDialog.tsx`**
+### Data Flow
+The `mediaClips` data is already being fetched in `fetchBuzzItems()` - we just need to extract the image URLs and combine them with `googlePhotos` for the carousel.
 
-Add a third view mode and star rating functionality:
-
-- Update `ViewMode` type to include `'rate'`
-- Add `selectedRating` state (1-5)
-- Add `rateAnonymous` state (default true, like Quick Vibe)
-- Add third button on selection screen with Star icon
-- Create "Quick Rate" view with 5 tappable stars
-- Add submit handler for rating-only buzz
-
-**UI Design for Quick Rate view:**
-```
-┌─────────────────────────────────────┐
-│  ← Quick Rate                       │
-├─────────────────────────────────────┤
-│  How would you rate it tonight?     │
-│                                     │
-│     ☆   ☆   ☆   ☆   ☆             │
-│    (tap to select 1-5 stars)        │
-│                                     │
-│  [x] Post anonymously               │
-│                                     │
-│  [Cancel]        [Rate ★]           │
-│                                     │
-│       Expires at 5am ✨              │
-└─────────────────────────────────────┘
-```
-
-**Selection screen update (3 columns):**
-```
-┌─────────────────────────────────────┐
-│  Add to Tonight's Buzz              │
-├─────────────────────────────────────┤
-│ Everyone at [Venue] can see this    │
-│                                     │
-│ ┌─────────┐ ┌─────────┐ ┌─────────┐ │
-│ │ 📷      │ │ 💬      │ │ ⭐      │ │
-│ │ Share a │ │ Quick   │ │ Quick   │ │
-│ │ Clip    │ │ Vibe    │ │ Rate    │ │
-│ │photo/vid│ │text msg │ │ 1-5 ★   │ │
-│ └─────────┘ └─────────┘ └─────────┘ │
-└─────────────────────────────────────┘
-```
-
----
-
-### 3. Update BuzzItem Component
-
-**File: `src/components/BuzzItem.tsx`**
-
-- Add `star_rating` to the `TextBuzzItem` interface (or create new `RatingBuzzItem` type)
-- Render star display when `star_rating` is present
-- Show filled stars (★) for the rating value
-
-**Display examples:**
-- Rating only: `★★★★☆ • Anonymous • 2h ago`
-- Rating + text: `★★★★★ "Great DJ tonight!" • John • 1h ago`
-
----
-
-### 4. Update VenueIdCard Fetching
+### Changes Required
 
 **File: `src/components/VenueIdCard.tsx`**
 
-- Update `fetchBuzzItems` to include `star_rating` in the select query
-- Update `BuzzItemData` interface to include `star_rating`
+1. **Add state for buzz media photos**
+   ```typescript
+   const [buzzMediaPhotos, setBuzzMediaPhotos] = useState<string[]>([]);
+   ```
+
+2. **Update `fetchBuzzItems` to extract image URLs**
+   After fetching `mediaClips`, extract image URLs and store them:
+   ```typescript
+   // Extract image URLs from buzz media clips for carousel
+   const buzzImageUrls = (mediaClips || [])
+     .filter(c => c.media_type === 'image' && c.media_url)
+     .map(c => c.media_url);
+   setBuzzMediaPhotos(buzzImageUrls);
+   ```
+
+3. **Combine photos for carousel**
+   Create a combined photos array that shows buzz photos first (more recent/relevant), then Google photos:
+   ```typescript
+   const allCarouselPhotos = [...buzzMediaPhotos, ...googlePhotos];
+   ```
+
+4. **Update carousel rendering**
+   - Replace `googlePhotos` with `allCarouselPhotos` in the carousel
+   - Optionally add a small badge/indicator on buzz photos to show they're from tonight
+   - Handle the empty state when neither exists
 
 ---
 
-## Technical Details
+## Visual Design
 
-### Database Schema Change
-| Column | Type | Nullable | Check |
-|--------|------|----------|-------|
-| star_rating | smallint | YES | 1-5 |
-| text | text | YES (was NOT NULL) | - |
-
-### New State in DropVibeDialog
-```typescript
-const [selectedRating, setSelectedRating] = useState<number>(0);
-const [rateAnonymous, setRateAnonymous] = useState(true);
+### Carousel with mixed content:
+```text
+┌─────────────────────────────────────┐
+│ [Tonight's Buzz Photo 1]            │
+│                                     │
+│                    ○ ● ○ ○ ○        │  ← Dots indicate slide position
+│              🔥 Tonight's Buzz      │  ← Optional badge on user photos
+└─────────────────────────────────────┘
+     ◄                           ►
 ```
 
-### Star Rating Component (inline)
-```typescript
-// Render 5 stars, filled up to selectedRating
-{[1, 2, 3, 4, 5].map((star) => (
-  <button
-    key={star}
-    onClick={() => setSelectedRating(star)}
-    className={`text-3xl transition-all ${
-      star <= selectedRating ? 'text-yellow-400' : 'text-white/30'
-    }`}
-  >
-    ★
-  </button>
-))}
-```
+### Photo ordering:
+1. Tonight's Buzz photos (newest first) - shows current vibe
+2. Google Place photos - shows venue aesthetic
 
-### Submit Handler for Rating
-```typescript
-const handleSubmitRating = async () => {
-  if (selectedRating === 0 || !user) return;
-
-  setUploading(true);
-  try {
-    const { error } = await supabase
-      .from('venue_buzz_messages')
-      .insert({
-        user_id: user.id,
-        venue_id: venueId,
-        venue_name: venueName,
-        text: '', // Empty for rating-only
-        star_rating: selectedRating,
-        is_anonymous: rateAnonymous,
-        expires_at: calculateExpiryTime(),
-      });
-
-    if (error) throw error;
-
-    haptic.success();
-    toast.success('Rating added to Tonight\'s Buzz! ⭐');
-    onVibeSubmitted?.();
-    handleClose();
-  } catch (error) {
-    console.error('Error posting rating:', error);
-    toast.error('Failed to submit rating');
-  } finally {
-    setUploading(false);
-  }
-};
-```
+### Optional: Visual differentiation
+- Add a small "Tonight" pill badge on user-contributed photos
+- Or a subtle gradient/border color difference
 
 ---
 
@@ -170,8 +79,19 @@ const handleSubmitRating = async () => {
 
 | File | Change |
 |------|--------|
-| Database | Add `star_rating` column, make `text` nullable |
-| `src/components/DropVibeDialog.tsx` | Add Quick Rate view mode and submission |
-| `src/components/BuzzItem.tsx` | Display star ratings |
-| `src/components/VenueIdCard.tsx` | Fetch star_rating in query, update types |
+| `src/components/VenueIdCard.tsx` | Extract buzz media URLs, combine with Google photos in carousel |
+
+---
+
+## Considerations
+
+### Videos
+Currently the carousel only displays images. Videos from Tonight's Buzz could either:
+1. Be included as thumbnail previews that open fullscreen on tap
+2. Be excluded from the carousel and only shown in the Buzz section (simpler)
+
+For this implementation, I recommend **starting with images only** in the carousel - videos can remain in the Buzz section since they need playback controls.
+
+### Performance
+No additional API calls needed - the media clips are already fetched for the Tonight's Buzz section.
 
