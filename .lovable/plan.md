@@ -1,126 +1,108 @@
 
-# Fix Missing Photos on Venue ID Cards
+# Fix Find Friends Skip Flow Bug
 
 ## Problem
-Venue ID cards are missing pictures because:
-1. **Early return on error** - When the edge function returns an error, the code returns early and never attempts to set photos (even from cached database data)
-2. **Authentication required** - The `get-venue-hours` edge function requires authentication, so unauthenticated users see no photos
-3. **Inconsistent response handling** - The API response structure isn't being safely extracted
+When users try to skip the Find Friends onboarding step, clicking "Skip anyway" on the confirmation dialog sends them backwards or shows a login form instead of completing onboarding and entering the main app.
+
+## Root Cause
+The skip confirmation flow has a race condition:
+1. `handleConfirmSkip()` closes the Dialog and calls `onSkip()` without waiting
+2. `onSkip()` → `completeOnboarding()` is async but not awaited
+3. The Dialog's close animation/state change can cause re-renders before the database update completes
+4. This can trigger the onboarding check to run again, finding `has_onboarded` still false
 
 ## Solution
-Implement two fixes:
-
-1. **Fallback to database-cached photos** when the edge function fails
-2. **Add safe response extraction** to handle API response variations
+Fix the async handling and ensure the onboarding state is updated before closing the dialog.
 
 ---
 
 ## Technical Changes
 
-### File: `src/components/VenueIdCard.tsx`
+### File: `src/components/FindFriendsOnboarding.tsx`
 
-**1. Modify `fetchVenueHours` to not early-return on error (lines 120-166)**
+**1. Prevent Dialog from interfering with the skip flow (line 447)**
 
-Instead of returning early on error, continue to attempt using any cached data:
+Change the Dialog's `onOpenChange` to prevent closing during the skip action:
 
 ```typescript
-const fetchVenueHours = async () => {
-  if (!selectedVenueId) return;
+// Add state to track skip in progress
+const [skipInProgress, setSkipInProgress] = useState(false);
+```
 
-  setLoadingHours(true);
+**2. Update `handleConfirmSkip` to be async and set loading state (lines 229-233)**
+
+```typescript
+const handleConfirmSkip = async () => {
+  setSkipInProgress(true);
+  haptic.light();
+  
+  // Complete onboarding FIRST, then close dialog
+  await onSkip();
+  
+  setShowSkipConfirmation(false);
+  setSkipInProgress(false);
+};
+```
+
+**3. Update Dialog onOpenChange to prevent close during skip (line 447)**
+
+```typescript
+<Dialog 
+  open={showSkipConfirmation} 
+  onOpenChange={(open) => {
+    // Don't allow closing if skip is in progress
+    if (!skipInProgress) {
+      setShowSkipConfirmation(open);
+    }
+  }}
+>
+```
+
+**4. Disable buttons during skip to prevent double-clicks (lines 467-478)**
+
+```typescript
+<Button
+  onClick={() => setShowSkipConfirmation(false)}
+  disabled={skipInProgress}
+  className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold rounded-full py-5"
+>
+  Add Friends First
+</Button>
+<button
+  onClick={handleConfirmSkip}
+  disabled={skipInProgress}
+  className="w-full text-white/50 hover:text-white py-2 transition-colors text-sm disabled:opacity-50"
+>
+  {skipInProgress ? 'Please wait...' : 'Skip anyway'}
+</button>
+```
+
+---
+
+### File: `src/hooks/useOnboarding.ts`
+
+**5. Make `completeOnboarding` return a Promise that resolves after state update (lines 35-46)**
+
+```typescript
+const completeOnboarding = async () => {
   try {
-    const { data, error } = await supabase.functions.invoke('get-venue-hours', {
-      body: { venueId: selectedVenueId }
-    });
+    const { error } = await supabase
+      .from('profiles')
+      .update({ has_onboarded: true })
+      .eq('id', user?.id);
 
     if (error) {
-      console.error('Error fetching venue hours:', error);
-      // Don't return early - try to load cached data from database
-      await fetchCachedVenuePhotos();
-      return;
+      console.error('Error completing onboarding:', error);
+      throw error;
     }
 
-    // Safe extraction of response data
-    if (data?.operating_hours) {
-      const hoursDisplay = getHoursDisplayString(data.operating_hours as VenueHours);
-      setVenueHours(hoursDisplay);
-    } else {
-      setVenueHours(null);
-    }
-
-    // Set Google data with safe extraction
-    const photos = extractArraySafe(data, 'google_photo_refs');
-    setGooglePhotos(photos);
-
-    if (data?.google_rating) {
-      setGoogleRating(data.google_rating);
-    } else {
-      setGoogleRating(null);
-    }
-
-    if (data?.google_user_ratings_total) {
-      setGoogleRatingsCount(data.google_user_ratings_total);
-    } else {
-      setGoogleRatingsCount(0);
-    }
+    setShowOnboarding(false);
   } catch (error) {
-    console.error('Error fetching venue hours:', error);
-    // Fallback to cached data
-    await fetchCachedVenuePhotos();
-  } finally {
-    setLoadingHours(false);
+    console.error('Error completing onboarding:', error);
+    // Still hide onboarding on error to prevent user from being stuck
+    setShowOnboarding(false);
+    throw error;
   }
-};
-```
-
-**2. Add fallback function to fetch cached photos from venues table (new function)**
-
-```typescript
-const fetchCachedVenuePhotos = async () => {
-  if (!selectedVenueId) return;
-  
-  try {
-    const { data: venueData } = await supabase
-      .from('venues')
-      .select('google_photo_refs, google_rating, google_user_ratings_total, operating_hours')
-      .eq('id', selectedVenueId)
-      .single();
-    
-    if (venueData) {
-      // Set cached photos if available
-      if (venueData.google_photo_refs && Array.isArray(venueData.google_photo_refs)) {
-        setGooglePhotos(venueData.google_photo_refs);
-      }
-      
-      if (venueData.google_rating) {
-        setGoogleRating(venueData.google_rating);
-      }
-      
-      if (venueData.google_user_ratings_total) {
-        setGoogleRatingsCount(venueData.google_user_ratings_total);
-      }
-      
-      if (venueData.operating_hours) {
-        const hoursDisplay = getHoursDisplayString(venueData.operating_hours as VenueHours);
-        setVenueHours(hoursDisplay);
-      }
-    }
-  } catch (err) {
-    console.error('Error fetching cached venue photos:', err);
-  }
-};
-```
-
-**3. Add safe array extraction helper (near top of component)**
-
-```typescript
-// Safe extraction helper for API responses
-const extractArraySafe = (response: unknown, key: string): string[] => {
-  if (!response || typeof response !== 'object') return [];
-  const r = response as Record<string, unknown>;
-  const value = r[key];
-  if (Array.isArray(value)) return value;
-  return [];
 };
 ```
 
@@ -129,24 +111,21 @@ const extractArraySafe = (response: unknown, key: string): string[] => {
 ## Flow After Fix
 
 ```text
-User opens Venue ID Card
+User clicks "Skip anyway"
         |
         v
-fetchVenueHours() called
+setSkipInProgress(true)
         |
         v
-Edge function succeeds? ----Yes----> Set photos from response
-        |
-        No (auth error, etc.)
-        |
-        v
-fetchCachedVenuePhotos() called
+await onSkip() (completeOnboarding)
+   - Updates database
+   - Sets showOnboarding = false
         |
         v
-Load photos from venues table
+setShowSkipConfirmation(false)
         |
         v
-Photos display (if cached)
+Main app renders (onboarding complete)
 ```
 
 ---
@@ -155,4 +134,5 @@ Photos display (if cached)
 
 | File | Change |
 |------|--------|
-| `src/components/VenueIdCard.tsx` | Add fallback to cached photos, safe extraction helper |
+| `src/components/FindFriendsOnboarding.tsx` | Add async handling, loading state, prevent dialog close during skip |
+| `src/hooks/useOnboarding.ts` | Improve error handling in completeOnboarding |
