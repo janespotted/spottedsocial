@@ -117,6 +117,50 @@ export function VenueIdCard() {
     }
   }, [venue?.id]);
 
+  // Safe extraction helper for API responses
+  const extractArraySafe = (response: unknown, key: string): string[] => {
+    if (!response || typeof response !== 'object') return [];
+    const r = response as Record<string, unknown>;
+    const value = r[key];
+    if (Array.isArray(value)) return value;
+    return [];
+  };
+
+  // Fallback function to fetch cached photos from venues table
+  const fetchCachedVenuePhotos = async () => {
+    if (!selectedVenueId) return;
+    
+    try {
+      const { data: venueData } = await supabase
+        .from('venues')
+        .select('google_photo_refs, google_rating, google_user_ratings_total, operating_hours')
+        .eq('id', selectedVenueId)
+        .single();
+      
+      if (venueData) {
+        // Set cached photos if available
+        if (venueData.google_photo_refs && Array.isArray(venueData.google_photo_refs)) {
+          setGooglePhotos(venueData.google_photo_refs.filter((p): p is string => typeof p === 'string'));
+        }
+        
+        if (venueData.google_rating) {
+          setGoogleRating(venueData.google_rating);
+        }
+        
+        if (venueData.google_user_ratings_total) {
+          setGoogleRatingsCount(venueData.google_user_ratings_total);
+        }
+        
+        if (venueData.operating_hours) {
+          const hoursDisplay = getHoursDisplayString(venueData.operating_hours as VenueHours);
+          setVenueHours(hoursDisplay);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching cached venue photos:', err);
+    }
+  };
+
   const fetchVenueHours = async () => {
     if (!selectedVenueId) return;
 
@@ -128,10 +172,12 @@ export function VenueIdCard() {
 
       if (error) {
         console.error('Error fetching venue hours:', error);
-        setVenueHours(null);
+        // Don't return early - try to load cached data from database
+        await fetchCachedVenuePhotos();
         return;
       }
 
+      // Safe extraction of response data
       if (data?.operating_hours) {
         const hoursDisplay = getHoursDisplayString(data.operating_hours as VenueHours);
         setVenueHours(hoursDisplay);
@@ -139,12 +185,9 @@ export function VenueIdCard() {
         setVenueHours(null);
       }
 
-      // Set Google data
-      if (data?.google_photo_refs && Array.isArray(data.google_photo_refs)) {
-        setGooglePhotos(data.google_photo_refs);
-      } else {
-        setGooglePhotos([]);
-      }
+      // Set Google data with safe extraction
+      const photos = extractArraySafe(data, 'google_photo_refs');
+      setGooglePhotos(photos);
 
       if (data?.google_rating) {
         setGoogleRating(data.google_rating);
@@ -159,7 +202,8 @@ export function VenueIdCard() {
       }
     } catch (error) {
       console.error('Error fetching venue hours:', error);
-      setVenueHours(null);
+      // Fallback to cached data
+      await fetchCachedVenuePhotos();
     } finally {
       setLoadingHours(false);
     }
