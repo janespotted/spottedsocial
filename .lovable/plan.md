@@ -1,131 +1,167 @@
 
-# Fix Find Friends Skip Flow Bug
 
-## Problem
-When users try to skip the Find Friends onboarding step, clicking "Skip anyway" on the confirmation dialog sends them backwards or shows a login form instead of completing onboarding and entering the main app.
+# Add Quick Star Rating to Tonight's Buzz
 
-## Root Cause
-The skip confirmation flow has a race condition:
-1. `handleConfirmSkip()` closes the Dialog and calls `onSkip()` without waiting
-2. `onSkip()` → `completeOnboarding()` is async but not awaited
-3. The Dialog's close animation/state change can cause re-renders before the database update completes
-4. This can trigger the onboarding check to run again, finding `has_onboarded` still false
-
-## Solution
-Fix the async handling and ensure the onboarding state is updated before closing the dialog.
+## Overview
+Add a third "Quick Rate" option to the Drop Vibe dialog that lets users rate a venue 1-5 stars with a single tap. This rating is ephemeral (expires at 5am like all buzz content) and provides a fast way for users to indicate venue quality.
 
 ---
 
-## Technical Changes
+## Changes Required
 
-### File: `src/components/FindFriendsOnboarding.tsx`
+### 1. Database Migration
+Add a `star_rating` column to `venue_buzz_messages` table:
 
-**1. Prevent Dialog from interfering with the skip flow (line 447)**
-
-Change the Dialog's `onOpenChange` to prevent closing during the skip action:
-
-```typescript
-// Add state to track skip in progress
-const [skipInProgress, setSkipInProgress] = useState(false);
+```sql
+ALTER TABLE venue_buzz_messages 
+ADD COLUMN star_rating smallint CHECK (star_rating >= 1 AND star_rating <= 5);
 ```
 
-**2. Update `handleConfirmSkip` to be async and set loading state (lines 229-233)**
+This makes `text` no longer strictly required when a star rating is present (will handle in code by inserting empty string or special marker).
 
-```typescript
-const handleConfirmSkip = async () => {
-  setSkipInProgress(true);
-  haptic.light();
-  
-  // Complete onboarding FIRST, then close dialog
-  await onSkip();
-  
-  setShowSkipConfirmation(false);
-  setSkipInProgress(false);
-};
-```
-
-**3. Update Dialog onOpenChange to prevent close during skip (line 447)**
-
-```typescript
-<Dialog 
-  open={showSkipConfirmation} 
-  onOpenChange={(open) => {
-    // Don't allow closing if skip is in progress
-    if (!skipInProgress) {
-      setShowSkipConfirmation(open);
-    }
-  }}
->
-```
-
-**4. Disable buttons during skip to prevent double-clicks (lines 467-478)**
-
-```typescript
-<Button
-  onClick={() => setShowSkipConfirmation(false)}
-  disabled={skipInProgress}
-  className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold rounded-full py-5"
->
-  Add Friends First
-</Button>
-<button
-  onClick={handleConfirmSkip}
-  disabled={skipInProgress}
-  className="w-full text-white/50 hover:text-white py-2 transition-colors text-sm disabled:opacity-50"
->
-  {skipInProgress ? 'Please wait...' : 'Skip anyway'}
-</button>
+Also need to update the table to allow empty text when star_rating is provided:
+```sql
+-- Make text nullable or allow empty string for rating-only submissions
+ALTER TABLE venue_buzz_messages 
+ALTER COLUMN text DROP NOT NULL;
 ```
 
 ---
 
-### File: `src/hooks/useOnboarding.ts`
+### 2. Update DropVibeDialog Component
 
-**5. Make `completeOnboarding` return a Promise that resolves after state update (lines 35-46)**
+**File: `src/components/DropVibeDialog.tsx`**
 
+Add a third view mode and star rating functionality:
+
+- Update `ViewMode` type to include `'rate'`
+- Add `selectedRating` state (1-5)
+- Add `rateAnonymous` state (default true, like Quick Vibe)
+- Add third button on selection screen with Star icon
+- Create "Quick Rate" view with 5 tappable stars
+- Add submit handler for rating-only buzz
+
+**UI Design for Quick Rate view:**
+```
+┌─────────────────────────────────────┐
+│  ← Quick Rate                       │
+├─────────────────────────────────────┤
+│  How would you rate it tonight?     │
+│                                     │
+│     ☆   ☆   ☆   ☆   ☆             │
+│    (tap to select 1-5 stars)        │
+│                                     │
+│  [x] Post anonymously               │
+│                                     │
+│  [Cancel]        [Rate ★]           │
+│                                     │
+│       Expires at 5am ✨              │
+└─────────────────────────────────────┘
+```
+
+**Selection screen update (3 columns):**
+```
+┌─────────────────────────────────────┐
+│  Add to Tonight's Buzz              │
+├─────────────────────────────────────┤
+│ Everyone at [Venue] can see this    │
+│                                     │
+│ ┌─────────┐ ┌─────────┐ ┌─────────┐ │
+│ │ 📷      │ │ 💬      │ │ ⭐      │ │
+│ │ Share a │ │ Quick   │ │ Quick   │ │
+│ │ Clip    │ │ Vibe    │ │ Rate    │ │
+│ │photo/vid│ │text msg │ │ 1-5 ★   │ │
+│ └─────────┘ └─────────┘ └─────────┘ │
+└─────────────────────────────────────┘
+```
+
+---
+
+### 3. Update BuzzItem Component
+
+**File: `src/components/BuzzItem.tsx`**
+
+- Add `star_rating` to the `TextBuzzItem` interface (or create new `RatingBuzzItem` type)
+- Render star display when `star_rating` is present
+- Show filled stars (★) for the rating value
+
+**Display examples:**
+- Rating only: `★★★★☆ • Anonymous • 2h ago`
+- Rating + text: `★★★★★ "Great DJ tonight!" • John • 1h ago`
+
+---
+
+### 4. Update VenueIdCard Fetching
+
+**File: `src/components/VenueIdCard.tsx`**
+
+- Update `fetchBuzzItems` to include `star_rating` in the select query
+- Update `BuzzItemData` interface to include `star_rating`
+
+---
+
+## Technical Details
+
+### Database Schema Change
+| Column | Type | Nullable | Check |
+|--------|------|----------|-------|
+| star_rating | smallint | YES | 1-5 |
+| text | text | YES (was NOT NULL) | - |
+
+### New State in DropVibeDialog
 ```typescript
-const completeOnboarding = async () => {
+const [selectedRating, setSelectedRating] = useState<number>(0);
+const [rateAnonymous, setRateAnonymous] = useState(true);
+```
+
+### Star Rating Component (inline)
+```typescript
+// Render 5 stars, filled up to selectedRating
+{[1, 2, 3, 4, 5].map((star) => (
+  <button
+    key={star}
+    onClick={() => setSelectedRating(star)}
+    className={`text-3xl transition-all ${
+      star <= selectedRating ? 'text-yellow-400' : 'text-white/30'
+    }`}
+  >
+    ★
+  </button>
+))}
+```
+
+### Submit Handler for Rating
+```typescript
+const handleSubmitRating = async () => {
+  if (selectedRating === 0 || !user) return;
+
+  setUploading(true);
   try {
     const { error } = await supabase
-      .from('profiles')
-      .update({ has_onboarded: true })
-      .eq('id', user?.id);
+      .from('venue_buzz_messages')
+      .insert({
+        user_id: user.id,
+        venue_id: venueId,
+        venue_name: venueName,
+        text: '', // Empty for rating-only
+        star_rating: selectedRating,
+        is_anonymous: rateAnonymous,
+        expires_at: calculateExpiryTime(),
+      });
 
-    if (error) {
-      console.error('Error completing onboarding:', error);
-      throw error;
-    }
+    if (error) throw error;
 
-    setShowOnboarding(false);
+    haptic.success();
+    toast.success('Rating added to Tonight\'s Buzz! ⭐');
+    onVibeSubmitted?.();
+    handleClose();
   } catch (error) {
-    console.error('Error completing onboarding:', error);
-    // Still hide onboarding on error to prevent user from being stuck
-    setShowOnboarding(false);
-    throw error;
+    console.error('Error posting rating:', error);
+    toast.error('Failed to submit rating');
+  } finally {
+    setUploading(false);
   }
 };
-```
-
----
-
-## Flow After Fix
-
-```text
-User clicks "Skip anyway"
-        |
-        v
-setSkipInProgress(true)
-        |
-        v
-await onSkip() (completeOnboarding)
-   - Updates database
-   - Sets showOnboarding = false
-        |
-        v
-setShowSkipConfirmation(false)
-        |
-        v
-Main app renders (onboarding complete)
 ```
 
 ---
@@ -134,5 +170,8 @@ Main app renders (onboarding complete)
 
 | File | Change |
 |------|--------|
-| `src/components/FindFriendsOnboarding.tsx` | Add async handling, loading state, prevent dialog close during skip |
-| `src/hooks/useOnboarding.ts` | Improve error handling in completeOnboarding |
+| Database | Add `star_rating` column, make `text` nullable |
+| `src/components/DropVibeDialog.tsx` | Add Quick Rate view mode and submission |
+| `src/components/BuzzItem.tsx` | Display star ratings |
+| `src/components/VenueIdCard.tsx` | Fetch star_rating in query, update types |
+
