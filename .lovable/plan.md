@@ -1,101 +1,153 @@
 
-# Fix Chat Dialog Loading Delay
+# Fix Missing Photos on Venue ID Cards
 
 ## Problem
-When opening the "Start a Chat" dialog, there's a noticeable delay before friends appear due to:
-1. Unnecessary auth session retry loop (up to 1 second wait)
-2. Sequential database calls for each friend's venue status (N+1 query problem)
+Venue ID cards are missing pictures because:
+1. **Early return on error** - When the edge function returns an error, the code returns early and never attempts to set photos (even from cached database data)
+2. **Authentication required** - The `get-venue-hours` edge function requires authentication, so unauthenticated users see no photos
+3. **Inconsistent response handling** - The API response structure isn't being safely extracted
 
 ## Solution
-Optimize the data fetching to be faster and show content immediately.
+Implement two fixes:
+
+1. **Fallback to database-cached photos** when the edge function fails
+2. **Add safe response extraction** to handle API response variations
 
 ---
 
 ## Technical Changes
 
-### File: `src/components/messages/NewChatDialog.tsx`
+### File: `src/components/VenueIdCard.tsx`
 
-**1. Remove unnecessary auth wait for fetching friends**
+**1. Modify `fetchVenueHours` to not early-return on error (lines 120-166)**
 
-The `waitForAuthSession` function is only needed when creating a thread, not when fetching friends. The `fetchFriends` call already has the user available.
-
-**2. Batch venue status queries**
-
-Instead of querying each friend's venue status individually, fetch all venue statuses in a single query and match them client-side.
-
-**Lines 86-149** - Optimize fetchFriends function:
+Instead of returning early on error, continue to attempt using any cached data:
 
 ```typescript
-const fetchFriends = async () => {
-  // Get accepted friendships (both directions)
-  const { data: sentFriendships } = await supabase
-    .from('friendships')
-    .select('friend_id')
-    .eq('user_id', user?.id)
-    .eq('status', 'accepted');
+const fetchVenueHours = async () => {
+  if (!selectedVenueId) return;
 
-  const { data: receivedFriendships } = await supabase
-    .from('friendships')
-    .select('user_id')
-    .eq('friend_id', user?.id)
-    .eq('status', 'accepted');
+  setLoadingHours(true);
+  try {
+    const { data, error } = await supabase.functions.invoke('get-venue-hours', {
+      body: { venueId: selectedVenueId }
+    });
 
-  const friendIds = [
-    ...(sentFriendships?.map(f => f.friend_id) || []),
-    ...(receivedFriendships?.map(f => f.user_id) || [])
-  ];
+    if (error) {
+      console.error('Error fetching venue hours:', error);
+      // Don't return early - try to load cached data from database
+      await fetchCachedVenuePhotos();
+      return;
+    }
 
-  if (friendIds.length === 0) {
-    setFriends([]);
-    return;
+    // Safe extraction of response data
+    if (data?.operating_hours) {
+      const hoursDisplay = getHoursDisplayString(data.operating_hours as VenueHours);
+      setVenueHours(hoursDisplay);
+    } else {
+      setVenueHours(null);
+    }
+
+    // Set Google data with safe extraction
+    const photos = extractArraySafe(data, 'google_photo_refs');
+    setGooglePhotos(photos);
+
+    if (data?.google_rating) {
+      setGoogleRating(data.google_rating);
+    } else {
+      setGoogleRating(null);
+    }
+
+    if (data?.google_user_ratings_total) {
+      setGoogleRatingsCount(data.google_user_ratings_total);
+    } else {
+      setGoogleRatingsCount(0);
+    }
+  } catch (error) {
+    console.error('Error fetching venue hours:', error);
+    // Fallback to cached data
+    await fetchCachedVenuePhotos();
+  } finally {
+    setLoadingHours(false);
   }
+};
+```
 
-  // Fetch profiles and venue statuses in parallel
-  const [profilesResult, statusesResult] = await Promise.all([
-    supabase.rpc('get_profiles_safe'),
-    supabase
-      .from('night_statuses')
-      .select('user_id, venue_name')
-      .in('user_id', friendIds)
-  ]);
+**2. Add fallback function to fetch cached photos from venues table (new function)**
 
-  let profiles = (profilesResult.data || []).filter((p: any) => friendIds.includes(p.id));
+```typescript
+const fetchCachedVenuePhotos = async () => {
+  if (!selectedVenueId) return;
   
-  if (!demoEnabled) {
-    profiles = profiles.filter((p: any) => p.is_demo === false);
+  try {
+    const { data: venueData } = await supabase
+      .from('venues')
+      .select('google_photo_refs, google_rating, google_user_ratings_total, operating_hours')
+      .eq('id', selectedVenueId)
+      .single();
+    
+    if (venueData) {
+      // Set cached photos if available
+      if (venueData.google_photo_refs && Array.isArray(venueData.google_photo_refs)) {
+        setGooglePhotos(venueData.google_photo_refs);
+      }
+      
+      if (venueData.google_rating) {
+        setGoogleRating(venueData.google_rating);
+      }
+      
+      if (venueData.google_user_ratings_total) {
+        setGoogleRatingsCount(venueData.google_user_ratings_total);
+      }
+      
+      if (venueData.operating_hours) {
+        const hoursDisplay = getHoursDisplayString(venueData.operating_hours as VenueHours);
+        setVenueHours(hoursDisplay);
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching cached venue photos:', err);
   }
+};
+```
 
-  // Deduplicate by display_name
-  const seenNames = new Set<string>();
-  const uniqueProfiles = profiles.filter(profile => {
-    if (seenNames.has(profile.display_name)) return false;
-    seenNames.add(profile.display_name);
-    return true;
-  });
+**3. Add safe array extraction helper (near top of component)**
 
-  // Create venue status lookup map
-  const venueMap = new Map(
-    (statusesResult.data || []).map(s => [s.user_id, s.venue_name])
-  );
-
-  // Map profiles with venue info (no additional queries)
-  const friendsData = uniqueProfiles.map(profile => ({
-    ...profile,
-    venue_name: venueMap.get(profile.id) || null,
-  }));
-
-  setFriends(friendsData);
+```typescript
+// Safe extraction helper for API responses
+const extractArraySafe = (response: unknown, key: string): string[] => {
+  if (!response || typeof response !== 'object') return [];
+  const r = response as Record<string, unknown>;
+  const value = r[key];
+  if (Array.isArray(value)) return value;
+  return [];
 };
 ```
 
 ---
 
-## Performance Improvement
+## Flow After Fix
 
-| Metric | Before | After |
-|--------|--------|-------|
-| Database queries | 2 + N (one per friend) | 4 total (parallel) |
-| Time for 10 friends | ~1-2 seconds | ~200-300ms |
+```text
+User opens Venue ID Card
+        |
+        v
+fetchVenueHours() called
+        |
+        v
+Edge function succeeds? ----Yes----> Set photos from response
+        |
+        No (auth error, etc.)
+        |
+        v
+fetchCachedVenuePhotos() called
+        |
+        v
+Load photos from venues table
+        |
+        v
+Photos display (if cached)
+```
 
 ---
 
@@ -103,4 +155,4 @@ const fetchFriends = async () => {
 
 | File | Change |
 |------|--------|
-| `src/components/messages/NewChatDialog.tsx` | Batch venue status queries using `Promise.all` and `Map` lookup |
+| `src/components/VenueIdCard.tsx` | Add fallback to cached photos, safe extraction helper |
