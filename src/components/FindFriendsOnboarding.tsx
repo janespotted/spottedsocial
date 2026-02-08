@@ -40,6 +40,7 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
   const [friendsAddedCount, setFriendsAddedCount] = useState(0);
   const [inviteSentCount, setInviteSentCount] = useState(0);
   const [showSkipConfirmation, setShowSkipConfirmation] = useState(false);
+  const [skipInProgress, setSkipInProgress] = useState(false);
 
   // Check if requirement is met
   const requirementMet = friendsAddedCount >= REQUIRED_FRIENDS || inviteSentCount >= REQUIRED_INVITES;
@@ -226,10 +227,15 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
     }
   };
 
-  const handleConfirmSkip = () => {
-    setShowSkipConfirmation(false);
+  const handleConfirmSkip = async () => {
+    setSkipInProgress(true);
     haptic.light();
-    onSkip();
+    
+    // Complete onboarding FIRST, then close dialog
+    await onSkip();
+    
+    setShowSkipConfirmation(false);
+    setSkipInProgress(false);
   };
 
   // Progress indicator text
@@ -444,7 +450,15 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
       />
 
       {/* Skip Confirmation Modal */}
-      <Dialog open={showSkipConfirmation} onOpenChange={setShowSkipConfirmation}>
+      <Dialog 
+        open={showSkipConfirmation} 
+        onOpenChange={(open) => {
+          // Don't allow closing if skip is in progress
+          if (!skipInProgress) {
+            setShowSkipConfirmation(open);
+          }
+        }}
+      >
         <DialogOverlay className="bg-black/80 backdrop-blur-sm z-[200]" />
         <DialogContent className="max-w-[340px] bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 rounded-3xl p-6 z-[200]" aria-describedby={undefined}>
           <VisuallyHidden>
@@ -466,15 +480,17 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
             <div className="space-y-3">
               <Button
                 onClick={() => setShowSkipConfirmation(false)}
+                disabled={skipInProgress}
                 className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold rounded-full py-5"
               >
                 Add Friends First
               </Button>
               <button
                 onClick={handleConfirmSkip}
-                className="w-full text-white/50 hover:text-white py-2 transition-colors text-sm"
+                disabled={skipInProgress}
+                className="w-full text-white/50 hover:text-white py-2 transition-colors text-sm disabled:opacity-50"
               >
-                Skip anyway
+                {skipInProgress ? 'Please wait...' : 'Skip anyway'}
               </button>
             </div>
           </div>
