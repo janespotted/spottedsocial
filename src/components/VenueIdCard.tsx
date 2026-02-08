@@ -92,6 +92,7 @@ export function VenueIdCard() {
   const [venueHours, setVenueHours] = useState<VenueHoursDisplay | null>(null);
   const [loadingHours, setLoadingHours] = useState(false);
   const [googlePhotos, setGooglePhotos] = useState<string[]>([]);
+  const [buzzMediaPhotos, setBuzzMediaPhotos] = useState<string[]>([]);
   const [googleRating, setGoogleRating] = useState<number | null>(null);
   const [googleRatingsCount, setGoogleRatingsCount] = useState<number>(0);
   const [similarVenues, setSimilarVenues] = useState<Array<{
@@ -471,6 +472,12 @@ export function VenueIdCard() {
         profile: profilesMap[v.user_id],
       }));
 
+      // Extract image URLs from buzz media clips for carousel
+      const buzzImageUrls = (mediaClips || [])
+        .filter(c => c.media_type === 'image' && c.media_url)
+        .map(c => c.media_url);
+      setBuzzMediaPhotos(buzzImageUrls);
+
       const mediaItems: BuzzItemData[] = (mediaClips || []).map(c => ({
         type: 'media' as const,
         id: c.id,
@@ -681,39 +688,53 @@ export function VenueIdCard() {
                 </DropdownMenu>
                 <div className="flex-1 min-h-0 overflow-y-auto">
                   <div className="p-5">
-              {/* Photo Carousel */}
-              {googlePhotos.length > 0 ? (
-                <div className="relative mb-4 -mx-5 -mt-5">
-                  <Carousel className="w-full">
-                    <CarouselContent>
-                      {googlePhotos.map((photoUrl, index) => (
-                        <CarouselItem key={index}>
-                          <div className="relative w-full h-56 overflow-hidden">
-                            <img
-                              src={photoUrl}
-                              alt={`${venue.name} photo ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                            {/* Dark gradient overlay at bottom */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                          </div>
-                        </CarouselItem>
-                      ))}
-                    </CarouselContent>
-                    {googlePhotos.length > 1 && (
-                      <>
-                        <CarouselPrevious className="left-2 bg-white/90 hover:bg-white border-none" />
-                        <CarouselNext className="right-2 bg-white/90 hover:bg-white border-none" />
-                      </>
-                    )}
-                  </Carousel>
-                </div>
-              ) : (
-                /* Fallback gradient if no photos */
-                <div className="relative mb-4 -mx-5 -mt-5">
-                  <div className="w-full h-56 bg-gradient-to-br from-[#a855f7]/40 to-[#d4ff00]/40" />
-                </div>
-              )}
+              {/* Photo Carousel - Buzz photos first, then Google photos */}
+              {(() => {
+                const allCarouselPhotos = [...buzzMediaPhotos, ...googlePhotos];
+                const buzzPhotoCount = buzzMediaPhotos.length;
+                
+                return allCarouselPhotos.length > 0 ? (
+                  <div className="relative mb-4 -mx-5 -mt-5">
+                    <Carousel className="w-full">
+                      <CarouselContent>
+                        {allCarouselPhotos.map((photoUrl, index) => {
+                          const isBuzzPhoto = index < buzzPhotoCount;
+                          return (
+                            <CarouselItem key={index}>
+                              <div className="relative w-full h-56 overflow-hidden">
+                                <img
+                                  src={photoUrl}
+                                  alt={`${venue.name} photo ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                {/* Dark gradient overlay at bottom */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                                {/* Tonight badge for buzz photos */}
+                                {isBuzzPhoto && (
+                                  <span className="absolute top-3 left-3 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#a855f7]/80 text-white backdrop-blur-sm">
+                                    🔥 Tonight
+                                  </span>
+                                )}
+                              </div>
+                            </CarouselItem>
+                          );
+                        })}
+                      </CarouselContent>
+                      {allCarouselPhotos.length > 1 && (
+                        <>
+                          <CarouselPrevious className="left-2 bg-white/90 hover:bg-white border-none" />
+                          <CarouselNext className="right-2 bg-white/90 hover:bg-white border-none" />
+                        </>
+                      )}
+                    </Carousel>
+                  </div>
+                ) : (
+                  /* Fallback gradient if no photos */
+                  <div className="relative mb-4 -mx-5 -mt-5">
+                    <div className="w-full h-56 bg-gradient-to-br from-[#a855f7]/40 to-[#d4ff00]/40" />
+                  </div>
+                );
+              })()}
 
               {/* Venue Info */}
               <div className="mb-4">
