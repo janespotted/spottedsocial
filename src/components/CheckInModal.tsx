@@ -757,11 +757,35 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     </div>
   );
 
-  const handlePrivatePartyFromVenueConfirm = () => {
+  const handlePrivatePartyFromVenueConfirm = async () => {
     // Close venue confirm and start private party flow
     setShowVenueConfirm(false);
     setSelectedStatus('private_party');
-    setShowPrivatePartyPrivacy(true);
+    
+    // Reuse the already-selected privacy tier from "I'm out" flow
+    setPrivatePartyVisibility(shareOption);
+    
+    // Skip privacy screen, go directly to neighborhood selection
+    setPrivatePartyNeighborhood(undefined);
+    setShowNeighborhoodManualSelect(false);
+    setShowPrivatePartyNeighborhood(true);
+    
+    // Auto-detect neighborhood from GPS
+    const detectedCity = await refreshCity();
+    setIsDetectingNeighborhood(true);
+    try {
+      const detectedNeighborhood = await detectNeighborhoodFromGPS(detectedCity);
+      if (detectedNeighborhood) {
+        setPrivatePartyNeighborhood(detectedNeighborhood);
+      } else {
+        setShowNeighborhoodManualSelect(true);
+      }
+    } catch (error) {
+      console.error('Failed to detect neighborhood:', error);
+      setShowNeighborhoodManualSelect(true);
+    } finally {
+      setIsDetectingNeighborhood(false);
+    }
   };
 
   const handleVenueSelect = (venueId: string) => {
