@@ -56,7 +56,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [showVenueConfirm, setShowVenueConfirm] = useState(false);
   const [showPlanningNeighborhood, setShowPlanningNeighborhood] = useState(false);
   const [showPlanningPrivacy, setShowPlanningPrivacy] = useState(false);
-  const [planningNeighborhood, setPlanningNeighborhood] = useState<string>('');
+  const [planningNeighborhood, setPlanningNeighborhood] = useState<string | undefined>(undefined);
   const [planningVisibility, setPlanningVisibility] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('all_friends');
   const [shareOption, setShareOption] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('close_friends');
   const [detectedVenue, setDetectedVenue] = useState<string>('');
@@ -74,7 +74,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [showPrivatePartyNeighborhood, setShowPrivatePartyNeighborhood] = useState(false);
   const [showPrivatePartyPrivacy, setShowPrivatePartyPrivacy] = useState(false);
   const [showPrivatePartyInvite, setShowPrivatePartyInvite] = useState(false);
-  const [privatePartyNeighborhood, setPrivatePartyNeighborhood] = useState<string>('');
+  const [privatePartyNeighborhood, setPrivatePartyNeighborhood] = useState<string | undefined>(undefined);
   const [privatePartyAddress, setPrivatePartyAddress] = useState<string>('');
   const [privatePartyVisibility, setPrivatePartyVisibility] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('close_friends');
   const [isDetectingNeighborhood, setIsDetectingNeighborhood] = useState(false);
@@ -235,7 +235,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const handlePrivatePartyPrivacyConfirm = async () => {
     setShowPrivatePartyPrivacy(false);
-    setPrivatePartyNeighborhood('');
+    setPrivatePartyNeighborhood(undefined);
     setShowNeighborhoodManualSelect(false);
     setShowPrivatePartyNeighborhood(true);
     
@@ -330,7 +330,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const handlePlanningPrivacyConfirm = async () => {
     setShowPlanningPrivacy(false);
     // Refresh city detection based on current GPS before showing neighborhoods
-    setPlanningNeighborhood('');
+    setPlanningNeighborhood(undefined);
     await refreshCity();
     setShowPlanningNeighborhood(true);
   };
@@ -808,7 +808,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             {hasMultipleVenues && (
               <div className="space-y-2">
                 <p className="text-sm text-white/60">Not right? Select another:</p>
-                <Select value={selectedVenueId || ''} onValueChange={handleVenueSelect}>
+                <Select value={selectedVenueId ?? undefined} onValueChange={handleVenueSelect}>
                   <SelectTrigger className="h-12 bg-[#1a0f2e] border border-white/20 text-white focus:ring-[#d4ff00] focus:border-[#d4ff00]">
                     <SelectValue placeholder="Select a different venue..." />
                   </SelectTrigger>
@@ -900,7 +900,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </div>
 
         <div className="space-y-4">
-          <Select value={planningNeighborhood} onValueChange={setPlanningNeighborhood}>
+          <Select value={planningNeighborhood ?? undefined} onValueChange={setPlanningNeighborhood}>
             <SelectTrigger className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#a855f7]/50 text-white focus:ring-[#a855f7] focus:border-[#a855f7]">
               <SelectValue placeholder="Select neighborhood..." />
             </SelectTrigger>
@@ -1182,7 +1182,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         <div className="h-px bg-white/20" />
 
         <div className="space-y-4">
-          <Select value={privatePartyNeighborhood} onValueChange={setPrivatePartyNeighborhood}>
+          <Select value={privatePartyNeighborhood ?? undefined} onValueChange={setPrivatePartyNeighborhood}>
             <SelectTrigger className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#6366f1]/50 text-white focus:ring-[#6366f1] focus:border-[#6366f1]">
               <SelectValue placeholder="Select neighborhood..." />
             </SelectTrigger>
