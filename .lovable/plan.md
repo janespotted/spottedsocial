@@ -1,214 +1,153 @@
 
-# Security Audit Remediation Plan
 
-## Executive Summary
+# Magic URL for YC Demo Mode
 
-After thorough analysis of the codebase and existing security scan results, I can confirm the audit's findings and provide specific fixes. **The good news**: most of the app has strong security practices already in place. **The critical issue**: the profiles table RLS policy has an `OR true` clause that exposes all user data.
+## Overview
+
+Create a special URL that automatically activates demo mode and seeds the app with sample data when YC partners visit. They'll sign up normally, and the app will auto-populate with nightlife activity.
+
+**Magic URL Format:**
+```
+https://spottedsocial.lovable.app?demo=yc&city=nyc
+```
 
 ---
 
-## Issues by Priority
+## How It Works
 
-### CRITICAL - Must Fix Immediately
-
-#### 1. Profiles Table RLS Policy Exposes All User Data
-**Current State**: The profiles table has this SELECT policy:
-```sql
-((auth.uid() IS NOT NULL) AND ((auth.uid() = id) OR true))
+```text
+1. YC partner clicks your link
+   ↓
+2. They land on /auth (login/signup page)
+   ↓
+3. URL params are stored in localStorage
+   ↓
+4. They sign up/login normally
+   ↓
+5. After auth, DemoActivator component detects stored params
+   ↓
+6. Auto-enables demo mode + seeds city data
+   ↓
+7. Shows toast: "Welcome! Demo mode activated with NYC nightlife data"
+   ↓
+8. App feels alive with venues, posts, users, and activity
 ```
-The `OR true` makes the entire policy always pass, exposing ALL profiles to ANY authenticated user.
-
-**Impact**: Any logged-in user can access every other user's profile data, including:
-- Location data (last_known_lat, last_known_lng)
-- Personal details (bio, home_city)
-- Status (is_out, last_active_at)
-
-**Fix Required**:
-```sql
--- Drop the problematic policy
-DROP POLICY "Users can read own profile or public data" ON profiles;
-
--- Create proper policy using the existing helper functions
-CREATE POLICY "Users can view own profile" ON profiles
-FOR SELECT
-USING (auth.uid() = id);
-
-CREATE POLICY "Users can view public profile info via view" ON profiles
-FOR SELECT
-USING (
-  -- Allow viewing basic info for authenticated users
-  -- Sensitive fields are masked by can_see_location check in RPC functions
-  auth.uid() IS NOT NULL
-);
-```
-
-**Better approach**: Since `get_profiles_safe()` and `get_profile_safe()` RPC functions already exist and properly enforce privacy controls, the app should exclusively use these RPCs. The base table SELECT policy should be restricted to self-only access.
 
 ---
 
-### HIGH Priority
+## Implementation Details
 
-#### 2. Venue Claim Requests - Business Contact Exposure
-**Current State**: Users can see their own claim requests. Admins can see all.
-**Potential Issue**: If not properly scoped, users claiming the same venue might see each other's business contact info.
+### New Component: DemoActivator
 
-**Status**: ✅ Already secure - policies correctly scope to `user_id = auth.uid()` for users, admin-only for full access.
+This component will:
+1. Check for `?demo=yc` (or `?demo=true`) on first load
+2. Store the intent in localStorage (survives auth redirect)
+3. After user authenticates, trigger demo seeding
+4. Clear URL params after activation
 
-#### 3. Invite Code RPC Security
-**Current State**: The `process_invite_code` function does NOT verify that `new_user_id` matches `auth.uid()`.
+### Files to Create/Modify
 
-**Concern**: A malicious user could potentially call this RPC with someone else's `new_user_id` to create unwanted friendships.
+| File | Change |
+|------|--------|
+| `src/components/DemoActivator.tsx` | **NEW** - Handles magic URL detection and activation |
+| `src/App.tsx` | Add DemoActivator inside AuthProvider |
 
-**Fix Required**: Add auth verification to the function:
-```sql
-CREATE OR REPLACE FUNCTION public.process_invite_code(invite_code text, new_user_id uuid)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  invite_record record;
-  inviter_profile record;
-BEGIN
-  -- SECURITY: Verify the calling user matches new_user_id
-  IF auth.uid() IS NULL OR auth.uid() != new_user_id THEN
-    RETURN json_build_object('success', false, 'error', 'Unauthorized');
-  END IF;
-  
-  -- ... rest of existing logic unchanged
-END;
-$$;
-```
+---
 
-#### 4. Account Deletion - Missing Storage Cleanup
-**Current State**: The `delete-account` edge function deletes:
-- All database records (posts, comments, friendships, etc.)
-- Avatar files from the `avatars` bucket
+## DemoActivator Logic
 
-**Missing**: Post images, story images, and DM images are NOT deleted.
-
-**Fix Required**: Update `supabase/functions/delete-account/index.ts`:
 ```typescript
-// Add after avatar deletion
-console.log('🗑️ Deleting post images from storage');
-const { data: postFiles } = await supabaseAdmin.storage
-  .from('post-images')
-  .list(userId);
+// On mount (even before auth):
+const params = new URLSearchParams(window.location.search);
+const demoParam = params.get('demo');
+const cityParam = params.get('city') as SupportedCity;
 
-if (postFiles?.length) {
-  const filesToDelete = postFiles.map(f => `${userId}/${f.name}`);
-  await supabaseAdmin.storage
-    .from('post-images')
-    .remove(filesToDelete);
+if (demoParam === 'yc' || demoParam === 'true') {
+  // Store intent - survives auth redirect
+  localStorage.setItem('pending_demo_activation', JSON.stringify({
+    city: cityParam || 'nyc',
+    timestamp: Date.now()
+  }));
+  
+  // Clean URL
+  window.history.replaceState({}, '', window.location.pathname);
 }
 
-// Also delete DM images
-console.log('🗑️ Deleting DM images from storage');
-const { data: dmFiles } = await supabaseAdmin.storage
-  .from('dm-images')
-  .list(userId);
-
-if (dmFiles?.length) {
-  const dmFilesToDelete = dmFiles.map(f => `${userId}/${f.name}`);
-  await supabaseAdmin.storage
-    .from('dm-images')
-    .remove(dmFilesToDelete);
+// After user authenticates:
+if (user && pendingActivation) {
+  // Check not expired (24 hours)
+  if (Date.now() - pendingActivation.timestamp < 24 * 60 * 60 * 1000) {
+    setDemoMode(true);
+    cacheCity(pendingActivation.city);
+    
+    // Seed data via edge function
+    await supabase.functions.invoke('seed-demo-data', {
+      body: { action: 'seed', city: pendingActivation.city, userId: user.id }
+    });
+    
+    toast.success('Welcome! Demo mode activated with sample nightlife data');
+  }
+  
+  localStorage.removeItem('pending_demo_activation');
 }
 ```
 
-Note: Looking at the upload patterns, files are stored as `{userId}-{timestamp}.{ext}` at the root level, not in user folders. The deletion logic needs to list ALL files and filter by userId prefix.
+---
+
+## URL Options
+
+You can share different URLs for different cities:
+
+| URL | Effect |
+|-----|--------|
+| `?demo=yc` | Activates demo with NYC data (default) |
+| `?demo=yc&city=nyc` | Activates demo with NYC data |
+| `?demo=yc&city=la` | Activates demo with LA data |
 
 ---
 
-### MEDIUM Priority
+## What YC Will See
 
-#### 5. Enable Leaked Password Protection
-**Status**: Detected by Supabase linter
-**Fix**: Enable in Lovable Cloud dashboard under auth settings
+After signing up with the magic link:
 
-#### 6. Rate Limiting Improvements
-**Current State**: ✅ Rate limiting exists for:
-- Posts (10/hour)
-- Yaps (30/hour)
-- Yap comments (30/hour)
-- Venue reports (10/hour)
-- New venues (5/day)
-
-**Missing**: Friend requests, invite code attempts
+- **Leaderboard**: 20+ trending venues with energy rankings
+- **Map**: Demo users "out" at various venues
+- **Feed**: Recent posts from demo users at nightlife spots
+- **Plans**: Weekend plans from demo users they can browse
+- **Yap Board**: Anonymous messages at venues
+- **Messages**: Activity and notifications (if enabled)
 
 ---
 
-## What's Already Secure
+## Security Considerations
 
-The audit raised concerns about several areas that are actually well-protected:
-
-### ✅ XSS Prevention
-- The only `dangerouslySetInnerHTML` usage is in the chart.tsx component for CSS injection, which uses static theme data (no user input).
-- All user-generated content is displayed using React JSX (auto-escaped).
-- `escapeHtml()` and `escapeUrl()` utilities exist in `src/lib/html-escape.ts`.
-- Push notifications have message sanitization.
-
-### ✅ Send-Push Edge Function Security
-Comprehensive security controls:
-- JWT validation required
-- Sender impersonation prevention (`sender_id !== user.id` check)
-- Input validation (UUID format, message length, notification type whitelist)
-- Message sanitization (HTML entity escaping)
-- Subscription endpoint validation (HTTPS only, known push services)
-
-### ✅ Service Worker Notification Handling
-The `urlToOpen` in sw.js only uses:
-- Hardcoded paths (`/`, `/?nudge=first`, etc.)
-- Data from the push payload (which comes from our validated edge function)
-Not vulnerable to user-controlled redirects.
-
-### ✅ Environment Variables
-- `VITE_SUPABASE_PUBLISHABLE_KEY` - correctly public (anon key)
-- `VITE_MAPBOX_PUBLIC_TOKEN` - correctly public
-- Service keys are server-side only (edge functions)
-
-### ✅ RLS on Most Tables
-All 47 tables have RLS enabled with 142 policies. Key tables are properly protected:
-- `dm_messages`: Thread membership check
-- `posts`: Visibility-based with friend checks
-- `checkins`: `can_see_location()` check
-- `friendships`: User-scoped
-
-### ✅ Location Privacy
-Three-tier privacy system exists:
-- `close_friends` - Only close friends see location
-- `all_friends` - All friends see location  
-- `mutual_friends` - Friends of friends see location
-
-Enforced via `can_see_location()` SECURITY DEFINER function.
+- The `?demo=yc` parameter only activates demo mode - it doesn't bypass auth
+- Users still need to sign up with a real email
+- Demo data is clearly marked with `is_demo: true` in the database
+- No sensitive data is exposed
 
 ---
 
-## Files to Modify
+## What to Send YC
 
-| File | Change | Priority |
-|------|--------|----------|
-| Database Migration | Fix profiles RLS policy | CRITICAL |
-| Database Migration | Add auth check to process_invite_code | HIGH |
-| `supabase/functions/delete-account/index.ts` | Add storage cleanup for post-images, dm-images | HIGH |
+**Email/Application text:**
 
----
-
-## Implementation Order
-
-1. **Immediately**: Fix the profiles RLS policy (prevents data exposure)
-2. **Same day**: Add auth check to `process_invite_code` function
-3. **Same day**: Update delete-account to clean up storage files
-4. **Before launch**: Enable leaked password protection in Cloud dashboard
-5. **Optional**: Add rate limiting for friend requests
+> **Try the full experience:**
+> Visit [spottedsocial.lovable.app?demo=yc&city=nyc](https://spottedsocial.lovable.app?demo=yc&city=nyc) and sign up. The app will auto-populate with sample NYC nightlife data so you can explore all features.
+>
+> **Demo controls:**
+> After signing up, triple-tap the "PROFILE" header on your profile page to access demo settings where you can switch cities (NYC/LA), re-seed data, or disable demo mode.
 
 ---
 
-## Testing After Fixes
+## Files Changed Summary
 
-1. Create two test accounts
-2. Verify Account A cannot see Account B's profile location fields via direct query
-3. Verify invite code only works when called by the user being invited
-4. Verify account deletion removes all storage files
-5. Test all friend visibility levels (close friends, all friends, mutual)
+1. **`src/components/DemoActivator.tsx`** (NEW)
+   - Detects `?demo=yc` or `?demo=true` URL params
+   - Stores activation intent in localStorage
+   - After auth: enables demo mode, seeds data, shows confirmation toast
+
+2. **`src/App.tsx`**
+   - Import and add `<DemoActivator />` inside `AppContent` component
+   - Place it after `<AutoTracker />` so it has access to auth state
+
