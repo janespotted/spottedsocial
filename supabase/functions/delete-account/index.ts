@@ -112,6 +112,43 @@ Deno.serve(async (req) => {
       .from('avatars')
       .remove([`${userId}/avatar.jpg`, `${userId}/avatar.png`, `${userId}/avatar.webp`]);
 
+    // SECURITY FIX: Delete post images from storage
+    // Files are stored as {userId}-{timestamp}.{ext} at root level
+    console.log('🗑️ Deleting post images from storage');
+    const { data: postFiles } = await supabaseAdmin.storage
+      .from('post-images')
+      .list('', { limit: 1000 });
+
+    if (postFiles?.length) {
+      const userPostFiles = postFiles
+        .filter(f => f.name.startsWith(`${userId}-`))
+        .map(f => f.name);
+      if (userPostFiles.length > 0) {
+        await supabaseAdmin.storage
+          .from('post-images')
+          .remove(userPostFiles);
+        console.log(`🗑️ Deleted ${userPostFiles.length} post images`);
+      }
+    }
+
+    // SECURITY FIX: Delete DM images from storage
+    console.log('🗑️ Deleting DM images from storage');
+    const { data: dmFiles } = await supabaseAdmin.storage
+      .from('dm-images')
+      .list('', { limit: 1000 });
+
+    if (dmFiles?.length) {
+      const userDmFiles = dmFiles
+        .filter(f => f.name.startsWith(`${userId}-`))
+        .map(f => f.name);
+      if (userDmFiles.length > 0) {
+        await supabaseAdmin.storage
+          .from('dm-images')
+          .remove(userDmFiles);
+        console.log(`🗑️ Deleted ${userDmFiles.length} DM images`);
+      }
+    }
+
     // Finally, delete the auth user
     console.log('🗑️ Deleting auth user');
     const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(userId);
