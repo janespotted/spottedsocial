@@ -1,153 +1,149 @@
 
+# Auto Check-In for YC Demo Mode
 
-# Magic URL for YC Demo Mode
+## The Problem
+When a YC partner signs up via the magic URL (`?demo=yc&city=nyc`), the app populates with demo users and venues, but **they** aren't checked in anywhere. This means:
+- They can't test "Drop a Vibe" without manually navigating to Demo Settings
+- They don't see themselves on the map
+- The experience feels incomplete
 
-## Overview
-
-Create a special URL that automatically activates demo mode and seeds the app with sample data when YC partners visit. They'll sign up normally, and the app will auto-populate with nightlife activity.
-
-**Magic URL Format:**
-```
-https://spottedsocial.lovable.app?demo=yc&city=nyc
-```
+## The Solution
+Automatically "check in" the user at a popular NYC venue as part of the demo activation flow.
 
 ---
 
-## How It Works
+## Implementation
+
+### Modify DemoActivator Component
+
+After demo seeding completes, simulate a check-in for the user at a popular venue:
 
 ```text
-1. YC partner clicks your link
-   ↓
-2. They land on /auth (login/signup page)
-   ↓
-3. URL params are stored in localStorage
-   ↓
-4. They sign up/login normally
-   ↓
-5. After auth, DemoActivator component detects stored params
-   ↓
-6. Auto-enables demo mode + seeds city data
-   ↓
-7. Shows toast: "Welcome! Demo mode activated with NYC nightlife data"
-   ↓
-8. App feels alive with venues, posts, users, and activity
+Current flow:
+1. Detect ?demo=yc
+2. Store in localStorage
+3. After auth: enable demo mode + seed data
+4. Show toast
+
+New flow:
+1. Detect ?demo=yc
+2. Store in localStorage
+3. After auth: enable demo mode + seed data
+4. Auto check-in user at a popular venue
+5. Show toast mentioning the venue
 ```
+
+### Venue Selection Logic
+
+Pick a well-known venue from the seeded city:
+- **NYC**: "Le Bain" (popular rooftop club in Meatpacking)
+- **LA**: "Sound Nightclub" (iconic Hollywood club)
+- **PB**: "Respectable Street" (famous Clematis club)
+
+### Check-In Implementation
+
+The check-in creates:
+1. **night_statuses** record with `status: 'out'` and venue info
+2. **checkins** record for tracking
+
+This uses the same logic as `handleSimulateCheckin` in DemoSettings.
 
 ---
 
-## Implementation Details
-
-### New Component: DemoActivator
-
-This component will:
-1. Check for `?demo=yc` (or `?demo=true`) on first load
-2. Store the intent in localStorage (survives auth redirect)
-3. After user authenticates, trigger demo seeding
-4. Clear URL params after activation
-
-### Files to Create/Modify
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/DemoActivator.tsx` | **NEW** - Handles magic URL detection and activation |
-| `src/App.tsx` | Add DemoActivator inside AuthProvider |
+| `src/components/DemoActivator.tsx` | Add auto check-in after seeding |
 
----
+### Code Changes
 
-## DemoActivator Logic
+**DemoActivator.tsx** - Add check-in after seed:
 
 ```typescript
-// On mount (even before auth):
-const params = new URLSearchParams(window.location.search);
-const demoParam = params.get('demo');
-const cityParam = params.get('city') as SupportedCity;
+// After successful seed, check in user at a featured venue
+await simulateCheckinForDemo(userId, city);
 
-if (demoParam === 'yc' || demoParam === 'true') {
-  // Store intent - survives auth redirect
-  localStorage.setItem('pending_demo_activation', JSON.stringify({
-    city: cityParam || 'nyc',
-    timestamp: Date.now()
-  }));
+async function simulateCheckinForDemo(userId: string, city: SupportedCity) {
+  // Featured venues per city
+  const featuredVenues = {
+    nyc: { name: 'Le Bain', lat: 40.7414, lng: -74.0078 },
+    la: { name: 'Sound Nightclub', lat: 34.0412, lng: -118.2468 },
+    pb: { name: 'Respectable Street', lat: 26.7140, lng: -80.0555 }
+  };
   
-  // Clean URL
-  window.history.replaceState({}, '', window.location.pathname);
-}
-
-// After user authenticates:
-if (user && pendingActivation) {
-  // Check not expired (24 hours)
-  if (Date.now() - pendingActivation.timestamp < 24 * 60 * 60 * 1000) {
-    setDemoMode(true);
-    cacheCity(pendingActivation.city);
-    
-    // Seed data via edge function
-    await supabase.functions.invoke('seed-demo-data', {
-      body: { action: 'seed', city: pendingActivation.city, userId: user.id }
-    });
-    
-    toast.success('Welcome! Demo mode activated with sample nightlife data');
-  }
+  const venue = featuredVenues[city];
   
-  localStorage.removeItem('pending_demo_activation');
+  // Find venue ID from database
+  const { data: venueData } = await supabase
+    .from('venues')
+    .select('id')
+    .eq('name', venue.name)
+    .single();
+  
+  if (!venueData) return;
+  
+  // Calculate expiry (5 AM next morning)
+  const expiresAt = new Date();
+  if (expiresAt.getHours() >= 5) expiresAt.setDate(expiresAt.getDate() + 1);
+  expiresAt.setHours(5, 0, 0, 0);
+  
+  // Upsert night_status
+  await supabase.from('night_statuses').upsert({
+    user_id: userId,
+    status: 'out',
+    venue_id: venueData.id,
+    venue_name: venue.name,
+    lat: venue.lat,
+    lng: venue.lng,
+    expires_at: expiresAt.toISOString(),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id' });
+  
+  // Create checkin record
+  await supabase.from('checkins').insert({
+    user_id: userId,
+    venue_id: venueData.id,
+    venue_name: venue.name,
+    lat: venue.lat,
+    lng: venue.lng,
+    started_at: new Date().toISOString(),
+  });
 }
 ```
 
 ---
 
-## URL Options
+## Enhanced Toast Message
 
-You can share different URLs for different cities:
+After activation, show:
 
-| URL | Effect |
-|-----|--------|
-| `?demo=yc` | Activates demo with NYC data (default) |
-| `?demo=yc&city=nyc` | Activates demo with NYC data |
-| `?demo=yc&city=la` | Activates demo with LA data |
-
----
-
-## What YC Will See
-
-After signing up with the magic link:
-
-- **Leaderboard**: 20+ trending venues with energy rankings
-- **Map**: Demo users "out" at various venues
-- **Feed**: Recent posts from demo users at nightlife spots
-- **Plans**: Weekend plans from demo users they can browse
-- **Yap Board**: Anonymous messages at venues
-- **Messages**: Activity and notifications (if enabled)
+```
+"Welcome to Spotted! You're 'at' Le Bain in NYC 🎉
+Explore the map, check the leaderboard, and drop a vibe!"
+```
 
 ---
 
-## Security Considerations
+## What YC Partners Will Experience
 
-- The `?demo=yc` parameter only activates demo mode - it doesn't bypass auth
-- Users still need to sign up with a real email
-- Demo data is clearly marked with `is_demo: true` in the database
-- No sensitive data is exposed
-
----
-
-## What to Send YC
-
-**Email/Application text:**
-
-> **Try the full experience:**
-> Visit [spottedsocial.lovable.app?demo=yc&city=nyc](https://spottedsocial.lovable.app?demo=yc&city=nyc) and sign up. The app will auto-populate with sample NYC nightlife data so you can explore all features.
->
-> **Demo controls:**
-> After signing up, triple-tap the "PROFILE" header on your profile page to access demo settings where you can switch cities (NYC/LA), re-seed data, or disable demo mode.
+1. Click `spottedsocial.lovable.app?demo=yc&city=nyc`
+2. Sign up with email
+3. App auto-seeds with NYC nightlife data
+4. They're automatically "checked in" at Le Bain
+5. They see:
+   - Their avatar on the map at Le Bain
+   - Themselves in the leaderboard at Le Bain
+   - "Drop a Vibe" button is active when they view Le Bain's venue card
+   - Demo friends "out" at other venues
 
 ---
 
-## Files Changed Summary
+## URL Options Summary
 
-1. **`src/components/DemoActivator.tsx`** (NEW)
-   - Detects `?demo=yc` or `?demo=true` URL params
-   - Stores activation intent in localStorage
-   - After auth: enables demo mode, seeds data, shows confirmation toast
-
-2. **`src/App.tsx`**
-   - Import and add `<DemoActivator />` inside `AppContent` component
-   - Place it after `<AutoTracker />` so it has access to auth state
-
+| URL | City | User Checked In At |
+|-----|------|-------------------|
+| `?demo=yc` | NYC (default) | Le Bain |
+| `?demo=yc&city=nyc` | NYC | Le Bain |
+| `?demo=yc&city=la` | LA | Sound Nightclub |
+| `?demo=yc&city=pb` | Palm Beach | Respectable Street |
