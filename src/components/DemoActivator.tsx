@@ -6,6 +6,7 @@ import { cacheCity } from '@/lib/city-detection';
 import type { SupportedCity } from '@/lib/city-detection';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
+import { calculateExpiryTime } from '@/lib/time-utils';
 
 const PENDING_DEMO_KEY = 'pending_demo_activation';
 const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -14,6 +15,12 @@ interface PendingDemoActivation {
   city: SupportedCity;
   timestamp: number;
 }
+
+// Featured venues per city for auto check-in
+const FEATURED_VENUES: Record<SupportedCity, { name: string; lat: number; lng: number }> = {
+  nyc: { name: 'Le Bain', lat: 40.7414, lng: -74.0078 },
+  la: { name: 'Sound Nightclub', lat: 34.0412, lng: -118.2468 }
+};
 
 export function DemoActivator() {
   const { user, loading } = useAuth();
@@ -87,19 +94,80 @@ async function activateDemo(city: SupportedCity, userId: string) {
       return;
     }
 
+    // Auto check-in user at featured venue
+    const venue = FEATURED_VENUES[city];
+    const venueName = await simulateCheckinForDemo(userId, city, venue);
+
     // Clear pending activation
     localStorage.removeItem(PENDING_DEMO_KEY);
 
     // Dispatch event to notify other components
     window.dispatchEvent(new Event('demoModeChanged'));
 
-    // Show success toast
-    const cityName = city === 'nyc' ? 'NYC' : city === 'la' ? 'LA' : 'Palm Beach';
-    toast.success(`Welcome! Demo mode activated with ${cityName} nightlife data 🎉`);
+    // Show success toast with venue info
+    const cityName = city === 'nyc' ? 'NYC' : 'LA';
+    if (venueName) {
+      toast.success(`Welcome to Spotted! You're "at" ${venueName} in ${cityName} 🎉`, {
+        description: 'Explore the map, check the leaderboard, and drop a vibe!'
+      });
+    } else {
+      toast.success(`Welcome! Demo mode activated with ${cityName} nightlife data 🎉`);
+    }
 
-    logger.debug('demo:activated', { city });
+    logger.debug('demo:activated', { city, venueName });
   } catch (e) {
     logger.error('demo:activation-failed', { error: String(e) });
     toast.error('Failed to activate demo mode');
+  }
+}
+
+async function simulateCheckinForDemo(
+  userId: string, 
+  city: SupportedCity, 
+  venue: { name: string; lat: number; lng: number }
+): Promise<string | null> {
+  try {
+    // Find venue ID from database
+    const { data: venueData } = await supabase
+      .from('venues')
+      .select('id')
+      .eq('name', venue.name)
+      .single();
+
+    if (!venueData) {
+      logger.warn('demo:venue-not-found', { venueName: venue.name });
+      return null;
+    }
+
+    const expiresAt = calculateExpiryTime();
+    const now = new Date().toISOString();
+
+    // Upsert night_status
+    await supabase.from('night_statuses').upsert({
+      user_id: userId,
+      status: 'out',
+      venue_id: venueData.id,
+      venue_name: venue.name,
+      lat: venue.lat,
+      lng: venue.lng,
+      expires_at: expiresAt,
+      updated_at: now,
+    }, { onConflict: 'user_id' });
+
+    // Create checkin record
+    await supabase.from('checkins').insert({
+      user_id: userId,
+      venue_id: venueData.id,
+      venue_name: venue.name,
+      lat: venue.lat,
+      lng: venue.lng,
+      started_at: now,
+    });
+
+    logger.debug('demo:checkin-simulated', { userId, venue: venue.name });
+    return venue.name;
+  } catch (e) {
+    logger.error('demo:checkin-failed', { error: String(e) });
+    return null;
   }
 }
