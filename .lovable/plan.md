@@ -1,52 +1,21 @@
 
-# Auto Check-In for YC Demo Mode
 
-## The Problem
-When a YC partner signs up via the magic URL (`?demo=yc&city=nyc`), the app populates with demo users and venues, but **they** aren't checked in anywhere. This means:
-- They can't test "Drop a Vibe" without manually navigating to Demo Settings
-- They don't see themselves on the map
-- The experience feels incomplete
+# Fix Glitchy Text Field in Check-In Flow
 
-## The Solution
-Automatically "check in" the user at a popular NYC venue as part of the demo activation flow.
+## Problem Identified
+
+When checking in and no venue is detected, the venue Select dropdown and neighborhood Select dropdowns appear glitchy. This is a **known Radix UI Select limitation** - it doesn't handle empty string (`''`) values properly.
+
+**Root Cause:** Multiple Select components in `CheckInModal.tsx` use empty string `''` as the default/unselected value:
+- Line 811: `value={selectedVenueId || ''}` 
+- Line 903: `value={planningNeighborhood}` (initialized as `''`)
+- Line 1185: `value={privatePartyNeighborhood}` (initialized as `''`)
 
 ---
 
-## Implementation
+## Solution
 
-### Modify DemoActivator Component
-
-After demo seeding completes, simulate a check-in for the user at a popular venue:
-
-```text
-Current flow:
-1. Detect ?demo=yc
-2. Store in localStorage
-3. After auth: enable demo mode + seed data
-4. Show toast
-
-New flow:
-1. Detect ?demo=yc
-2. Store in localStorage
-3. After auth: enable demo mode + seed data
-4. Auto check-in user at a popular venue
-5. Show toast mentioning the venue
-```
-
-### Venue Selection Logic
-
-Pick a well-known venue from the seeded city:
-- **NYC**: "Le Bain" (popular rooftop club in Meatpacking)
-- **LA**: "Sound Nightclub" (iconic Hollywood club)
-- **PB**: "Respectable Street" (famous Clematis club)
-
-### Check-In Implementation
-
-The check-in creates:
-1. **night_statuses** record with `status: 'out'` and venue info
-2. **checkins** record for tracking
-
-This uses the same logic as `handleSimulateCheckin` in DemoSettings.
+Convert all empty string values to `undefined` for Select components. Radix Select handles `undefined` correctly as "no selection."
 
 ---
 
@@ -54,96 +23,79 @@ This uses the same logic as `handleSimulateCheckin` in DemoSettings.
 
 | File | Change |
 |------|--------|
-| `src/components/DemoActivator.tsx` | Add auto check-in after seeding |
+| `src/components/CheckInModal.tsx` | Fix Select value handling |
 
-### Code Changes
+---
 
-**DemoActivator.tsx** - Add check-in after seed:
+## Implementation Details
+
+### 1. Change State Initialization
 
 ```typescript
-// After successful seed, check in user at a featured venue
-await simulateCheckinForDemo(userId, city);
+// BEFORE
+const [planningNeighborhood, setPlanningNeighborhood] = useState<string>('');
+const [privatePartyNeighborhood, setPrivatePartyNeighborhood] = useState<string>('');
 
-async function simulateCheckinForDemo(userId: string, city: SupportedCity) {
-  // Featured venues per city
-  const featuredVenues = {
-    nyc: { name: 'Le Bain', lat: 40.7414, lng: -74.0078 },
-    la: { name: 'Sound Nightclub', lat: 34.0412, lng: -118.2468 },
-    pb: { name: 'Respectable Street', lat: 26.7140, lng: -80.0555 }
-  };
-  
-  const venue = featuredVenues[city];
-  
-  // Find venue ID from database
-  const { data: venueData } = await supabase
-    .from('venues')
-    .select('id')
-    .eq('name', venue.name)
-    .single();
-  
-  if (!venueData) return;
-  
-  // Calculate expiry (5 AM next morning)
-  const expiresAt = new Date();
-  if (expiresAt.getHours() >= 5) expiresAt.setDate(expiresAt.getDate() + 1);
-  expiresAt.setHours(5, 0, 0, 0);
-  
-  // Upsert night_status
-  await supabase.from('night_statuses').upsert({
-    user_id: userId,
-    status: 'out',
-    venue_id: venueData.id,
-    venue_name: venue.name,
-    lat: venue.lat,
-    lng: venue.lng,
-    expires_at: expiresAt.toISOString(),
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'user_id' });
-  
-  // Create checkin record
-  await supabase.from('checkins').insert({
-    user_id: userId,
-    venue_id: venueData.id,
-    venue_name: venue.name,
-    lat: venue.lat,
-    lng: venue.lng,
-    started_at: new Date().toISOString(),
-  });
-}
+// AFTER
+const [planningNeighborhood, setPlanningNeighborhood] = useState<string | undefined>(undefined);
+const [privatePartyNeighborhood, setPrivatePartyNeighborhood] = useState<string | undefined>(undefined);
+```
+
+### 2. Fix Venue Select Value
+
+```typescript
+// BEFORE (Line 811)
+<Select value={selectedVenueId || ''} onValueChange={handleVenueSelect}>
+
+// AFTER
+<Select value={selectedVenueId ?? undefined} onValueChange={handleVenueSelect}>
+```
+
+### 3. Fix State Reset Logic
+
+When resetting states (e.g., when privacy flow starts), use `undefined` instead of `''`:
+
+```typescript
+// BEFORE
+setPlanningNeighborhood('');
+setPrivatePartyNeighborhood('');
+
+// AFTER  
+setPlanningNeighborhood(undefined);
+setPrivatePartyNeighborhood(undefined);
+```
+
+### 4. Update Condition Checks
+
+```typescript
+// BEFORE
+disabled={!planningNeighborhood}
+disabled={!privatePartyNeighborhood}
+
+// AFTER (no change needed - undefined is falsy too)
+disabled={!planningNeighborhood}
+disabled={!privatePartyNeighborhood}
 ```
 
 ---
 
-## Enhanced Toast Message
+## Changes Summary
 
-After activation, show:
+1. **State types**: Change `useState<string>('')` to `useState<string | undefined>(undefined)` for:
+   - `planningNeighborhood`
+   - `privatePartyNeighborhood`
 
-```
-"Welcome to Spotted! You're 'at' Le Bain in NYC 🎉
-Explore the map, check the leaderboard, and drop a vibe!"
-```
+2. **Select value prop**: Change `value={selectedVenueId || ''}` to `value={selectedVenueId ?? undefined}`
 
----
-
-## What YC Partners Will Experience
-
-1. Click `spottedsocial.lovable.app?demo=yc&city=nyc`
-2. Sign up with email
-3. App auto-seeds with NYC nightlife data
-4. They're automatically "checked in" at Le Bain
-5. They see:
-   - Their avatar on the map at Le Bain
-   - Themselves in the leaderboard at Le Bain
-   - "Drop a Vibe" button is active when they view Le Bain's venue card
-   - Demo friends "out" at other venues
+3. **State resets**: Change all `setState('')` to `setState(undefined)` for these fields
 
 ---
 
-## URL Options Summary
+## Why This Works
 
-| URL | City | User Checked In At |
-|-----|------|-------------------|
-| `?demo=yc` | NYC (default) | Le Bain |
-| `?demo=yc&city=nyc` | NYC | Le Bain |
-| `?demo=yc&city=la` | LA | Sound Nightclub |
-| `?demo=yc&city=pb` | Palm Beach | Respectable Street |
+Radix UI Select component:
+- Empty string `''` is treated as a valid value, causing the component to try to find a matching SelectItem
+- `undefined` is treated as "no selection," which properly shows the placeholder and doesn't cause rendering glitches
+
+This is a documented Radix limitation and using `undefined` for optional selections is the recommended pattern.
+
