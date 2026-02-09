@@ -28,6 +28,7 @@ import { VenueInviteConfirmation } from "./components/VenueInviteConfirmation";
 import { ImDownConfirmation } from "./components/ImDownConfirmation";
 import { NotificationBanner } from "./components/NotificationBanner";
 import { VenueArrivalPrompt } from "./components/VenueArrivalPrompt";
+import { DemoActivator } from "./components/DemoActivator";
 import { useAuth } from "./contexts/AuthContext";
 import { autoTrackVenue } from "./lib/auto-venue-tracker";
 import { logger } from "./lib/logger";
@@ -57,7 +58,7 @@ import BusinessDashboard from "./pages/business/BusinessDashboard";
 import BusinessPromote from "./pages/business/BusinessPromote";
 import BusinessYap from "./pages/business/BusinessYap";
 import BusinessEvents from "./pages/business/BusinessEvents";
- import { BusinessRoute } from "./components/business/BusinessRoute";
+import { BusinessRoute } from "./components/business/BusinessRoute";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +93,7 @@ function AppContent() {
     <>
       {showSplash && <SplashScreen />}
       <AutoTracker onReady={() => setShowSplash(false)} />
+      <DemoActivator />
       <FriendIdCard />
       <VenueIdCard />
       <MeetUpConfirmation />
