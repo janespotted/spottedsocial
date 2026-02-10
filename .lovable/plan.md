@@ -1,42 +1,40 @@
 
 
-# Fix: Leaderboard Not Showing Friend Avatars in Demo Mode
+# Add Fake DMs to Messages Section in Demo Mode
 
-## Root Cause
+## Problem
+The Messages tab is empty in demo mode because the seed function never creates DM threads or messages between the real user and demo users.
 
-The demo night_statuses all have `venue_id = NULL`. The leaderboard query uses `venues!inner(...)` (an INNER JOIN), which completely excludes rows with null venue_id. So all 8 demo "out" users are invisible on the leaderboard.
-
-**Why venue_id is null**: The seed function does an `upsert` with `onConflict:'name'`, but when venues already exist (from a previous seed), Supabase's upsert doesn't reliably return data for conflict rows. The `vm` Map ends up empty, so `vm.get(v.name)` returns `undefined` (stored as null).
-
-## Fix
+## Solution
 
 **File: `supabase/functions/seed-demo-data/index.ts`**
 
-After the upsert, add a separate SELECT query to reliably fetch venue IDs by name:
+Add DM thread and message seeding at the end of the `seed` action. The seed function already receives `userId` (the real user's ID) in the request body.
 
-```typescript
-// Venues - upsert then fetch IDs separately (upsert may not return on conflict)
-await sb.from('venues').upsert(
-  V.map(v => ({ name: v.name, lat: v.lat, lng: v.lng, ... })),
-  { onConflict: 'name' }
-);
+### What gets seeded:
+- 4 DM threads between the real user and 4 different demo users
+- Each thread gets 2-3 messages with realistic nightlife chat content (mix of sent by demo user and the real user)
+- Messages are timestamped within the last 1-2 hours so they appear recent
 
-// Reliably fetch venue IDs
-const { data: vens } = await sb.from('venues')
-  .select('id, name')
-  .in('name', V.map(v => v.name));
+### Implementation:
 
-const vm = new Map((vens || []).map(v => [v.name, v.id]));
-```
+1. Pick 4 demo user IDs for conversations
+2. For each, call the existing `create_dm_thread` RPC (or insert directly into `dm_threads` + `dm_thread_members` using service role)
+3. Insert `dm_messages` with varied timestamps and demo-appropriate text like:
+   - "Are you coming out tonight?"
+   - "We're at Le Bain, come through!"
+   - "Omw! Save me a spot"
+   - "This DJ is insane rn"
 
-This ensures `vm.get('Le Bain')` always returns the correct UUID, and all night_statuses, posts, plans, and events get proper venue_id values.
+### Cleanup:
+On `clear` action, delete DM messages and threads created with demo users (find threads where a member is a demo user profile).
+
+### No changes needed to MessagesTab
+The `MessagesTab` already includes demo user threads when `demoEnabled` is true (line 147-149 only filters them in bootstrap-without-demo mode). So once threads + messages exist in the DB, they'll show up automatically.
 
 ## Summary
 
 | File | Change |
 |------|--------|
-| `supabase/functions/seed-demo-data/index.ts` | Split upsert + select into two steps so venue IDs are always resolved, fixing null venue_id in all seeded data |
+| `supabase/functions/seed-demo-data/index.ts` | Add DM thread creation (4 threads) with 2-3 messages each between real user and demo users; clean up on `clear` |
 
-## Expected Result
-
-After re-seeding (toggle demo off/on or revisit the magic URL), the leaderboard will show stacked friend avatars (3 at Le Bain, 2 at House of Yes, etc.) because venue_id will be properly set and the INNER JOIN will match.
