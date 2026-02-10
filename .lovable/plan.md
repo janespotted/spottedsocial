@@ -1,29 +1,28 @@
 
 
-# Add "Add to Home Screen" Slide to Onboarding Carousel
+# Fix: Photo Screens Cut Off in PWA Mode
 
-## What Changes
+## Problem
 
-Add a 5th slide to the existing onboarding carousel (before the Find Friends step) that prompts new users to add the app to their home screen. No other slides or logic will be touched.
+When in PWA (standalone) mode, the status bar overlaps the top of fullscreen photo screens (PhotoFilterScreen, PostMediaPicker, PostCaptionScreen, StoryCaptureScreen, StoryEditor). This hides the close/check/share buttons, making them untappable.
 
-## Technical Details
+## Solution
 
-### File: `src/components/OnboardingCarousel.tsx`
+Add `padding-top: env(safe-area-inset-top, 0px)` to the top-level container of each fullscreen photo screen. In non-PWA (browser) mode, `env(safe-area-inset-top)` resolves to `0px`, so there is zero visual impact outside of PWA mode.
 
-Add one new slide object to the `slides` array (inserted as the last item, index 4):
+## Files to Change
 
-```typescript
-{
-  icon: Smartphone, // from lucide-react
-  title: 'Add Spotted to Home Screen',
-  description: 'For the best experience, add Spotted to your home screen. Tap the share icon in your browser, then "Add to Home Screen".',
-  color: '#d4ff00',
-}
-```
+| File | Change |
+|------|--------|
+| `src/components/PhotoFilterScreen.tsx` (line 106) | Add `pt-[env(safe-area-inset-top,0px)]` to the outer `div` |
+| `src/components/PostMediaPicker.tsx` (line ~97) | Add `pt-[env(safe-area-inset-top,0px)]` to the outer `div` |
+| `src/components/PostCaptionScreen.tsx` (line 213) | Add `pt-[env(safe-area-inset-top,0px)]` to the outer `div` |
+| `src/components/StoryCaptureScreen.tsx` (line ~131) | Add `pt-[env(safe-area-inset-top,0px)]` to the outer `div` |
+| `src/components/StoryEditor.tsx` | Add `pt-[env(safe-area-inset-top,0px)]` to the outer `div` |
 
-Additional changes in the same file:
-- Import `Smartphone` from `lucide-react`
-- No other logic changes -- the existing Next/Skip/Find Friends flow handles the new slide automatically since it's array-driven
+Each change is a single class addition to the root `<div className="fixed inset-0 ...">` element. No other code is modified.
 
-That's it. One import added, one object added to the array. Everything else (navigation, dots, skip, Find Friends step) works as-is.
+## Why This Is Safe for Non-PWA Mode
+
+The CSS `env(safe-area-inset-top, 0px)` function returns `0px` when safe area insets aren't defined (i.e., in a regular browser tab). This means zero extra padding is applied outside of PWA/standalone mode -- the layout is completely unchanged.
 
