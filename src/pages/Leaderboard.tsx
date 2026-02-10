@@ -739,7 +739,7 @@ export default function Leaderboard() {
 
       {/* Biggest Mover Card */}
       {biggestMover && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-20 w-full max-w-[430px] px-4">
+        <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-20 w-full max-w-[430px] px-4">
           <div className="bg-[#2d1b4e] border border-[#a855f7] rounded-2xl p-3 shadow-[0_0_12px_rgba(168,85,247,0.3)]">
             <div className="flex items-center justify-between">
               <div className="flex-1">
