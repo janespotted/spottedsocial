@@ -19,7 +19,8 @@ interface PendingDemoActivation {
 // Featured venues per city for auto check-in
 const FEATURED_VENUES: Record<SupportedCity, { name: string; lat: number; lng: number }> = {
   nyc: { name: 'Le Bain', lat: 40.7414, lng: -74.0078 },
-  la: { name: 'Sound Nightclub', lat: 34.0412, lng: -118.2468 }
+  la: { name: 'Sound Nightclub', lat: 34.0412, lng: -118.2468 },
+  pb: { name: 'Cucina', lat: 26.7056, lng: -80.0364 }
 };
 
 export function DemoActivator() {
@@ -105,7 +106,7 @@ async function activateDemo(city: SupportedCity, userId: string) {
     window.dispatchEvent(new Event('demoModeChanged'));
 
     // Show success toast with venue info
-    const cityName = city === 'nyc' ? 'NYC' : 'LA';
+    const cityName = city === 'nyc' ? 'NYC' : city === 'la' ? 'LA' : 'Palm Beach';
     if (venueName) {
       toast.success(`Welcome to Spotted! You're "at" ${venueName} in ${cityName} 🎉`, {
         description: 'Explore the map, check the leaderboard, and drop a vibe!'
@@ -163,6 +164,15 @@ async function simulateCheckinForDemo(
       lng: venue.lng,
       started_at: now,
     });
+
+    // Update profile so map shows yellow "me" marker
+    await supabase.from('profiles').update({
+      is_out: true,
+      last_known_lat: venue.lat,
+      last_known_lng: venue.lng,
+      last_location_at: now,
+      last_active_at: now,
+    }).eq('id', userId);
 
     logger.debug('demo:checkin-simulated', { userId, venue: venue.name });
     return venue.name;
