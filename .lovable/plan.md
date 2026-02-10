@@ -1,49 +1,42 @@
 
 
-# Demo Mode: Populate "Who's Going Out Tonight" and Leaderboard Avatars
+# Fix: Leaderboard Not Showing Friend Avatars in Demo Mode
 
-## Problem 1: Empty "Who's Going Out Tonight" on Home
+## Root Cause
 
-The Home page's `fetchPlanningFriends` always queries through real friendships, even in demo mode. The Map page already has a demo shortcut that fetches planning demo users directly from `night_statuses` -- but Home doesn't have this logic. Result: 0 planning friends shown on Home in demo mode.
+The demo night_statuses all have `venue_id = NULL`. The leaderboard query uses `venues!inner(...)` (an INNER JOIN), which completely excludes rows with null venue_id. So all 8 demo "out" users are invisible on the leaderboard.
 
-## Problem 2: No friend avatars on leaderboard venues
+**Why venue_id is null**: The seed function does an `upsert` with `onConflict:'name'`, but when venues already exist (from a previous seed), Supabase's upsert doesn't reliably return data for conflict rows. The `vm` Map ends up empty, so `vm.get(v.name)` returns `undefined` (stored as null).
 
-The seed function spreads 5 "out" demo users across different venues (1 per venue). So each venue shows at most 1 avatar. To make the leaderboard look alive, we need to cluster multiple demo users at key venues so avatars stack up.
-
----
-
-## Fix 1: Home page demo shortcut for planning friends
-
-**File: `src/pages/Home.tsx`**
-
-Add a demo-mode branch to `fetchPlanningFriends` (mirroring what Map.tsx already does at lines 235-245):
-
-- When `demoEnabled` is true, skip the friendship query
-- Directly fetch `night_statuses` with `status='planning'` and `profiles.is_demo = true`
-- Map results to the same `PlanningFriend` shape and set state
-- Return early, skipping normal friendship-based logic
-
-## Fix 2: Seed more demo users at key venues for leaderboard
+## Fix
 
 **File: `supabase/functions/seed-demo-data/index.ts`**
 
-Currently creates 12 demo users total, puts 5 at venues (1 each). Change to:
+After the upsert, add a separate SELECT query to reliably fetch venue IDs by name:
 
-- Increase "out" users to 8 (from 5), with some users sharing venues so avatars cluster
-- Specifically place 2-3 users at the top-ranked venue (Le Bain for NYC) so the leaderboard row shows a stack of friend avatars
-- Keep 3 users in "planning" status for the "Who's Going Out Tonight" section (already done, these will now actually show on Home)
+```typescript
+// Venues - upsert then fetch IDs separately (upsert may not return on conflict)
+await sb.from('venues').upsert(
+  V.map(v => ({ name: v.name, lat: v.lat, lng: v.lng, ... })),
+  { onConflict: 'name' }
+);
 
----
+// Reliably fetch venue IDs
+const { data: vens } = await sb.from('venues')
+  .select('id, name')
+  .in('name', V.map(v => v.name));
+
+const vm = new Map((vens || []).map(v => [v.name, v.id]));
+```
+
+This ensures `vm.get('Le Bain')` always returns the correct UUID, and all night_statuses, posts, plans, and events get proper venue_id values.
 
 ## Summary
 
 | File | Change |
 |------|--------|
-| `src/pages/Home.tsx` | Add demo-mode branch in `fetchPlanningFriends` to directly query demo planning statuses (skip friendship lookup) |
-| `supabase/functions/seed-demo-data/index.ts` | Cluster more demo users at top venues so leaderboard shows stacked friend avatars |
+| `supabase/functions/seed-demo-data/index.ts` | Split upsert + select into two steps so venue IDs are always resolved, fixing null venue_id in all seeded data |
 
 ## Expected Result
 
-- Home page "Who's Going Out Tonight" shows 3 demo users with neighborhoods in demo mode
-- Leaderboard venues show 2-3 stacked friend avatars at top venues (especially Le Bain)
-- Map continues working as before (already had demo shortcut)
+After re-seeding (toggle demo off/on or revisit the magic URL), the leaderboard will show stacked friend avatars (3 at Le Bain, 2 at House of Yes, etc.) because venue_id will be properly set and the INNER JOIN will match.
