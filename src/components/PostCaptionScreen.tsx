@@ -210,7 +210,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
   const VisibilityIcon = getVisibilityIcon();
 
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] flex flex-col pt-[env(safe-area-inset-top,0px)]">
       {/* Header - tighter padding */}
       <div className="flex items-center justify-between px-3 py-3">
         <button

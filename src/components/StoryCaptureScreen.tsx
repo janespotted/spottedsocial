@@ -134,7 +134,7 @@ export function StoryCaptureScreen({ onCapture, onGallerySelect, onClose }: Stor
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col pt-[env(safe-area-inset-top,0px)]">
       {/* Hidden file inputs for web fallback */}
       <input
         type="file"
