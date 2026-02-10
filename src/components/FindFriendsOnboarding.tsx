@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ const REQUIRED_INVITES = 1;
 
 export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboardingProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -161,7 +163,14 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
   const searchUsers = async () => {
     setSearching(true);
     try {
-      const { data } = await supabase.rpc('get_profiles_safe');
+      const data = await queryClient.fetchQuery({
+        queryKey: ['profiles-safe'],
+        queryFn: async () => {
+          const { data } = await supabase.rpc('get_profiles_safe');
+          return data || [];
+        },
+        staleTime: 60_000,
+      });
       
       if (data) {
         const filtered = data.filter((profile: any) => 

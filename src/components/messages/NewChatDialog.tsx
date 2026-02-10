@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useProfilesSafe } from '@/hooks/useProfilesCache';
+import { useFriendIds } from '@/hooks/useFriendIds';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -33,6 +35,8 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   const navigate = useNavigate();
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
+  const { data: allProfiles } = useProfilesSafe();
+  const { data: friendIds } = useFriendIds(user?.id);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [search, setSearch] = useState('');
   const [isCreatingThread, setIsCreatingThread] = useState(false);
@@ -84,39 +88,18 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
   };
 
   const fetchFriends = async () => {
-    // Get accepted friendships (both directions)
-    const { data: sentFriendships } = await supabase
-      .from('friendships')
-      .select('friend_id')
-      .eq('user_id', user?.id)
-      .eq('status', 'accepted');
-
-    const { data: receivedFriendships } = await supabase
-      .from('friendships')
-      .select('user_id')
-      .eq('friend_id', user?.id)
-      .eq('status', 'accepted');
-
-    const friendIds = [
-      ...(sentFriendships?.map(f => f.friend_id) || []),
-      ...(receivedFriendships?.map(f => f.user_id) || [])
-    ];
-
-    if (friendIds.length === 0) {
+    if (!friendIds || friendIds.length === 0 || !allProfiles) {
       setFriends([]);
       return;
     }
 
-    // Fetch profiles and venue statuses in parallel (eliminates N+1 queries)
-    const [profilesResult, statusesResult] = await Promise.all([
-      supabase.rpc('get_profiles_safe'),
-      supabase
-        .from('night_statuses')
-        .select('user_id, venue_name')
-        .in('user_id', friendIds)
-    ]);
+    // Fetch venue statuses
+    const { data: statusesData } = await supabase
+      .from('night_statuses')
+      .select('user_id, venue_name')
+      .in('user_id', friendIds);
 
-    let profiles = (profilesResult.data || []).filter((p: any) => friendIds.includes(p.id));
+    let profiles = allProfiles.filter((p: any) => friendIds.includes(p.id));
     
     // Only filter out demo users when demo mode is OFF (bootstrap mode)
     if (!demoEnabled) {
@@ -133,7 +116,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
 
     // Create venue status lookup map for O(1) access
     const venueMap = new Map(
-      (statusesResult.data || []).map(s => [s.user_id, s.venue_name])
+      (statusesData || []).map(s => [s.user_id, s.venue_name])
     );
 
     // Map profiles with venue info (no additional queries needed)

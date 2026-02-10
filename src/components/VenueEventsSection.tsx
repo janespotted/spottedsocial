@@ -1,6 +1,8 @@
  import { useState, useEffect } from 'react';
  import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
  import { supabase } from '@/integrations/supabase/client';
+ import { useProfilesSafe } from '@/hooks/useProfilesCache';
+ import { useFriendIds } from '@/hooks/useFriendIds';
  import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
  import { useAuth } from '@/contexts/AuthContext';
  import { format, isToday, isTomorrow, differenceInDays } from 'date-fns';
@@ -50,8 +52,10 @@
  
  export function VenueEventsSection({ venueId }: VenueEventsSectionProps) {
    const { user } = useAuth();
-   const { openFriendCard } = useFriendIdCard();
-   const [venueEvents, setVenueEvents] = useState<VenueEventWithFriends[]>([]);
+    const { openFriendCard } = useFriendIdCard();
+    const { data: allProfilesData } = useProfilesSafe();
+    const { data: cachedFriendIds } = useFriendIds(user?.id);
+    const [venueEvents, setVenueEvents] = useState<VenueEventWithFriends[]>([]);
    const [userRsvps, setUserRsvps] = useState<Set<string>>(new Set());
  
    useEffect(() => {
@@ -94,31 +98,19 @@
        );
        setUserRsvps(userRsvpIds);
  
-       // Get user's friends
-       const { data: friendships } = await supabase
-         .from('friendships')
-         .select('friend_id, user_id')
-         .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`)
-         .eq('status', 'accepted');
- 
-       const friendIds = (friendships || []).map(f => f.user_id === user.id ? f.friend_id : f.user_id);
+       // Use cached friend IDs
+       const friendIds = cachedFriendIds || [];
  
        // Filter to friend RSVPs only
        const friendRsvps = (rsvps || []).filter(r => friendIds.includes(r.user_id));
  
-       // Get profiles for friends who RSVP'd
+       // Get profiles for friends who RSVP'd from cache
        const rsvpUserIds = [...new Set(friendRsvps.map(r => r.user_id))];
-       let profileMap = new Map<string, { id: string; display_name: string; avatar_url: string | null }>();
-       
-       if (rsvpUserIds.length > 0) {
-         const { data: profiles } = await supabase
-           .rpc('get_profiles_safe')
-           .in('id', rsvpUserIds);
-         
-         profileMap = new Map(
-           (profiles || []).map((p: { id: string; display_name: string; avatar_url: string | null }) => [p.id, p])
-         );
-       }
+       const profileMap = new Map<string, { id: string; display_name: string; avatar_url: string | null }>(
+         (allProfilesData || [])
+           .filter((p: any) => rsvpUserIds.includes(p.id))
+           .map((p: any) => [p.id, p])
+       );
  
        // Build events with friend data
        const eventsWithFriends: VenueEventWithFriends[] = events.map(event => {

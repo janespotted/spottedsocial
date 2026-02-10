@@ -6,6 +6,8 @@ import { withRetry } from '@/lib/retry';
 import { logger } from '@/lib/logger';
 import { validateCommentText } from '@/lib/validation-schemas';
 
+const POSTS_PER_PAGE = 20;
+
 export interface Post {
   id: string;
   user_id: string;
@@ -54,7 +56,7 @@ export interface StoryUser {
 interface UseFeedOptions {
   userId: string | undefined;
   demoEnabled: boolean;
-  city?: string; // 'nyc' | 'la' for filtering posts/stories by venue city
+  city?: string;
   onCachePosts?: (posts: Post[]) => void;
   onCacheFriends?: (friends: Friend[]) => void;
   onCacheStories?: (stories: StoryUser[]) => void;
@@ -76,6 +78,8 @@ export function useFeed(options: UseFeedOptions) {
   const [newComment, setNewComment] = useState<{ [key: string]: string }>({});
   const [animatingLike, setAnimatingLike] = useState<string | null>(null);
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const getTimeAgo = useCallback((date: string) => {
     const distance = formatDistanceToNow(new Date(date), { addSuffix: false });
@@ -147,25 +151,22 @@ export function useFeed(options: UseFeedOptions) {
     }
   }, [userId, demoEnabled, onCacheFriends, getCachedFriends]);
 
-  const fetchPosts = useCallback(async () => {
+  const fetchPosts = useCallback(async (cursor?: string) => {
     if (!userId) return;
 
+    const isLoadMore = !!cursor;
+    if (isLoadMore) setIsLoadingMore(true);
+
     try {
-      // Parallelize: Get venues AND friendships at the same time with retry
-      const [cityVenuesResult, sentFriendships, receivedFriendships] = await withRetry(
+      // Get friend IDs (use cached if available from useFriendIds)
+      const [sentFriendships, receivedFriendships] = await withRetry(
         () => Promise.all([
-          supabase.from('venues').select('id, name').eq('city', city || 'nyc'),
           supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('status', 'accepted'),
           supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('status', 'accepted'),
         ]),
         { maxAttempts: 3, onRetry: (attempt) => logger.warn('feed:posts_retry', { attempt }) }
       );
-      
-      const cityVenues = cityVenuesResult.data;
-      const cityVenueIds = new Set(cityVenues?.map(v => v.id) || []);
-      const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
 
-      // Combine friend IDs from both directions
       const friendIds = [
         ...(sentFriendships.data?.map(f => f.friend_id) || []),
         ...(receivedFriendships.data?.map(f => f.user_id) || []),
@@ -184,7 +185,12 @@ export function useFeed(options: UseFeedOptions) {
           )
         `)
         .gt('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(POSTS_PER_PAGE);
+
+      if (cursor) {
+        query = query.lt('created_at', cursor);
+      }
 
       if (demoEnabled) {
         query = query.or(`user_id.in.(${userIds.join(',')}),is_demo.eq.true`);
@@ -193,40 +199,100 @@ export function useFeed(options: UseFeedOptions) {
       }
 
       const { data } = await query;
+      const fetchedPosts = data || [];
 
-      // Filter posts by city: include if venue matches OR no venue (general posts allowed)
-      const filteredPosts = (data || []).filter(post => {
-        // Include posts without venue info (general posts)
-        if (!post.venue_id && !post.venue_name) return true;
-        // If post has a venue_id that matches city venues, include it
-        if (post.venue_id && cityVenueIds.has(post.venue_id)) return true;
-        // If post has a venue_name that matches city venue names, include it
-        if (post.venue_name && cityVenueNames.has(post.venue_name.toLowerCase())) return true;
-        // Exclude posts from other cities
-        return false;
-      });
+      // Check if there are more posts
+      setHasMorePosts(fetchedPosts.length === POSTS_PER_PAGE);
 
-      setPosts(filteredPosts);
-      onCachePosts?.(filteredPosts);
+      if (isLoadMore) {
+        setPosts(prev => [...prev, ...fetchedPosts]);
+      } else {
+        setPosts(fetchedPosts);
+        onCachePosts?.(fetchedPosts);
+      }
 
       // Fetch user's likes for these posts
-      if (filteredPosts.length > 0) {
-        const postIds = filteredPosts.map(p => p.id);
+      if (fetchedPosts.length > 0) {
+        const postIds = fetchedPosts.map(p => p.id);
         const { data: likes } = await supabase
           .from('post_likes')
           .select('post_id')
           .eq('user_id', userId)
           .in('post_id', postIds);
         
-        setLikedPosts(new Set(likes?.map(l => l.post_id) || []));
+        if (isLoadMore) {
+          setLikedPosts(prev => {
+            const newSet = new Set(prev);
+            likes?.forEach(l => newSet.add(l.post_id));
+            return newSet;
+          });
+        } else {
+          setLikedPosts(new Set(likes?.map(l => l.post_id) || []));
+        }
       }
     } catch (error) {
       logger.apiError('fetchPosts', error);
-      // Try cache on error
-      const cached = getCachedPosts?.();
-      if (cached) setPosts(cached);
+      if (!cursor) {
+        const cached = getCachedPosts?.();
+        if (cached) setPosts(cached);
+      }
+    } finally {
+      if (isLoadMore) setIsLoadingMore(false);
     }
   }, [userId, demoEnabled, city, onCachePosts, getCachedPosts]);
+
+  const loadMorePosts = useCallback(async () => {
+    if (!hasMorePosts || isLoadingMore || posts.length === 0) return;
+    const lastPost = posts[posts.length - 1];
+    await fetchPosts(lastPost.created_at);
+  }, [fetchPosts, hasMorePosts, isLoadingMore, posts]);
+
+  // Incremental handlers for realtime
+  const handleIncrementalNewPost = useCallback(async (payload: any) => {
+    if (!userId) return;
+    const newRecord = payload.new;
+    if (!newRecord?.id) return;
+
+    // Fetch the full post with profile
+    const { data } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles:user_id (
+          display_name,
+          username,
+          avatar_url
+        )
+      `)
+      .eq('id', newRecord.id)
+      .single();
+
+    if (!data) return;
+
+    // Check if post is from current user or a friend
+    const isOwnPost = data.user_id === userId;
+    if (!isOwnPost) {
+      // Quick check against cached friend IDs
+      const [sent, received] = await Promise.all([
+        supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('friend_id', data.user_id).eq('status', 'accepted').maybeSingle(),
+        supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('user_id', data.user_id).eq('status', 'accepted').maybeSingle(),
+      ]);
+      if (!sent.data && !received.data) return; // Not a friend
+    }
+
+    // Prepend to posts (avoid duplicates)
+    setPosts(prev => {
+      if (prev.some(p => p.id === data.id)) return prev;
+      return [data, ...prev];
+    });
+  }, [userId]);
+
+  const handleIncrementalDelete = useCallback((payload: any) => {
+    const deletedId = payload.old?.id;
+    if (deletedId) {
+      setPosts(prev => prev.filter(p => p.id !== deletedId));
+    }
+  }, []);
 
   const fetchStories = useCallback(async () => {
     if (!userId) return;
@@ -577,6 +643,8 @@ export function useFeed(options: UseFeedOptions) {
     newComment,
     setNewComment,
     animatingLike,
+    hasMorePosts,
+    isLoadingMore,
     getTimeAgo,
     fetchFriends,
     fetchPosts,
@@ -587,5 +655,8 @@ export function useFeed(options: UseFeedOptions) {
     handleLikePost,
     handleLikeComment,
     handleDeletePost,
+    loadMorePosts,
+    handleIncrementalNewPost,
+    handleIncrementalDelete,
   };
 }
