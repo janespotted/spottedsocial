@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { detectUserCity, getCachedCity, clearCachedCity, type SupportedCity } from '@/lib/city-detection';
+import { getDemoMode } from '@/lib/demo-data';
 
 export function useUserCity() {
   // Synchronously initialize from localStorage cache to avoid race condition
@@ -13,8 +14,14 @@ export function useUserCity() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Only detect if no cached city exists
+    const demoMode = getDemoMode();
     const cached = getCachedCity();
+    if (demoMode.enabled && cached) {
+      // In demo mode, never override the cached city with GPS
+      setCity(cached);
+      setIsLoading(false);
+      return;
+    }
     if (!cached) {
       detectUserCity().then(detectedCity => {
         setCity(detectedCity);
