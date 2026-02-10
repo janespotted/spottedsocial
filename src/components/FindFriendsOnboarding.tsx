@@ -468,8 +468,7 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
           }
         }}
       >
-        <DialogOverlay className="bg-black/80 backdrop-blur-sm z-[200]" />
-        <DialogContent className="max-w-[340px] bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 rounded-3xl p-6 z-[200]" aria-describedby={undefined}>
+        <DialogContent className="max-w-[340px] bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] border-2 border-[#a855f7]/40 rounded-3xl p-6 z-[500]" aria-describedby={undefined}>
           <VisuallyHidden>
             <DialogTitle>Skip Confirmation</DialogTitle>
           </VisuallyHidden>
