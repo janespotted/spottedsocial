@@ -103,7 +103,7 @@ export function PhotoFilterScreen({ imagePreview, onConfirm, onCancel }: PhotoFi
   };
 
   return (
-    <div className="fixed inset-0 z-[110] bg-black flex flex-col">
+    <div className="fixed inset-0 z-[110] bg-black flex flex-col pt-[env(safe-area-inset-top,0px)]">
       {/* Hidden canvas for processing */}
       <canvas ref={canvasRef} className="hidden" />
 

@@ -205,7 +205,7 @@ export function StoryEditor({ imageUrl, isVideo, onSave, onCancel }: StoryEditor
   }, [imageUrl, isVideo, overlays, onSave]);
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+    <div className="fixed inset-0 z-[60] bg-black flex flex-col pt-[env(safe-area-inset-top,0px)]">
       {/* Hidden canvas for compositing */}
       <canvas ref={canvasRef} className="hidden" />
       
