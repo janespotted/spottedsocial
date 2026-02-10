@@ -199,8 +199,8 @@ export default function Home() {
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString());
     
-    // Filter out demo statuses in bootstrap mode
-    if (bootstrapEnabled && !demoEnabled) {
+    // Filter out demo statuses when demo mode is off
+    if (!demoEnabled) {
       statusQuery = statusQuery.eq('is_demo', false);
     }
     
@@ -220,8 +220,8 @@ export default function Home() {
       .select('id, display_name, avatar_url, is_demo')
       .in('id', planningUserIds);
 
-    // Filter out demo users in bootstrap mode (when demo mode is OFF)
-    const filteredProfiles = (bootstrapEnabled && !demoEnabled)
+    // Filter out demo users when demo mode is OFF
+    const filteredProfiles = !demoEnabled
       ? (profiles || []).filter((p: any) => !p.is_demo)
       : (profiles || []);
 
