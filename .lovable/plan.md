@@ -1,28 +1,28 @@
 
 
-# Fix: Photo Screens Cut Off in PWA Mode
+# Fix: Remove Overlapping X Buttons and Add Tap-Outside-to-Dismiss
 
 ## Problem
+The OnboardingCarousel and BusinessOnboarding have both a "Skip X" button in the top-right and a "Next" button at the bottom. On smaller screens these can feel redundant or overlap visually. The user also wants to be able to tap outside the content card to dismiss.
 
-When in PWA (standalone) mode, the status bar overlaps the top of fullscreen photo screens (PhotoFilterScreen, PostMediaPicker, PostCaptionScreen, StoryCaptureScreen, StoryEditor). This hides the close/check/share buttons, making them untappable.
+## Changes
 
-## Solution
+### 1. `src/components/OnboardingCarousel.tsx`
+- **Remove the top-right "Skip X" button entirely** (lines 78-86). The "Next" button at the bottom already handles progression.
+- **Add a "Skip" text-only link** below the Next button (subtle, no X icon) for users who want to skip the whole carousel.
+- **Add tap-outside-to-close**: Wrap the inner card in a narrower container and attach an `onClick` handler on the backdrop `div` that triggers skip when tapping outside the card content.
 
-Add `padding-top: env(safe-area-inset-top, 0px)` to the top-level container of each fullscreen photo screen. In non-PWA (browser) mode, `env(safe-area-inset-top)` resolves to `0px`, so there is zero visual impact outside of PWA mode.
+### 2. `src/components/business/BusinessOnboarding.tsx`
+- **Same treatment**: Remove the top-right "Skip X" button (lines 64-72).
+- **Add a "Skip" text link** below the "Next/Get Started" button.
+- **Add tap-outside-to-close** on the backdrop area.
 
-## Files to Change
+## What Stays the Same
+- All slide content, progress dots, and Next/Get Started button logic remain untouched.
+- FindFriendsOnboarding is not changed (it has a proper "Skip for now" at the bottom, no conflicting X button).
+- DailyNudgeModal uses a Dialog which already supports click-outside-to-close.
 
-| File | Change |
-|------|--------|
-| `src/components/PhotoFilterScreen.tsx` (line 106) | Add `pt-[env(safe-area-inset-top,0px)]` to the outer `div` |
-| `src/components/PostMediaPicker.tsx` (line ~97) | Add `pt-[env(safe-area-inset-top,0px)]` to the outer `div` |
-| `src/components/PostCaptionScreen.tsx` (line 213) | Add `pt-[env(safe-area-inset-top,0px)]` to the outer `div` |
-| `src/components/StoryCaptureScreen.tsx` (line ~131) | Add `pt-[env(safe-area-inset-top,0px)]` to the outer `div` |
-| `src/components/StoryEditor.tsx` | Add `pt-[env(safe-area-inset-top,0px)]` to the outer `div` |
+## Technical Detail
 
-Each change is a single class addition to the root `<div className="fixed inset-0 ...">` element. No other code is modified.
-
-## Why This Is Safe for Non-PWA Mode
-
-The CSS `env(safe-area-inset-top, 0px)` function returns `0px` when safe area insets aren't defined (i.e., in a regular browser tab). This means zero extra padding is applied outside of PWA/standalone mode -- the layout is completely unchanged.
+For tap-outside-to-close, the outer `div` gets an `onClick` handler that checks `e.target === e.currentTarget` (only fires when clicking the backdrop, not the card content). This is the same pattern used in `ImDownConfirmation.tsx`.
 
