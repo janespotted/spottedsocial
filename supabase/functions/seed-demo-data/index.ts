@@ -44,8 +44,9 @@ Deno.serve(async (req) => {
       const fr=(real||[]).flatMap((r:any)=>uids.map(d=>({user_id:r.id,friend_id:d,status:'accepted'})));
       if(fr.length) await sb.from('friendships').insert(fr);
       
-      // Venues
-      const {data:vens}=await sb.from('venues').upsert(V.map(v=>({name:v.name,lat:v.lat,lng:v.lng,neighborhood:v.hood,is_demo:true,popularity_rank:v.rank,city})),{onConflict:'name'}).select('id,name');
+      // Venues - upsert then fetch IDs separately (upsert may not return on conflict)
+      await sb.from('venues').upsert(V.map(v=>({name:v.name,lat:v.lat,lng:v.lng,neighborhood:v.hood,is_demo:true,popularity_rank:v.rank,city})),{onConflict:'name'});
+      const {data:vens}=await sb.from('venues').select('id,name').in('name',V.map(v=>v.name));
       const vm=new Map((vens||[]).map((v:any)=>[v.name,v.id]));
       
       // Night statuses - 8 users "out" at venues, clustered at top venues for leaderboard avatars
