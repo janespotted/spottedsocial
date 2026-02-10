@@ -1,40 +1,51 @@
 
 
-# Add Fake DMs to Messages Section in Demo Mode
+# Fix: Demo DMs Not Appearing in Messages Tab
 
-## Problem
-The Messages tab is empty in demo mode because the seed function never creates DM threads or messages between the real user and demo users.
+## Root Cause
+
+The demo was seeded **before** the DM creation code was added to the seed function. The `DemoActivator` only triggers once (when `?demo=yc` URL param is present), so it won't re-seed on subsequent visits. Result: DM threads were never created for the current user.
 
 ## Solution
 
-**File: `supabase/functions/seed-demo-data/index.ts`**
+Two changes to ensure DMs always appear in demo mode:
 
-Add DM thread and message seeding at the end of the `seed` action. The seed function already receives `userId` (the real user's ID) in the request body.
+### 1. MessagesTab: Auto-seed DMs when missing in demo mode
 
-### What gets seeded:
-- 4 DM threads between the real user and 4 different demo users
-- Each thread gets 2-3 messages with realistic nightlife chat content (mix of sent by demo user and the real user)
-- Messages are timestamped within the last 1-2 hours so they appear recent
+**File: `src/components/messages/MessagesTab.tsx`**
 
-### Implementation:
+After `fetchThreads` completes, if `demoEnabled === true` and `threads` is empty, automatically invoke the `seed-demo-data` edge function (with the current user's ID and city) and re-fetch threads. This ensures DMs are created even if the original seed ran before the DM code existed.
 
-1. Pick 4 demo user IDs for conversations
-2. For each, call the existing `create_dm_thread` RPC (or insert directly into `dm_threads` + `dm_thread_members` using service role)
-3. Insert `dm_messages` with varied timestamps and demo-appropriate text like:
-   - "Are you coming out tonight?"
-   - "We're at Le Bain, come through!"
-   - "Omw! Save me a spot"
-   - "This DJ is insane rn"
+Add a guard (`hasTriedDemoSeed` ref) to prevent infinite loops -- only attempt once per session.
 
-### Cleanup:
-On `clear` action, delete DM messages and threads created with demo users (find threads where a member is a demo user profile).
+```typescript
+const hasTriedDemoSeed = useRef(false);
 
-### No changes needed to MessagesTab
-The `MessagesTab` already includes demo user threads when `demoEnabled` is true (line 147-149 only filters them in bootstrap-without-demo mode). So once threads + messages exist in the DB, they'll show up automatically.
+// After fetchThreads sets threads to []
+if (demoEnabled && threads.length === 0 && !hasTriedDemoSeed.current) {
+  hasTriedDemoSeed.current = true;
+  // Re-seed to create DMs
+  await supabase.functions.invoke('seed-demo-data', {
+    body: { action: 'seed', city: getDemoCity(), userId: user.id }
+  });
+  // Re-fetch threads
+  fetchThreads();
+}
+```
+
+### 2. Seed function: Skip cleanup if data already exists (optional optimization)
+
+The seed function already handles re-seeding gracefully (it deletes old demo data first, then recreates). No changes needed to the edge function itself since it was already updated with DM creation logic.
 
 ## Summary
 
 | File | Change |
 |------|--------|
-| `supabase/functions/seed-demo-data/index.ts` | Add DM thread creation (4 threads) with 2-3 messages each between real user and demo users; clean up on `clear` |
+| `src/components/messages/MessagesTab.tsx` | Add auto-seed logic: when demo mode is on and inbox is empty, trigger seed-demo-data once and re-fetch threads |
 
+## Expected Result
+
+- User visits Messages tab in demo mode
+- If no DM threads exist, the seed function runs automatically (one-time)
+- 4 demo DM conversations appear with realistic nightlife chat messages
+- Subsequent visits use the already-seeded data without re-triggering
