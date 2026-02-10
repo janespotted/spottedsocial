@@ -56,79 +56,82 @@
    const isLastSlide = currentSlide === slides.length - 1;
  
    return (
-     <div className="fixed inset-0 z-[100] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center">
-       <div className="w-full max-w-[430px] h-full flex flex-col">
-         {/* Skip Button */}
-         <div className="flex justify-end p-6">
-           <button
-             onClick={handleSkip}
-             className="text-white/60 hover:text-white transition-colors flex items-center gap-1"
-           >
-             Skip
-             <X className="h-4 w-4" />
-           </button>
-         </div>
- 
-         {/* Content */}
-         <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
-           {/* Icon */}
-           <div 
-             className="w-24 h-24 rounded-full flex items-center justify-center mb-8"
-             style={{ 
-               backgroundColor: `${slide.color}20`,
-               boxShadow: `0 0 60px ${slide.color}40`,
-             }}
-           >
-             <Icon 
-               className="h-12 w-12"
-               style={{ color: slide.color }}
-             />
-           </div>
- 
-           {/* Title */}
-           <h1 className="text-3xl font-bold text-white mb-4">
-             {slide.title}
-           </h1>
- 
-           {/* Description */}
-           <p className="text-white/70 text-lg leading-relaxed max-w-sm">
-             {slide.description}
-           </p>
-         </div>
- 
-         {/* Bottom Section */}
-         <div className="p-8 space-y-6">
-           {/* Progress Dots */}
-           <div className="flex justify-center gap-2">
-             {slides.map((_, index) => (
-               <button
-                 key={index}
-                 onClick={() => setCurrentSlide(index)}
-                 className={`w-2 h-2 rounded-full transition-all ${
-                   index === currentSlide
-                     ? 'w-6 bg-[#d4ff00]'
-                     : 'bg-white/30 hover:bg-white/50'
-                 }`}
-               />
-             ))}
-           </div>
- 
-           {/* Next/Get Started Button */}
-           <Button
-             onClick={handleNext}
-             className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold text-lg py-6 rounded-full"
-           >
-             {isLastSlide ? (
-               "Get Started"
-             ) : (
-               <>
-                 Next
-                 <ChevronRight className="h-5 w-5 ml-2" />
-               </>
-             )}
-           </Button>
-         </div>
-       </div>
-     </div>
+    <div 
+      className="fixed inset-0 z-[100] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center"
+      onClick={(e) => { if (e.target === e.currentTarget) handleSkip(); }}
+    >
+      <div className="w-full max-w-[430px] h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Spacer replacing removed skip button */}
+        <div className="h-16" />
+
+        {/* Content */}
+        <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
+          {/* Icon */}
+          <div 
+            className="w-24 h-24 rounded-full flex items-center justify-center mb-8"
+            style={{ 
+              backgroundColor: `${slide.color}20`,
+              boxShadow: `0 0 60px ${slide.color}40`,
+            }}
+          >
+            <Icon 
+              className="h-12 w-12"
+              style={{ color: slide.color }}
+            />
+          </div>
+
+          {/* Title */}
+          <h1 className="text-3xl font-bold text-white mb-4">
+            {slide.title}
+          </h1>
+
+          {/* Description */}
+          <p className="text-white/70 text-lg leading-relaxed max-w-sm">
+            {slide.description}
+          </p>
+        </div>
+
+        {/* Bottom Section */}
+        <div className="p-8 space-y-6">
+          {/* Progress Dots */}
+          <div className="flex justify-center gap-2">
+            {slides.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentSlide(index)}
+                className={`w-2 h-2 rounded-full transition-all ${
+                  index === currentSlide
+                    ? 'w-6 bg-[#d4ff00]'
+                    : 'bg-white/30 hover:bg-white/50'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Next/Get Started Button */}
+          <Button
+            onClick={handleNext}
+            className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold text-lg py-6 rounded-full"
+          >
+            {isLastSlide ? (
+              "Get Started"
+            ) : (
+              <>
+                Next
+                <ChevronRight className="h-5 w-5 ml-2" />
+              </>
+            )}
+          </Button>
+
+          {/* Skip link */}
+          <button
+            onClick={handleSkip}
+            className="w-full text-center text-white/40 hover:text-white/60 text-sm transition-colors"
+          >
+            Skip
+          </button>
+        </div>
+      </div>
+    </div>
    );
  }
