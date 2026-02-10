@@ -1,28 +1,49 @@
 
 
-# Fix: Remove Overlapping X Buttons and Add Tap-Outside-to-Dismiss
+# Audit: Venice Venue Location Accuracy and Data Fixes
 
-## Problem
-The OnboardingCarousel and BusinessOnboarding have both a "Skip X" button in the top-right and a "Next" button at the bottom. On smaller screens these can feel redundant or overlap visually. The user also wants to be able to tap outside the content card to dismiss.
+## Issues Found
 
-## Changes
+### 1. Dudley Market city is wrong
+Dudley Market is stored with `city: 'nyc'` instead of `city: 'la'`. This means it won't appear in LA-filtered features (newsfeed, leaderboard) even though it's a Venice venue.
 
-### 1. `src/components/OnboardingCarousel.tsx`
-- **Remove the top-right "Skip X" button entirely** (lines 78-86). The "Next" button at the bottom already handles progression.
-- **Add a "Skip" text-only link** below the Next button (subtle, no X icon) for users who want to skip the whole carousel.
-- **Add tap-outside-to-close**: Wrap the inner card in a narrower container and attach an `onClick` handler on the backdrop `div` that triggers skip when tapping outside the card content.
+### 2. Kassi Rooftop coordinates are significantly wrong
+- **DB coords:** 33.9935, -118.4800 (points to somewhere near the canals/residential area)
+- **Real location** (Hotel Erwin, 1697 Pacific Ave): approximately **33.9860, -118.4633**
+- This is ~1km off, which explains why it was incorrectly detected as "nearby" from your boardwalk location
 
-### 2. `src/components/business/BusinessOnboarding.tsx`
-- **Same treatment**: Remove the top-right "Skip X" button (lines 64-72).
-- **Add a "Skip" text link** below the "Next/Get Started" button.
-- **Add tap-outside-to-close** on the backdrop area.
+### 3. Dudley Market coordinates are also off
+- **DB coords:** 33.9942, -118.4797 (same area as Kassi - both placed ~1km north)
+- **Real location** (11 Dudley Ave): approximately **33.9862, -118.4720**
+- With corrected coords, Dudley Market would actually be very close to 523 Ocean Front Walk (~100m), and should have been the detected venue
 
-## What Stays the Same
-- All slide content, progress dots, and Next/Get Started button logic remain untouched.
-- FindFriendsOnboarding is not changed (it has a proper "Skip for now" at the bottom, no conflicting X button).
-- DailyNudgeModal uses a Dialog which already supports click-outside-to-close.
+### 4. Venice Beach Bar and Kitchen has similar coordinate issues
+- DB coords nearly identical to Dudley Market (33.9941, -118.4799), suggesting copy-paste or batch geocoding error
+
+## Distances from Your Location (523 Ocean Front Walk)
+
+With current (wrong) DB coordinates, neither Kassi nor Dudley is within the 500m detection range from your actual location. The venues that should be detected are:
+
+| Venue | Distance | Notes |
+|-------|----------|-------|
+| Hinano Cafe Venice | 186m | Correct coords, would trigger detection |
+| Venice Whaler | 278m | Correct coords |
+| Waterfront Venice | 427m | Correct coords |
+| Dudley Market | ~100m (corrected) | Currently 1km off in DB |
+| Kassi Rooftop | ~865m (corrected) | Should never trigger from boardwalk |
+
+## Fix Plan
+
+### Database Migration
+Update the three problematic records:
+
+1. **Dudley Market**: Fix city to `la`, update lat/lng to **33.9862, -118.4720**
+2. **Kassi Rooftop**: Update lat/lng to **33.9860, -118.4633**
+3. **Venice Beach Bar and Kitchen**: Update lat/lng to **33.9860, -118.4633** (also at Hotel Erwin / boardwalk area -- needs verification, but current coords are clearly wrong)
+
+### No Code Changes Needed
+The detection logic (Haversine distance, 200m trigger radius, 500m dropdown radius, dwell time, GPS accuracy gates) is all correct. The problem is purely bad coordinate data in the database.
 
 ## Technical Detail
 
-For tap-outside-to-close, the outer `div` gets an `onClick` handler that checks `e.target === e.currentTarget` (only fires when clicking the backdrop, not the card content). This is the same pattern used in `ImDownConfirmation.tsx`.
-
+The `find_nearest_venue` and `find_nearby_venues` database functions use the Haversine formula correctly. With accurate venue coordinates, the system will correctly identify Dudley Market as the nearest venue when you're at 523 Ocean Front Walk, and Kassi Rooftop will correctly not trigger (it's ~865m away on Pacific Ave).
