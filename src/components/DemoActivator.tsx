@@ -153,6 +153,8 @@ async function simulateCheckinForDemo(
       lng: venue.lng,
       expires_at: expiresAt,
       updated_at: now,
+      is_private_party: false,
+      planning_neighborhood: null,
     }, { onConflict: 'user_id' });
 
     // Create checkin record
