@@ -772,11 +772,11 @@ export default function Map() {
 
   // Determine how many venues to show based on zoom level
   const getVisibleVenueCount = (zoom: number): number => {
-    if (zoom < 11) return 5;         // City overview: Top 5 hottest venues
-    if (zoom < 12) return 15;        // Wide view: Top 15 venues
-    if (zoom < 13) return 30;        // Neighborhood view: Top 30 venues
-    if (zoom < 14) return 60;        // Closer: Top 60 venues
-    if (zoom < 15) return 100;       // Close: Top 100 venues
+    if (zoom < 11) return 25;        // City overview: Top 25 venues
+    if (zoom < 12) return 50;        // Wide view: Top 50 venues
+    if (zoom < 13) return 100;       // Neighborhood view: Top 100 venues
+    if (zoom < 14) return 150;       // Closer: Top 150 venues
+    if (zoom < 15) return 200;       // Close: Top 200 venues
     return Infinity;                  // All venues at zoom 15+
   };
 
