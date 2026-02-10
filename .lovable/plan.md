@@ -1,79 +1,68 @@
 
 
-# TestFlight Prep: What Lovable Can Fix Now
+# Fix Demo Mode: Force NYC Location, Show People on Map
 
-## What I CAN do (in Lovable):
+## Problems Identified
 
-### 1. Fix the Capacitor config for production
-Remove the remote server URL so the app bundles locally instead of loading from a remote preview. This is the #1 blocker.
+1. **City overridden by GPS**: When you open `?demo=yc&city=nyc`, the `DemoActivator` caches "nyc" but then `useUserCity` detects your real GPS (LA) and overwrites the cache. Result: app shows LA instead of NYC.
 
-**File:** `capacitor.config.ts`
-- Remove the `server` block entirely
-- Keep `appId`, `appName`, and `webDir`
+2. **No people on map**: Demo users are seeded at NYC venues, but since the city got overridden to LA, the map filters them out (it only shows demo users at venues matching the current city).
 
-### 2. Add Info.plist permission descriptions
-Create an `ios/App/App/Info.plist` configuration via Capacitor config so that when you run `npx cap add ios`, the permission strings are already set.
-
-**File:** `capacitor.config.ts` -- add an `ios` section:
-```typescript
-ios: {
-  contentInset: 'automatic',
-  backgroundColor: '#0a0118',
-}
-```
-
-The actual `Info.plist` entries (NSCameraUsageDescription, NSLocationWhenInUseUsageDescription, NSPhotoLibraryUsageDescription) must be added in Xcode after running `npx cap add ios`, because Lovable cannot create the `ios/` directory -- that requires Xcode on a Mac.
+3. **Your own avatar missing from map**: The demo check-in creates a `night_statuses` row and a `checkins` row, but never sets `is_out = true` and `last_known_lat/lng` on your `profiles` row. The map reads `profiles.is_out` to show your yellow avatar marker -- since it's not set, you're invisible.
 
 ---
 
-## What YOU must do on your Mac (cannot be done in Lovable):
+## Fix 1: Skip GPS detection when demo mode is active
 
-| Step | Command / Action | Time |
-|------|-----------------|------|
-| 1 | Export project to GitHub, git clone it | 5 min |
-| 2 | `npm install` | 2 min |
-| 3 | `npm run build` | 1 min |
-| 4 | `npx cap add ios` | 1 min |
-| 5 | `npx cap sync` | 1 min |
-| 6 | Open `ios/App/App/Info.plist` in Xcode and add these keys: | 5 min |
-|   | `NSCameraUsageDescription` = "Spotted needs camera access to take photos for check-ins and stories" | |
-|   | `NSLocationWhenInUseUsageDescription` = "Spotted uses your location to find nearby venues and show you on the map" | |
-|   | `NSPhotoLibraryUsageDescription` = "Spotted needs photo library access to share photos in posts and stories" | |
-| 7 | Set your Apple Developer Team in Xcode Signing | 5 min |
-| 8 | Archive and upload to TestFlight | 10 min |
+**File: `src/hooks/useUserCity.ts`**
 
-**Total: ~30 minutes** if you have a Mac with Xcode and a $99 Apple Developer account.
+When demo mode is enabled, the hook should respect the cached city (set by DemoActivator) and NOT run GPS detection that would override it.
 
----
+- Import `getDemoMode` from `@/lib/demo-data`
+- If demo mode is ON, skip the `detectUserCity()` call entirely
+- Only use the cached city value
 
-## What Lovable will change (1 file):
+## Fix 2: Update user's profile during demo check-in
 
-**`capacitor.config.ts`** -- Remove the development server block and add iOS config:
+**File: `src/components/DemoActivator.tsx`**
+
+In the `simulateCheckinForDemo` function, after creating the night_status and checkin records, also update the user's `profiles` row:
 
 ```typescript
-import type { CapacitorConfig } from '@capacitor/cli';
-
-const config: CapacitorConfig = {
-  appId: 'app.lovable.922058387a8543c998041815d203234f',
-  appName: 'Spotted',
-  webDir: 'dist',
-  ios: {
-    contentInset: 'automatic',
-    backgroundColor: '#0a0118',
-  }
-};
-
-export default config;
+await supabase.from('profiles').update({
+  is_out: true,
+  last_known_lat: venue.lat,
+  last_known_lng: venue.lng,
+  last_location_at: now,
+  last_active_at: now,
+}).eq('id', userId);
 ```
 
-This is a small but critical change -- without removing the `server` block, the TestFlight build will try to load from a Lovable URL instead of running the bundled app.
+This ensures the map's user-location logic finds valid coordinates and shows the yellow "me" marker.
+
+## Fix 3: Add Palm Beach to FEATURED_VENUES
+
+**File: `src/components/DemoActivator.tsx`**
+
+The `FEATURED_VENUES` map is missing `'pb'`, which would crash if someone uses `?demo=yc&city=pb`. Add:
+
+```typescript
+pb: { name: 'Cucina', lat: 26.7056, lng: -80.0364 }
+```
 
 ---
 
-## Do you have these prerequisites?
+## Summary of Changes
 
-Before approving, confirm you have:
-- A Mac with Xcode installed (required, no workaround)
-- Apple Developer Account ($99/year) -- if not, sign up now at developer.apple.com, approval takes 24-48 hours
-- Your GitHub repo connected (check Settings in Lovable)
+| File | Change |
+|------|--------|
+| `src/hooks/useUserCity.ts` | Skip GPS detection when demo mode is active, use cached city |
+| `src/components/DemoActivator.tsx` | Update `profiles` row with `is_out`, lat/lng during demo check-in; add `pb` to FEATURED_VENUES |
 
+## Expected Result
+
+- Opening `?demo=yc&city=nyc` from LA will force the app to stay on NYC
+- Map will center on NYC and show demo user avatars at NYC venues
+- Your own yellow avatar will appear at Le Bain
+- Yap board will show NYC venue messages
+- All works for `city=la` and `city=pb` too
