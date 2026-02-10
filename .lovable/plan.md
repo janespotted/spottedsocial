@@ -1,51 +1,41 @@
 
 
-# Fix: Demo DMs Not Appearing in Messages Tab
+# Fix: Demo Check-in Shows "Private Party" Instead of Le Bain
 
 ## Root Cause
 
-The demo was seeded **before** the DM creation code was added to the seed function. The `DemoActivator` only triggers once (when `?demo=yc` URL param is present), so it won't re-seed on subsequent visits. Result: DM threads were never created for the current user.
+The `simulateCheckinForDemo` function upserts into `night_statuses` but never sets `is_private_party: false`. When the user previously checked into a private party, that boolean flag persists through the upsert (Postgres only updates columns you specify). The profile page then renders "Out - Private Party (Santa Monica)" instead of "Out - Le Bain".
 
-## Solution
+Current DB state confirms this: `is_private_party: true`, `venue_name: Thunderbolt` (a leftover from a prior session).
 
-Two changes to ensure DMs always appear in demo mode:
+## Fix
 
-### 1. MessagesTab: Auto-seed DMs when missing in demo mode
+**File: `src/components/DemoActivator.tsx`**
 
-**File: `src/components/messages/MessagesTab.tsx`**
-
-After `fetchThreads` completes, if `demoEnabled === true` and `threads` is empty, automatically invoke the `seed-demo-data` edge function (with the current user's ID and city) and re-fetch threads. This ensures DMs are created even if the original seed ran before the DM code existed.
-
-Add a guard (`hasTriedDemoSeed` ref) to prevent infinite loops -- only attempt once per session.
+Add `is_private_party: false` and `planning_neighborhood: null` to the upsert in `simulateCheckinForDemo` to fully reset the night status:
 
 ```typescript
-const hasTriedDemoSeed = useRef(false);
-
-// After fetchThreads sets threads to []
-if (demoEnabled && threads.length === 0 && !hasTriedDemoSeed.current) {
-  hasTriedDemoSeed.current = true;
-  // Re-seed to create DMs
-  await supabase.functions.invoke('seed-demo-data', {
-    body: { action: 'seed', city: getDemoCity(), userId: user.id }
-  });
-  // Re-fetch threads
-  fetchThreads();
-}
+await supabase.from('night_statuses').upsert({
+  user_id: userId,
+  status: 'out',
+  venue_id: venueData.id,
+  venue_name: venue.name,
+  lat: venue.lat,
+  lng: venue.lng,
+  expires_at: expiresAt,
+  updated_at: now,
+  is_private_party: false,       // <-- ADD
+  planning_neighborhood: null,   // <-- ADD
+}, { onConflict: 'user_id' });
 ```
-
-### 2. Seed function: Skip cleanup if data already exists (optional optimization)
-
-The seed function already handles re-seeding gracefully (it deletes old demo data first, then recreates). No changes needed to the edge function itself since it was already updated with DM creation logic.
 
 ## Summary
 
 | File | Change |
 |------|--------|
-| `src/components/messages/MessagesTab.tsx` | Add auto-seed logic: when demo mode is on and inbox is empty, trigger seed-demo-data once and re-fetch threads |
+| `src/components/DemoActivator.tsx` | Add `is_private_party: false` and `planning_neighborhood: null` to the night_status upsert to fully reset previous check-in state |
 
 ## Expected Result
 
-- User visits Messages tab in demo mode
-- If no DM threads exist, the seed function runs automatically (one-time)
-- 4 demo DM conversations appear with realistic nightlife chat messages
-- Subsequent visits use the already-seeded data without re-triggering
+After re-activating demo mode (revisit the magic URL), the profile will correctly show "Out - Le Bain" instead of "Private Party (Santa Monica)".
+
