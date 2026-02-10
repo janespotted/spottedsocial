@@ -1,67 +1,49 @@
 
-# Demo Mode: Force Le Bain Location on "Yes I'm Out"
 
-## Problem
-When a YC reviewer in demo mode taps "Yes I'm Out" in the Are You Out modal, the app tries to get their real GPS -- which resolves to LA (or wherever they actually are), not NYC. The demo experience breaks because the detected venue won't be Le Bain.
+# Demo Mode: Populate "Who's Going Out Tonight" and Leaderboard Avatars
 
-## Solution
+## Problem 1: Empty "Who's Going Out Tonight" on Home
 
-Intercept the `captureLocationWithVenue` call in `CheckInModal.tsx` when demo mode is active. Instead of hitting GPS, return fake location data pointing to Le Bain (or the city's featured venue).
+The Home page's `fetchPlanningFriends` always queries through real friendships, even in demo mode. The Map page already has a demo shortcut that fetches planning demo users directly from `night_statuses` -- but Home doesn't have this logic. Result: 0 planning friends shown on Home in demo mode.
 
-**File: `src/components/CheckInModal.tsx`**
+## Problem 2: No friend avatars on leaderboard venues
 
-1. Import `getDemoMode` from `@/lib/demo-data` and the `FEATURED_VENUES` concept (we'll inline the coords or look up from the venues table)
-2. Modify `captureAndDeriveVenue` to check demo mode first:
-   - If demo enabled, look up the featured venue for the demo city from the `venues` table (e.g., "Le Bain" for NYC)
-   - Return a fake `LocationData` with that venue's coordinates, name, and ID -- skip GPS entirely
-   - Fall through to normal GPS flow if demo mode is off
+The seed function spreads 5 "out" demo users across different venues (1 per venue). So each venue shows at most 1 avatar. To make the leaderboard look alive, we need to cluster multiple demo users at key venues so avatars stack up.
 
-**Changes (~15 lines added):**
+---
 
-```typescript
-import { getDemoMode } from '@/lib/demo-data';
-import { getCachedCity } from '@/lib/city-detection';
+## Fix 1: Home page demo shortcut for planning friends
 
-// Inside captureAndDeriveVenue:
-const demoMode = getDemoMode();
-if (demoMode.enabled) {
-  const demoCity = getCachedCity() || 'nyc';
-  const DEMO_VENUES: Record<string, { name: string; lat: number; lng: number }> = {
-    nyc: { name: 'Le Bain', lat: 40.7414, lng: -74.0078 },
-    la: { name: 'Sound Nightclub', lat: 34.0412, lng: -118.2468 },
-    pb: { name: 'Cucina', lat: 26.7056, lng: -80.0364 },
-  };
-  const venue = DEMO_VENUES[demoCity] || DEMO_VENUES.nyc;
-  
-  // Look up venue ID from database
-  const { data: venueRow } = await supabase
-    .from('venues')
-    .select('id')
-    .eq('name', venue.name)
-    .maybeSingle();
-  
-  const locData: LocationData = {
-    lat: venue.lat,
-    lng: venue.lng,
-    timestamp: new Date().toISOString(),
-    venueId: venueRow?.id || null,
-    venueName: venue.name,
-    nearbyVenues: [],
-  };
-  setLocationData(locData);
-  setDetectedVenue(venue.name);
-  setCustomVenue(venue.name);
-  setSelectedVenueId(venueRow?.id || null);
-  setShowVenueConfirm(true);
-  setIsDetectingLocation(false);
-  return;
-}
-```
+**File: `src/pages/Home.tsx`**
 
-This is scoped entirely to demo mode -- production users are completely unaffected.
+Add a demo-mode branch to `fetchPlanningFriends` (mirroring what Map.tsx already does at lines 235-245):
+
+- When `demoEnabled` is true, skip the friendship query
+- Directly fetch `night_statuses` with `status='planning'` and `profiles.is_demo = true`
+- Map results to the same `PlanningFriend` shape and set state
+- Return early, skipping normal friendship-based logic
+
+## Fix 2: Seed more demo users at key venues for leaderboard
+
+**File: `supabase/functions/seed-demo-data/index.ts`**
+
+Currently creates 12 demo users total, puts 5 at venues (1 each). Change to:
+
+- Increase "out" users to 8 (from 5), with some users sharing venues so avatars cluster
+- Specifically place 2-3 users at the top-ranked venue (Le Bain for NYC) so the leaderboard row shows a stack of friend avatars
+- Keep 3 users in "planning" status for the "Who's Going Out Tonight" section (already done, these will now actually show on Home)
+
+---
 
 ## Summary
 
 | File | Change |
 |------|--------|
-| `src/components/CheckInModal.tsx` | Import demo helpers; short-circuit `captureAndDeriveVenue` to return featured venue coords when demo mode is active |
+| `src/pages/Home.tsx` | Add demo-mode branch in `fetchPlanningFriends` to directly query demo planning statuses (skip friendship lookup) |
+| `supabase/functions/seed-demo-data/index.ts` | Cluster more demo users at top venues so leaderboard shows stacked friend avatars |
+
+## Expected Result
+
+- Home page "Who's Going Out Tonight" shows 3 demo users with neighborhoods in demo mode
+- Leaderboard venues show 2-3 stacked friend avatars at top venues (especially Le Bain)
+- Map continues working as before (already had demo shortcut)
