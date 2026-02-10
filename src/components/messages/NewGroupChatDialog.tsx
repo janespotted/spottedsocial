@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useProfilesSafe } from '@/hooks/useProfilesCache';
+import { useFriendIds } from '@/hooks/useFriendIds';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -26,6 +28,8 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
   const navigate = useNavigate();
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
+  const { data: allProfilesData } = useProfilesSafe();
+  const { data: cachedFriendIds } = useFriendIds(user?.id);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<Friend[]>([]);
   const [search, setSearch] = useState('');
@@ -48,40 +52,24 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
   const fetchFriends = async () => {
     setLoading(true);
     try {
-      // Get accepted friendships (both directions) and user's threads in parallel
-      const [sentResult, receivedResult, userThreadsResult] = await Promise.all([
-        supabase
-          .from('friendships')
-          .select('friend_id')
-          .eq('user_id', user?.id)
-          .eq('status', 'accepted'),
-        supabase
-          .from('friendships')
-          .select('user_id')
-          .eq('friend_id', user?.id)
-          .eq('status', 'accepted'),
-        supabase
-          .from('dm_thread_members')
-          .select('thread_id')
-          .eq('user_id', user?.id)
-      ]);
-
-      const friendIds = [
-        ...(sentResult.data?.map(f => f.friend_id) || []),
-        ...(receivedResult.data?.map(f => f.user_id) || [])
-      ];
+      const friendIds = cachedFriendIds || [];
 
       if (friendIds.length === 0) {
         setFriends([]);
         return;
       }
 
+      // Get user's threads for recency sorting
+      const { data: userThreadsData } = await supabase
+        .from('dm_thread_members')
+        .select('thread_id')
+        .eq('user_id', user?.id);
+
       // Get recent messages to determine recency
-      const threadIds = userThreadsResult.data?.map(t => t.thread_id) || [];
+      const threadIds = userThreadsData?.map(t => t.thread_id) || [];
       const recentFriendIds: string[] = [];
       
       if (threadIds.length > 0) {
-        // Get recent messages ordered by time
         const { data: recentMessages } = await supabase
           .from('dm_messages')
           .select('thread_id, created_at')
@@ -90,10 +78,8 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
           .limit(50);
 
         if (recentMessages && recentMessages.length > 0) {
-          // Get unique thread IDs in order of recency
           const recentThreadIds = [...new Set(recentMessages.map(m => m.thread_id))];
           
-          // Get members of these threads
           const { data: threadMembers } = await supabase
             .from('dm_thread_members')
             .select('thread_id, user_id')
@@ -101,7 +87,6 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
             .neq('user_id', user?.id);
 
           if (threadMembers) {
-            // Order by thread recency
             for (const threadId of recentThreadIds) {
               const members = threadMembers.filter(m => m.thread_id === threadId);
               for (const member of members) {
@@ -114,10 +99,8 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
         }
       }
 
-      // Get friend profiles using safe RPC
-      const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
-      
-      let profiles = (allProfiles || []).filter((p: any) => friendIds.includes(p.id));
+      // Use cached profiles
+      let profiles = (allProfilesData || []).filter((p: any) => friendIds.includes(p.id));
       
       if (!demoEnabled) {
         profiles = profiles.filter((p: any) => p.is_demo === false);
@@ -136,15 +119,11 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
         const aRecentIndex = recentFriendIds.indexOf(a.id);
         const bRecentIndex = recentFriendIds.indexOf(b.id);
         
-        // Both are recent - sort by recency
         if (aRecentIndex !== -1 && bRecentIndex !== -1) {
           return aRecentIndex - bRecentIndex;
         }
-        // Only a is recent
         if (aRecentIndex !== -1) return -1;
-        // Only b is recent
         if (bRecentIndex !== -1) return 1;
-        // Neither recent - alphabetical
         return a.display_name.localeCompare(b.display_name);
       });
 

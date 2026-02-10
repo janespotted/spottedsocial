@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useProfilesSafe } from '@/hooks/useProfilesCache';
+import { useFriendIds } from '@/hooks/useFriendIds';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -41,6 +43,8 @@ export function PrivatePartyInviteModal({
 }: PrivatePartyInviteModalProps) {
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
+  const { data: allProfilesData } = useProfilesSafe();
+  const { data: cachedFriendIds } = useFriendIds(user?.id);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -61,57 +65,31 @@ export function PrivatePartyInviteModal({
 
     setLoading(true);
     try {
-      // Fetch accepted friendships (both directions)
-      const { data: sentFriendships } = await supabase
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', user.id)
-        .eq('status', 'accepted');
-
-      const { data: receivedFriendships } = await supabase
-        .from('friendships')
-        .select('user_id')
-        .eq('friend_id', user.id)
-        .eq('status', 'accepted');
-
-      const friendIds = [
-        ...(sentFriendships?.map(f => f.friend_id) || []),
-        ...(receivedFriendships?.map(f => f.user_id) || [])
-      ];
+      const friendIds = cachedFriendIds || [];
 
       if (friendIds.length === 0) {
         setFriends([]);
         return;
       }
 
-      // Fetch friend profiles and night statuses in parallel
-      const [profilesResult, statusesResult] = await Promise.all([
-        supabase.rpc('get_profiles_safe'),
-        supabase
-          .from('night_statuses')
-          .select('user_id, status, venue_name, planning_neighborhood')
-          .in('user_id', friendIds)
-      ]);
+      // Fetch night statuses
+      const { data: nightStatuses } = await supabase
+        .from('night_statuses')
+        .select('user_id, status, venue_name, planning_neighborhood')
+        .in('user_id', friendIds);
 
-      const allProfiles = profilesResult.data || [];
-      const nightStatuses = statusesResult.data || [];
-
-      // Create a map of user_id to night status
       const statusMap = new Map(
-        nightStatuses.map(ns => [ns.user_id, ns])
+        (nightStatuses || []).map(ns => [ns.user_id, ns])
       );
 
-      // Filter to only friends and conditionally exclude demo users
-      let profiles = allProfiles
+      let profiles = (allProfilesData || [])
         .filter((p: any) => friendIds.includes(p.id))
         .sort((a: any, b: any) => a.display_name.localeCompare(b.display_name));
 
-      // Only filter out demo users when demo mode is OFF
       if (!demoEnabled) {
         profiles = profiles.filter((p: any) => p.is_demo === false);
       }
 
-      // Deduplicate by display_name
       const seenNames = new Set<string>();
       const uniqueFriends: Friend[] = [];
 

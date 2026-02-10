@@ -69,6 +69,8 @@ export default function Home() {
     newComment,
     setNewComment,
     animatingLike,
+    hasMorePosts,
+    isLoadingMore,
     getTimeAgo,
     fetchFriends,
     fetchPosts,
@@ -78,6 +80,9 @@ export default function Home() {
     handleLikePost,
     handleLikeComment,
     handleDeletePost,
+    loadMorePosts,
+    handleIncrementalNewPost,
+    handleIncrementalDelete,
   } = useFeed({
     userId: user?.id,
     demoEnabled,
@@ -222,11 +227,11 @@ export default function Home() {
     console.log('📝 New post received via realtime');
   }, []);
 
-  // Realtime subscriptions with proper cleanup - using incremental where possible
+  // Realtime subscriptions - use incremental handlers
   useRealtimeSubscriptions({
-    onPostsChange: fetchPosts, // Full refetch for new posts to ensure proper filtering
+    onNewPost: handleIncrementalNewPost,
+    onPostDeleted: handleIncrementalDelete,
     onStoriesChange: fetchStories,
-    // Likes are handled optimistically, no need for realtime callback
   });
 
   const handlePostDelete = async (postId: string) => {

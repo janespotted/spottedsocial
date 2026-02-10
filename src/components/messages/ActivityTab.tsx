@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isVenueOpen, VenueHours } from '@/lib/venue-hours';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
@@ -126,6 +127,7 @@ export function ActivityTab() {
   const demoEnabled = useDemoMode();
   const { bootstrapEnabled } = useBootstrapMode();
   const { city } = useUserCity();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (user) {
@@ -154,10 +156,11 @@ export function ActivityTab() {
 
   const fetchActivities = async () => {
     // Parallelize initial queries including real notifications
-    const [currentStatusResult, sentFriendshipsResult, receivedFriendshipsResult, realInvitesResult] = await Promise.all([
+    // Use cached friend IDs
+    const cachedFriendIds: string[] = queryClient.getQueryData(['friend-ids', user?.id]) || [];
+
+    const [currentStatusResult, realInvitesResult] = await Promise.all([
       supabase.from('night_statuses').select('venue_name').eq('user_id', user?.id).eq('status', 'out').maybeSingle(),
-      supabase.from('friendships').select('friend_id').eq('user_id', user?.id).eq('status', 'accepted'),
-      supabase.from('friendships').select('user_id').eq('friend_id', user?.id).eq('status', 'accepted'),
       supabase.from('notifications')
         .select(`id, type, message, created_at, sender_id, is_read`)
         .eq('receiver_id', user?.id)
@@ -167,19 +170,16 @@ export function ActivityTab() {
     ]);
 
     const userCurrentVenue = currentStatusResult.data?.venue_name?.toLowerCase() || null;
-    const friendIds = [
-      ...(sentFriendshipsResult.data?.map(f => f.friend_id) || []),
-      ...(receivedFriendshipsResult.data?.map(f => f.user_id) || [])
-    ];
+    const friendIds = cachedFriendIds;
 
     const activityList: Activity[] = [];
 
     // Add real notifications/invites with sender profile lookup using safe RPC
     if (realInvitesResult.data?.length) {
       const senderIds = [...new Set(realInvitesResult.data.map(n => n.sender_id))];
-      // Use safe RPC to get profiles (respects location privacy)
-      const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
-      let senderProfiles = (allProfiles || []).filter((p: any) => senderIds.includes(p.id));
+      // Use cached profiles
+      const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+      let senderProfiles = allProfiles.filter((p: any) => senderIds.includes(p.id));
       
       // In bootstrap mode (not demo mode), filter out demo users
       if (bootstrapEnabled && !demoEnabled) {

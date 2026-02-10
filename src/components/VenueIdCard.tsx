@@ -4,6 +4,8 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueInvite } from '@/contexts/VenueInviteContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useProfilesSafe } from '@/hooks/useProfilesCache';
+import { useFriendIds } from '@/hooks/useFriendIds';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Bookmark, BookmarkCheck, ChevronRight } from 'lucide-react';
@@ -81,6 +83,8 @@ export function VenueIdCard() {
   const { openInviteModal } = useVenueInvite();
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
+  const { data: allProfilesData } = useProfilesSafe();
+  const { data: cachedFriendIds } = useFriendIds(user?.id);
   const [venue, setVenue] = useState<VenueData | null>(null);
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendAtVenue[]>([]);
   const [friendsPlanning, setFriendsPlanning] = useState<FriendAtVenue[]>([]);
@@ -266,31 +270,13 @@ export function VenueIdCard() {
         if (statuses && statuses.length > 0) {
           const userIds = statuses.map(s => s.user_id);
           
-          // Get friend profiles (both directions)
-          const { data: sentFriendships } = await supabase
-            .from('friendships')
-            .select('friend_id')
-            .eq('user_id', user.id)
-            .eq('status', 'accepted');
-
-          const { data: receivedFriendships } = await supabase
-            .from('friendships')
-            .select('user_id')
-            .eq('friend_id', user.id)
-            .eq('status', 'accepted');
-
-          const friendIds = [
-            ...(sentFriendships?.map(f => f.friend_id) || []),
-            ...(receivedFriendships?.map(f => f.user_id) || [])
-          ];
+          // Use cached friend IDs
+          const friendIds = cachedFriendIds || [];
           const friendsAtVenueIds = userIds.filter(id => friendIds.includes(id));
 
           if (friendsAtVenueIds.length > 0) {
-            // Use safe RPC to get profiles (respects location privacy)
-            const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
-            
-            // Filter to only friends at venue and conditionally exclude demo users
-            let profiles = (allProfiles || []).filter((p: any) => friendsAtVenueIds.includes(p.id));
+            // Use cached profiles
+            let profiles = (allProfilesData || []).filter((p: any) => friendsAtVenueIds.includes(p.id));
             
             // Only filter out demo users when demo mode is OFF (bootstrap mode)
             if (!demoEnabled) {
@@ -354,23 +340,8 @@ export function VenueIdCard() {
             .select('user_id')
             .in('plan_id', planIds);
 
-          // Get friend IDs again for comparison
-          const { data: sentFriendshipsForPlans } = await supabase
-            .from('friendships')
-            .select('friend_id')
-            .eq('user_id', user.id)
-            .eq('status', 'accepted');
-
-          const { data: receivedFriendshipsForPlans } = await supabase
-            .from('friendships')
-            .select('user_id')
-            .eq('friend_id', user.id)
-            .eq('status', 'accepted');
-
-          const allFriendIds = [
-            ...(sentFriendshipsForPlans?.map(f => f.friend_id) || []),
-            ...(receivedFriendshipsForPlans?.map(f => f.user_id) || [])
-          ];
+          // Use cached friend IDs
+          const allFriendIds = cachedFriendIds || [];
 
           // Combine all interested users (deduplicated)
           const allInterestedIds = [...new Set([
@@ -395,8 +366,7 @@ export function VenueIdCard() {
             // Filter out demo users when demo mode is OFF
             let filteredPlanningProfiles = planningProfiles || [];
             if (!demoEnabled) {
-              const { data: fullProfiles } = await supabase.rpc('get_profiles_safe');
-              const nonDemoIds = new Set((fullProfiles || []).filter((p: any) => p.is_demo === false).map((p: any) => p.id));
+              const nonDemoIds = new Set((allProfilesData || []).filter((p: any) => p.is_demo === false).map((p: any) => p.id));
               filteredPlanningProfiles = filteredPlanningProfiles.filter(p => nonDemoIds.has(p.id));
             }
 
@@ -448,9 +418,8 @@ export function VenueIdCard() {
       let profilesMap: Record<string, { display_name: string; avatar_url: string | null }> = {};
 
       if (allUserIds.length > 0) {
-        // Use safe RPC to get profiles (respects location privacy)
-        const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
-        const profiles = (allProfiles || []).filter((p: any) => allUserIds.includes(p.id));
+        // Use cached profiles
+        const profiles = (allProfilesData || []).filter((p: any) => allUserIds.includes(p.id));
 
         if (profiles) {
           profilesMap = profiles.reduce((acc: typeof profilesMap, p: any) => {

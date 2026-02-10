@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,6 +53,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
   const [isLoading, setIsLoading] = useState(true);
   const demoEnabled = useDemoMode();
   const { bootstrapEnabled } = useBootstrapMode();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (user) {
@@ -123,14 +125,21 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
 
       // Step 3: Batch fetch profiles and statuses for all other users
       const [profilesResult, statusesResult] = await Promise.all([
-        supabase.rpc('get_profiles_safe'),
+        queryClient.fetchQuery({
+          queryKey: ['profiles-safe'],
+          queryFn: async () => {
+            const { data } = await supabase.rpc('get_profiles_safe');
+            return data || [];
+          },
+          staleTime: 60_000,
+        }),
         supabase
           .from('night_statuses')
           .select('user_id, venue_name')
           .in('user_id', otherUserIds),
       ]);
 
-      const allProfiles = profilesResult.data || [];
+      const allProfiles = profilesResult || [];
       const profiles = allProfiles.filter((p: any) => otherUserIds.includes(p.id));
       const statuses = statusesResult.data || [];
 

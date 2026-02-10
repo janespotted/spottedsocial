@@ -292,24 +292,29 @@ export default function Map() {
         }));
         setPlanningFriends(planningFriendsData);
       } else {
-        // Normal mode: show real friends only
-        // Get list of accepted friends (both directions)
-        const { data: sentFriendships } = await supabase
-          .from('friendships')
-          .select('friend_id')
-          .eq('user_id', user.id)
-          .eq('status', 'accepted');
+        // Normal mode: show real friends only - use cached friend IDs if available
+        const cachedIds: string[] | undefined = (window as any).__cachedFriendIds;
+        
+        if (cachedIds) {
+          friendIds = cachedIds;
+        } else {
+          const { data: sentFriendships } = await supabase
+            .from('friendships')
+            .select('friend_id')
+            .eq('user_id', user.id)
+            .eq('status', 'accepted');
 
-        const { data: receivedFriendships } = await supabase
-          .from('friendships')
-          .select('user_id')
-          .eq('friend_id', user.id)
-          .eq('status', 'accepted');
+          const { data: receivedFriendships } = await supabase
+            .from('friendships')
+            .select('user_id')
+            .eq('friend_id', user.id)
+            .eq('status', 'accepted');
 
-        friendIds = [
-          ...(sentFriendships?.map(f => f.friend_id) || []),
-          ...(receivedFriendships?.map(f => f.user_id) || [])
-        ];
+          friendIds = [
+            ...(sentFriendships?.map(f => f.friend_id) || []),
+            ...(receivedFriendships?.map(f => f.user_id) || [])
+          ];
+        }
 
         if (friendIds.length > 0) {
           // Get friends' profiles with location data via safe RPC function
@@ -434,10 +439,11 @@ export default function Map() {
   // Simplified heat score calculation using popularity_rank instead of expensive queries
   const fetchVenuesWithHeatScores = async (friendIds: string[]) => {
     try {
-      // Fetch all venues (single query)
+      // Fetch venues filtered by city (server-side filtering)
       const { data: venuesData } = await supabase
         .from('venues')
-        .select('*');
+        .select('*')
+        .eq('city', cityRef.current);
 
       if (!venuesData) return;
 
@@ -460,8 +466,8 @@ export default function Map() {
         };
       });
 
-      // Filter venues by city (not radius) to show all venues in the user's city
-      const filteredVenues = venuesWithHeat.filter((venue) => venue.city === cityRef.current);
+      // Venues already filtered by city in the query
+      const filteredVenues = venuesWithHeat;
 
       // Sort by heat score (descending)
       filteredVenues.sort((a, b) => b.heatScore - a.heatScore);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Calendar, Plus, Sparkles } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PlanItem } from './PlanItem';
 import { CreatePlanDialog } from './CreatePlanDialog';
@@ -85,6 +86,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
   const [userPlanningNeighborhood, setUserPlanningNeighborhood] = useState<string | null>(null);
   const [userPlanningVisibility, setUserPlanningVisibility] = useState<string | null>(null);
   const demoEnabled = useDemoMode();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { openCheckIn } = useCheckIn();
   const { city } = useUserCity();
@@ -147,12 +149,11 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
 
       const planningUserIds = planningStatuses.map(s => s.user_id);
       
-      // Get profiles for planning friends
-      const { data: profiles } = await supabase
-        .rpc('get_profiles_safe')
-        .in('id', planningUserIds);
+      // Get profiles for planning friends using cache
+      const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+      const profiles = allProfiles.filter((p: any) => planningUserIds.includes(p.id));
 
-      if (profiles) {
+      if (profiles.length > 0) {
         const friendsWithNeighborhood = profiles.map(p => ({
           user_id: p.id,
           display_name: p.display_name,
@@ -218,14 +219,13 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
          return;
        }
  
-       // Get profiles for friends who RSVP'd
+       // Get profiles for friends who RSVP'd using cache
        const rsvpUserIds = [...new Set(friendRsvps.map(r => r.user_id))];
-       const { data: profiles } = await supabase
-         .rpc('get_profiles_safe')
-         .in('id', rsvpUserIds);
+       const allEventProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+       const eventProfiles = allEventProfiles.filter((p: any) => rsvpUserIds.includes(p.id));
  
        const profileMap = new Map(
-         (profiles || []).map((p: { id: string; display_name: string; avatar_url: string | null }) => [p.id, p])
+         eventProfiles.map((p: { id: string; display_name: string; avatar_url: string | null }) => [p.id, p])
        );
  
        // Build events with friend data, only include events with friend RSVPs
@@ -383,11 +383,10 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
         return;
       }
 
-      // Fetch user profiles for plans
+      // Fetch user profiles for plans using cache
       const userIds = [...new Set(plansData.map(p => p.user_id))];
-      const { data: profiles } = await supabase
-        .rpc('get_profiles_safe')
-        .in('id', userIds);
+      const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+      const profiles = allProfiles.filter((p: any) => userIds.includes(p.id));
 
       // Fetch user's votes
       const { data: votesData } = await supabase
