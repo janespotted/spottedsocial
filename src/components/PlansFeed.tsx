@@ -170,6 +170,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
         .select('user_id, planning_neighborhood')
         .in('user_id', friendIds)
         .eq('status', 'planning')
+        .eq('is_demo', false)
         .gte('expires_at', new Date().toISOString());
 
       if (!planningStatuses || planningStatuses.length === 0) {
@@ -217,12 +218,14 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
  
        // Fetch upcoming events (today and future)
        const today = new Date().toISOString().split('T')[0];
-       const { data: eventsData } = await supabase
-         .from('events')
-         .select('*')
-         .gte('event_date', today)
-         .gt('expires_at', new Date().toISOString())
-         .order('event_date', { ascending: true });
+        const { data: eventsData } = await supabase
+          .from('events')
+          .select('*')
+          .gte('event_date', today)
+          .gt('expires_at', new Date().toISOString())
+          .eq('is_demo', false)
+          .eq('city', city)
+          .order('event_date', { ascending: true });
  
        if (!eventsData || eventsData.length === 0) {
          setEvents([]);
