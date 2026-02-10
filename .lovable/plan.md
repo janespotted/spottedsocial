@@ -1,32 +1,29 @@
 
 
-# Register the Service Worker
+# Fix: Content Cut Off at Top in PWA Standalone Mode
 
 ## Problem
 
-The service worker (`public/sw.js`) exists but is never registered in the app entry point, so push notifications and PWA install prompts don't work.
+When running as a PWA (Add to Home Screen), iOS removes the browser chrome and the app content renders behind the status bar. The Layout component only accounts for `safe-area-inset-bottom` (for the home indicator) but not `safe-area-inset-top` (for the notch/Dynamic Island area). The Map page handles this on its own, but every other page (Home, Leaderboard, Profile, etc.) gets clipped.
 
-**Note:** The `usePushNotifications` hook does register the SW, but only after the user is logged in and the hook mounts. Registering it early in `main.tsx` ensures it's active immediately on page load for all users.
+## Fix
 
-## Change
+### File: `src/components/Layout.tsx`
 
-### File: `src/main.tsx`
-
-Add service worker registration before the React render call:
+Add top safe area padding to the outer wrapper div, but skip it for the Map page (which already handles its own insets):
 
 ```typescript
-import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
-import "./index.css";
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js");
-  });
-}
-
-createRoot(document.getElementById("root")!).render(<App />);
+<div className={cn(
+  "min-h-[100dvh] bg-background flex flex-col",
+  !isMapPage && "pb-[calc(4rem+env(safe-area-inset-bottom,0px))]",
+  !isMapPage && "pt-[env(safe-area-inset-top,0px)]"
+)}>
 ```
 
-Single file, 5 lines added. No other changes needed.
+This single line addition ensures all non-map pages get proper top padding in PWA standalone mode, while having zero effect in a normal browser (where `safe-area-inset-top` is `0px`).
 
+| File | Change |
+|------|--------|
+| `src/components/Layout.tsx` | Add `pt-[env(safe-area-inset-top,0px)]` to the wrapper div for non-map pages |
+
+One line. Fixes all pages at once.
