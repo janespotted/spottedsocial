@@ -6,6 +6,12 @@ const PB = [["Cucina",26.7056,-80.0364,"Royal Poinciana"],["Mary Lou's",26.7151,
 
 const USERS = [["Alex","alex"],["Sam","sam"],["Jordan","jordan"],["Taylor","taylor"],["Morgan","morgan"],["Casey","casey"],["Riley","riley"],["Jamie","jamie"]];
 const CAPTIONS = ["Amazing! 🔥","Best night 💯","Vibes ✨","So packed!","DJ killing it 🎵"];
+const DM_CONVOS = [
+  [["Are you coming out tonight? 👀","Yeah definitely! Where's everyone at?","We're at {venue}, come through!"],["Omw! Save me a spot 🙌"]],
+  [["This DJ is insane rn 🔥","Who is it??","No idea but the vibes are unmatched"],["Send me the location!"]],
+  [["Yo where'd you go? Lost you in the crowd 😂","I'm by the bar lol","Stay there I'm coming to find you"]],
+  [["Best night out in a while 💯","Fr fr, we need to do this more often"],["Next weekend for sure 🤝"]],
+];
 const YAP_TEXTS = ["Pretty sure Justin Bieber just walked in...","This music is awesome who's the DJ right now","What's everyone's move after close?","Anyone here? Looking for my friends","This DJ set is unreal!!!","Line is crazy long outside","The energy is INSANE right now","Dance floor is PACKED","Where's the after party at?","Bartender hooked it up"];
 const IMG = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&h=800&fit=crop";
 
@@ -82,7 +88,37 @@ Deno.serve(async (req) => {
       const rs=(evs||[]).flatMap(ev=>pick(uids,3).map(u=>({event_id:ev.id,user_id:u,rsvp_type:'going'})));
       if(rs.length) await sb.from('event_rsvps').insert(rs);
       
-      return new Response(JSON.stringify({success:true,stats:{users:uids.length,venues:V.length,posts:15,plans:4,events:3,city}}),{headers:{...h,'Content-Type':'application/json'}});
+      // DM threads & messages between real user and demo users
+      if (userId) {
+        const dmUsers = uids.slice(0, 4);
+        for (let i = 0; i < dmUsers.length; i++) {
+          const demoUid = dmUsers[i];
+          const convo = DM_CONVOS[i];
+          // Create thread
+          const { data: thread } = await sb.from('dm_threads').insert({ created_by: demoUid }).select('id').single();
+          if (!thread) continue;
+          // Add members
+          await sb.from('dm_thread_members').insert([
+            { thread_id: thread.id, user_id: userId },
+            { thread_id: thread.id, user_id: demoUid },
+          ]);
+          // Insert messages - alternate senders, recent timestamps
+          const msgs: any[] = [];
+          let msgTime = Date.now() - (90 + Math.random() * 60) * 60000; // 1.5-2.5h ago
+          for (const group of convo) {
+            // First group = demo user messages, second group = real user replies
+            const senderId = msgs.length === 0 ? demoUid : (convo.indexOf(group) % 2 === 0 ? demoUid : userId);
+            for (const text of group) {
+              const venueRef = text.includes('{venue}') ? text.replace('{venue}', V[i % V.length].name) : text;
+              msgs.push({ thread_id: thread.id, sender_id: senderId, text: venueRef, created_at: new Date(msgTime).toISOString() });
+              msgTime += (2 + Math.random() * 5) * 60000; // 2-7 min between msgs
+            }
+          }
+          await sb.from('dm_messages').insert(msgs);
+        }
+      }
+      
+      return new Response(JSON.stringify({success:true,stats:{users:uids.length,venues:V.length,posts:15,plans:4,events:3,dms:4,city}}),{headers:{...h,'Content-Type':'application/json'}});
     } else if (action === 'clear') {
       await sb.from('events').delete().eq('is_demo',true);
       await sb.from('plans').delete().eq('is_demo',true);
@@ -91,7 +127,19 @@ Deno.serve(async (req) => {
       await sb.from('night_statuses').delete().eq('is_demo',true);
       await sb.from('venues').delete().eq('is_demo',true);
       const {data:d}=await sb.from('profiles').select('id').eq('is_demo',true);
-      if(d?.length){await sb.from('friendships').delete().in('user_id',d.map((x:any)=>x.id));await sb.from('friendships').delete().in('friend_id',d.map((x:any)=>x.id));}
+      if(d?.length){
+        const dids=d.map((x:any)=>x.id);
+        // Clean up DM threads with demo users
+        const {data:dThreadMembers}=await sb.from('dm_thread_members').select('thread_id').in('user_id',dids);
+        if(dThreadMembers?.length){
+          const tids=[...new Set(dThreadMembers.map((t:any)=>t.thread_id))];
+          await sb.from('dm_messages').delete().in('thread_id',tids);
+          await sb.from('dm_thread_members').delete().in('thread_id',tids);
+          await sb.from('dm_threads').delete().in('id',tids);
+        }
+        await sb.from('friendships').delete().in('user_id',dids);
+        await sb.from('friendships').delete().in('friend_id',dids);
+      }
       await sb.from('profiles').delete().eq('is_demo',true);
       return new Response(JSON.stringify({success:true}),{headers:{...h,'Content-Type':'application/json'}});
     }
