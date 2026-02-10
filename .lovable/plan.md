@@ -1,41 +1,73 @@
 
-
-# Fix: Demo Check-in Shows "Private Party" Instead of Le Bain
+# Fix: "Who's Going Out Tonight" Empty in Demo Mode (PlansFeed)
 
 ## Root Cause
 
-The `simulateCheckinForDemo` function upserts into `night_statuses` but never sets `is_private_party: false`. When the user previously checked into a private party, that boolean flag persists through the upsert (Postgres only updates columns you specify). The profile page then renders "Out - Private Party (Santa Monica)" instead of "Out - Le Bain".
+The `PlansFeed.tsx` component's `fetchPlanningFriends` function has no demo-mode-specific logic. It:
+1. Queries friendships, then checks `night_statuses` for `status='planning'`
+2. Looks up profiles from a React Query cache (`queryClient.getQueryData(['profiles-safe'])`)
 
-Current DB state confirms this: `is_private_party: true`, `venue_name: Thunderbolt` (a leftover from a prior session).
+Demo profiles are not in that cache, so even though the seed function creates 4 planning statuses for demo users, their profiles are never found and the list stays empty.
+
+Meanwhile, `Home.tsx` already has the correct pattern -- a demo mode shortcut that directly queries `night_statuses` where `is_demo=true` and `status='planning'`, then fetches profiles directly from the database.
 
 ## Fix
 
-**File: `src/components/DemoActivator.tsx`**
+**File: `src/components/PlansFeed.tsx`**
 
-Add `is_private_party: false` and `planning_neighborhood: null` to the upsert in `simulateCheckinForDemo` to fully reset the night status:
+Add a demo mode shortcut to `fetchPlanningFriends` (same pattern as `Home.tsx`):
 
 ```typescript
-await supabase.from('night_statuses').upsert({
-  user_id: userId,
-  status: 'out',
-  venue_id: venueData.id,
-  venue_name: venue.name,
-  lat: venue.lat,
-  lng: venue.lng,
-  expires_at: expiresAt,
-  updated_at: now,
-  is_private_party: false,       // <-- ADD
-  planning_neighborhood: null,   // <-- ADD
-}, { onConflict: 'user_id' });
+const fetchPlanningFriends = async () => {
+  if (!userId) return;
+  
+  try {
+    // Demo mode shortcut: directly query demo planning statuses
+    if (demoEnabled) {
+      const { data: demoStatuses } = await supabase
+        .from('night_statuses')
+        .select('user_id, planning_neighborhood')
+        .eq('status', 'planning')
+        .eq('is_demo', true)
+        .not('expires_at', 'is', null)
+        .gt('expires_at', new Date().toISOString());
+
+      if (!demoStatuses || demoStatuses.length === 0) {
+        setPlanningFriends([]);
+        // still fetch user status below...
+      } else {
+        const demoUserIds = demoStatuses.map(s => s.user_id);
+        const neighborhoodMap = new Map(demoStatuses.map(s => [s.user_id, s.planning_neighborhood]));
+        const { data: demoProfiles } = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', demoUserIds);
+
+        setPlanningFriends((demoProfiles || []).map((p: any) => ({
+          user_id: p.id,
+          display_name: p.display_name,
+          avatar_url: p.avatar_url,
+          planning_neighborhood: neighborhoodMap.get(p.id) || null,
+        })));
+      }
+      // Still need to fetch user's own status
+      // (keep existing user status/profile fetch)
+      return;
+    }
+    
+    // ... existing non-demo logic unchanged
+  }
+};
 ```
+
+The user's own planning status and profile fetch (lines 99-121) should still run regardless, so we keep that part and only shortcut the friends portion.
 
 ## Summary
 
 | File | Change |
 |------|--------|
-| `src/components/DemoActivator.tsx` | Add `is_private_party: false` and `planning_neighborhood: null` to the night_status upsert to fully reset previous check-in state |
+| `src/components/PlansFeed.tsx` | Add demo mode shortcut in `fetchPlanningFriends` to directly query demo planning statuses and profiles from DB instead of relying on cache |
 
 ## Expected Result
 
-After re-activating demo mode (revisit the magic URL), the profile will correctly show "Out - Le Bain" instead of "Private Party (Santa Monica)".
-
+In demo mode, the "Who's Going Out Tonight" section will show 4 demo users with their planning neighborhoods, matching what already works on the Home page.
