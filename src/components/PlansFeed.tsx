@@ -401,12 +401,18 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
   const fetchPlans = async () => {
     try {
       // Fetch plans that haven't expired
-      const { data: plansData, error: plansError } = await supabase
+      let plansQuery = supabase
         .from('plans')
         .select('*')
         .gte('expires_at', new Date().toISOString())
         .order('score', { ascending: false })
         .order('created_at', { ascending: false });
+
+      if (!demoEnabled) {
+        plansQuery = plansQuery.eq('is_demo', false);
+      }
+
+      const { data: plansData, error: plansError } = await plansQuery;
 
       if (plansError) throw plansError;
 
