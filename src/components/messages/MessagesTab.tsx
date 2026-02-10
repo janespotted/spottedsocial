@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +12,7 @@ import { PullToRefresh } from '@/components/PullToRefresh';
 import { MessagesSkeleton } from './MessagesSkeleton';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
+import { getCachedCity } from '@/lib/city-detection';
 
 interface ThreadMember {
   user_id: string;
@@ -54,6 +55,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
   const demoEnabled = useDemoMode();
   const { bootstrapEnabled } = useBootstrapMode();
   const queryClient = useQueryClient();
+  const hasTriedDemoSeed = useRef(false);
 
   useEffect(() => {
     if (user) {
@@ -225,6 +227,18 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
 
       console.log('✅ Optimized fetch complete:', threadsData.length, 'threads');
       setThreads(threadsData);
+
+      // Auto-seed DMs if in demo mode and inbox is empty
+      if (demoEnabled && threadsData.length === 0 && !hasTriedDemoSeed.current) {
+        hasTriedDemoSeed.current = true;
+        console.log('🎭 Demo mode with empty inbox, triggering DM seed...');
+        const city = getCachedCity() || 'nyc';
+        await supabase.functions.invoke('seed-demo-data', {
+          body: { action: 'seed', city, userId: user!.id }
+        });
+        // Re-fetch after seeding
+        setTimeout(() => fetchThreads(), 500);
+      }
     } finally {
       setIsLoading(false);
     }
