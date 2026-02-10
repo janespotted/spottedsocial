@@ -71,19 +71,13 @@ export function OnboardingCarousel({ onComplete }: OnboardingCarouselProps) {
   const isLastSlide = currentSlide === slides.length - 1;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center">
-      {/* iPhone frame container */}
-      <div className="w-full max-w-[430px] h-full flex flex-col">
-        {/* Skip Button */}
-        <div className="flex justify-end p-6">
-          <button
-            onClick={handleSkip}
-            className="text-white/60 hover:text-white transition-colors flex items-center gap-1"
-          >
-            Skip
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <div 
+      className="fixed inset-0 z-[100] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center"
+      onClick={(e) => { if (e.target === e.currentTarget) handleSkip(); }}
+    >
+      <div className="w-full max-w-[430px] h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Spacer replacing removed skip button */}
+        <div className="h-16" />
 
         {/* Content */}
         <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
@@ -143,6 +137,14 @@ export function OnboardingCarousel({ onComplete }: OnboardingCarouselProps) {
               </>
             )}
           </Button>
+
+          {/* Skip link */}
+          <button
+            onClick={handleSkip}
+            className="w-full text-center text-white/40 hover:text-white/60 text-sm transition-colors"
+          >
+            Skip
+          </button>
         </div>
       </div>
     </div>
