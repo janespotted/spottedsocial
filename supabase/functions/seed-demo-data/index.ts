@@ -48,11 +48,21 @@ Deno.serve(async (req) => {
       const {data:vens}=await sb.from('venues').upsert(V.map(v=>({name:v.name,lat:v.lat,lng:v.lng,neighborhood:v.hood,is_demo:true,popularity_rank:v.rank,city})),{onConflict:'name'}).select('id,name');
       const vm=new Map((vens||[]).map((v:any)=>[v.name,v.id]));
       
-      // Night statuses - 5 users "out" at venues
-      await sb.from('night_statuses').insert(uids.slice(0,5).map((u,i)=>{const v=V[i%V.length];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}));
+      // Night statuses - 8 users "out" at venues, clustered at top venues for leaderboard avatars
+      // First 3 users at the #1 venue (e.g. Le Bain for NYC) so avatars stack
+      const outStatuses = [
+        ...uids.slice(0,3).map(u=>{const v=V[0];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
+        // 2 users at the #2 venue
+        ...uids.slice(3,5).map(u=>{const v=V[1];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
+        // 2 users at the #3 venue
+        ...uids.slice(5,7).map(u=>{const v=V[2];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
+        // 1 user at #4 venue
+        {user_id:uids[7],status:'out',venue_id:vm.get(V[3].name),venue_name:V[3].name,lat:V[3].lat,lng:V[3].lng,expires_at:exp(),is_demo:true},
+      ];
+      await sb.from('night_statuses').insert(outStatuses);
       
-      // 3 users "planning" (thinking about going out)
-      await sb.from('night_statuses').insert(uids.slice(5,8).map((u,i)=>{const v=V[i%V.length];return{user_id:u,status:'planning',planning_neighborhood:v.hood,planning_visibility:'all_friends',expires_at:exp(),is_demo:true};}));
+      // 4 users "planning" (thinking about going out) - users 8-11
+      await sb.from('night_statuses').insert(uids.slice(8,12).map((u,i)=>{const v=V[i%V.length];return{user_id:u,status:'planning',planning_neighborhood:v.hood,planning_visibility:'all_friends',expires_at:exp(),is_demo:true};}));
       
       // Posts
       await sb.from('posts').insert(Array.from({length:15},()=>{const v=V[Math.floor(Math.random()*V.length)];return{user_id:uids[Math.floor(Math.random()*uids.length)],text:CAPTIONS[Math.floor(Math.random()*5)],venue_id:vm.get(v.name),venue_name:v.name,image_url:Math.random()>0.4?IMG:null,expires_at:exp(),created_at:rec(4),is_demo:true,visibility:'friends'};}));

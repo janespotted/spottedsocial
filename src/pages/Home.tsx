@@ -133,6 +133,38 @@ export default function Home() {
   // Fetch planning friends
   const fetchPlanningFriends = async () => {
     if (!user) return;
+
+    // Demo mode shortcut: directly query demo planning statuses (skip friendship lookup)
+    if (demoEnabled) {
+      const { data: demoStatuses } = await supabase
+        .from('night_statuses')
+        .select('user_id, planning_neighborhood')
+        .eq('status', 'planning')
+        .eq('is_demo', true)
+        .not('expires_at', 'is', null)
+        .gt('expires_at', new Date().toISOString());
+
+      if (!demoStatuses || demoStatuses.length === 0) {
+        setPlanningFriends([]);
+        return;
+      }
+
+      const demoUserIds = demoStatuses.map(s => s.user_id);
+      const neighborhoodMap = new Map(demoStatuses.map(s => [s.user_id, s.planning_neighborhood]));
+
+      const { data: demoProfiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', demoUserIds);
+
+      setPlanningFriends((demoProfiles || []).map((p: any) => ({
+        user_id: p.id,
+        display_name: p.display_name,
+        avatar_url: p.avatar_url,
+        planning_neighborhood: neighborhoodMap.get(p.id) || null,
+      })));
+      return;
+    }
     
     // Get friend IDs
     const { data: sentFriendships } = await supabase
