@@ -1115,6 +1115,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          apns_device_token: string | null
           avatar_url: string | null
           bio: string | null
           created_at: string | null
@@ -1134,6 +1135,7 @@ export type Database = {
           username: string
         }
         Insert: {
+          apns_device_token?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string | null
@@ -1153,6 +1155,7 @@ export type Database = {
           username: string
         }
         Update: {
+          apns_device_token?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string | null
