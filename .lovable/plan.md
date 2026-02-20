@@ -1,29 +1,70 @@
 
 
-# Add Missing Tables to Realtime Publication
+# Add APNs Device Token Support
 
-## Problem
-Two tables are subscribed to via realtime in the frontend code but are **not** in the `supabase_realtime` publication, so their change events never fire.
+## Overview
+Add native iOS push notification support by storing APNs device tokens in the database and updating the push notification edge function to route notifications through either APNs (for native iOS) or Web Push/VAPID (for browsers).
 
-### 1. `post_likes`
-- **Subscribed in**: `src/hooks/useRealtimeSubscriptions.ts` (all events)
-- **Impact**: Like count changes from other users don't push to the feed in real time. This is partially mitigated by optimistic updates on the liker's own device, but other viewers won't see like counts update live.
+## Part 1: Database Migration
 
-### 2. `venues`
-- **Subscribed in**: `src/pages/Map.tsx` (UPDATE events)
-- **Impact**: When venue coordinates or data are corrected (e.g., the auto-correction system), the map doesn't refresh in real time. Users must manually reload.
-
-## Fix
-Single database migration:
+Add a nullable `apns_device_token` column to the `profiles` table:
 
 ```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.post_likes;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.venues;
+ALTER TABLE public.profiles ADD COLUMN apns_device_token text;
 ```
 
-No code changes needed -- the frontend already has the subscription logic wired up.
+No RLS changes needed -- existing profile policies already cover read/update for own profile.
 
-## Summary of realtime publication after this fix
+## Part 2: Update send-push Edge Function
 
-All tables the app subscribes to will be covered:
-- checkins, dm_messages, night_statuses, notifications, posts, post_likes, profiles, stories, venue_buzz_messages, venue_reviews, venues, yap_messages
+Modify `supabase/functions/send-push/index.ts`:
+
+1. **Update the profile query** to also select `apns_device_token`:
+   ```
+   .select('push_subscription, push_enabled, display_name, apns_device_token')
+   ```
+
+2. **Update the push-enabled check** so that having *either* a web subscription or an APNs token (with push_enabled=true) is sufficient to proceed.
+
+3. **Add an `sendApnsPush()` function** that:
+   - Creates a JWT signed with the APNs auth key (ES256, using `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_AUTH_KEY` secrets)
+   - Sends an HTTP/2 POST to `https://api.push.apple.com/3/device/{token}` with the notification payload
+   - Sets proper APNs headers: `apns-topic` (bundle ID), `apns-push-type: alert`, `apns-priority: 10`
+   - Returns success/failure boolean
+
+4. **Route notifications** in the main handler:
+   - If `apns_device_token` exists on the receiver's profile, call `sendApnsPush()`
+   - If `push_subscription` exists, call existing `sendWebPush()`
+   - If both exist, send to both channels
+   - Log which channel(s) were used
+
+5. **APNs payload format**:
+   ```json
+   {
+     "aps": {
+       "alert": { "title": "...", "body": "..." },
+       "sound": "default",
+       "badge": 1,
+       "thread-id": "notification-type"
+     },
+     "url": "/messages",
+     "type": "dm"
+   }
+   ```
+
+## Secrets Required (Not Yet Set)
+
+The APNs integration will need three new secrets before it can actually send. The function will gracefully skip APNs if these are missing:
+- `APNS_KEY_ID` -- Key ID from Apple Developer
+- `APNS_TEAM_ID` -- Apple Developer Team ID  
+- `APNS_AUTH_KEY` -- The .p8 private key contents (base64 encoded)
+- `APNS_BUNDLE_ID` -- The app's bundle identifier
+
+These won't be requested now since you said you'll provide them later. The code will check for their presence and fall back to web push only if missing.
+
+## Technical Notes
+
+- Deno's `fetch()` handles HTTP/2 transparently when connecting to `api.push.apple.com`, so no special HTTP/2 library is needed.
+- APNs JWT tokens are valid for up to 1 hour; the function generates a fresh one per invocation (edge functions are short-lived, so caching isn't needed).
+- No changes to the frontend client-side code in this step -- the native Capacitor push registration that populates `apns_device_token` will be a separate task.
+
