@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN apns_device_token text;

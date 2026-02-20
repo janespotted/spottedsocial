@@ -415,7 +415,7 @@ async function sendWebPush(
     const vapidKeyBytes = base64ToUint8Array(urlBase64ToBase64(vapidPublicKey));
     const vapidKeyB64 = uint8ArrayToBase64(vapidKeyBytes).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
     
-    console.log('Sending push to:', subscription.endpoint);
+    console.log('Sending web push to:', subscription.endpoint);
     
     const response = await fetch(subscription.endpoint, {
       method: 'POST',
@@ -430,7 +430,7 @@ async function sendWebPush(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Push failed:', response.status, errorText);
+      console.error('Web push failed:', response.status, errorText);
       
       // If subscription is gone, return false to trigger cleanup
       if (response.status === 404 || response.status === 410) {
@@ -440,75 +440,157 @@ async function sendWebPush(
       return false;
     }
 
-    console.log('Push sent successfully');
+    console.log('Web push sent successfully');
     return true;
   } catch (err) {
-    console.error('Push error:', err);
+    console.error('Web push error:', err);
     return false;
   }
 }
 
-function getNotificationContent(type: string, message: string, _senderName?: string): { title: string; body: string; url: string } {
-  switch (type) {
-    case 'meetup_request':
-      return {
-        title: '🎉 Meet Up Request!',
-        body: message,
-        url: '/messages?tab=activity',
-      };
-    case 'venue_invite':
-      return {
-        title: '📍 Venue Invite!',
-        body: message,
-        url: '/messages?tab=activity',
-      };
-    case 'friend_request':
-      return {
-        title: '👋 Friend Request',
-        body: message,
-        url: '/profile/friend-requests',
-      };
-    case 'friend_accepted':
-      return {
-        title: '🎊 Friend Accepted!',
-        body: message,
-        url: '/messages',
-      };
-    case 'invite_accepted':
-      return {
-        title: '🎉 Invite Accepted!',
-        body: message,
-        url: '/profile',
-      };
-    case 'dm':
-      return {
-        title: `💬 New Message`,
-        body: message,
-        url: '/messages',
-      };
-    case 'meetup_accepted':
-      return {
-        title: '🎉 Meet Up Accepted!',
-        body: message,
-        url: '/messages?tab=activity',
-      };
-    case 'venue_invite_accepted':
-      return {
-        title: '📍 Invite Accepted!',
-        body: message,
-        url: '/messages?tab=activity',
-      };
-    default:
-      return {
-        title: 'Spotted',
-        body: message,
-        url: '/',
-      };
+// ============================================================================
+// APNs Push Notification Implementation
+// ============================================================================
+
+async function createApnsJwt(
+  keyId: string,
+  teamId: string,
+  authKeyBase64: string
+): Promise<string> {
+  const header = { alg: 'ES256', kid: keyId };
+  const payload = {
+    iss: teamId,
+    iat: Math.floor(Date.now() / 1000),
+  };
+
+  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+
+  // Decode the base64-encoded .p8 key (PEM contents without header/footer)
+  const keyData = base64ToUint8Array(authKeyBase64);
+
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8',
+    toArrayBuffer(keyData),
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign']
+  );
+
+  const signatureBuffer = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    privateKey,
+    new TextEncoder().encode(unsignedToken)
+  );
+
+  const signatureBytes = new Uint8Array(signatureBuffer);
+  const signatureB64 = uint8ArrayToBase64(signatureBytes).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+  return `${unsignedToken}.${signatureB64}`;
+}
+
+async function sendApnsPush(
+  deviceToken: string,
+  notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string }
+): Promise<boolean> {
+  const keyId = Deno.env.get('APNS_KEY_ID');
+  const teamId = Deno.env.get('APNS_TEAM_ID');
+  const authKey = Deno.env.get('APNS_AUTH_KEY');
+  const bundleId = Deno.env.get('APNS_BUNDLE_ID');
+
+  if (!keyId || !teamId || !authKey || !bundleId) {
+    console.log('APNs secrets not configured, skipping APNs push');
+    return false;
+  }
+
+  try {
+    const jwt = await createApnsJwt(keyId, teamId, authKey);
+
+    const apnsPayload = {
+      aps: {
+        alert: {
+          title: notificationPayload.title,
+          body: notificationPayload.body,
+        },
+        sound: 'default',
+        badge: 1,
+        'thread-id': notificationPayload.type || 'default',
+      },
+      url: notificationPayload.url,
+      type: notificationPayload.type,
+    };
+
+    console.log('Sending APNs push to device:', deviceToken.substring(0, 8) + '...');
+
+    const response = await fetch(
+      `https://api.push.apple.com/3/device/${deviceToken}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `bearer ${jwt}`,
+          'apns-topic': bundleId,
+          'apns-push-type': 'alert',
+          'apns-priority': '10',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apnsPayload),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('APNs push failed:', response.status, errorText);
+
+      if (response.status === 410) {
+        console.log('APNs device token is no longer active');
+      }
+
+      return false;
+    }
+
+    // Consume body to prevent resource leak
+    await response.text();
+    console.log('APNs push sent successfully');
+    return true;
+  } catch (err) {
+    console.error('APNs push error:', err);
+    return false;
   }
 }
 
+// ============================================================================
+// Notification Content
+// ============================================================================
+
+function getNotificationContent(type: string, message: string, _senderName?: string): { title: string; body: string; url: string } {
+  switch (type) {
+    case 'meetup_request':
+      return { title: '🎉 Meet Up Request!', body: message, url: '/messages?tab=activity' };
+    case 'venue_invite':
+      return { title: '📍 Venue Invite!', body: message, url: '/messages?tab=activity' };
+    case 'friend_request':
+      return { title: '👋 Friend Request', body: message, url: '/profile/friend-requests' };
+    case 'friend_accepted':
+      return { title: '🎊 Friend Accepted!', body: message, url: '/messages' };
+    case 'invite_accepted':
+      return { title: '🎉 Invite Accepted!', body: message, url: '/profile' };
+    case 'dm':
+      return { title: '💬 New Message', body: message, url: '/messages' };
+    case 'meetup_accepted':
+      return { title: '🎉 Meet Up Accepted!', body: message, url: '/messages?tab=activity' };
+    case 'venue_invite_accepted':
+      return { title: '📍 Invite Accepted!', body: message, url: '/messages?tab=activity' };
+    default:
+      return { title: 'Spotted', body: message, url: '/' };
+  }
+}
+
+// ============================================================================
+// Main Handler
+// ============================================================================
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -516,13 +598,11 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify JWT and get authenticated user
+    // Verify JWT
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      console.error('Missing authorization header');
       return new Response(
         JSON.stringify({ error: 'Unauthorized: Missing authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -533,7 +613,6 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
-      console.error('Auth error:', authError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized: Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -541,11 +620,8 @@ Deno.serve(async (req) => {
     }
 
     const rawPayload = await req.json();
-    
-    // Validate input payload structure and values
     const validation = validatePayload(rawPayload);
     if (!validation.valid) {
-      console.error('Payload validation failed:', validation.error);
       return new Response(
         JSON.stringify({ error: `Bad Request: ${validation.error}` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -553,46 +629,45 @@ Deno.serve(async (req) => {
     }
 
     const payload = rawPayload as PushPayload;
-    console.log('Received push request:', { type: payload.type, receiver_id: payload.receiver_id });
 
-    // SECURITY: Verify sender_id matches authenticated user to prevent impersonation
+    // Verify sender matches authenticated user
     if (payload.sender_id !== user.id) {
-      console.error('Sender mismatch:', { payload_sender: payload.sender_id, auth_user: user.id });
       return new Response(
         JSON.stringify({ error: 'Forbidden: sender_id must match authenticated user' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Use the sanitized message from validation
     const { receiver_id, sender_id, type } = payload;
     const message = validation.sanitizedMessage!;
 
-    // Get receiver's push subscription
+    // Get receiver's push subscription AND apns token
     const { data: receiverProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('push_subscription, push_enabled, display_name')
+      .select('push_subscription, push_enabled, display_name, apns_device_token')
       .eq('id', receiver_id)
       .single();
 
     if (profileError || !receiverProfile) {
-      console.log('Receiver profile not found:', profileError);
       return new Response(
         JSON.stringify({ success: false, reason: 'receiver_not_found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check if push is enabled and subscription exists
-    if (!receiverProfile.push_enabled || !receiverProfile.push_subscription) {
-      console.log('Push not enabled or no subscription for user:', receiver_id);
+    // Check if push is enabled and at least one channel exists
+    const hasWebPush = !!receiverProfile.push_subscription;
+    const hasApns = !!receiverProfile.apns_device_token;
+
+    if (!receiverProfile.push_enabled || (!hasWebPush && !hasApns)) {
+      console.log('Push not enabled or no subscription/token for user:', receiver_id);
       return new Response(
         JSON.stringify({ success: false, reason: 'push_not_enabled' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get sender's name for personalized notifications
+    // Get sender's name
     const { data: senderProfile } = await supabase
       .from('profiles')
       .select('display_name')
@@ -600,30 +675,39 @@ Deno.serve(async (req) => {
       .single();
 
     const senderName = senderProfile?.display_name || 'Someone';
-    const subscription = receiverProfile.push_subscription as PushSubscription;
-
-    // Validate subscription endpoint for security
-    if (!subscription.endpoint || !validateSubscriptionEndpoint(subscription.endpoint)) {
-      console.error('Invalid subscription endpoint:', subscription.endpoint);
-      return new Response(
-        JSON.stringify({ success: false, reason: 'invalid_subscription' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const content = getNotificationContent(type, message, senderName);
-
-    // Send the push notification
-    const success = await sendWebPush(subscription, {
+    const notificationPayload = {
       ...content,
       tag: `${type}-${payload.notification_id}`,
       type,
-    });
+    };
 
-    console.log('Push notification result:', { success, receiver_id, type });
+    const results: { web?: boolean; apns?: boolean } = {};
+
+    // Send via Web Push if subscription exists
+    if (hasWebPush) {
+      const subscription = receiverProfile.push_subscription as PushSubscription;
+      if (subscription.endpoint && validateSubscriptionEndpoint(subscription.endpoint)) {
+        results.web = await sendWebPush(subscription, notificationPayload);
+      } else {
+        console.error('Invalid web push subscription endpoint');
+        results.web = false;
+      }
+    }
+
+    // Send via APNs if device token exists
+    if (hasApns) {
+      results.apns = await sendApnsPush(
+        receiverProfile.apns_device_token as string,
+        notificationPayload
+      );
+    }
+
+    const success = (results.web === true) || (results.apns === true);
+    console.log('Push notification results:', { receiver_id, type, ...results });
 
     return new Response(
-      JSON.stringify({ success }),
+      JSON.stringify({ success, channels: results }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
