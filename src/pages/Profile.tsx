@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { APP_BASE_URL, getShareableUrl, copyToClipboard } from '@/lib/platform';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
@@ -114,7 +115,7 @@ export default function Profile() {
     }
   };
 
-  const getInviteUrl = () => `${window.location.origin}/invite/${inviteCode}`;
+  const getInviteUrl = () => `${APP_BASE_URL}/invite/${inviteCode}`;
 
   // Realtime subscription for night_statuses changes
   useEffect(() => {
@@ -308,19 +309,19 @@ export default function Profile() {
   };
 
   const handleShareProfile = async () => {
+    const profileUrl = getShareableUrl(`/profile/${profile?.username}`);
     if (navigator.share) {
       try {
         await navigator.share({
           title: 'Spotted Profile',
           text: `Check out @${profile?.username} on Spotted!`,
-          url: window.location.href,
+          url: profileUrl,
         });
       } catch (error) {
         // User cancelled share
       }
     } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href);
+      await copyToClipboard(profileUrl);
       toast.success('Profile link copied to clipboard!');
     }
   };

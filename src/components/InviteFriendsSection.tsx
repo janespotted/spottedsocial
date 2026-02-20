@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Link2, Copy, Share2, RefreshCw, Users, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export function InviteFriendsSection() {
@@ -86,12 +87,12 @@ export function InviteFriendsSection() {
   };
 
   const getInviteUrl = () => {
-    return `${window.location.origin}/invite/${inviteCode}`;
+    return `${APP_BASE_URL}/invite/${inviteCode}`;
   };
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(getInviteUrl());
+      await copyToClipboard(getInviteUrl());
       haptic.light();
       toast.success('Link copied to clipboard!');
     } catch (error) {

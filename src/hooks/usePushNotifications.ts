@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { logger } from '@/lib/logger';
+import { isNativePlatform } from '@/lib/platform';
 import type { Json } from '@/integrations/supabase/types';
 
 interface UsePushNotificationsReturn {
@@ -31,16 +32,91 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   return outputArray.buffer as ArrayBuffer;
 }
 
+// ── Native (Capacitor) push helpers ──────────────────────────────────
+
+async function subscribeNative(userId: string): Promise<boolean> {
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+
+    // Request permission
+    const permResult = await PushNotifications.requestPermissions();
+    if (permResult.receive !== 'granted') {
+      logger.info('push:native_permission_denied');
+      return false;
+    }
+
+    // Register with APNs
+    await PushNotifications.register();
+
+    // Listen for registration token
+    return new Promise<boolean>((resolve) => {
+      PushNotifications.addListener('registration', async (token) => {
+        logger.info('push:native_registered', { token: token.value.slice(0, 8) + '…' });
+
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            apns_device_token: token.value,
+            push_enabled: true,
+          })
+          .eq('id', userId);
+
+        if (error) {
+          logger.apiError('push:save_apns_token', error);
+          resolve(false);
+        } else {
+          resolve(true);
+        }
+      });
+
+      PushNotifications.addListener('registrationError', (err) => {
+        logger.error('push:native_registration_error', { error: String(err) });
+        resolve(false);
+      });
+    });
+  } catch (error) {
+    logger.error('push:native_subscribe_error', { error: String(error) });
+    return false;
+  }
+}
+
+async function unsubscribeNative(userId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        apns_device_token: null,
+        push_enabled: false,
+      })
+      .eq('id', userId);
+
+    if (error) {
+      logger.apiError('push:remove_apns_token', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    logger.error('push:native_unsubscribe_error', { error: String(error) });
+    return false;
+  }
+}
+
+// ── Hook ─────────────────────────────────────────────────────────────
+
 export function usePushNotifications(): UsePushNotificationsReturn {
   const { user } = useAuth();
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isSupported = typeof window !== 'undefined' && 
+  const native = isNativePlatform();
+
+  const isSupported = native || (
+    typeof window !== 'undefined' && 
     'serviceWorker' in navigator && 
     'PushManager' in window &&
-    'Notification' in window;
+    'Notification' in window
+  );
 
   // Check current subscription status
   const checkSubscription = useCallback(async () => {
@@ -50,27 +126,38 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     }
 
     try {
-      setPermission(Notification.permission);
+      if (native) {
+        // On native, check if we have a stored token
+        const { data } = await supabase
+          .from('profiles')
+          .select('apns_device_token, push_enabled')
+          .eq('id', user.id)
+          .single();
 
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await (registration as any).pushManager.getSubscription();
-      
-      setIsSubscribed(!!subscription);
-      logger.info('push:check_subscription', { isSubscribed: !!subscription });
+        const subscribed = !!(data?.apns_device_token && data?.push_enabled);
+        setIsSubscribed(subscribed);
+        setPermission(subscribed ? 'granted' : 'default');
+      } else {
+        setPermission(Notification.permission);
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await (registration as any).pushManager.getSubscription();
+        setIsSubscribed(!!subscription);
+      }
+      logger.info('push:check_subscription', { isSubscribed, native });
     } catch (error) {
       logger.error('push:check_error', { error: String(error) });
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported, user]);
+  }, [isSupported, user, native]);
 
   useEffect(() => {
     checkSubscription();
   }, [checkSubscription]);
 
-  // Register service worker on mount
+  // Register service worker on mount (web only)
   useEffect(() => {
-    if (!isSupported) return;
+    if (!isSupported || native) return;
 
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
@@ -79,20 +166,66 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       .catch((error) => {
         logger.error('push:sw_register_error', { error: String(error) });
       });
-  }, [isSupported]);
+  }, [isSupported, native]);
+
+  // Set up native push notification listeners
+  useEffect(() => {
+    if (!native) return;
+
+    let cleanup: (() => void) | undefined;
+
+    (async () => {
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+
+        const received = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          logger.info('push:native_received', { title: notification.title });
+        });
+
+        const action = await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+          logger.info('push:native_action', { actionId: notification.actionId });
+          // Navigate based on notification data
+          const url = (notification.notification.data as any)?.url;
+          if (url) {
+            window.history.pushState(null, '', url);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }
+        });
+
+        cleanup = () => {
+          received.remove();
+          action.remove();
+        };
+      } catch {}
+    })();
+
+    return () => cleanup?.();
+  }, [native]);
 
   const subscribe = useCallback(async (): Promise<boolean> => {
-    if (!isSupported || !user || !VAPID_PUBLIC_KEY) {
-      logger.warn('push:subscribe_failed', { 
-        reason: !isSupported ? 'not_supported' : !user ? 'no_user' : 'no_vapid_key' 
-      });
+    if (!isSupported || !user) {
+      logger.warn('push:subscribe_failed', { reason: !isSupported ? 'not_supported' : 'no_user' });
       return false;
     }
 
     try {
       setIsLoading(true);
 
-      // Request permission
+      if (native) {
+        const success = await subscribeNative(user.id);
+        if (success) {
+          setIsSubscribed(true);
+          setPermission('granted');
+        }
+        return success;
+      }
+
+      // Web push flow
+      if (!VAPID_PUBLIC_KEY) {
+        logger.warn('push:subscribe_failed', { reason: 'no_vapid_key' });
+        return false;
+      }
+
       const permissionResult = await Notification.requestPermission();
       setPermission(permissionResult);
 
@@ -101,19 +234,14 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         return false;
       }
 
-      // Get service worker registration
       const registration = await navigator.serviceWorker.ready;
-
-      // Subscribe to push
       const subscription = await (registration as any).pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
 
-      // Convert subscription to JSON-compatible format
       const subscriptionJson = subscription.toJSON() as unknown as Json;
 
-      // Save subscription to database
       const { error } = await supabase
         .from('profiles')
         .update({ 
@@ -136,7 +264,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported, user]);
+  }, [isSupported, user, native]);
 
   const unsubscribe = useCallback(async (): Promise<boolean> => {
     if (!isSupported || !user) return false;
@@ -144,6 +272,16 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     try {
       setIsLoading(true);
 
+      if (native) {
+        const success = await unsubscribeNative(user.id);
+        if (success) {
+          setIsSubscribed(false);
+          setPermission('default');
+        }
+        return success;
+      }
+
+      // Web push flow
       const registration = await navigator.serviceWorker.ready;
       const subscription = await (registration as any).pushManager.getSubscription();
 
@@ -151,7 +289,6 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         await subscription.unsubscribe();
       }
 
-      // Remove subscription from database
       const { error } = await supabase
         .from('profiles')
         .update({ 
@@ -174,7 +311,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported, user]);
+  }, [isSupported, user, native]);
 
   return {
     isSupported,

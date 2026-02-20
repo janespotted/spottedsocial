@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logEvent } from '@/lib/event-logger';
+import { isNativePlatform } from '@/lib/platform';
 
 interface AuthContextType {
   user: User | null;
@@ -67,10 +68,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             processPendingInvite(session.user.id);
           }, 0);
           
-          // Use window.location for navigation to avoid hook dependency
-          // This ensures we redirect even on initial mount
+          // Navigate without full page reload (avoids WebView white flash on Capacitor)
           if (window.location.pathname === '/auth') {
-            window.location.href = '/';
+            if (isNativePlatform()) {
+              // Use history API to avoid full WebView reload in Capacitor
+              window.history.replaceState(null, '', '/');
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            } else {
+              window.location.href = '/';
+            }
           }
         }
       }
@@ -88,7 +94,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-    window.location.href = '/auth';
+    if (isNativePlatform()) {
+      window.history.replaceState(null, '', '/auth');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    } else {
+      window.location.href = '/auth';
+    }
   }, []);
 
   return (

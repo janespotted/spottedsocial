@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { loginSchema, signupSchema } from '@/lib/auth-validation';
+import { getRedirectOrigin, APP_BASE_URL } from '@/lib/platform';
 import { Mail, Lock, User, AtSign, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
@@ -107,7 +108,7 @@ export default function Auth() {
 
     try {
       const { error } = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: getRedirectOrigin(),
       });
 
       if (error) throw error;
@@ -123,7 +124,7 @@ export default function Auth() {
 
     try {
       const { error } = await lovable.auth.signInWithOAuth("apple", {
-        redirect_uri: window.location.origin,
+        redirect_uri: getRedirectOrigin(),
       });
 
       if (error) throw error;
@@ -166,7 +167,7 @@ export default function Auth() {
           agreedToTerms,
         });
 
-        const redirectUrl = `${window.location.origin}/`;
+        const redirectUrl = `${getRedirectOrigin()}/`;
         const { error, data } = await supabase.auth.signUp({
           email: validatedData.email,
           password: validatedData.password,

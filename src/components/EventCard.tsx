@@ -9,6 +9,7 @@
  import { format, isToday, isTomorrow, differenceInDays } from 'date-fns';
  import { toast } from 'sonner';
  import { haptic } from '@/lib/haptics';
+ import { APP_BASE_URL, openExternalUrl } from '@/lib/platform';
  import confetti from 'canvas-confetti';
  
  const formatTimeTo12Hour = (time: string) => {
@@ -131,7 +132,7 @@
        await navigator.share({
          title: event.title,
          text: `Check out ${event.title} at ${event.venue_name}!`,
-         url: event.ticket_url || window.location.href,
+         url: event.ticket_url || APP_BASE_URL,
        });
      } catch {
        // User cancelled or share not supported
@@ -141,7 +142,7 @@
    const handleTicket = () => {
      if (event.ticket_url) {
        haptic.light();
-       window.open(event.ticket_url, '_blank');
+       openExternalUrl(event.ticket_url);
      }
    };
  

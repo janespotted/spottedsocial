@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogOverlay, DialogTitle } from '@/components/
 import { Link2, Copy, Share2, Search, UserPlus, QrCode, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import { VisuallyHidden } from '@/components/ui/visually-hidden';
 
@@ -123,11 +124,11 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
     }
   };
 
-  const getInviteUrl = () => `${window.location.origin}/invite/${inviteCode}`;
+  const getInviteUrl = () => `${APP_BASE_URL}/invite/${inviteCode}`;
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(getInviteUrl());
+      await copyToClipboard(getInviteUrl());
       haptic.light();
       toast.success('Link copied!');
       
