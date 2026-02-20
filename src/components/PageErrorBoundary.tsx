@@ -37,7 +37,9 @@ export class PageErrorBoundary extends Component<Props, State> {
   };
 
   private handleGoHome = () => {
-    window.location.href = '/';
+    // Use history API to avoid full WebView reload in Capacitor
+    window.history.replaceState(null, '', '/');
+    window.location.reload();
   };
 
   public render() {

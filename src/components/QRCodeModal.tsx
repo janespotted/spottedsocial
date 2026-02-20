@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Share2, Copy, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { copyToClipboard, isNativePlatform } from '@/lib/platform';
 
 interface QRCodeModalProps {
   open: boolean;
@@ -13,11 +14,11 @@ interface QRCodeModalProps {
 
 export function QRCodeModal({ open, onOpenChange, inviteUrl }: QRCodeModalProps) {
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(inviteUrl);
+    const ok = await copyToClipboard(inviteUrl);
+    if (ok) {
       haptic.light();
       toast.success('Link copied!');
-    } catch (error) {
+    } else {
       toast.error('Failed to copy');
     }
   };
@@ -39,7 +40,7 @@ export function QRCodeModal({ open, onOpenChange, inviteUrl }: QRCodeModalProps)
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     const svg = document.getElementById('qr-code-svg');
     if (!svg) return;
 
@@ -48,16 +49,32 @@ export function QRCodeModal({ open, onOpenChange, inviteUrl }: QRCodeModalProps)
     const ctx = canvas.getContext('2d');
     const img = new Image();
     
-    img.onload = () => {
+    img.onload = async () => {
       canvas.width = img.width;
       canvas.height = img.height;
       ctx?.drawImage(img, 0, 0);
-      const link = document.createElement('a');
-      link.download = 'spotted-invite-qr.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      const dataUrl = canvas.toDataURL('image/png');
+
+      if (isNativePlatform()) {
+        // On native, use Share sheet instead of download
+        try {
+          const { Share } = await import('@capacitor/share');
+          await Share.share({
+            title: 'Spotted QR Code',
+            text: 'Scan to add me on Spotted!',
+            url: inviteUrl,
+          });
+        } catch {
+          // User cancelled
+        }
+      } else {
+        const link = document.createElement('a');
+        link.download = 'spotted-invite-qr.png';
+        link.href = dataUrl;
+        link.click();
+      }
       haptic.success();
-      toast.success('QR code downloaded!');
+      toast.success('QR code saved!');
     };
     
     img.src = 'data:image/svg+xml;base64,' + btoa(svgData);

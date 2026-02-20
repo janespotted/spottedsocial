@@ -18,6 +18,7 @@ import { useNotifications } from '@/contexts/NotificationsContext';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { StoryViewer } from '@/components/StoryViewer';
 import { CreateStoryDialog } from '@/components/CreateStoryDialog';
@@ -395,19 +396,19 @@ export default function Feed() {
                       const shareData = {
                         title: `${post.profiles?.display_name} on Spotted`,
                         text: `${post.text}${post.venue_name ? ` @ ${post.venue_name}` : ''}`,
-                        url: window.location.origin,
+                        url: APP_BASE_URL,
                       };
                       if (navigator.share) {
                         try {
                           await navigator.share(shareData);
                         } catch (err) {
                           if ((err as Error).name !== 'AbortError') {
-                            await navigator.clipboard.writeText(`${shareData.text} - ${shareData.url}`);
+                            await copyToClipboard(`${shareData.text} - ${shareData.url}`);
                             toast.success('Link copied to clipboard!');
                           }
                         }
                       } else {
-                        await navigator.clipboard.writeText(`${shareData.text} - ${shareData.url}`);
+                        await copyToClipboard(`${shareData.text} - ${shareData.url}`);
                         toast.success('Link copied to clipboard!');
                       }
                     }}

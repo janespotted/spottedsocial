@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import { useUserCity } from '@/hooks/useUserCity';
 import { cacheCity, type SupportedCity } from '@/lib/city-detection';
-
+import { APP_BASE_URL, openExternalUrl } from '@/lib/platform';
 export default function Settings() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -59,7 +59,7 @@ export default function Settings() {
     }
   };
 
-  const getInviteUrl = () => `${window.location.origin}/invite/${inviteCode}`;
+  const getInviteUrl = () => `${APP_BASE_URL}/invite/${inviteCode}`;
 
   const handlePushToggle = async (enabled: boolean) => {
     setIsToggling(true);
@@ -265,7 +265,7 @@ export default function Settings() {
         {/* Help Section */}
         <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
           <button
-            onClick={() => window.open('mailto:support@spotted.app?subject=Help%20Request%20-%20Spotted%20App', '_blank')}
+            onClick={() => openExternalUrl('mailto:support@spotted.app?subject=Help%20Request%20-%20Spotted%20App')}
             className="w-full flex items-center justify-between p-4 hover:bg-[#a855f7]/10 transition-colors"
           >
             <div className="flex items-center gap-3">

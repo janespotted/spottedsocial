@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Copy, Users, Search, UserPlus, QrCode, Check, Loader2, Clock, ChevronRight, MessageCircle, Link2, X, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 
@@ -337,7 +338,7 @@ export default function Friends() {
     }
   }, [user?.id]);
 
-  const getInviteUrl = () => `${window.location.origin}/invite/${inviteCode}`;
+  const getInviteUrl = () => `${APP_BASE_URL}/invite/${inviteCode}`;
 
   const handleTextFriend = () => {
     const message = encodeURIComponent(
@@ -349,7 +350,7 @@ export default function Friends() {
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(getInviteUrl());
+      await copyToClipboard(getInviteUrl());
       haptic.light();
       setJustCopied(true);
       toast.success('Link copied to clipboard!');

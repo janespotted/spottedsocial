@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogOverlay } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { MapPin, Settings, X } from 'lucide-react';
+import { isNativePlatform, openExternalUrl } from '@/lib/platform';
 
 interface LocationPermissionPromptProps {
   open: boolean;
@@ -118,7 +119,12 @@ export function LocationPermissionPrompt({
                 variant="outline"
                 onClick={() => {
                   // Open a guide - can't directly open settings programmatically
-                  window.open('https://support.google.com/chrome/answer/142065', '_blank');
+                  if (isNativePlatform()) {
+                    // On iOS, guide to Settings app
+                    openExternalUrl('app-settings:');
+                  } else {
+                    openExternalUrl('https://support.google.com/chrome/answer/142065');
+                  }
                 }}
                 className="w-full h-12 text-base font-medium rounded-xl border-[#a855f7]/40 text-white hover:bg-[#a855f7]/20"
               >

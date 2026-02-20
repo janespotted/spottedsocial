@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getShareableUrl, copyToClipboard, openExternalUrl } from '@/lib/platform';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueInvite } from '@/contexts/VenueInviteContext';
@@ -519,7 +520,7 @@ export function VenueIdCard() {
     if (venue) {
       // Open Apple Maps with directions from current location to venue
       const appleMapsUrl = `https://maps.apple.com/?daddr=${venue.lat},${venue.lng}&dirflg=d`;
-      window.open(appleMapsUrl, '_blank');
+      openExternalUrl(appleMapsUrl);
     }
   };
 
@@ -557,7 +558,7 @@ export function VenueIdCard() {
     if (!venue) return;
     
     const shareText = `Check out ${venue.name} in ${venue.neighborhood}! 🎉`;
-    const shareUrl = `${window.location.origin}/?venue=${selectedVenueId}`;
+    const shareUrl = getShareableUrl(`/?venue=${selectedVenueId}`);
     
     if (navigator.share) {
       try {
@@ -572,7 +573,7 @@ export function VenueIdCard() {
       }
     } else {
       try {
-        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+        await copyToClipboard(`${shareText}\n${shareUrl}`);
         haptic.light();
         toast.success('Link copied!');
       } catch {

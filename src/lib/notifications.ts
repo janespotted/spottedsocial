@@ -1,8 +1,14 @@
 /**
- * Browser notification utilities for reminder system
+ * Browser notification utilities for reminder system.
+ * Gracefully handles native Capacitor environment where
+ * window.Notification does not exist.
  */
+import { isNativePlatform } from '@/lib/platform';
 
 export const requestNotificationPermission = async (): Promise<boolean> => {
+  // On native, push permissions are handled by @capacitor/push-notifications
+  if (isNativePlatform()) return false;
+
   if (!('Notification' in window)) {
     console.log('Browser does not support notifications');
     return false;
@@ -21,6 +27,7 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 };
 
 export const showBrowserNotification = (title: string, body: string) => {
+  if (isNativePlatform()) return;
   if (!('Notification' in window)) return;
   
   if (Notification.permission === 'granted') {
