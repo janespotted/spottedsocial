@@ -186,7 +186,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
           className="w-full flex items-center justify-between bg-white/[0.06] backdrop-blur-sm rounded-2xl px-4 py-2.5 active:bg-white/[0.10] transition-colors animate-fade-in"
         >
           <span className="text-white text-sm">📍 You're at <span className="font-semibold">{userVenueName}</span></span>
-          <span className="bg-[#d4ff00] text-[#1a0f2e] font-bold text-xs px-3 py-1 rounded-full">Post</span>
+          <span className="bg-[#d4ff00] text-[#1a0f2e] font-bold text-xs px-3 py-1 rounded-full">View</span>
         </button>
       )}
 
