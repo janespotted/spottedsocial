@@ -448,7 +448,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
   return (
     <div className="space-y-4 pb-24">
       {/* Back + Venue Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 bg-white/[0.04] rounded-2xl px-4 py-3">
         <button onClick={onBack} className="text-white/60 hover:text-white transition-colors p-1">
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -463,7 +463,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         <button
           onClick={() => setSortBy('hot')}
           className={cn(
-            'px-4 py-1.5 rounded-full text-sm font-medium border transition-colors',
+            'px-4 py-1.5 rounded-xl text-sm font-medium border transition-colors',
             sortBy === 'hot'
               ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
               : 'bg-white/5 text-white/40 border-transparent'
@@ -472,7 +472,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         <button
           onClick={() => setSortBy('new')}
           className={cn(
-            'px-4 py-1.5 rounded-full text-sm font-medium border transition-colors',
+            'px-4 py-1.5 rounded-xl text-sm font-medium border transition-colors',
             sortBy === 'new'
               ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
               : 'bg-white/5 text-white/40 border-transparent'
@@ -482,7 +482,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
 
       {/* Post Input or Check-in Bar */}
       {canPost ? (
-        <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4">
+        <div className="bg-white/[0.06] backdrop-blur-sm border border-[#a855f7]/20 rounded-2xl p-4">
           <Textarea
             value={newYap}
             onChange={(e) => setNewYap(e.target.value)}
@@ -526,7 +526,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl px-4 py-3 flex items-center gap-3 cursor-default">
+              <div className="bg-white/[0.06] backdrop-blur-sm border border-[#a855f7]/20 rounded-2xl px-4 py-3 flex items-center gap-3 cursor-default">
                 <MapPin className="h-5 w-5 text-[#d4ff00] shrink-0" />
                 <span className="text-white/70 text-sm font-medium">📍 Head here to post</span>
               </div>
@@ -546,7 +546,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
 
           if (isBuried && !isRevealed) {
             return (
-              <div key={msg.id} className="bg-[#2d1b4e]/30 border border-white/10 rounded-2xl px-4 py-3 flex items-center justify-between">
+              <div key={msg.id} className="bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-3 flex items-center justify-between">
                 <span className="text-white/50 text-sm">💀 buried by the crowd</span>
                 <button onClick={() => setRevealedBuriedIds(prev => new Set([...prev, msg.id]))} className="text-[#a855f7] text-sm font-medium hover:underline">show</button>
               </div>
@@ -554,7 +554,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
           }
 
           return (
-            <div key={msg.id} className={cn("bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 border-l-[3px] border-l-[#d4ff00]", isBuried && isRevealed && "opacity-60")}>
+            <div key={msg.id} className={cn("bg-white/[0.06] backdrop-blur-sm border border-[#a855f7]/20 rounded-2xl p-4 border-l-[3px] border-l-[#d4ff00]", isBuried && isRevealed && "opacity-60")}>
               <div className="flex gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -590,7 +590,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
                     <div className="mt-4 space-y-3 border-t border-[#a855f7]/20 pt-3">
                       {comments[msg.id]?.map((comment) => (
                         <div key={comment.id} className="flex gap-2">
-                          <div className="flex-1 bg-[#1a0f2e]/60 rounded-lg p-3">
+                          <div className="flex-1 bg-white/[0.04] rounded-lg p-3">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-semibold text-white text-sm">{comment.author_handle || `User${comment.id.slice(0, 6)}`}</span>
                               <span className="text-white/40 text-xs">{getTimeAgo(comment.created_at)}</span>
@@ -642,7 +642,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
 
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+            <div className="w-16 h-16 rounded-full bg-white/[0.06] flex items-center justify-center mb-4 border border-[#a855f7]/20">
               <MessageCircle className="h-8 w-8 text-[#d4ff00]/60" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">No yaps yet</h3>
