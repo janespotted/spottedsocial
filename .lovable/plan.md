@@ -1,77 +1,101 @@
 
 
-# Fix Map Pin Overlap, Sizing, and Visibility
+# Consolidate Map Search & Filter Controls
 
-## Problem
-Friend avatar pins on the map overlap and stack on top of each other when multiple friends are at the same or nearby venues. Pins are too large, avatars are hard to see against the dark map, and z-index priority for close friends is not enforced.
+## Summary
+Replace the 4 separate top-of-map controls (Search button, Explore dropdown, All Venues filter, Both/People/Venues toggle) with a single unified search bar. Tapping it opens a full-screen search overlay with smart filtering, trending venues, and friends out. A small filter icon on the search bar opens a quick-filter bottom sheet for show mode (Everyone / Close Friends Only / Friends Only).
 
-## Current State (in `src/pages/Map.tsx`)
-- **Clustering**: Only triggers at 4+ friends within 5m (`CLUSTER_THRESHOLD = 0.000045`). Groups of 2-3 just get a small lng offset (`0.00015`) which still causes heavy overlap.
-- **Pin size**: Individual avatar markers are `52x52px` with `3px` padding inside the border ring. Too large.
-- **Avatar visibility**: Avatar images sit directly on a dark background with only a thin colored ring border (2px) that blends with the dark map.
-- **Z-index**: All friend markers use `z-index: 10` regardless of relationship type. Close friends don't render on top.
+## What gets removed (lines 1148-1318 in Map.tsx)
+1. **Search button/input** (lines 1148-1181) - the `🔍 Search` pill and inline input
+2. **Search results dropdown** (lines 1183-1209) - the floating venue results
+3. **Venue type filter** (lines 1211-1269) - the `All Venues` / Clubs / Cocktails / Bars / Rooftops dropdown
+4. **Layer visibility toggle** (lines 1271-1318) - the `Both` / 👤 / 📍 segmented control
 
-## Changes (1 file: `src/components/../pages/Map.tsx`)
+## What stays untouched
+- **Bottom-left**: "X friends out" pill + expanded friends list (lines 1410-1541)
+- **Bottom-right**: Relationship legend (lines 1554-1577)
+- **Bottom-right**: My Location button (lines 1544-1552)
+- **All map pins**, avatars, clustering, venue markers
+- **Header** with "Spotted" title, city badge, bell, check-in button
 
-### 1. Lower the clustering threshold from 4 to 2
-- Change the cluster condition on line 714 from `cluster.length >= 4` to `cluster.length >= 2`
-- When 2+ friends are within the 5m threshold, show a single cluster pin with a count badge instead of stacked individuals
-- Cluster pin: show top 1-2 avatars stacked with a `+N` badge (adjust the existing cluster HTML for 2-3 friend clusters to show a simpler layout)
-- For 2-3 friend clusters, show the first friend's avatar with a count badge overlay (simpler than the current 3-avatar triangle layout)
-- Keep the existing popover-on-tap behavior for expanding the cluster
+## New UI Elements
 
-### 2. Reduce pin sizes by ~25%
-- Individual avatar marker: `52px` → `40px` (container), avatar padding adjusted proportionally
-- Cluster marker (4+): `70px` → `56px`
-- Small cluster (2-3): use `46px` container
-- User marker stays unchanged (it's the "me" pin and should stand out)
-- Venue pins: reduce `containerSize` from 50 → 40 and `pinSize` from 38 → 30 (non-promoted); promoted stays slightly larger at 50/38
+### 1. Collapsed search bar (replaces all 4 controls)
+- Single rounded bar below the header, spanning most of the width with horizontal margins
+- Placeholder: "Search people, venues, or neighborhoods..."
+- Left side: search icon
+- Right side: small funnel/filter icon button
+- Same glass-morphism style as existing controls (`bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30`)
+- Position: `top: calc(6.5rem + env(safe-area-inset-top))`, `left: 16px`, `right: 16px`
 
-### 3. Add bright border for avatar visibility
-- Add a `2px solid white` border on the `<img>` element inside each avatar marker (in addition to the existing relationship color ring)
-- This creates a double-ring effect: outer ring = relationship color, inner ring = white, making avatars pop against the dark map
-- Apply the same white inner border to cluster avatar thumbnails
+### 2. Full-screen search overlay (on tap of search bar)
+- Covers the map with a dark overlay (`bg-[#0a0118]/95`)
+- Fixed position, `z-index: 500`
+- Top: text input with auto-focus, back arrow to close
+- Below input: two filter chips — "People" and "Venues" (both active by default, tap to toggle)
+- **When no query typed** (default state):
+  - "Trending Tonight" section: top 3 venues sorted by `heatScore` from the existing `venues` state, each showing name + neighborhood + type emoji
+  - "Friends Out Now" section: list of friends from the existing `friends` state, showing avatar + name + venue
+- **When query is typed**:
+  - "People" section: filter `friends` array by `display_name` matching query (only if People chip active)
+  - "Venues" section: filter `venues` array by `name` or `neighborhood` matching query (only if Venues chip active)
+- Tapping a person result: close overlay, fly map to their pin coordinates, open friend card
+- Tapping a venue result: close overlay, fly map to venue, open venue card
 
-### 4. Z-index by relationship type
-- Close friends: `z-index: 14`
-- Direct friends: `z-index: 11`
-- Mutual friends: `z-index: 10`
-- Clusters containing a close friend: `z-index: 14`
-- This ensures close friend pins always render on top when overlapping with other friend pins
-- Venue pins remain at `z-index: 12` (non-promoted) and `30` (promoted), user marker at `15`
+### 3. Quick-filter bottom sheet (on tap of funnel icon)
+- Uses the existing `Drawer` component from `src/components/ui/drawer.tsx`
+- Title: "Show on Map"
+- Three radio-style options:
+  - **Everyone** (default) — sets `layerVisibility = 'both'` and no relationship filter
+  - **Close Friends Only** — sets a new `relationshipFilter = 'close'` state, filters friend markers to only close friends
+  - **Friends Only** — sets `layerVisibility = 'friends'` (hides venue pins)
+- Also includes venue type filter section below: All / Clubs / Cocktails / Bars / Rooftops (migrating the existing venue filter into this sheet)
 
-### 5. Small cluster rendering (2-3 friends)
-Instead of offset individual pins for 2-3 friends, render a compact cluster:
-- Show the highest-priority friend's avatar (close > direct > mutual) as the main image
-- Overlay a small count badge (e.g., circle with "2" or "3") in bottom-right
-- Tap opens the same cluster popover showing the full list
+## State Changes
+- Remove: `showSearch`, `showVenueFilters`, `showVenueList` states
+- Add: `showSearchOverlay: boolean`, `showFilterSheet: boolean`, `searchFilterPeople: boolean` (default true), `searchFilterVenues: boolean` (default true), `relationshipFilter: 'all' | 'close' | 'friends_only'` (default 'all')
+- Keep: `searchQuery`, `venueFilter`, `layerVisibility` (repurposed internally)
+- Remove refs: `searchContainerRef`, `venueFilterRef`, `venueListRef`
+
+## Impact on existing marker rendering
+- The `relationshipFilter` state will be used in the friend markers `useEffect` (line 612+) to filter which friends get rendered:
+  - `'all'`: show all friends + venues (current `'both'` behavior)
+  - `'close'`: only render friends where `relationshipType === 'close'`, still show venues
+  - `'friends_only'`: show all friends, hide venues (current `'friends'` behavior)
+- The `venueFilter` continues to work as-is for venue type filtering
+- The click-outside handler (lines 1024-1054) simplified since fewer dropdowns exist
 
 ## Technical Details
 
-All changes are in `src/pages/Map.tsx` in the `useEffect` that renders friend markers (lines ~612-771):
-
 ```text
-Current flow:
-  friends → group by proximity → if 4+: cluster bubble | if 1-3: offset individuals
+Current top controls layout:
+  Row 1 (top: 7rem):  [🔍 Search]  ........  [🗺️ All Venues ▾]
+  Row 2 (top: 9.5rem): [📍 Explore ▾]  .....  [Both | 👤 | 📍]
 
-New flow:
-  friends → group by proximity → if 2+: cluster with count badge | if 1: single avatar
-  
-Pin sizes:
-  Individual: 52px → 40px
-  Cluster 2-3: new 46px compact pin  
-  Cluster 4+: 70px → 56px
-  Venue (normal): 50px → 40px
-  Venue (promoted): 60px → 50px (container), stays prominent
+New layout:
+  Row 1 (top: 6.5rem):  [🔍 Search people, venues, or neighborhoods...  🔽]
+  (everything else is in overlays/sheets)
 
-Z-index hierarchy:
-  30: promoted venues
-  15: user marker
-  14: close friend pins / clusters with close friends
-  12: venue pins
-  11: direct friend pins
-  10: mutual friend pins
+State flow:
+  Tap search bar → showSearchOverlay = true → full screen search
+  Tap funnel icon → showFilterSheet = true → Drawer with filter options
+  Select filter option → update relationshipFilter/venueFilter/layerVisibility → close sheet
+  Tap search result → close overlay, fly to location, open card
+
+Files modified: src/pages/Map.tsx only
+No new files, no DB changes, no new dependencies
 ```
 
-No database changes, no new files, no dependency changes needed.
+## File: `src/pages/Map.tsx`
+
+1. **Remove** old state variables: `showSearch`, `showVenueFilters`, `showVenueList` and their refs
+2. **Add** new state: `showSearchOverlay`, `showFilterSheet`, `searchFilterPeople`, `searchFilterVenues`, `relationshipFilter`
+3. **Add** import for `Drawer, DrawerContent, DrawerHeader, DrawerTitle` and `Filter` icon from lucide
+4. **Remove** the 4 control blocks (lines 1148-1318) and search results dropdown (lines 1183-1209)
+5. **Add** collapsed search bar JSX in their place
+6. **Add** full-screen search overlay JSX (rendered conditionally)
+7. **Add** filter Drawer JSX (rendered conditionally)
+8. **Update** friend marker rendering to respect `relationshipFilter`
+9. **Update** click-outside handler to remove references to deleted refs
+10. **Keep** all bottom elements (friends pill, legend, my-location button) exactly as-is
 
