@@ -11,7 +11,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, MapPin, Target } from 'lucide-react';
+import { ChevronDown, MapPin, Target, Share2 } from 'lucide-react';
+import { getOrCreateInviteCode, getInviteLink, triggerSmsInvite } from '@/lib/sms-invite';
+import { haptic } from '@/lib/haptics';
+import { toast } from 'sonner';
 
 interface Friend {
   id: string;
@@ -23,7 +26,7 @@ interface Friend {
 }
 
 export function InviteFriendsModal() {
-  const { showInviteModal, closeInviteModal, sendInvites, venueName } = useVenueInvite();
+  const { showInviteModal, closeInviteModal, sendInvites, venueName, venueId } = useVenueInvite();
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
   const { data: allProfilesData } = useProfilesSafe();
@@ -251,6 +254,43 @@ export function InviteFriendsModal() {
               </div>
             )}
           </ScrollArea>
+
+          {/* Invite from Contacts */}
+          <div className="border-t border-white/10 pt-4 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Share2 className="h-4 w-4 text-[#d4ff00]" />
+              <span className="font-semibold text-white text-sm">Invite from Contacts</span>
+            </div>
+            <p className="text-white/50 text-xs mb-3">
+              Invite friends who aren't on Spotted yet via text message
+            </p>
+            <Button
+              onClick={async () => {
+                if (!user) return;
+                haptic.light();
+                try {
+                  const { data: profile } = await supabase
+                    .rpc('get_profile_safe', { target_user_id: user.id });
+                  const senderName = profile?.[0]?.display_name?.split(' ')[0] || 'Your friend';
+                  const code = await getOrCreateInviteCode(user.id);
+                  const link = getInviteLink(code, venueId || undefined);
+                  await triggerSmsInvite({
+                    senderName,
+                    venueName: venueName || undefined,
+                    inviteLink: link,
+                  });
+                } catch (err) {
+                  console.error('SMS invite error:', err);
+                  toast.error('Could not open share sheet');
+                }
+              }}
+              variant="outline"
+              className="w-full border-[#d4ff00]/40 text-[#d4ff00] hover:bg-[#d4ff00]/10"
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Send Text Invite
+            </Button>
+          </div>
 
           {/* Send Button */}
           <Button
