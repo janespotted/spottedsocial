@@ -1,8 +1,8 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import { Home, MapPin, BarChart3, MessageSquare } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useInputFocusState } from '@/contexts/InputFocusContext';
+import { useInputFocusState, useInputFocus } from '@/contexts/InputFocusContext';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 
 const navItems = [
@@ -16,6 +16,32 @@ const navItems = [
 export const BottomNav = memo(function BottomNav() {
   const location = useLocation();
   const isInputFocused = useInputFocusState();
+  const { setInputFocused } = useInputFocus();
+
+  // Safety net: reset focus state on route change
+  useEffect(() => {
+    setInputFocused(false);
+  }, [location.pathname, setInputFocused]);
+
+  // Safety net: global blur listener catches cases where raw inputs
+  // (not wrapped in shadcn Input/Textarea) don't call setInputFocused(false)
+  useEffect(() => {
+    const handleFocusOut = () => {
+      // Small delay to allow focus to move to another input
+      setTimeout(() => {
+        const active = document.activeElement;
+        const isInput = active instanceof HTMLInputElement || 
+                        active instanceof HTMLTextAreaElement ||
+                        active?.getAttribute('contenteditable') === 'true';
+        if (!isInput) {
+          setInputFocused(false);
+        }
+      }, 100);
+    };
+
+    document.addEventListener('focusout', handleFocusOut);
+    return () => document.removeEventListener('focusout', handleFocusOut);
+  }, [setInputFocused]);
 
   return (
     <nav 
