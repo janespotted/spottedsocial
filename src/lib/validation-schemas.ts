@@ -33,14 +33,6 @@ export const yapMessageSchema = z.object({
     .max(280, { message: 'Message must be less than 280 characters' }),
 });
 
-// Venue buzz message validation schema
-export const buzzMessageSchema = z.object({
-  text: z
-    .string()
-    .trim()
-    .min(1, { message: 'Vibe message cannot be empty' })
-    .max(140, { message: 'Vibe message must be less than 140 characters' }),
-});
 
 // Yap comment validation schema
 export const yapCommentSchema = z.object({
@@ -78,14 +70,6 @@ export function validateYapText(text: string): { success: boolean; error?: strin
   return { success: false, error: result.error.errors[0]?.message || 'Invalid message' };
 }
 
-// Validate buzz message text
-export function validateBuzzText(text: string): { success: boolean; error?: string; data?: string } {
-  const result = buzzMessageSchema.shape.text.safeParse(text);
-  if (result.success) {
-    return { success: true, data: result.data };
-  }
-  return { success: false, error: result.error.errors[0]?.message || 'Invalid vibe message' };
-}
 
 // Validate yap comment text
 export function validateYapCommentText(text: string): { success: boolean; error?: string; data?: string } {

@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { YapSkeleton } from './MessagesSkeleton';
 import { validateYapText, validateYapCommentText } from '@/lib/validation-schemas';
 import { checkAndRecordRateLimit, getRateLimitMessage } from '@/lib/rate-limit';
+import { LoginPromptSheet } from '@/components/LoginPromptSheet';
 
 interface YapMessage {
   id: string;
@@ -44,11 +45,15 @@ interface YapComment {
   } | null;
 }
 
-export function YapTab() {
+interface YapTabProps {
+  venueName?: string;
+}
+
+export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const { user } = useAuth();
   const demoMode = useDemoMode();
   const [messages, setMessages] = useState<YapMessage[]>([]);
-  const [selectedVenue, setSelectedVenue] = useState<string>('');
+  const [selectedVenue, setSelectedVenue] = useState<string>(venueNameProp || '');
   const [sortBy, setSortBy] = useState<'new' | 'hot'>('new');
   const [newYap, setNewYap] = useState('');
   const [isPosting, setIsPosting] = useState(false);
@@ -56,20 +61,29 @@ export function YapTab() {
   const [comments, setComments] = useState<Record<string, YapComment[]>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
+  // Use prop if provided, otherwise fetch from user's night_status
   useEffect(() => {
-    if (user) {
+    if (venueNameProp) {
+      setSelectedVenue(venueNameProp);
+    } else if (user) {
       fetchUserVenue();
+    } else {
+      setIsLoading(false);
     }
-  }, [user]);
+  }, [user, venueNameProp]);
 
   useEffect(() => {
     if (selectedVenue) {
       fetchYapMessages();
-      const cleanup = subscribeToYaps();
-      return cleanup;
+      // Only subscribe to realtime if authenticated
+      if (user) {
+        const cleanup = subscribeToYaps();
+        return cleanup;
+      }
     }
-  }, [selectedVenue, sortBy, demoMode]);
+  }, [selectedVenue, sortBy, demoMode, user]);
 
   const fetchUserVenue = async () => {
     setIsLoading(true);
@@ -87,12 +101,17 @@ export function YapTab() {
     }
   };
 
-  const fetchYapMessages = async () => {
-    if (!user) return;
+  const requireAuth = (): boolean => {
+    if (!user) {
+      setShowLoginPrompt(true);
+      return false;
+    }
+    return true;
+  };
 
+  const fetchYapMessages = async () => {
     setIsLoading(true);
     try {
-      // Fetch yap messages with vote information
       let query = supabase
         .from('yap_messages')
         .select(`
@@ -104,8 +123,6 @@ export function YapTab() {
         `)
         .gt('expires_at', new Date().toISOString());
 
-      // In demo mode, show all demo yaps OR yaps for current venue
-      // In normal mode, only show yaps for current venue (non-demo)
       if (demoMode) {
         query = query.or(`venue_name.eq.${selectedVenue},is_demo.eq.true`);
       } else {
@@ -120,13 +137,11 @@ export function YapTab() {
         return;
       }
 
-      // Set messages immediately with null votes (fast initial render)
       const initialMessages: YapMessage[] = yaps.map(msg => ({
         ...msg,
         user_vote: null,
       }));
 
-      // Sort based on selected tab
       if (sortBy === 'hot') {
         initialMessages.sort((a, b) => {
           if (b.score !== a.score) return b.score - a.score;
@@ -141,21 +156,23 @@ export function YapTab() {
       setMessages(initialMessages);
       setIsLoading(false);
 
-      // Then fetch votes in background (progressive enhancement)
-      const yapIds = yaps.map(y => y.id);
-      const { data: votes } = await supabase
-        .from('yap_votes')
-        .select('yap_id, vote_type')
-        .eq('user_id', user.id)
-        .in('yap_id', yapIds);
+      // Fetch votes only if authenticated
+      if (user) {
+        const yapIds = yaps.map(y => y.id);
+        const { data: votes } = await supabase
+          .from('yap_votes')
+          .select('yap_id, vote_type')
+          .eq('user_id', user.id)
+          .in('yap_id', yapIds);
 
-      if (votes?.length) {
-        const voteMap = new Map<string, 'up' | 'down'>();
-        votes.forEach(v => voteMap.set(v.yap_id, v.vote_type as 'up' | 'down'));
-        setMessages(prev => prev.map(msg => ({
-          ...msg,
-          user_vote: voteMap.get(msg.id) || null,
-        })));
+        if (votes?.length) {
+          const voteMap = new Map<string, 'up' | 'down'>();
+          votes.forEach(v => voteMap.set(v.yap_id, v.vote_type as 'up' | 'down'));
+          setMessages(prev => prev.map(msg => ({
+            ...msg,
+            user_vote: voteMap.get(msg.id) || null,
+          })));
+        }
       }
     } catch (error) {
       console.error('Error fetching yaps:', error);
@@ -186,7 +203,7 @@ export function YapTab() {
   };
 
   const handleVote = async (yapId: string, voteType: 'up' | 'down') => {
-    if (!user) return;
+    if (!requireAuth()) return;
 
     const currentMessage = messages.find(m => m.id === yapId);
     if (!currentMessage) return;
@@ -194,38 +211,32 @@ export function YapTab() {
     const existingVote = currentMessage.user_vote;
     let scoreDelta = 0;
 
-    // Calculate score change
     if (existingVote === voteType) {
-      // Remove vote
       scoreDelta = voteType === 'up' ? -1 : 1;
       await supabase
         .from('yap_votes')
         .delete()
         .eq('yap_id', yapId)
-        .eq('user_id', user.id);
+        .eq('user_id', user!.id);
     } else if (existingVote) {
-      // Change vote
       scoreDelta = voteType === 'up' ? 2 : -2;
       await supabase
         .from('yap_votes')
         .update({ vote_type: voteType })
         .eq('yap_id', yapId)
-        .eq('user_id', user.id);
+        .eq('user_id', user!.id);
     } else {
-      // New vote
       scoreDelta = voteType === 'up' ? 1 : -1;
       await supabase
         .from('yap_votes')
-        .insert({ yap_id: yapId, user_id: user.id, vote_type: voteType });
+        .insert({ yap_id: yapId, user_id: user!.id, vote_type: voteType });
     }
 
-    // Update score in database
     await supabase
       .from('yap_messages')
       .update({ score: currentMessage.score + scoreDelta })
       .eq('id', yapId);
 
-    // Update local state
     setMessages(prev => prev.map(m => 
       m.id === yapId 
         ? { 
@@ -238,16 +249,15 @@ export function YapTab() {
   };
 
   const handlePostYap = async () => {
-    if (!user || !newYap.trim() || !selectedVenue) return;
+    if (!requireAuth()) return;
+    if (!newYap.trim() || !selectedVenue) return;
 
-    // Validate input
     const validation = validateYapText(newYap);
     if (!validation.success) {
       toast.error(validation.error || 'Invalid message');
       return;
     }
 
-    // Check rate limit
     const allowed = await checkAndRecordRateLimit('yap_message');
     if (!allowed) {
       toast.error(getRateLimitMessage('yap_message'));
@@ -256,23 +266,20 @@ export function YapTab() {
 
     setIsPosting(true);
     try {
-      // Generate anonymous handle (User + 6 random digits)
       const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
       
-      // Set expiry to 5am next day
       const now = new Date();
       const expiry = new Date(now);
       expiry.setDate(expiry.getDate() + 1);
       expiry.setHours(5, 0, 0, 0);
       if (now.getHours() >= 5) {
-        // If it's already past 5am today, set to 5am tomorrow
         expiry.setDate(expiry.getDate() + 1);
       }
 
       const { error } = await supabase
         .from('yap_messages')
         .insert({
-          user_id: user.id,
+          user_id: user!.id,
           text: validation.data!,
           venue_name: selectedVenue,
           is_anonymous: true,
@@ -296,8 +303,6 @@ export function YapTab() {
   };
 
   const fetchComments = async (yapId: string) => {
-    if (!user) return;
-
     const { data } = await supabase
       .from('yap_comments')
       .select(`
@@ -315,7 +320,6 @@ export function YapTab() {
       return;
     }
 
-    // Set comments immediately with null votes (fast initial render)
     const initialComments: YapComment[] = data.map(comment => ({
       ...comment,
       score: comment.score || 0,
@@ -323,29 +327,31 @@ export function YapTab() {
     }));
     setComments(prev => ({ ...prev, [yapId]: initialComments }));
 
-    // Fetch votes in background (progressive enhancement)
-    const commentIds = data.map(c => c.id);
-    const { data: votes } = await supabase
-      .from('yap_comment_votes')
-      .select('comment_id, vote_type')
-      .eq('user_id', user.id)
-      .in('comment_id', commentIds);
+    // Fetch votes only if authenticated
+    if (user) {
+      const commentIds = data.map(c => c.id);
+      const { data: votes } = await supabase
+        .from('yap_comment_votes')
+        .select('comment_id, vote_type')
+        .eq('user_id', user.id)
+        .in('comment_id', commentIds);
 
-    if (votes?.length) {
-      const voteMap = new Map<string, 'up' | 'down'>();
-      votes.forEach(v => voteMap.set(v.comment_id, v.vote_type as 'up' | 'down'));
-      setComments(prev => ({
-        ...prev,
-        [yapId]: prev[yapId]?.map(c => ({
-          ...c,
-          user_vote: voteMap.get(c.id) || null,
-        })) || [],
-      }));
+      if (votes?.length) {
+        const voteMap = new Map<string, 'up' | 'down'>();
+        votes.forEach(v => voteMap.set(v.comment_id, v.vote_type as 'up' | 'down'));
+        setComments(prev => ({
+          ...prev,
+          [yapId]: prev[yapId]?.map(c => ({
+            ...c,
+            user_vote: voteMap.get(c.id) || null,
+          })) || [],
+        }));
+      }
     }
   };
 
   const handleCommentVote = async (yapId: string, commentId: string, voteType: 'up' | 'down') => {
-    if (!user) return;
+    if (!requireAuth()) return;
 
     const yapComments = comments[yapId];
     if (!yapComments) return;
@@ -356,38 +362,32 @@ export function YapTab() {
     const existingVote = currentComment.user_vote;
     let scoreDelta = 0;
 
-    // Calculate score change
     if (existingVote === voteType) {
-      // Remove vote
       scoreDelta = voteType === 'up' ? -1 : 1;
       await supabase
         .from('yap_comment_votes')
         .delete()
         .eq('comment_id', commentId)
-        .eq('user_id', user.id);
+        .eq('user_id', user!.id);
     } else if (existingVote) {
-      // Change vote
       scoreDelta = voteType === 'up' ? 2 : -2;
       await supabase
         .from('yap_comment_votes')
         .update({ vote_type: voteType })
         .eq('comment_id', commentId)
-        .eq('user_id', user.id);
+        .eq('user_id', user!.id);
     } else {
-      // New vote
       scoreDelta = voteType === 'up' ? 1 : -1;
       await supabase
         .from('yap_comment_votes')
-        .insert({ comment_id: commentId, user_id: user.id, vote_type: voteType });
+        .insert({ comment_id: commentId, user_id: user!.id, vote_type: voteType });
     }
 
-    // Update score in database
     await supabase
       .from('yap_comments')
       .update({ score: currentComment.score + scoreDelta })
       .eq('id', commentId);
 
-    // Update local state
     setComments(prev => ({
       ...prev,
       [yapId]: prev[yapId].map(c =>
@@ -414,16 +414,15 @@ export function YapTab() {
   };
 
   const handlePostComment = async (yapId: string) => {
-    if (!user || !newComment[yapId]?.trim()) return;
+    if (!requireAuth()) return;
+    if (!newComment[yapId]?.trim()) return;
 
-    // Validate input
     const validation = validateYapCommentText(newComment[yapId]);
     if (!validation.success) {
       toast.error(validation.error || 'Invalid comment');
       return;
     }
 
-    // Check rate limit
     const allowed = await checkAndRecordRateLimit('yap_comment');
     if (!allowed) {
       toast.error(getRateLimitMessage('yap_comment'));
@@ -437,7 +436,7 @@ export function YapTab() {
         .from('yap_comments')
         .insert({
           yap_id: yapId,
-          user_id: user.id,
+          user_id: user!.id,
           text: validation.data!,
           is_anonymous: true,
           author_handle: handle,
@@ -448,7 +447,7 @@ export function YapTab() {
       setNewComment(prev => ({ ...prev, [yapId]: '' }));
       toast.success('Comment posted!');
       await fetchComments(yapId);
-      await fetchYapMessages(); // Refresh to update comment count
+      await fetchYapMessages();
     } catch (error) {
       console.error('Error posting comment:', error);
       toast.error('Failed to post comment');
@@ -505,6 +504,7 @@ export function YapTab() {
             <Textarea
               value={newYap}
               onChange={(e) => setNewYap(e.target.value)}
+              onFocus={() => { if (!user) { setShowLoginPrompt(true); } }}
               placeholder="What's happening at the venue? (anonymous)"
               className="bg-[#1a0f2e] border-[#a855f7]/20 text-white placeholder:text-white/40 resize-none"
               rows={3}
@@ -553,7 +553,6 @@ export function YapTab() {
                     {/* Comments Section */}
                     {expandedYapId === msg.id && (
                       <div className="mt-4 space-y-3 border-t border-[#a855f7]/20 pt-3">
-                        {/* Comments List */}
                         {comments[msg.id]?.map((comment) => (
                           <div key={comment.id} className="flex gap-2">
                             <div className="flex-1 bg-[#1a0f2e]/60 rounded-lg p-3">
@@ -604,6 +603,7 @@ export function YapTab() {
                             type="text"
                             value={newComment[msg.id] || ''}
                             onChange={(e) => setNewComment(prev => ({ ...prev, [msg.id]: e.target.value }))}
+                            onFocus={() => { if (!user) { setShowLoginPrompt(true); } }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
@@ -664,10 +664,10 @@ export function YapTab() {
                   <MessageCircle className="h-8 w-8 text-[#d4ff00]/60" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">
-                  You're the first one here
+                  No yaps yet
                 </h3>
                 <p className="text-white/50 text-sm max-w-xs">
-                  Drop a yap — others at {selectedVenue} will see it.
+                  Be the first to yap about {selectedVenue}.
                 </p>
               </div>
             )}
@@ -686,6 +686,8 @@ export function YapTab() {
           </p>
         </div>
       )}
+
+      <LoginPromptSheet open={showLoginPrompt} onOpenChange={setShowLoginPrompt} />
     </div>
   );
 }

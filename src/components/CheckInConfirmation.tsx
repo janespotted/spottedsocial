@@ -8,7 +8,6 @@ import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Camera, MessageCircle } from 'lucide-react';
-import { DropVibeDialog } from '@/components/DropVibeDialog';
 
 export function CheckInConfirmation() {
   const { 
@@ -24,8 +23,7 @@ export function CheckInConfirmation() {
   const navigate = useNavigate();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>('');
-  const [phase, setPhase] = useState<'celebration' | 'buzz_prompt'>('celebration');
-  const [showDropVibeDialog, setShowDropVibeDialog] = useState(false);
+  const [phase, setPhase] = useState<'celebration' | 'yap_prompt'>('celebration');
 
   const handleDismissAndNavigate = () => {
     closeCheckInConfirmation();
@@ -86,14 +84,14 @@ export function CheckInConfirmation() {
         });
       }, 250);
 
-      // After 2 seconds, show buzz prompt
-      const buzzTimer = setTimeout(() => {
-        setPhase('buzz_prompt');
+      // After 2 seconds, show yap prompt
+      const yapTimer = setTimeout(() => {
+        setPhase('yap_prompt');
       }, 2500);
 
       return () => {
         clearInterval(interval);
-        clearTimeout(buzzTimer);
+        clearTimeout(yapTimer);
       };
     } else if (showCheckInConfirmation) {
       // For planning or non-venue check-ins, just show confetti
@@ -137,12 +135,8 @@ export function CheckInConfirmation() {
   };
 
   const handleShareClick = () => {
-    setShowDropVibeDialog(true);
-  };
-
-  const handleVibeSubmitted = () => {
-    setShowDropVibeDialog(false);
-    handleDismissAndNavigate();
+    closeCheckInConfirmation();
+    navigate('/messages', { state: { activeTab: 'yap', venueName: checkInVenueName } });
   };
 
   const getPrivacyLabel = (level: string): string => {
@@ -164,67 +158,55 @@ export function CheckInConfirmation() {
   const emoji = isOut ? '🥳' : '🤔';
   const privacyLabel = getPrivacyLabel(checkInPrivacyLevel || 'all_friends');
 
-  // Show buzz prompt phase for venue check-ins
-  if (phase === 'buzz_prompt' && isOut && checkInVenueId) {
+  // Show yap prompt phase for venue check-ins
+  if (phase === 'yap_prompt' && isOut && checkInVenueId) {
     return (
-      <>
-        <div 
-          className="fixed inset-0 z-[600] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"
-          onClick={handleBackdropClick}
-        >
-          <div className="w-[90%] max-w-md">
-            <div className="relative bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in">
-              {/* Top Left - Target emoji */}
-              <div className="absolute top-6 left-6 h-12 w-12 flex items-center justify-center text-3xl">
-                ✨
-              </div>
+      <div 
+        className="fixed inset-0 z-[600] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"
+        onClick={handleBackdropClick}
+      >
+        <div className="w-[90%] max-w-md">
+          <div className="relative bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in">
+            {/* Top Left - Target emoji */}
+            <div className="absolute top-6 left-6 h-12 w-12 flex items-center justify-center text-3xl">
+              ✨
+            </div>
 
-              {/* Spotted S - Top Right */}
-              <div className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center">
-                <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain" />
-              </div>
+            {/* Spotted S - Top Right */}
+            <div className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center">
+              <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain" />
+            </div>
 
-              {/* Center Content */}
-              <div className="flex flex-col items-center text-center mt-4 mb-6">
-                {/* Text */}
-                <h2 className="text-2xl font-bold text-white mb-2">
-                  What's {checkInVenueName} like tonight?
-                </h2>
-                <p className="text-white/80 text-sm mb-6">
-                  Add to Tonight's Buzz — everyone at this spot can see it
-                </p>
+            {/* Center Content */}
+            <div className="flex flex-col items-center text-center mt-4 mb-6">
+              {/* Text */}
+              <h2 className="text-2xl font-bold text-white mb-2">
+                What's {checkInVenueName} like tonight?
+              </h2>
+              <p className="text-white/80 text-sm mb-6">
+                Share what it's like — everyone at this spot can see it
+              </p>
 
-                {/* Share button */}
-                <Button
-                  onClick={handleShareClick}
-                  className="w-full h-14 text-lg font-semibold rounded-2xl bg-gradient-to-r from-[#c4ee00] to-[#d4ff00] text-black hover:opacity-90 transition-all shadow-[0_0_20px_rgba(212,255,0,0.3)] flex items-center justify-center gap-2 mb-3"
-                >
-                  <Camera className="h-5 w-5" />
-                  <MessageCircle className="h-5 w-5" />
-                  Share what it's like
-                </Button>
+              {/* Share button */}
+              <Button
+                onClick={handleShareClick}
+                className="w-full h-14 text-lg font-semibold rounded-2xl bg-gradient-to-r from-[#c4ee00] to-[#d4ff00] text-black hover:opacity-90 transition-all shadow-[0_0_20px_rgba(212,255,0,0.3)] flex items-center justify-center gap-2 mb-3"
+              >
+                <MessageCircle className="h-5 w-5" />
+                Yap about it
+              </Button>
 
-                {/* Maybe later */}
-                <button
-                  onClick={handleDismissAndNavigate}
-                  className="text-white/60 hover:text-white text-sm transition-colors"
-                >
-                  Maybe later
-                </button>
-              </div>
+              {/* Maybe later */}
+              <button
+                onClick={handleDismissAndNavigate}
+                className="text-white/60 hover:text-white text-sm transition-colors"
+              >
+                Maybe later
+              </button>
             </div>
           </div>
         </div>
-
-        {/* Drop Vibe Dialog */}
-        <DropVibeDialog
-          open={showDropVibeDialog}
-          onOpenChange={setShowDropVibeDialog}
-          venueId={checkInVenueId}
-          venueName={checkInVenueName || ''}
-          onVibeSubmitted={handleVibeSubmitted}
-        />
-      </>
+      </div>
     );
   }
 

@@ -12,7 +12,6 @@ interface CreateStoryDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type AudienceOption = 'friends' | 'buzz' | 'both';
 type VisibilityOption = 'close_friends' | 'all_friends' | 'mutual_friends';
 type FlowStep = 'capture' | 'edit' | 'audience';
 
@@ -24,27 +23,21 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
   const [preview, setPreview] = useState<string | null>(null);
   const [venueName, setVenueName] = useState<string | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
-  const [audience, setAudience] = useState<AudienceOption>('friends');
   const [visibility, setVisibility] = useState<VisibilityOption>('all_friends');
-  const [isAnonymous, setIsAnonymous] = useState(false);
   const [editedBlob, setEditedBlob] = useState<Blob | null>(null);
 
-  // Fetch current venue when dialog opens
   useEffect(() => {
     if (open && user) {
       fetchCurrentVenue();
     }
   }, [open, user]);
 
-  // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
       setStep('capture');
       setFile(null);
       setPreview(null);
-      setAudience('friends');
       setVisibility('all_friends');
-      setIsAnonymous(false);
       setEditedBlob(null);
     }
   }, [open]);
@@ -69,11 +62,9 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
     setFile(capturedFile);
     setPreview(URL.createObjectURL(capturedFile));
     setEditedBlob(null);
-    // Go to editor for images
     if (capturedFile.type.startsWith('image/')) {
       setStep('edit');
     } else {
-      // Videos go straight to audience selection
       setStep('audience');
     }
   };
@@ -82,11 +73,9 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
     setFile(selectedFile);
     setPreview(URL.createObjectURL(selectedFile));
     setEditedBlob(null);
-    // Go to editor for images
     if (selectedFile.type.startsWith('image/')) {
       setStep('edit');
     } else {
-      // Videos go straight to audience selection
       setStep('audience');
     }
   };
@@ -98,7 +87,6 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
   };
 
   const handleEditorCancel = () => {
-    // Go back to capture
     setStep('capture');
     setFile(null);
     setPreview(null);
@@ -111,7 +99,6 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
     setUploading(true);
 
     try {
-      // Re-fetch venue to ensure we have the latest check-in data
       const { data: venueData } = await supabase
         .from('night_statuses')
         .select('venue_name, venue_id, status')
@@ -121,7 +108,6 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
       const currentVenueName = venueData?.status === 'out' ? venueData.venue_name : null;
       const currentVenueId = venueData?.status === 'out' ? venueData.venue_id : null;
 
-      // Use edited blob if available, otherwise use original file
       const uploadFile = editedBlob || file!;
       const fileExt = editedBlob ? 'jpg' : file!.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
@@ -136,11 +122,8 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
         .from('post-images')
         .getPublicUrl(fileName);
 
-      // Determine story settings based on audience
-      const isPublicBuzz = audience === 'buzz' || audience === 'both';
       const mediaType = editedBlob ? 'image' : (file!.type.startsWith('image/') ? 'image' : 'video');
       
-      // Create story with fresh venue data
       const { error: insertError } = await supabase
         .from('stories')
         .insert({
@@ -149,21 +132,15 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
           media_type: mediaType,
           venue_name: currentVenueName,
           venue_id: currentVenueId,
-          is_public_buzz: isPublicBuzz,
-          is_anonymous: isAnonymous && isPublicBuzz,
+          is_public_buzz: false,
+          is_anonymous: false,
           visibility,
           expires_at: calculateExpiryTime(),
         });
 
       if (insertError) throw insertError;
 
-      const successMessage = audience === 'buzz' 
-        ? 'Shared to Tonight\'s Buzz!' 
-        : audience === 'both'
-        ? 'Posted to friends & Tonight\'s Buzz!'
-        : 'Story posted!';
-        
-      toast.success(successMessage);
+      toast.success('Story posted!');
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error uploading story:', error);
@@ -173,12 +150,10 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
     }
   };
 
-  // Don't render anything if not open
   if (!open) return null;
 
   return (
     <>
-      {/* Step 1: Camera Capture */}
       {step === 'capture' && (
         <StoryCaptureScreen
           onCapture={handleCapture}
@@ -187,7 +162,6 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
         />
       )}
 
-      {/* Step 2: Story Editor (images only) */}
       {step === 'edit' && preview && file && (
         <StoryEditor
           imageUrl={preview}
@@ -197,12 +171,10 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
         />
       )}
 
-      {/* Step 3: Audience Selection Sheet */}
       <StoryAudienceSheet
         open={step === 'audience'}
         onOpenChange={(isOpen) => {
           if (!isOpen) {
-            // Go back to editor if closing sheet
             if (file?.type.startsWith('image/')) {
               setStep('edit');
             } else {
@@ -210,18 +182,12 @@ export function CreateStoryDialog({ open, onOpenChange }: CreateStoryDialogProps
             }
           }
         }}
-        venueName={venueName}
-        audience={audience}
-        onAudienceChange={setAudience}
         visibility={visibility}
         onVisibilityChange={setVisibility}
-        isAnonymous={isAnonymous}
-        onAnonymousChange={setIsAnonymous}
         onPost={handleSubmit}
         isPosting={uploading}
       />
 
-      {/* Preview behind sheet when on audience step */}
       {step === 'audience' && preview && (
         <div className="fixed inset-0 z-40 bg-black flex items-center justify-center">
           {file?.type.startsWith('video/') ? (

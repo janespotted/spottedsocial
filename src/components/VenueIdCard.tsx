@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getShareableUrl, copyToClipboard, openExternalUrl } from '@/lib/platform';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
@@ -25,8 +26,6 @@ import {
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
-import { BuzzItem } from './BuzzItem';
-import { DropVibeDialog } from './DropVibeDialog';
 import { ReportDialog } from './ReportDialog';
 import { VenueHoursDisplay, getHoursDisplayString } from '@/lib/venue-hours';
 import type { VenueHours } from '@/lib/venue-hours';
@@ -49,21 +48,6 @@ interface FriendAtVenue {
   avatar_url: string | null;
 }
 
-interface BuzzItemData {
-  type: 'text' | 'media';
-  id: string;
-  text?: string;
-  emoji_vibe?: string | null;
-  star_rating?: number | null;
-  media_url?: string;
-  media_type?: string;
-  is_anonymous: boolean;
-  created_at: string;
-  profile?: {
-    display_name: string;
-    avatar_url: string | null;
-  };
-}
 
 const getVenueTypeDisplay = (type: string) => {
   const typeMap: Record<string, { label: string; emoji: string; color: string }> = {
@@ -83,6 +67,7 @@ export function VenueIdCard() {
   const { openFriendCard } = useFriendIdCard();
   const { openInviteModal } = useVenueInvite();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const demoEnabled = useDemoMode();
   const { data: allProfilesData } = useProfilesSafe();
   const { data: cachedFriendIds } = useFriendIds(user?.id);
@@ -91,13 +76,12 @@ export function VenueIdCard() {
   const [friendsPlanning, setFriendsPlanning] = useState<FriendAtVenue[]>([]);
   const [distance, setDistance] = useState<string>('--');
   const [isInWishlist, setIsInWishlist] = useState(false);
-  const [buzzItems, setBuzzItems] = useState<BuzzItemData[]>([]);
-  const [showDropVibe, setShowDropVibe] = useState(false);
+  const [hotYap, setHotYap] = useState<{ text: string; score: number } | null>(null);
   const [moreInfoOpen, setMoreInfoOpen] = useState(false);
   const [venueHours, setVenueHours] = useState<VenueHoursDisplay | null>(null);
   const [loadingHours, setLoadingHours] = useState(false);
   const [googlePhotos, setGooglePhotos] = useState<string[]>([]);
-  const [buzzMediaPhotos, setBuzzMediaPhotos] = useState<string[]>([]);
+  
   const [googleRating, setGoogleRating] = useState<number | null>(null);
   const [googleRatingsCount, setGoogleRatingsCount] = useState<number>(0);
   const [similarVenues, setSimilarVenues] = useState<Array<{
@@ -113,7 +97,6 @@ export function VenueIdCard() {
   useEffect(() => {
     if (selectedVenueId) {
       fetchVenueData();
-      fetchBuzzItems();
       fetchVenueHours();
     }
   }, [selectedVenueId]);
@@ -384,88 +367,21 @@ export function VenueIdCard() {
     }
   };
 
-  const fetchBuzzItems = async () => {
-    if (!selectedVenueId || !user) return;
-
+  const fetchHotYap = async (venueName: string) => {
     try {
-      const now = new Date().toISOString();
+      const { data } = await supabase
+        .from('yap_messages')
+        .select('text, score')
+        .eq('venue_name', venueName)
+        .eq('is_demo', false)
+        .gt('expires_at', new Date().toISOString())
+        .order('score', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      // Fetch text vibes
-      const { data: textVibes } = await supabase
-        .from('venue_buzz_messages')
-        .select('*')
-        .eq('venue_id', selectedVenueId)
-        .gt('expires_at', now)
-        .order('created_at', { ascending: false });
-
-      // Fetch media clips (stories with is_public_buzz = true)
-      const { data: mediaClips } = await supabase
-        .from('stories')
-        .select('*')
-        .eq('venue_id', selectedVenueId)
-        .eq('is_public_buzz', true)
-        .gt('expires_at', now)
-        .order('created_at', { ascending: false });
-
-      // Get user profiles for non-anonymous items
-      const textUserIds = (textVibes || [])
-        .filter(v => !v.is_anonymous)
-        .map(v => v.user_id);
-      const mediaUserIds = (mediaClips || [])
-        .filter(c => !c.is_anonymous)
-        .map(c => c.user_id);
-      const allUserIds = [...new Set([...textUserIds, ...mediaUserIds])];
-
-      let profilesMap: Record<string, { display_name: string; avatar_url: string | null }> = {};
-
-      if (allUserIds.length > 0) {
-        // Use cached profiles
-        const profiles = (allProfilesData || []).filter((p: any) => allUserIds.includes(p.id));
-
-        if (profiles) {
-          profilesMap = profiles.reduce((acc: typeof profilesMap, p: any) => {
-            acc[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url };
-            return acc;
-          }, {} as typeof profilesMap);
-        }
-      }
-
-      // Transform and combine items
-      const textItems: BuzzItemData[] = (textVibes || []).map(v => ({
-        type: 'text' as const,
-        id: v.id,
-        text: v.text || undefined,
-        emoji_vibe: v.emoji_vibe,
-        star_rating: (v as any).star_rating,
-        is_anonymous: v.is_anonymous || false,
-        created_at: v.created_at || '',
-        profile: profilesMap[v.user_id],
-      }));
-
-      // Extract image URLs from buzz media clips for carousel
-      const buzzImageUrls = (mediaClips || [])
-        .filter(c => c.media_type === 'image' && c.media_url)
-        .map(c => c.media_url);
-      setBuzzMediaPhotos(buzzImageUrls);
-
-      const mediaItems: BuzzItemData[] = (mediaClips || []).map(c => ({
-        type: 'media' as const,
-        id: c.id,
-        media_url: c.media_url,
-        media_type: c.media_type,
-        is_anonymous: c.is_anonymous || false,
-        created_at: c.created_at,
-        profile: profilesMap[c.user_id],
-      }));
-
-      // Combine and sort by created_at (most recent first)
-      const allItems = [...textItems, ...mediaItems].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-
-      setBuzzItems(allItems);
+      setHotYap(data ? { text: data.text, score: data.score } : null);
     } catch (error) {
-      console.error('Error fetching buzz items:', error);
+      console.error('Error fetching hot yap:', error);
     }
   };
 
@@ -658,17 +574,16 @@ export function VenueIdCard() {
                 </DropdownMenu>
                 <div className="flex-1 min-h-0 overflow-y-auto">
                   <div className="p-5">
-              {/* Photo Carousel - Buzz photos first, then Google photos */}
+              {/* Photo Carousel - Google photos */}
               {(() => {
-                const allCarouselPhotos = [...buzzMediaPhotos, ...googlePhotos];
-                const buzzPhotoCount = buzzMediaPhotos.length;
+                const allCarouselPhotos = [...googlePhotos];
+                
                 
                 return allCarouselPhotos.length > 0 ? (
                   <div className="relative mb-4 -mx-5 -mt-5">
                     <Carousel className="w-full">
                       <CarouselContent>
                         {allCarouselPhotos.map((photoUrl, index) => {
-                          const isBuzzPhoto = index < buzzPhotoCount;
                           return (
                             <CarouselItem key={index}>
                               <div className="relative w-full h-56 overflow-hidden">
@@ -679,12 +594,6 @@ export function VenueIdCard() {
                                 />
                                 {/* Dark gradient overlay at bottom */}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                                {/* Tonight badge for buzz photos */}
-                                {isBuzzPhoto && (
-                                  <span className="absolute top-3 left-3 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#a855f7]/80 text-white backdrop-blur-sm">
-                                    🔥 Tonight
-                                  </span>
-                                )}
                               </div>
                             </CarouselItem>
                           );
@@ -914,6 +823,25 @@ export function VenueIdCard() {
                 </Button>
               </div>
 
+              {/* Yap Preview */}
+              <button
+                onClick={() => navigate('/messages', { state: { activeTab: 'yap', venueName: venue.name } })}
+                className="w-full py-3 px-1 border-t border-white/10 flex items-center gap-2 text-left hover:bg-white/5 transition-colors"
+              >
+                <span className="text-[#d4ff00] font-semibold text-sm">Yap</span>
+                <span className="text-white/60 text-sm">·</span>
+                <span className="text-white/70 text-sm flex-1 truncate">
+                  {hotYap ? `"${hotYap.text}"` : '"No posts yet — be the first"'}
+                </span>
+                {hotYap && (
+                  <>
+                    <span className="text-white/60 text-sm">·</span>
+                    <span className="text-white/50 text-xs whitespace-nowrap">{hotYap.score} ↑</span>
+                  </>
+                )}
+                <ChevronRight className="w-4 h-4 text-white/30 flex-shrink-0" />
+              </button>
+
               {/* More Info - Single collapsible, closed by default */}
               <Collapsible open={moreInfoOpen} onOpenChange={setMoreInfoOpen}>
                 <div className="border-t border-white/10 pt-3">
@@ -945,32 +873,7 @@ export function VenueIdCard() {
                   </CollapsibleTrigger>
                 </div>
                 <CollapsibleContent className="pt-3">
-                  {/* Tonight's Buzz sub-section */}
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-semibold text-white">Tonight's Buzz ({buzzItems.length})</h4>
-                      {isUserAtVenue && (
-                        <Button
-                          onClick={() => setShowDropVibe(true)}
-                          size="sm"
-                          className="bg-[#d4ff00] text-[#2d1b4e] hover:bg-[#d4ff00]/90 font-semibold text-xs h-7"
-                        >
-                          Drop a Vibe ✨
-                        </Button>
-                      )}
-                    </div>
-                    <div className="space-y-3">
-                      {buzzItems.length > 0 ? (
-                        buzzItems.map((item) => (
-                          <BuzzItem key={item.id} item={item as any} />
-                        ))
-                      ) : (
-                        <p className="text-center text-white/50 py-3 text-sm">No vibes yet. Drop yours! ✨</p>
-                      )}
-                    </div>
-                  </div>
-
-                   {/* Upcoming Events sub-section */}
+                  {/* Upcoming Events sub-section */}
                    {selectedVenueId && <VenueEventsSection venueId={selectedVenueId} />}
  
                   {/* Trending Nearby sub-section */}
@@ -1013,14 +916,6 @@ export function VenueIdCard() {
           </div>
         </>
       )}
-
-      <DropVibeDialog
-        open={showDropVibe}
-        onOpenChange={setShowDropVibe}
-        venueId={venue?.id || ''}
-        venueName={venue?.name || ''}
-        onVibeSubmitted={fetchBuzzItems}
-      />
 
       <ReportDialog
         open={showReportDialog}
