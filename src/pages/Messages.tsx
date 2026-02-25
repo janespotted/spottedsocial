@@ -28,6 +28,7 @@ export default function Messages() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<TabType>('messages');
   const [preselectedUser, setPreselectedUser] = useState<PreselectedUser | null>(null);
+  const [yapVenueName, setYapVenueName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     // Check if we have a preselected user from navigation state
@@ -38,6 +39,11 @@ export default function Messages() {
     // Check if we should open a specific tab (e.g., from bell icon)
     if (location.state?.activeTab) {
       setActiveTab(location.state.activeTab);
+    }
+    // Check if we have a venue name for Yap
+    if (location.state?.venueName) {
+      setYapVenueName(location.state.venueName);
+      setActiveTab('yap');
     }
   }, [location.state]);
 
@@ -126,7 +132,7 @@ export default function Messages() {
             onClearPreselection={() => setPreselectedUser(null)}
           />
         )}
-        {activeTab === 'yap' && <YapTab />}
+        {activeTab === 'yap' && <YapTab venueName={yapVenueName} />}
         {activeTab === 'activity' && <ActivityTab />}
       </div>
     </div>

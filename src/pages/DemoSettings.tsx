@@ -247,7 +247,7 @@ export default function DemoSettings() {
 
       if (error) throw error;
 
-      toast.success(`You're now "at" ${venue.name}! Open its Venue Card to test Drop a Vibe.`, { duration: 5000 });
+      toast.success(`You're now "at" ${venue.name}! Open its Venue Card to test Yap.`, { duration: 5000 });
     } catch (error) {
       console.error('Error simulating check-in:', error);
       toast.error('Failed to simulate check-in');

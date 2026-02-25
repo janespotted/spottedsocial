@@ -145,7 +145,7 @@ export function WriteReviewDialog({
       <DialogContent className="w-[90%] max-w-[400px] bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl">
         <DialogHeader>
           <DialogTitle className="text-white text-center">
-            Drop a Vibe Check ✨
+            Review {venueName} ✨
           </DialogTitle>
           <p className="text-sm text-white/60 text-center">What's the vibe at {venueName}?</p>
         </DialogHeader>
