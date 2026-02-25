@@ -388,7 +388,7 @@ export default function Profile() {
               onClick={openCheckIn}
               className="hover:scale-110 transition-transform"
             >
-              <img src={spottedLogo} alt="Check In" className="h-12 w-12 object-contain" />
+              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
             </button>
           </div>
         </div>
@@ -650,7 +650,7 @@ export default function Profile() {
                   Your night out history starts here
                 </h3>
                 <p className="text-white/50 text-sm max-w-xs">
-                  Check in at spots and they'll show up on your profile.
+                  Go live at spots and they'll show up on your profile.
                 </p>
               </div>
             )

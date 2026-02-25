@@ -932,10 +932,10 @@ export function ActivityTab() {
               Nothing yet — but that's okay
             </h3>
             <p className="text-white/50 text-sm max-w-xs mb-4">
-              When friends invite you or check in nearby, you'll see it here.
+              When friends invite you or show up nearby, you'll see it here.
             </p>
             <p className="text-white/30 text-xs">
-              💡 Check in to let friends know you're around
+              💡 Go live to let friends know you're around
             </p>
           </div>
         );
