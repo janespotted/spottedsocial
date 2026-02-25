@@ -183,7 +183,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       {userVenueName && (
         <button
           onClick={() => openThread(userVenueName)}
-          className="w-full flex items-center justify-between bg-[#1a0f2e]/90 border border-[#d4ff00]/30 rounded-xl px-4 py-2.5 active:bg-[#2d1b4e]/90 transition-colors animate-fade-in"
+          className="w-full flex items-center justify-between bg-[#1a0f2e]/90 border border-[#d4ff00]/30 rounded-2xl px-4 py-2.5 active:bg-[#2d1b4e]/90 transition-colors animate-fade-in"
         >
           <span className="text-white text-sm">📍 You're at <span className="font-semibold">{userVenueName}</span></span>
           <span className="bg-[#d4ff00] text-[#1a0f2e] font-bold text-xs px-3 py-1 rounded-full">Post</span>
@@ -195,7 +195,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         <button
           onClick={() => setSortMode('hot')}
           className={cn(
-            'px-4 py-1.5 rounded-full text-sm font-medium border transition-colors',
+            'px-4 py-1.5 rounded-xl text-sm font-medium border transition-colors',
             sortMode === 'hot'
               ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
               : 'bg-white/5 text-white/40 border-transparent'
@@ -206,7 +206,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         <button
           onClick={() => setSortMode('new')}
           className={cn(
-            'px-4 py-1.5 rounded-full text-sm font-medium border transition-colors',
+            'px-4 py-1.5 rounded-xl text-sm font-medium border transition-colors',
             sortMode === 'new'
               ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
               : 'bg-white/5 text-white/40 border-transparent'
@@ -243,8 +243,8 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                   onClick={() => openThread(quote.venue_name)}
                   className={cn(
                     'w-full text-left rounded-2xl p-4 relative',
-                    'bg-gradient-to-r from-[#2d1b4e]/80 to-[#1f1338]/60',
-                    'border border-[#a855f7]/15',
+                    'bg-white/[0.06] backdrop-blur-sm',
+                    'border border-[#a855f7]/20',
                     quote.score > 30 ? (grouped ? 'border-l-[6px]' : 'border-l-[5px]')
                       : quote.score > 10 ? (grouped ? 'border-l-[5px]' : 'border-l-[4px]')
                       : quote.score > 0 ? (grouped ? 'border-l-[4px]' : 'border-l-[3px]')
