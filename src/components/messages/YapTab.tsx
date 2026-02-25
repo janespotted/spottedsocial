@@ -173,15 +173,22 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
 
   return (
     <div className="space-y-6 pb-24">
+      {/* Page Header */}
+      <div className="animate-fade-in">
+        <h1 className="text-3xl font-bold text-white mb-1">Yap</h1>
+        <p className="text-white/60 text-sm">Live from the crowd — see what people are saying at venues tonight</p>
+      </div>
+
       {/* Your Venue card */}
       {userVenueName && (
         <button
           onClick={() => openThread(userVenueName)}
-          className="w-full bg-[#d4ff00]/10 border border-[#d4ff00]/30 rounded-2xl p-4 flex items-center justify-between active:bg-[#d4ff00]/20 transition-colors animate-fade-in"
+          className="w-full bg-gradient-to-r from-[#2d1b4e]/80 to-[#1f1338]/60 border border-[#a855f7]/20 rounded-2xl p-4 flex items-center justify-between active:bg-[#2d1b4e]/90 transition-colors animate-fade-in"
         >
           <div className="text-left">
             <p className="text-[#d4ff00] text-xs font-semibold uppercase tracking-wider mb-1">You're at</p>
             <p className="text-white font-bold text-lg">{userVenueName}</p>
+            <p className="text-white/40 text-xs mt-0.5">Share what's happening</p>
           </div>
           <div className="bg-[#d4ff00] text-[#1a0f2e] font-bold text-sm px-4 py-2 rounded-full">
             Post
@@ -191,68 +198,68 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
 
       {venues.length > 0 ? (
         <>
-          {/* 🔥 Hottest Right Now — Featured Card */}
+          {/* 🔥 Hottest Right Now — Section Heading + Featured Card */}
           {hottestVenue && (
-            <button
-              onClick={() => openThread(hottestVenue.venue_name)}
-              className={cn(
-                'w-full text-left rounded-2xl p-5 relative overflow-hidden',
-                'bg-gradient-to-br from-[#3d1f6e] via-[#2d1b4e] to-[#1a0f2e]',
-                'border border-[#a855f7]/30',
-                'active:scale-[0.98] transition-all duration-200',
-                'animate-fade-in',
-                'shadow-[0_0_30px_rgba(168,85,247,0.15)]'
-              )}
-              style={{ animationDelay: '50ms' }}
-            >
-              {/* Animated glow overlay */}
-              <div className="absolute inset-0 rounded-2xl opacity-30 pointer-events-none"
-                style={{
-                  background: 'radial-gradient(ellipse at 30% 20%, rgba(168,85,247,0.25) 0%, transparent 60%)',
-                }}
-              />
-              {/* Pulsing border accent */}
-              <div className="absolute left-0 top-0 bottom-0 w-[6px] rounded-l-2xl bg-gradient-to-b from-[#d4ff00] to-[#a855f7] animate-pulse" />
-
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-base">🔥</span>
-                  <span className="text-[#d4ff00] text-xs font-bold uppercase tracking-widest">Hottest Right Now</span>
-                </div>
-
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="text-white font-bold text-xl">{hottestVenue.venue_name}</p>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      {(hottestVenue.venue_type || hottestVenue.venue_neighborhood) && (
-                        <span className="text-white/40 text-xs">
-                          {[hottestVenue.venue_type, hottestVenue.venue_neighborhood].filter(Boolean).join(' · ')}
-                        </span>
-                      )}
-                      <span className="text-white/40 text-xs">
-                        {hottestVenue.venue_type || hottestVenue.venue_neighborhood ? ' · ' : ''}
-                        {getActivityEmoji(hottestVenue.post_count)} {hottestVenue.post_count} {hottestVenue.post_count === 1 ? 'post' : 'posts'}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-white/30 shrink-0" />
-                </div>
-
-                {/* Top quotes */}
-                {hottestVenue.top_quotes.length > 0 && (
-                  <div className="space-y-2 mt-3 pt-3 border-t border-white/10">
-                    {hottestVenue.top_quotes.map((quote, i) => (
-                      <p key={i} className="text-white/70 text-sm leading-relaxed truncate">
-                        "{quote.text}"
-                        {quote.score > 0 && (
-                          <span className="text-[#d4ff00] ml-1.5 text-xs font-semibold">▲ {quote.score}</span>
-                        )}
-                      </p>
-                    ))}
-                  </div>
-                )}
+            <>
+              <div className="flex items-center gap-2">
+                <h3 className="text-white font-semibold text-base">🔥 Hottest Right Now</h3>
               </div>
-            </button>
+              <button
+                onClick={() => openThread(hottestVenue.venue_name)}
+                className={cn(
+                  'w-full text-left rounded-2xl p-5 relative overflow-hidden',
+                  'bg-gradient-to-br from-[#3d1f6e] via-[#2d1b4e] to-[#1a0f2e]',
+                  'border border-[#a855f7]/30',
+                  'active:scale-[0.98] transition-all duration-200',
+                  'animate-fade-in',
+                  'shadow-[0_0_30px_rgba(168,85,247,0.15)]'
+                )}
+                style={{ animationDelay: '50ms' }}
+              >
+                {/* Animated glow overlay */}
+                <div className="absolute inset-0 rounded-2xl opacity-30 pointer-events-none"
+                  style={{
+                    background: 'radial-gradient(ellipse at 30% 20%, rgba(168,85,247,0.25) 0%, transparent 60%)',
+                  }}
+                />
+                {/* Pulsing border accent */}
+                <div className="absolute left-0 top-0 bottom-0 w-[6px] rounded-l-2xl bg-gradient-to-b from-[#d4ff00] to-[#a855f7] animate-pulse" />
+
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-white font-bold text-xl">{hottestVenue.venue_name}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        {(hottestVenue.venue_type || hottestVenue.venue_neighborhood) && (
+                          <span className="text-white/40 text-xs">
+                            {[hottestVenue.venue_type, hottestVenue.venue_neighborhood].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
+                        <span className="text-white/40 text-xs">
+                          {hottestVenue.venue_type || hottestVenue.venue_neighborhood ? ' · ' : ''}
+                          {getActivityEmoji(hottestVenue.post_count)} {hottestVenue.post_count} {hottestVenue.post_count === 1 ? 'post' : 'posts'}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-white/30 shrink-0" />
+                  </div>
+
+                  {/* Top quotes — speech bubble style */}
+                  {hottestVenue.top_quotes.length > 0 && (
+                    <div className="space-y-2 mt-3 pt-3 border-t border-white/10">
+                      {hottestVenue.top_quotes.map((quote, i) => (
+                        <div key={i} className="bg-white/5 rounded-xl px-3 py-2 flex items-start justify-between gap-2">
+                          <p className="text-white/80 text-sm leading-relaxed truncate">{quote.text}</p>
+                          {quote.score > 0 && (
+                            <span className="text-[#d4ff00] text-xs font-semibold shrink-0">▲ {quote.score}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </button>
+            </>
           )}
 
           {/* Active Tonight */}
@@ -296,12 +303,12 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                           </span>
                         </div>
                         {venue.hottest_text && (
-                          <p className="text-white/60 text-[13px] mt-1.5 truncate leading-relaxed">
-                            "{venue.hottest_text}"
+                          <div className="bg-white/5 rounded-xl px-3 py-2 mt-2 flex items-start justify-between gap-2">
+                            <p className="text-white/80 text-sm leading-relaxed truncate">{venue.hottest_text}</p>
                             {venue.hottest_score > 0 && (
-                              <span className="text-[#d4ff00] ml-1.5 text-xs font-semibold">▲ {venue.hottest_score}</span>
+                              <span className="text-[#d4ff00] text-xs font-semibold shrink-0">▲ {venue.hottest_score}</span>
                             )}
-                          </p>
+                          </div>
                         )}
                       </div>
                       <ChevronRight className="h-5 w-5 text-white/20 shrink-0" />
