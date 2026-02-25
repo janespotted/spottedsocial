@@ -1,64 +1,45 @@
 
 
-# Polish Yap Tab + Thread to Match App Aesthetic
+# Fix Comments Access + Gate Posting/Commenting to Checked-In Users
 
-The Yap directory (empty state) already looks consistent with the app. The main issues are:
+## Two Issues
 
-1. **Yap directory feed cards** — the `bg-gradient-to-r from-[#2d1b4e]/80 to-[#1f1338]/60` gradient and explicit `border-[#a855f7]/15` look slightly different from every other card in the app, which uses `bg-[#2d1b4e]/60 border border-[#a855f7]/20` or `bg-white/[0.06] backdrop-blur-sm` (PlanItem). The gradient makes it feel "custom" rather than cohesive.
+### Issue 1: Comments not accessible despite showing count
+The comment toggle at line 583 calls `handleToggleComments(msg.id)` which sets `expandedYapId` and fetches comments. The comments section renders at line 589 when `expandedYapId === msg.id`. This logic looks correct, so the issue is likely that the comment input area and comments render but comments may fail to load. However, looking more closely — the comment section (lines 611-624) shows the input field regardless of `canPost`. The user may be tapping the comment input area (which looks interactive) but nothing happens because they're not at the venue. This leads to the second issue naturally.
 
-2. **Sort pills** use `rounded-full` which contradicts the design system (pills reserved for impulsive CTAs, small UI should be `rounded-xl` or `rounded-lg`).
+### Issue 2: Gate posting and commenting to checked-in users only
+Currently `canPost` is passed as a prop but only controls the main post input area (lines 484-538). The comment input (lines 611-624) and `handlePostComment` have no `canPost` check. Need to:
+- Replace the comment input with "Head here to post" when `!canPost`
+- Block `handlePostComment` when `!canPost`
+- Keep voting (up/down on comments and messages) available to everyone
 
-3. **VenueYapThread** message cards have inconsistent styling — the `border-l-[3px] border-l-[#d4ff00]` accent is fine but combined with `bg-[#2d1b4e]/60 border border-[#a855f7]/20` looks cluttered with two border colors.
+## Changes — Single File: `src/components/messages/VenueYapThread.tsx`
 
-4. **Thread header** is plain — no glassmorphism or backdrop blur like the rest of the app.
+### Comment input gating (lines 611-624)
+Replace the comment input + send button with a conditional:
+- If `canPost`: show the existing input + send button (unchanged)
+- If `!canPost`: show a compact "📍 Head here to comment" bar matching the existing "Head here to post" style (smaller version, inline within the comments section)
 
-## Changes
+```tsx
+{canPost ? (
+  <div className="flex gap-2">
+    <input ... />
+    <Button ... />
+  </div>
+) : (
+  <div className="flex items-center gap-2 bg-white/[0.04] rounded-lg px-3 py-2">
+    <MapPin className="h-4 w-4 text-[#d4ff00] shrink-0" />
+    <span className="text-white/50 text-sm">📍 Head here to comment</span>
+  </div>
+)}
+```
 
-### File 1: `src/components/messages/YapTab.tsx`
+### handlePostComment guard (line 414)
+Add `if (!canPost) return;` at the top of `handlePostComment` as a safety check.
 
-**Quote card styling** (lines 244-254): Replace the gradient background with the standard card pattern used across the app:
-- Change `bg-gradient-to-r from-[#2d1b4e]/80 to-[#1f1338]/60` to `bg-white/[0.06] backdrop-blur-sm`
-- Change `border border-[#a855f7]/15` to `border border-[#a855f7]/20`
-- Keep the dynamic `border-l-[#d4ff00]` left accent — it's the signature Yap element
-
-**Sort toggles** (lines 194-217): Change `rounded-full` to `rounded-xl` on both pills to follow the design system (small UI = rounded-xl, pills = CTAs only).
-
-**Empty state icon** (line 288): The purple circle with mic icon looks good, no change needed.
-
-**"You're At" bar** (line 186): Change `rounded-xl` to `rounded-2xl` to match card radius used elsewhere.
-
-### File 2: `src/components/messages/VenueYapThread.tsx`
-
-**Venue header area** (lines 449-459): Wrap in a subtle glass card background to give it more weight:
-- Add `bg-white/[0.04] rounded-2xl px-4 py-3` to the header container
-- This matches how the Home page treats section headers with subtle card backgrounds
-
-**Sort tabs** (lines 462-481): Change `rounded-full` to `rounded-xl` to match feed pills and design system.
-
-**Message cards** (line 557): Align with the feed card pattern:
-- Change `bg-[#2d1b4e]/60 border border-[#a855f7]/20` to `bg-white/[0.06] backdrop-blur-sm border border-[#a855f7]/20`
-- Keep `border-l-[3px] border-l-[#d4ff00]` accent
-
-**Buried card** (line 549): Same treatment — `bg-white/[0.04]` instead of `bg-[#2d1b4e]/30`.
-
-**Post input area** (line 485): Change `bg-[#2d1b4e]/60` to `bg-white/[0.06] backdrop-blur-sm` for consistency.
-
-**"Head here to post" bar** (line 529): Same — `bg-white/[0.06]` instead of `bg-[#2d1b4e]/60`.
-
-**Comment area backgrounds** (line 593): Change `bg-[#1a0f2e]/60` to `bg-white/[0.04]` for comment bubbles.
-
-**Empty state** (line 644): Change `bg-[#2d1b4e]/60` to `bg-white/[0.06]` on the icon container.
-
-### Technical Notes
-- `bg-white/[0.06] backdrop-blur-sm` is the pattern used by `PlanItem` (`bg-white/[0.06] backdrop-blur-sm rounded-2xl`) — the most modern-looking card in the app
-- This creates a frosted glass effect that feels premium and cohesive
-- No structural, data, or logic changes — purely CSS class swaps
-- No new dependencies
-
-### Summary
-
-| File | Changes |
-|------|---------|
-| `YapTab.tsx` | Card bg → `bg-white/[0.06]`, sort pills → `rounded-xl`, "You're At" → `rounded-2xl` |
-| `VenueYapThread.tsx` | All cards/inputs → `bg-white/[0.06]`, header gets glass bg, sort pills → `rounded-xl`, comment bubbles → `bg-white/[0.04]` |
+### No other changes
+- Voting on messages and comments stays open to all logged-in users
+- Reading/expanding comments stays open to everyone
+- The main post input area already gates on `canPost` correctly
+- Thread navigation, sorting, moderation all unchanged
 
