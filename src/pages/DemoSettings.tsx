@@ -474,7 +474,7 @@ export default function DemoSettings() {
               Simulate Check-in
             </CardTitle>
             <CardDescription className="text-white/60">
-              Pretend you're at a venue to test "Drop a Vibe" feature
+              Pretend you're at a venue to test Yap feature
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -507,7 +507,7 @@ export default function DemoSettings() {
               </Button>
               
               <p className="text-xs text-white/50">
-                After check-in, go to the Leaderboard → tap the venue → expand "More Info" → you'll see the "Drop a Vibe ✨" button
+                After check-in, go to the Leaderboard → tap the venue → you'll see the Yap board
               </p>
             </div>
           </CardContent>
@@ -534,7 +534,7 @@ export default function DemoSettings() {
               </div>
               <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
                 <div className="text-[#d4ff00] text-2xl font-bold">15+</div>
-                <div className="text-white/60 text-xs">Yaps + Buzz</div>
+                <div className="text-white/60 text-xs">Yaps</div>
               </div>
             </div>
             

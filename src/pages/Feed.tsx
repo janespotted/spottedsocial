@@ -20,8 +20,6 @@ import { PostLikesModal } from '@/components/PostLikesModal';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { StoryViewer } from '@/components/StoryViewer';
-import { CreateStoryDialog } from '@/components/CreateStoryDialog';
 import { toast } from 'sonner';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import {
@@ -45,13 +43,11 @@ export default function Feed() {
   const { setInputFocused } = useInputFocus();
   useAutoVenueTracking();
 
-  const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends, cacheStories, getCachedStories } = useOfflineCache();
+  const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends } = useOfflineCache();
 
   const {
     posts,
     friends,
-    storyUsers,
-    userHasStory,
     likedPosts,
     likedComments,
     expandedPostId,
@@ -64,7 +60,6 @@ export default function Feed() {
     getTimeAgo,
     fetchFriends,
     fetchPosts,
-    fetchStories,
     handleToggleComments,
     handlePostComment,
     handleLikePost,
@@ -79,28 +74,21 @@ export default function Feed() {
     city,
     onCachePosts: cachePosts,
     onCacheFriends: cacheFriends,
-    onCacheStories: cacheStories,
     getCachedPosts,
     getCachedFriends,
-    getCachedStories,
   });
 
   const [showCreatePost, setShowCreatePost] = useState(false);
-  const [selectedStoryUser, setSelectedStoryUser] = useState<string | null>(null);
-  const [createStoryOpen, setCreateStoryOpen] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Store fetch functions in refs to avoid dependency changes causing re-renders
   const fetchFriendsRef = useRef(fetchFriends);
   const fetchPostsRef = useRef(fetchPosts);
-  const fetchStoriesRef = useRef(fetchStories);
 
   useEffect(() => {
     fetchFriendsRef.current = fetchFriends;
     fetchPostsRef.current = fetchPosts;
-    fetchStoriesRef.current = fetchStories;
   });
 
   const handleVenueClick = async (venueName: string, venueId?: string | null) => {
@@ -128,7 +116,6 @@ export default function Feed() {
     setProfile(data);
   };
 
-  // Initial data fetch - only depends on user and demoEnabled, not on callback functions
   useEffect(() => {
     if (user) {
       setIsLoading(true);
@@ -136,16 +123,13 @@ export default function Feed() {
       Promise.all([
         fetchFriendsRef.current(),
         fetchPostsRef.current(),
-        fetchStoriesRef.current(),
       ]).finally(() => setIsLoading(false));
     }
   }, [user, demoEnabled, city]);
 
-  // Realtime subscriptions - use incremental handlers
   useRealtimeSubscriptions({
     onNewPost: handleIncrementalNewPost,
     onPostDeleted: handleIncrementalDelete,
-    onStoriesChange: fetchStories,
   });
 
   const handlePostDelete = async (postId: string) => {
@@ -155,7 +139,6 @@ export default function Feed() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
-      {/* Offline Indicator */}
       {!isOnline && (
         <div className="bg-yellow-500/20 text-yellow-500 text-center py-2 text-sm">
           You're offline. Showing cached data.
@@ -190,77 +173,10 @@ export default function Feed() {
             </button>
           </div>
         </div>
-
-        {/* Stories Row */}
-        <div className="py-4 overflow-hidden">
-          <div className="flex gap-4 overflow-x-auto scrollbar-hide px-6">
-            {/* Your Story Button */}
-            <button
-              onClick={() => {
-                if (userHasStory) {
-                  setSelectedStoryUser(user?.id || null);
-                } else {
-                  setCreateStoryOpen(true);
-                }
-              }}
-              className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
-            >
-              <div className="relative">
-                <div className={`p-[3px] rounded-full ${
-                  userHasStory
-                    ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active'
-                    : 'bg-gradient-to-br from-[#a855f7]/60 to-[#a855f7]/20'
-                }`}>
-                  <div className="rounded-full bg-[#0a0118] p-[2px]">
-                    <Avatar className="h-14 w-14">
-                      <AvatarImage src={profile?.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white">
-                        {profile?.display_name?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </div>
-                {!userHasStory && (
-                  <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-[#a855f7] to-[#7c3aed] rounded-full p-1.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
-                    <Plus className="h-3 w-3 text-white" />
-                  </div>
-                )}
-              </div>
-              <span className="text-[10px] text-white/60 font-medium">Your Story</span>
-            </button>
-
-            {/* Friend Stories */}
-            {storyUsers.map((storyUser) => (
-              <button
-                key={storyUser.user_id}
-                onClick={() => setSelectedStoryUser(storyUser.user_id)}
-                className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
-              >
-                <div className={`p-[3px] rounded-full ${
-                  storyUser.has_unviewed 
-                    ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active' 
-                    : 'bg-gradient-to-br from-[#a855f7]/40 to-[#a855f7]/20'
-                }`}>
-                  <div className="rounded-full bg-[#0a0118] p-[2px]">
-                    <Avatar className="h-14 w-14">
-                      <AvatarImage src={storyUser.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white">
-                        {storyUser.display_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </div>
-                <span className="text-[10px] text-white/70 font-medium max-w-[60px] truncate">
-                  {storyUser.display_name.split(' ')[0]}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Posts Feed */}
-      <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); }}>
+      <PullToRefresh onRefresh={async () => { await fetchPosts(); }}>
         <div className="px-4 py-6 space-y-6">
         {isLoading ? (
           <FeedSkeleton />
@@ -418,124 +334,77 @@ export default function Feed() {
                   </button>
                 </div>
 
-                {(post.likes_count || 0) > 0 && (
-                  <div className="flex items-center gap-2">
-                    <div className="flex -space-x-2">
-                      {friends.slice(0, 3).map((friend, idx) => (
-                        <Avatar key={idx} className="h-6 w-6 border-2 border-[#1a0f2e]">
-                          <AvatarImage src={friend.avatar_url || undefined} />
-                          <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                            {friend.display_name[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                      ))}
-                    </div>
-                    <p className="text-white text-sm">
-                      Liked by <span className="font-semibold">{post.likes_count === 1 ? 'a friend' : `${post.likes_count} friends`}</span>
-                    </p>
-                  </div>
-                )}
-
-                {/* Image posts with captions - Instagram style */}
-                {post.image_url && post.text && (
-                  <div className="text-white/90 text-sm leading-relaxed">
-                    <button 
-                      onClick={() => openFriendCard({
-                        userId: post.user_id,
-                        displayName: post.profiles?.display_name || 'Friend',
-                        avatarUrl: post.profiles?.avatar_url || null,
-                        venueName: post.venue_name || undefined,
-                      })}
-                      className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
-                    >
-                      {post.profiles?.display_name}
-                    </button>{' '}
-                    {post.text}
-                  </div>
-                )}
-
-                {/* Text-only posts - clean display without redundant username */}
-                {!post.image_url && post.text && (
-                  <div className="text-white text-base leading-relaxed">
-                    {post.text}
-                  </div>
-                )}
+                <p className="text-white text-base leading-relaxed">{post.text}</p>
 
                 {expandedPostId === post.id && (
-                  <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+                  <div className="space-y-3 pt-2 border-t border-white/10">
                     {comments[post.id]?.map((comment) => (
-                      <div key={comment.id} className="flex gap-3">
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          <AvatarImage src={comment.profiles?.avatar_url || undefined} />
-                          <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                            {comment.profiles?.display_name?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
+                      <div key={comment.id} className="flex items-start gap-2">
+                        <button
+                          onClick={() => openFriendCard({
+                            userId: comment.user_id,
+                            displayName: comment.profiles?.display_name || 'User',
+                            avatarUrl: comment.profiles?.avatar_url || null,
+                          })}
+                        >
+                          <Avatar className="h-7 w-7">
+                            <AvatarImage src={comment.profiles?.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                              {comment.profiles?.display_name?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                        </button>
                         <div className="flex-1 min-w-0">
-                          <div className="bg-[#0a0118]/60 rounded-lg px-3 py-2">
-                            <p className="font-semibold text-white text-sm">
+                          <p className="text-sm">
+                            <button
+                              onClick={() => openFriendCard({
+                                userId: comment.user_id,
+                                displayName: comment.profiles?.display_name || 'User',
+                                avatarUrl: comment.profiles?.avatar_url || null,
+                              })}
+                              className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
+                            >
                               {comment.profiles?.display_name}
-                            </p>
-                            <p className="text-white/80 text-sm break-words">{comment.text}</p>
-                          </div>
-                          <div className="flex items-center gap-3 mt-1 ml-1">
+                            </button>
+                            <span className="text-white/80 ml-2">{comment.text}</span>
+                          </p>
+                          <div className="flex items-center gap-3 mt-1">
                             <span className="text-white/40 text-xs">{getTimeAgo(comment.created_at)}</span>
                             <button 
                               onClick={() => handleLikeComment(comment.id, post.id)}
-                              className={`flex items-center gap-1 transition-colors ${
-                                likedComments.has(comment.id) ? 'text-[#d4ff00]' : 'text-white/50 hover:text-[#d4ff00]'
+                              className={`flex items-center gap-1 text-xs transition-colors ${
+                                likedComments.has(comment.id) ? 'text-[#d4ff00]' : 'text-white/40 hover:text-white'
                               }`}
                             >
-                              <Heart 
-                                className="h-3.5 w-3.5"
-                                fill={likedComments.has(comment.id) ? 'currentColor' : 'none'}
-                              />
-                              {(comment.likes_count || 0) > 0 && (
-                                <span className="text-xs">{comment.likes_count}</span>
-                              )}
+                              <Heart className="h-3 w-3" fill={likedComments.has(comment.id) ? 'currentColor' : 'none'} />
+                              {comment.likes_count > 0 && <span>{comment.likes_count}</span>}
                             </button>
                           </div>
                         </div>
                       </div>
                     ))}
-
-                    <div className="flex gap-2 items-end pt-2">
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarImage src={friends.find(f => f.user_id === user?.id)?.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                          {user?.email?.[0].toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 flex gap-2">
-                        <input
-                          type="text"
-                          value={newComment[post.id] || ''}
-                          onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handlePostComment(post.id);
-                            }
-                          }}
-                          onFocus={(e) => {
-                            setInputFocused(true);
-                            setTimeout(() => {
-                              e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }, 300);
-                          }}
-                          onBlur={() => setInputFocused(false)}
-                          placeholder="Add a comment..."
-                          maxLength={500}
-                          className="flex-1 bg-[#0a0118]/60 border border-white/10 rounded-full px-4 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-[#d4ff00]/40"
-                        />
-                        <button
-                          onClick={() => handlePostComment(post.id)}
-                          disabled={!newComment[post.id]?.trim()}
-                          className="text-[#d4ff00] hover:text-[#d4ff00]/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Send className="h-5 w-5" />
-                        </button>
-                      </div>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        value={newComment[post.id] || ''}
+                        onChange={(e) => {
+                          setNewComment(prev => ({ ...prev, [post.id]: e.target.value }));
+                        }}
+                        onFocus={() => setInputFocused(true)}
+                        onBlur={() => setInputFocused(false)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handlePostComment(post.id);
+                        }}
+                        placeholder="Add a comment..."
+                        className="flex-1 bg-white/5 rounded-full px-4 py-2 text-sm text-white placeholder:text-white/30 border border-white/10 focus:border-[#a855f7]/50 outline-none"
+                      />
+                      <button
+                        onClick={() => handlePostComment(post.id)}
+                        disabled={!newComment[post.id]?.trim()}
+                        className="text-[#d4ff00] text-sm font-semibold disabled:opacity-30"
+                      >
+                        Post
+                      </button>
                     </div>
                   </div>
                 )}
@@ -543,39 +412,20 @@ export default function Feed() {
             </div>
           ))
         )}
+
+        {posts.length > 0 && hasMorePosts && (
+          <div className="flex justify-center py-4">
+            <button
+              onClick={loadMorePosts}
+              disabled={isLoadingMore}
+              className="px-6 py-2 rounded-full bg-[#a855f7]/20 text-[#a855f7] text-sm font-medium hover:bg-[#a855f7]/30 transition-colors disabled:opacity-50"
+            >
+              {isLoadingMore ? 'Loading...' : 'Load more'}
+            </button>
+          </div>
+        )}
         </div>
       </PullToRefresh>
-
-      {/* Floating Create Post Button */}
-      <div className="fixed bottom-24 right-0 left-0 z-20 flex justify-end px-6 pointer-events-none max-w-[430px] mx-auto">
-        <button
-          onClick={() => setShowCreatePost(true)}
-          className="h-12 w-12 rounded-full bg-[#d4ff00] shadow-[0_0_30px_rgba(212,255,0,0.8)] hover:scale-110 transition-transform flex items-center justify-center pointer-events-auto"
-        >
-          <Plus className="h-6 w-6 text-[#1a0f2e]" />
-        </button>
-      </div>
-
-      <CreatePostDialog open={showCreatePost} onOpenChange={setShowCreatePost} />
-
-      {selectedStoryUser && (
-        <StoryViewer
-          userId={selectedStoryUser}
-          onClose={() => setSelectedStoryUser(null)}
-          allStoryUsers={
-            selectedStoryUser === user?.id && userHasStory
-              ? [user.id, ...storyUsers.map(u => u.user_id)]
-              : storyUsers.map(u => u.user_id)
-          }
-          currentUserIndex={
-            selectedStoryUser === user?.id && userHasStory
-              ? 0
-              : storyUsers.findIndex(u => u.user_id === selectedStoryUser)
-          }
-        />
-      )}
-
-      <CreateStoryDialog open={createStoryOpen} onOpenChange={setCreateStoryOpen} />
 
       {/* Create Post FAB */}
       <button

@@ -1,7 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { X, Camera, Image } from 'lucide-react';
 import { captureSelfie, pickFromGallery, isNativePlatform } from '@/lib/camera-service';
-import { PhotoFilterScreen } from './PhotoFilterScreen';
 import { toast } from 'sonner';
 
 interface PostMediaPickerProps {
@@ -12,26 +11,25 @@ interface PostMediaPickerProps {
 export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  
-  // Filter screen state
-  const [showFilterScreen, setShowFilterScreen] = useState(false);
-  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
 
   const handleNativeCapture = async () => {
     const result = await captureSelfie();
     if (result) {
-      // Show filter screen before proceeding
-      setPendingImagePreview(result.preview);
-      setShowFilterScreen(true);
+      // Convert preview to file
+      const res = await fetch(result.preview);
+      const blob = await res.blob();
+      const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      onMediaSelect(file, result.preview);
     }
   };
 
   const handleNativeGallery = async () => {
     const result = await pickFromGallery();
     if (result) {
-      // Show filter screen before proceeding
-      setPendingImagePreview(result.preview);
-      setShowFilterScreen(true);
+      const res = await fetch(result.preview);
+      const blob = await res.blob();
+      const file = new File([blob], `gallery-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      onMediaSelect(file, result.preview);
     }
   };
 
@@ -44,22 +42,10 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPendingImagePreview(reader.result as string);
-        setShowFilterScreen(true);
+        onMediaSelect(file, reader.result as string);
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  const handleFilterConfirm = (filteredFile: File, filteredPreview: string) => {
-    setShowFilterScreen(false);
-    setPendingImagePreview(null);
-    onMediaSelect(filteredFile, filteredPreview);
-  };
-
-  const handleFilterCancel = () => {
-    setShowFilterScreen(false);
-    setPendingImagePreview(null);
   };
 
   const openGallery = () => {
@@ -77,17 +63,6 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
       cameraInputRef.current?.click();
     }
   };
-
-  // Show filter screen if we have a pending image
-  if (showFilterScreen && pendingImagePreview) {
-    return (
-      <PhotoFilterScreen
-        imagePreview={pendingImagePreview}
-        onConfirm={handleFilterConfirm}
-        onCancel={handleFilterCancel}
-      />
-    );
-  }
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col pt-[env(safe-area-inset-top,0px)]">

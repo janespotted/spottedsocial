@@ -45,33 +45,21 @@ export interface Friend {
   avatar_url: string | null;
 }
 
-export interface StoryUser {
-  user_id: string;
-  display_name: string;
-  avatar_url: string | null;
-  has_unviewed: boolean;
-  story_count: number;
-}
-
 interface UseFeedOptions {
   userId: string | undefined;
   demoEnabled: boolean;
   city?: string;
   onCachePosts?: (posts: Post[]) => void;
   onCacheFriends?: (friends: Friend[]) => void;
-  onCacheStories?: (stories: StoryUser[]) => void;
   getCachedPosts?: () => Post[] | null;
   getCachedFriends?: () => Friend[] | null;
-  getCachedStories?: () => StoryUser[] | null;
 }
 
 export function useFeed(options: UseFeedOptions) {
-  const { userId, demoEnabled, city, onCachePosts, onCacheFriends, onCacheStories, getCachedPosts, getCachedFriends, getCachedStories } = options;
+  const { userId, demoEnabled, city, onCachePosts, onCacheFriends, getCachedPosts, getCachedFriends } = options;
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
-  const [storyUsers, setStoryUsers] = useState<StoryUser[]>([]);
-  const [userHasStory, setUserHasStory] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<{ [key: string]: PostComment[] }>({});
@@ -95,7 +83,6 @@ export function useFeed(options: UseFeedOptions) {
     if (!userId) return;
 
     try {
-      // Query both directions of friendships with retry
       const [sentFriendships, receivedFriendships] = await withRetry(
         () => Promise.all([
           supabase
@@ -112,13 +99,11 @@ export function useFeed(options: UseFeedOptions) {
         { maxAttempts: 3, onRetry: (attempt) => logger.warn('feed:friends_retry', { attempt }) }
       );
 
-      // Combine friend IDs from both directions
       const friendIds = [
         ...(sentFriendships.data?.map(f => f.friend_id) || []),
         ...(receivedFriendships.data?.map(f => f.user_id) || []),
       ];
 
-      // Remove duplicates
       const uniqueFriendIds = [...new Set(friendIds)];
 
       if (uniqueFriendIds.length > 0) {
@@ -145,7 +130,6 @@ export function useFeed(options: UseFeedOptions) {
       }
     } catch (error) {
       logger.apiError('fetchFriends', error);
-      // Try cache on error
       const cached = getCachedFriends?.();
       if (cached) setFriends(cached);
     }
@@ -158,7 +142,6 @@ export function useFeed(options: UseFeedOptions) {
     if (isLoadMore) setIsLoadingMore(true);
 
     try {
-      // Get friend IDs (use cached if available from useFriendIds)
       const [sentFriendships, receivedFriendships] = await withRetry(
         () => Promise.all([
           supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('status', 'accepted'),
@@ -201,7 +184,6 @@ export function useFeed(options: UseFeedOptions) {
       const { data } = await query;
       const fetchedPosts = data || [];
 
-      // Check if there are more posts
       setHasMorePosts(fetchedPosts.length === POSTS_PER_PAGE);
 
       if (isLoadMore) {
@@ -211,7 +193,6 @@ export function useFeed(options: UseFeedOptions) {
         onCachePosts?.(fetchedPosts);
       }
 
-      // Fetch user's likes for these posts
       if (fetchedPosts.length > 0) {
         const postIds = fetchedPosts.map(p => p.id);
         const { data: likes } = await supabase
@@ -247,13 +228,11 @@ export function useFeed(options: UseFeedOptions) {
     await fetchPosts(lastPost.created_at);
   }, [fetchPosts, hasMorePosts, isLoadingMore, posts]);
 
-  // Incremental handlers for realtime
   const handleIncrementalNewPost = useCallback(async (payload: any) => {
     if (!userId) return;
     const newRecord = payload.new;
     if (!newRecord?.id) return;
 
-    // Fetch the full post with profile
     const { data } = await supabase
       .from('posts')
       .select(`
@@ -269,18 +248,15 @@ export function useFeed(options: UseFeedOptions) {
 
     if (!data) return;
 
-    // Check if post is from current user or a friend
     const isOwnPost = data.user_id === userId;
     if (!isOwnPost) {
-      // Quick check against cached friend IDs
       const [sent, received] = await Promise.all([
         supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('friend_id', data.user_id).eq('status', 'accepted').maybeSingle(),
         supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('user_id', data.user_id).eq('status', 'accepted').maybeSingle(),
       ]);
-      if (!sent.data && !received.data) return; // Not a friend
+      if (!sent.data && !received.data) return;
     }
 
-    // Prepend to posts (avoid duplicates)
     setPosts(prev => {
       if (prev.some(p => p.id === data.id)) return prev;
       return [data, ...prev];
@@ -293,118 +269,6 @@ export function useFeed(options: UseFeedOptions) {
       setPosts(prev => prev.filter(p => p.id !== deletedId));
     }
   }, []);
-
-  const fetchStories = useCallback(async () => {
-    if (!userId) return;
-
-    try {
-      // Parallelize: Get venues AND friendships at the same time
-      const [cityVenuesResult, sentFriendships, receivedFriendships] = await Promise.all([
-        supabase.from('venues').select('id, name').eq('city', city || 'nyc'),
-        supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('status', 'accepted'),
-        supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('status', 'accepted'),
-      ]);
-      
-      const cityVenues = cityVenuesResult.data;
-      const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
-
-      // Combine friend IDs from both directions
-      const friendIds = [
-        ...(sentFriendships.data?.map(f => f.friend_id) || []),
-        ...(receivedFriendships.data?.map(f => f.user_id) || []),
-      ];
-      const uniqueFriendIds = [...new Set(friendIds)];
-      const userIds = [userId, ...uniqueFriendIds];
-
-      let query = supabase
-        .from('stories')
-        .select(`
-          id,
-          user_id,
-          venue_name,
-          profiles:user_id (
-            display_name,
-            avatar_url
-          )
-        `)
-        .gt('expires_at', new Date().toISOString());
-
-      if (demoEnabled) {
-        query = query.or(`user_id.in.(${userIds.join(',')}),is_demo.eq.true`);
-      } else {
-        query = query.in('user_id', userIds).eq('is_demo', false);
-      }
-
-      const { data: stories } = await query;
-
-      if (!stories) {
-        setStoryUsers([]);
-        return;
-      }
-
-      // Filter stories by city venue names, but ALWAYS include current user's stories
-      const filteredStories = stories.filter(story => {
-        // Always include current user's stories regardless of venue
-        if (story.user_id === userId) return true;
-        if (!story.venue_name) return true; // Include stories without venue
-        return cityVenueNames.has(story.venue_name.toLowerCase());
-      });
-
-      // Fetch story views for current user
-      const storyIds = filteredStories.map(s => s.id);
-      const { data: views } = storyIds.length > 0 ? await supabase
-        .from('story_views')
-        .select('story_id')
-        .eq('user_id', userId)
-        .in('story_id', storyIds) : { data: [] };
-
-      const viewedStoryIds = new Set(views?.map(v => v.story_id) || []);
-
-      // Group stories by user
-      const userStoryMap = new Map<string, { profile: any; stories: any[]; hasUnviewed: boolean }>();
-
-      filteredStories.forEach(story => {
-        const storyUserId = story.user_id;
-        if (!userStoryMap.has(storyUserId)) {
-          userStoryMap.set(storyUserId, {
-            profile: story.profiles,
-            stories: [],
-            hasUnviewed: false,
-          });
-        }
-        const userStory = userStoryMap.get(storyUserId)!;
-        userStory.stories.push(story);
-        if (!viewedStoryIds.has(story.id)) {
-          userStory.hasUnviewed = true;
-        }
-      });
-
-      // Check if current user has active stories
-      const currentUserHasStory = userStoryMap.has(userId);
-      setUserHasStory(currentUserHasStory);
-
-      const storyUsersList: StoryUser[] = [];
-      userStoryMap.forEach((data, storyUserId) => {
-        if (storyUserId !== userId) {
-          storyUsersList.push({
-            user_id: storyUserId,
-            display_name: data.profile?.display_name || 'Unknown',
-            avatar_url: data.profile?.avatar_url,
-            has_unviewed: data.hasUnviewed,
-            story_count: data.stories.length,
-          });
-        }
-      });
-
-      setStoryUsers(storyUsersList);
-      onCacheStories?.(storyUsersList);
-    } catch (error) {
-      logger.apiError('fetchStories', error);
-      // Try cache on error
-      const cached = getCachedStories?.();
-      if (cached) setStoryUsers(cached);
-    }
-  }, [userId, demoEnabled, city, onCacheStories, getCachedStories]);
 
   const fetchComments = useCallback(async (postId: string) => {
     const { data } = await supabase
@@ -423,7 +287,6 @@ export function useFeed(options: UseFeedOptions) {
     if (data) {
       setComments(prev => ({ ...prev, [postId]: data }));
       
-      // Fetch user's comment likes for these comments
       if (userId && data.length > 0) {
         const commentIds = data.map(c => c.id);
         const { data: commentLikes } = await supabase
@@ -455,11 +318,9 @@ export function useFeed(options: UseFeedOptions) {
   }, [expandedPostId, comments, fetchComments]);
 
   const handlePostComment = useCallback(async (postId: string, text?: string) => {
-    // Support both old (state-based) and new (direct text) API
     const rawText = text ?? newComment[postId];
     if (!rawText || !userId) return;
 
-    // Validate comment with Zod schema
     const validation = validateCommentText(rawText);
     if (!validation.success) {
       logger.warn('feed:invalid_comment', { error: validation.error });
@@ -469,7 +330,7 @@ export function useFeed(options: UseFeedOptions) {
     const { error } = await supabase.from('post_comments').insert({
       post_id: postId,
       user_id: userId,
-      text: validation.data!, // Use validated and trimmed text
+      text: validation.data!,
     });
 
     if (error) {
@@ -477,7 +338,6 @@ export function useFeed(options: UseFeedOptions) {
       return;
     }
 
-    // Only clear state-based input if we used it
     if (!text) {
       setNewComment(prev => ({ ...prev, [postId]: '' }));
     }
@@ -490,7 +350,6 @@ export function useFeed(options: UseFeedOptions) {
 
     const isLiked = likedPosts.has(postId);
     
-    // Haptic feedback on like
     if (!isLiked) {
       haptic.light();
       setAnimatingLike(postId);
@@ -498,22 +357,13 @@ export function useFeed(options: UseFeedOptions) {
     }
 
     // Optimistic UI update
-    setPosts(prev => prev.map(p => {
-      if (p.id === postId) {
-        return {
-          ...p,
-          likes_count: isLiked ? Math.max((p.likes_count || 0) - 1, 0) : (p.likes_count || 0) + 1
-        };
-      }
-      return p;
-    }));
-
     if (isLiked) {
       setLikedPosts(prev => {
         const newSet = new Set(prev);
         newSet.delete(postId);
         return newSet;
       });
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: Math.max((p.likes_count || 0) - 1, 0) } : p));
 
       const { error } = await supabase
         .from('post_likes')
@@ -523,12 +373,12 @@ export function useFeed(options: UseFeedOptions) {
 
       if (error) {
         console.error('Error unliking post:', error);
-        // Revert
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: (p.likes_count || 0) + 1 } : p));
         setLikedPosts(prev => new Set(prev).add(postId));
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: (p.likes_count || 0) + 1 } : p));
       }
     } else {
       setLikedPosts(prev => new Set(prev).add(postId));
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: (p.likes_count || 0) + 1 } : p));
 
       const { error } = await supabase
         .from('post_likes')
@@ -536,13 +386,12 @@ export function useFeed(options: UseFeedOptions) {
 
       if (error) {
         console.error('Error liking post:', error);
-        // Revert
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: Math.max((p.likes_count || 0) - 1, 0) } : p));
         setLikedPosts(prev => {
           const newSet = new Set(prev);
           newSet.delete(postId);
           return newSet;
         });
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: Math.max((p.likes_count || 0) - 1, 0) } : p));
       }
     }
   }, [userId, likedPosts]);
@@ -550,39 +399,29 @@ export function useFeed(options: UseFeedOptions) {
   const handleDeletePost = useCallback(async (postId: string) => {
     if (!userId) return;
 
+    setPosts(prev => prev.filter(p => p.id !== postId));
+
     const { error } = await supabase
       .from('posts')
       .delete()
       .eq('id', postId)
       .eq('user_id', userId);
 
-    if (!error) {
-      setPosts(prev => prev.filter(p => p.id !== postId));
+    if (error) {
+      console.error('Error deleting post:', error);
+      await fetchPosts();
     }
-  }, [userId]);
+  }, [userId, fetchPosts]);
 
   const handleLikeComment = useCallback(async (commentId: string, postId: string) => {
     if (!userId) return;
 
     const isLiked = likedComments.has(commentId);
-    
-    // Haptic feedback on like
-    if (!isLiked) {
-      haptic.light();
-    }
 
-    // Optimistic UI update
+    // Optimistic update
     setComments(prev => ({
       ...prev,
-      [postId]: prev[postId]?.map(c => {
-        if (c.id === commentId) {
-          return {
-            ...c,
-            likes_count: isLiked ? Math.max((c.likes_count || 0) - 1, 0) : (c.likes_count || 0) + 1
-          };
-        }
-        return c;
-      }) || []
+      [postId]: prev[postId]?.map(c => c.id === commentId ? { ...c, likes_count: isLiked ? Math.max((c.likes_count || 0) - 1, 0) : (c.likes_count || 0) + 1 } : c) || []
     }));
 
     if (isLiked) {
@@ -600,7 +439,6 @@ export function useFeed(options: UseFeedOptions) {
 
       if (error) {
         console.error('Error unliking comment:', error);
-        // Revert
         setComments(prev => ({
           ...prev,
           [postId]: prev[postId]?.map(c => c.id === commentId ? { ...c, likes_count: (c.likes_count || 0) + 1 } : c) || []
@@ -616,7 +454,6 @@ export function useFeed(options: UseFeedOptions) {
 
       if (error) {
         console.error('Error liking comment:', error);
-        // Revert
         setComments(prev => ({
           ...prev,
           [postId]: prev[postId]?.map(c => c.id === commentId ? { ...c, likes_count: Math.max((c.likes_count || 0) - 1, 0) } : c) || []
@@ -634,8 +471,6 @@ export function useFeed(options: UseFeedOptions) {
     posts,
     setPosts,
     friends,
-    storyUsers,
-    userHasStory,
     likedPosts,
     likedComments,
     expandedPostId,
@@ -648,7 +483,6 @@ export function useFeed(options: UseFeedOptions) {
     getTimeAgo,
     fetchFriends,
     fetchPosts,
-    fetchStories,
     fetchComments,
     handleToggleComments,
     handlePostComment,
