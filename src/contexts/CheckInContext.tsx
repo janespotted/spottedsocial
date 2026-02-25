@@ -29,7 +29,8 @@ interface CheckInContextType {
   checkInVenueId: string | null;
   checkInNeighborhood: string | null;
   checkInPrivacyLevel: string | null;
-  showOutConfirmation: (venueName: string, venueId: string, privacyLevel: string) => void;
+  checkInIsPrivateParty: boolean;
+  showOutConfirmation: (venueName: string, venueId: string, privacyLevel: string, isPrivateParty?: boolean) => void;
   showPlanningConfirmation: (neighborhood: string | null, privacyLevel: string) => void;
   closeCheckInConfirmation: () => void;
 }
@@ -50,6 +51,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
   const [checkInVenueId, setCheckInVenueId] = useState<string | null>(null);
   const [checkInNeighborhood, setCheckInNeighborhood] = useState<string | null>(null);
   const [checkInPrivacyLevel, setCheckInPrivacyLevel] = useState<string | null>(null);
+  const [checkInIsPrivateParty, setCheckInIsPrivateParty] = useState(false);
 
   const openCheckIn = () => {
     setIsReminderTriggered(false);
@@ -73,12 +75,13 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
     setNearbyVenues([]);
   };
 
-  const showOutConfirmation = (venueName: string, venueId: string, privacyLevel: string) => {
+  const showOutConfirmation = (venueName: string, venueId: string, privacyLevel: string, isPrivateParty: boolean = false) => {
     setCheckInConfirmationType('out');
     setCheckInVenueName(venueName);
     setCheckInVenueId(venueId);
     setCheckInNeighborhood(null);
     setCheckInPrivacyLevel(privacyLevel);
+    setCheckInIsPrivateParty(isPrivateParty);
     setShowCheckInConfirmation(true);
   };
 
@@ -97,6 +100,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
     setCheckInVenueId(null);
     setCheckInNeighborhood(null);
     setCheckInPrivacyLevel(null);
+    setCheckInIsPrivateParty(false);
   };
 
   return (
@@ -119,6 +123,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       checkInVenueId,
       checkInNeighborhood,
       checkInPrivacyLevel,
+      checkInIsPrivateParty,
       showOutConfirmation,
       showPlanningConfirmation,
       closeCheckInConfirmation,
