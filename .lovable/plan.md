@@ -1,214 +1,122 @@
 
 
-# iOS Capacitor Compatibility Audit
+# Unify Tonight's Buzz into Yap
 
-## CRITICAL ISSUES (Will Break)
+## Overview
+Kill "Tonight's Buzz" as a concept. Replace it with a one-line Yap preview on venue cards. Make Yap readable without login. One word, one system, two surfaces.
 
-### 1. OAuth Redirect URI -- BLOCKER
-**Files:** `src/pages/Auth.tsx` lines 110, 126
+## Scope of Changes
+
+### Files to modify
+- `src/components/VenueIdCard.tsx` -- remove Buzz fetching/display, add Yap preview
+- `src/components/CheckInConfirmation.tsx` -- remove DropVibeDialog, update copy
+- `src/components/CreateStoryDialog.tsx` -- remove "buzz" audience option
+- `src/components/StoryAudienceSheet.tsx` -- remove "buzz" and "both" options
+- `src/components/messages/YapTab.tsx` -- accept optional `venueName` prop, support unauthenticated browsing, show login prompt for actions
+- `src/pages/Messages.tsx` -- pass venue context to YapTab when navigating from venue card
+- `src/components/DemoActivator.tsx` -- update toast copy
+- `src/pages/DemoSettings.tsx` -- update references
+- `src/lib/validation-schemas.ts` -- remove `buzzMessageSchema` / `validateBuzzText` if unused after changes
+- `src/components/WriteReviewDialog.tsx` -- update "Drop a Vibe Check" title
+
+### Files to delete (no longer imported)
+- `src/components/DropVibeDialog.tsx`
+- `src/components/BuzzItem.tsx`
+
+### Database changes
+- Update RLS on `yap_messages`: change SELECT policy from `authenticated` to allow `anon` role (public read)
+- Update RLS on `yap_comments`: add public SELECT policy for `anon` role
+- No changes to `venue_buzz_messages` table (data stays, just not used by UI anymore)
+
+---
+
+## Detailed Plan
+
+### 1. Database: Make Yap publicly readable
+
+Migration SQL:
+```sql
+-- Drop existing SELECT policy that requires authenticated
+DROP POLICY IF EXISTS "Yap messages viewable by all authenticated users" ON public.yap_messages;
+
+-- Create new public SELECT policy
+CREATE POLICY "Yap messages viewable by everyone"
+  ON public.yap_messages FOR SELECT
+  USING (true);
+
+-- Also make yap_comments publicly readable
+-- (need to check existing policies first)
 ```
-redirect_uri: window.location.origin
+
+The INSERT/DELETE policies still require `auth.uid()`, so posting/voting/deleting remain authenticated-only.
+
+### 2. VenueIdCard: Replace Buzz section with Yap preview
+
+Remove:
+- `BuzzItem` and `DropVibeDialog` imports
+- `BuzzItemData` interface
+- `buzzItems` state, `buzzMediaPhotos` state, `showDropVibe` state
+- `fetchBuzzItems()` function
+- The entire "Tonight's Buzz" collapsible section (lines ~948-970)
+- The `<DropVibeDialog>` render (lines ~1017-1023)
+
+Add:
+- A `hotYap` state (`{ text: string; score: number } | null`) fetched from `yap_messages` for the venue
+- A `fetchHotYap()` function: query `yap_messages` where `venue_name = venue.name`, not expired, order by `score desc`, limit 1
+- A Yap preview row in the venue card (above the "More Info" collapsible):
+
 ```
-In Capacitor iOS, `window.location.origin` resolves to `capacitor://localhost`. This origin is almost certainly not registered as an allowed redirect URI with Google or Apple OAuth. The OAuth flow will fail with an "invalid redirect" error.
-
-**Fix needed:** Detect Capacitor environment and use a custom URL scheme or Universal Link, or use `@capacitor/browser` to open OAuth in an in-app browser with the hosted app's origin as the redirect, then deep-link back.
-
----
-
-### 2. Service Worker Registration -- WILL SILENTLY FAIL
-**Files:** `src/main.tsx` lines 5-8, `src/hooks/usePushNotifications.ts` lines 41-42, 55, 75-76, 105, 147
-WKWebView on iOS does **not** support Service Workers. All of the following will silently fail or error:
-- `navigator.serviceWorker.register('/sw.js')` -- main.tsx line 7
-- `navigator.serviceWorker.ready` -- usePushNotifications.ts lines 55, 105, 147
-- `'serviceWorker' in navigator` -- will be `false` in WKWebView
-
-**Impact:** Web Push subscription/unsubscription is entirely broken. The `usePushNotifications` hook will report `isSupported = false` and never subscribe.
-
-**Fix needed:** Gate service worker registration behind a `!Capacitor.isNativePlatform()` check. Use `@capacitor/push-notifications` plugin for native push on iOS instead.
-
----
-
-### 3. Web Push Notifications API -- NOT AVAILABLE
-**Files:** `src/lib/notifications.ts` lines 6, 11, 16, 23-24, 26-27; `src/hooks/usePushNotifications.ts` lines 42-43
-`window.Notification` and `PushManager` do not exist in WKWebView. The browser `Notification` constructor (line 27 of notifications.ts) will throw. The permission checks will all return false.
-
-**Fix needed:** Replace with `@capacitor/push-notifications` for native APNs. You already have the `apns_device_token` column and server-side APNs logic -- just need the client-side Capacitor plugin.
-
----
-
-## HIGH PRIORITY (Functional Issues)
-
-### 4. `window.location.href` for Navigation
-**Files:** `src/contexts/AuthContext.tsx` lines 73, 91; `src/components/PageErrorBoundary.tsx` line 40
-Using `window.location.href = '/auth'` or `window.location.href = '/'` triggers a full page reload. In Capacitor, this reloads the entire WebView from the local bundle, which is slow (~1-2s white flash) and destroys all React state.
-
-**Fix needed:** Use React Router's `navigate()` instead of `window.location.href` for in-app navigation.
-
----
-
-### 5. `window.location.origin` in Invite/Share URLs
-**Files:**
-- `src/pages/Friends.tsx` line 340 -- `getInviteUrl()`
-- `src/pages/Profile.tsx` line 117 -- `getInviteUrl()`
-- `src/pages/Settings.tsx` line 62 -- `getInviteUrl()`
-- `src/pages/Feed.tsx` line 398 -- share URL
-- `src/pages/Home.tsx` line 579 -- share URL
-- `src/components/FindFriendsOnboarding.tsx` line 126 -- `getInviteUrl()`
-- `src/components/InviteFriendsSection.tsx` line 89 -- `getInviteUrl()`
-- `src/components/VenueIdCard.tsx` line 560 -- share URL
-- `src/components/EventCard.tsx` line 134 -- share URL
-- `src/pages/Profile.tsx` lines 316, 323 -- `window.location.href`
-
-All of these will generate URLs like `capacitor://localhost/invite/ABC123` which are completely useless -- they can't be opened by anyone. They need to use your published URL (`https://spottedsocial.lovable.app`) instead.
-
-**Fix needed:** Create a constant like `const APP_BASE_URL = 'https://spottedsocial.lovable.app'` and use it for all shareable URLs.
-
----
-
-### 6. `window.open()` Behavior
-**Files:**
-- `src/pages/Settings.tsx` line 268 -- `mailto:` link
-- `src/components/EventCard.tsx` line 144 -- ticket URL
-- `src/components/VenueIdCard.tsx` line 522 -- Apple Maps URL
-- `src/components/LocationPermissionPrompt.tsx` line 121 -- Chrome help page
-
-`window.open()` in WKWebView either opens in the same WebView (breaking your app) or is blocked entirely. External URLs should use `@capacitor/browser` plugin's `Browser.open()` to open in an in-app Safari sheet.
-
-The `mailto:` link (Settings.tsx line 268) and `sms:` link (`src/pages/Friends.tsx` line 347) should work via `window.location.href` on iOS as URL schemes, but `window.open` with `_blank` may not.
-
----
-
-### 7. `navigator.vibrate()` -- No-Op on iOS
-**File:** `src/lib/haptics.ts` lines 9, 16, 23, 30, 37
-`navigator.vibrate()` is **not supported** on iOS (Safari or WKWebView). It's already wrapped in try/catch with optional chaining, so it won't crash, but haptics will be completely absent.
-
-**Fix needed:** Use `@capacitor/haptics` plugin for native haptic feedback on iOS. The try/catch means this is safe to leave for now but the UX will feel flat.
-
----
-
-### 8. `navigator.clipboard.writeText()` -- Restricted in WKWebView
-**Files:**
-- `src/pages/Feed.tsx` lines 405, 410
-- `src/pages/Home.tsx` lines 586, 591
-- `src/pages/Friends.tsx` line 352
-- `src/pages/Profile.tsx` line 323
-- `src/components/FindFriendsOnboarding.tsx` line 130
-- `src/components/InviteFriendsSection.tsx` line 94
-- `src/components/VenueIdCard.tsx` line 575
-- `src/components/QRCodeModal.tsx` line 17
-
-`navigator.clipboard.writeText()` requires a secure context AND user activation. In WKWebView it may silently fail. Use `@capacitor/clipboard` plugin as a reliable alternative.
-
----
-
-### 9. Password Reset Redirect URL
-**File:** `src/pages/ResetPassword.tsx` line 37
+Yap · "DJ is insane right now 🔥" · 72 ↑
 ```
-redirectTo: `${window.location.origin}/reset-password`
-```
-Same `capacitor://localhost` problem. The reset email link will point to a non-functional URL.
 
-**Fix needed:** Use `APP_BASE_URL` constant here too.
+- Tapping navigates to `/messages` with state `{ activeTab: 'yap', venueName: venue.name }`
+- If no yaps exist: `Yap · "No posts yet — be the first"` (tappable, same navigation)
 
----
+### 3. YapTab: Accept venue prop + unauthenticated browsing
 
-### 10. Email Signup Confirmation Redirect
-**File:** `src/pages/Auth.tsx` line 169
-```
-redirectUrl: `${window.location.origin}/`
-```
-Email confirmation links will redirect to `capacitor://localhost/` which won't open the native app unless Universal Links are configured.
+- Add optional `venueName?: string` prop. If provided, use it instead of fetching from `night_statuses`
+- Remove the `if (!user) return;` guard in `fetchYapMessages()` -- allow fetching without auth
+- For vote fetching (lines 146-158), only run if `user` is present
+- For post/vote/comment actions: if `!user`, show a lightweight login prompt (bottom sheet/dialog) with "Create an account to join the conversation" + Sign Up / Log In buttons that navigate to `/auth`
+- The realtime subscription can remain auth-gated (non-logged-in users just see static data)
 
-**Fix needed:** Use `APP_BASE_URL` and configure Universal Links / Associated Domains.
+### 4. Messages page: Pass venue context
 
----
+- When navigating from VenueIdCard, pass `location.state.venueName`
+- In `Messages.tsx`, read `location.state?.venueName` and pass it to `<YapTab venueName={venueName} />`
 
-## MEDIUM PRIORITY (Degraded UX)
+### 5. CheckInConfirmation: Remove Buzz references
 
-### 11. QR Code Download
-**File:** `src/components/QRCodeModal.tsx` lines 41-57
-The `handleDownload()` function creates a download link via `document.createElement('a')` with a `download` attribute. This doesn't work in WKWebView -- the download will be silently ignored.
+- Remove `DropVibeDialog` import and render
+- Change copy from "Add to Tonight's Buzz" to "Share what it's like" or navigate to Yap
+- The "Share what it's like" button can navigate to `/messages` with `{ activeTab: 'yap', venueName }` instead of opening DropVibeDialog
 
-**Fix needed:** Use `@capacitor/filesystem` to save to device, or `@capacitor/share` to share the image.
+### 6. Story sharing: Remove Buzz audience option
 
----
+- `StoryAudienceSheet.tsx`: Remove the `buzz` and `both` radio options. Stories only go to friends. Remove anonymous toggle (was Buzz-only). Remove "Tonight's Buzz" text references.
+- `CreateStoryDialog.tsx`: Remove `is_public_buzz` logic. Always set `is_public_buzz: false`. Remove Buzz success messages. Simplify `AudienceOption` type to just visibility levels.
 
-### 12. `navigator.share()` -- Works But Different
-**Files:** `src/components/InviteFriendsSection.tsx` line 109-112, `src/components/VenueIdCard.tsx` line 562, `src/components/QRCodeModal.tsx` line 26, `src/pages/Profile.tsx` line 311, `src/pages/Feed.tsx` line 400, `src/components/EventCard.tsx` line 131, `src/pages/Home.tsx` line 581, `src/components/FindFriendsOnboarding.tsx` line 148
+### 7. Cleanup
 
-`navigator.share()` IS supported in WKWebView on iOS 15+, so these will work. However, the shared URLs will still be broken (see issue #5 above).
+- Delete `src/components/DropVibeDialog.tsx`
+- Delete `src/components/BuzzItem.tsx`
+- Remove `validateBuzzText` from `validation-schemas.ts` (only used by DropVibeDialog)
+- Update `WriteReviewDialog.tsx` title from "Drop a Vibe Check" to something neutral
+- Update `DemoActivator.tsx` and `DemoSettings.tsx` toast/description copy to remove "drop a vibe" references
 
----
+### 8. Login prompt component
 
-### 13. `navigator.onLine` -- Unreliable
-**File:** `src/hooks/useOfflineCache.ts` line 49
-`navigator.onLine` in WKWebView may not accurately reflect network state. Consider using `@capacitor/network` plugin.
-
----
-
-### 14. `navigator.permissions.query()` -- Not Supported
-**File:** `src/lib/location-service.ts` lines 65-70
-The Permissions API (`navigator.permissions`) is not available in WKWebView. The fallback to `'prompt'` (line 67) is correct, so this won't crash, but the permission state detection won't work.
+Create a lightweight `LoginPromptSheet` component (bottom sheet):
+- "Create an account to join the conversation"
+- Two buttons: "Sign Up" and "Log In" -- both navigate to `/auth`
+- Used by YapTab when unauthenticated user taps post/vote/comment
 
 ---
 
-### 15. Location Permission Prompt -- Chrome-Specific Help
-**File:** `src/components/LocationPermissionPrompt.tsx` line 121
-Opens a Chrome help page for enabling location. On iOS this should link to iOS Settings or show iOS-specific instructions.
+## Technical Notes
 
----
-
-## LOW PRIORITY (Minor / Already Handled)
-
-### 16. `localStorage` Usage -- SAFE
-**Files:** 18+ files using localStorage
-`localStorage` works fine in WKWebView and persists correctly in Capacitor iOS. The Supabase client using `localStorage` for auth persistence (client.ts line 13) is fine. No changes needed.
-
----
-
-### 17. `document.visibilitychange` -- SAFE
-**File:** `src/lib/auto-venue-tracker.ts` lines 33-37
-Works correctly in WKWebView for detecting app backgrounding.
-
----
-
-### 18. Mapbox GL -- SAFE with Caveats
-**File:** `src/pages/Map.tsx` (throughout)
-WebGL is supported in WKWebView on iOS. Mapbox GL JS works in Capacitor. The DOM marker approach (`document.createElement('div')`) used throughout Map.tsx is fine. Touch events work natively. One caveat: performance may be slightly lower than native MapKit, and you should test with many markers.
-
----
-
-### 19. `navigator.geolocation` -- SAFE
-**Files:** `src/lib/location-service.ts`, `src/components/CheckInModal.tsx`, `src/pages/DemoSettings.tsx`, `src/lib/city-detection.ts`, `src/pages/Map.tsx`
-`navigator.geolocation` works in WKWebView. However, you need to add `NSLocationWhenInUseUsageDescription` to Info.plist in Xcode. You can optionally upgrade to `@capacitor/geolocation` for better native integration.
-
----
-
-### 20. CSS Safe Area Insets -- SAFE
-**Files:** `src/components/Layout.tsx`, `src/components/BottomNav.tsx`, `src/pages/Map.tsx`, `src/index.css`, and 6+ other files
-The `env(safe-area-inset-*)` usage is correct and comprehensive. The viewport meta tag in `index.html` includes `viewport-fit=cover` which is required. The iOS config in `capacitor.config.ts` sets `contentInset: 'automatic'`. This is all properly configured.
-
----
-
-### 21. `100dvh` -- SAFE
-**File:** `src/components/Layout.tsx` line 71
-`100dvh` is supported in iOS Safari / WKWebView from iOS 15.4+. Should be fine.
-
----
-
-## Summary: Action Items Before TestFlight
-
-| Priority | Issue | Effort |
-|----------|-------|--------|
-| BLOCKER | OAuth redirect_uri fix | Medium -- need Universal Links or custom scheme |
-| BLOCKER | Native push via @capacitor/push-notifications | Medium -- plugin + APNs cert config |
-| HIGH | Replace window.location.origin in share URLs with hosted URL | Low -- create constant, find/replace |
-| HIGH | Replace window.location.href navigation with React Router | Low |
-| HIGH | Replace window.open with @capacitor/browser | Low |
-| MEDIUM | Replace navigator.vibrate with @capacitor/haptics | Low |
-| MEDIUM | Replace navigator.clipboard with @capacitor/clipboard | Low |
-| MEDIUM | Fix QR download for iOS | Low |
-| MEDIUM | Fix password reset / email confirm redirect URLs | Low |
-| LOW | iOS-specific location permission instructions | Low |
-| LOW | Network status via @capacitor/network | Low |
+- Yap threads are scoped by `venue_name` (text), not `venue_id`. The VenueIdCard has the venue name, so the preview query uses `venue_name = venue.name`.
+- The `venue_buzz_messages` table data remains in the database but is no longer queried by any UI. It can be cleaned up later.
+- The `stories.is_public_buzz` column stays in the schema but will always be `false` going forward.
+- Making `yap_messages` SELECT public (anon) is safe because yap content is already anonymous and ephemeral. Write operations remain authenticated.
 
