@@ -1226,21 +1226,21 @@ export default function Map() {
 
       {/* Unified Search Bar */}
       <div 
-        className={`absolute left-4 right-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-        style={{ top: 'calc(6.5rem + env(safe-area-inset-top, 0px))' }}
+        className={`absolute left-4 z-[200] flex items-center gap-2 transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        style={{ top: 'calc(5.5rem + env(safe-area-inset-top, 0px))' }}
       >
         <button
           onClick={() => setShowSearchOverlay(true)}
-          className="w-full bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
+          className="max-w-[260px] h-10 bg-black/50 backdrop-blur-md border border-white/15 rounded-full px-3 py-2 flex items-center gap-2 hover:bg-black/60 transition-all"
         >
-          <Search className="w-4 h-4 text-white/50 flex-shrink-0" />
-          <span className="text-white/50 text-sm flex-1 text-left">Search people, venues, or neighborhoods...</span>
-          <div
-            onClick={(e) => { e.stopPropagation(); setShowFilterSheet(true); }}
-            className="w-8 h-8 rounded-lg bg-[#a855f7]/20 flex items-center justify-center hover:bg-[#a855f7]/30 transition-colors"
-          >
-            <SlidersHorizontal className="w-4 h-4 text-white/70" />
-          </div>
+          <Search className="w-3.5 h-3.5 text-white/50 flex-shrink-0" />
+          <span className="text-white/50 text-xs flex-1 text-left truncate">Search people, venues...</span>
+        </button>
+        <button
+          onClick={() => setShowFilterSheet(true)}
+          className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/15 flex items-center justify-center hover:bg-black/60 transition-colors flex-shrink-0"
+        >
+          <SlidersHorizontal className="w-4 h-4 text-white/70" />
         </button>
       </div>
 
@@ -1248,7 +1248,7 @@ export default function Map() {
       {showSmartPrompt && smartPromptVenue && !focusMode && (
         <div
           className="absolute left-4 right-4 z-[201] animate-fade-in"
-          style={{ top: 'calc(10rem + env(safe-area-inset-top, 0px))' }}
+          style={{ top: 'calc(8.5rem + env(safe-area-inset-top, 0px))' }}
         >
           <div className="bg-gradient-to-r from-[#d4ff00]/20 to-[#a855f7]/20 backdrop-blur border border-[#d4ff00]/40 rounded-xl px-4 py-3 flex items-center gap-3">
             <div className="flex-1">
@@ -1283,32 +1283,32 @@ export default function Map() {
       {currentUserStatus && !focusMode && (
         <div
           className="absolute left-4 z-[199] flex items-center gap-2 transition-opacity duration-300"
-          style={{ top: showSmartPrompt && smartPromptVenue ? 'calc(14rem + env(safe-area-inset-top, 0px))' : 'calc(10rem + env(safe-area-inset-top, 0px))' }}
+          style={{ top: showSmartPrompt && smartPromptVenue ? 'calc(12rem + env(safe-area-inset-top, 0px))' : 'calc(8.5rem + env(safe-area-inset-top, 0px))' }}
         >
           <button
             onClick={() => setShowQuickStatus(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur border transition-all hover:scale-105 ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full backdrop-blur-md border transition-all hover:scale-105 bg-black/40 border-white/10 ${
               currentUserStatus === 'out'
-                ? 'bg-[#d4ff00]/15 border-[#d4ff00]/40 text-[#d4ff00]'
+                ? 'text-[#d4ff00]'
                 : currentUserStatus === 'planning'
-                ? 'bg-[#a855f7]/15 border-[#a855f7]/40 text-[#a855f7]'
-                : 'bg-white/5 border-white/20 text-white/50'
+                ? 'text-[#a855f7]'
+                : 'text-white/50'
             }`}
           >
             {currentUserStatus === 'out' ? (
               <>
-                <MapPin className="w-3.5 h-3.5 fill-current" />
-                <span className="text-xs font-medium">Out{currentUserVenue ? ` · ${currentUserVenue}` : ''}</span>
+                <MapPin className="w-3 h-3 fill-current" />
+                <span className="text-[11px] font-medium">Out{currentUserVenue ? ` · ${currentUserVenue}` : ''}</span>
               </>
             ) : currentUserStatus === 'planning' ? (
               <>
-                <Target className="w-3.5 h-3.5" />
-                <span className="text-xs font-medium">Planning on it</span>
+                <Target className="w-3 h-3" />
+                <span className="text-[11px] font-medium">Planning</span>
               </>
             ) : (
               <>
-                <Home className="w-3.5 h-3.5" />
-                <span className="text-xs font-medium">Staying in</span>
+                <Home className="w-3 h-3" />
+                <span className="text-[11px] font-medium">In</span>
               </>
             )}
           </button>
@@ -1339,10 +1339,10 @@ export default function Map() {
                 toast({ title: 'Location sharing stopped', description: 'Your friends can no longer see you.' });
                 fetchFriendsLocations();
               }}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full backdrop-blur border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-xs font-medium"
+              className="flex items-center gap-1 px-2 py-1 rounded-full backdrop-blur-md border border-white/10 bg-black/40 text-red-400 hover:bg-black/50 transition-all text-[11px] font-medium"
             >
               <MapPinOff className="w-3 h-3" />
-              Stop Sharing
+              Stop
             </button>
           )}
         </div>
