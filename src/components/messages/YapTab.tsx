@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { MessageCircle, ChevronRight, Mic } from 'lucide-react';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { cn } from '@/lib/utils';
 import { VenueYapThread } from './VenueYapThread';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,12 +15,14 @@ interface VenueYapSummary {
   venue_name: string;
   post_count: number;
   hottest_text: string | null;
+  hottest_score: number;
   venue_type: string | null;
   venue_neighborhood: string | null;
 }
 
 export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const { user } = useAuth();
+  const demoEnabled = useDemoMode();
   const [view, setView] = useState<'directory' | 'thread'>(venueNameProp ? 'thread' : 'directory');
   const [threadVenueName, setThreadVenueName] = useState<string | null>(venueNameProp || null);
   const [userVenueName, setUserVenueName] = useState<string | null>(null);
@@ -39,7 +42,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
     if (view === 'directory') {
       fetchDirectory();
     }
-  }, [view, user]);
+  }, [view, user, demoEnabled]);
 
   const fetchDirectory = async () => {
     setIsLoading(true);
@@ -54,11 +57,16 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
               .not('venue_name', 'is', null)
               .maybeSingle()
           : Promise.resolve({ data: null }),
-        supabase
-          .from('yap_messages')
-          .select('venue_name, score, text')
-          .gt('expires_at', new Date().toISOString())
-          .eq('is_demo', false),
+        (() => {
+          let yapQuery = supabase
+            .from('yap_messages')
+            .select('venue_name, score, text')
+            .gt('expires_at', new Date().toISOString());
+          if (!demoEnabled) {
+            yapQuery = yapQuery.eq('is_demo', false);
+          }
+          return yapQuery;
+        })(),
       ]);
 
       const currentVenue = userVenueResult.data?.venue_name || null;
@@ -104,6 +112,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
           venue_name: name,
           post_count: data.count,
           hottest_text: data.hottestText,
+          hottest_score: data.hottestScore,
           venue_type: venueMetaMap.get(name)?.type || null,
           venue_neighborhood: venueMetaMap.get(name)?.neighborhood || null,
         }))
@@ -194,7 +203,9 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                     </span>
                   </div>
                   {venue.hottest_text && (
-                    <p className="text-white/50 text-xs mt-1 truncate">"{venue.hottest_text}"</p>
+                    <p className="text-white/50 text-xs mt-1 truncate">
+                      "{venue.hottest_text}" {venue.hottest_score > 0 && <span className="text-[#d4ff00]/70">▲ {venue.hottest_score}</span>}
+                    </p>
                   )}
                 </div>
                 <ChevronRight className="h-5 w-5 text-white/30 shrink-0" />
