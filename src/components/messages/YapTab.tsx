@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronRight, Mic } from 'lucide-react';
+import { Mic } from 'lucide-react';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { cn } from '@/lib/utils';
 import { VenueYapThread } from './VenueYapThread';
@@ -11,15 +11,24 @@ interface YapTabProps {
   venueName?: string;
 }
 
-interface VenueYapSummary {
+interface YapQuote {
+  id: string;
+  text: string;
+  score: number;
   venue_name: string;
-  post_count: number;
-  hottest_text: string | null;
-  hottest_score: number;
-  venue_type: string | null;
   venue_neighborhood: string | null;
-  top_quotes: { text: string; score: number }[];
+  venue_type: string | null;
+  created_at: string;
 }
+
+const relativeTime = (dateStr: string) => {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h`;
+};
 
 export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const { user } = useAuth();
@@ -27,7 +36,8 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const [view, setView] = useState<'directory' | 'thread'>(venueNameProp ? 'thread' : 'directory');
   const [threadVenueName, setThreadVenueName] = useState<string | null>(venueNameProp || null);
   const [userVenueName, setUserVenueName] = useState<string | null>(null);
-  const [venues, setVenues] = useState<VenueYapSummary[]>([]);
+  const [quotes, setQuotes] = useState<YapQuote[]>([]);
+  const [sortMode, setSortMode] = useState<'hot' | 'new'>('hot');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -39,11 +49,11 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
 
   useEffect(() => {
     if (view === 'directory') {
-      fetchDirectory();
+      fetchQuotes();
     }
   }, [view, user, demoEnabled]);
 
-  const fetchDirectory = async () => {
+  const fetchQuotes = async () => {
     setIsLoading(true);
     try {
       const [userVenueResult, yapResult] = await Promise.all([
@@ -58,7 +68,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         (() => {
           let yapQuery = supabase
             .from('yap_messages')
-            .select('venue_name, score, text')
+            .select('id, text, score, venue_name, created_at')
             .gt('expires_at', new Date().toISOString())
             .eq('is_private_party', false);
           if (!demoEnabled) {
@@ -68,24 +78,12 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         })(),
       ]);
 
-      const currentVenue = userVenueResult.data?.venue_name || null;
-      setUserVenueName(currentVenue);
+      setUserVenueName(userVenueResult.data?.venue_name || null);
 
       const yaps = yapResult.data || [];
 
-      // Group by venue — collect top quotes
-      const venueMap = new Map<string, { count: number; quotes: { text: string; score: number }[] }>();
-      for (const yap of yaps) {
-        const existing = venueMap.get(yap.venue_name);
-        if (existing) {
-          existing.count++;
-          existing.quotes.push({ text: yap.text, score: yap.score });
-        } else {
-          venueMap.set(yap.venue_name, { count: 1, quotes: [{ text: yap.text, score: yap.score }] });
-        }
-      }
-
-      const venueNames = [...venueMap.keys()];
+      // Get unique venue names for metadata lookup
+      const venueNames = [...new Set(yaps.map(y => y.venue_name))];
       let venueMetaMap = new Map<string, { type: string | null; neighborhood: string | null }>();
 
       if (venueNames.length > 0) {
@@ -101,28 +99,28 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         }
       }
 
-      const summaries: VenueYapSummary[] = [...venueMap.entries()]
-        .map(([name, data]) => {
-          const sortedQuotes = data.quotes.sort((a, b) => b.score - a.score);
-          return {
-            venue_name: name,
-            post_count: data.count,
-            hottest_text: sortedQuotes[0]?.text || null,
-            hottest_score: sortedQuotes[0]?.score || 0,
-            venue_type: venueMetaMap.get(name)?.type || null,
-            venue_neighborhood: venueMetaMap.get(name)?.neighborhood || null,
-            top_quotes: sortedQuotes.slice(0, 3),
-          };
-        })
-        .sort((a, b) => b.post_count - a.post_count);
+      const enrichedQuotes: YapQuote[] = yaps.map(yap => ({
+        id: yap.id,
+        text: yap.text,
+        score: yap.score,
+        venue_name: yap.venue_name,
+        venue_neighborhood: venueMetaMap.get(yap.venue_name)?.neighborhood || null,
+        venue_type: venueMetaMap.get(yap.venue_name)?.type || null,
+        created_at: yap.created_at,
+      }));
 
-      setVenues(summaries);
+      setQuotes(enrichedQuotes);
     } catch (error) {
-      console.error('Error fetching yap directory:', error);
+      console.error('Error fetching yap quotes:', error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const sortedQuotes = [...quotes].sort((a, b) => {
+    if (sortMode === 'hot') return b.score - a.score;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 
   const openThread = (name: string) => {
     setThreadVenueName(name);
@@ -147,179 +145,141 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
 
   if (isLoading) {
     return (
-      <div className="space-y-5">
-        <Skeleton className="h-36 w-full rounded-2xl bg-[#2d1b4e]/40" />
-        <Skeleton className="h-6 w-48 bg-[#2d1b4e]/40" />
-        {[1, 2, 3].map(i => (
-          <Skeleton key={i} className="h-24 w-full rounded-2xl bg-[#2d1b4e]/40" />
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-32 bg-[#2d1b4e]/40" />
+        <Skeleton className="h-4 w-64 bg-[#2d1b4e]/40" />
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-20 rounded-full bg-[#2d1b4e]/40" />
+          <Skeleton className="h-8 w-20 rounded-full bg-[#2d1b4e]/40" />
+        </div>
+        {[1, 2, 3, 4].map(i => (
+          <Skeleton key={i} className="h-28 w-full rounded-2xl bg-[#2d1b4e]/40" />
         ))}
       </div>
     );
   }
 
-  const hottestVenue = venues.length > 0 ? venues[0] : null;
-  const remainingVenues = venues.slice(1);
-
-  // Border thickness based on activity
-  const getBorderWidth = (postCount: number) => {
-    if (postCount >= 10) return 'border-l-[6px]';
-    if (postCount >= 5) return 'border-l-[4px]';
-    return 'border-l-[3px]';
+  // Detect consecutive same-venue groups
+  const isFirstInGroup = (index: number) => {
+    if (index === 0) return true;
+    return sortedQuotes[index].venue_name !== sortedQuotes[index - 1].venue_name;
   };
-
-  const getActivityEmoji = (postCount: number) => {
-    if (postCount >= 5) return '🔥';
-    return '✦';
+  const isInGroup = (index: number) => {
+    const vn = sortedQuotes[index].venue_name;
+    const prev = index > 0 && sortedQuotes[index - 1].venue_name === vn;
+    const next = index < sortedQuotes.length - 1 && sortedQuotes[index + 1].venue_name === vn;
+    return prev || next;
   };
 
   return (
-    <div className="space-y-6 pb-24">
-      {/* Page Header */}
+    <div className="space-y-4 pb-24">
+      {/* Header */}
       <div className="animate-fade-in">
         <h1 className="text-3xl font-bold text-white mb-1">Yap</h1>
         <p className="text-white/60 text-sm">Live from the crowd — see what people are saying at venues tonight</p>
       </div>
 
-      {/* Your Venue card */}
+      {/* You're At compact bar */}
       {userVenueName && (
         <button
           onClick={() => openThread(userVenueName)}
-          className="w-full bg-gradient-to-r from-[#2d1b4e]/80 to-[#1f1338]/60 border border-[#a855f7]/20 rounded-2xl p-4 flex items-center justify-between active:bg-[#2d1b4e]/90 transition-colors animate-fade-in"
+          className="w-full flex items-center justify-between bg-[#1a0f2e]/90 border border-[#d4ff00]/30 rounded-xl px-4 py-2.5 active:bg-[#2d1b4e]/90 transition-colors animate-fade-in"
         >
-          <div className="text-left">
-            <p className="text-[#d4ff00] text-xs font-semibold uppercase tracking-wider mb-1">You're at</p>
-            <p className="text-white font-bold text-lg">{userVenueName}</p>
-            <p className="text-white/40 text-xs mt-0.5">Share what's happening</p>
-          </div>
-          <div className="bg-[#d4ff00] text-[#1a0f2e] font-bold text-sm px-4 py-2 rounded-full">
-            Post
-          </div>
+          <span className="text-white text-sm">📍 You're at <span className="font-semibold">{userVenueName}</span></span>
+          <span className="bg-[#d4ff00] text-[#1a0f2e] font-bold text-xs px-3 py-1 rounded-full">Post</span>
         </button>
       )}
 
-      {venues.length > 0 ? (
-        <>
-          {/* 🔥 Hottest Right Now — Section Heading + Featured Card */}
-          {hottestVenue && (
-            <>
-              <div className="flex items-center gap-2">
-                <h3 className="text-white font-semibold text-base">🔥 Hottest Right Now</h3>
-              </div>
-              <button
-                onClick={() => openThread(hottestVenue.venue_name)}
-                className={cn(
-                  'w-full text-left rounded-2xl p-5 relative overflow-hidden',
-                  'bg-gradient-to-br from-[#3d1f6e] via-[#2d1b4e] to-[#1a0f2e]',
-                  'border border-[#a855f7]/30',
-                  'active:scale-[0.98] transition-all duration-200',
-                  'animate-fade-in',
-                  'shadow-[0_0_30px_rgba(168,85,247,0.15)]'
-                )}
-                style={{ animationDelay: '50ms' }}
-              >
-                {/* Animated glow overlay */}
-                <div className="absolute inset-0 rounded-2xl opacity-30 pointer-events-none"
-                  style={{
-                    background: 'radial-gradient(ellipse at 30% 20%, rgba(168,85,247,0.25) 0%, transparent 60%)',
-                  }}
-                />
-                {/* Pulsing border accent */}
-                <div className="absolute left-0 top-0 bottom-0 w-[6px] rounded-l-2xl bg-gradient-to-b from-[#d4ff00] to-[#a855f7] animate-pulse" />
-
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-white font-bold text-xl">{hottestVenue.venue_name}</p>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        {(hottestVenue.venue_type || hottestVenue.venue_neighborhood) && (
-                          <span className="text-white/40 text-xs">
-                            {[hottestVenue.venue_type, hottestVenue.venue_neighborhood].filter(Boolean).join(' · ')}
-                          </span>
-                        )}
-                        <span className="text-white/40 text-xs">
-                          {hottestVenue.venue_type || hottestVenue.venue_neighborhood ? ' · ' : ''}
-                          {getActivityEmoji(hottestVenue.post_count)} {hottestVenue.post_count} {hottestVenue.post_count === 1 ? 'post' : 'posts'}
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-white/30 shrink-0" />
-                  </div>
-
-                  {/* Top quotes — speech bubble style */}
-                  {hottestVenue.top_quotes.length > 0 && (
-                    <div className="space-y-2 mt-3 pt-3 border-t border-white/10">
-                      {hottestVenue.top_quotes.map((quote, i) => (
-                        <div key={i} className="bg-white/5 rounded-xl px-3 py-2 flex items-start justify-between gap-2">
-                          <p className="text-white/80 text-sm leading-relaxed truncate">{quote.text}</p>
-                          {quote.score > 0 && (
-                            <span className="text-[#d4ff00] text-xs font-semibold shrink-0">▲ {quote.score}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </button>
-            </>
+      {/* Sort Toggles */}
+      <div className="flex gap-2 animate-fade-in">
+        <button
+          onClick={() => setSortMode('hot')}
+          className={cn(
+            'px-4 py-1.5 rounded-full text-sm font-medium border transition-colors',
+            sortMode === 'hot'
+              ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
+              : 'bg-white/5 text-white/40 border-transparent'
           )}
+        >
+          🔥 Hot
+        </button>
+        <button
+          onClick={() => setSortMode('new')}
+          className={cn(
+            'px-4 py-1.5 rounded-full text-sm font-medium border transition-colors',
+            sortMode === 'new'
+              ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
+              : 'bg-white/5 text-white/40 border-transparent'
+          )}
+        >
+          🕐 New
+        </button>
+      </div>
 
-          {/* Active Tonight */}
-          {remainingVenues.length > 0 && (
-            <>
-              <div className="flex items-center gap-2">
-                <h3 className="text-white font-semibold text-base">Active Tonight</h3>
-                <span className="text-white/30 text-xs bg-white/5 px-2 py-0.5 rounded-full">
-                  {remainingVenues.length} {remainingVenues.length === 1 ? 'venue' : 'venues'}
-                </span>
-              </div>
-              <div className="space-y-3">
-                {remainingVenues.map((venue, index) => (
+      {/* Quote Feed */}
+      {sortedQuotes.length > 0 ? (
+        <div className="space-y-2">
+          {sortedQuotes.map((quote, index) => {
+            const firstInGroup = isFirstInGroup(index);
+            const grouped = isInGroup(index);
+            const showVenueHeader = grouped && firstInGroup;
+            const showVenueLine = !grouped;
+
+            return (
+              <div key={quote.id} className="animate-fade-in" style={{ animationDelay: `${index * 40}ms` }}>
+                {/* Group venue header */}
+                {showVenueHeader && (
                   <button
-                    key={venue.venue_name}
-                    onClick={() => openThread(venue.venue_name)}
-                    className={cn(
-                      'w-full text-left rounded-2xl p-4 relative overflow-hidden',
-                      'bg-gradient-to-r from-[#2d1b4e]/80 to-[#1f1338]/60',
-                      'border border-[#a855f7]/15',
-                      getBorderWidth(venue.post_count),
-                      venue.post_count >= 5 ? 'border-l-[#d4ff00]' : 'border-l-[#a855f7]/60',
-                      'active:bg-[#2d1b4e]/90 transition-all duration-200',
-                      'hover:shadow-[0_0_20px_rgba(168,85,247,0.1)]',
-                      'animate-fade-in'
-                    )}
-                    style={{ animationDelay: `${(index + 1) * 60}ms` }}
+                    onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
+                    className="text-white/50 text-xs mb-1.5 ml-1 flex items-center gap-1 hover:text-white/70 transition-colors"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-bold text-[15px] truncate">{venue.venue_name}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {(venue.venue_type || venue.venue_neighborhood) && (
-                            <span className="text-white/35 text-xs">
-                              {[venue.venue_type, venue.venue_neighborhood].filter(Boolean).join(' · ')}
-                            </span>
-                          )}
-                          <span className="text-white/35 text-xs">
-                            {venue.venue_type || venue.venue_neighborhood ? ' · ' : ''}
-                            {getActivityEmoji(venue.post_count)} {venue.post_count} {venue.post_count === 1 ? 'post' : 'posts'}
-                          </span>
-                        </div>
-                        {venue.hottest_text && (
-                          <div className="bg-white/5 rounded-xl px-3 py-2 mt-2 flex items-start justify-between gap-2">
-                            <p className="text-white/80 text-sm leading-relaxed truncate">{venue.hottest_text}</p>
-                            {venue.hottest_score > 0 && (
-                              <span className="text-[#d4ff00] text-xs font-semibold shrink-0">▲ {venue.hottest_score}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-white/20 shrink-0" />
-                    </div>
+                    📍 {quote.venue_name}
+                    {quote.venue_neighborhood && <span>· {quote.venue_neighborhood}</span>}
                   </button>
-                ))}
+                )}
+
+                {/* Quote card */}
+                <button
+                  onClick={() => openThread(quote.venue_name)}
+                  className={cn(
+                    'w-full text-left rounded-2xl p-4 relative',
+                    'bg-gradient-to-r from-[#2d1b4e]/80 to-[#1f1338]/60',
+                    'border border-[#a855f7]/15',
+                    grouped ? 'border-l-[4px]' : 'border-l-[3px]',
+                    'border-l-[#d4ff00]',
+                    'active:bg-[#2d1b4e]/90 transition-all duration-200'
+                  )}
+                >
+                  {/* Quote text — the hero */}
+                  <p className="text-white text-[15px] font-medium leading-relaxed mb-3">
+                    "{quote.text}"
+                  </p>
+
+                  {/* Venue line (only if not in a group) */}
+                  {showVenueLine && (
+                    <p
+                      className="text-white/40 text-xs mb-2 hover:text-white/60 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
+                    >
+                      📍 {quote.venue_name}
+                      {quote.venue_neighborhood && ` · ${quote.venue_neighborhood}`}
+                    </p>
+                  )}
+
+                  {/* Bottom row: score + timestamp */}
+                  <div className="flex items-center justify-between">
+                    {quote.score > 0 ? (
+                      <span className="text-[#d4ff00] text-xs font-semibold">▲ {quote.score}</span>
+                    ) : (
+                      <span />
+                    )}
+                    <span className="text-white/30 text-xs">{relativeTime(quote.created_at)}</span>
+                  </div>
+                </button>
               </div>
-            </>
-          )}
-        </>
+            );
+          })}
+        </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-fade-in">
           <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
