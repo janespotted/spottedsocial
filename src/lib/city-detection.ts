@@ -9,15 +9,34 @@ export const CITY_CENTERS = {
 };
 
 const CITY_CACHE_KEY = 'detected_city';
+const CITY_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours in ms
 
 /**
- * Get cached city from localStorage
+ * Get cached city from localStorage (returns null if expired)
  */
 export function getCachedCity(): SupportedCity | null {
   try {
-    const cached = localStorage.getItem(CITY_CACHE_KEY);
-    if (cached === 'nyc' || cached === 'la' || cached === 'pb') {
-      return cached;
+    const raw = localStorage.getItem(CITY_CACHE_KEY);
+    if (!raw) return null;
+    
+    // Support legacy format (plain string) and new format ({city, timestamp})
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.city && parsed.timestamp) {
+        const age = Date.now() - parsed.timestamp;
+        if (age > CITY_CACHE_TTL) {
+          console.log('City cache expired after', Math.round(age / 60000), 'min');
+          return null;
+        }
+        if (parsed.city === 'nyc' || parsed.city === 'la' || parsed.city === 'pb') {
+          return parsed.city;
+        }
+      }
+    } catch {
+      // Legacy plain string format
+      if (raw === 'nyc' || raw === 'la' || raw === 'pb') {
+        return raw;
+      }
     }
   } catch (error) {
     console.error('Error reading cached city:', error);
@@ -26,12 +45,11 @@ export function getCachedCity(): SupportedCity | null {
 }
 
 /**
- * Cache detected city in localStorage
+ * Cache detected city in localStorage with timestamp
  */
 export function cacheCity(city: SupportedCity): void {
   try {
-    localStorage.setItem(CITY_CACHE_KEY, city);
-    // Dispatch event for reactive components
+    localStorage.setItem(CITY_CACHE_KEY, JSON.stringify({ city, timestamp: Date.now() }));
     window.dispatchEvent(new CustomEvent('cityChanged', { detail: { city } }));
   } catch (error) {
     console.error('Error caching city:', error);

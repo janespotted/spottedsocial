@@ -17,7 +17,6 @@ export function useUserCity() {
     const demoMode = getDemoMode();
     const cached = getCachedCity();
     if (demoMode.enabled && cached) {
-      // In demo mode, never override the cached city with GPS
       setCity(cached);
       setIsLoading(false);
       return;
@@ -29,9 +28,18 @@ export function useUserCity() {
       });
     } else {
       setIsLoading(false);
+      // Background GPS re-validation after 2s even when cache is valid
+      const timer = setTimeout(() => {
+        detectUserCity(true).then(detectedCity => {
+          if (detectedCity !== cached) {
+            console.log('Background GPS corrected city:', cached, '→', detectedCity);
+            setCity(detectedCity);
+          }
+        });
+      }, 2000);
+      return () => clearTimeout(timer);
     }
 
-    // Listen for city changes (manual override, etc.)
     const handleCityChanged = (e: Event) => {
       const customEvent = e as CustomEvent<{ city: SupportedCity | null }>;
       if (customEvent.detail.city) {
