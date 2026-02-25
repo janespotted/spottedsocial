@@ -464,21 +464,21 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         <button
           onClick={() => setSortBy('hot')}
           className={cn(
-            'px-4 py-1.5 rounded-xl text-sm font-medium border transition-colors',
+            'px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200',
             sortBy === 'hot'
-              ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
-              : 'bg-white/5 text-white/40 border-transparent'
+              ? 'bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]'
+              : 'bg-transparent border border-white/15 text-white/40 hover:text-white/60'
           )}
-        >🔥 Hot</button>
+        >Hot</button>
         <button
           onClick={() => setSortBy('new')}
           className={cn(
-            'px-4 py-1.5 rounded-xl text-sm font-medium border transition-colors',
+            'px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200',
             sortBy === 'new'
-              ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
-              : 'bg-white/5 text-white/40 border-transparent'
+              ? 'bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]'
+              : 'bg-transparent border border-white/15 text-white/40 hover:text-white/60'
           )}
-        >🕐 New</button>
+        >New</button>
       </div>
 
       {/* Post Input or Check-in Bar */}

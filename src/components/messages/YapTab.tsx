@@ -195,24 +195,24 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         <button
           onClick={() => setSortMode('hot')}
           className={cn(
-            'px-4 py-1.5 rounded-xl text-sm font-medium border transition-colors',
+            'px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200',
             sortMode === 'hot'
-              ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
-              : 'bg-white/5 text-white/40 border-transparent'
+              ? 'bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]'
+              : 'bg-transparent border border-white/15 text-white/40 hover:text-white/60'
           )}
         >
-          🔥 Hot
+          Hot
         </button>
         <button
           onClick={() => setSortMode('new')}
           className={cn(
-            'px-4 py-1.5 rounded-xl text-sm font-medium border transition-colors',
+            'px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200',
             sortMode === 'new'
-              ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
-              : 'bg-white/5 text-white/40 border-transparent'
+              ? 'bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]'
+              : 'bg-transparent border border-white/15 text-white/40 hover:text-white/60'
           )}
         >
-          🕐 New
+          New
         </button>
       </div>
 
