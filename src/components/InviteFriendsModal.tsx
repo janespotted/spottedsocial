@@ -151,7 +151,13 @@ export function InviteFriendsModal() {
           </span>
         )}
         {(friend.status === 'out' || friend.status === 'heading_out') && friend.venue_name && (
-          <span className="text-[#a855f7] text-sm flex items-center gap-1">
+          <span className="text-[#d4ff00] text-sm flex items-center gap-1">
+            <MapPin className="h-3 w-3" />
+            At {friend.venue_name}
+          </span>
+        )}
+        {friend.status !== 'planning' && friend.status !== 'out' && friend.status !== 'heading_out' && friend.venue_name && (
+          <span className="text-white/50 text-sm flex items-center gap-1">
             <MapPin className="h-3 w-3" />
             At {friend.venue_name}
           </span>
