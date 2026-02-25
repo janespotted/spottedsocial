@@ -825,8 +825,8 @@ export function VenueIdCard() {
 
               {/* Yap Preview */}
               <button
-                onClick={() => navigate('/messages', { state: { activeTab: 'yap', venueName: venue.name } })}
-                className="w-full py-3 px-1 border-t border-white/10 flex items-center gap-2 text-left hover:bg-white/5 transition-colors"
+                onClick={() => { closeVenueCard(); navigate('/messages', { state: { activeTab: 'yap', venueName: venue.name } }); }}
+                className="w-full py-3 px-1 border-t border-white/10 flex items-center gap-2 text-left hover:bg-white/5 active:bg-white/10 transition-colors"
               >
                 <span className="text-[#d4ff00] font-semibold text-sm">Yap</span>
                 <span className="text-white/60 text-sm">·</span>
@@ -839,7 +839,7 @@ export function VenueIdCard() {
                     <span className="text-white/50 text-xs whitespace-nowrap">{hotYap.score} ↑</span>
                   </>
                 )}
-                <ChevronRight className="w-4 h-4 text-white/30 flex-shrink-0" />
+                <ChevronRight className="w-4 h-4 text-white/50 flex-shrink-0" />
               </button>
 
               {/* More Info - Single collapsible, closed by default */}
