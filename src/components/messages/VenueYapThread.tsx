@@ -412,6 +412,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
   };
 
   const handlePostComment = async (yapId: string) => {
+    if (!canPost) return;
     if (!requireAuth()) return;
     if (!newComment[yapId]?.trim()) return;
     const validation = validateYapCommentText(newComment[yapId]);
@@ -608,20 +609,27 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
                           </div>
                         </div>
                       ))}
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newComment[msg.id] || ''}
-                          onChange={(e) => setNewComment(prev => ({ ...prev, [msg.id]: e.target.value }))}
-                          onFocus={() => { if (!user) setShowLoginPrompt(true); }}
-                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostComment(msg.id); } }}
-                          placeholder="Add a comment..."
-                          className="flex-1 bg-[#1a0f2e] border border-[#a855f7]/20 rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-[#a855f7]"
-                        />
-                        <Button onClick={() => handlePostComment(msg.id)} disabled={!newComment[msg.id]?.trim()} size="sm" className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white">
-                          <Send className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      {canPost ? (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newComment[msg.id] || ''}
+                            onChange={(e) => setNewComment(prev => ({ ...prev, [msg.id]: e.target.value }))}
+                            onFocus={() => { if (!user) setShowLoginPrompt(true); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostComment(msg.id); } }}
+                            placeholder="Add a comment..."
+                            className="flex-1 bg-white/[0.04] border border-[#a855f7]/20 rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-[#a855f7]"
+                          />
+                          <Button onClick={() => handlePostComment(msg.id)} disabled={!newComment[msg.id]?.trim()} size="sm" className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white">
+                            <Send className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 bg-white/[0.04] rounded-lg px-3 py-2">
+                          <MapPin className="h-4 w-4 text-[#d4ff00] shrink-0" />
+                          <span className="text-white/50 text-sm">📍 Head here to comment</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
