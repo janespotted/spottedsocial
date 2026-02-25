@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageCircle, ChevronUp, ChevronDown, Send } from 'lucide-react';
+import { MessageCircle, ChevronUp, ChevronDown, Send, Image, X, Play } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,8 @@ interface YapMessage {
   is_anonymous: boolean;
   venue_name: string;
   author_handle: string | null;
+  image_url: string | null;
+  media_type: string | null;
   profiles: {
     display_name: string;
     avatar_url: string | null;
@@ -62,6 +64,10 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Use prop if provided, otherwise fetch from user's night_status
   useEffect(() => {
@@ -248,14 +254,70 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
     ));
   };
 
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) {
+      toast.error('Only images and videos are supported');
+      return;
+    }
+
+    // Validate file size (10MB for images, 50MB for videos)
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error(`File too large. Max ${isVideo ? '50MB' : '10MB'}`);
+      return;
+    }
+
+    setMediaFile(file);
+    setMediaPreview(URL.createObjectURL(file));
+  };
+
+  const clearMedia = () => {
+    setMediaFile(null);
+    if (mediaPreview) {
+      URL.revokeObjectURL(mediaPreview);
+      setMediaPreview(null);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const uploadMedia = async (file: File): Promise<{ url: string; type: string } | null> => {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const filePath = `${user!.id}/${Date.now()}.${ext}`;
+    const mediaType = file.type.startsWith('video/') ? 'video' : 'image';
+
+    const { error } = await supabase.storage
+      .from('yap-media')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('yap-media')
+      .getPublicUrl(filePath);
+
+    return { url: publicUrl, type: mediaType };
+  };
+
   const handlePostYap = async () => {
     if (!requireAuth()) return;
-    if (!newYap.trim() || !selectedVenue) return;
+    if (!newYap.trim() && !mediaFile) return;
+    if (!selectedVenue) return;
 
-    const validation = validateYapText(newYap);
-    if (!validation.success) {
-      toast.error(validation.error || 'Invalid message');
-      return;
+    if (newYap.trim()) {
+      const validation = validateYapText(newYap);
+      if (!validation.success) {
+        toast.error(validation.error || 'Invalid message');
+        return;
+      }
     }
 
     const allowed = await checkAndRecordRateLimit('yap_message');
@@ -276,22 +338,41 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         expiry.setDate(expiry.getDate() + 1);
       }
 
+      let mediaUrl: string | null = null;
+      let mediaType: string | null = null;
+
+      if (mediaFile) {
+        setIsUploading(true);
+        const result = await uploadMedia(mediaFile);
+        setIsUploading(false);
+        if (!result) {
+          toast.error('Failed to upload media');
+          setIsPosting(false);
+          return;
+        }
+        mediaUrl = result.url;
+        mediaType = result.type;
+      }
+
       const { error } = await supabase
         .from('yap_messages')
         .insert({
           user_id: user!.id,
-          text: validation.data!,
+          text: newYap.trim() || (mediaType === 'video' ? '📹' : '📸'),
           venue_name: selectedVenue,
           is_anonymous: true,
           author_handle: handle,
           score: 0,
           comments_count: 0,
           expires_at: expiry.toISOString(),
+          image_url: mediaUrl,
+          media_type: mediaType,
         });
 
       if (error) throw error;
 
       setNewYap('');
+      clearMedia();
       toast.success('Yap posted!');
       fetchYapMessages();
     } catch (error) {
@@ -510,15 +591,60 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
               rows={3}
               maxLength={280}
             />
+
+            {/* Media Preview */}
+            {mediaPreview && (
+              <div className="relative mt-2 inline-block">
+                {mediaFile?.type.startsWith('video/') ? (
+                  <video
+                    src={mediaPreview}
+                    className="max-h-40 rounded-lg border border-[#a855f7]/20"
+                    muted
+                  />
+                ) : (
+                  <img
+                    src={mediaPreview}
+                    alt="Preview"
+                    className="max-h-40 rounded-lg border border-[#a855f7]/20"
+                  />
+                )}
+                <button
+                  onClick={clearMedia}
+                  className="absolute -top-2 -right-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-full p-1"
+                >
+                  <X className="h-3 w-3 text-white" />
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center justify-between mt-2">
-              <span className="text-white/40 text-sm">{newYap.length}/280</span>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={handleMediaSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => {
+                    if (!requireAuth()) return;
+                    fileInputRef.current?.click();
+                  }}
+                  className="text-white/40 hover:text-[#d4ff00] transition-colors"
+                  title="Add photo or video"
+                >
+                  <Image className="h-5 w-5" />
+                </button>
+                <span className="text-white/40 text-sm">{newYap.length}/280</span>
+              </div>
               <Button
                 onClick={handlePostYap}
-                disabled={!newYap.trim() || isPosting}
+                disabled={(!newYap.trim() && !mediaFile) || isPosting || isUploading}
                 className="bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
               >
                 <Send className="h-4 w-4 mr-2" />
-                Post
+                {isUploading ? 'Uploading...' : 'Post'}
               </Button>
             </div>
           </div>
@@ -540,6 +666,27 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                       <span className="text-white/40 text-sm">{getTimeAgo(msg.created_at)}</span>
                     </div>
                     <p className="text-white/90 mt-1 text-[15px]">{msg.text}</p>
+
+                    {/* Media Display */}
+                    {msg.image_url && (
+                      <div className="mt-2">
+                        {msg.media_type === 'video' ? (
+                          <video
+                            src={msg.image_url}
+                            controls
+                            className="max-h-64 w-full rounded-lg object-cover border border-[#a855f7]/20"
+                            preload="metadata"
+                          />
+                        ) : (
+                          <img
+                            src={msg.image_url}
+                            alt="Yap media"
+                            className="max-h-64 w-full rounded-lg object-cover border border-[#a855f7]/20"
+                            loading="lazy"
+                          />
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-center gap-4 mt-2">
                       <button
                         onClick={() => handleToggleComments(msg.id)}
