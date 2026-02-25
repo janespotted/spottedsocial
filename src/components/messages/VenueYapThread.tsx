@@ -555,7 +555,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
           }
 
           return (
-            <div key={msg.id} className={cn("bg-white/[0.06] backdrop-blur-sm border border-[#a855f7]/20 rounded-2xl p-4 border-l-[3px] border-l-[#d4ff00]", isBuried && isRevealed && "opacity-60")}>
+            <div key={msg.id} className={cn("bg-white/[0.06] backdrop-blur-sm rounded-2xl p-4", isBuried && isRevealed && "opacity-60")}>
               <div className="flex gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
