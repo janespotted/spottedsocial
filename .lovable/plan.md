@@ -1,98 +1,44 @@
 
 
-# Yap Tab — Quote-First Feed Redesign
+# Polish Yap Feed Cards + Yap Thread Visual Consistency
 
-## Overview
-Replace the current venue-centric directory (Hottest Right Now card + Active Tonight list) with a single continuous quote-first feed. Each item is a Yap quote card with venue attribution as secondary context. The feed mixes posts from all venues, sorted by Hot or New.
+Two areas to address: the three specific tweaks to the Yap feed cards, and improving the Yap thread (VenueYapThread) to match the app's visual style better.
 
-## Changes — Single File: `src/components/messages/YapTab.tsx`
+## File 1: `src/components/messages/YapTab.tsx`
 
-### Data Model Change
-Currently, the `fetchDirectory` function groups yap_messages by venue and builds `VenueYapSummary[]`. The new approach fetches individual yap messages directly instead of grouping.
+### 1. Remove Quotation Marks
+Line 255: Change `"{quote.text}"` to `{quote.text}` — remove the wrapping quote characters.
 
-**New query**: Fetch all non-expired, non-private-party yap_messages with their venue metadata:
-```typescript
-// Fetch individual yaps, not venue summaries
-const yapQuery = supabase
-  .from('yap_messages')
-  .select('id, text, score, venue_name, created_at')
-  .gt('expires_at', new Date().toISOString())
-  .eq('is_private_party', false);
-```
-Then join with `venues` table for neighborhood/type metadata (same pattern as current code — fetch venue names, batch lookup).
+### 2. Bold Venue Name
+Lines 236-237 (group header) and 264-265 (inline venue line): Split the venue name and neighborhood into separate spans. Venue name gets `font-semibold text-white/70`, neighborhood stays `text-white/40`.
 
-### New State
-- Replace `venues: VenueYapSummary[]` with `quotes: YapQuote[]` where `YapQuote = { id, text, score, venue_name, venue_neighborhood, venue_type, created_at }`
-- Add `sortMode: 'hot' | 'new'` state (default `'hot'`)
-- Sorting: `'hot'` sorts by `score` descending, `'new'` sorts by `created_at` descending
+### 3. Dynamic Left Border Thickness
+Lines 248-249: Replace the static `border-l-[3px]` / `border-l-[4px]` with a computed thickness based on `quote.score`. Logic:
+- score <= 0: `border-l-[2px]`
+- score 1-10: `border-l-[3px]`
+- score 11-30: `border-l-[4px]`
+- score 31+: `border-l-[5px]`
+For grouped cards, add 1px to each tier.
 
-### UI Structure (top to bottom)
+## File 2: `src/components/messages/VenueYapThread.tsx`
 
-1. **Header** (unchanged)
-   - "Yap" title + subtitle — keep exactly as-is
+### Visual Polish to Match App Style
+The thread view currently looks functional but "cheap" compared to the rest of the app. Changes:
 
-2. **"You're At" Compact Bar** (if user is at a venue)
-   - Replace the current large card with a slim horizontal bar
-   - Dark background `bg-[#1a0f2e]/90` with `border border-[#d4ff00]/30`
-   - Left: `📍 You're at [Venue]` in small white text
-   - Right: compact "Post" pill button in `bg-[#d4ff00] text-[#1a0f2e]`
-   - Height ~44px, rounded-xl, pinned above sort toggles
+**Venue header** (line 455): Change from `text-[#d4ff00]` to `text-white` with a subtle venue type badge, and add a small `text-white/50` subtitle line.
 
-3. **Sort Toggles**
-   - Two pill buttons: "🔥 Hot" (default) and "🕐 New"
-   - Active pill: `bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30`
-   - Inactive pill: `bg-white/5 text-white/40`
-   - Horizontal flex row with gap-2
+**Sort tabs** (lines 459-474): Restyle to match the Yap feed's pill toggles — smaller, `rounded-full`, with the same active/inactive colors (`bg-[#d4ff00]/20 text-[#d4ff00]` active, `bg-white/5 text-white/40` inactive). Currently they're large bordered buttons that look inconsistent.
 
-4. **Quote Feed** — the main content
-   - Each quote card layout:
-     ```
-     ┌──────────────────────────────────┐
-     │ [left border accent]             │
-     │  "Quote text here, large and     │
-     │   bold, this is the hero..."     │
-     │                                  │
-     │  📍 Venue Name · Neighborhood    │
-     │  ▲ 72                      1h   │
-     └──────────────────────────────────┘
-     ```
-   - Card: `bg-gradient-to-r from-[#2d1b4e]/80 to-[#1f1338]/60`, `border border-[#a855f7]/15`, `border-l-[3px] border-l-[#d4ff00]`
-   - Quote text: `text-white text-[15px] font-medium leading-relaxed` — the primary visual element
-   - Venue line: `text-white/40 text-xs` with `📍` prefix, venue name tappable (stops propagation, opens thread)
-   - Bottom row: upvote `▲ {score}` in `text-[#d4ff00] text-xs font-semibold` on left, relative timestamp in `text-white/30 text-xs` on right
-   - Tapping card opens that venue's thread
+**Message cards** (line 550): Add a subtle left border accent `border-l-[3px] border-l-[#d4ff00]` to each message card to match the feed cards. Keep the existing background and padding.
 
-5. **Venue Grouping** (consecutive same-venue quotes)
-   - When rendering, detect consecutive quotes from the same venue
-   - First card in a group gets a small venue header above it: `📍 Venue Name · Neighborhood` in `text-white/50 text-xs`
-   - Subsequent cards in the same group omit the venue line (since the group header covers it)
-   - The group shares a continuous left border with slightly thicker width `border-l-[4px]`
+**Post input area** (lines 478-517): No changes needed — already styled correctly.
 
-6. **Empty State** — unchanged
+**"Head here to post" bar** (lines 518-531): No changes needed.
 
-### What Stays the Same
-- `VenueYapThread` component and navigation into threads
-- The `view === 'thread'` branch — untouched
-- Loading skeleton — minor tweak to show quote-shaped cards instead of venue cards
-- `openThread` / `goBackToDirectory` functions
-- All data filtering (demo mode, private party exclusion)
+### Summary
 
-### Timestamp Formatting
-Add a small helper for relative time (e.g., "1h", "23m", "3h"):
-```typescript
-const relativeTime = (dateStr: string) => {
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  return `${hours}h`;
-};
-```
-
-### Technical Notes
-- No database changes needed — all data already exists in `yap_messages`
-- No new dependencies
-- Single file edit: `src/components/messages/YapTab.tsx`
-- The `VenueYapThread` is opened the same way — `openThread(venueName)` — no changes to thread navigation
+| File | Changes |
+|------|---------|
+| `src/components/messages/YapTab.tsx` | Remove quotes, bold venue name, dynamic border thickness |
+| `src/components/messages/VenueYapThread.tsx` | Restyle sort tabs to match feed pills, add left border accent to message cards, refine venue header |
 
