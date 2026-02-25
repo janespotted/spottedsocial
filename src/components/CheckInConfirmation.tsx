@@ -178,7 +178,7 @@ export function CheckInConfirmation() {
             </div>
 
             {/* Center Content */}
-            <div className="flex flex-col items-center text-center mt-4 mb-6">
+            <div className="flex flex-col items-center text-center mt-12 mb-6">
               {/* Text */}
               <h2 className="text-2xl font-bold text-white mb-2">
                 What's {checkInVenueName} like tonight?
