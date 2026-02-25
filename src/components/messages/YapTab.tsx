@@ -231,10 +231,10 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                 {showVenueHeader && (
                   <button
                     onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
-                    className="text-white/50 text-xs mb-1.5 ml-1 flex items-center gap-1 hover:text-white/70 transition-colors"
+                    className="text-xs mb-1.5 ml-1 flex items-center gap-1 hover:text-white/70 transition-colors"
                   >
-                    📍 {quote.venue_name}
-                    {quote.venue_neighborhood && <span>· {quote.venue_neighborhood}</span>}
+                    📍 <span className="font-semibold text-white/70">{quote.venue_name}</span>
+                    {quote.venue_neighborhood && <span className="text-white/40">· {quote.venue_neighborhood}</span>}
                   </button>
                 )}
 
@@ -245,24 +245,27 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                     'w-full text-left rounded-2xl p-4 relative',
                     'bg-gradient-to-r from-[#2d1b4e]/80 to-[#1f1338]/60',
                     'border border-[#a855f7]/15',
-                    grouped ? 'border-l-[4px]' : 'border-l-[3px]',
+                    quote.score > 30 ? (grouped ? 'border-l-[6px]' : 'border-l-[5px]')
+                      : quote.score > 10 ? (grouped ? 'border-l-[5px]' : 'border-l-[4px]')
+                      : quote.score > 0 ? (grouped ? 'border-l-[4px]' : 'border-l-[3px]')
+                      : (grouped ? 'border-l-[3px]' : 'border-l-[2px]'),
                     'border-l-[#d4ff00]',
                     'active:bg-[#2d1b4e]/90 transition-all duration-200'
                   )}
                 >
                   {/* Quote text — the hero */}
                   <p className="text-white text-[15px] font-medium leading-relaxed mb-3">
-                    "{quote.text}"
+                    {quote.text}
                   </p>
 
                   {/* Venue line (only if not in a group) */}
                   {showVenueLine && (
                     <p
-                      className="text-white/40 text-xs mb-2 hover:text-white/60 transition-colors"
+                      className="text-xs mb-2 hover:text-white/60 transition-colors"
                       onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
                     >
-                      📍 {quote.venue_name}
-                      {quote.venue_neighborhood && ` · ${quote.venue_neighborhood}`}
+                      📍 <span className="font-semibold text-white/70">{quote.venue_name}</span>
+                      {quote.venue_neighborhood && <span className="text-white/40"> · {quote.venue_neighborhood}</span>}
                     </p>
                   )}
 

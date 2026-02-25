@@ -452,25 +452,32 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         <button onClick={onBack} className="text-white/60 hover:text-white transition-colors p-1">
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h2 className="text-2xl font-bold text-[#d4ff00]">@{venueName}</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-white">{venueName}</h2>
+          <p className="text-white/50 text-xs">Live from the crowd</p>
+        </div>
       </div>
 
       {/* Sort Tabs */}
-      <div className="flex items-center justify-center gap-2">
-        <button
-          onClick={() => setSortBy('new')}
-          className={cn(
-            'px-8 py-2 rounded-full border-2 transition-colors font-semibold',
-            sortBy === 'new' ? 'border-[#d4ff00] text-[#d4ff00] bg-[#d4ff00]/10' : 'border-white/20 text-white/60'
-          )}
-        >New</button>
+      <div className="flex items-center gap-2">
         <button
           onClick={() => setSortBy('hot')}
           className={cn(
-            'px-8 py-2 rounded-full border-2 transition-colors font-semibold',
-            sortBy === 'hot' ? 'border-white text-white bg-white/10' : 'border-white/20 text-white/60'
+            'px-4 py-1.5 rounded-full text-sm font-medium border transition-colors',
+            sortBy === 'hot'
+              ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
+              : 'bg-white/5 text-white/40 border-transparent'
           )}
-        >Hot</button>
+        >🔥 Hot</button>
+        <button
+          onClick={() => setSortBy('new')}
+          className={cn(
+            'px-4 py-1.5 rounded-full text-sm font-medium border transition-colors',
+            sortBy === 'new'
+              ? 'bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30'
+              : 'bg-white/5 text-white/40 border-transparent'
+          )}
+        >🕐 New</button>
       </div>
 
       {/* Post Input or Check-in Bar */}
@@ -547,7 +554,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
           }
 
           return (
-            <div key={msg.id} className={cn("bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4", isBuried && isRevealed && "opacity-60")}>
+            <div key={msg.id} className={cn("bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 border-l-[3px] border-l-[#d4ff00]", isBuried && isRevealed && "opacity-60")}>
               <div className="flex gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
