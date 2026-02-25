@@ -1,51 +1,53 @@
 
 
-# Fix: City Detection + Private Party Neighborhood Flow
+# Fix Yap Tab — Show Active Venue Boards
 
-## Root Cause Analysis
+## Root Cause
 
-Two related bugs, one root cause: **stale city cache**.
+The Yap tab directory query (line 61 of `YapTab.tsx`) always filters `.eq('is_demo', false)`. However, all 10 active yap posts in the database have `is_demo = true`. The VenueYapThread component correctly handles this by checking `useDemoMode()` and conditionally including demo data, but the directory view does not.
 
-### Bug 1: Map shows NYC when user is in LA
-The `useUserCity` hook initializes from `localStorage` cache (`detected_city`). If the user was previously in NYC, the cache says `nyc` and the hook never re-detects because `detectUserCity()` returns early when a cache exists. The map initializes centered on NYC because `city === 'nyc'` at render time.
+There are 8 venues with active yap posts right now (Academy LA, Sound Nightclub, EP & LP, The Dresden, The Bungalow, Akbar, Tenants of the Trees, Highland Park Bowl) — all being hidden by the `is_demo` filter.
 
-The city cache has **no TTL** — once set, it persists forever. A user who travels from NYC to LA will always see the NYC map until they manually clear the cache (which no user would know to do).
+## Changes
 
-### Bug 2: Private party said NYC, didn't properly ask neighborhood  
-The private party flow calls `refreshCity()` which *does* force GPS re-detection. However:
-- The `refreshCity()` call updates state asynchronously, but the map was already initialized with the wrong city
-- The neighborhood detection via `detectNeighborhoodFromGPS` uses `find_nearest_venue` RPC with a 50km radius and **no city filter** on the `venues` table — but this is actually fine geographically since LA venues are 2,500 miles from NYC
-- The real problem: the map already showed NYC, and the `CITY_NEIGHBORHOODS[city]` dropdown used the stale `city` value for the neighborhood list, potentially showing NYC neighborhoods instead of LA ones
+### 1. `src/components/messages/YapTab.tsx` — Fix demo data filtering + add hottest score display
 
-## Fix Plan
+- Import and use `useDemoMode` hook (matching what `VenueYapThread` does)
+- When demo mode is enabled, remove the `is_demo = false` filter from the yap_messages query
+- When demo mode is disabled, keep the existing filter
+- Add `hottest_score` to the `VenueYapSummary` interface and display it alongside the hottest post preview
+- Update the "Your spot" card text to show post count
 
-### 1. Add TTL to city cache (`src/lib/city-detection.ts`)
-- Store `{ city, timestamp }` instead of just the city string in localStorage
-- Add a `CITY_CACHE_TTL` of 4 hours (14,400,000ms)
-- In `getCachedCity()`, check if the cached value is within TTL. If expired, return `null` so GPS re-detection triggers
-- Update `cacheCity()` to store the timestamp alongside the city
+### 2. `src/components/messages/VenueYapThread.tsx` — Language fix
 
-### 2. Force GPS city detection on app open (`src/hooks/useUserCity.ts`)
-- On mount, even if a cache exists, always trigger a background GPS re-detection after a short delay (2 seconds)
-- If the GPS-detected city differs from the cached city, update both the state and cache, which will trigger the map's `city` dependency to re-center
-- This ensures the map corrects itself within seconds of opening, even if the initial render used a stale cache
+- Change "📍 Be here to post" (line 504) to "📍 Head here to post" per the user's request
 
-### 3. Re-center map when city changes (already works)
-The map already has a `useEffect([city])` that calls `flyTo` when the city changes (line 626-635). Once the hook updates the city from background GPS, the map will automatically re-center to LA.
+## Technical Detail
 
-### 4. Ensure private party flow uses fresh city for neighborhoods
-In `handlePrivatePartyPrivacyConfirm` (CheckInModal.tsx line 272), `refreshCity()` already returns the detected city and passes it to `detectNeighborhoodFromGPS(detectedCity)`. This part is correct. The neighborhood dropdown at line 1159 uses `CITY_NEIGHBORHOODS[city]` where `city` comes from `useUserCity()` — once the TTL fix ensures the hook re-detects, this will show the correct neighborhoods.
+The query change is minimal. Current code:
+```typescript
+supabase.from('yap_messages')
+  .select('venue_name, score, text')
+  .gt('expires_at', new Date().toISOString())
+  .eq('is_demo', false)
+```
+
+Fixed code conditionally applies the demo filter:
+```typescript
+let yapQuery = supabase.from('yap_messages')
+  .select('venue_name, score, text')
+  .gt('expires_at', new Date().toISOString());
+
+if (!demoEnabled) {
+  yapQuery = yapQuery.eq('is_demo', false);
+}
+```
+
+This matches the exact pattern used in `VenueYapThread.tsx` lines 140-144.
 
 ## Files Modified
-
 | File | Change |
 |------|--------|
-| `src/lib/city-detection.ts` | Add TTL (4 hours) to city cache: store `{city, timestamp}`, expire stale entries |
-| `src/hooks/useUserCity.ts` | Add background GPS re-validation on mount even when cache exists |
-
-## What Stays Untouched
-- Map initialization and flyTo logic (already handles city changes reactively)
-- Private party flow (already calls `refreshCity()` correctly)
-- Venue detection RPCs (geographically correct, don't need city filter)
-- All other city-related logic
+| `src/components/messages/YapTab.tsx` | Add `useDemoMode`, fix demo data filter, add score display |
+| `src/components/messages/VenueYapThread.tsx` | Change "Be here to post" → "Head here to post" |
 
