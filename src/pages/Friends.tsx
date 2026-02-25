@@ -476,7 +476,7 @@ export default function Friends() {
               onClick={openCheckIn}
               className="hover:scale-110 transition-transform"
             >
-              <img src={spottedLogo} alt="Check In" className="h-10 w-10 object-contain" />
+              <img src={spottedLogo} alt="Go live" className="h-10 w-10 object-contain" />
             </button>
           </div>
         </header>

@@ -501,11 +501,11 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
             <TooltipTrigger asChild>
               <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl px-4 py-3 flex items-center gap-3 cursor-default">
                 <MapPin className="h-5 w-5 text-[#d4ff00] shrink-0" />
-                <span className="text-white/70 text-sm font-medium">Check in here to post</span>
+                <span className="text-white/70 text-sm font-medium">📍 Be here to post</span>
               </div>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-[260px] bg-[#1a0f2e] border-[#a855f7]/30 text-white text-xs">
-              You can only post on a venue's Yap when you're there. Head over and check in to join the conversation.
+              You can only post on a venue's Yap when you're there. Head over and go live to join the conversation.
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

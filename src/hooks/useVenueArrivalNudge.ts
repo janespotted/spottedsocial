@@ -32,13 +32,22 @@ interface VenueLocation {
 
 let knownVenues: Map<string, VenueLocation> = new Map();
 
-export function useVenueArrivalNudge() {
+export interface VenueShiftData {
+  venue: { id: string; name: string };
+  lat: number;
+  lng: number;
+  hasMultipleNearby: boolean;
+}
+
+export function useVenueArrivalNudge(onVenueShiftDetected?: (data: VenueShiftData) => void) {
   const { user } = useAuth();
   const { showVenueArrival, setDetectedVenue, setNearbyVenues } = useCheckIn();
   const { isInputFocused } = useInputFocus();
   const hasCheckedRef = useRef(false);
   const [isOutStatus, setIsOutStatus] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const onVenueShiftRef = useRef(onVenueShiftDetected);
+  onVenueShiftRef.current = onVenueShiftDetected;
 
   // Create modal delivery handler
   const deliveryHandler = createModalDelivery(setDetectedVenue, showVenueArrival);
@@ -210,17 +219,25 @@ export function useVenueArrivalNudge() {
       updatePreviousVenue(nearestVenue.id);
 
       if (decision.deliveryMethod === 'toast') {
-        // Auto-update venue for "out" users - no confirmation needed
+        // For "out" users near a new venue — expose via callback for banner UI
         markToastShown(nearestVenue.id);
         
-        // Update venue automatically
-        await silentVenueUpdate(user.id, nearestVenue, location.lat, location.lng);
-        
-        // Show brief informational notification (auto-dismisses)
-        toast(`📍 Now at ${nearestVenue.name}`, {
-          duration: 3000,
-          position: 'bottom-center',
-        });
+        if (onVenueShiftRef.current) {
+          // Let the UI show a banner instead of auto-updating
+          onVenueShiftRef.current({
+            venue: { id: nearestVenue.id, name: nearestVenue.name },
+            lat: location.lat,
+            lng: location.lng,
+            hasMultipleNearby: allNearbyVenues.length > 1,
+          });
+        } else {
+          // Fallback: auto-update silently (original behavior)
+          await silentVenueUpdate(user.id, nearestVenue, location.lat, location.lng);
+          toast(`📍 Now at ${nearestVenue.name}`, {
+            duration: 3000,
+            position: 'bottom-center',
+          });
+        }
       } else {
         // Modal flow for planning/no-status users
         if (isVenueDismissed(nearestVenue.id)) {

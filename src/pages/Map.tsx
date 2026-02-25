@@ -28,6 +28,10 @@ import { CityBadge } from '@/components/CityBadge';
 import { logger } from '@/lib/logger';
 import { escapeHtml, escapeUrl } from '@/lib/html-escape';
 import { QuickStatusSheet } from '@/components/QuickStatusSheet';
+import { UpdateSpotSheet } from '@/components/UpdateSpotSheet';
+import { VenueMoveBanner } from '@/components/VenueMoveBanner';
+import { PlanningReadyBanner } from '@/components/PlanningReadyBanner';
+import { useVenueArrivalNudge, type VenueShiftData } from '@/hooks/useVenueArrivalNudge';
 
 interface FriendLocation {
   user_id: string;
@@ -64,6 +68,16 @@ export default function Map() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
+  
+  // Venue arrival nudge with shift detection callback
+  const handleVenueShift = useCallback((data: VenueShiftData) => {
+    if (!venueMoveDismissedRef.current) {
+      setVenueShiftData(data);
+      setShowVenueMoveBanner(true);
+    }
+  }, []);
+  useVenueArrivalNudge(handleVenueShift);
+  
   useAutoVenueTracking(); // Trigger auto-venue tracking on map view
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -99,6 +113,7 @@ export default function Map() {
   
   // Status pill & quick-switch state
   const [showQuickStatus, setShowQuickStatus] = useState(false);
+  const [showUpdateSpot, setShowUpdateSpot] = useState(false);
   const [currentUserStatus, setCurrentUserStatus] = useState<string | null>(null);
   const [currentUserVenue, setCurrentUserVenue] = useState<string | null>(null);
   
@@ -106,6 +121,15 @@ export default function Map() {
   const [smartPromptVenue, setSmartPromptVenue] = useState<{ id: string; name: string; lat: number; lng: number } | null>(null);
   const [showSmartPrompt, setShowSmartPrompt] = useState(false);
   const smartPromptDismissedRef = useRef<Set<string>>(new Set());
+  
+  // Venue move banner state
+  const [venueShiftData, setVenueShiftData] = useState<VenueShiftData | null>(null);
+  const [showVenueMoveBanner, setShowVenueMoveBanner] = useState(false);
+  const venueMoveDismissedRef = useRef(false);
+  
+  // Planning ready banner — once per session
+  const [showPlanningReady, setShowPlanningReady] = useState(false);
+  const planningReadyShownRef = useRef(false);
   
   // Use ref for city to prevent callback recreation
   const cityRef = useRef(city);
@@ -236,6 +260,12 @@ export default function Map() {
 
       setCurrentUserStatus(nightStatus?.status || null);
       setCurrentUserVenue(nightStatus?.venue_name || null);
+
+      // Show planning-ready banner once per session
+      if (nightStatus?.status === 'planning' && !planningReadyShownRef.current) {
+        planningReadyShownRef.current = true;
+        setShowPlanningReady(true);
+      }
 
       // Smart prompt: if planning, check if near a venue
       if (nightStatus?.status === 'planning' && 'geolocation' in navigator) {
@@ -1219,7 +1249,7 @@ export default function Map() {
             onClick={openCheckIn} 
             className="hover:scale-110 transition-transform"
           >
-            <img src={spottedLogo} alt="Check In" className="h-10 w-10 object-contain" />
+            <img src={spottedLogo} alt="Go live" className="h-10 w-10 object-contain" />
           </button>
         </div>
       </div>
@@ -1279,14 +1309,80 @@ export default function Map() {
         </div>
       )}
 
+      {/* Banners area (venue move + planning ready) */}
+      {!focusMode && (showVenueMoveBanner || showPlanningReady) && (
+        <div
+          className="absolute left-4 right-4 z-[202] space-y-2"
+          style={{ top: showSmartPrompt && smartPromptVenue ? 'calc(12rem + env(safe-area-inset-top, 0px))' : 'calc(8.5rem + env(safe-area-inset-top, 0px))' }}
+        >
+          {showVenueMoveBanner && venueShiftData && (
+            <VenueMoveBanner
+              venue={venueShiftData.venue}
+              hasMultipleNearby={venueShiftData.hasMultipleNearby}
+              onAccept={async () => {
+                if (!user) return;
+                setShowVenueMoveBanner(false);
+                const now = new Date().toISOString();
+                // Instant one-tap update
+                await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
+                await supabase.from('checkins').insert({
+                  user_id: user.id,
+                  venue_id: venueShiftData.venue.id,
+                  venue_name: venueShiftData.venue.name,
+                  lat: venueShiftData.lat,
+                  lng: venueShiftData.lng,
+                  started_at: now,
+                });
+                await supabase.from('night_statuses').update({
+                  venue_id: venueShiftData.venue.id,
+                  venue_name: venueShiftData.venue.name,
+                  lat: venueShiftData.lat,
+                  lng: venueShiftData.lng,
+                  updated_at: now,
+                }).eq('user_id', user.id);
+                await supabase.from('profiles').update({
+                  last_known_lat: venueShiftData.lat,
+                  last_known_lng: venueShiftData.lng,
+                  last_location_at: now,
+                }).eq('id', user.id);
+                toast({ title: `📍 Now at ${venueShiftData.venue.name}` });
+                fetchFriendsLocations();
+              }}
+              onDismiss={() => {
+                setShowVenueMoveBanner(false);
+                venueMoveDismissedRef.current = true;
+              }}
+              onSomewhereElse={() => {
+                setShowVenueMoveBanner(false);
+                setShowUpdateSpot(true);
+              }}
+            />
+          )}
+          {showPlanningReady && currentUserStatus === 'planning' && (
+            <PlanningReadyBanner
+              onGoOut={() => {
+                setShowPlanningReady(false);
+                openCheckIn();
+              }}
+              onDismiss={() => setShowPlanningReady(false)}
+            />
+          )}
+        </div>
+      )}
+
       {/* Status Pill + Stop Sharing */}
       {currentUserStatus && !focusMode && (
         <div
           className="absolute left-4 z-[199] flex items-center gap-2 transition-opacity duration-300"
-          style={{ top: showSmartPrompt && smartPromptVenue ? 'calc(12rem + env(safe-area-inset-top, 0px))' : 'calc(8.5rem + env(safe-area-inset-top, 0px))' }}
+          style={{ top: (() => {
+            let base = 8.5;
+            if (showSmartPrompt && smartPromptVenue) base = 12;
+            if (showVenueMoveBanner || showPlanningReady) base += 3.5;
+            return `calc(${base}rem + env(safe-area-inset-top, 0px))`;
+          })() }}
         >
           <button
-            onClick={() => setShowQuickStatus(true)}
+            onClick={() => currentUserStatus === 'out' ? setShowUpdateSpot(true) : setShowQuickStatus(true)}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full backdrop-blur-md border transition-all hover:scale-105 bg-black/40 border-white/10 ${
               currentUserStatus === 'out'
                 ? 'text-[#d4ff00]'
@@ -1348,17 +1444,24 @@ export default function Map() {
         </div>
       )}
 
-      {/* Quick Status Sheet */}
+      {/* Quick Status Sheet (for non-out statuses) */}
       <QuickStatusSheet
         open={showQuickStatus}
         onOpenChange={(open) => {
           setShowQuickStatus(open);
-          if (!open) {
-            // Refresh status after closing
-            fetchFriendsLocations();
-          }
+          if (!open) fetchFriendsLocations();
         }}
         suggestedVenue={showSmartPrompt ? smartPromptVenue : null}
+      />
+
+      {/* Update Spot Sheet (for out status — venue switching) */}
+      <UpdateSpotSheet
+        open={showUpdateSpot}
+        onOpenChange={(open) => {
+          setShowUpdateSpot(open);
+          if (!open) fetchFriendsLocations();
+        }}
+        onUpdated={fetchFriendsLocations}
       />
 
       {/* Full-Screen Search Overlay */}

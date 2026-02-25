@@ -31,7 +31,7 @@
            <div className="h-[180px] flex flex-col items-center justify-center text-white/50">
              <TrendingUp className="h-8 w-8 mb-2 opacity-50" />
              <p className="text-sm">Your trend data will appear here</p>
-             <p className="text-xs mt-1">as guests check in</p>
+             <p className="text-xs mt-1">as guests arrive</p>
            </div>
          ) : (
            <div className="h-[180px]">

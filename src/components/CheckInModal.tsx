@@ -1290,7 +1290,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       ) : (
         <Dialog open={open && !showShareModal && !showVenueConfirm && !showPlanningNeighborhood && !showPlanningPrivacy && !isPrivatePartyFlowOpen} onOpenChange={onOpenChange}>
           <DialogContent className="bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/98 to-[#0a0118] backdrop-blur-xl border border-white/10 shadow-[0_0_60px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] max-w-md p-0 overflow-hidden rounded-3xl" aria-describedby={undefined}>
-            <VisuallyHidden><DialogTitle>Check In Status</DialogTitle></VisuallyHidden>
+            <VisuallyHidden><DialogTitle>Update Status</DialogTitle></VisuallyHidden>
             <StatusContent />
           </DialogContent>
         </Dialog>
