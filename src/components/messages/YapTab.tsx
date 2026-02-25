@@ -1,9 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageCircle, ChevronUp, ChevronDown, Send, Image, X, Play } from 'lucide-react';
+import { MessageCircle, ChevronUp, ChevronDown, Send, Image, X, MoreHorizontal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { YapSkeleton } from './MessagesSkeleton';
 import { validateYapText, validateYapCommentText } from '@/lib/validation-schemas';
 import { checkAndRecordRateLimit, getRateLimitMessage } from '@/lib/rate-limit';
 import { LoginPromptSheet } from '@/components/LoginPromptSheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 
 interface YapMessage {
   id: string;
@@ -23,6 +24,7 @@ interface YapMessage {
   author_handle: string | null;
   image_url: string | null;
   media_type: string | null;
+  user_id: string;
   profiles: {
     display_name: string;
     avatar_url: string | null;
@@ -51,6 +53,8 @@ interface YapTabProps {
   venueName?: string;
 }
 
+const VENUE_COOLDOWN_MS = 30_000; // 30 seconds
+
 export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const { user } = useAuth();
   const demoMode = useDemoMode();
@@ -68,6 +72,58 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Moderation state
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+  const [revealedBuriedIds, setRevealedBuriedIds] = useState<Set<string>>(new Set());
+  const [moderationYapId, setModerationYapId] = useState<string | null>(null);
+  const [moderationUserId, setModerationUserId] = useState<string | null>(null);
+
+  // Per-venue cooldown state
+  const lastPostTimeRef = useRef<Record<string, number>>({});
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch blocked users on mount
+  useEffect(() => {
+    if (user) {
+      fetchBlockedUsers();
+    }
+  }, [user]);
+
+  const fetchBlockedUsers = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('blocked_users')
+      .select('blocked_id')
+      .eq('blocker_id', user.id);
+    if (data) {
+      setBlockedUserIds(new Set(data.map(b => b.blocked_id)));
+    }
+  };
+
+  // Cooldown timer
+  const updateCooldown = useCallback(() => {
+    const lastTime = lastPostTimeRef.current[selectedVenue];
+    if (!lastTime) {
+      setCooldownRemaining(0);
+      return;
+    }
+    const elapsed = Date.now() - lastTime;
+    const remaining = Math.max(0, VENUE_COOLDOWN_MS - elapsed);
+    setCooldownRemaining(remaining);
+    if (remaining <= 0 && cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+      cooldownIntervalRef.current = null;
+    }
+  }, [selectedVenue]);
+
+  useEffect(() => {
+    updateCooldown();
+    return () => {
+      if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    };
+  }, [selectedVenue, updateCooldown]);
 
   // Use prop if provided, otherwise fetch from user's night_status
   useEffect(() => {
@@ -143,7 +199,10 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         return;
       }
 
-      const initialMessages: YapMessage[] = yaps.map(msg => ({
+      // Filter out blocked users client-side
+      const filteredYaps = yaps.filter(y => !blockedUserIds.has(y.user_id));
+
+      const initialMessages: YapMessage[] = filteredYaps.map(msg => ({
         ...msg,
         user_vote: null,
       }));
@@ -164,7 +223,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
 
       // Fetch votes only if authenticated
       if (user) {
-        const yapIds = yaps.map(y => y.id);
+        const yapIds = filteredYaps.map(y => y.id);
         const { data: votes } = await supabase
           .from('yap_votes')
           .select('yap_id, vote_type')
@@ -185,6 +244,13 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       setIsLoading(false);
     }
   };
+
+  // Re-fetch when blocked users change
+  useEffect(() => {
+    if (selectedVenue && blockedUserIds.size > 0) {
+      fetchYapMessages();
+    }
+  }, [blockedUserIds]);
 
   const subscribeToYaps = () => {
     const channel = supabase
@@ -258,7 +324,6 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const isImage = file.type.startsWith('image/');
     const isVideo = file.type.startsWith('video/');
     if (!isImage && !isVideo) {
@@ -266,7 +331,6 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       return;
     }
 
-    // Validate file size (10MB for images, 50MB for videos)
     const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
     if (file.size > maxSize) {
       toast.error(`File too large. Max ${isVideo ? '50MB' : '10MB'}`);
@@ -311,6 +375,14 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
     if (!requireAuth()) return;
     if (!newYap.trim() && !mediaFile) return;
     if (!selectedVenue) return;
+
+    // Per-venue cooldown check
+    const lastTime = lastPostTimeRef.current[selectedVenue];
+    if (lastTime && Date.now() - lastTime < VENUE_COOLDOWN_MS) {
+      const remaining = Math.ceil((VENUE_COOLDOWN_MS - (Date.now() - lastTime)) / 1000);
+      toast.error(`Wait ${remaining}s before posting in this venue again`);
+      return;
+    }
 
     if (newYap.trim()) {
       const validation = validateYapText(newYap);
@@ -371,6 +443,12 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
 
       if (error) throw error;
 
+      // Record cooldown for this venue
+      lastPostTimeRef.current[selectedVenue] = Date.now();
+      setCooldownRemaining(VENUE_COOLDOWN_MS);
+      if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+      cooldownIntervalRef.current = setInterval(updateCooldown, 1000);
+
       setNewYap('');
       clearMedia();
       toast.success('Yap posted!');
@@ -380,6 +458,41 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       toast.error('Failed to post yap');
     } finally {
       setIsPosting(false);
+    }
+  };
+
+  // --- Moderation handlers ---
+  const handleReportYap = async (yapId: string) => {
+    if (!requireAuth()) return;
+
+    try {
+      await supabase.from('reports').insert({
+        reporter_id: user!.id,
+        reported_yap_id: yapId,
+        reason: 'user_reported',
+      });
+      setModerationYapId(null);
+      toast.success("Got it — we'll take a look 👍");
+    } catch {
+      toast.error('Failed to report');
+    }
+  };
+
+  const handleBlockYapUser = async (targetUserId: string) => {
+    if (!requireAuth() || !targetUserId) return;
+
+    try {
+      const { error } = await supabase.from('blocked_users').insert({
+        blocker_id: user!.id,
+        blocked_id: targetUserId,
+      });
+      if (error && error.code !== '23505') throw error;
+
+      setBlockedUserIds(prev => new Set([...prev, targetUserId]));
+      setModerationYapId(null);
+      toast.success("Blocked. You won't see posts from this user.");
+    } catch {
+      toast.error('Failed to block user');
     }
   };
 
@@ -408,7 +521,6 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
     }));
     setComments(prev => ({ ...prev, [yapId]: initialComments }));
 
-    // Fetch votes only if authenticated
     if (user) {
       const commentIds = data.map(c => c.id);
       const { data: votes } = await supabase
@@ -541,6 +653,9 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       .replace(' hours', 'h').replace(' hour', 'h');
   };
 
+  const cooldownSeconds = Math.ceil(cooldownRemaining / 1000);
+  const isOnCooldown = cooldownRemaining > 0;
+
   if (isLoading) {
     return <YapSkeleton />;
   }
@@ -640,170 +755,206 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
               </div>
               <Button
                 onClick={handlePostYap}
-                disabled={(!newYap.trim() && !mediaFile) || isPosting || isUploading}
+                disabled={(!newYap.trim() && !mediaFile) || isPosting || isUploading || isOnCooldown}
                 className="bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
               >
                 <Send className="h-4 w-4 mr-2" />
-                {isUploading ? 'Uploading...' : 'Post'}
+                {isUploading ? 'Uploading...' : isOnCooldown ? `Post (0:${cooldownSeconds.toString().padStart(2, '0')})` : 'Post'}
               </Button>
             </div>
           </div>
 
           {/* Messages */}
           <div className="space-y-3">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4"
-              >
-                <div className="flex gap-3">
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white">
-                        {msg.author_handle || `User${msg.id.slice(0, 6)}`}
-                      </span>
-                      <span className="text-white/40 text-sm">{getTimeAgo(msg.created_at)}</span>
-                    </div>
-                    <p className="text-white/90 mt-1 text-[15px]">{msg.text}</p>
+            {messages.map((msg) => {
+              const isBuried = msg.score <= -8;
+              const isRevealed = revealedBuriedIds.has(msg.id);
 
-                    {/* Media Display */}
-                    {msg.image_url && (
-                      <div className="mt-2">
-                        {msg.media_type === 'video' ? (
-                          <video
-                            src={msg.image_url}
-                            controls
-                            className="max-h-64 w-full rounded-lg object-cover border border-[#a855f7]/20"
-                            preload="metadata"
-                          />
-                        ) : (
-                          <img
-                            src={msg.image_url}
-                            alt="Yap media"
-                            className="max-h-64 w-full rounded-lg object-cover border border-[#a855f7]/20"
-                            loading="lazy"
-                          />
-                        )}
+              // Buried post — collapsed view
+              if (isBuried && !isRevealed) {
+                return (
+                  <div
+                    key={msg.id}
+                    className="bg-[#2d1b4e]/30 border border-white/10 rounded-2xl px-4 py-3 flex items-center justify-between"
+                  >
+                    <span className="text-white/50 text-sm">💀 buried by the crowd</span>
+                    <button
+                      onClick={() => setRevealedBuriedIds(prev => new Set([...prev, msg.id]))}
+                      className="text-[#a855f7] text-sm font-medium hover:underline"
+                    >
+                      show
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    "bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4",
+                    isBuried && isRevealed && "opacity-60"
+                  )}
+                >
+                  <div className="flex gap-3">
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white">
+                          {msg.author_handle || `User${msg.id.slice(0, 6)}`}
+                        </span>
+                        <span className="text-white/40 text-sm">{getTimeAgo(msg.created_at)}</span>
+                        {/* "..." moderation menu trigger */}
+                        <button
+                          onClick={() => {
+                            setModerationYapId(msg.id);
+                            setModerationUserId(msg.user_id);
+                          }}
+                          className="ml-auto text-white/30 hover:text-white/60 transition-colors p-1"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
                       </div>
-                    )}
-                    <div className="flex items-center gap-4 mt-2">
-                      <button
-                        onClick={() => handleToggleComments(msg.id)}
-                        className="flex items-center gap-1 text-white/60 hover:text-white transition-colors text-sm"
+                      <p className="text-white/90 mt-1 text-[15px]">{msg.text}</p>
+
+                      {/* Media Display */}
+                      {msg.image_url && (
+                        <div className="mt-2">
+                          {msg.media_type === 'video' ? (
+                            <video
+                              src={msg.image_url}
+                              controls
+                              className="max-h-64 w-full rounded-lg object-cover border border-[#a855f7]/20"
+                              preload="metadata"
+                            />
+                          ) : (
+                            <img
+                              src={msg.image_url}
+                              alt="Yap media"
+                              className="max-h-64 w-full rounded-lg object-cover border border-[#a855f7]/20"
+                              loading="lazy"
+                            />
+                          )}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-4 mt-2">
+                        <button
+                          onClick={() => handleToggleComments(msg.id)}
+                          className="flex items-center gap-1 text-white/60 hover:text-white transition-colors text-sm"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          <span>{msg.comments_count}</span>
+                        </button>
+                      </div>
+
+                      {/* Comments Section */}
+                      {expandedYapId === msg.id && (
+                        <div className="mt-4 space-y-3 border-t border-[#a855f7]/20 pt-3">
+                          {comments[msg.id]?.map((comment) => (
+                            <div key={comment.id} className="flex gap-2">
+                              <div className="flex-1 bg-[#1a0f2e]/60 rounded-lg p-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-semibold text-white text-sm">
+                                    {comment.author_handle || `User${comment.id.slice(0, 6)}`}
+                                  </span>
+                                  <span className="text-white/40 text-xs">
+                                    {getTimeAgo(comment.created_at)}
+                                  </span>
+                                </div>
+                                <p className="text-white/80 text-sm">{comment.text}</p>
+                              </div>
+                              {/* Comment Vote Controls */}
+                              <div className="flex flex-col items-center gap-0.5">
+                                <button
+                                  onClick={() => handleCommentVote(msg.id, comment.id, 'up')}
+                                  className={cn(
+                                    'transition-colors',
+                                    comment.user_vote === 'up'
+                                      ? 'text-[#d4ff00]'
+                                      : 'text-white/40 hover:text-[#d4ff00]'
+                                  )}
+                                >
+                                  <ChevronUp className="h-4 w-4" />
+                                </button>
+                                <span className="font-bold text-xs text-white">
+                                  {comment.score}
+                                </span>
+                                <button
+                                  onClick={() => handleCommentVote(msg.id, comment.id, 'down')}
+                                  className={cn(
+                                    'transition-colors',
+                                    comment.user_vote === 'down'
+                                      ? 'text-[#a855f7]'
+                                      : 'text-white/40 hover:text-[#a855f7]'
+                                  )}
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Comment Input */}
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={newComment[msg.id] || ''}
+                              onChange={(e) => setNewComment(prev => ({ ...prev, [msg.id]: e.target.value }))}
+                              onFocus={() => { if (!user) { setShowLoginPrompt(true); } }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handlePostComment(msg.id);
+                                }
+                              }}
+                              placeholder="Add a comment..."
+                              className="flex-1 bg-[#1a0f2e] border border-[#a855f7]/20 rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-[#a855f7]"
+                            />
+                            <Button
+                              onClick={() => handlePostComment(msg.id)}
+                              disabled={!newComment[msg.id]?.trim()}
+                              size="sm"
+                              className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white"
+                            >
+                              <Send className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Vote Controls */}
+                    <div className="flex flex-col items-center gap-1">
+                      <button 
+                        onClick={() => handleVote(msg.id, 'up')}
+                        className={cn(
+                          'transition-colors',
+                          msg.user_vote === 'up' 
+                            ? 'text-[#d4ff00]' 
+                            : 'text-white/40 hover:text-[#d4ff00]'
+                        )}
                       >
-                        <MessageCircle className="h-4 w-4" />
-                        <span>{msg.comments_count}</span>
+                        <ChevronUp className="h-5 w-5" />
+                      </button>
+                      <span className="font-bold text-sm text-white">
+                        {msg.score}
+                      </span>
+                      <button 
+                        onClick={() => handleVote(msg.id, 'down')}
+                        className={cn(
+                          'transition-colors',
+                          msg.user_vote === 'down' 
+                            ? 'text-[#a855f7]' 
+                            : 'text-white/40 hover:text-[#a855f7]'
+                        )}
+                      >
+                        <ChevronDown className="h-5 w-5" />
                       </button>
                     </div>
-
-                    {/* Comments Section */}
-                    {expandedYapId === msg.id && (
-                      <div className="mt-4 space-y-3 border-t border-[#a855f7]/20 pt-3">
-                        {comments[msg.id]?.map((comment) => (
-                          <div key={comment.id} className="flex gap-2">
-                            <div className="flex-1 bg-[#1a0f2e]/60 rounded-lg p-3">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold text-white text-sm">
-                                  {comment.author_handle || `User${comment.id.slice(0, 6)}`}
-                                </span>
-                                <span className="text-white/40 text-xs">
-                                  {getTimeAgo(comment.created_at)}
-                                </span>
-                              </div>
-                              <p className="text-white/80 text-sm">{comment.text}</p>
-                            </div>
-                            {/* Comment Vote Controls */}
-                            <div className="flex flex-col items-center gap-0.5">
-                              <button
-                                onClick={() => handleCommentVote(msg.id, comment.id, 'up')}
-                                className={cn(
-                                  'transition-colors',
-                                  comment.user_vote === 'up'
-                                    ? 'text-[#d4ff00]'
-                                    : 'text-white/40 hover:text-[#d4ff00]'
-                                )}
-                              >
-                                <ChevronUp className="h-4 w-4" />
-                              </button>
-                              <span className="font-bold text-xs text-white">
-                                {comment.score}
-                              </span>
-                              <button
-                                onClick={() => handleCommentVote(msg.id, comment.id, 'down')}
-                                className={cn(
-                                  'transition-colors',
-                                  comment.user_vote === 'down'
-                                    ? 'text-[#a855f7]'
-                                    : 'text-white/40 hover:text-[#a855f7]'
-                                )}
-                              >
-                                <ChevronDown className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* Comment Input */}
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={newComment[msg.id] || ''}
-                            onChange={(e) => setNewComment(prev => ({ ...prev, [msg.id]: e.target.value }))}
-                            onFocus={() => { if (!user) { setShowLoginPrompt(true); } }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handlePostComment(msg.id);
-                              }
-                            }}
-                            placeholder="Add a comment..."
-                            className="flex-1 bg-[#1a0f2e] border border-[#a855f7]/20 rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-[#a855f7]"
-                          />
-                          <Button
-                            onClick={() => handlePostComment(msg.id)}
-                            disabled={!newComment[msg.id]?.trim()}
-                            size="sm"
-                            className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white"
-                          >
-                            <Send className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Vote Controls */}
-                  <div className="flex flex-col items-center gap-1">
-                    <button 
-                      onClick={() => handleVote(msg.id, 'up')}
-                      className={cn(
-                        'transition-colors',
-                        msg.user_vote === 'up' 
-                          ? 'text-[#d4ff00]' 
-                          : 'text-white/40 hover:text-[#d4ff00]'
-                      )}
-                    >
-                      <ChevronUp className="h-5 w-5" />
-                    </button>
-                    <span className="font-bold text-sm text-white">
-                      {msg.score}
-                    </span>
-                    <button 
-                      onClick={() => handleVote(msg.id, 'down')}
-                      className={cn(
-                        'transition-colors',
-                        msg.user_vote === 'down' 
-                          ? 'text-[#a855f7]' 
-                          : 'text-white/40 hover:text-[#a855f7]'
-                      )}
-                    >
-                      <ChevronDown className="h-5 w-5" />
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
@@ -833,6 +984,29 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
           </p>
         </div>
       )}
+
+      {/* Moderation Bottom Sheet */}
+      <Drawer open={!!moderationYapId} onOpenChange={(open) => { if (!open) { setModerationYapId(null); setModerationUserId(null); } }}>
+        <DrawerContent className="bg-[#1a0f2e] border-[#a855f7]/30">
+          <DrawerHeader>
+            <DrawerTitle className="text-white text-center text-base">Post Options</DrawerTitle>
+          </DrawerHeader>
+          <div className="px-6 pb-8 space-y-2">
+            <button
+              onClick={() => moderationYapId && handleReportYap(moderationYapId)}
+              className="w-full text-left px-4 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-white text-sm font-medium"
+            >
+              Report post
+            </button>
+            <button
+              onClick={() => moderationUserId && handleBlockYapUser(moderationUserId)}
+              className="w-full text-left px-4 py-3.5 rounded-xl bg-white/5 hover:bg-red-500/10 transition-colors text-red-400 text-sm font-medium"
+            >
+              Block this user
+            </button>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       <LoginPromptSheet open={showLoginPrompt} onOpenChange={setShowLoginPrompt} />
     </div>
