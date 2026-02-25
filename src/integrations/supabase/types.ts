@@ -2045,9 +2045,11 @@ export type Database = {
           created_at: string | null
           expires_at: string
           id: string
+          image_url: string | null
           is_anonymous: boolean | null
           is_demo: boolean | null
           is_promoted: boolean | null
+          media_type: string | null
           score: number | null
           text: string
           user_id: string
@@ -2059,9 +2061,11 @@ export type Database = {
           created_at?: string | null
           expires_at: string
           id?: string
+          image_url?: string | null
           is_anonymous?: boolean | null
           is_demo?: boolean | null
           is_promoted?: boolean | null
+          media_type?: string | null
           score?: number | null
           text: string
           user_id: string
@@ -2073,9 +2077,11 @@ export type Database = {
           created_at?: string | null
           expires_at?: string
           id?: string
+          image_url?: string | null
           is_anonymous?: boolean | null
           is_demo?: boolean | null
           is_promoted?: boolean | null
+          media_type?: string | null
           score?: number | null
           text?: string
           user_id?: string
