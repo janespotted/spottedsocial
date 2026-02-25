@@ -1,102 +1,106 @@
 
 
-# Redesign Yap Tab as Browsable Venue Directory
+# Smooth Venue Switching & Planning-to-Out Transition
 
-## Current State
-The YapTab component (`src/components/messages/YapTab.tsx`, 1014 lines) currently shows a single venue's Yap thread. It determines the venue either from a `venueName` prop (from navigation state) or by looking up the user's `night_statuses` record. If neither exists, it shows "Yap unlocks when you arrive." All logic — posting, voting, comments, moderation — lives in this one component.
+## Current State Summary
 
-The `yap_messages` table has `venue_name` as the venue key, with `score`, `comments_count`, `expires_at`, `text`, `user_id`, etc.
+The system already has:
+- A **status pill** on the map (lines 1282-1348 of Map.tsx) showing "Out · Venue", "Planning", or "In" that opens `QuickStatusSheet`
+- A **venue arrival nudge system** (`useVenueArrivalNudge` hook) that auto-detects venues via GPS polling and either silently updates venue (toast for "out" users) or shows a modal (for planning/no-status users)
+- A **smart prompt banner** (lines 1247-1280) for planning users near a venue, showing "Looks like you're at [Venue]" with a "Share Location" button
+- `QuickStatusSheet` — a drawer with "Yes I'm out", "Planning on it", "Staying in", and "Stop Sharing" options, but NO venue switching capability
+- `CheckInModal` — the full "Are you out?" flow with privacy selection and venue detection
 
-## Architecture
+What's **missing**:
+1. **No manual venue-switch UI** — QuickStatusSheet doesn't show nearby venues when user is already "out"
+2. **No gentle GPS-drift banner** — the venue arrival nudge for "out" users auto-updates silently via toast; there's no interactive banner asking "Moved to a new spot?"
+3. **No planning-to-out banner** — the smart prompt exists but only for users near a venue; there's no general "Ready to go?" prompt for planning users opening the app
 
-Split the current monolithic `YapTab` into two views with internal navigation:
+## Changes
 
-1. **YapTab** (refactored) — The venue directory/listing view
-2. **VenueYapThread** (new component) — The existing Yap thread view, extracted and enhanced with read-only mode
+### 1. New Component: `UpdateSpotSheet.tsx`
+A bottom sheet specifically for venue switching while already "out". This replaces the QuickStatusSheet when the user taps the status pill while status is "out".
 
-### Internal state machine in YapTab:
-- `view: 'directory' | 'thread'` + `threadVenueName: string | null`
-- When `venueName` prop is provided (from venue card navigation), go directly to thread view
-- Back button from thread returns to directory view
+**Contents:**
+- Title: "Update your spot 📍"
+- Nearby venues list (top 5 from GPS, via `findNearbyVenues` RPC) ordered by distance
+- Search bar to find a venue by name (queries `venues` table)
+- "Somewhere else" option (opens text input for custom venue name)
+- "Stop sharing" option at the bottom
+- Tapping a venue: instant one-tap update — closes sheet, updates `night_statuses`, `checkins`, `profiles`, shows toast "📍 Now at [Venue Name]"
 
-## Detailed Changes
+**No privacy re-selection** — user already chose privacy when they went live. Just update the venue.
 
-### File: `src/components/messages/VenueYapThread.tsx` (NEW)
-Extract all the existing Yap thread logic (lines 58-1014 of current YapTab) into this new component. Props:
-```typescript
-interface VenueYapThreadProps {
-  venueName: string;
-  canPost: boolean; // true only if user is checked into THIS venue
-  onBack: () => void; // return to directory
-}
-```
+### 2. Modify Status Pill Tap Behavior (`Map.tsx`)
+Currently, tapping the status pill always opens `QuickStatusSheet`.
 
-Key changes from current behavior:
-- Accept `canPost` prop instead of always showing the post input
-- When `canPost` is false, replace the post input area with a bar: "📍 Check in here to post" with a tooltip on tap explaining you must be physically present
-- Voting and commenting remain available to all authenticated users regardless of `canPost`
-- Unauthenticated users see login prompt for vote/comment/post actions (existing behavior)
-- Add a back arrow button at the top next to the venue name header
-- Keep ALL existing functionality: anonymous posting, New/Hot sort, upvote/downvote, 280 char limit, "..." moderation menu, auto-hide at -8, cooldown, media upload, comments, blocked users
+Change: When `currentUserStatus === 'out'`, open the new `UpdateSpotSheet` instead. When status is anything else, keep opening `QuickStatusSheet` as before.
 
-### File: `src/components/messages/YapTab.tsx` (REFACTORED)
-Completely new top-level structure with two states:
+### 3. New Component: `VenueMoveBanner.tsx`
+A thin, non-intrusive banner at the top of the map screen. Shown when:
+- User status is "out"
+- GPS detects they are >200m from their current venue
+- They are within 500m of a different venue in the database
 
-**State 1: Directory view** (`view === 'directory'`)
+**Layout:** Single-line bar: "Moved to a new spot? 📍" with buttons: "[Venue Name]" and "Dismiss". Small "or somewhere else →" link if multiple nearby venues (opens UpdateSpotSheet).
 
-Query `yap_messages` to get all venues with active yaps tonight:
-```sql
-SELECT venue_name, 
-       COUNT(*) as post_count, 
-       MAX(score) as top_score
-FROM yap_messages 
-WHERE expires_at > now() 
-  AND is_demo = false
-GROUP BY venue_name 
-ORDER BY COUNT(*) DESC
-```
+**Behavior:**
+- Tap venue name → instant update, toast "📍 Now at [Venue]", banner disappears
+- Tap "Dismiss" → banner disappears, does NOT reappear until user moves another 200m+
+- Auto-dismiss after 10 seconds
+- Non-blocking — user can interact with map normally while it's showing
 
-Also look up the user's current venue from `night_statuses` to determine check-in state.
+### 4. New Component: `PlanningReadyBanner.tsx`
+A thin banner at the top of the map screen for planning users. Shown ONCE per session.
 
-For each venue with yaps, also fetch the hottest post text (highest score) for the preview line.
+**Layout:** "Ready to go? 🎉" with buttons: "I'm out" and "Not yet"
 
-For venue metadata (type, neighborhood), join with `venues` table by name matching.
+**Behavior:**
+- "I'm out" → Opens the full CheckInModal privacy selection flow (same as initial "Yes I'm out" path), then venue detection
+- "Not yet" → dismisses, doesn't come back until next app session
+- Only shown when `currentUserStatus === 'planning'` and session flag not set
 
-Layout:
-1. **"Your Venue" card** (conditional — only if user has a `night_statuses` record with a `venue_name`):
-   - "You're at [Venue Name]" with a prominent "Post" button
-   - Tapping opens that venue's thread with `canPost=true`
+### 5. Integrate into `Map.tsx`
+Add state and rendering for the two new banners:
+- `showVenueMoveBanner` + `moveVenue: { id, name }` state — set by the venue arrival nudge system
+- `showPlanningReadyBanner` state — set once per session for planning users
+- Stack banners below the existing header and search bar, above the status pill
+- The venue move detection logic can piggyback on the existing `useVenueArrivalNudge` hook — modify it to expose a "venue shift detected" callback instead of auto-updating for "out" users
 
-2. **"Active Tonight 🔥" section**:
-   - Scrollable list of venue cards, each showing:
-     - Venue name (bold)
-     - Venue type + neighborhood (from venues table, e.g. "Bar · Silver Lake")
-     - Post count ("12 posts")
-     - One-line preview of hottest post (truncated)
-     - ChevronRight indicator
-   - Tapping opens that venue's thread with `canPost` = true only if user is checked into that specific venue
+### 6. Modify `useVenueArrivalNudge` Hook
+Currently, when a user is "out" and near a new venue, it auto-updates silently with a toast. Change to:
+- Instead of silently updating, call a callback to show the `VenueMoveBanner` on the map
+- Add a new context/callback mechanism: `onVenueShiftDetected(venue)` that Map.tsx can use to show the banner
+- Keep the dwell time, GPS accuracy, and re-entry gates unchanged
+- The banner-based flow replaces the toast-only flow for "out" users
 
-3. **Empty state**: "No Yap yet tonight. Be the first to post when you're out! 🎤"
+### 7. Language Audit
+Search for any instance of "check in" in UI-facing strings across the codebase and replace with the approved alternatives:
+- "Update your spot" (venue switch sheet)
+- "Where are you?" (venue selection)
+- "Moved to a new spot?" (gentle nudge)
+- "Now at [Venue]" (confirmations)
+- "📍" pin emoji throughout
 
-**State 2: Thread view** (`view === 'thread'`)
-- Renders `<VenueYapThread venueName={threadVenueName} canPost={isCheckedInHere} onBack={goBackToDirectory} />`
+**Note:** The words "checkin" and "check-in" in code identifiers (variable names, table names, function names) stay as-is — only user-facing strings change.
 
-When `venueName` prop is provided (from venue card / map navigation):
-- Skip directory, go straight to thread view
-- Back button returns to directory (not navigate(-1), since we want to stay in the Yap tab)
+## Files Modified/Created
 
-### Venue data enrichment
-To show "Bar · Silver Lake" on the directory cards, query the `venues` table for matching venue names. This is a simple client-side join since venue names map 1:1 to venue records.
-
-## Files Modified
-1. `src/components/messages/VenueYapThread.tsx` — **NEW** — extracted thread component (~700 lines, moved from YapTab)
-2. `src/components/messages/YapTab.tsx` — **REWRITTEN** — directory + routing shell (~250 lines new code, delegates to VenueYapThread)
+| File | Action |
+|------|--------|
+| `src/components/UpdateSpotSheet.tsx` | **NEW** — venue switch bottom sheet |
+| `src/components/VenueMoveBanner.tsx` | **NEW** — gentle GPS nudge banner |
+| `src/components/PlanningReadyBanner.tsx` | **NEW** — planning-to-out prompt |
+| `src/pages/Map.tsx` | **EDIT** — integrate banners, change status pill tap behavior |
+| `src/hooks/useVenueArrivalNudge.ts` | **EDIT** — expose venue shift callback instead of auto-toast for "out" users |
+| `src/components/QuickStatusSheet.tsx` | **MINOR EDIT** — no functional changes, just ensure language consistency |
+| `src/components/CheckInModal.tsx` | **MINOR EDIT** — language audit on UI strings |
 
 ## What Stays Untouched
-- All Yap thread internals: anonymous posting, New/Hot sorting, upvote/downvote, 280 char limit, "..." report menu, auto-hide at -8, 60-second cooldown, media uploads, comments, blocked users
-- Yap preview on venue cards (VenueIdCard.tsx)
-- Position of Yap as sub-tab under Messages
-- Messages.tsx navigation/tab structure
-- Database schema — no migrations needed, existing `yap_messages` table supports all queries
-- All other components and pages
+- Initial "Are you out?" → "Share location" → "Venue selection" flow
+- 5am auto-expire
+- "X friends out" counter
+- Map pins, relationship key, bottom navigation
+- All venue arrival nudge gates (GPS accuracy, dwell time, re-entry)
+- Database schema — no migrations needed
 
