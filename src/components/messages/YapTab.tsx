@@ -183,7 +183,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       {userVenueName && (
         <button
           onClick={() => openThread(userVenueName)}
-          className="w-full flex items-center justify-between bg-[#1a0f2e]/90 border border-[#d4ff00]/30 rounded-2xl px-4 py-2.5 active:bg-[#2d1b4e]/90 transition-colors animate-fade-in"
+          className="w-full flex items-center justify-between bg-white/[0.06] backdrop-blur-sm rounded-2xl px-4 py-2.5 active:bg-white/[0.10] transition-colors animate-fade-in"
         >
           <span className="text-white text-sm">📍 You're at <span className="font-semibold">{userVenueName}</span></span>
           <span className="bg-[#d4ff00] text-[#1a0f2e] font-bold text-xs px-3 py-1 rounded-full">Post</span>
@@ -191,34 +191,34 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       )}
 
       {/* Sort Toggles */}
-      <div className="flex gap-2 animate-fade-in">
+      <div className="flex items-center gap-6 animate-fade-in">
         <button
           onClick={() => setSortMode('hot')}
-          className={cn(
-            'px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200',
-            sortMode === 'hot'
-              ? 'bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]'
-              : 'bg-transparent border border-white/15 text-white/40 hover:text-white/60'
-          )}
+          className={`relative pb-2 text-lg font-medium transition-colors ${
+            sortMode === 'hot' ? 'text-white' : 'text-white/60'
+          }`}
         >
           Hot
+          {sortMode === 'hot' && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+          )}
         </button>
         <button
           onClick={() => setSortMode('new')}
-          className={cn(
-            'px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200',
-            sortMode === 'new'
-              ? 'bg-[#a855f7] text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]'
-              : 'bg-transparent border border-white/15 text-white/40 hover:text-white/60'
-          )}
+          className={`relative pb-2 text-lg font-medium transition-colors ${
+            sortMode === 'new' ? 'text-white' : 'text-white/60'
+          }`}
         >
           New
+          {sortMode === 'new' && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+          )}
         </button>
       </div>
 
       {/* Quote Feed */}
       {sortedQuotes.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {sortedQuotes.map((quote, index) => {
             const firstInGroup = isFirstInGroup(index);
             const grouped = isInGroup(index);
@@ -242,19 +242,17 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                 <button
                   onClick={() => openThread(quote.venue_name)}
                   className={cn(
-                    'w-full text-left rounded-2xl p-4 relative',
+                    'w-full text-left rounded-2xl p-5 relative',
                     'bg-white/[0.06] backdrop-blur-sm',
-                    'border border-[#a855f7]/20',
-                    quote.score > 30 ? (grouped ? 'border-l-[6px]' : 'border-l-[5px]')
-                      : quote.score > 10 ? (grouped ? 'border-l-[5px]' : 'border-l-[4px]')
-                      : quote.score > 0 ? (grouped ? 'border-l-[4px]' : 'border-l-[3px]')
-                      : (grouped ? 'border-l-[3px]' : 'border-l-[2px]'),
-                    'border-l-[#d4ff00]',
-                    'active:bg-[#2d1b4e]/90 transition-all duration-200'
+                    'active:bg-white/[0.10] transition-all duration-200',
+                    index === 0 && sortMode === 'hot' && 'p-6'
                   )}
                 >
                   {/* Quote text — the hero */}
-                  <p className="text-white text-[15px] font-medium leading-relaxed mb-3">
+                  <p className={cn(
+                    "text-white font-medium leading-relaxed mb-3",
+                    index === 0 && sortMode === 'hot' ? 'text-[17px]' : 'text-[15px]'
+                  )}>
                     {quote.text}
                   </p>
 
@@ -264,7 +262,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                       className="text-xs mb-2 hover:text-white/60 transition-colors"
                       onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
                     >
-                      📍 <span className="font-semibold text-white/70">{quote.venue_name}</span>
+                      📍 <span className="font-semibold text-white">{quote.venue_name}</span>
                       {quote.venue_neighborhood && <span className="text-white/40"> · {quote.venue_neighborhood}</span>}
                     </p>
                   )}
@@ -272,7 +270,9 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                   {/* Bottom row: score + timestamp */}
                   <div className="flex items-center justify-between">
                     {quote.score > 0 ? (
-                      <span className="text-[#d4ff00] text-xs font-semibold">▲ {quote.score}</span>
+                      <span className="text-[#d4ff00] text-xs font-semibold">
+                        {index === 0 && sortMode === 'hot' ? '🔥 ' : ''}▲ {quote.score}
+                      </span>
                     ) : (
                       <span />
                     )}
@@ -285,7 +285,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-fade-in">
-          <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+          <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6">
             <Mic className="h-10 w-10 text-[#a855f7]/60" />
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">
