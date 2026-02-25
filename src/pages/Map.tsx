@@ -15,7 +15,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -1279,10 +1279,10 @@ export default function Map() {
         </div>
       )}
 
-      {/* Status Pill */}
+      {/* Status Pill + Stop Sharing */}
       {currentUserStatus && !focusMode && (
         <div
-          className="absolute left-4 z-[199] transition-opacity duration-300"
+          className="absolute left-4 z-[199] flex items-center gap-2 transition-opacity duration-300"
           style={{ top: showSmartPrompt && smartPromptVenue ? 'calc(14rem + env(safe-area-inset-top, 0px))' : 'calc(10rem + env(safe-area-inset-top, 0px))' }}
         >
           <button
@@ -1312,6 +1312,39 @@ export default function Map() {
               </>
             )}
           </button>
+
+          {/* Stop Sharing button — visible when actively out */}
+          {currentUserStatus === 'out' && (
+            <button
+              onClick={async () => {
+                if (!user) return;
+                const now = new Date().toISOString();
+                const expiry = new Date();
+                if (expiry.getHours() < 5) { expiry.setHours(5, 0, 0, 0); } else { expiry.setDate(expiry.getDate() + 1); expiry.setHours(5, 0, 0, 0); }
+
+                await supabase.from('night_statuses').upsert({
+                  user_id: user.id, status: 'off', venue_id: null, venue_name: null,
+                  lat: null, lng: null, updated_at: now, expires_at: expiry.toISOString(),
+                  is_private_party: false, planning_neighborhood: null,
+                }, { onConflict: 'user_id' });
+
+                await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
+
+                await supabase.from('profiles').update({
+                  is_out: false, last_known_lat: null, last_known_lng: null, last_location_at: null,
+                }).eq('id', user.id);
+
+                setCurrentUserStatus('off');
+                setCurrentUserVenue(null);
+                toast({ title: 'Location sharing stopped', description: 'Your friends can no longer see you.' });
+                fetchFriendsLocations();
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full backdrop-blur border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-xs font-medium"
+            >
+              <MapPinOff className="w-3 h-3" />
+              Stop Sharing
+            </button>
+          )}
         </div>
       )}
 

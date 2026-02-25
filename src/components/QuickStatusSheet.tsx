@@ -6,12 +6,11 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
-import { MapPin, Target, Home } from 'lucide-react';
+import { MapPin, Target, Home, MapPinOff } from 'lucide-react';
 
 interface QuickStatusSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** If provided, pre-fills the "go live" flow with this venue */
   suggestedVenue?: { id: string; name: string; lat: number; lng: number } | null;
 }
 
@@ -56,7 +55,6 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
   const handleGoLive = async () => {
     if (!user) return;
     
-    // If we have a suggested venue, go live directly at that venue
     if (suggestedVenue) {
       setLoading(true);
       haptic.medium();
@@ -64,14 +62,12 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
       try {
         const now = new Date().toISOString();
         
-        // End existing check-ins
         await supabase
           .from('checkins')
           .update({ ended_at: now })
           .eq('user_id', user.id)
           .is('ended_at', null);
 
-        // Create new check-in
         await supabase
           .from('checkins')
           .insert({
@@ -83,7 +79,6 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
             started_at: now,
           });
 
-        // Update night status to out
         await supabase
           .from('night_statuses')
           .upsert({
@@ -99,7 +94,6 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
             planning_neighborhood: null,
           }, { onConflict: 'user_id' });
 
-        // Update profile
         await supabase
           .from('profiles')
           .update({
@@ -121,7 +115,6 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
       return;
     }
 
-    // No suggested venue — open full check-in modal for location capture
     onOpenChange(false);
     openCheckIn();
   };
@@ -182,7 +175,6 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
           planning_neighborhood: null,
         }, { onConflict: 'user_id' });
 
-      // End any active check-ins
       await supabase
         .from('checkins')
         .update({ ended_at: new Date().toISOString() })
@@ -209,6 +201,60 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
     }
   };
 
+  const handleStopSharing = async () => {
+    if (!user) return;
+    setLoading(true);
+    haptic.medium();
+
+    try {
+      const now = new Date().toISOString();
+
+      // Clear night status location but keep status as 'home'
+      await supabase
+        .from('night_statuses')
+        .upsert({
+          user_id: user.id,
+          status: 'off',
+          venue_id: null,
+          venue_name: null,
+          lat: null,
+          lng: null,
+          updated_at: now,
+          expires_at: getExpiryTime(),
+          is_private_party: false,
+          planning_neighborhood: null,
+        }, { onConflict: 'user_id' });
+
+      // End active check-ins
+      await supabase
+        .from('checkins')
+        .update({ ended_at: now })
+        .eq('user_id', user.id)
+        .is('ended_at', null);
+
+      // Clear location from profile
+      await supabase
+        .from('profiles')
+        .update({
+          is_out: false,
+          last_known_lat: null,
+          last_known_lng: null,
+          last_location_at: null,
+        })
+        .eq('id', user.id);
+
+      toast.success('Location sharing stopped. Your friends can no longer see you.');
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error stopping sharing:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isSharing = currentStatus === 'out';
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="bg-[#1a0f2e] border-[#a855f7]/30">
@@ -216,7 +262,6 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
           <DrawerTitle className="text-white text-center">Update Your Status</DrawerTitle>
         </DrawerHeader>
         <div className="px-6 pb-8 space-y-3">
-          {/* Current status indicator */}
           {currentStatus && (
             <div className="text-center mb-4">
               <span className="text-white/40 text-xs uppercase tracking-wider">Currently: </span>
@@ -262,6 +307,22 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
             <Home className="w-4 h-4 mr-2" />
             No — staying in 🏠
           </Button>
+
+          {/* Stop Sharing option — only visible when actively sharing */}
+          {isSharing && (
+            <>
+              <div className="border-t border-white/10 my-2" />
+              <Button
+                onClick={handleStopSharing}
+                disabled={loading}
+                variant="ghost"
+                className="w-full h-12 text-base text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-2xl"
+              >
+                <MapPinOff className="w-4 h-4 mr-2" />
+                Stop Sharing Location
+              </Button>
+            </>
+          )}
         </div>
       </DrawerContent>
     </Drawer>
