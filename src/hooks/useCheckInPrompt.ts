@@ -3,14 +3,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { isNightlifeHours } from '@/lib/time-context';
 
-const PROMPT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+const SESSION_KEY = 'checkin_prompt_session';
 const STORAGE_KEY = 'checkin_prompt_last_shown';
 
 /**
  * Hook to handle automatic check-in prompts
- * - Prompts user every app open during nightlife hours (5pm - 5am)
- * - Won't re-prompt if shown within last 10 minutes
- * - Uses localStorage for persistence across sessions
+ * - Shows full modal only ONCE per session (browser tab lifetime)
+ * - Uses sessionStorage to track if already shown this session
+ * - Still respects 10-minute cooldown for edge cases (page reload)
  */
 export function useCheckInPrompt() {
   const { user } = useAuth();
@@ -20,9 +20,11 @@ export function useCheckInPrompt() {
     if (!user?.id) return;
     if (!isNightlifeHours()) return;
 
-    const lastShown = localStorage.getItem(STORAGE_KEY);
-    if (lastShown && Date.now() - Number(lastShown) < PROMPT_COOLDOWN_MS) return;
+    // Only show once per session (tab lifetime)
+    const shownThisSession = sessionStorage.getItem(SESSION_KEY);
+    if (shownThisSession) return;
 
+    sessionStorage.setItem(SESSION_KEY, 'true');
     localStorage.setItem(STORAGE_KEY, String(Date.now()));
     openCheckIn();
   }, [user?.id, openCheckIn]);

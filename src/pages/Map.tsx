@@ -15,7 +15,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2 } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CityBadge } from '@/components/CityBadge';
 import { logger } from '@/lib/logger';
 import { escapeHtml, escapeUrl } from '@/lib/html-escape';
+import { QuickStatusSheet } from '@/components/QuickStatusSheet';
 
 interface FriendLocation {
   user_id: string;
@@ -95,6 +96,16 @@ export default function Map() {
   const [relationshipFilter, setRelationshipFilter] = useState<'all' | 'close' | 'friends_only'>('all');
   const friendsListRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Status pill & quick-switch state
+  const [showQuickStatus, setShowQuickStatus] = useState(false);
+  const [currentUserStatus, setCurrentUserStatus] = useState<string | null>(null);
+  const [currentUserVenue, setCurrentUserVenue] = useState<string | null>(null);
+  
+  // Smart venue prompt for planning users
+  const [smartPromptVenue, setSmartPromptVenue] = useState<{ id: string; name: string; lat: number; lng: number } | null>(null);
+  const [showSmartPrompt, setShowSmartPrompt] = useState(false);
+  const smartPromptDismissedRef = useRef<Set<string>>(new Set());
   
   // Use ref for city to prevent callback recreation
   const cityRef = useRef(city);
@@ -212,6 +223,43 @@ export default function Map() {
       } else {
         console.log('User location not set - is_out:', myProfile?.is_out, 'has coords:', !!myProfile?.last_known_lat);
         setUserLocation(null);
+      }
+
+      // Fetch current night status for status pill
+      const { data: nightStatus } = await supabase
+        .from('night_statuses')
+        .select('status, venue_name, venue_id')
+        .eq('user_id', user?.id)
+        .not('expires_at', 'is', null)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+
+      setCurrentUserStatus(nightStatus?.status || null);
+      setCurrentUserVenue(nightStatus?.venue_name || null);
+
+      // Smart prompt: if planning, check if near a venue
+      if (nightStatus?.status === 'planning' && 'geolocation' in navigator) {
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: true })
+          );
+          const { data: nearbyVenues } = await supabase.rpc('find_nearest_venue', {
+            user_lat: pos.coords.latitude,
+            user_lng: pos.coords.longitude,
+            radius_meters: 200,
+          });
+          if (nearbyVenues && nearbyVenues.length > 0 && !smartPromptDismissedRef.current.has(nearbyVenues[0].venue_id)) {
+            setSmartPromptVenue({
+              id: nearbyVenues[0].venue_id,
+              name: nearbyVenues[0].venue_name,
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+            setShowSmartPrompt(true);
+          }
+        } catch {
+          // GPS not available, skip smart prompt
+        }
       }
 
       let friendLocations: FriendLocation[] = [];
@@ -1195,6 +1243,90 @@ export default function Map() {
           </div>
         </button>
       </div>
+
+      {/* Smart Venue Prompt Banner (planning users near a venue) */}
+      {showSmartPrompt && smartPromptVenue && !focusMode && (
+        <div
+          className="absolute left-4 right-4 z-[201] animate-fade-in"
+          style={{ top: 'calc(10rem + env(safe-area-inset-top, 0px))' }}
+        >
+          <div className="bg-gradient-to-r from-[#d4ff00]/20 to-[#a855f7]/20 backdrop-blur border border-[#d4ff00]/40 rounded-xl px-4 py-3 flex items-center gap-3">
+            <div className="flex-1">
+              <p className="text-white text-sm font-medium">
+                Looks like you're at <span className="text-[#d4ff00]">{smartPromptVenue.name}</span>
+              </p>
+              <p className="text-white/50 text-xs">Go live?</p>
+            </div>
+            <button
+              onClick={() => {
+                setShowSmartPrompt(false);
+                setShowQuickStatus(true);
+              }}
+              className="px-3 py-1.5 bg-[#d4ff00] text-[#0a0118] text-xs font-semibold rounded-full hover:bg-[#d4ff00]/90 transition-colors"
+            >
+              Share Location
+            </button>
+            <button
+              onClick={() => {
+                setShowSmartPrompt(false);
+                smartPromptDismissedRef.current.add(smartPromptVenue.id);
+              }}
+              className="text-white/40 hover:text-white/60 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Status Pill */}
+      {currentUserStatus && !focusMode && (
+        <div
+          className="absolute left-4 z-[199] transition-opacity duration-300"
+          style={{ top: showSmartPrompt && smartPromptVenue ? 'calc(14rem + env(safe-area-inset-top, 0px))' : 'calc(10rem + env(safe-area-inset-top, 0px))' }}
+        >
+          <button
+            onClick={() => setShowQuickStatus(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur border transition-all hover:scale-105 ${
+              currentUserStatus === 'out'
+                ? 'bg-[#d4ff00]/15 border-[#d4ff00]/40 text-[#d4ff00]'
+                : currentUserStatus === 'planning'
+                ? 'bg-[#a855f7]/15 border-[#a855f7]/40 text-[#a855f7]'
+                : 'bg-white/5 border-white/20 text-white/50'
+            }`}
+          >
+            {currentUserStatus === 'out' ? (
+              <>
+                <MapPin className="w-3.5 h-3.5 fill-current" />
+                <span className="text-xs font-medium">Out{currentUserVenue ? ` · ${currentUserVenue}` : ''}</span>
+              </>
+            ) : currentUserStatus === 'planning' ? (
+              <>
+                <Target className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">Planning on it</span>
+              </>
+            ) : (
+              <>
+                <Home className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">Staying in</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Quick Status Sheet */}
+      <QuickStatusSheet
+        open={showQuickStatus}
+        onOpenChange={(open) => {
+          setShowQuickStatus(open);
+          if (!open) {
+            // Refresh status after closing
+            fetchFriendsLocations();
+          }
+        }}
+        suggestedVenue={showSmartPrompt ? smartPromptVenue : null}
+      />
 
       {/* Full-Screen Search Overlay */}
       {showSearchOverlay && (

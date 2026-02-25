@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CityBadge } from '@/components/CityBadge';
 import { ProfileSkeleton } from '@/components/ProfileSkeleton';
+import { QuickStatusSheet } from '@/components/QuickStatusSheet';
 
 
 interface WishlistPlace {
@@ -68,6 +69,7 @@ export default function Profile() {
   const [partyNeighborhood, setPartyNeighborhood] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [showQuickStatus, setShowQuickStatus] = useState(false);
   
   // Triple-tap secret access to demo settings
   const tapCountRef = useRef(0);
@@ -398,7 +400,7 @@ export default function Profile() {
         <div>
           <h2 className="text-xl font-bold text-white">@{profile?.username || 'username'}</h2>
           <button 
-            onClick={openCheckIn}
+            onClick={() => setShowQuickStatus(true)}
             className={cn(
               "flex items-center gap-1.5 cursor-pointer hover:bg-white/10 transition-all px-3 py-1.5 rounded-full border bg-white/5 mt-1",
               currentStatus === 'out' ? "border-[#d4ff00]/40" : 
@@ -753,6 +755,15 @@ export default function Profile() {
           inviteUrl={getInviteUrl()}
         />
       )}
+
+      {/* Quick Status Sheet */}
+      <QuickStatusSheet
+        open={showQuickStatus}
+        onOpenChange={(open) => {
+          setShowQuickStatus(open);
+          if (!open) fetchProfileData();
+        }}
+      />
     </div>
   );
 }
