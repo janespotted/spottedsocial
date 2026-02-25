@@ -1,30 +1,26 @@
 
 
-# Fix Search Overlay Buttons Not Responding to Taps
+# Fix Yap Preview Tap on Venue Cards
 
 ## Problem
-The "People" and "Venues" filter buttons in the search overlay don't respond to taps on mobile devices. Two issues combine:
+The Yap preview row on the venue card is already a `<button>` with an `onClick` handler and navigation logic (line 827-828), but tapping it doesn't work reliably. Two issues:
 
-1. **Map bleeding through**: The overlay uses `bg-[#0a0118]/95` (95% opacity), and Mapbox GL markers are rendered as real DOM nodes that sit in a separate stacking context. On mobile, touch events can pass through to the map layer underneath.
+1. **Venue card stays open over the Messages page**: The `onClick` calls `navigate()` but never calls `closeVenueCard()`. The venue card overlay (z-300 backdrop + card) remains rendered on top of the Messages page, making it appear like nothing happened.
 
-2. **No visible feedback on default state**: When the search query is empty, toggling People/Venues filters has zero visual effect on the content below (Trending Tonight and Friends Out Now always show regardless). Users tap the button, the style toggles, but nothing changes — so it feels broken.
+2. **No active/press feedback**: The button has `hover:bg-white/5` which works on desktop but provides no visible touch feedback on mobile.
 
-## Changes — all in `src/pages/Map.tsx`
+## Changes — `src/components/VenueIdCard.tsx` only
 
-### 1. Make overlay fully opaque and block map interaction
-- Change the overlay background from `bg-[#0a0118]/95` to `bg-[#0a0118]` (fully opaque, no transparency)
-- Add `pointer-events-auto` explicitly on the overlay and `touch-action: auto` to ensure mobile touches are captured
-- This prevents mapbox markers from intercepting touch events
+### 1. Close venue card before navigating (line 828)
+Update the Yap button's `onClick` to:
+- Call `closeVenueCard()` first to dismiss the venue card overlay
+- Then call `navigate('/messages', { state: { activeTab: 'yap', venueName: venue.name } })`
 
-### 2. Apply People/Venues filters to the default (no-query) view too
-Currently when `searchQuery.length === 0`, both "Trending Tonight" (venues) and "Friends Out Now" (people) sections always render regardless of filter state. Fix:
-- Only show "🔥 Trending Tonight" when `searchFilterVenues` is true
-- Only show "👥 Friends Out Now" when `searchFilterPeople` is true
-- This gives immediate, visible feedback when tapping the filter chips even without a search query
+### 2. Add active press state (line 829)
+Add `active:bg-white/10` to the button's className for visible mobile touch feedback.
 
-### 3. Add `e.stopPropagation()` to filter chip buttons
-As a defensive measure, add `e.stopPropagation()` to the People and Venues button `onClick` handlers to prevent any event bubbling to parent elements or the map.
+### 3. Make chevron more visible (line 842)
+Change the `ChevronRight` color from `text-white/30` to `text-white/50` so it's clearly visible as a navigation indicator.
 
-## Files modified
-- `src/pages/Map.tsx` only
+These are minimal, surgical changes — just 3 lines modified.
 
