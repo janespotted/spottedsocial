@@ -59,7 +59,8 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
           let yapQuery = supabase
             .from('yap_messages')
             .select('venue_name, score, text')
-            .gt('expires_at', new Date().toISOString());
+            .gt('expires_at', new Date().toISOString())
+            .eq('is_private_party', false);
           if (!demoEnabled) {
             yapQuery = yapQuery.eq('is_demo', false);
           }

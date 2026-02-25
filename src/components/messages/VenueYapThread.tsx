@@ -275,6 +275,23 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         mediaType = result.type;
       }
 
+      // Check if user is at a private party to set private party fields
+      let isPrivateParty = false;
+      let partyLat: number | null = null;
+      let partyLng: number | null = null;
+
+      const { data: nightStatus } = await supabase
+        .from('night_statuses')
+        .select('is_private_party, lat, lng')
+        .eq('user_id', user!.id)
+        .maybeSingle();
+
+      if (nightStatus?.is_private_party) {
+        isPrivateParty = true;
+        partyLat = nightStatus.lat;
+        partyLng = nightStatus.lng;
+      }
+
       const { error } = await supabase.from('yap_messages').insert({
         user_id: user!.id,
         text: newYap.trim() || (mediaType === 'video' ? '📹' : '📸'),
@@ -286,6 +303,9 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         expires_at: expiry.toISOString(),
         image_url: mediaUrl,
         media_type: mediaType,
+        is_private_party: isPrivateParty,
+        party_lat: partyLat,
+        party_lng: partyLng,
       });
 
       if (error) throw error;

@@ -17,6 +17,7 @@ export function CheckInConfirmation() {
     checkInVenueId,
     checkInNeighborhood,
     checkInPrivacyLevel,
+    checkInIsPrivateParty,
     closeCheckInConfirmation 
   } = useCheckIn();
   const { user } = useAuth();
@@ -53,7 +54,7 @@ export function CheckInConfirmation() {
   }, [user, showCheckInConfirmation]);
 
   useEffect(() => {
-    if (showCheckInConfirmation && checkInConfirmationType === 'out' && checkInVenueId) {
+    if (showCheckInConfirmation && checkInConfirmationType === 'out' && (checkInVenueId || checkInIsPrivateParty)) {
       // Trigger confetti animation
       const duration = 3000;
       const animationEnd = Date.now() + duration;
@@ -159,7 +160,7 @@ export function CheckInConfirmation() {
   const privacyLabel = getPrivacyLabel(checkInPrivacyLevel || 'all_friends');
 
   // Show yap prompt phase for venue check-ins
-  if (phase === 'yap_prompt' && isOut && checkInVenueId) {
+  if (phase === 'yap_prompt' && isOut && (checkInVenueId || checkInIsPrivateParty)) {
     return (
       <div 
         className="fixed inset-0 z-[600] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"

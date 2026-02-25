@@ -180,6 +180,26 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
       const lat = userLocation?.lat ?? 0;
       const lng = userLocation?.lng ?? 0;
 
+      // Detect neighborhood from GPS coords
+      let detectedNeighborhood: string | null = null;
+      try {
+        const { data: nearestVenue } = await supabase.rpc('find_nearest_venue', {
+          user_lat: lat,
+          user_lng: lng,
+          radius_meters: 50000,
+        });
+        if (nearestVenue?.[0]) {
+          const { data: venueData } = await supabase
+            .from('venues')
+            .select('neighborhood')
+            .eq('id', nearestVenue[0].venue_id)
+            .maybeSingle();
+          detectedNeighborhood = venueData?.neighborhood || null;
+        }
+      } catch (e) {
+        console.warn('Neighborhood detection failed:', e);
+      }
+
       await supabase
         .from('checkins')
         .update({ ended_at: now })
@@ -202,6 +222,8 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
           lat,
           lng,
           updated_at: now,
+          is_private_party: true,
+          party_neighborhood: detectedNeighborhood,
         })
         .eq('user_id', user.id);
 
@@ -210,7 +232,8 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
         .update({ last_known_lat: lat, last_known_lng: lng, last_location_at: now })
         .eq('id', user.id);
 
-      toast(`📍 Now at ${customName.trim()}`);
+      const displayNeighborhood = detectedNeighborhood ? ` (${detectedNeighborhood})` : '';
+      toast(`📍 Now at ${customName.trim()}${displayNeighborhood}`);
       onOpenChange(false);
       onUpdated?.();
     } catch (error) {

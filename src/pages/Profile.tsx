@@ -413,7 +413,7 @@ export default function Profile() {
                 <>
                   <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
                   <span className="text-[#d4ff00] font-medium">
-                    Out · Private Party{partyNeighborhood ? ` (${partyNeighborhood})` : ''}
+                    Out · {currentVenue || 'Private Party'}{partyNeighborhood ? ` (${partyNeighborhood})` : ''}
                   </span>
                 </>
               ) : currentVenue ? (

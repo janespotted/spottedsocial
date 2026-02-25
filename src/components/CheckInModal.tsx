@@ -343,7 +343,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       haptic.medium();
       
       // Show confirmation
-      showOutConfirmation(`Private Party (${privatePartyNeighborhood})`, '', privatePartyVisibility);
+      showOutConfirmation(`Private Party (${privatePartyNeighborhood})`, '', privatePartyVisibility, true);
       
       logEvent('private_party_checkin', {
         neighborhood: privatePartyNeighborhood,
@@ -461,9 +461,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     // Use selected venue if user picked from dropdown, otherwise use original
     let finalVenueId = selectedVenueId || locationData.venueId;
     let finalVenueName = customVenue.trim() || locationData.venueName;
+    let isCustomVenue = false;
 
     // If user entered custom venue and no venue ID, create new venue
     if (!finalVenueId && customVenue.trim()) {
+      isCustomVenue = true;
       const newVenueId = await createNewVenue(
         customVenue.trim(),
         locationData.lat,
@@ -509,11 +511,53 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         // Start tracking location updates
         startLocationTracking(locationData.lat, locationData.lng);
 
-        await updateStatus('out', locationData.lat, locationData.lng, finalVenueName, finalVenueId);
-        onOpenChange(false);
+        // For custom venues (no DB venue ID), detect neighborhood and set as private party
+        if (isCustomVenue && !finalVenueId) {
+          let detectedNeighborhood: string | null = null;
+          try {
+            const { data: nearestVenue } = await supabase.rpc('find_nearest_venue', {
+              user_lat: locationData.lat,
+              user_lng: locationData.lng,
+              radius_meters: 50000,
+            });
+            if (nearestVenue?.[0]) {
+              const { data: venueData } = await supabase
+                .from('venues')
+                .select('neighborhood')
+                .eq('id', nearestVenue[0].venue_id)
+                .maybeSingle();
+              detectedNeighborhood = venueData?.neighborhood || null;
+            }
+          } catch (e) {
+            console.warn('Neighborhood detection failed for custom venue:', e);
+          }
 
-        // Show celebration confirmation card instead of toast
-        showOutConfirmation(finalVenueName, finalVenueId || '', shareOption);
+          // Update night_statuses with private party info + neighborhood
+          await supabase.from('night_statuses').upsert({
+            user_id: user?.id,
+            status: 'out',
+            lat: locationData.lat,
+            lng: locationData.lng,
+            venue_name: finalVenueName,
+            venue_id: null,
+            updated_at: new Date().toISOString(),
+            expires_at: calculateExpiryTime(),
+            is_private_party: true,
+            party_neighborhood: detectedNeighborhood,
+            planning_visibility: shareOption,
+          }, { onConflict: 'user_id' });
+
+          const displayName = detectedNeighborhood
+            ? `${finalVenueName} (${detectedNeighborhood})`
+            : finalVenueName;
+          
+          onOpenChange(false);
+          showOutConfirmation(displayName, '', shareOption, true);
+        } else {
+          await updateStatus('out', locationData.lat, locationData.lng, finalVenueName, finalVenueId);
+          onOpenChange(false);
+          showOutConfirmation(finalVenueName, finalVenueId || '', shareOption);
+        }
       } catch (error) {
         console.error('Error updating location sharing:', error);
         toast({

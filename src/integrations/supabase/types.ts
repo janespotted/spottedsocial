@@ -2048,8 +2048,11 @@ export type Database = {
           image_url: string | null
           is_anonymous: boolean | null
           is_demo: boolean | null
+          is_private_party: boolean | null
           is_promoted: boolean | null
           media_type: string | null
+          party_lat: number | null
+          party_lng: number | null
           score: number | null
           text: string
           user_id: string
@@ -2064,8 +2067,11 @@ export type Database = {
           image_url?: string | null
           is_anonymous?: boolean | null
           is_demo?: boolean | null
+          is_private_party?: boolean | null
           is_promoted?: boolean | null
           media_type?: string | null
+          party_lat?: number | null
+          party_lng?: number | null
           score?: number | null
           text: string
           user_id: string
@@ -2080,8 +2086,11 @@ export type Database = {
           image_url?: string | null
           is_anonymous?: boolean | null
           is_demo?: boolean | null
+          is_private_party?: boolean | null
           is_promoted?: boolean | null
           media_type?: string | null
+          party_lat?: number | null
+          party_lng?: number | null
           score?: number | null
           text?: string
           user_id?: string
