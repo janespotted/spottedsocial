@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from 'react';
 const CACHE_KEYS = {
   POSTS: 'offline_cache_posts',
   FRIENDS: 'offline_cache_friends',
-  STORIES: 'offline_cache_stories',
 };
 
 const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
@@ -32,7 +31,6 @@ function getCache<T>(key: string): T | null {
     
     const entry: CacheEntry<T> = JSON.parse(item);
     
-    // Check if cache is expired
     if (Date.now() - entry.timestamp > CACHE_EXPIRY) {
       localStorage.removeItem(key);
       return null;
@@ -77,21 +75,11 @@ export function useOfflineCache() {
     return getCache<T>(CACHE_KEYS.FRIENDS);
   }, []);
 
-  const cacheStories = useCallback(<T>(stories: T) => {
-    setCache(CACHE_KEYS.STORIES, stories);
-  }, []);
-
-  const getCachedStories = useCallback(<T>(): T | null => {
-    return getCache<T>(CACHE_KEYS.STORIES);
-  }, []);
-
   return {
     isOnline,
     cachePosts,
     getCachedPosts,
     cacheFriends,
     getCachedFriends,
-    cacheStories,
-    getCachedStories,
   };
 }

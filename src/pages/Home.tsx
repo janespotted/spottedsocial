@@ -27,8 +27,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { StoryViewer } from '@/components/StoryViewer';
-import { CreateStoryDialog } from '@/components/CreateStoryDialog';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { PostLikesModal } from '@/components/PostLikesModal';
@@ -56,13 +54,11 @@ export default function Home() {
   const { isWeekendRally, clearRally } = useWeekendRally();
   useAutoVenueTracking();
 
-  const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends, cacheStories, getCachedStories } = useOfflineCache();
+  const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends } = useOfflineCache();
 
   const {
     posts,
     friends,
-    storyUsers,
-    userHasStory,
     likedPosts,
     likedComments,
     expandedPostId,
@@ -75,7 +71,6 @@ export default function Home() {
     getTimeAgo,
     fetchFriends,
     fetchPosts,
-    fetchStories,
     handleToggleComments,
     handlePostComment,
     handleLikePost,
@@ -90,14 +85,10 @@ export default function Home() {
     city,
     onCachePosts: cachePosts,
     onCacheFriends: cacheFriends,
-    onCacheStories: cacheStories,
     getCachedPosts,
     getCachedFriends,
-    getCachedStories,
   });
 
-  const [selectedStoryUser, setSelectedStoryUser] = useState<string | null>(null);
-  const [createStoryOpen, setCreateStoryOpen] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -108,12 +99,10 @@ export default function Home() {
   // Store fetch functions in refs to avoid dependency changes causing re-renders
   const fetchFriendsRef = useRef(fetchFriends);
   const fetchPostsRef = useRef(fetchPosts);
-  const fetchStoriesRef = useRef(fetchStories);
 
   useEffect(() => {
     fetchFriendsRef.current = fetchFriends;
     fetchPostsRef.current = fetchPosts;
-    fetchStoriesRef.current = fetchStories;
   });
 
   const handleVenueClick = async (venueName: string, venueId?: string | null) => {
@@ -241,7 +230,6 @@ export default function Home() {
       Promise.all([
         fetchFriendsRef.current(),
         fetchPostsRef.current(),
-        fetchStoriesRef.current(),
         fetchPlanningFriends(),
       ]).finally(() => setIsLoading(false));
     }
@@ -264,7 +252,6 @@ export default function Home() {
   useRealtimeSubscriptions({
     onNewPost: handleIncrementalNewPost,
     onPostDeleted: handleIncrementalDelete,
-    onStoriesChange: fetchStories,
   });
 
   const handlePostDelete = async (postId: string) => {
@@ -339,72 +326,7 @@ export default function Home() {
             )}
           </button>
         </div>
-        {feedMode === 'newsfeed' && (
-          <div className="pb-4 overflow-hidden">
-            <div className="flex gap-4 overflow-x-auto scrollbar-hide px-6">
-              {/* Your Story Button */}
-              <button
-                onClick={() => {
-                  if (userHasStory) {
-                    setSelectedStoryUser(user?.id || null);
-                  } else {
-                    setCreateStoryOpen(true);
-                  }
-                }}
-                className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
-              >
-                <div className="relative">
-                  <div className={`p-[3px] rounded-full ${
-                    userHasStory
-                      ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active'
-                      : 'bg-gradient-to-br from-[#a855f7]/60 to-[#a855f7]/20'
-                  }`}>
-                    <div className="rounded-full bg-[#0a0118] p-[2px]">
-                      <Avatar className="h-14 w-14">
-                        <AvatarImage src={user?.user_metadata?.avatar_url} />
-                        <AvatarFallback className="bg-[#1a0f2e] text-white">
-                          {user?.user_metadata?.display_name?.[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                  </div>
-                  {/* Always show + badge to indicate you can add more */}
-                  <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-br from-[#a855f7] to-[#7c3aed] rounded-full p-1.5 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
-                    <Plus className="h-3 w-3 text-white" />
-                  </div>
-                </div>
-                <span className="text-[10px] text-white/60 font-medium">Your Story</span>
-              </button>
-
-              {/* Friend Stories */}
-              {storyUsers.map((storyUser) => (
-                <button
-                  key={storyUser.user_id}
-                  onClick={() => setSelectedStoryUser(storyUser.user_id)}
-                  className="flex-shrink-0 flex flex-col items-center gap-1.5 transition-all hover:scale-105"
-                >
-                  <div className={`p-[3px] rounded-full ${
-                    storyUser.has_unviewed 
-                      ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00] story-ring-active' 
-                      : 'bg-gradient-to-br from-[#a855f7]/40 to-[#a855f7]/20'
-                  }`}>
-                    <div className="rounded-full bg-[#0a0118] p-[2px]">
-                      <Avatar className="h-14 w-14">
-                        <AvatarImage src={storyUser.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#1a0f2e] text-white">
-                          {storyUser.display_name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-white/70 font-medium max-w-[60px] truncate">
-                    {storyUser.display_name.split(' ')[0]}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Story row removed — Yap handles venue content now */}
       </div>
 
       {/* No Friends Banner */}
@@ -420,7 +342,7 @@ export default function Home() {
           />
         </div>
       ) : (
-      <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchStories(); await fetchPlanningFriends(); }}>
+      <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchPlanningFriends(); }}>
         <div className="px-4 py-6 space-y-6">
         
         
@@ -678,25 +600,6 @@ export default function Home() {
       </PullToRefresh>
       )}
 
-      {selectedStoryUser && (
-        <StoryViewer
-          userId={selectedStoryUser}
-          onClose={() => setSelectedStoryUser(null)}
-          allStoryUsers={
-            selectedStoryUser === user?.id && userHasStory
-              ? [user.id, ...storyUsers.map(u => u.user_id)]
-              : storyUsers.map(u => u.user_id)
-          }
-          currentUserIndex={
-            selectedStoryUser === user?.id && userHasStory
-              ? 0
-              : storyUsers.findIndex(u => u.user_id === selectedStoryUser)
-          }
-          onAddStory={() => setCreateStoryOpen(true)}
-        />
-      )}
-
-      <CreateStoryDialog open={createStoryOpen} onOpenChange={setCreateStoryOpen} />
 
       {/* Create Post FAB - only show in newsfeed mode */}
       {feedMode === 'newsfeed' && (

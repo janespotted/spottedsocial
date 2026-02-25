@@ -14,7 +14,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { ReportDialog } from '@/components/ReportDialog';
 import { toast } from 'sonner';
-import { StoryViewer } from '@/components/StoryViewer';
 import { CreatePlanDialog } from '@/components/CreatePlanDialog';
 import { getOrCreateInviteCode, getInviteLink, triggerSmsInvite } from '@/lib/sms-invite';
 import { haptic } from '@/lib/haptics';
@@ -65,8 +64,6 @@ export function FriendIdCard() {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isDemoUser, setIsDemoUser] = useState(false);
   const [venueCoords, setVenueCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [hasStory, setHasStory] = useState(false);
-  const [showStoryViewer, setShowStoryViewer] = useState(false);
   const [showCreatePlanDialog, setShowCreatePlanDialog] = useState(false);
   const [preselectedFriendForPlan, setPreselectedFriendForPlan] = useState<{
     id: string;
@@ -79,8 +76,7 @@ export function FriendIdCard() {
       console.log('Friend ID Card opened for:', selectedFriend);
       // Check if this is a demo user
       checkIfDemoUser();
-      // Check if friend has active stories
-      checkForStories();
+      // Fetch venue coordinates for distance calculation
       // Fetch venue coordinates for distance calculation
       if (selectedFriend.venueName) {
         fetchVenueCoordinates(selectedFriend.venueName);
@@ -102,29 +98,9 @@ export function FriendIdCard() {
       setStatusSubtitle('');
       setIsDemoUser(false);
       setVenueCoords(null);
-      setHasStory(false);
       setShowCreatePlanDialog(false);
     }
   }, [selectedFriend, demoEnabled]);
-
-  const checkForStories = async () => {
-    if (!selectedFriend) return;
-    const { data: stories } = await supabase
-      .from('stories')
-      .select('id')
-      .eq('user_id', selectedFriend.userId)
-      .gt('expires_at', new Date().toISOString())
-      .limit(1);
-    
-    setHasStory(stories && stories.length > 0);
-  };
-
-  const handleViewStory = () => {
-    if (hasStory && selectedFriend) {
-      closeFriendCard(); // Close the card first
-      setShowStoryViewer(true); // Then show the story
-    }
-  };
 
   const fetchVenueCoordinates = async (venueName: string) => {
     const { data } = await supabase
@@ -550,23 +526,8 @@ export function FriendIdCard() {
 
               <div className="p-5 pt-8 relative">
                 <div className="flex items-start gap-4 mb-4">
-                {/* Large Avatar - with story ring if has stories, relationship-colored border */}
+                {/* Large Avatar - relationship-colored border */}
                 <div className="relative flex-shrink-0">
-                  {hasStory ? (
-                    <button 
-                      onClick={handleViewStory}
-                      className="p-[3px] rounded-full bg-gradient-to-br from-[#d4ff00] via-[#d4ff00] to-[#a855f7] story-ring"
-                    >
-                      <div className="rounded-full bg-[#0a0118] p-[2px]">
-                        <Avatar className="h-20 w-20">
-                          <AvatarImage src={selectedFriend.avatarUrl || undefined} />
-                          <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
-                            {selectedFriend.displayName[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                      </div>
-                    </button>
-                  ) : (
                     <Avatar className={`h-20 w-20 border-[3px] ${
                       selectedFriend.relationshipType === 'close' ? 'border-[#d4ff00]' :
                       selectedFriend.relationshipType === 'mutual' ? 'border-[#6366f1]' :
@@ -577,7 +538,6 @@ export function FriendIdCard() {
                         {selectedFriend.displayName[0]}
                       </AvatarFallback>
                     </Avatar>
-                  )}
                   
                   {/* Relationship badge */}
                   {selectedFriend.relationshipType === 'close' && (
@@ -782,18 +742,6 @@ export function FriendIdCard() {
       />
     )}
 
-    {/* Story Viewer */}
-    {showStoryViewer && selectedFriend && (
-      <StoryViewer
-        userId={selectedFriend.userId}
-        onClose={() => {
-          setShowStoryViewer(false);
-          closeFriendCard(); // Close card when done viewing stories
-        }}
-        allStoryUsers={[selectedFriend.userId]}
-        currentUserIndex={0}
-      />
-    )}
 
     {/* Create Plan Dialog - rendered outside of selectedFriend check so it stays open after card closes */}
     {user && (
