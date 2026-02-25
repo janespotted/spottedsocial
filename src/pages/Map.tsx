@@ -1363,7 +1363,7 @@ export default function Map() {
 
       {/* Full-Screen Search Overlay */}
       {showSearchOverlay && (
-        <div className="fixed inset-0 bg-[#0a0118]/95 z-[500] flex flex-col animate-fade-in">
+        <div className="fixed inset-0 bg-[#0a0118] z-[500] flex flex-col animate-fade-in pointer-events-auto" style={{ touchAction: 'auto' }}>
           {/* Search Header */}
           <div className="flex items-center gap-3 px-4 py-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
             <button 
@@ -1394,7 +1394,7 @@ export default function Map() {
           {/* Filter Chips */}
           <div className="flex gap-2 px-4 pb-3">
             <button
-              onClick={() => setSearchFilterPeople(!searchFilterPeople)}
+              onClick={(e) => { e.stopPropagation(); setSearchFilterPeople(!searchFilterPeople); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 searchFilterPeople 
                   ? 'bg-[#a855f7]/30 text-white border border-[#a855f7]/50' 
@@ -1405,7 +1405,7 @@ export default function Map() {
               People
             </button>
             <button
-              onClick={() => setSearchFilterVenues(!searchFilterVenues)}
+              onClick={(e) => { e.stopPropagation(); setSearchFilterVenues(!searchFilterVenues); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 searchFilterVenues 
                   ? 'bg-[#a855f7]/30 text-white border border-[#a855f7]/50' 
@@ -1422,7 +1422,7 @@ export default function Map() {
             {searchQuery.length === 0 ? (
               <>
                 {/* Trending Tonight */}
-                {trendingVenues.length > 0 && (
+                {searchFilterVenues && trendingVenues.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">🔥 Trending Tonight</h3>
                     <div className="space-y-1">
@@ -1444,7 +1444,7 @@ export default function Map() {
                 )}
 
                 {/* Friends Out Now */}
-                {friends.length > 0 && (
+                {searchFilterPeople && friends.length > 0 && (
                   <div>
                     <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">👥 Friends Out Now</h3>
                     <div className="space-y-1">
