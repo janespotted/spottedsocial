@@ -15,7 +15,10 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin, Bell, ChevronDown, Search, X } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2 } from 'lucide-react';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import { FriendsPlanning } from '@/components/FriendsPlanning';
 import { useNavigate } from 'react-router-dom';
@@ -74,7 +77,6 @@ export default function Map() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [userProfile, setUserProfile] = useState<{ avatar_url: string | null; display_name: string } | null>(null);
   const [showFriendsList, setShowFriendsList] = useState(false);
-  const [showVenueFilters, setShowVenueFilters] = useState(false);
   const [isLoadingFriends, setIsLoadingFriends] = useState(true);
   const [currentZoom, setCurrentZoom] = useState(13);
   const [selectedCluster, setSelectedCluster] = useState<{
@@ -83,15 +85,16 @@ export default function Map() {
     screenX: number;
     screenY: number;
   } | null>(null);
-  const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [focusMode, setFocusMode] = useState(false);
-  const [showVenueList, setShowVenueList] = useState(false);
   const [layerVisibility, setLayerVisibility] = useState<'both' | 'friends' | 'venues'>('both');
+  const [showSearchOverlay, setShowSearchOverlay] = useState(false);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [searchFilterPeople, setSearchFilterPeople] = useState(true);
+  const [searchFilterVenues, setSearchFilterVenues] = useState(true);
+  const [relationshipFilter, setRelationshipFilter] = useState<'all' | 'close' | 'friends_only'>('all');
   const friendsListRef = useRef<HTMLDivElement>(null);
-  const venueFilterRef = useRef<HTMLDivElement>(null);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const venueListRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Use ref for city to prevent callback recreation
   const cityRef = useRef(city);
@@ -512,7 +515,6 @@ export default function Map() {
     // Toggle focus mode and close cluster popover when clicking on map
     map.current.on('click', () => {
       setSelectedCluster(null);
-      setShowVenueList(false);
       setFocusMode(prev => !prev);
     });
 
@@ -621,6 +623,11 @@ export default function Map() {
       return;
     }
 
+    // Apply relationship filter
+    const filteredFriends = relationshipFilter === 'close'
+      ? friends.filter(f => f.relationshipType === 'close')
+      : friends;
+
     // At high zoom (18+), don't cluster - show all individual avatars
     const shouldCluster = currentZoom < 18;
 
@@ -628,14 +635,14 @@ export default function Map() {
     const clusters: FriendLocation[][] = [];
     const assigned = new Set<string>();
 
-    friends.forEach((friend) => {
+    filteredFriends.forEach((friend) => {
       if (assigned.has(friend.user_id)) return;
       
       const cluster = [friend];
       assigned.add(friend.user_id);
       
       if (shouldCluster) {
-        friends.forEach((other) => {
+        filteredFriends.forEach((other) => {
           if (assigned.has(other.user_id)) return;
           const latDiff = Math.abs(friend.lat - other.lat);
           const lngDiff = Math.abs(friend.lng - other.lng);
@@ -838,7 +845,7 @@ export default function Map() {
         });
       }
     });
-  }, [friends, isLoadingFriends, currentZoom, layerVisibility]);
+  }, [friends, isLoadingFriends, currentZoom, layerVisibility, relationshipFilter]);
 
   // Determine how many venues to show based on zoom level
   const getVisibleVenueCount = (zoom: number): number => {
@@ -1031,27 +1038,13 @@ export default function Map() {
       ) {
         setShowFriendsList(false);
       }
-      if (
-        venueFilterRef.current &&
-        !venueFilterRef.current.contains(event.target as Node) &&
-        showVenueFilters
-      ) {
-        setShowVenueFilters(false);
-      }
-      if (
-        venueListRef.current &&
-        !venueListRef.current.contains(event.target as Node) &&
-        showVenueList
-      ) {
-        setShowVenueList(false);
-      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showFriendsList, showVenueFilters, showVenueList]);
+  }, [showFriendsList]);
 
   const centerOnMyLocation = () => {
     if (!map.current) return;
@@ -1089,11 +1082,6 @@ export default function Map() {
     }
   };
 
-  // Filtered venues for search
-  const filteredSearchVenues = venues.filter(venue =>
-    venue.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    venue.neighborhood.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   // Handle venue selection from search
   const handleVenueSearchSelect = (venue: Venue) => {
@@ -1105,9 +1093,52 @@ export default function Map() {
       });
     }
     openVenueCard(venue.id);
-    setShowSearch(false);
+    setShowSearchOverlay(false);
     setSearchQuery('');
   };
+
+  // Handle friend selection from search
+  const handleFriendSearchSelect = (friend: FriendLocation) => {
+    if (map.current) {
+      map.current.flyTo({
+        center: [friend.lng, friend.lat],
+        zoom: 15,
+        duration: 1500,
+      });
+    }
+    const friendCardData: FriendCardData = {
+      userId: friend.user_id,
+      displayName: friend.profiles?.display_name || 'Friend',
+      avatarUrl: friend.profiles?.avatar_url || null,
+      venueName: friend.venue_name,
+      lat: friend.lat,
+      lng: friend.lng,
+      relationshipType: friend.relationshipType,
+    };
+    openFriendCard(friendCardData);
+    setShowSearchOverlay(false);
+    setSearchQuery('');
+  };
+
+  // Trending venues (top 3 by heat score)
+  const trendingVenues = venues.slice(0, 3);
+
+  // Venue type emoji helper
+  const venueTypeEmoji = (type: string) => {
+    if (type === 'nightclub') return '🎵';
+    if (type === 'cocktail_bar') return '🍸';
+    if (type === 'bar') return '🍺';
+    if (type === 'rooftop') return '🌃';
+    return '📍';
+  };
+
+  // Filtered search results
+  const searchPeopleResults = searchFilterPeople && searchQuery.length > 0
+    ? friends.filter(f => f.profiles?.display_name?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : [];
+  const searchVenueResults = searchFilterVenues && searchQuery.length > 0
+    ? venues.filter(v => v.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.neighborhood.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 10)
+    : [];
 
   // Consistent bottom offset for all floating elements (nav height + padding + safe area)
   const bottomOffset = 'calc(5rem + env(safe-area-inset-bottom, 0px))';
@@ -1145,267 +1176,277 @@ export default function Map() {
         </div>
       </div>
 
-      {/* Search Button/Input - Top Left Below Header */}
+      {/* Unified Search Bar */}
       <div 
-        ref={searchContainerRef} 
-        className={`absolute left-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-        style={{ top: 'calc(7rem + env(safe-area-inset-top, 0px))' }}
+        className={`absolute left-4 right-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        style={{ top: 'calc(6.5rem + env(safe-area-inset-top, 0px))' }}
       >
-        {showSearch ? (
-          <div className="flex items-center gap-2 bg-[#2d1b4e]/90 backdrop-blur rounded-xl border border-[#a855f7]/50 px-3 py-2 animate-fade-in shadow-[0_0_10px_rgba(168,85,247,0.1)]">
-            <span className="text-sm">🔍</span>
-            <input
-              type="text"
-              placeholder="Search venues..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent text-white text-sm w-40 outline-none placeholder:text-white/40"
-              autoFocus
-            />
-            <button onClick={() => { setShowSearch(false); setSearchQuery(''); }}>
-              <X className="w-4 h-4 text-white/60 hover:text-white transition-colors" />
+        <button
+          onClick={() => setShowSearchOverlay(true)}
+          className="w-full bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
+        >
+          <Search className="w-4 h-4 text-white/50 flex-shrink-0" />
+          <span className="text-white/50 text-sm flex-1 text-left">Search people, venues, or neighborhoods...</span>
+          <div
+            onClick={(e) => { e.stopPropagation(); setShowFilterSheet(true); }}
+            className="w-8 h-8 rounded-lg bg-[#a855f7]/20 flex items-center justify-center hover:bg-[#a855f7]/30 transition-colors"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-white/70" />
+          </div>
+        </button>
+      </div>
+
+      {/* Full-Screen Search Overlay */}
+      {showSearchOverlay && (
+        <div className="fixed inset-0 bg-[#0a0118]/95 z-[500] flex flex-col animate-fade-in">
+          {/* Search Header */}
+          <div className="flex items-center gap-3 px-4 py-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
+            <button 
+              onClick={() => { setShowSearchOverlay(false); setSearchQuery(''); }}
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-white" />
             </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowSearch(true)}
-            className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
-            aria-label="Search venues"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-sm">🔍</span>
-              <span className="text-white/90 text-sm font-medium">Search</span>
-            </div>
-          </button>
-        )}
-      </div>
-
-      {/* Search Results Dropdown */}
-      {showSearch && searchQuery.length > 0 && !focusMode && (
-        <div 
-          className="absolute left-4 w-64 z-[250] bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 overflow-y-auto"
-          style={{ top: 'calc(10rem + env(safe-area-inset-top, 0px))' }}
-        >
-          {filteredSearchVenues.length > 0 ? (
-            filteredSearchVenues.slice(0, 10).map((venue) => (
-              <button
-                key={venue.id}
-                onClick={() => handleVenueSearchSelect(venue)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#a855f7]/15 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
-              >
-                <MapPin className="w-5 h-5 text-[#a855f7]" />
-                <div className="flex-1 text-left">
-                  <p className="text-white font-medium text-sm">{venue.name}</p>
-                  <p className="text-white/50 text-xs">{venue.neighborhood}</p>
-                </div>
-              </button>
-            ))
-          ) : (
-            <div className="px-4 py-6 text-center text-white/50 text-sm">
-              No venues found
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Venue Type Filter - Collapsible in top right */}
-      <div 
-        ref={venueFilterRef} 
-        className={`absolute right-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-        style={{ top: 'calc(7rem + env(safe-area-inset-top, 0px))' }}
-      >
-        {/* Collapsed Pill */}
-        <button
-          onClick={() => setShowVenueFilters(!showVenueFilters)}
-          className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-sm">
-              {venueFilter === 'all' ? '🗺️' : 
-               venueFilter === 'nightclub' ? '🎵' :
-               venueFilter === 'cocktail_bar' ? '🍸' :
-               venueFilter === 'bar' ? '🍺' : '🌃'}
-            </span>
-            <span className="text-white/90 text-sm font-medium">
-              {venueFilter === 'all' ? 'All Venues' :
-               venueFilter === 'nightclub' ? 'Clubs' :
-               venueFilter === 'cocktail_bar' ? 'Cocktails' :
-               venueFilter === 'bar' ? 'Bars' : 'Rooftops'}
-            </span>
-            <ChevronDown className={`w-4 h-4 text-white/60 transition-transform duration-200 ${showVenueFilters ? 'rotate-180' : ''}`} />
-          </div>
-        </button>
-
-        {/* Expanded Filter Options */}
-        {showVenueFilters && (
-          <div className="mt-1.5 bg-[#1a0f2e] backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_25px_rgba(168,85,247,0.4)] overflow-hidden animate-fade-in min-w-[140px] relative z-[300]">
-            {[
-              { key: 'all', label: 'All Venues', icon: '🗺️' },
-              { key: 'nightclub', label: 'Clubs', icon: '🎵' },
-              { key: 'cocktail_bar', label: 'Cocktails', icon: '🍸' },
-              { key: 'bar', label: 'Bars', icon: '🍺' },
-              { key: 'rooftop', label: 'Rooftops', icon: '🌃' },
-            ].map((filter) => (
-              <button
-                key={filter.key}
-                onClick={() => {
-                  setVenueFilter(filter.key as typeof venueFilter);
-                  setShowVenueFilters(false);
-                }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 transition-all border-b border-[#a855f7]/10 last:border-b-0 ${
-                  venueFilter === filter.key 
-                    ? 'bg-[#a855f7]/25 shadow-[inset_0_0_10px_rgba(168,85,247,0.2)]' 
-                    : 'hover:bg-[#a855f7]/15 hover:shadow-[inset_0_0_15px_rgba(168,85,247,0.1)]'
-                }`}
-              >
-                <span className="text-sm">{filter.icon}</span>
-                <span className={`text-sm ${venueFilter === filter.key ? 'text-[#d4ff00] font-semibold' : 'text-white/80'}`}>
-                  {filter.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Layer Visibility Toggle - Below Venue Filter on Right */}
-      <div 
-        className={`absolute right-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-        style={{ top: 'calc(9.5rem + env(safe-area-inset-top, 0px))' }}
-      >
-        <div className="flex bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl overflow-hidden">
-          <button
-            onClick={() => {
-              setLayerVisibility('both');
-              setSelectedCluster(null);
-            }}
-            className={`px-3 py-2 text-sm transition-colors ${
-              layerVisibility === 'both' 
-                ? 'bg-[#a855f7]/30 text-[#d4ff00]' 
-                : 'text-white/70 hover:bg-[#a855f7]/15'
-            }`}
-          >
-            Both
-          </button>
-          <button
-            onClick={() => {
-              setLayerVisibility('friends');
-              setSelectedCluster(null);
-            }}
-            className={`px-3 py-2 text-sm transition-colors ${
-              layerVisibility === 'friends' 
-                ? 'bg-[#a855f7]/30 text-[#d4ff00]' 
-                : 'text-white/70 hover:bg-[#a855f7]/15'
-            }`}
-          >
-            👤
-          </button>
-          <button
-            onClick={() => {
-              setLayerVisibility('venues');
-              setSelectedCluster(null);
-              setShowFriendsList(false);
-            }}
-            className={`px-3 py-2 text-sm transition-colors ${
-              layerVisibility === 'venues' 
-                ? 'bg-[#a855f7]/30 text-[#d4ff00]' 
-                : 'text-white/70 hover:bg-[#a855f7]/15'
-            }`}
-          >
-            📍
-          </button>
-        </div>
-      </div>
-
-      {/* Explore Venues Button + List - Below Search on Left */}
-      <div 
-        ref={venueListRef}
-        className={`absolute left-4 z-[200] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-        style={{ top: 'calc(9.5rem + env(safe-area-inset-top, 0px))' }}
-      >
-        <button
-          onClick={() => setShowVenueList(!showVenueList)}
-          className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl px-3 py-2 hover:bg-[#2d1b4e] hover:border-[#a855f7]/50 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-sm">📍</span>
-            <span className="text-white/90 text-sm font-medium">Explore</span>
-            <ChevronDown className={`w-4 h-4 text-white/60 transition-transform duration-200 ${showVenueList ? 'rotate-180' : ''}`} />
-          </div>
-        </button>
-
-        {/* Venue List Panel */}
-        {showVenueList && (
-          <div className="mt-1.5 bg-[#1a0f2e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden max-h-80 w-64 animate-fade-in">
-            {/* Header with count */}
-            <div className="sticky top-0 bg-[#1a0f2e] border-b border-[#a855f7]/30 px-3 py-2">
-              <p className="text-white/70 text-xs font-medium">
-                {typeFilteredVenues.length} venues in {city.toUpperCase()}
-                {userLocation && ' • Sorted by distance'}
-              </p>
-            </div>
-            
-            {/* Scrollable Venue List - Sorted by distance */}
-            <div className="max-h-64 overflow-y-auto">
-              {typeFilteredVenues.length > 0 ? (
-                [...typeFilteredVenues]
-                  .map(venue => ({
-                    ...venue,
-                    distanceMiles: userLocation 
-                      ? parseFloat(calculateDistance(userLocation.lat, userLocation.lng, venue.lat, venue.lng))
-                      : null
-                  }))
-                  .sort((a, b) => {
-                    if (a.distanceMiles !== null && b.distanceMiles !== null) {
-                      return a.distanceMiles - b.distanceMiles;
-                    }
-                    return a.name.localeCompare(b.name); // Fallback to alphabetical
-                  })
-                  .map((venue) => (
-                  <button
-                    key={venue.id}
-                    onClick={() => {
-                      openVenueCard(venue.id);
-                      setShowVenueList(false);
-                      if (map.current) {
-                        map.current.flyTo({
-                          center: [venue.lng, venue.lat],
-                          zoom: 15,
-                          duration: 1500,
-                        });
-                      }
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#a855f7]/15 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
-                  >
-                    <MapPin className="w-4 h-4 text-[#a855f7] flex-shrink-0" />
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="text-white font-medium text-sm truncate">{venue.name}</p>
-                      <p className="text-white/50 text-xs truncate">{venue.neighborhood}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {venue.distanceMiles !== null && (
-                        <span className="text-[#a855f7] text-xs font-medium">
-                          {venue.distanceMiles < 0.1 ? '<0.1' : venue.distanceMiles} mi
-                        </span>
-                      )}
-                      <span className="text-xs">
-                        {venue.type === 'nightclub' ? '🎵' :
-                         venue.type === 'cocktail_bar' ? '🍸' :
-                         venue.type === 'bar' ? '🍺' :
-                         venue.type === 'rooftop' ? '🌃' : '📍'}
-                      </span>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="px-3 py-6 text-center text-white/50 text-sm">
-                  No venues found
-                </div>
+            <div className="flex-1 bg-[#2d1b4e]/80 border border-[#a855f7]/30 rounded-xl px-4 py-2.5 flex items-center gap-2">
+              <Search className="w-4 h-4 text-white/40" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search people, venues, or neighborhoods..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-transparent text-white text-sm flex-1 outline-none placeholder:text-white/40"
+                autoFocus
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')}>
+                  <X className="w-4 h-4 text-white/40 hover:text-white transition-colors" />
+                </button>
               )}
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Filter Chips */}
+          <div className="flex gap-2 px-4 pb-3">
+            <button
+              onClick={() => setSearchFilterPeople(!searchFilterPeople)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                searchFilterPeople 
+                  ? 'bg-[#a855f7]/30 text-white border border-[#a855f7]/50' 
+                  : 'bg-[#2d1b4e]/50 text-white/50 border border-white/10'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              People
+            </button>
+            <button
+              onClick={() => setSearchFilterVenues(!searchFilterVenues)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                searchFilterVenues 
+                  ? 'bg-[#a855f7]/30 text-white border border-[#a855f7]/50' 
+                  : 'bg-[#2d1b4e]/50 text-white/50 border border-white/10'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              Venues
+            </button>
+          </div>
+
+          {/* Search Content */}
+          <div className="flex-1 overflow-y-auto px-4 pb-8">
+            {searchQuery.length === 0 ? (
+              <>
+                {/* Trending Tonight */}
+                {trendingVenues.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">🔥 Trending Tonight</h3>
+                    <div className="space-y-1">
+                      {trendingVenues.map((venue) => (
+                        <button
+                          key={venue.id}
+                          onClick={() => handleVenueSearchSelect(venue)}
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
+                        >
+                          <span className="text-lg">{venueTypeEmoji(venue.type)}</span>
+                          <div className="flex-1 text-left">
+                            <p className="text-white font-medium text-sm">{venue.name}</p>
+                            <p className="text-white/40 text-xs">{venue.neighborhood}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Friends Out Now */}
+                {friends.length > 0 && (
+                  <div>
+                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">👥 Friends Out Now</h3>
+                    <div className="space-y-1">
+                      {friends.map((friend) => (
+                        <button
+                          key={friend.user_id}
+                          onClick={() => handleFriendSearchSelect(friend)}
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
+                        >
+                          <Avatar className="w-9 h-9 border-2 border-[#a855f7]/40">
+                            <AvatarImage src={friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`} />
+                            <AvatarFallback className="bg-[#a855f7]/20 text-white text-xs">
+                              {friend.profiles?.display_name?.[0] || '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 text-left">
+                            <p className="text-white font-medium text-sm">{friend.profiles?.display_name}</p>
+                            <p className="text-[#d4ff00] text-xs">📍 {friend.venue_name}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* People Results */}
+                {searchFilterPeople && searchPeopleResults.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">People</h3>
+                    <div className="space-y-1">
+                      {searchPeopleResults.map((friend) => (
+                        <button
+                          key={friend.user_id}
+                          onClick={() => handleFriendSearchSelect(friend)}
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
+                        >
+                          <Avatar className="w-9 h-9 border-2 border-[#a855f7]/40">
+                            <AvatarImage src={friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`} />
+                            <AvatarFallback className="bg-[#a855f7]/20 text-white text-xs">
+                              {friend.profiles?.display_name?.[0] || '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 text-left">
+                            <p className="text-white font-medium text-sm">{friend.profiles?.display_name}</p>
+                            <p className="text-[#d4ff00] text-xs">📍 {friend.venue_name}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Venue Results */}
+                {searchFilterVenues && searchVenueResults.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Venues</h3>
+                    <div className="space-y-1">
+                      {searchVenueResults.map((venue) => (
+                        <button
+                          key={venue.id}
+                          onClick={() => handleVenueSearchSelect(venue)}
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
+                        >
+                          <span className="text-lg">{venueTypeEmoji(venue.type)}</span>
+                          <div className="flex-1 text-left">
+                            <p className="text-white font-medium text-sm">{venue.name}</p>
+                            <p className="text-white/40 text-xs">{venue.neighborhood}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* No results */}
+                {searchPeopleResults.length === 0 && searchVenueResults.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-white/40 text-sm">No results found</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Filter Bottom Sheet */}
+      <Drawer open={showFilterSheet} onOpenChange={setShowFilterSheet}>
+        <DrawerContent className="bg-[#1a0f2e] border-[#a855f7]/30">
+          <DrawerHeader>
+            <DrawerTitle className="text-white">Show on Map</DrawerTitle>
+          </DrawerHeader>
+          <div className="px-6 pb-6 space-y-6">
+            {/* Relationship Filter */}
+            <div className="space-y-3">
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">People</p>
+              <RadioGroup 
+                value={relationshipFilter} 
+                onValueChange={(val) => {
+                  setRelationshipFilter(val as 'all' | 'close' | 'friends_only');
+                  if (val === 'friends_only') {
+                    setLayerVisibility('friends');
+                  } else {
+                    setLayerVisibility('both');
+                  }
+                  setShowFilterSheet(false);
+                }}
+                className="space-y-2"
+              >
+                {[
+                  { value: 'all', label: 'Everyone', desc: 'Show all friends & venues' },
+                  { value: 'close', label: 'Close Friends Only', desc: 'Only close friends, still show venues' },
+                  { value: 'friends_only', label: 'Friends Only', desc: 'Hide venue pins' },
+                ].map((opt) => (
+                  <Label
+                    key={opt.value}
+                    htmlFor={`filter-${opt.value}`}
+                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
+                      relationshipFilter === opt.value 
+                        ? 'bg-[#a855f7]/20 border border-[#a855f7]/40' 
+                        : 'bg-[#2d1b4e]/50 border border-transparent hover:bg-[#2d1b4e]/80'
+                    }`}
+                  >
+                    <RadioGroupItem value={opt.value} id={`filter-${opt.value}`} className="border-[#a855f7] text-[#a855f7]" />
+                    <div>
+                      <p className="text-white text-sm font-medium">{opt.label}</p>
+                      <p className="text-white/40 text-xs">{opt.desc}</p>
+                    </div>
+                  </Label>
+                ))}
+              </RadioGroup>
+            </div>
+
+            {/* Venue Type Filter */}
+            <div className="space-y-3">
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">Venue Type</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: 'all', label: 'All Venues', icon: '🗺️' },
+                  { key: 'nightclub', label: 'Clubs', icon: '🎵' },
+                  { key: 'cocktail_bar', label: 'Cocktails', icon: '🍸' },
+                  { key: 'bar', label: 'Bars', icon: '🍺' },
+                  { key: 'rooftop', label: 'Rooftops', icon: '🌃' },
+                ].map((filter) => (
+                  <button
+                    key={filter.key}
+                    onClick={() => {
+                      setVenueFilter(filter.key as typeof venueFilter);
+                      setShowFilterSheet(false);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                      venueFilter === filter.key
+                        ? 'bg-[#a855f7]/25 text-[#d4ff00] font-semibold border border-[#a855f7]/40'
+                        : 'bg-[#2d1b4e]/50 text-white/70 border border-transparent hover:bg-[#2d1b4e]/80'
+                    }`}
+                  >
+                    <span>{filter.icon}</span>
+                    <span>{filter.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       {/* Friends Out Pill + List - Bottom Left - Hidden in venues-only mode */}
       {layerVisibility !== 'venues' && friends.length > 0 ? (
