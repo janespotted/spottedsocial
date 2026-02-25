@@ -4,7 +4,7 @@ import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, ChevronRight, CalendarPlus } from 'lucide-react';
+import { X, ChevronRight, CalendarPlus, Share2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MessageCircle, MoreVertical, Flag, Ban, X as CloseIcon } from 'lucide-react';
@@ -16,6 +16,8 @@ import { ReportDialog } from '@/components/ReportDialog';
 import { toast } from 'sonner';
 import { StoryViewer } from '@/components/StoryViewer';
 import { CreatePlanDialog } from '@/components/CreatePlanDialog';
+import { getOrCreateInviteCode, getInviteLink, triggerSmsInvite } from '@/lib/sms-invite';
+import { haptic } from '@/lib/haptics';
 
 interface FriendData {
   id: string;
@@ -376,14 +378,60 @@ export function FriendIdCard() {
   };
 
   const handleMeetUp = async () => {
-    if (!selectedFriend) return;
-    
+    if (!selectedFriend || !user) return;
+
+    // If demo user (not a real Spotted user), prompt SMS invite instead
+    if (isDemoUser && !demoEnabled) {
+      haptic.light();
+      try {
+        const { data: profile } = await supabase
+          .rpc('get_profile_safe', { target_user_id: user.id });
+        const senderName = profile?.[0]?.display_name?.split(' ')[0] || 'Your friend';
+        const code = await getOrCreateInviteCode(user.id);
+        const venueName = userStatus?.currentVenue || selectedFriend.venueName || undefined;
+        const link = getInviteLink(code);
+        await triggerSmsInvite({
+          senderName,
+          venueName,
+          inviteLink: link,
+          contactName: selectedFriend.displayName,
+        });
+      } catch (err) {
+        console.error('SMS invite error:', err);
+        toast.error('Could not open share sheet');
+      }
+      closeFriendCard();
+      return;
+    }
+
     await sendMeetUpNotification(
       selectedFriend.userId,
       selectedFriend.displayName,
       selectedFriend.avatarUrl
     );
     closeFriendCard();
+  };
+
+  const handleInviteViaSms = async () => {
+    if (!selectedFriend || !user) return;
+    haptic.light();
+    try {
+      const { data: profile } = await supabase
+        .rpc('get_profile_safe', { target_user_id: user.id });
+      const senderName = profile?.[0]?.display_name?.split(' ')[0] || 'Your friend';
+      const code = await getOrCreateInviteCode(user.id);
+      const venueName = userStatus?.currentVenue || selectedFriend.venueName || undefined;
+      const link = getInviteLink(code);
+      await triggerSmsInvite({
+        senderName,
+        venueName,
+        inviteLink: link,
+        contactName: selectedFriend.displayName,
+      });
+    } catch (err) {
+      console.error('SMS invite error:', err);
+      toast.error('Could not open share sheet');
+    }
   };
 
   const handleMakePlans = () => {
@@ -700,6 +748,19 @@ export function FriendIdCard() {
                       className="p-2 rounded-full bg-transparent border-2 border-white/20 text-white hover:bg-white/10 transition-colors"
                     >
                      <MessageCircle className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Demo user who isn't on Spotted — show invite CTA */}
+                {isDemoUser && !demoEnabled && (
+                  <div className="flex items-center gap-2 flex-1">
+                    <button
+                      onClick={handleInviteViaSms}
+                      className="flex-1 py-2 px-5 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      Invite to Spotted
                     </button>
                   </div>
                 )}
