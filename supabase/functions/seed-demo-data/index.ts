@@ -39,6 +39,22 @@ Deno.serve(async (req) => {
       await sb.from('yap_messages').delete().eq('is_demo',true);
       await sb.from('night_statuses').delete().eq('is_demo',true);
       await sb.from('venues').delete().eq('is_demo',true);
+      // Clean up friendships & DMs before deleting profiles (prevents silent FK failures)
+      const {data:demoProfiles}=await sb.from('profiles').select('id').eq('is_demo',true);
+      if(demoProfiles?.length){
+        const demoIds=demoProfiles.map((x:any)=>x.id);
+        const {data:dThreadMembers}=await sb.from('dm_thread_members').select('thread_id').in('user_id',demoIds);
+        if(dThreadMembers?.length){
+          const tids=[...new Set(dThreadMembers.map((t:any)=>t.thread_id))];
+          await sb.from('dm_messages').delete().in('thread_id',tids);
+          await sb.from('dm_thread_members').delete().in('thread_id',tids);
+          await sb.from('dm_threads').delete().in('id',tids);
+        }
+        await sb.from('friendships').delete().in('user_id',demoIds);
+        await sb.from('friendships').delete().in('friend_id',demoIds);
+        await sb.from('checkins').delete().eq('is_demo',true);
+        await sb.from('stories').delete().eq('is_demo',true);
+      }
       await sb.from('profiles').delete().eq('is_demo',true);
       
       // Users
