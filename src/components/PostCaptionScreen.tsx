@@ -151,11 +151,8 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
       return null;
     }
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('post-images')
-      .getPublicUrl(fileName);
-
-    return publicUrl;
+    // Store just the file path — signed URLs are generated at read time
+    return fileName;
   };
 
   const handleShare = async () => {

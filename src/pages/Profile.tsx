@@ -295,7 +295,10 @@ export default function Profile() {
       .order('created_at', { ascending: false })
       .limit(12);
 
-    setUserPosts(postsData || []);
+    // Resolve signed URLs for post images
+    const { resolvePostImageUrls } = await import('@/lib/storage-utils');
+    const resolvedPosts = await resolvePostImageUrls(postsData || []);
+    setUserPosts(resolvedPosts);
     setLoading(false);
   };
 
