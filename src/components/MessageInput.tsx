@@ -13,12 +13,14 @@ interface MessageInputProps {
   onSendMessage: (text: string) => void;
   onImageUpload: (file: File) => void;
   isUploading: boolean;
+  onTyping?: () => void;
 }
 
 export const MessageInput = memo(function MessageInput({ 
   onSendMessage, 
   onImageUpload,
-  isUploading 
+  isUploading,
+  onTyping 
 }: MessageInputProps) {
   const [message, setMessage] = useState('');
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -91,7 +93,10 @@ export const MessageInput = memo(function MessageInput({
 
         <Input
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            onTyping?.();
+          }}
           placeholder="Message..."
           className="flex-1 bg-[#2d1b4e]/60 border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full"
         />

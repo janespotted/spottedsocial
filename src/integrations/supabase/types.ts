@@ -284,6 +284,24 @@ export type Database = {
           },
         ]
       }
+      dm_typing_indicators: {
+        Row: {
+          thread_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          thread_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          thread_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       event_logs: {
         Row: {
           created_at: string

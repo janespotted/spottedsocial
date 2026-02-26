@@ -14,6 +14,7 @@ import { z } from 'zod';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { logger } from '@/lib/logger';
 import { MessageInput } from '@/components/MessageInput';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 
 // Validation schema for DM messages
 const messageSchema = z.object({
@@ -60,6 +61,9 @@ export default function Thread() {
   
   // Map sender_id to member info for group chats
   const [memberMap, setMemberMap] = useState<Map<string, ThreadMember>>(new Map());
+
+  // Typing indicator
+  const { typingUsers, setTyping } = useTypingIndicator(threadId, user?.id, memberMap);
 
   const handleImageUpload = useCallback(async (file: File) => {
     if (!user || !threadId) return;
@@ -569,10 +573,20 @@ export default function Thread() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Typing indicator */}
+      {typingUsers.length > 0 && (
+        <div className="px-4 py-2 text-white/50 text-sm animate-pulse">
+          {typingUsers.length === 1
+            ? `${typingUsers[0].display_name} is typing...`
+            : `${typingUsers.map(u => u.display_name).join(', ')} are typing...`}
+        </div>
+      )}
+
       <MessageInput
         onSendMessage={sendMessage}
         onImageUpload={handleImageUpload}
         isUploading={isUploading}
+        onTyping={setTyping}
       />
     </div>
   </div>
