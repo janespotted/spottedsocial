@@ -274,11 +274,9 @@ export function FriendIdCard() {
   const fetchUserLocation = async () => {
     if (!user) return;
     
-    const { data } = await supabase
-      .from('profiles')
-      .select('last_known_lat, last_known_lng')
-      .eq('id', user.id)
-      .single();
+    const { data: profileRows } = await supabase
+      .rpc('get_profile_safe', { target_user_id: user.id });
+    const data = profileRows?.[0] ?? null;
 
     if (data && data.last_known_lat && data.last_known_lng) {
       setUserLocation({ lat: data.last_known_lat, lng: data.last_known_lng });
