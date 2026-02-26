@@ -11,7 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { ChevronUp, ChevronDown, Bell, BarChart3, ChevronRight } from 'lucide-react';
+import { ChevronUp, ChevronDown, Bell, BarChart3, ChevronRight, Search } from 'lucide-react';
+import { FriendSearchModal } from '@/components/FriendSearchModal';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
@@ -65,6 +66,7 @@ export default function Leaderboard() {
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
+  const [showFriendSearch, setShowFriendSearch] = useState(false);
 
   // Reset neighborhood filter when city changes
   useEffect(() => {
@@ -483,6 +485,13 @@ export default function Leaderboard() {
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setShowFriendSearch(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+              aria-label="Search friends"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+            <button
               onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
               className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
               aria-label="View activity"
@@ -818,6 +827,8 @@ export default function Leaderboard() {
           </div>
         </div>
       )}
+
+      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
     </div>
   );
 }

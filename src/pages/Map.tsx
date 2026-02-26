@@ -32,6 +32,7 @@ import { UpdateSpotSheet } from '@/components/UpdateSpotSheet';
 import { VenueMoveBanner } from '@/components/VenueMoveBanner';
 import { PlanningReadyBanner } from '@/components/PlanningReadyBanner';
 import { useVenueArrivalNudge, type VenueShiftData } from '@/hooks/useVenueArrivalNudge';
+import { FriendSearchModal } from '@/components/FriendSearchModal';
 
 interface FriendLocation {
   user_id: string;
@@ -129,6 +130,7 @@ export default function Map() {
   
   // Planning ready banner — once per session
   const [showPlanningReady, setShowPlanningReady] = useState(false);
+  const [showFriendSearch, setShowFriendSearch] = useState(false);
   const planningReadyShownRef = useRef(false);
   
   // Use ref for city to prevent callback recreation
@@ -1238,6 +1240,13 @@ export default function Map() {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setShowFriendSearch(true)}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+            aria-label="Search friends"
+          >
+            <Search className="w-5 h-5" />
+          </button>
+          <button
             onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
             className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
             aria-label="View activity"
@@ -1945,6 +1954,8 @@ export default function Map() {
           </div>
         </div>
       )}
+
+      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
     </div>
   );
 }

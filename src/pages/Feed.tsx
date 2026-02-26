@@ -11,7 +11,8 @@ import { useOfflineCache } from '@/hooks/useOfflineCache';
 import { useUserCity } from '@/hooks/useUserCity';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search } from 'lucide-react';
+import { FriendSearchModal } from '@/components/FriendSearchModal';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -82,6 +83,7 @@ export default function Feed() {
   const [profile, setProfile] = useState<any>(null);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showFriendSearch, setShowFriendSearch] = useState(false);
 
   const fetchFriendsRef = useRef(fetchFriends);
   const fetchPostsRef = useRef(fetchPosts);
@@ -157,6 +159,13 @@ export default function Feed() {
             <p className="text-white/50 text-sm mt-1">Everything disappears by 5am</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowFriendSearch(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+              aria-label="Search friends"
+            >
+              <Search className="w-5 h-5" />
+            </button>
             <button
               onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
               className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
@@ -445,6 +454,8 @@ export default function Feed() {
           onClose={() => setSelectedPostForLikes(null)}
         />
       )}
+
+      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
     </div>
   );
 }

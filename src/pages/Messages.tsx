@@ -9,8 +9,9 @@ import { MessagesTab } from '@/components/messages/MessagesTab';
 import { YapTab } from '@/components/messages/YapTab';
 import { ActivityTab } from '@/components/messages/ActivityTab';
 import { CityBadge } from '@/components/CityBadge';
-import { Bell } from 'lucide-react';
+import { Bell, Search } from 'lucide-react';
 import { NotificationBadge } from '@/components/NotificationBadge';
+import { FriendSearchModal } from '@/components/FriendSearchModal';
 
 type TabType = 'messages' | 'yap' | 'activity';
 
@@ -29,6 +30,7 @@ export default function Messages() {
   const [activeTab, setActiveTab] = useState<TabType>('messages');
   const [preselectedUser, setPreselectedUser] = useState<PreselectedUser | null>(null);
   const [yapVenueName, setYapVenueName] = useState<string | undefined>(undefined);
+  const [showFriendSearch, setShowFriendSearch] = useState(false);
 
   useEffect(() => {
     // Check if we have a preselected user from navigation state
@@ -60,6 +62,13 @@ export default function Messages() {
             <p className="text-white/60 text-sm">Everything disappears by 5am</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowFriendSearch(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+              aria-label="Search friends"
+            >
+              <Search className="w-5 h-5" />
+            </button>
             <button
               onClick={() => setActiveTab('activity')}
               className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
@@ -135,6 +144,8 @@ export default function Messages() {
         {activeTab === 'yap' && <YapTab venueName={yapVenueName} />}
         {activeTab === 'activity' && <ActivityTab />}
       </div>
+
+      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
     </div>
   );
 }
