@@ -1,132 +1,46 @@
 
 
-# Add Read Receipts + Settings Toggle for Typing/Read Receipts
+# What Could Be Better — Visual & UX Polish
 
-## Testing Results — Typing Indicators
-
-Typing indicators are **fully working end-to-end**:
-- Typing in the message input triggers a `POST` to `dm_typing_indicators` (201 Created)
-- Realtime subscription on `typing_{threadId}` channel is active
-- Fetch of other typing users returns correctly (filtered by thread, excluding self, within 5s window)
-- Auto-cleanup after 4s of inactivity via `setTimeout` + row deletion
-- UI renders "{name} is typing..." with pulse animation below messages
-
-One minor issue found: a `validateDOMNesting` warning (button inside button) in the 1:1 chat header — will fix as part of this change.
+After reviewing the app's current design, fonts, and overall UX, here are the most impactful improvements:
 
 ---
 
-## Feature: Read Receipts
+## Font Assessment
 
-### Database Migration
+The current font stack (Montserrat) is solid for a social app — it's clean and modern. However, there are some typography issues:
 
-Add a `dm_read_receipts` table to track when each user last read a thread:
+1. **The "Spotted" header uses `tracking-[0.3em]` with `font-light`** — this ultra-spaced light weight looks a bit dated/generic. A tighter, bolder wordmark would feel more premium.
+2. **Inconsistent text sizing** — subtitles jump between `text-sm`, `text-xs`, and `text-white/50` vs `text-white/60` with no clear hierarchy.
+3. **No font weight variation** — almost everything is either `font-medium` or `font-semibold`. Using more weight contrast (regular body text vs bold headers) would improve readability.
 
-```sql
-CREATE TABLE public.dm_read_receipts (
-  thread_id uuid NOT NULL,
-  user_id uuid NOT NULL,
-  last_read_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (thread_id, user_id)
-);
+## Recommended Improvements (in priority order)
 
-ALTER TABLE public.dm_read_receipts ENABLE ROW LEVEL SECURITY;
+### 1. Tighten typography hierarchy
+- Make the "Spotted" wordmark bolder (`font-semibold tracking-[0.15em]`) for a more confident brand feel
+- Standardize muted text to `text-white/50` everywhere (currently mixed 40/50/60)
+- Use `font-normal` for body/caption text, `font-bold` for section headers
 
-CREATE POLICY "Users can upsert own read receipt"
-  ON public.dm_read_receipts FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+### 2. Add haptic-style micro-interactions
+- The bottom nav has no press feedback — add `active:scale-95` on tap
+- Post like button could use a quick scale bounce (`active:scale-110`)
+- Tab switches feel flat — add a subtle transition on the yellow underline
 
-CREATE POLICY "Thread members can view read receipts"
-  ON public.dm_read_receipts FOR SELECT
-  USING (public.user_is_thread_member(thread_id));
+### 3. Improve the header/status bar area
+- The sticky header takes up a lot of vertical space (title + subtitle + tabs = ~180px)
+- Collapse the subtitle when scrolling down to reclaim screen real estate
+- The notification bell and search icons could be smaller/more compact
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.dm_read_receipts;
-```
+### 4. Polish the bottom navigation
+- The Spotted logo as profile tab is confusing — users expect an avatar or person icon
+- Add a subtle active background indicator (pill shape) instead of just color change
+- The Map icon in the center should have a label like the others
 
-Also add messaging preference columns to profiles:
-
-```sql
-ALTER TABLE public.profiles
-  ADD COLUMN show_typing_indicators boolean NOT NULL DEFAULT true,
-  ADD COLUMN show_read_receipts boolean NOT NULL DEFAULT true;
-```
-
-### New Hook: `src/hooks/useReadReceipts.ts`
-
-- Exports `useReadReceipts(threadId, userId, messages)`
-- On mount and when messages change: upsert own read receipt with current timestamp
-- Subscribe to realtime changes on `dm_read_receipts` filtered by `thread_id`
-- Return `readReceipts: Map<string, Date>` mapping `user_id` to their `last_read_at`
-- Helper: `getLastSeenMessageId(userId)` — finds the latest message with `created_at <= last_read_at`
-
-### Changes to `src/pages/Thread.tsx`
-
-- Import and use `useReadReceipts`
-- Below the last message sent by the current user that the other person has read, show a small "Seen" label (gray text, right-aligned)
-- For group chats: show small avatar stack of who has seen the latest message
-- Mark thread as read on mount and when new messages arrive
-- Respect `show_typing_indicators` and `show_read_receipts` profile preferences — fetch current user's profile preferences and conditionally render/call
-
-### Changes to `src/hooks/useTypingIndicator.ts`
-
-- Accept an `enabled` parameter (default `true`)
-- When `enabled` is `false`, skip upsert calls and don't subscribe to realtime
-- This allows the Settings toggle to disable typing indicators
+### 5. Smooth page transitions
+- Currently pages just mount/unmount with no transition
+- Add a simple fade or slide transition between routes for a more app-like feel
 
 ---
 
-## Feature: Settings Toggle
-
-### Changes to `src/pages/Settings.tsx`
-
-Add a new "Chat Preferences" card between Push Notifications and City Selector with two toggles:
-- **Typing Indicators** — toggle `show_typing_indicators` on profiles table
-- **Read Receipts** — toggle `show_read_receipts` on profiles table
-
-When toggled off:
-- Typing indicators: user's typing won't be broadcast, and they won't see others typing
-- Read receipts: user's read status won't be sent, and they won't see others' read status
-
-Implementation:
-- Fetch current values from profiles on mount
-- On toggle: update profiles table and show toast confirmation
-- Use the `MessageSquare` icon for the card
-
----
-
-## File Changes Summary
-
-### New files:
-1. `src/hooks/useReadReceipts.ts` — read receipt tracking hook
-
-### Modified files:
-1. `src/pages/Thread.tsx` — integrate read receipts display, respect preferences, fix button nesting
-2. `src/hooks/useTypingIndicator.ts` — add `enabled` parameter
-3. `src/pages/Settings.tsx` — add Chat Preferences section with toggles
-4. Database migration — `dm_read_receipts` table + profile columns
-
----
-
-## Technical Details
-
-### Read receipt display logic:
-- For 1:1 chats: show "Seen" under the last message the other person has read
-- Only show under the current user's sent messages (not received ones)
-- Use small gray italic text, right-aligned: `Seen`
-
-### Read receipt upsert:
-```typescript
-await supabase
-  .from('dm_read_receipts')
-  .upsert({ thread_id, user_id, last_read_at: new Date().toISOString() });
-```
-Called on: thread mount, new message received via realtime, and window focus.
-
-### Settings preference flow:
-- Fetch: `supabase.from('profiles').select('show_typing_indicators, show_read_receipts').eq('id', user.id).single()`
-- Update: `supabase.from('profiles').update({ show_typing_indicators: value }).eq('id', user.id)`
-- Thread.tsx reads these preferences and conditionally enables/disables features
-
-### Button nesting fix (Thread.tsx line 464-494):
-The 1:1 chat header has a `<button>` wrapping the avatar/name, with another `<button>` for the venue name inside it. Fix by changing the outer `<button>` to a `<div>` with `onClick` and `cursor-pointer`, or restructure so the venue button is outside the parent button.
+These are design polish items — the app's functionality is strong. The biggest bang-for-buck improvement would be **tightening the typography** and **adding micro-interactions to the bottom nav and feed**.
 
