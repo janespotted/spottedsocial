@@ -1,57 +1,46 @@
 
 
-# Restyle Find Friends to Match Map Friends List
+# Fix: Duplicate Demo Profiles ("Alex" x36)
 
-## Two Changes
+## Root Cause
 
-### 1. Restyle FriendSearchModal results (FriendSearchModal.tsx)
+The `seed-demo-data` edge function's `seed` action (line 32-121) cleans up old demo data before re-seeding, but it **does not clean up the `friendships` table** before deleting demo profiles. Since friendships reference demo user IDs, the profile deletes silently fail on foreign key constraints, while new profiles are created on top — resulting in 36 "Alex" profiles after multiple seed runs.
 
-Replace the flat unsectioned list with grouped sections matching the map's friends panel:
+The `clear` action (line 122) correctly cleans friendships first, but the `seed` action skips this step.
 
-**Container**: `bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg` — identical to the map panel.
+## Fix (1 file)
 
-**Section headers** — split filtered results into "out", "planning", and "home" groups with headers:
-- "👥 Friends Out Now" — `text-white/70 text-xs font-semibold uppercase tracking-wider`
-- "🔥 Friends Planning 🎯" — same style, inside a `bg-[#1a0f2e]/50 border-y border-[#a855f7]/20` divider bar (matches map exactly)
-- Home friends shown without a header, just listed below
+### `supabase/functions/seed-demo-data/index.ts`
 
-**Row styling** — pixel-match the map list rows:
-- Row: `w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10`
-- Avatar: `w-10 h-10 border-2 border-[#a855f7]/50` with `bg-[#a855f7] text-white text-sm` fallback
-- Name: `text-white font-semibold text-sm truncate`
-- Out subtitle: `text-[#d4ff00] text-xs` with `📍 At {venue}` (matches map)
-- Planning subtitle: `text-[#a855f7] text-xs` with `🎯 Planning (neighborhood)` (matches map)
-- Home subtitle: `text-white/40 text-xs` showing "Home"
-- Remove the story ring, status badge pills, and `@username` line — the map list doesn't have these
+Add friendship cleanup to the `seed` action's cleanup block (before line 42 where profiles are deleted):
 
-**Search bar**: Keep exactly as-is at the top. Filters across all groups in real-time.
+```typescript
+// Before deleting profiles, clean up friendships referencing demo users
+const { data: demoProfiles } = await sb.from('profiles').select('id').eq('is_demo', true);
+if (demoProfiles?.length) {
+  const demoIds = demoProfiles.map((x: any) => x.id);
+  // Clean up DM threads with demo users
+  const { data: dThreadMembers } = await sb.from('dm_thread_members').select('thread_id').in('user_id', demoIds);
+  if (dThreadMembers?.length) {
+    const tids = [...new Set(dThreadMembers.map((t: any) => t.thread_id))];
+    await sb.from('dm_messages').delete().in('thread_id', tids);
+    await sb.from('dm_thread_members').delete().in('thread_id', tids);
+    await sb.from('dm_threads').delete().in('id', tids);
+  }
+  await sb.from('friendships').delete().in('user_id', demoIds);
+  await sb.from('friendships').delete().in('friend_id', demoIds);
+  // Also clean up related tables that reference demo user IDs
+  await sb.from('checkins').delete().eq('is_demo', true);
+  await sb.from('stories').delete().eq('is_demo', true);
+}
+```
 
-**Drawer background**: Change to `bg-[#1a0f2e]` to match the map panel's dark purple tone.
+This mirrors the same cleanup logic already in the `clear` action (lines 129-142), ensuring friendships and DM threads are removed before demo profiles are deleted.
 
-### 2. Add search icon to all pages with a bell icon
+## Immediate Data Fix
 
-Currently the search icon + FriendSearchModal only exists on `Home.tsx`. The user wants it "visible across all pages where the activity bell is."
-
-Pages with the bell icon: **Home, Feed, Profile, Leaderboard, Messages, Map**.
-
-Home already has it. For the other 5 pages, add:
-- Import `Search` from lucide-react, `FriendSearchModal` component, and `useState`
-- Add `const [showFriendSearch, setShowFriendSearch] = useState(false)` state
-- Add a search icon button (same style as Home's) to the left of the bell icon in each header
-- Render `<FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />` in each page
-
-Pages to modify:
-- `src/pages/Feed.tsx`
-- `src/pages/Profile.tsx`
-- `src/pages/Leaderboard.tsx`
-- `src/pages/Messages.tsx`
-- `src/pages/Map.tsx`
+After deploying, re-run the seed with `clear` then `seed` to remove the 36 duplicate Alex profiles and start fresh with 12 clean demo users (including 1-2 "Alex" entries as designed).
 
 ## Files Modified
-- `src/components/FriendSearchModal.tsx` — restyle results to match map panel
-- `src/pages/Feed.tsx` — add search icon + modal
-- `src/pages/Profile.tsx` — add search icon + modal
-- `src/pages/Leaderboard.tsx` — add search icon + modal
-- `src/pages/Messages.tsx` — add search icon + modal
-- `src/pages/Map.tsx` — add search icon + modal
+- `supabase/functions/seed-demo-data/index.ts` — add friendship/DM cleanup to `seed` action before profile deletion
 
