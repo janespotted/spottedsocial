@@ -561,7 +561,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
     <div className="space-y-7 px-4 pb-24">
       {/* Weekend Rally Header - shown when activated via push notification */}
       {weekendFilter && (
-        <div className="bg-gradient-to-br from-[#a855f7]/20 to-[#7c3aed]/10 border border-[#a855f7]/30 rounded-2xl p-4">
+        <div className="bg-gradient-to-br from-[#a855f7]/20 to-[#7c3aed]/10 rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-[#d4ff00]" />

@@ -224,7 +224,7 @@ export default function Auth() {
          <div className="absolute -bottom-32 left-1/4 w-72 h-72 bg-primary/15 rounded-full blur-3xl animate-float-slow" />
        </div>
  
-       <Card className="relative z-10 w-full max-w-[430px] mx-auto glass-card rounded-3xl border border-primary/30 shadow-[0_0_60px_rgba(168,85,247,0.3)] animate-fade-in">
+       <Card className="relative z-10 w-full max-w-[430px] mx-auto glass-card rounded-3xl shadow-[0_0_60px_rgba(168,85,247,0.3)] animate-fade-in">
          <CardHeader className="space-y-3 text-center pt-8 pb-4">
            {/* Logo with glow effect */}
            <div className="flex justify-center mb-2">
