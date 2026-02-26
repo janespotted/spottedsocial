@@ -205,6 +205,24 @@ export type Database = {
           },
         ]
       }
+      dm_read_receipts: {
+        Row: {
+          last_read_at: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          last_read_at?: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          last_read_at?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       dm_thread_members: {
         Row: {
           id: string
@@ -1153,6 +1171,8 @@ export type Database = {
           location_sharing_level: string | null
           push_enabled: boolean | null
           push_subscription: Json | null
+          show_read_receipts: boolean
+          show_typing_indicators: boolean
           username: string
         }
         Insert: {
@@ -1173,6 +1193,8 @@ export type Database = {
           location_sharing_level?: string | null
           push_enabled?: boolean | null
           push_subscription?: Json | null
+          show_read_receipts?: boolean
+          show_typing_indicators?: boolean
           username: string
         }
         Update: {
@@ -1193,6 +1215,8 @@ export type Database = {
           location_sharing_level?: string | null
           push_enabled?: boolean | null
           push_subscription?: Json | null
+          show_read_receipts?: boolean
+          show_typing_indicators?: boolean
           username?: string
         }
         Relationships: []
