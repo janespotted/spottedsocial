@@ -261,12 +261,15 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
                   </>
                 )}
 
-                {/* Home friends */}
+                {/* Staying In */}
                 {homeFriends.length > 0 && (
                   <>
-                    {(outFriends.length > 0 || planningFriends.length > 0) && (
-                      <div className="border-t border-[#a855f7]/10" />
-                    )}
+                    <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
+                      <p className="text-white/70 text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider">
+                        🏠 Staying In
+                        <span className="text-white/50 normal-case tracking-normal">({homeFriends.length})</span>
+                      </p>
+                    </div>
                     {homeFriends.map(renderFriendRow)}
                   </>
                 )}
