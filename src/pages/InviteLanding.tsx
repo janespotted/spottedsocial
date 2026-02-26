@@ -119,7 +119,7 @@ export default function InviteLanding() {
       <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#0a0118] rounded-3xl">
         <CardContent className="pt-8 pb-8 text-center">
           {/* Spotted Logo */}
-          <h1 className="text-4xl font-light tracking-[0.3em] text-white mb-8">
+          <h1 className="text-4xl font-semibold tracking-[0.15em] text-white mb-8">
             Spotted
           </h1>
 

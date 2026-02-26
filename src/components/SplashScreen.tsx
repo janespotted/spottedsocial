@@ -9,7 +9,7 @@ export function SplashScreen() {
           alt="Spotted" 
           className="w-20 h-20 object-contain"
         />
-        <h1 className="text-2xl font-bold text-white">Spotted</h1>
+        <h1 className="text-2xl font-semibold tracking-[0.15em] text-white">Spotted</h1>
       </div>
     </div>
   );
