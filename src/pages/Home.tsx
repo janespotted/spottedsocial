@@ -404,38 +404,28 @@ export default function Home() {
             <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
               <MessageCircle className="h-10 w-10 text-[#a855f7]/60" />
             </div>
-            {!isNightlifeHours() ? (
-              <>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  Fresh start! 🌅
-                </h3>
-                <p className="text-white/50 text-sm max-w-xs">
-                  Last night's posts are gone. Ready for tonight?
-                </p>
-              </>
-            ) : (
-              <>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  It's early
-                </h3>
-                <p className="text-white/50 text-sm max-w-xs mb-6">
-                  Be the first to check in tonight
-                </p>
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={() => setShowCreatePost(true)}
-                    className="bg-[#d4ff00] hover:bg-[#d4ff00]/90 text-[#1a0f2e] rounded-full px-6 py-2.5 font-medium transition-colors"
-                  >
-                    Share what you're up to
-                  </button>
-                  <button
-                    onClick={openCheckIn}
-                    className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6 py-2.5 font-medium transition-colors"
-                  >
-                    Set Your Status
-                  </button>
-                </div>
-              </>
+            <h3 className="text-xl font-semibold text-white mb-6">
+              {(() => {
+                const hour = new Date().getHours();
+                if (hour < 12) return "Who's up?";
+                if (hour < 17) return "What's the move?";
+                if (hour < 21) return "Night's young";
+                return "Be the first";
+              })()}
+            </h3>
+            <button
+              onClick={() => setShowCreatePost(true)}
+              className="bg-[#d4ff00] hover:bg-[#d4ff00]/90 text-[#1a0f2e] rounded-full px-6 py-2.5 font-medium transition-colors"
+            >
+              Share what you're up to
+            </button>
+            {planningFriends.length > 0 && (
+              <button
+                onClick={() => setFeedMode('plans')}
+                className="mt-4 text-white/40 text-sm hover:text-white/60 transition-colors"
+              >
+                🎯 {planningFriends.length} {planningFriends.length === 1 ? 'friend is' : 'friends are'} making plans
+              </button>
             )}
           </div>
         ) : (
