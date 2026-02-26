@@ -36,6 +36,7 @@ export default function BusinessYap() {
   const [messages, setMessages] = useState<VenueYapMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isPinned, setIsPinned] = useState(false);
+  const [duration, setDuration] = useState<'1h' | '2h' | '4h' | 'none'>('none');
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
 
@@ -57,30 +58,7 @@ export default function BusinessYap() {
 
         if (error) throw error;
 
-        const fetchedMessages = data || [];
-
-        // Auto-unpin messages older than 24 hours
-        const now = Date.now();
-        const staleIds: string[] = [];
-        const updatedMessages = fetchedMessages.map((msg) => {
-          if (msg.is_pinned && now - new Date(msg.created_at).getTime() > 24 * 60 * 60 * 1000) {
-            staleIds.push(msg.id);
-            return { ...msg, is_pinned: false };
-          }
-          return msg;
-        });
-
-        if (staleIds.length > 0) {
-          supabase
-            .from('venue_yap_messages')
-            .update({ is_pinned: false })
-            .in('id', staleIds)
-            .then(({ error }) => {
-              if (error) console.error('Error auto-unpinning:', error);
-            });
-        }
-
-        setMessages(updatedMessages);
+        setMessages(data || []);
       } catch (err) {
         console.error('Error fetching messages:', err);
       } finally {
@@ -90,6 +68,13 @@ export default function BusinessYap() {
 
     fetchMessages();
   }, [selectedVenueId]);
+
+  const calculateExpiresAt = (): string | null => {
+    const durations: Record<string, number> = { '1h': 1, '2h': 2, '4h': 4 };
+    const hours = durations[duration];
+    if (!hours) return null;
+    return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+  };
 
   const handlePost = async () => {
     if (!user || !selectedVenueId || !newMessage.trim()) return;
@@ -113,6 +98,7 @@ export default function BusinessYap() {
           text: newMessage.trim(),
           is_pinned: isPinned,
           display_as: 'venue',
+          expires_at: calculateExpiresAt(),
         })
         .select()
         .single();
@@ -122,6 +108,7 @@ export default function BusinessYap() {
       setMessages([data, ...messages]);
       setNewMessage('');
       setIsPinned(false);
+      setDuration('none');
       toast.success('Message posted to Yap board!');
     } catch (err) {
       console.error('Error posting message:', err);
@@ -190,6 +177,15 @@ export default function BusinessYap() {
     return `${diffDays}d ago`;
   };
 
+  const formatExpiryRemaining = (expiresAt: string) => {
+    const remaining = new Date(expiresAt).getTime() - Date.now();
+    if (remaining <= 0) return 'Expired';
+    const hours = Math.floor(remaining / (60 * 60 * 1000));
+    const mins = Math.floor((remaining % (60 * 60 * 1000)) / 60000);
+    if (hours > 0) return `Expires in ${hours}h ${mins}m`;
+    return `Expires in ${mins}m`;
+  };
+
   return (
     <BusinessLayout title="Yap Board">
       {/* Venue Selector */}
@@ -252,6 +248,28 @@ export default function BusinessYap() {
                   )}
                 </Button>
               </div>
+
+              {/* Duration Picker */}
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { value: '1h', label: '1 hour' },
+                  { value: '2h', label: '2 hours' },
+                  { value: '4h', label: '4 hours' },
+                  { value: 'none', label: 'Until I remove it' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setDuration(opt.value)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      duration === opt.value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-white/10 text-white/60 hover:bg-white/15'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </CardContent>
           </Card>
 
@@ -289,9 +307,16 @@ export default function BusinessYap() {
                             </Badge>
                           )}
                           <p className="text-white text-sm">{message.text}</p>
-                          <p className="text-white/40 text-xs mt-1">
-                            {formatTime(message.created_at)}
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-white/40 text-xs">
+                              {formatTime(message.created_at)}
+                            </span>
+                            {message.expires_at && (
+                              <span className="text-white/40 text-xs">
+                                · {formatExpiryRemaining(message.expires_at)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-1">
                           <Button

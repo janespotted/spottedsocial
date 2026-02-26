@@ -54,6 +54,7 @@ interface PinnedVenueMessage {
   text: string;
   created_at: string;
   is_pinned: boolean;
+  expires_at: string | null;
 }
 
 interface VenueYapThreadProps {
@@ -94,6 +95,21 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
   useEffect(() => {
     if (user) fetchBlockedUsers();
   }, [user]);
+
+  // Live countdown: remove expired pinned messages every 60s
+  const [, setCountdownTick] = useState(0);
+  useEffect(() => {
+    const hasTimedPins = pinnedMessages.some((m) => m.expires_at);
+    if (!hasTimedPins) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setPinnedMessages((prev) => prev.filter((m) => !m.expires_at || new Date(m.expires_at).getTime() > now));
+      setCountdownTick((t) => t + 1);
+    }, 60_000);
+
+    return () => clearInterval(interval);
+  }, [pinnedMessages.length]);
 
   const fetchBlockedUsers = async () => {
     if (!user) return;
@@ -145,7 +161,6 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
 
   const fetchPinnedVenueMessages = async () => {
     try {
-      // Resolve venue_id from venueName
       const { data: venue } = await supabase.from("venues").select("id").eq("name", venueName).maybeSingle();
 
       if (!venue) {
@@ -153,22 +168,16 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         return;
       }
 
-      // Fetch pinned messages from the business table
       const { data } = await supabase
         .from("venue_yap_messages")
-        .select("id, text, created_at, is_pinned")
+        .select("id, text, created_at, is_pinned, expires_at")
         .eq("venue_id", venue.id)
         .eq("is_pinned", true)
+        .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(3);
 
-      // Filter out pinned messages older than 24 hours client-side
-      const now = Date.now();
-      const freshPinned = (data || []).filter(
-        (msg) => now - new Date(msg.created_at).getTime() <= 24 * 60 * 60 * 1000
-      );
-
-      setPinnedMessages(freshPinned);
+      setPinnedMessages(data || []);
     } catch (error) {
       console.error("Error fetching pinned venue messages:", error);
       setPinnedMessages([]);
@@ -594,17 +603,33 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
       {/* Pinned Venue Messages (from business portal) */}
       {pinnedMessages.length > 0 && (
         <div className="space-y-2">
-          {pinnedMessages.map((pin) => (
-            <div key={pin.id} className="bg-white/[0.08] backdrop-blur-sm rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#d4ff00]/80 bg-[#d4ff00]/10 px-2 py-0.5 rounded-full">
-                  From the venue
-                </span>
-                <span className="text-white/40 text-xs">{getTimeAgo(pin.created_at)}</span>
+          {pinnedMessages.map((pin) => {
+            let countdownText: string | null = null;
+            if (pin.expires_at) {
+              const remaining = new Date(pin.expires_at).getTime() - Date.now();
+              if (remaining <= 0) return null;
+              const hours = Math.floor(remaining / (60 * 60 * 1000));
+              const mins = Math.floor((remaining % (60 * 60 * 1000)) / 60000);
+              countdownText = hours > 0 ? `ends in ${hours}h ${mins}m` : `ends in ${mins}m`;
+            }
+            return (
+              <div key={pin.id} className="bg-white/[0.08] backdrop-blur-sm rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[#d4ff00]/80 bg-[#d4ff00]/10 px-2 py-0.5 rounded-full">
+                    From the venue
+                  </span>
+                  <span className="text-white/40 text-xs">{getTimeAgo(pin.created_at)}</span>
+                </div>
+                {countdownText ? (
+                  <p className="text-white/90 text-[15px]">
+                    🔥 {pin.text} — <span className="text-[#d4ff00]">{countdownText}</span>
+                  </p>
+                ) : (
+                  <p className="text-white/90 text-[15px]">{pin.text}</p>
+                )}
               </div>
-              <p className="text-white/90 text-[15px]">{pin.text}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
