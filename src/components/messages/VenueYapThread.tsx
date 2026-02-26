@@ -162,7 +162,13 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         .order("created_at", { ascending: false })
         .limit(3);
 
-      setPinnedMessages(data || []);
+      // Filter out pinned messages older than 24 hours client-side
+      const now = Date.now();
+      const freshPinned = (data || []).filter(
+        (msg) => now - new Date(msg.created_at).getTime() <= 24 * 60 * 60 * 1000
+      );
+
+      setPinnedMessages(freshPinned);
     } catch (error) {
       console.error("Error fetching pinned venue messages:", error);
       setPinnedMessages([]);

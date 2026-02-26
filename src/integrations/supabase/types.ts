@@ -1176,6 +1176,44 @@ export type Database = {
         }
         Relationships: []
       }
+      promotion_interest: {
+        Row: {
+          billing_period: string
+          created_at: string | null
+          id: string
+          price_shown: number
+          tier: string
+          user_id: string
+          venue_id: string
+        }
+        Insert: {
+          billing_period: string
+          created_at?: string | null
+          id?: string
+          price_shown: number
+          tier: string
+          user_id: string
+          venue_id: string
+        }
+        Update: {
+          billing_period?: string
+          created_at?: string | null
+          id?: string
+          price_shown?: number
+          tier?: string
+          user_id?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotion_interest_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limit_actions: {
         Row: {
           action_type: string
