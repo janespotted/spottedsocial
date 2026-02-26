@@ -473,10 +473,10 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="p-4 space-y-3">
+              <div className={!post.image_url ? "pt-1 px-4 pb-4 space-y-3" : "p-4 space-y-3"}>
                 {/* Text-only posts - caption ABOVE engagement row */}
                 {!post.image_url && post.text && (
-                  <div className="text-white text-base leading-relaxed">
+                  <div className="text-white text-[17px] leading-relaxed font-medium">
                     {post.text}
                   </div>
                 )}
