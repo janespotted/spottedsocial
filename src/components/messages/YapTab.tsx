@@ -39,6 +39,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const [quotes, setQuotes] = useState<YapQuote[]>([]);
   const [sortMode, setSortMode] = useState<'hot' | 'new'>('hot');
   const [isLoading, setIsLoading] = useState(true);
+  const [pinnedCounts, setPinnedCounts] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (venueNameProp) {
@@ -84,17 +85,45 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
 
       // Get unique venue names for metadata lookup
       const venueNames = [...new Set(yaps.map(y => y.venue_name))];
-      let venueMetaMap = new Map<string, { type: string | null; neighborhood: string | null }>();
+      let venueMetaMap = new Map<string, { type: string | null; neighborhood: string | null; id: string }>();
 
       if (venueNames.length > 0) {
         const { data: venueData } = await supabase
           .from('venues')
-          .select('name, type, neighborhood')
+          .select('id, name, type, neighborhood')
           .in('name', venueNames);
 
         if (venueData) {
           for (const v of venueData) {
-            venueMetaMap.set(v.name, { type: v.type, neighborhood: v.neighborhood });
+            venueMetaMap.set(v.name, { type: v.type, neighborhood: v.neighborhood, id: v.id });
+          }
+        }
+
+        // Fetch pinned message counts for these venues
+        const venueIds = venueData?.map(v => v.id).filter(Boolean) || [];
+        if (venueIds.length > 0) {
+          const now = new Date();
+          const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+          
+          const { data: pinnedData } = await supabase
+            .from('venue_yap_messages')
+            .select('venue_id')
+            .eq('is_pinned', true)
+            .in('venue_id', venueIds)
+            .gte('created_at', twentyFourHoursAgo);
+
+          if (pinnedData) {
+            const counts = new Map<string, number>();
+            for (const row of pinnedData) {
+              counts.set(row.venue_id, (counts.get(row.venue_id) || 0) + 1);
+            }
+            // Map venue_id counts back to venue names
+            const nameCountMap = new Map<string, number>();
+            for (const [name, meta] of venueMetaMap.entries()) {
+              const count = counts.get(meta.id);
+              if (count) nameCountMap.set(name, count);
+            }
+            setPinnedCounts(nameCountMap);
           }
         }
       }
@@ -224,18 +253,26 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
             const grouped = isInGroup(index);
             const showVenueHeader = grouped && firstInGroup;
             const showVenueLine = !grouped;
+            const venuePinnedCount = pinnedCounts.get(quote.venue_name) || 0;
 
             return (
               <div key={quote.id} className="animate-fade-in" style={{ animationDelay: `${index * 40}ms` }}>
                 {/* Group venue header */}
                 {showVenueHeader && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
-                    className="text-xs mb-1.5 ml-1 flex items-center gap-1 hover:text-white/70 transition-colors"
-                  >
-                    📍 <span className="font-semibold text-white/70">{quote.venue_name}</span>
-                    {quote.venue_neighborhood && <span className="text-white/40">· {quote.venue_neighborhood}</span>}
-                  </button>
+                  <div className="mb-1.5 ml-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
+                      className="text-xs flex items-center gap-1 hover:text-white/70 transition-colors"
+                    >
+                      📍 <span className="font-semibold text-white/70">{quote.venue_name}</span>
+                      {quote.venue_neighborhood && <span className="text-white/40">· {quote.venue_neighborhood}</span>}
+                    </button>
+                    {venuePinnedCount > 0 && firstInGroup && (
+                      <p className="text-white/40 text-[11px] mt-0.5 ml-4">
+                        📌 {venuePinnedCount} update{venuePinnedCount > 1 ? 's' : ''} from venue
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {/* Quote card */}
@@ -258,13 +295,20 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
 
                   {/* Venue line (only if not in a group) */}
                   {showVenueLine && (
-                    <p
-                      className="text-xs mb-2 hover:text-white/60 transition-colors"
-                      onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
-                    >
-                      📍 <span className="font-semibold text-white">{quote.venue_name}</span>
-                      {quote.venue_neighborhood && <span className="text-white/40"> · {quote.venue_neighborhood}</span>}
-                    </p>
+                    <div className="mb-2">
+                      <p
+                        className="text-xs hover:text-white/60 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
+                      >
+                        📍 <span className="font-semibold text-white">{quote.venue_name}</span>
+                        {quote.venue_neighborhood && <span className="text-white/40"> · {quote.venue_neighborhood}</span>}
+                      </p>
+                      {venuePinnedCount > 0 && (
+                        <p className="text-white/40 text-[11px] mt-0.5 ml-4">
+                          📌 {venuePinnedCount} update{venuePinnedCount > 1 ? 's' : ''} from venue
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   {/* Bottom row: score + timestamp */}
