@@ -1,38 +1,20 @@
 
 
-# Secure Demo Settings Access
+# Move Search to Header Bar
 
-## Current State
-- Triple-tap on the profile header navigates to `/demo-settings` unconditionally (Profile.tsx, line 87)
-- The `/demo-settings` route is wrapped in `ProtectedRoute` (requires login) but has no admin check
-- Only `jane.reynolds752@gmail.com` is currently an admin in `user_roles`
-- `janecreynolds752@gmail.com` exists (id: `3ff01fb3-64ba-4747-84da-de108d96acfe`) but is not an admin
-- `jane@jointspottedapp.com` does not have an account yet — will need to be added once they sign up
+## Overview
+Move the floating search FAB from the bottom-left corner into the top header bar, next to the bell and S icons.
 
-## Changes
+## Changes (Home.tsx only)
 
-### 1. Add admin check to triple-tap gesture (Profile.tsx)
-In `handleHeaderTripleTap`, before navigating to `/demo-settings`, call `supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' })`. Only navigate if the result is `true`. For non-admins or logged-out users, the triple-tap does nothing.
+### 1. Add search icon to header (lines 286-301)
+Replace the existing header icon group with three icons in order (right to left): S logo, bell, search.
 
-This requires fetching admin status — to keep it snappy, pre-fetch admin status on mount (similar to AdminRoute) and store in a ref/state, so the triple-tap check is instant.
+The search button uses the same `w-10 h-10 rounded-full` sizing, with `text-white/60 hover:text-white transition-colors` styling to match the existing header icon treatment. It triggers `setShowFriendSearch(true)`.
 
-### 2. Protect the /demo-settings route (App.tsx)
-Wrap the `/demo-settings` route in `AdminRoute` (which already exists and checks `has_role` RPC):
-```
-<ProtectedRoute>
-  <AdminRoute>
-    <DemoSettings />
-  </AdminRoute>
-</ProtectedRoute>
-```
+### 2. Remove floating search FAB (lines 615-622)
+Delete the entire `{/* Friend Search FAB */}` block — the fixed-position button at the bottom-left.
 
-### 3. Add missing admin roles (data insert)
-Insert admin role for `janecreynolds752@gmail.com` (`3ff01fb3-64ba-4747-84da-de108d96acfe`).
-
-For `jane@jointspottedapp.com` — this account doesn't exist yet. Will insert the role once the account is created. A note will be added about this.
-
-## Files Modified
-- `src/pages/Profile.tsx` — admin check on triple-tap
-- `src/App.tsx` — wrap `/demo-settings` route in `AdminRoute`
-- Data insert for admin role
+## File Modified
+- `src/pages/Home.tsx` — two edits, no new files
 
