@@ -8,7 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode, Camera } from 'lucide-react';
+import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode, Camera, Search } from 'lucide-react';
+import { FriendSearchModal } from '@/components/FriendSearchModal';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { QRCodeModal } from '@/components/QRCodeModal';
@@ -70,6 +71,7 @@ export default function Profile() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [showQuickStatus, setShowQuickStatus] = useState(false);
+  const [showFriendSearch, setShowFriendSearch] = useState(false);
   
   // Triple-tap secret access to demo settings (admin-only)
   const tapCountRef = useRef(0);
@@ -377,6 +379,13 @@ export default function Profile() {
             <CityBadge />
           </div>
           <div className="flex gap-3">
+            <button
+              onClick={() => setShowFriendSearch(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+              aria-label="Search friends"
+            >
+              <Search className="w-5 h-5" />
+            </button>
             <button 
               onClick={() => navigate('/settings')}
               className="w-10 h-10 rounded-full bg-[#2d1b4e] border border-[#a855f7]/40 flex items-center justify-center text-white hover:bg-[#a855f7]/20 transition-colors"
@@ -771,6 +780,8 @@ export default function Profile() {
           if (!open) fetchProfileData();
         }}
       />
+
+      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
     </div>
   );
 }

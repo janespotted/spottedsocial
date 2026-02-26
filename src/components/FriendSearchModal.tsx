@@ -52,7 +52,6 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
     setIsLoading(true);
 
     try {
-      // Step 1: Get friend IDs (2 parallel queries)
       const [sentResult, receivedResult] = await Promise.all([
         supabase.from('friendships').select('friend_id').eq('user_id', user.id).eq('status', 'accepted'),
         supabase.from('friendships').select('user_id').eq('friend_id', user.id).eq('status', 'accepted'),
@@ -69,7 +68,6 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
         return;
       }
 
-      // Step 2: Batch all data queries in parallel (4 queries total)
       const now = new Date().toISOString();
       let profileQuery = supabase
         .from('profiles')
@@ -86,7 +84,6 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
 
       if (!profilesRes.data) { setFriends([]); setIsLoading(false); return; }
 
-      // Build lookup maps
       const checkinMap = new Map<string, string>();
       checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, c.venue_name); });
 
@@ -96,7 +93,6 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
       const storySet = new Set<string>();
       storiesRes.data?.forEach(s => storySet.add(s.user_id));
 
-      // Build friends array
       const friendsData: Friend[] = profilesRes.data.map(profile => {
         let status: 'out' | 'planning' | 'home' = 'home';
         let venue_name: string | null = null;
@@ -128,7 +124,6 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
         };
       });
 
-      // Sort: out → planning → home, then alphabetical
       friendsData.sort((a, b) => {
         const diff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
         return diff !== 0 ? diff : a.display_name.localeCompare(b.display_name);
@@ -158,18 +153,45 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
       f.username.toLowerCase().includes(search.toLowerCase())
     ), [friends, search]);
 
-  const outCount = friends.filter(f => f.status === 'out').length;
-  const planningCount = friends.filter(f => f.status === 'planning').length;
+  const outFriends = filteredFriends.filter(f => f.status === 'out');
+  const planningFriends = filteredFriends.filter(f => f.status === 'planning');
+  const homeFriends = filteredFriends.filter(f => f.status === 'home');
 
-  const getAvatarRing = (status: string) => {
-    if (status === 'out') return 'ring-2 ring-[#d4ff00]/50';
-    if (status === 'planning') return 'ring-2 ring-[#a855f7]/40';
-    return 'ring-1 ring-white/10';
-  };
+  const renderFriendRow = (friend: Friend) => (
+    <button
+      key={friend.id}
+      onClick={() => handleSelectFriend(friend)}
+      className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+    >
+      <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
+        <AvatarImage src={friend.avatar_url || undefined} />
+        <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+          {friend.display_name[0]}
+        </AvatarFallback>
+      </Avatar>
+
+      <div className="flex-1 min-w-0 text-left">
+        <p className="text-white font-semibold text-sm truncate">
+          {friend.display_name}
+        </p>
+        {friend.status === 'out' ? (
+          <p className="text-[#d4ff00] text-xs truncate">
+            📍 At {friend.venue_name || 'Nearby'}
+          </p>
+        ) : friend.status === 'planning' ? (
+          <p className="text-[#a855f7] text-xs truncate">
+            🎯 Planning{friend.planning_neighborhood ? ` (${friend.planning_neighborhood})` : ' tonight'}
+          </p>
+        ) : (
+          <p className="text-white/40 text-xs">Home</p>
+        )}
+      </div>
+    </button>
+  );
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
-      <DrawerContent className="bg-[#0a0118] border-t border-white/10 max-h-[85vh]">
+      <DrawerContent className="bg-[#1a0f2e] border-t border-[#a855f7]/30 max-h-[85vh]">
         <DrawerHeader className="pb-1">
           <DrawerTitle className="text-foreground text-center text-base">Find Friends</DrawerTitle>
         </DrawerHeader>
@@ -192,23 +214,8 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
             )}
           </div>
 
-          {/* Status summary */}
-          {!isLoading && friends.length > 0 && (outCount > 0 || planningCount > 0) && (
-            <div className="flex items-center gap-2 mt-2.5 px-1">
-              {outCount > 0 && (
-                <span className="text-[11px] text-[#d4ff00]/70">{outCount} out</span>
-              )}
-              {outCount > 0 && planningCount > 0 && (
-                <span className="text-white/20">·</span>
-              )}
-              {planningCount > 0 && (
-                <span className="text-[11px] text-[#a855f7]/70">{planningCount} planning</span>
-              )}
-            </div>
-          )}
-
           {/* Friends List */}
-          <div className="flex-1 mt-3 overflow-y-auto space-y-1">
+          <div className="flex-1 mt-3 overflow-y-auto">
             {isLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 p-3">
@@ -227,45 +234,43 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
                 </p>
               </div>
             ) : (
-              filteredFriends.map((friend) => (
-                <button
-                  key={friend.id}
-                  onClick={() => handleSelectFriend(friend)}
-                  className="w-full rounded-xl p-3 hover:bg-white/5 transition-colors flex items-center gap-3"
-                >
-                  <div className={`p-[2px] rounded-full ${
-                    friend.has_story
-                      ? 'bg-gradient-to-br from-[#d4ff00] via-[#a3e635] to-[#d4ff00]'
-                      : 'bg-transparent'
-                  }`}>
-                    <div className="rounded-full bg-[#0a0118] p-[1px]">
-                      <Avatar className={`h-10 w-10 ${getAvatarRing(friend.status)}`}>
-                        <AvatarImage src={friend.avatar_url || undefined} />
-                        <AvatarFallback className="bg-white/5 text-white/60 text-sm">
-                          {friend.display_name[0]}
-                        </AvatarFallback>
-                      </Avatar>
+              <div className="bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg overflow-hidden">
+                {/* Friends Out Now */}
+                {outFriends.length > 0 && (
+                  <>
+                    <div className="px-3 py-2">
+                      <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider">
+                        👥 Friends Out Now
+                        <span className="text-white/50 ml-1">({outFriends.length})</span>
+                      </h3>
                     </div>
-                  </div>
+                    {outFriends.map(renderFriendRow)}
+                  </>
+                )}
 
-                  <div className="flex-1 text-left min-w-0">
-                    <h3 className="font-medium text-sm text-white truncate">{friend.display_name}</h3>
-                    <p className="text-white/40 text-xs truncate">@{friend.username}</p>
-                  </div>
+                {/* Friends Planning */}
+                {planningFriends.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
+                      <p className="text-white/70 text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider">
+                        🔥 Friends Planning 🎯
+                        <span className="text-white/50 normal-case tracking-normal">({planningFriends.length})</span>
+                      </p>
+                    </div>
+                    {planningFriends.map(renderFriendRow)}
+                  </>
+                )}
 
-                  {friend.status === 'out' && friend.venue_name ? (
-                    <span className="text-[11px] bg-[#d4ff00]/10 text-[#d4ff00]/80 px-2 py-0.5 rounded-full truncate max-w-[120px]">
-                      @ {friend.venue_name}
-                    </span>
-                  ) : friend.status === 'planning' ? (
-                    <span className="text-[11px] bg-[#a855f7]/10 text-[#a855f7]/70 px-2 py-0.5 rounded-full">
-                      🎯 Planning
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-white/20">Home</span>
-                  )}
-                </button>
-              ))
+                {/* Home friends */}
+                {homeFriends.length > 0 && (
+                  <>
+                    {(outFriends.length > 0 || planningFriends.length > 0) && (
+                      <div className="border-t border-[#a855f7]/10" />
+                    )}
+                    {homeFriends.map(renderFriendRow)}
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
