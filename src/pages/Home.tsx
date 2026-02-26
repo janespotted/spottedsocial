@@ -474,6 +474,13 @@ export default function Home() {
               )}
 
               <div className="p-4 space-y-3">
+                {/* Text-only posts - caption ABOVE engagement row */}
+                {!post.image_url && post.text && (
+                  <div className="text-white text-base leading-relaxed">
+                    {post.text}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-4">
                   <button 
                     onClick={() => handleLikePost(post.id)}
@@ -528,7 +535,7 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* Image posts with captions - Instagram style */}
+                {/* Image posts with captions - Instagram style, BELOW engagement row */}
                 {post.image_url && post.text && (
                   <div className="text-white/90 text-sm">
                     <button
@@ -542,13 +549,6 @@ export default function Home() {
                     >
                       {post.profiles?.display_name}
                     </button>{' '}
-                    {post.text}
-                  </div>
-                )}
-
-                {/* Text-only posts - clean display without redundant username */}
-                {!post.image_url && post.text && (
-                  <div className="text-white text-base leading-relaxed">
                     {post.text}
                   </div>
                 )}
