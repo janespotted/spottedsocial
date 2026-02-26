@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
@@ -15,7 +15,7 @@ import { useWeekendRally } from '@/hooks/useWeekendRally';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search, Loader2, Copy, Users } from 'lucide-react';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -39,6 +39,7 @@ import { NoFriendsBanner } from '@/components/NoFriendsBanner';
 import { isNightlifeHours } from '@/lib/time-context';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
 import { CommentInput } from '@/components/CommentInput';
+import { ShareToDMModal } from '@/components/ShareToDMModal';
 
 export default function Home() {
   const { user } = useAuth();
@@ -95,6 +96,49 @@ export default function Home() {
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
   const [feedMode, setFeedMode] = useState<'newsfeed' | 'plans'>(() => isNightlifeHours() ? 'newsfeed' : 'plans');
   const [showFriendSearch, setShowFriendSearch] = useState(false);
+  const [sharePost, setSharePost] = useState<Post | null>(null);
+  const loadTriggerRef = useRef<HTMLDivElement>(null);
+  const videoObserverRef = useRef<IntersectionObserver | null>(null);
+  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const el = loadTriggerRef.current;
+    if (!el || feedMode !== 'newsfeed') return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMorePosts(); },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMorePosts, feedMode]);
+
+  // Video autoplay observer
+  useEffect(() => {
+    videoObserverRef.current = new IntersectionObserver(
+      (entries) => entries.forEach(e => {
+        const video = e.target as HTMLVideoElement;
+        if (e.isIntersecting) {
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      }),
+      { threshold: 0.5 }
+    );
+    return () => videoObserverRef.current?.disconnect();
+  }, []);
+
+  const videoRefCallback = useCallback((postId: string) => (el: HTMLVideoElement | null) => {
+    if (el) {
+      videoRefs.current.set(postId, el);
+      videoObserverRef.current?.observe(el);
+    } else {
+      const prev = videoRefs.current.get(postId);
+      if (prev) videoObserverRef.current?.unobserve(prev);
+      videoRefs.current.delete(postId);
+    }
+  }, []);
 
   // Store fetch functions in refs to avoid dependency changes causing re-renders
   const fetchFriendsRef = useRef(fetchFriends);
@@ -377,12 +421,20 @@ export default function Home() {
                 <p className="text-white/50 text-sm max-w-xs mb-6">
                   Be the first to check in tonight
                 </p>
-                <button
-                  onClick={openCheckIn}
-                  className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6 py-2.5 font-medium transition-colors"
-                >
-                  Set Your Status
-                </button>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => setShowCreatePost(true)}
+                    className="bg-[#d4ff00] hover:bg-[#d4ff00]/90 text-[#1a0f2e] rounded-full px-6 py-2.5 font-medium transition-colors"
+                  >
+                    Share what you're up to
+                  </button>
+                  <button
+                    onClick={openCheckIn}
+                    className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6 py-2.5 font-medium transition-colors"
+                  >
+                    Set Your Status
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -463,10 +515,12 @@ export default function Home() {
                 <div className="w-full aspect-square relative overflow-hidden group image-vignette">
                   {(post as any).media_type === 'video' ? (
                     <video
+                      ref={videoRefCallback(post.id)}
                       src={post.image_url}
                       controls
                       playsInline
                       muted
+                      loop
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -518,31 +572,48 @@ export default function Home() {
                     <MessageCircle className="h-6 w-6" />
                     <span className="font-semibold">{post.comments_count || 0}</span>
                   </button>
-                  <button 
-                    onClick={async () => {
-                      const shareData = {
-                        title: `${post.profiles?.display_name} on Spotted`,
-                        text: `${post.text}${post.venue_name ? ` @ ${post.venue_name}` : ''}`,
-                        url: APP_BASE_URL,
-                      };
-                      if (navigator.share) {
-                        try {
-                          await navigator.share(shareData);
-                        } catch (err) {
-                          if ((err as Error).name !== 'AbortError') {
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="text-white hover:text-[#d4ff00] transition-colors ml-auto">
+                        <Send className="h-6 w-6" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#4a3566]">
+                      <DropdownMenuItem
+                        onClick={() => setSharePost(post)}
+                        className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        Send to Friend
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={async () => {
+                          const shareData = {
+                            title: `${post.profiles?.display_name} on Spotted`,
+                            text: `${post.text}${post.venue_name ? ` @ ${post.venue_name}` : ''}`,
+                            url: APP_BASE_URL,
+                          };
+                          if (navigator.share) {
+                            try {
+                              await navigator.share(shareData);
+                            } catch (err) {
+                              if ((err as Error).name !== 'AbortError') {
+                                await copyToClipboard(`${shareData.text} - ${shareData.url}`);
+                                toast.success('Link copied to clipboard!');
+                              }
+                            }
+                          } else {
                             await copyToClipboard(`${shareData.text} - ${shareData.url}`);
                             toast.success('Link copied to clipboard!');
                           }
-                        }
-                      } else {
-                        await copyToClipboard(`${shareData.text} - ${shareData.url}`);
-                        toast.success('Link copied to clipboard!');
-                      }
-                    }}
-                    className="text-white hover:text-[#d4ff00] transition-colors ml-auto"
-                  >
-                    <Send className="h-6 w-6" />
-                  </button>
+                        }}
+                        className="text-white hover:bg-[#2d1b4e] cursor-pointer"
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Link
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
 
                 {/* Image posts with captions - Instagram style, BELOW engagement row */}
@@ -613,6 +684,20 @@ export default function Home() {
             </div>
           ))
         )}
+          {/* Infinite scroll trigger */}
+          {feedMode === 'newsfeed' && posts.length > 0 && (
+            <>
+              <div ref={loadTriggerRef} className="h-1" />
+              {isLoadingMore && (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-6 w-6 text-[#a855f7] animate-spin" />
+                </div>
+              )}
+              {!hasMorePosts && posts.length > 0 && (
+                <p className="text-center text-white/30 text-sm py-4">No more posts</p>
+              )}
+            </>
+          )}
         </div>
       </PullToRefresh>
       )}
@@ -649,6 +734,13 @@ export default function Home() {
           nudgeType={nudgeType}
         />
       )}
+
+      {/* Share to DM Modal */}
+      <ShareToDMModal
+        post={sharePost}
+        open={!!sharePost}
+        onOpenChange={(open) => !open && setSharePost(null)}
+      />
     </div>
   );
 }

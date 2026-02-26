@@ -524,15 +524,33 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
     return (
       <div className="space-y-5 px-4">
         {[1, 2, 3].map(i => (
-          <div key={i} className="bg-card/60 rounded-2xl p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <Skeleton className="h-11 w-11 rounded-full" />
+          <div 
+            key={i} 
+            className="glass-card rounded-2xl overflow-hidden"
+            style={{ animationDelay: `${i * 100}ms` }}
+          >
+            <div className="p-4 space-y-4">
+              {/* User info skeleton */}
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-full shimmer" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-4 w-28 rounded-full shimmer" />
+                  <div className="h-3 w-20 rounded-full shimmer" />
+                </div>
+                <div className="h-3 w-12 rounded-full shimmer" />
+              </div>
+              {/* Content skeleton */}
               <div className="space-y-2">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-3 w-20" />
+                <div className="h-4 w-full rounded-full shimmer" />
+                <div className="h-4 w-3/4 rounded-full shimmer" />
+              </div>
+              {/* Actions skeleton */}
+              <div className="flex items-center gap-4">
+                <div className="h-8 w-16 rounded-full shimmer" />
+                <div className="h-8 w-16 rounded-full shimmer" />
+                <div className="ml-auto h-8 w-8 rounded-full shimmer" />
               </div>
             </div>
-            <Skeleton className="h-20 w-full rounded-lg" />
           </div>
         ))}
       </div>
