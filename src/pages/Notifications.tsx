@@ -1,7 +1,7 @@
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -45,8 +45,8 @@ export default function Notifications() {
       <div className="max-w-[430px] mx-auto pb-24">
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-            <div className="w-20 h-20 rounded-full bg-[#2d1b4e] border border-[#a855f7]/30 flex items-center justify-center mb-4">
-              <span className="text-4xl">🔔</span>
+            <div className="w-20 h-20 rounded-full bg-[#2d1b4e] flex items-center justify-center mb-4">
+              <Bell className="h-10 w-10 text-[#a855f7]/60" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">
               All caught up

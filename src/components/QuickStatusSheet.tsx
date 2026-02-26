@@ -266,16 +266,16 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
             <div className="text-center mb-4">
               <span className="text-white/40 text-xs uppercase tracking-wider">Currently: </span>
               <span className="text-white/60 text-xs">
-                {currentStatus === 'out' ? `🟢 Out${currentVenue ? ` · ${currentVenue}` : ''}` :
-                 currentStatus === 'planning' ? '🎯 Planning on it' :
-                 '🏠 Staying in'}
+                 {currentStatus === 'out' ? `🟢 Out${currentVenue ? ` · ${currentVenue}` : ''}` :
+                 currentStatus === 'planning' ? 'Planning on it' :
+                 'Staying in'}
               </span>
             </div>
           )}
 
           {suggestedVenue && (
-            <div className="bg-[#d4ff00]/10 border border-[#d4ff00]/30 rounded-xl p-3 mb-2 text-center">
-              <p className="text-[#d4ff00] text-sm font-medium">📍 You're near {suggestedVenue.name}</p>
+            <div className="bg-white/[0.06] border border-white/20 rounded-xl p-3 mb-2 text-center">
+              <p className="text-white text-sm font-medium flex items-center justify-center gap-1"><MapPin className="h-4 w-4 text-[#d4ff00]" /> You're near {suggestedVenue.name}</p>
             </div>
           )}
 
@@ -285,7 +285,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
             className="w-full h-14 text-lg font-semibold bg-[#d4ff00] hover:bg-[#d4ff00]/90 text-[#0a0118] rounded-2xl"
           >
             <MapPin className="w-5 h-5 mr-2" />
-            Yes, I'm out 🎉
+            Yes, I'm out
           </Button>
 
           <Button
@@ -295,7 +295,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
             className="w-full h-14 text-lg font-semibold border-[#a855f7]/50 text-white hover:bg-[#a855f7]/20 rounded-2xl"
           >
             <Target className="w-5 h-5 mr-2" />
-            Planning on it 🎯
+            Planning on it
           </Button>
 
           <Button
@@ -305,7 +305,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
             className="w-full h-12 text-base text-white/60 hover:text-white hover:bg-white/5 rounded-2xl"
           >
             <Home className="w-4 h-4 mr-2" />
-            No — staying in 🏠
+            No — staying in
           </Button>
 
           {/* Stop Sharing option — only visible when actively sharing */}

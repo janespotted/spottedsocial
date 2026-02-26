@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, X } from 'lucide-react';
+import { Search, X, Home } from 'lucide-react';
 import {
   Drawer,
   DrawerContent,
@@ -266,7 +266,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
                   <>
                     <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
                       <p className="text-white/70 text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider">
-                        🏠 Staying In
+                        <Home className="h-3.5 w-3.5 text-white/50 inline mr-0.5" /> Staying In
                         <span className="text-white/50 normal-case tracking-normal">({homeFriends.length})</span>
                       </p>
                     </div>

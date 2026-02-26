@@ -15,7 +15,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home, Map as MapIcon, Music, Wine, Beer, Building } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -1204,12 +1204,12 @@ export default function Map() {
   const trendingVenues = venues.slice(0, 3);
 
   // Venue type emoji helper
-  const venueTypeEmoji = (type: string) => {
-    if (type === 'nightclub') return '🎵';
-    if (type === 'cocktail_bar') return '🍸';
-    if (type === 'bar') return '🍺';
-    if (type === 'rooftop') return '🌃';
-    return '📍';
+  const venueTypeIcon = (type: string) => {
+    if (type === 'nightclub') return <Music className="h-4 w-4 text-[#a855f7]" />;
+    if (type === 'cocktail_bar') return <Wine className="h-4 w-4 text-[#a855f7]" />;
+    if (type === 'bar') return <Beer className="h-4 w-4 text-[#a855f7]" />;
+    if (type === 'rooftop') return <Building className="h-4 w-4 text-[#a855f7]" />;
+    return <MapPin className="h-4 w-4 text-[#d4ff00]" />;
   };
 
   // Filtered search results
@@ -1537,7 +1537,7 @@ export default function Map() {
                           onClick={() => handleVenueSearchSelect(venue)}
                           className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
                         >
-                          <span className="text-lg">{venueTypeEmoji(venue.type)}</span>
+                          <span className="flex items-center">{venueTypeIcon(venue.type)}</span>
                           <div className="flex-1 text-left">
                             <p className="text-white font-medium text-sm">{venue.name}</p>
                             <p className="text-white/40 text-xs">{venue.neighborhood}</p>
@@ -1615,7 +1615,7 @@ export default function Map() {
                           onClick={() => handleVenueSearchSelect(venue)}
                           className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
                         >
-                          <span className="text-lg">{venueTypeEmoji(venue.type)}</span>
+                          <span className="flex items-center">{venueTypeIcon(venue.type)}</span>
                           <div className="flex-1 text-left">
                             <p className="text-white font-medium text-sm">{venue.name}</p>
                             <p className="text-white/40 text-xs">{venue.neighborhood}</p>
@@ -1690,11 +1690,11 @@ export default function Map() {
               <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">Venue Type</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { key: 'all', label: 'All Venues', icon: '🗺️' },
-                  { key: 'nightclub', label: 'Clubs', icon: '🎵' },
-                  { key: 'cocktail_bar', label: 'Cocktails', icon: '🍸' },
-                  { key: 'bar', label: 'Bars', icon: '🍺' },
-                  { key: 'rooftop', label: 'Rooftops', icon: '🌃' },
+                  { key: 'all', label: 'All Venues', icon: <MapIcon className="h-4 w-4" /> },
+                  { key: 'nightclub', label: 'Clubs', icon: <Music className="h-4 w-4" /> },
+                  { key: 'cocktail_bar', label: 'Cocktails', icon: <Wine className="h-4 w-4" /> },
+                  { key: 'bar', label: 'Bars', icon: <Beer className="h-4 w-4" /> },
+                  { key: 'rooftop', label: 'Rooftops', icon: <Building className="h-4 w-4" /> },
                 ].map((filter) => (
                   <button
                     key={filter.key}

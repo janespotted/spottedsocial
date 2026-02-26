@@ -147,7 +147,7 @@ export default function CloseFriends() {
 
       {/* Content */}
       <div className="px-4 py-6">
-        <div className="mb-6 p-4 bg-[#2d1b4e]/40 rounded-lg border border-[#a855f7]/20">
+        <div className="mb-6 p-4 bg-white/[0.06] backdrop-blur-sm rounded-2xl">
           <div className="flex items-center gap-2 mb-2">
             <Heart className="w-5 h-5 text-[#d4ff00]" />
             <h2 className="text-white font-semibold">What are Close Friends?</h2>
@@ -162,7 +162,7 @@ export default function CloseFriends() {
           <div className="text-center text-white/60 py-8">Loading friends...</div>
         ) : friends.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6">
               <Heart className="h-10 w-10 text-[#d4ff00]/60" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">
@@ -183,7 +183,7 @@ export default function CloseFriends() {
             {friends.map((friend) => (
               <div
                 key={friend.id}
-                className="flex items-center justify-between p-4 bg-[#2d1b4e]/40 rounded-lg border border-[#a855f7]/20 hover:border-[#a855f7]/40 transition-colors"
+                className="flex items-center justify-between p-4 bg-white/[0.06] backdrop-blur-sm rounded-2xl hover:bg-white/[0.10] transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <Avatar className="h-12 w-12 border-2 border-[#a855f7] flex-shrink-0">

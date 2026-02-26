@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import spottedLogo from '@/assets/spotted-s-logo.png';
-import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode, Camera, Search } from 'lucide-react';
+import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode, Camera, Search, Heart, MessageCircle } from 'lucide-react';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
@@ -728,8 +728,8 @@ export default function Profile() {
                       )}
                     </div>
                     <div className="flex items-center justify-center gap-3 text-white/40 text-xs">
-                      <span>❤️ {post.likes_count || 0}</span>
-                      <span>💬 {post.comments_count || 0}</span>
+                      <span className="flex items-center gap-0.5"><Heart className="h-3.5 w-3.5 text-red-400" /> {post.likes_count || 0}</span>
+                      <span className="flex items-center gap-0.5"><MessageCircle className="h-3.5 w-3.5 text-white/40" /> {post.comments_count || 0}</span>
                     </div>
                   </div>
                 ))}

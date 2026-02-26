@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemoMode } from "@/hooks/useDemoMode";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageCircle, ChevronUp, ChevronDown, Send, Image, X, MoreHorizontal, ArrowLeft, MapPin } from "lucide-react";
+import { MessageCircle, ChevronUp, ChevronDown, Send, Image, X, MoreHorizontal, ArrowLeft, MapPin, Flame, EyeOff } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -622,7 +622,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
                 </div>
                 {countdownText ? (
                   <p className="text-white/90 text-[15px]">
-                    🔥 {pin.text} — <span className="text-[#d4ff00]">{countdownText}</span>
+                    <Flame className="h-4 w-4 text-[#d4ff00] inline mr-1" /> {pin.text} — <span className="text-[#d4ff00]">{countdownText}</span>
                   </p>
                 ) : (
                   <p className="text-white/90 text-[15px]">{pin.text}</p>
@@ -727,9 +727,9 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="bg-white/[0.06] backdrop-blur-sm border border-[#a855f7]/20 rounded-2xl px-4 py-3 flex items-center gap-3 cursor-default">
+              <div className="bg-white/[0.06] backdrop-blur-sm rounded-2xl px-4 py-3 flex items-center gap-3 cursor-default">
                 <MapPin className="h-5 w-5 text-[#d4ff00] shrink-0" />
-                <span className="text-white/70 text-sm font-medium">📍 Head here to post</span>
+                <span className="text-white/70 text-sm font-medium">Head here to post</span>
               </div>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-[260px] bg-[#1a0f2e] border-[#a855f7]/30 text-white text-xs">
@@ -751,7 +751,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
                 key={msg.id}
                 className="bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-3 flex items-center justify-between"
               >
-                <span className="text-white/50 text-sm">💀 buried by the crowd</span>
+                <span className="text-white/50 text-sm flex items-center gap-1"><EyeOff className="h-4 w-4 text-white/50" /> buried by the crowd</span>
                 <button
                   onClick={() => setRevealedBuriedIds((prev) => new Set([...prev, msg.id]))}
                   className="text-[#a855f7] text-sm font-medium hover:underline"
@@ -880,7 +880,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
                       ) : (
                         <div className="flex items-center gap-2 bg-white/[0.04] rounded-lg px-3 py-2">
                           <MapPin className="h-4 w-4 text-[#d4ff00] shrink-0" />
-                          <span className="text-white/50 text-sm">📍 Head here to comment</span>
+                          <span className="text-white/50 text-sm">Head here to comment</span>
                         </div>
                       )}
                     </div>

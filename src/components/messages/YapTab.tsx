@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Mic } from 'lucide-react';
+import { Mic, MapPin, Pin, Flame } from 'lucide-react';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { cn } from '@/lib/utils';
 import { VenueYapThread } from './VenueYapThread';
@@ -214,7 +214,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
           onClick={() => openThread(userVenueName)}
           className="w-full flex items-center justify-between bg-white/[0.06] backdrop-blur-sm rounded-2xl px-4 py-2.5 active:bg-white/[0.10] transition-colors animate-fade-in"
         >
-          <span className="text-white text-sm">📍 You're at <span className="font-semibold">{userVenueName}</span></span>
+          <span className="text-white text-sm flex items-center gap-1"><MapPin className="h-4 w-4 text-[#d4ff00] inline" /> You're at <span className="font-semibold">{userVenueName}</span></span>
           <span className="bg-[#d4ff00] text-[#1a0f2e] font-bold text-xs px-3 py-1 rounded-full">View</span>
         </button>
       )}
@@ -264,12 +264,12 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                       onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
                       className="text-xs flex items-center gap-1 hover:text-white/70 transition-colors"
                     >
-                      📍 <span className="font-semibold text-white/70">{quote.venue_name}</span>
+                      <MapPin className="h-3.5 w-3.5 text-[#d4ff00] inline" /> <span className="font-semibold text-white/70">{quote.venue_name}</span>
                       {quote.venue_neighborhood && <span className="text-white/40">· {quote.venue_neighborhood}</span>}
                     </button>
                     {venuePinnedCount > 0 && firstInGroup && (
                       <p className="text-white/40 text-[11px] mt-0.5 ml-4">
-                        📌 {venuePinnedCount} update{venuePinnedCount > 1 ? 's' : ''} from venue
+                        <Pin className="h-3.5 w-3.5 text-[#d4ff00] inline mr-0.5" /> {venuePinnedCount} update{venuePinnedCount > 1 ? 's' : ''} from venue
                       </p>
                     )}
                   </div>
@@ -300,12 +300,12 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                         className="text-xs hover:text-white/60 transition-colors"
                         onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
                       >
-                        📍 <span className="font-semibold text-white">{quote.venue_name}</span>
+                        <MapPin className="h-3.5 w-3.5 text-[#d4ff00] inline" /> <span className="font-semibold text-white">{quote.venue_name}</span>
                         {quote.venue_neighborhood && <span className="text-white/40"> · {quote.venue_neighborhood}</span>}
                       </p>
                       {venuePinnedCount > 0 && (
                         <p className="text-white/40 text-[11px] mt-0.5 ml-4">
-                          📌 {venuePinnedCount} update{venuePinnedCount > 1 ? 's' : ''} from venue
+                          <Pin className="h-3.5 w-3.5 text-[#d4ff00] inline mr-0.5" /> {venuePinnedCount} update{venuePinnedCount > 1 ? 's' : ''} from venue
                         </p>
                       )}
                     </div>
@@ -315,7 +315,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                   <div className="flex items-center justify-between">
                     {quote.score > 0 ? (
                       <span className="text-[#d4ff00] text-xs font-semibold">
-                        {index === 0 && sortMode === 'hot' ? '🔥 ' : ''}▲ {quote.score}
+                        {index === 0 && sortMode === 'hot' && <Flame className="h-3.5 w-3.5 text-[#d4ff00] inline mr-0.5" />}▲ {quote.score}
                       </span>
                     ) : (
                       <span />

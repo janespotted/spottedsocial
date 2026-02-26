@@ -10,7 +10,7 @@ import { useProfilesSafe } from '@/hooks/useProfilesCache';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Bookmark, BookmarkCheck, ChevronRight } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ChevronRight, Music, Wine, Beer, Building, EyeOff, Sofa } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -49,17 +49,28 @@ interface FriendAtVenue {
 }
 
 
+const venueTypeIcons: Record<string, React.ReactNode> = {
+  'bar': <Beer className="h-3.5 w-3.5" />,
+  'cocktail_bar': <Wine className="h-3.5 w-3.5" />,
+  'nightclub': <Music className="h-3.5 w-3.5" />,
+  'rooftop': <Building className="h-3.5 w-3.5" />,
+  'speakeasy': <EyeOff className="h-3.5 w-3.5" />,
+  'lounge': <Sofa className="h-3.5 w-3.5" />,
+  'dive_bar': <Beer className="h-3.5 w-3.5" />,
+};
+
 const getVenueTypeDisplay = (type: string) => {
-  const typeMap: Record<string, { label: string; emoji: string; color: string }> = {
-    'bar': { label: 'Bar', emoji: '🍺', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-    'cocktail_bar': { label: 'Cocktail Lounge', emoji: '🍸', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-    'nightclub': { label: 'Club', emoji: '🎉', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
-    'rooftop': { label: 'Rooftop', emoji: '🌃', color: 'bg-teal-500/20 text-teal-400 border-teal-500/30' },
-    'speakeasy': { label: 'Speakeasy', emoji: '🕵️', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
-    'lounge': { label: 'Lounge', emoji: '🛋️', color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
-    'dive_bar': { label: 'Dive Bar', emoji: '🍻', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+  const typeMap: Record<string, { label: string; color: string }> = {
+    'bar': { label: 'Bar', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+    'cocktail_bar': { label: 'Cocktail Lounge', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+    'nightclub': { label: 'Club', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
+    'rooftop': { label: 'Rooftop', color: 'bg-teal-500/20 text-teal-400 border-teal-500/30' },
+    'speakeasy': { label: 'Speakeasy', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+    'lounge': { label: 'Lounge', color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
+    'dive_bar': { label: 'Dive Bar', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
   };
-  return typeMap[type] || { label: type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), emoji: '📍', color: 'bg-white/10 text-white/70 border-white/20' };
+  const info = typeMap[type] || { label: type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), color: 'bg-white/10 text-white/70 border-white/20' };
+  return { ...info, icon: venueTypeIcons[type] || <MapPin className="h-3.5 w-3.5" /> };
 };
 
 export function VenueIdCard() {
@@ -634,7 +645,7 @@ export function VenueIdCard() {
                 {/* Venue Type Badge */}
                 {venue.type && (
                   <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border mb-2 ${getVenueTypeDisplay(venue.type).color}`}>
-                    {getVenueTypeDisplay(venue.type).emoji} {getVenueTypeDisplay(venue.type).label}
+                    {getVenueTypeDisplay(venue.type).icon} {getVenueTypeDisplay(venue.type).label}
                   </span>
                 )}
 
