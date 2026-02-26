@@ -285,6 +285,13 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setShowFriendSearch(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+              aria-label="Search friends"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+            <button
               onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
               className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
               aria-label="View activity"
@@ -611,15 +618,6 @@ export default function Home() {
           <Plus className="h-7 w-7 text-white" />
         </button>
       )}
-
-      {/* Friend Search FAB - always visible */}
-      <button
-        onClick={() => setShowFriendSearch(true)}
-        className="fixed bottom-28 left-6 z-20 w-14 h-14 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.5)] hover:scale-110 transition-transform"
-        aria-label="Find friends"
-      >
-        <Search className="h-6 w-6 text-white" />
-      </button>
 
       <CreatePostDialog open={showCreatePost} onOpenChange={setShowCreatePost} />
 
