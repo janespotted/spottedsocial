@@ -80,7 +80,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
       const [profilesRes, checkinsRes, nightRes, storiesRes] = await Promise.all([
         profileQuery,
         supabase.from('checkins').select('user_id, venue_name').in('user_id', friendIds).is('ended_at', null),
-        supabase.from('night_statuses').select('user_id, status, planning_neighborhood').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
+        supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
         supabase.from('stories').select('user_id').in('user_id', friendIds).gt('expires_at', now),
       ]);
 
@@ -90,7 +90,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
       const checkinMap = new Map<string, string>();
       checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, c.venue_name); });
 
-      const nightMap = new Map<string, { status: string; planning_neighborhood: string | null }>();
+      const nightMap = new Map<string, { status: string; planning_neighborhood: string | null; venue_name: string | null }>();
       nightRes.data?.forEach(n => { if (!nightMap.has(n.user_id)) nightMap.set(n.user_id, n); });
 
       const storySet = new Set<string>();
@@ -108,6 +108,9 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
         if (activeCheckin) {
           status = 'out';
           venue_name = activeCheckin;
+        } else if (nightStatus?.status === 'out') {
+          status = 'out';
+          venue_name = nightStatus.venue_name || null;
         } else if (nightStatus?.status === 'planning') {
           status = 'planning';
           planning_neighborhood = nightStatus.planning_neighborhood;
