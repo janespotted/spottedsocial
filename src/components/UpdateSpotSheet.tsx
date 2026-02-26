@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
-import { MapPin, MapPinOff, Search, Navigation, ChevronRight } from 'lucide-react';
+import { MapPin, MapPinOff, Search, Navigation, ChevronRight, Music, Wine, Beer, Building, Sofa } from 'lucide-react';
 
 interface NearbyVenue {
   id: string;
@@ -277,14 +277,14 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
     }
   };
 
-  const venueTypeEmoji = (type?: string) => {
+  const venueTypeIcon = (type?: string) => {
     switch (type) {
-      case 'nightclub': return '🪩';
-      case 'cocktail_bar': return '🍸';
-      case 'bar': return '🍺';
-      case 'rooftop': return '🌃';
-      case 'lounge': return '🛋️';
-      default: return '📍';
+      case 'nightclub': return <Music className="h-4 w-4 text-[#a855f7]" />;
+      case 'cocktail_bar': return <Wine className="h-4 w-4 text-[#a855f7]" />;
+      case 'bar': return <Beer className="h-4 w-4 text-[#a855f7]" />;
+      case 'rooftop': return <Building className="h-4 w-4 text-[#a855f7]" />;
+      case 'lounge': return <Sofa className="h-4 w-4 text-[#a855f7]" />;
+      default: return <MapPin className="h-4 w-4 text-[#d4ff00]" />;
     }
   };
 
@@ -294,7 +294,7 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="bg-[#1a0f2e] border-[#a855f7]/30">
         <DrawerHeader>
-          <DrawerTitle className="text-white text-center">Update your spot 📍</DrawerTitle>
+          <DrawerTitle className="text-white text-center">Update your spot</DrawerTitle>
         </DrawerHeader>
         <div className="px-6 pb-8 space-y-4">
           {/* Search bar */}
@@ -326,7 +326,7 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
                   disabled={loading}
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors disabled:opacity-50"
                 >
-                  <span className="text-lg">{venueTypeEmoji(venue.type)}</span>
+                  <span className="flex items-center">{venueTypeIcon(venue.type)}</span>
                   <div className="flex-1 text-left">
                     <p className="text-white font-medium text-sm">{venue.name}</p>
                     <p className="text-white/40 text-xs">

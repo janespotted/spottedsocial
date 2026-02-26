@@ -187,7 +187,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
               {/* Create Group Button */}
               <button
                 onClick={handleCreateGroup}
-                className="w-full flex items-center gap-3 bg-[#2d1b4e]/60 border border-[#a855f7]/30 rounded-xl p-4 hover:bg-[#2d1b4e]/80 transition-colors mb-2"
+                className="w-full flex items-center gap-3 bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 hover:bg-white/[0.10] transition-colors mb-2"
               >
                 <div className="w-12 h-12 rounded-full bg-[#a855f7]/20 border-2 border-[#a855f7]/40 flex items-center justify-center">
                   <Users className="h-6 w-6 text-[#a855f7]" />
@@ -230,7 +230,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
                     <button
                       key={friend.id}
                       onClick={() => createThread(friend.id)}
-                      className="w-full bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-xl p-4 hover:bg-[#2d1b4e]/80 transition-colors flex items-center gap-3"
+                      className="w-full bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 hover:bg-white/[0.10] transition-colors flex items-center gap-3"
                     >
                       <Avatar className="h-12 w-12 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
                         <AvatarImage src={friend.avatar_url || undefined} />

@@ -21,7 +21,7 @@ export function VenueMoveBanner({ venue, hasMultipleNearby, onAccept, onDismiss,
   }, [onDismiss]);
 
   return (
-    <div className="bg-gradient-to-r from-[#2d1b4e]/90 to-[#1a0f2e]/90 backdrop-blur border border-[#a855f7]/30 rounded-xl px-3 py-2.5 flex items-center gap-2 animate-fade-in">
+    <div className="bg-gradient-to-r from-[#2d1b4e]/90 to-[#1a0f2e]/90 backdrop-blur-sm rounded-xl px-3 py-2.5 flex items-center gap-2 animate-fade-in">
       <MapPin className="w-3.5 h-3.5 text-[#d4ff00] shrink-0" />
       <span className="text-white/70 text-xs">Moved to a new spot?</span>
       <button

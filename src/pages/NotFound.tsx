@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Home } from "lucide-react";
+import { Home, Search } from "lucide-react";
 
 const NotFound = () => {
   const location = useLocation();
@@ -14,10 +14,10 @@ const NotFound = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
       <div className="text-center max-w-[430px] mx-auto px-4">
-        <div className="w-24 h-24 rounded-full bg-[#2d1b4e] border-2 border-[#a855f7]/40 flex items-center justify-center mx-auto mb-6">
-          <span className="text-5xl">🔍</span>
+        <div className="w-24 h-24 rounded-full bg-[#2d1b4e] flex items-center justify-center mx-auto mb-6">
+          <Search className="h-10 w-10 text-[#a855f7]/60" />
         </div>
-        <h1 className="mb-2 text-6xl font-bold text-[#d4ff00]">404</h1>
+        <h1 className="mb-2 text-6xl font-bold text-white">404</h1>
         <p className="mb-2 text-xl text-white font-medium">Page not found</p>
         <p className="mb-8 text-white/60">
           Looks like this page went out without telling us where

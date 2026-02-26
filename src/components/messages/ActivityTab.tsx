@@ -12,7 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { logEvent } from '@/lib/event-logger';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target, Heart } from 'lucide-react';
+import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target, Heart, TrendingUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
@@ -628,7 +628,7 @@ export function ActivityTab() {
       {planningFriends.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <span className="text-lg">🎯</span>
+            <Target className="h-4 w-4 text-[#a855f7]" />
             <h3 className="text-sm font-semibold text-white">Friends Planning / PGing</h3>
             <span className="text-white/40 text-xs">{planningFriends.length} deciding</span>
           </div>
@@ -767,7 +767,7 @@ export function ActivityTab() {
                 {activity.type === 'trending' && (
                   <div className="text-white text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="mr-1">⚡</span>
+                      <TrendingUp className="h-4 w-4 text-[#d4ff00] mr-1" />
                       <span className="font-semibold text-[#d4ff00]">{activity.title.replace(' is trending', '')}</span>
                       <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
                     </div>
@@ -780,7 +780,7 @@ export function ActivityTab() {
                       <span className="font-semibold">{activity.display_name}</span>
                       <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
                     </div>
-                    <span className="text-white/70 block text-xs mt-0.5">liked your post ❤️</span>
+                    <span className="text-white/70 text-xs mt-0.5 flex items-center gap-0.5"><Heart className="h-3.5 w-3.5 text-red-400 inline" /> liked your post</span>
                   </div>
                 )}
                 {activity.type === 'city_pulse' && (
@@ -810,7 +810,7 @@ export function ActivityTab() {
                     size="sm"
                     className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
                   >
-                    I'm down! 🎉
+                    I'm down!
                   </Button>
                 )}
 
@@ -821,7 +821,7 @@ export function ActivityTab() {
                       size="sm"
                       className="h-8 bg-[#d4ff00] hover:bg-[#d4ff00]/80 text-[#1a0f2e] rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(212,255,0,0.5)] hover:shadow-[0_0_16px_rgba(212,255,0,0.7)] transition-all"
                     >
-                      Say hi! 👋
+                      Say hi!
                     </Button>
                   ) : (
                     <Button
@@ -829,7 +829,7 @@ export function ActivityTab() {
                       size="sm"
                       className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
                     >
-                      I'm down! 🎉
+                      I'm down!
                     </Button>
                   )
                 )}

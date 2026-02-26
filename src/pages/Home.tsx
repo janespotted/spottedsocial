@@ -15,7 +15,7 @@ import { useWeekendRally } from '@/hooks/useWeekendRally';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search, Loader2, Copy, Users } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search, Loader2, Copy, Users, Target } from 'lucide-react';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -401,7 +401,7 @@ export default function Home() {
           <FeedSkeleton />
         ) : posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6">
               <MessageCircle className="h-10 w-10 text-[#a855f7]/60" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-6">
@@ -424,7 +424,7 @@ export default function Home() {
                 onClick={() => setFeedMode('plans')}
                 className="mt-4 text-white/40 text-sm hover:text-white/60 transition-colors"
               >
-                🎯 {planningFriends.length} {planningFriends.length === 1 ? 'friend is' : 'friends are'} making plans
+                <Target className="h-4 w-4 text-[#a855f7] inline mr-1" /> {planningFriends.length} {planningFriends.length === 1 ? 'friend is' : 'friends are'} making plans
               </button>
             )}
           </div>

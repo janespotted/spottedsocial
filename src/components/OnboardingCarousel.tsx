@@ -10,7 +10,7 @@ interface OnboardingCarouselProps {
 const slides = [
   {
     icon: Sparkles,
-    title: 'Welcome to Spotted 🎉',
+    title: 'Welcome to Spotted',
     description: 'See which friends are out right now, what venues they\'re at, and what looks buzzing — instantly.',
     color: '#d4ff00',
   },

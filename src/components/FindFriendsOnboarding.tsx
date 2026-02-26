@@ -280,7 +280,7 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
         <div className={`text-center py-3 px-4 rounded-xl mb-6 ${
           requirementMet 
             ? 'bg-green-500/20 border border-green-500/40' 
-            : 'bg-[#2d1b4e]/60 border border-[#a855f7]/40'
+            : 'bg-white/[0.06] backdrop-blur-sm'
         }`}>
           <p className={`text-sm font-medium ${requirementMet ? 'text-green-400' : 'text-white/80'}`}>
             {getProgressText()}
@@ -297,7 +297,7 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
         {/* Content */}
         <div className="flex-1 space-y-5">
           {/* Share Your Invite Link - Primary CTA */}
-          <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/40 rounded-2xl p-5 space-y-4">
+           <div className="bg-white/[0.06] backdrop-blur-sm rounded-2xl p-5 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-[#a855f7] flex items-center justify-center">
                 <Link2 className="h-6 w-6 text-white" />
@@ -312,7 +312,7 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
               <div className="h-12 bg-[#1a0f2e] rounded-xl animate-pulse" />
             ) : (
               <>
-                <div className="flex items-center gap-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl p-3">
+                <div className="flex items-center gap-2 bg-[#1a0f2e] border border-white/20 rounded-xl p-3">
                   <span className="text-white/80 text-sm truncate flex-1 font-mono">
                     {getInviteUrl()}
                   </span>
@@ -338,7 +338,7 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
           </div>
 
           {/* Search by Username */}
-          <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/40 rounded-2xl p-5 space-y-4">
+           <div className="bg-white/[0.06] backdrop-blur-sm rounded-2xl p-5 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-[#a855f7]/30 flex items-center justify-center">
                 <Search className="h-6 w-6 text-[#a855f7]" />
@@ -372,7 +372,7 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
                     key={result.id}
                     className="flex items-center gap-3 p-3 bg-[#1a0f2e] rounded-xl"
                   >
-                    <Avatar className="h-10 w-10 border border-[#a855f7]/40">
+                    <Avatar className="h-10 w-10 border border-white/20">
                       <AvatarImage src={result.avatar_url || undefined} />
                       <AvatarFallback className="bg-[#2d1b4e] text-white">
                         {result.display_name?.[0] || 'U'}
@@ -418,7 +418,7 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
           {/* QR Code Button */}
           <button
             onClick={() => setShowQRModal(true)}
-            className="w-full bg-[#2d1b4e]/60 border border-[#a855f7]/40 rounded-2xl p-5 flex items-center gap-3 hover:bg-[#a855f7]/10 transition-colors"
+            className="w-full bg-white/[0.06] backdrop-blur-sm rounded-2xl p-5 flex items-center gap-3 hover:bg-white/[0.10] transition-colors"
           >
             <div className="w-12 h-12 rounded-full bg-[#a855f7]/30 flex items-center justify-center">
               <QrCode className="h-6 w-6 text-[#a855f7]" />

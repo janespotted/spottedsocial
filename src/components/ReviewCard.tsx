@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronUp, ChevronDown, Star } from 'lucide-react';
+import { ChevronUp, ChevronDown, Star, Flame, Sparkles, Wine, Music } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { haptic } from '@/lib/haptics';
@@ -94,7 +94,7 @@ export function ReviewCard({ review, currentUserVote, onVoteChange }: ReviewCard
     : review.profile?.avatar_url;
 
   return (
-    <div className="p-3 bg-[#2d1b4e]/50 rounded-xl border border-[#a855f7]/20">
+    <div className="p-3 bg-white/[0.06] backdrop-blur-sm rounded-2xl">
       <div className="flex gap-3">
         {/* Vote buttons */}
         <div className="flex flex-col items-center gap-1">
@@ -144,12 +144,12 @@ export function ReviewCard({ review, currentUserVote, onVoteChange }: ReviewCard
             </Avatar>
             <span className="text-sm font-medium text-white">{displayName}</span>
             {/* Emoji rating display */}
-            <span className="text-base">
-              {review.rating === 5 && '🔥'}
-              {review.rating === 4 && '💃'}
-              {review.rating === 3 && '🍸'}
-              {review.rating === 2 && '🎵'}
-              {review.rating === 1 && '✨'}
+            <span className="flex items-center">
+              {review.rating === 5 && <Flame className="h-4 w-4 text-[#d4ff00]" />}
+              {review.rating === 4 && <Sparkles className="h-4 w-4 text-[#a855f7]" />}
+              {review.rating === 3 && <Wine className="h-4 w-4 text-[#a855f7]" />}
+              {review.rating === 2 && <Music className="h-4 w-4 text-[#a855f7]" />}
+              {review.rating === 1 && <Star className="h-4 w-4 text-white/50" />}
             </span>
           </div>
           {review.review_text && (

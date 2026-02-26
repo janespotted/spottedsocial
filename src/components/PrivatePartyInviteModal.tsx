@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, MapPin, Target, Home } from 'lucide-react';
+import { ChevronDown, MapPin, Target, Home, Flame } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
 
@@ -243,9 +243,9 @@ export function PrivatePartyInviteModal({
                   <Collapsible open={planningOpen} onOpenChange={setPlanningOpen}>
                     <CollapsibleTrigger className="w-full flex items-center justify-between py-2 px-1 hover:bg-white/5 rounded-lg transition-colors">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">🔥</span>
+                        <Flame className="h-4 w-4 text-[#d4ff00]" />
                         <span className="font-semibold text-white">Friends Planning</span>
-                        <span className="text-lg">🎯</span>
+                        <Target className="h-4 w-4 text-[#a855f7]" />
                         <span className="text-white/50 text-sm">({planningFriends.length})</span>
                       </div>
                       <ChevronDown className={`h-5 w-5 text-white/60 transition-transform duration-200 ${planningOpen ? 'rotate-180' : ''}`} />
@@ -267,7 +267,7 @@ export function PrivatePartyInviteModal({
                   <Collapsible open={outOpen} onOpenChange={setOutOpen}>
                     <CollapsibleTrigger className="w-full flex items-center justify-between py-2 px-1 hover:bg-white/5 rounded-lg transition-colors">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">🎉</span>
+                        <MapPin className="h-4 w-4 text-[#d4ff00]" />
                         <span className="font-semibold text-white">Friends Out</span>
                         <span className="text-white/50 text-sm">({outFriends.length})</span>
                       </div>

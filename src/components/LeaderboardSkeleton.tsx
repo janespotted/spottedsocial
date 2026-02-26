@@ -4,7 +4,7 @@ export function LeaderboardSkeleton() {
       {[1, 2, 3, 4, 5, 6, 7].map((i) => (
         <div 
           key={i} 
-          className="rounded-2xl p-4 bg-[#2d1b4e]/40 border border-[#a855f7]/10"
+          className="rounded-2xl p-4 bg-white/[0.06] backdrop-blur-sm"
         >
           <div className="flex items-center gap-4">
             <div className="h-8 w-8 bg-[#a855f7]/20 rounded" />
