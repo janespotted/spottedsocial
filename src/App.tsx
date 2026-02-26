@@ -209,7 +209,9 @@ function AppContent() {
           path="/demo-settings"
           element={
             <ProtectedRoute>
-              <DemoSettings />
+              <AdminRoute>
+                <DemoSettings />
+              </AdminRoute>
             </ProtectedRoute>
           }
         />
