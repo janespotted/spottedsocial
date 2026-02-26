@@ -289,6 +289,9 @@ export default function Feed() {
               </div>
 
               <div className="px-4 pb-4 space-y-3">
+                {!post.image_url && (
+                  <p className="text-white text-base leading-relaxed">{post.text}</p>
+                )}
                 <div className="flex items-center gap-5">
                   <button 
                     onClick={() => handleLikePost(post.id)}
@@ -343,7 +346,9 @@ export default function Feed() {
                   </button>
                 </div>
 
-                <p className="text-white text-base leading-relaxed">{post.text}</p>
+                {post.image_url && (
+                  <p className="text-white text-base leading-relaxed">{post.text}</p>
+                )}
 
                 {expandedPostId === post.id && (
                   <div className="space-y-3 pt-2 border-t border-white/10">
