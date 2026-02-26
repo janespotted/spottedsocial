@@ -1,40 +1,60 @@
 
 
-# Polish Text-Only Newsfeed Posts
+# Add Video Posting to the Newsfeed
 
-## Changes — `src/pages/Home.tsx`
+## Overview
+Add video support to the post creation flow and newsfeed rendering, matching how Yap threads handle video. This requires a database migration, changes to 5 files, and updates to the storage utility.
 
-Two small edits in the text-only caption block (lines 476–482):
+## Database Migration
 
-1. **Larger text**: Change `text-base` → `text-[17px]` on the caption div (line 479) to make text-only posts feel like primary content rather than a caption label.
+Add a `media_type` column to the `posts` table:
 
-2. **Tighter spacing**: On the wrapping container (line 476), change `p-4 space-y-3` → `pt-2 px-4 pb-4 space-y-3` **only for text-only posts**. Since the container is shared with media posts, the cleaner approach is to reduce spacing on just the caption div itself: remove the `space-y-3` gap contribution by adding `-mt-1` or simply reducing the container's top padding conditionally. The simplest correct approach: keep the container as-is (`p-4 space-y-3`) but add a negative top margin on the text-only caption div: `className="-mt-1 text-white text-[17px] leading-relaxed font-medium"`.
-
-   Actually, the better approach is to conditionally set the container's top padding. When there's no image, the `p-4` creates a gap between the header row and the caption. We can handle this by:
-   - Changing the container className from `"p-4 space-y-3"` to a conditional: `{!post.image_url ? "pt-1 px-4 pb-4 space-y-3" : "p-4 space-y-3"}`
-   - This reduces the gap between the username row and the caption text from 16px to 4px, making them feel connected.
-
-3. **Slightly bolder weight**: Add `font-medium` to the caption to give it more presence as the card's main content.
-
-### Summary of line changes
-
-**Line 476** — conditional padding on the content container:
-```tsx
-// Before:
-<div className="p-4 space-y-3">
-
-// After:
-<div className={!post.image_url ? "pt-1 px-4 pb-4 space-y-3" : "p-4 space-y-3"}>
+```sql
+ALTER TABLE public.posts ADD COLUMN media_type text DEFAULT NULL;
 ```
 
-**Line 479** — larger, bolder caption text:
-```tsx
-// Before:
-<div className="text-white text-base leading-relaxed">
+Values will be `'image'`, `'video'`, or `null` (for text-only posts). No RLS changes needed since existing policies cover the column automatically.
 
-// After:
-<div className="text-white text-[17px] leading-relaxed font-medium">
-```
+## File Changes
 
-No other files affected. No backend changes.
+### 1. `src/components/PostMediaPicker.tsx`
+- Change both file input `accept` attributes from `"image/*"` to `"image/*,video/*"`
+- Update size validation: check `file.type.startsWith('video/')` — if video, cap at 50MB; if image, keep 10MB
+- For video files, use `URL.createObjectURL(file)` instead of `FileReader.readAsDataURL` (faster, avoids memory issues with large video files)
+- Rename "Choose from Gallery" to "Choose from Gallery" (no change needed, already generic)
+
+### 2. `src/components/CreatePostDialog.tsx`
+- Add `mediaType` state (`'image' | 'video'`) alongside `imageFile`/`imagePreview`
+- Derive media type from the selected file's MIME type in `handleMediaSelect`
+- Pass `mediaType` to `PostCaptionScreen`
+- Reset `mediaType` on dialog close and back navigation
+
+### 3. `src/components/PostCaptionScreen.tsx`
+- Update props interface: add `mediaType: 'image' | 'video'`
+- In the preview section (line 233-241): conditionally render `<video>` (muted, no autoplay, controls, playsInline) for video, `<img>` for image
+- In `uploadImage` (rename to `uploadMedia`): use same `post-images` bucket (works for both), adjust error message
+- In `handleShare`: include `media_type: mediaType` in the insert payload (cast via `as any` since types won't regenerate immediately)
+
+### 4. `src/hooks/useFeed.ts`
+- Add `media_type: string | null` to the `Post` interface
+
+### 5. `src/pages/Home.tsx`
+- In the media rendering block (lines 462-473): conditionally render `<video>` or `<img>` based on `post.media_type`
+  - Video: `<video src={post.image_url} controls playsInline muted className="w-full h-full object-cover" />`
+  - Image: keep existing `<img>` tag
+- Update the `!post.image_url` checks throughout the post card to also consider media_type (existing logic works since `image_url` is used for both — no change needed here)
+
+### 6. `src/lib/storage-utils.ts`
+- No changes needed — `resolvePostImageUrl` already handles any file path in the `post-images` bucket, works for video files too
+
+### 7. `src/pages/Feed.tsx`
+- Same conditional video/image rendering as Home.tsx for the `/feed` route (mirror the change)
+
+## Technical Details
+
+- Videos use the same `post-images` storage bucket (private, signed URLs)
+- Media type is determined client-side from `file.type` (`startsWith('video/')` → `'video'`, else `'image'`)
+- Video preview in composer: `<video src={preview} muted playsInline controls className="w-full h-full object-cover rounded-2xl" />`
+- Video in feed: `<video src={post.image_url} controls playsInline className="w-full h-full object-cover" />` — same aspect-square container, same border radius
+- The `as any` cast on insert is temporary until the types file auto-regenerates after migration
 
