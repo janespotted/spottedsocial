@@ -140,7 +140,7 @@ export default function Settings() {
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
-          <h1 className="text-2xl font-light tracking-[0.3em] text-white">Settings</h1>
+          <h1 className="text-2xl font-semibold tracking-[0.15em] text-white">Settings</h1>
         </div>
       </div>
 

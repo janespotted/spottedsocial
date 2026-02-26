@@ -1235,7 +1235,7 @@ export default function Map() {
         style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
       >
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
+          <h1 className="text-3xl font-semibold tracking-[0.15em] text-white">Spotted</h1>
           <CityBadge />
         </div>
         <div className="flex items-center gap-4">

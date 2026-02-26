@@ -268,7 +268,7 @@ export default function DemoSettings() {
             <ArrowLeft className="h-6 w-6" />
           </button>
           <div>
-            <h1 className="text-2xl font-light tracking-[0.3em] text-white">Demo</h1>
+            <h1 className="text-2xl font-semibold tracking-[0.15em] text-white">Demo</h1>
             <h2 className="text-3xl font-bold text-white">Settings</h2>
           </div>
         </div>

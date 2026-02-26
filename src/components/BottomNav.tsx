@@ -10,7 +10,7 @@ const navItems = [
   { to: '/leaderboard', icon: BarChart3, label: 'Leaderboard' },
   { to: '/map', icon: MapPin, label: 'Map', isCenter: true },
   { to: '/messages', icon: MessageSquare, label: 'Messages' },
-  { to: '/profile', icon: null, label: 'S', isSpecial: true },
+  { to: '/profile', icon: null, label: 'Profile', isSpecial: true },
 ];
 
 export const BottomNav = memo(function BottomNav() {
@@ -59,24 +59,26 @@ export const BottomNav = memo(function BottomNav() {
               key={to}
               to={to}
               className={cn(
-                'flex flex-col items-center justify-center flex-1 h-full transition-all',
+                'flex flex-col items-center justify-center flex-1 h-full transition-all active:scale-95',
                 isActive 
                   ? 'text-[#d4ff00]' 
-                  : 'text-white/40 hover:text-white/60',
-                isCenter && isActive && 'scale-110'
+                  : 'text-white/50 hover:text-white/70',
               )}
             >
-              {isSpecial ? (
-                <img 
-                  src={spottedLogo}
-                  alt="Profile"
-                  className={cn(
-                    'h-10 w-10 object-contain transition-all',
-                    isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]'
-                  )}
-                />
-              ) : Icon ? (
-                <>
+              <div className={cn(
+                'relative flex flex-col items-center justify-center rounded-2xl px-3 py-1 transition-all',
+                isActive && 'bg-[#d4ff00]/10'
+              )}>
+                {isSpecial ? (
+                  <img 
+                    src={spottedLogo}
+                    alt="Profile"
+                    className={cn(
+                      'h-7 w-7 object-contain transition-all',
+                      isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]'
+                    )}
+                  />
+                ) : Icon ? (
                   <Icon 
                     className={cn(
                       'h-6 w-6 transition-all',
@@ -84,11 +86,9 @@ export const BottomNav = memo(function BottomNav() {
                       isCenter && 'h-7 w-7'
                     )} 
                   />
-                  {!isCenter && (
-                    <span className="text-xs mt-0.5">{label}</span>
-                  )}
-                </>
-              ) : null}
+                ) : null}
+              </div>
+              <span className="text-[10px] mt-0.5 font-medium">{label}</span>
             </Link>
           );
         })}

@@ -56,10 +56,10 @@ export default function Messages() {
         <div className="flex items-start justify-between p-6">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
+              <h1 className="text-2xl font-semibold tracking-[0.15em] text-white">Spotted</h1>
               <CityBadge />
             </div>
-            <p className="text-white/60 text-sm">Everything disappears by 5am</p>
+            <p className="text-white/50 text-sm">Everything disappears by 5am</p>
           </div>
           <div className="flex items-center gap-4">
             <button

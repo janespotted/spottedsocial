@@ -317,13 +317,13 @@ export default function Home() {
         <div className="flex items-start justify-between p-6 pb-3">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
+              <h1 className="text-2xl font-semibold tracking-[0.15em] text-white">Spotted</h1>
               <CityBadge />
             </div>
             <h2 className="text-3xl font-bold text-white">
               {feedMode === 'plans' ? 'Make Plans' : 'Newsfeed'}
             </h2>
-            <p className="text-white/60 text-sm mt-1">
+            <p className="text-white/50 text-sm mt-1">
               {feedMode === 'plans' ? 'See what your friends are planning' : 'Everything disappears by 5am'}
             </p>
           </div>
@@ -357,24 +357,20 @@ export default function Home() {
           <button
             onClick={() => setFeedMode('newsfeed')}
             className={`relative pb-2 text-lg font-medium transition-colors ${
-              feedMode === 'newsfeed' ? 'text-white' : 'text-white/60'
+              feedMode === 'newsfeed' ? 'text-white' : 'text-white/50'
             }`}
           >
             Newsfeed
-            {feedMode === 'newsfeed' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
-            )}
+            <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00] transition-all duration-300 ${feedMode === 'newsfeed' ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'}`} />
           </button>
           <button
             onClick={() => setFeedMode('plans')}
             className={`relative pb-2 text-lg font-medium transition-colors ${
-              feedMode === 'plans' ? 'text-white' : 'text-white/60'
+              feedMode === 'plans' ? 'text-white' : 'text-white/50'
             }`}
           >
             Plans
-            {feedMode === 'plans' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
-            )}
+            <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00] transition-all duration-300 ${feedMode === 'plans' ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'}`} />
           </button>
         </div>
         {/* Story row removed — Yap handles venue content now */}
