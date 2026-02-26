@@ -36,15 +36,22 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('File too large. Max 10MB.');
+      const isVideo = file.type.startsWith('video/');
+      const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast.error(`File too large. Max ${isVideo ? '50' : '10'}MB.`);
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onMediaSelect(file, reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      if (isVideo) {
+        const preview = URL.createObjectURL(file);
+        onMediaSelect(file, preview);
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          onMediaSelect(file, reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -70,14 +77,14 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         onChange={handleFileSelect}
         className="hidden"
       />
       <input
         ref={cameraInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         capture="user"
         onChange={handleFileSelect}
         className="hidden"

@@ -1,0 +1,1 @@
+ALTER TABLE public.posts ADD COLUMN media_type text DEFAULT NULL;

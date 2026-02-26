@@ -14,6 +14,7 @@ export interface Post {
   user_id: string;
   text: string;
   image_url: string | null;
+  media_type: string | null;
   venue_name: string | null;
   venue_id: string | null;
   created_at: string;

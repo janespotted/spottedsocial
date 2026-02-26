@@ -1053,6 +1053,7 @@ export type Database = {
           is_demo: boolean | null
           is_promoted: boolean | null
           likes_count: number | null
+          media_type: string | null
           text: string
           user_id: string
           venue_id: string | null
@@ -1068,6 +1069,7 @@ export type Database = {
           is_demo?: boolean | null
           is_promoted?: boolean | null
           likes_count?: number | null
+          media_type?: string | null
           text: string
           user_id: string
           venue_id?: string | null
@@ -1083,6 +1085,7 @@ export type Database = {
           is_demo?: boolean | null
           is_promoted?: boolean | null
           likes_count?: number | null
+          media_type?: string | null
           text?: string
           user_id?: string
           venue_id?: string | null

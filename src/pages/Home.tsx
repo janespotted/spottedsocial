@@ -461,15 +461,25 @@ export default function Home() {
 
               {post.image_url && (
                 <div className="w-full aspect-square relative overflow-hidden group image-vignette">
-                  <img 
-                    src={post.image_url} 
-                    alt="Post" 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    onError={(e) => {
-                      const parent = e.currentTarget.parentElement;
-                      if (parent) parent.style.display = 'none';
-                    }}
-                  />
+                  {(post as any).media_type === 'video' ? (
+                    <video
+                      src={post.image_url}
+                      controls
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img 
+                      src={post.image_url} 
+                      alt="Post" 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      onError={(e) => {
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) parent.style.display = 'none';
+                      }}
+                    />
+                  )}
                 </div>
               )}
 

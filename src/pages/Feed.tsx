@@ -210,15 +210,25 @@ export default function Feed() {
             >
               {post.image_url && (
                 <div className="w-full relative overflow-hidden group image-vignette">
-                  <img
-                    src={post.image_url}
-                    alt="Post"
-                    loading="lazy"
-                    className="w-full h-80 object-cover transition-transform duration-500 group-hover:scale-105"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+                  {(post as any).media_type === 'video' ? (
+                    <video
+                      src={post.image_url}
+                      controls
+                      playsInline
+                      muted
+                      className="w-full h-80 object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={post.image_url}
+                      alt="Post"
+                      loading="lazy"
+                      className="w-full h-80 object-cover transition-transform duration-500 group-hover:scale-105"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
                 </div>
               )}
 
