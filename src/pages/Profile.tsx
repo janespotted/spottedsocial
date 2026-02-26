@@ -169,7 +169,7 @@ export default function Profile() {
     setLoading(true);
     const { data: profileData } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, display_name, username, avatar_url, bio, home_city, created_at, has_onboarded, is_demo, location_sharing_level, push_enabled')
       .eq('id', user?.id)
       .single();
 

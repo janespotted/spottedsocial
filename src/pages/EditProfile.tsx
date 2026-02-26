@@ -37,7 +37,7 @@ export default function EditProfile() {
   const fetchProfile = async () => {
     const { data } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, display_name, username, avatar_url, bio, home_city, created_at, has_onboarded, is_demo, location_sharing_level')
       .eq('id', user?.id)
       .single();
 
