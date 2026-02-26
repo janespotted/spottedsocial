@@ -451,10 +451,11 @@ export default function Leaderboard() {
         <div className="flex items-start justify-between p-6">
           <div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold text-white">Leaderboard</h2>
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
                 <CityBadge />
               </div>
+              <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
               <p className="text-white/60 text-sm mb-4">Top places to go out now</p>
               
               {/* Neighborhood Filter Dropdown */}
