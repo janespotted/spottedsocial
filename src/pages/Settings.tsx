@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus, MapPin, MessageSquare } from 'lucide-react';
+import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -27,9 +27,6 @@ export default function Settings() {
   const [isToggling, setIsToggling] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
-  const [showTypingIndicators, setShowTypingIndicators] = useState(true);
-  const [showReadReceipts, setShowReadReceipts] = useState(true);
-  const [isLoadingPrefs, setIsLoadingPrefs] = useState(true);
 
   const cityLabels: Record<SupportedCity, string> = {
     nyc: 'New York City',
@@ -45,42 +42,8 @@ export default function Settings() {
   useEffect(() => {
     if (user) {
       fetchInviteCode();
-      fetchChatPreferences();
     }
   }, [user]);
-
-  const fetchChatPreferences = async () => {
-    if (!user) return;
-    setIsLoadingPrefs(true);
-    const { data } = await supabase
-      .from('profiles')
-      .select('show_typing_indicators, show_read_receipts')
-      .eq('id', user.id)
-      .single();
-    if (data) {
-      setShowTypingIndicators((data as any).show_typing_indicators ?? true);
-      setShowReadReceipts((data as any).show_read_receipts ?? true);
-    }
-    setIsLoadingPrefs(false);
-  };
-
-  const handleToggleTyping = async (value: boolean) => {
-    setShowTypingIndicators(value);
-    await supabase
-      .from('profiles')
-      .update({ show_typing_indicators: value } as any)
-      .eq('id', user?.id);
-    toast.success(value ? 'Typing indicators enabled' : 'Typing indicators disabled');
-  };
-
-  const handleToggleReadReceipts = async (value: boolean) => {
-    setShowReadReceipts(value);
-    await supabase
-      .from('profiles')
-      .update({ show_read_receipts: value } as any)
-      .eq('id', user?.id);
-    toast.success(value ? 'Read receipts enabled' : 'Read receipts disabled');
-  };
 
   const fetchInviteCode = async () => {
     const { data } = await supabase
@@ -140,7 +103,7 @@ export default function Settings() {
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
-          <h1 className="text-2xl font-semibold tracking-[0.15em] text-white">Settings</h1>
+          <h1 className="text-2xl font-light tracking-[0.3em] text-white">Settings</h1>
         </div>
       </div>
 
@@ -191,37 +154,6 @@ export default function Settings() {
             {!isSupported && (
               <span className="text-white/40 text-xs">Browser not supported</span>
             )}
-          </div>
-        </Card>
-
-        {/* Chat Preferences Section */}
-        <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
-          <div className="p-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
-                <MessageSquare className="h-5 w-5 text-[#a855f7]" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-semibold text-white">Chat Preferences</h3>
-                <p className="text-white/60 text-sm">Control typing & read receipts</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between pl-[52px]">
-              <span className="text-white text-sm">Typing Indicators</span>
-              <Switch
-                checked={showTypingIndicators}
-                onCheckedChange={handleToggleTyping}
-                disabled={isLoadingPrefs}
-              />
-            </div>
-            <div className="flex items-center justify-between pl-[52px]">
-              <span className="text-white text-sm">Read Receipts</span>
-              <Switch
-                checked={showReadReceipts}
-                onCheckedChange={handleToggleReadReceipts}
-                disabled={isLoadingPrefs}
-              />
-            </div>
           </div>
         </Card>
 

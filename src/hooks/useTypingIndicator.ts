@@ -6,13 +6,13 @@ interface TypingUser {
   display_name: string;
 }
 
-export function useTypingIndicator(threadId: string | undefined, userId: string | undefined, memberMap: Map<string, { display_name: string }>, enabled: boolean = true) {
+export function useTypingIndicator(threadId: string | undefined, userId: string | undefined, memberMap: Map<string, { display_name: string }>) {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const lastTypingSent = useRef(0);
   const clearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setTyping = useCallback(async () => {
-    if (!threadId || !userId || !enabled) return;
+    if (!threadId || !userId) return;
     const now = Date.now();
     if (now - lastTypingSent.current < 2000) return;
     lastTypingSent.current = now;
@@ -32,10 +32,10 @@ export function useTypingIndicator(threadId: string | undefined, userId: string 
         .eq('thread_id', threadId)
         .eq('user_id', userId);
     }, 4000);
-  }, [threadId, userId, enabled]);
+  }, [threadId, userId]);
 
   useEffect(() => {
-    if (!threadId || !userId || !enabled) return;
+    if (!threadId || !userId) return;
 
     const channel = supabase
       .channel(`typing_${threadId}`)
@@ -48,6 +48,7 @@ export function useTypingIndicator(threadId: string | undefined, userId: string 
           filter: `thread_id=eq.${threadId}`,
         },
         () => {
+          // Refetch current typing users
           fetchTypingUsers();
         }
       )
@@ -55,6 +56,7 @@ export function useTypingIndicator(threadId: string | undefined, userId: string 
 
     return () => {
       supabase.removeChannel(channel);
+      // Clean up own typing indicator on unmount
       supabase
         .from('dm_typing_indicators' as any)
         .delete()
@@ -63,7 +65,7 @@ export function useTypingIndicator(threadId: string | undefined, userId: string 
         .then(() => {});
       if (clearTimeoutRef.current) clearTimeout(clearTimeoutRef.current);
     };
-  }, [threadId, userId, enabled]);
+  }, [threadId, userId]);
 
   const fetchTypingUsers = async () => {
     if (!threadId || !userId) return;

@@ -1,6 +1,5 @@
 import { ReactNode, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { PageTransition } from './PageTransition';
 import { BottomNav } from './BottomNav';
 import { CheckInModal } from './CheckInModal';
 import { CheckInConfirmation } from './CheckInConfirmation';
@@ -78,9 +77,7 @@ export function Layout({ children }: LayoutProps) {
         "flex-1 flex flex-col",
         isMapPage ? "w-full" : "max-w-[430px] mx-auto w-full"
       )}>
-        <PageTransition>
-          {children}
-        </PageTransition>
+        {children}
       </main>
       <BottomNav />
       <CheckInModal open={showCheckIn} onOpenChange={closeCheckIn} />

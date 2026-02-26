@@ -676,7 +676,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       
       {/* Header */}
       <div className="relative w-full flex items-start justify-between pt-4">
-        <h1 className="text-2xl font-semibold tracking-[0.15em] text-white/90">Spotted</h1>
+        <h1 className="text-2xl font-light tracking-[0.3em] text-white/90">Spotted</h1>
         <img 
           src={spottedLogo} 
           alt="Spotted" 

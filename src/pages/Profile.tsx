@@ -375,7 +375,7 @@ export default function Profile() {
           <div className="flex items-center gap-3">
             <button 
               onClick={handleHeaderTripleTap}
-              className="text-2xl font-semibold tracking-[0.15em] text-white select-none"
+              className="text-2xl font-light tracking-[0.3em] text-white select-none"
             >
               Spotted
             </button>

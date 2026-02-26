@@ -15,7 +15,6 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { logger } from '@/lib/logger';
 import { MessageInput } from '@/components/MessageInput';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
-import { useReadReceipts } from '@/hooks/useReadReceipts';
 
 // Validation schema for DM messages
 const messageSchema = z.object({
@@ -58,17 +57,13 @@ export default function Thread() {
   const [isUploading, setIsUploading] = useState(false);
   const [showMembersPopover, setShowMembersPopover] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
-  const [chatPrefs, setChatPrefs] = useState({ show_typing_indicators: true, show_read_receipts: true });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Map sender_id to member info for group chats
   const [memberMap, setMemberMap] = useState<Map<string, ThreadMember>>(new Map());
 
-  // Typing indicator (respects preference)
-  const { typingUsers, setTyping } = useTypingIndicator(threadId, user?.id, memberMap, chatPrefs.show_typing_indicators);
-
-  // Read receipts (respects preference)
-  const { getLastSeenMessageId } = useReadReceipts(threadId, user?.id, messages, chatPrefs.show_read_receipts);
+  // Typing indicator
+  const { typingUsers, setTyping } = useTypingIndicator(threadId, user?.id, memberMap);
 
   const handleImageUpload = useCallback(async (file: File) => {
     if (!user || !threadId) return;
@@ -145,15 +140,11 @@ export default function Thread() {
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('display_name, avatar_url, show_typing_indicators, show_read_receipts')
+      .select('display_name, avatar_url')
       .eq('id', user.id)
       .single();
     if (data) {
       setCurrentUserProfile(data);
-      setChatPrefs({
-        show_typing_indicators: (data as any).show_typing_indicators ?? true,
-        show_read_receipts: (data as any).show_read_receipts ?? true,
-      });
     }
   };
 
@@ -470,14 +461,14 @@ export default function Thread() {
               </Popover>
             ) : (
               // 1:1 chat header
-              <div 
+              <button 
                 onClick={() => otherMember && openFriendCard({
                   userId: otherMember.user_id,
                   displayName: otherMember.display_name,
                   avatarUrl: otherMember.avatar_url,
                   venueName: otherMember.venue_name || undefined,
                 })}
-                className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity cursor-pointer"
+                className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity"
               >
                 <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
                   <AvatarImage src={otherMember?.avatar_url || undefined} />
@@ -500,7 +491,7 @@ export default function Thread() {
                     @{otherMember.venue_name}
                   </button>
                 )}
-              </div>
+              </button>
             )}
 
             <button 
@@ -526,65 +517,54 @@ export default function Thread() {
               const isCurrentUser = message.sender_id === user?.id;
               const sender = !isCurrentUser ? memberMap.get(message.sender_id) : null;
               
-              // Determine if this message should show "Seen"
-              const otherUserId = otherMember?.user_id;
-              const lastSeenId = otherUserId && chatPrefs.show_read_receipts
-                ? getLastSeenMessageId(otherUserId)
-                : null;
-              const showSeen = isCurrentUser && lastSeenId === message.id;
-              
               return (
-                <div key={message.id}>
-                  <div
-                    className={`flex items-end gap-2 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
-                  >
-                    {!isCurrentUser && (
-                      <button
-                        onClick={() => sender && openFriendCard({
-                          userId: sender.user_id,
-                          displayName: sender.display_name,
-                          avatarUrl: sender.avatar_url,
-                          venueName: sender.venue_name || undefined,
-                        })}
-                        className="hover:opacity-80 transition-opacity"
-                      >
-                        <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.4)]">
-                          <AvatarImage src={sender?.avatar_url || otherMember?.avatar_url || undefined} />
-                          <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
-                            {sender?.display_name?.[0] || otherMember?.display_name?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                      </button>
-                    )}
+                <div
+                  key={message.id}
+                  className={`flex items-end gap-2 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
+                >
+                  {!isCurrentUser && (
+                    <button
+                      onClick={() => sender && openFriendCard({
+                        userId: sender.user_id,
+                        displayName: sender.display_name,
+                        avatarUrl: sender.avatar_url,
+                        venueName: sender.venue_name || undefined,
+                      })}
+                      className="hover:opacity-80 transition-opacity"
+                    >
+                      <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.4)]">
+                        <AvatarImage src={sender?.avatar_url || otherMember?.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                          {sender?.display_name?.[0] || otherMember?.display_name?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
+                  )}
 
-                    <div className="flex flex-col max-w-[75%]">
-                      {/* Show sender name in group chats */}
-                      {groupInfo && !isCurrentUser && sender && (
-                        <span className="text-white/50 text-xs mb-1 ml-1">{sender.display_name.split(' ')[0]}</span>
+                  <div className="flex flex-col max-w-[75%]">
+                    {/* Show sender name in group chats */}
+                    {groupInfo && !isCurrentUser && sender && (
+                      <span className="text-white/50 text-xs mb-1 ml-1">{sender.display_name.split(' ')[0]}</span>
+                    )}
+                    <div
+                      className={`rounded-2xl overflow-hidden ${
+                        isCurrentUser
+                          ? 'bg-[#4c2f6e] text-white rounded-br-sm'
+                          : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
+                      }`}
+                    >
+                      {message.image_url && (
+                        <img 
+                          src={message.image_url} 
+                          alt="Shared image" 
+                          className="w-full max-w-[250px] rounded-t-2xl"
+                        />
                       )}
-                      <div
-                        className={`rounded-2xl overflow-hidden ${
-                          isCurrentUser
-                            ? 'bg-[#4c2f6e] text-white rounded-br-sm'
-                            : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
-                        }`}
-                      >
-                        {message.image_url && (
-                          <img 
-                            src={message.image_url} 
-                            alt="Shared image" 
-                            className="w-full max-w-[250px] rounded-t-2xl"
-                          />
-                        )}
-                        {message.text && (
-                          <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
-                        )}
-                      </div>
+                      {message.text && (
+                        <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
+                      )}
                     </div>
                   </div>
-                  {showSeen && (
-                    <p className="text-white/40 text-xs italic text-right mt-1 mr-1">Seen</p>
-                  )}
                 </div>
               );
             })}
