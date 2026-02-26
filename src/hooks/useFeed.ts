@@ -5,6 +5,7 @@ import { haptic } from '@/lib/haptics';
 import { withRetry } from '@/lib/retry';
 import { logger } from '@/lib/logger';
 import { validateCommentText } from '@/lib/validation-schemas';
+import { resolvePostImageUrls } from '@/lib/storage-utils';
 
 const POSTS_PER_PAGE = 20;
 
@@ -183,14 +184,17 @@ export function useFeed(options: UseFeedOptions) {
 
       const { data } = await query;
       const fetchedPosts = data || [];
+      
+      // Resolve signed URLs for post images
+      const resolvedPosts = await resolvePostImageUrls(fetchedPosts);
 
-      setHasMorePosts(fetchedPosts.length === POSTS_PER_PAGE);
+      setHasMorePosts(resolvedPosts.length === POSTS_PER_PAGE);
 
       if (isLoadMore) {
-        setPosts(prev => [...prev, ...fetchedPosts]);
+        setPosts(prev => [...prev, ...resolvedPosts]);
       } else {
-        setPosts(fetchedPosts);
-        onCachePosts?.(fetchedPosts);
+        setPosts(resolvedPosts);
+        onCachePosts?.(resolvedPosts);
       }
 
       if (fetchedPosts.length > 0) {
@@ -248,11 +252,14 @@ export function useFeed(options: UseFeedOptions) {
 
     if (!data) return;
 
-    const isOwnPost = data.user_id === userId;
+    // Resolve signed URL for image
+    const [resolvedPost] = await resolvePostImageUrls([data]);
+
+    const isOwnPost = resolvedPost.user_id === userId;
     if (!isOwnPost) {
       const [sent, received] = await Promise.all([
-        supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('friend_id', data.user_id).eq('status', 'accepted').maybeSingle(),
-        supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('user_id', data.user_id).eq('status', 'accepted').maybeSingle(),
+        supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('friend_id', resolvedPost.user_id).eq('status', 'accepted').maybeSingle(),
+        supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('user_id', resolvedPost.user_id).eq('status', 'accepted').maybeSingle(),
       ]);
       if (!sent.data && !received.data) return;
     }
