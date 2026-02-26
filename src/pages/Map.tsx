@@ -1238,7 +1238,7 @@ export default function Map() {
           <h1 className="text-3xl font-light tracking-[0.3em] text-white">Spotted</h1>
           <CityBadge />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
             className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
