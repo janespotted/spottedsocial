@@ -193,7 +193,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
     <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
       <DrawerContent className="bg-[#1a0f2e] border-t border-[#a855f7]/30 max-h-[85vh]">
         <DrawerHeader className="pb-1">
-          <DrawerTitle className="text-foreground text-center text-base">Find Friends</DrawerTitle>
+          <DrawerTitle className="text-foreground text-center text-base">Who's Out</DrawerTitle>
         </DrawerHeader>
 
         <div className="px-4 pb-6 flex flex-col flex-1 min-h-0 overflow-hidden">
