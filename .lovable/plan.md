@@ -1,73 +1,40 @@
 
-Goal: Fix the text-only post layout in the actual newsfeed screen the user is viewing (`/` route), so caption renders above the engagement row when there is no media.
 
-What I found:
-1. The previous fix was applied in `src/pages/Feed.tsx` (the `/feed` route).
-2. The user is on `/` (Home), and `src/pages/Home.tsx` has a separate post-card JSX.
-3. In `Home.tsx`, inside each post card:
-   - Engagement row (`likes/comments/share`) is rendered first.
-   - Text-only caption block (`!post.image_url && post.text`) is rendered after that row.
-   - This is exactly why text-only posts still appear broken.
-4. This is a frontend-only rendering issue; no backend/database/auth changes are needed.
+# Polish Text-Only Newsfeed Posts
 
-Implementation plan:
+## Changes — `src/pages/Home.tsx`
 
-1) Update the correct post-card renderer in `src/pages/Home.tsx`
-- Target section: `posts.map((post, index) => ...)` inside newsfeed mode.
-- Specifically the card content container:
-  - Current order in this container is:
-    - Engagement row
-    - Image-caption block (`post.image_url && post.text`)
-    - Text-only block (`!post.image_url && post.text`)
-- Change to:
-  - Text-only caption block first (only when no media)
-  - Engagement row
-  - Media-caption block last (only when media exists)
+Two small edits in the text-only caption block (lines 476–482):
 
-2) Keep media-post behavior unchanged
-- For posts with media (`post.image_url`), preserve:
-  - Header
-  - Media
-  - Engagement row
-  - Caption below row
-- Only text-only posts get the reordered caption.
+1. **Larger text**: Change `text-base` → `text-[17px]` on the caption div (line 479) to make text-only posts feel like primary content rather than a caption label.
 
-3) Keep structure/styles/events unchanged except position
-- Do not alter like/comment/share handlers.
-- Do not alter comment expansion block.
-- Do not alter media rendering block behavior.
-- Only move the text-only JSX block above the engagement row.
+2. **Tighter spacing**: On the wrapping container (line 476), change `p-4 space-y-3` → `pt-2 px-4 pb-4 space-y-3` **only for text-only posts**. Since the container is shared with media posts, the cleaner approach is to reduce spacing on just the caption div itself: remove the `space-y-3` gap contribution by adding `-mt-1` or simply reducing the container's top padding conditionally. The simplest correct approach: keep the container as-is (`p-4 space-y-3`) but add a negative top margin on the text-only caption div: `className="-mt-1 text-white text-[17px] leading-relaxed font-medium"`.
 
-Expected render order after fix:
+   Actually, the better approach is to conditionally set the container's top padding. When there's no image, the `p-4` creates a gap between the header row and the caption. We can handle this by:
+   - Changing the container className from `"p-4 space-y-3"` to a conditional: `{!post.image_url ? "pt-1 px-4 pb-4 space-y-3" : "p-4 space-y-3"}`
+   - This reduces the gap between the username row and the caption text from 16px to 4px, making them feel connected.
 
-```text
-Text-only post:
-Header (avatar/name/venue/time)
-Caption text
-Likes + Comments + Share
-Comments thread (if expanded)
+3. **Slightly bolder weight**: Add `font-medium` to the caption to give it more presence as the card's main content.
 
-Media post:
-Header (avatar/name/venue/time)
-Media
-Likes + Comments + Share
-Caption text
-Comments thread (if expanded)
+### Summary of line changes
+
+**Line 476** — conditional padding on the content container:
+```tsx
+// Before:
+<div className="p-4 space-y-3">
+
+// After:
+<div className={!post.image_url ? "pt-1 px-4 pb-4 space-y-3" : "p-4 space-y-3"}>
 ```
 
-Technical details (exact JSX move):
-- In `src/pages/Home.tsx`, move:
+**Line 479** — larger, bolder caption text:
+```tsx
+// Before:
+<div className="text-white text-base leading-relaxed">
 
-- From current location (below buttons):
-  `{!post.image_url && post.text && (<div className="text-white text-base leading-relaxed">{post.text}</div>)}`
-- To immediately before the engagement buttons `<div className="flex items-center gap-4">...</div>` inside the same `p-4 space-y-3` container.
+// After:
+<div className="text-white text-[17px] leading-relaxed font-medium">
+```
 
-Validation checklist:
-1. Open `/` and verify a text-only post now shows caption above engagement row.
-2. Verify media post still shows caption below engagement row.
-3. Verify like/comment/share interactions still work.
-4. Expand comments on both post types and confirm spacing/order remains visually correct.
-5. Quick mobile viewport check to ensure wrapping/spacing remains stable.
+No other files affected. No backend changes.
 
-Out of scope (not required for this fix):
-- Refactoring `Home.tsx` and `Feed.tsx` into a shared post-card component (could be done later to avoid layout drift between routes).
