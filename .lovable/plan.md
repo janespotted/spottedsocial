@@ -1,30 +1,42 @@
 
 
-# Restore "Spotted" Title Above Leaderboard
+# Fix Newsfeed Post Layout for Text-Only Posts
 
 ## Problem
-The Home page header has a "Spotted" text line above the page title (line 276: `<h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>` with `CityBadge` next to it), but the Leaderboard page is missing this — it only has "Leaderboard" with the CityBadge directly.
+Currently the post layout is always: header → media (if any) → likes/comments row → caption text. For posts **without** media, the text appears below the action buttons, which looks broken. The reference screenshot confirms the desired layout.
 
-## Fix
+## Desired Layout
 
-### `src/pages/Leaderboard.tsx` — lines 454-457
+**With media:** header → media → likes/comments/share → caption
+**Without media:** header → caption → likes/comments/share
 
-Replace the current title block:
+## Change
+
+### `src/pages/Feed.tsx` — lines 291–346
+
+The content section currently renders actions first, then text. We need to conditionally reorder:
+
 ```tsx
-<div className="flex items-center gap-2">
-  <h2 className="text-2xl font-bold text-white">Leaderboard</h2>
-  <CityBadge />
+<div className="px-4 pb-4 space-y-3">
+  {/* Text ABOVE actions when no media */}
+  {!post.image_url && (
+    <p className="text-white text-base leading-relaxed">{post.text}</p>
+  )}
+
+  {/* Likes / comments / share row (unchanged) */}
+  <div className="flex items-center gap-5">
+    {/* ... all existing action buttons unchanged ... */}
+  </div>
+
+  {/* Text BELOW actions when there IS media */}
+  {post.image_url && (
+    <p className="text-white text-base leading-relaxed">{post.text}</p>
+  )}
+
+  {/* Comments section (unchanged) */}
+  {expandedPostId === post.id && ( ... )}
 </div>
 ```
 
-With the same pattern as Home — "Spotted" + CityBadge on top, then the page title below:
-```tsx
-<div className="flex items-center gap-3 mb-1">
-  <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-  <CityBadge />
-</div>
-<h2 className="text-3xl font-bold text-white">Leaderboard</h2>
-```
-
-This restores the consistent header hierarchy: Spotted logo text + CityBadge on the first line, page title on the second.
+Only one file changes — `src/pages/Feed.tsx`. The single `<p>` tag on line 346 is replaced by two conditional renders of the same element, placed before and after the action buttons respectively.
 
