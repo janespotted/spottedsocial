@@ -1,106 +1,49 @@
 
 
-# Fix Business Yap Board UX + Promotion Waitlist
+# Add Timed Posts for Business Yap Messages
 
 ## Overview
-Five changes across business portal pages, consumer-side Yap components, and a new database table.
+Add a duration picker to the business compose form, use `expires_at` for message expiry, show live countdowns on the consumer side, and remove the old 24-hour auto-unpin logic.
 
----
+## Changes
 
-## 1. Yap Board Improvements (BusinessYap.tsx)
+### 1. BusinessYap.tsx — Duration Picker + Remove Auto-Unpin
 
-### 1a. Character counter (45/280)
-Add a visible character counter below the Textarea, styled like the consumer-side Yap input. The `maxLength={280}` is already on the Textarea; add a `<span>` showing `{newMessage.length}/280`.
+**Add state**: `duration` with type `'1h' | '2h' | '4h' | 'none'`, default `'none'`.
 
-### 1b. Cap pinned messages at 3
-Before toggling a message to pinned, count currently pinned messages for the venue. If already 3 pinned and trying to pin another, show `toast.error("You can only pin up to 3 messages at a time. Unpin one first.")` and abort.
+**Remove lines 62–81** (the 24-hour auto-unpin logic in `fetchMessages`). Replace with just `setMessages(data || [])`.
 
-### 1c. Delete confirmation dialog
-Wrap the delete action in an `AlertDialog` from the existing UI library. Prompt: "Are you sure you want to delete this message? This can't be undone." with Cancel and Delete buttons.
+**Add duration picker UI** below the Pin toggle row — a row of four pill-shaped buttons:
+- "1 hour", "2 hours", "4 hours", "Until I remove it"
+- Selected pill gets `bg-primary text-black`, unselected gets `bg-white/10 text-white/60`
 
-### 1d. Auto-unpin after 24 hours
-When fetching messages in `BusinessYap.tsx`, after receiving data, check each pinned message's `created_at`. If older than 24 hours, fire an update to set `is_pinned = false` and reflect it locally. Same logic in `VenueYapThread.tsx`'s `fetchPinnedVenueMessages` — filter out pinned messages older than 24h client-side (they'll also get unpinned on next business portal load).
+**Update `handlePost`** to calculate `expires_at`:
+- `'1h'` → `new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString()`
+- `'2h'` → `new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()`
+- `'4h'` → `new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()`
+- `'none'` → `null`
 
----
+Pass `expires_at` in the insert call. Reset `duration` to `'none'` after posting.
 
-## 2. Fix Venue Name Matching (VenueYapThread.tsx)
+**Show expiry on message cards**: If `message.expires_at`, display remaining time like "Expires in 2h 15m" in `text-white/40 text-xs`.
 
-The current `fetchPinnedVenueMessages` already resolves `venue_id` from `venueName` via `supabase.from("venues").select("id").eq("name", venueName).maybeSingle()` at line 149. The `VenueSelector` dropdown shows `{name} ({neighborhood})` but the `venueName` passed to `VenueYapThread` comes from `yap_messages.venue_name` or `night_statuses.venue_name`, which stores just the venue name (no neighborhood suffix). So the lookup already works correctly — the name in the `venues` table matches what `VenueYapThread` receives. No code change needed here; just confirming the data flow is correct.
+### 2. VenueYapThread.tsx — Expiry Filter + Live Countdown + Remove Auto-Unpin
 
----
+**Update `fetchPinnedVenueMessages`** (lines 146–176):
+- Remove the 24-hour client-side filter (lines 165–169)
+- Add expiry filter to the query: `.or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())`
+- Include `expires_at` in the select fields
 
-## 3. Update Promotion Pricing (BusinessPromote.tsx)
+**Update `PinnedVenueMessage` interface** to include `expires_at: string | null`.
 
-Update the hardcoded price values:
-- Leaderboard Boost: `weeklyPrice: 29`, `monthlyPrice: 79`
-- Map Highlight: `weeklyPrice: 19`, `monthlyPrice: 49`
+**Add live countdown**: For pinned messages with `expires_at`, show countdown text like "🔥 {text} — ends in 47 min" styled in `text-[#d4ff00]`. Use a `useEffect` with a 60-second `setInterval` that:
+- Recalculates remaining time for each pinned message
+- Removes expired messages from `pinnedMessages` state when countdown hits zero
 
----
-
-## 4. Promotion Waitlist Capture
-
-### 4a. New database table
-Create `promotion_interest` table via migration:
-```sql
-CREATE TABLE promotion_interest (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  venue_id uuid NOT NULL REFERENCES venues(id),
-  user_id uuid NOT NULL,
-  tier text NOT NULL,
-  billing_period text NOT NULL,
-  price_shown integer NOT NULL,
-  created_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE promotion_interest ENABLE ROW LEVEL SECURITY;
-
--- Venue owners can insert their own interest
-CREATE POLICY "Venue owners can insert promotion interest"
-  ON promotion_interest FOR INSERT
-  WITH CHECK (auth.uid() = user_id AND is_venue_owner(auth.uid(), venue_id));
-
--- Users can view their own interest entries
-CREATE POLICY "Users can view own promotion interest"
-  ON promotion_interest FOR SELECT
-  USING (auth.uid() = user_id);
-
--- Admins can view all
-CREATE POLICY "Admins can view all promotion interest"
-  ON promotion_interest FOR SELECT
-  USING (has_role(auth.uid(), 'admin'::app_role));
-
--- Add unique constraint to prevent duplicate entries per tier
-ALTER TABLE promotion_interest
-  ADD CONSTRAINT unique_venue_tier UNIQUE (venue_id, tier);
-```
-
-### 4b. Replace buy buttons with waitlist drawer (BusinessPromote.tsx)
-When a pricing button is clicked, open a Drawer/bottom sheet showing:
-- "We're launching promotions soon! Want to be first in line?"
-- Selected tier name and price
-- "Join the waitlist" button
-
-On confirmation, attempt insert into `promotion_interest`. If unique constraint violation (code `23505`), show: "You're already on the list for this — we'll be in touch soon!" Otherwise show: "You're on the list! We'll reach out when promotions go live."
-
----
-
-## 5. Pinned Message Indicator on Yap Directory (YapTab.tsx)
-
-After fetching yap quotes and venue metadata, also query `venue_yap_messages` for pinned message counts grouped by venue:
-```sql
-SELECT venue_id, COUNT(*) as count
-FROM venue_yap_messages
-WHERE is_pinned = true AND (expires_at IS NULL OR expires_at > now())
-GROUP BY venue_id
-```
-Then join with the venues table to get venue names. On each quote card in the directory, if the venue has pinned messages, show a subtle line like `📌 1 update from venue` in muted text below the venue name.
-
----
+### 3. No Database Migration Needed
+The `expires_at` column already exists on `venue_yap_messages` as `timestamptz, nullable, default null`. The RLS policies already filter by `expires_at`.
 
 ## Files Modified
-- `src/pages/business/BusinessYap.tsx` — char counter, pin cap, delete confirmation, auto-unpin
-- `src/pages/business/BusinessPromote.tsx` — pricing update, waitlist drawer
-- `src/components/messages/YapTab.tsx` — pinned indicator query + display
-- `src/components/messages/VenueYapThread.tsx` — auto-unpin stale pinned messages
-- New migration for `promotion_interest` table
+- `src/pages/business/BusinessYap.tsx` — duration picker, remove auto-unpin, show expiry on cards
+- `src/components/messages/VenueYapThread.tsx` — expiry query filter, live countdown, remove 24h auto-unpin
 
