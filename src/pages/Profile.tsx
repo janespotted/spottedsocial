@@ -71,26 +71,33 @@ export default function Profile() {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [showQuickStatus, setShowQuickStatus] = useState(false);
   
-  // Triple-tap secret access to demo settings
+  // Triple-tap secret access to demo settings (admin-only)
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Pre-fetch admin status on mount
+  useEffect(() => {
+    if (!user) return;
+    supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' as any })
+      .then(({ data }) => setIsAdmin(data === true));
+  }, [user]);
 
   const handleHeaderTripleTap = () => {
+    if (!isAdmin) return; // Non-admins: triple-tap does nothing
+
     tapCountRef.current += 1;
 
-    // Clear existing timer
     if (tapTimerRef.current) {
       clearTimeout(tapTimerRef.current);
     }
 
-    // If triple-tapped, navigate to demo settings
     if (tapCountRef.current === 3) {
       navigate('/demo-settings');
       tapCountRef.current = 0;
       return;
     }
 
-    // Reset counter after 500ms
     tapTimerRef.current = setTimeout(() => {
       tapCountRef.current = 0;
     }, 500);
