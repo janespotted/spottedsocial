@@ -1,18 +1,15 @@
 
 
-# Add CityBadge to Leaderboard Header + Reduce Title Size
+# Restore "Spotted" Title Above Leaderboard
 
-## Current State
-The Leaderboard header (line 454) shows "Leaderboard" at `text-3xl font-bold` with no CityBadge. All other pages (Home, Map, Messages, Profile) include the CityBadge next to the title.
+## Problem
+The Home page header has a "Spotted" text line above the page title (line 276: `<h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>` with `CityBadge` next to it), but the Leaderboard page is missing this — it only has "Leaderboard" with the CityBadge directly.
 
-## Changes
+## Fix
 
-### `src/pages/Leaderboard.tsx`
+### `src/pages/Leaderboard.tsx` — lines 454-457
 
-**1. Add CityBadge next to the title (line 453-454)**
-
-Wrap the title in a flex row and append the CityBadge:
-
+Replace the current title block:
 ```tsx
 <div className="flex items-center gap-2">
   <h2 className="text-2xl font-bold text-white">Leaderboard</h2>
@@ -20,8 +17,14 @@ Wrap the title in a flex row and append the CityBadge:
 </div>
 ```
 
-- Title reduced from `text-3xl` to `text-2xl` to fit the badge comfortably
-- `mb-1` removed from h2 since the flex container handles spacing
+With the same pattern as Home — "Spotted" + CityBadge on top, then the page title below:
+```tsx
+<div className="flex items-center gap-3 mb-1">
+  <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
+  <CityBadge />
+</div>
+<h2 className="text-3xl font-bold text-white">Leaderboard</h2>
+```
 
-**2. Verify CityBadge import exists** — it's already imported in other pages; confirm it's imported here (or add the import).
+This restores the consistent header hierarchy: Spotted logo text + CityBadge on the first line, page title on the second.
 
