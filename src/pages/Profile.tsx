@@ -378,19 +378,13 @@ export default function Profile() {
             </button>
             <CityBadge />
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             <button
               onClick={() => setShowFriendSearch(true)}
               className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
               aria-label="Search friends"
             >
               <Search className="w-5 h-5" />
-            </button>
-            <button 
-              onClick={() => navigate('/settings')}
-              className="w-10 h-10 rounded-full bg-[#2d1b4e] border border-[#a855f7]/40 flex items-center justify-center text-white hover:bg-[#a855f7]/20 transition-colors"
-            >
-              <Settings className="h-5 w-5" />
             </button>
             <button
               onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
@@ -514,6 +508,13 @@ export default function Profile() {
             className="flex-1 border-white text-white hover:bg-white/10 rounded-full"
           >
             Edit Profile
+          </Button>
+          <Button
+            onClick={() => navigate('/settings')}
+            variant="outline"
+            className="border-white/40 text-white hover:bg-white/10 rounded-full px-3"
+          >
+            <Settings className="h-4 w-4" />
           </Button>
           <Button
             onClick={handleShareProfile}

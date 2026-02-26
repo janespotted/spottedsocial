@@ -61,7 +61,7 @@ export default function Messages() {
             </div>
             <p className="text-white/60 text-sm">Everything disappears by 5am</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => setShowFriendSearch(true)}
               className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
