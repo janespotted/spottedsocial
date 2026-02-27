@@ -129,7 +129,7 @@ export const getAccurateLocation = (): Promise<{
     }> = [];
     
     const MAX_TIME_MS = 10000;     // Max 10 seconds (cold GPS fix can be slow indoors)
-    const TARGET_ACCURACY = 100;   // Target 100m accuracy (indoor/urban realistic)
+    const TARGET_ACCURACY = 150;   // Match GPS_ACCURACY_THRESHOLD_CHECKIN — resolve immediately on first acceptable reading
     const MIN_READINGS = 1;        // Accept first good reading immediately
     
     let watchId: number;
