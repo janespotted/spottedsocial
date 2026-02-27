@@ -18,15 +18,28 @@ interface TrackingState {
   lastGPS: { lat: number; lng: number; timestamp: string } | null;
   wasInBackground: boolean;
   lastTrackTime: number;
+  lastManualCheckinTime: number;
 }
 
 // Global debounce: 30 seconds between tracking calls
 const TRACK_DEBOUNCE_MS = 30000;
+// Cooldown after manual check-in: 30 minutes
+const MANUAL_CHECKIN_COOLDOWN_MS = 30 * 60 * 1000;
 
 const trackingState: TrackingState = {
   lastGPS: null,
   wasInBackground: false,
   lastTrackTime: 0,
+  lastManualCheckinTime: 0,
+};
+
+/**
+ * Mark that the user just manually confirmed a venue.
+ * Prevents autoTrackVenue from overwriting for 30 minutes.
+ */
+export const markManualCheckin = (): void => {
+  trackingState.lastManualCheckinTime = Date.now();
+  console.log('🔒 Manual checkin marked — auto-tracking paused for 30 min');
 };
 
 // Detect if app was in background
@@ -193,6 +206,12 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
       return;
     }
     trackingState.lastTrackTime = currentTime;
+
+    // Skip if user manually checked in within the last 30 minutes
+    if (currentTime - trackingState.lastManualCheckinTime < MANUAL_CHECKIN_COOLDOWN_MS) {
+      console.debug('🔒 Auto-tracking paused (manual checkin cooldown)');
+      return;
+    }
 
     // Check if user is marked as "Out"
     const isOut = await isUserOut(userId);

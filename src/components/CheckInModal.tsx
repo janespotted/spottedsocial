@@ -15,6 +15,7 @@ import { captureLocationWithVenue, createNewVenue, detectNeighborhoodFromGPS, ty
 import { haptic } from '@/lib/haptics';
 import { requestNotificationPermission } from '@/lib/notifications';
 import { logEvent } from '@/lib/event-logger';
+import { markManualCheckin } from '@/lib/auto-venue-tracker';
 import { getDemoMode } from '@/lib/demo-data';
 import { getCachedCity } from '@/lib/city-detection';
 import { useUserCity } from '@/hooks/useUserCity';
@@ -599,6 +600,9 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           started_at: new Date().toISOString(),
           last_updated_at: new Date().toISOString(),
         });
+        
+        // Mark manual checkin to prevent auto-tracker from overwriting
+        markManualCheckin();
         
         // Log location update
         logEvent('location_update', {

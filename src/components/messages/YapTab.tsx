@@ -48,6 +48,47 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
     }
   }, [venueNameProp]);
 
+  // Fetch user's current venue independently from quotes
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchUserVenue = async () => {
+      const { data } = await supabase
+        .from('night_statuses')
+        .select('venue_name')
+        .eq('user_id', user.id)
+        .not('venue_name', 'is', null)
+        .maybeSingle();
+      setUserVenueName(data?.venue_name || null);
+    };
+    
+    fetchUserVenue();
+
+    // Realtime subscription for venue changes
+    const channel = supabase
+      .channel(`yap-venue-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'night_statuses',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          const newRecord = payload.new;
+          if (newRecord) {
+            setUserVenueName(newRecord.venue_name || null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   useEffect(() => {
     if (view === 'directory') {
       fetchQuotes();
@@ -57,31 +98,18 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const fetchQuotes = async () => {
     setIsLoading(true);
     try {
-      const [userVenueResult, yapResult] = await Promise.all([
-        user
-          ? supabase
-              .from('night_statuses')
-              .select('venue_name')
-              .eq('user_id', user.id)
-              .not('venue_name', 'is', null)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-        (() => {
-          let yapQuery = supabase
-            .from('yap_messages')
-            .select('id, text, score, venue_name, created_at')
-            .gt('expires_at', new Date().toISOString())
-            .eq('is_private_party', false);
-          if (!demoEnabled) {
-            yapQuery = yapQuery.eq('is_demo', false);
-          }
-          return yapQuery;
-        })(),
-      ]);
+      // userVenueName is now managed by its own useEffect + realtime subscription
+      let yapQuery = supabase
+        .from('yap_messages')
+        .select('id, text, score, venue_name, created_at')
+        .gt('expires_at', new Date().toISOString())
+        .eq('is_private_party', false);
+      if (!demoEnabled) {
+        yapQuery = yapQuery.eq('is_demo', false);
+      }
+      const { data: yapData } = await yapQuery;
 
-      setUserVenueName(userVenueResult.data?.venue_name || null);
-
-      const yaps = yapResult.data || [];
+      const yaps = yapData || [];
 
       // Get unique venue names for metadata lookup
       const venueNames = [...new Set(yaps.map(y => y.venue_name))];
