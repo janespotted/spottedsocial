@@ -1,24 +1,47 @@
 
 
-## Fix 3 Audit Issues
+## Two Targeted Fixes
 
-### 1. Add Missing DialogTitle (Accessibility)
+### 1. GPS failure: keep last known city (`src/lib/city-detection.ts`)
 
-**`src/components/PrivatePartyInviteModal.tsx`**
-- Line 7: Add `DialogTitle` to the import from `@/components/ui/dialog`, add new import for `VisuallyHidden` from `@/components/ui/visually-hidden`
-- Line 232 (inside `DialogContent`, as first child before the `<div className="p-5">`): Add `<VisuallyHidden><DialogTitle>Invite Friends to Party</DialogTitle></VisuallyHidden>`
+**Lines 162-167** — In the catch block of `detectUserCity`, instead of always defaulting to `'nyc'`:
+- Read the existing cache via `getCachedCity()` (which may still hold a valid city even if expired — we want it here as a fallback)
+- Actually, `getCachedCity()` respects TTL and returns null if expired. So we need to read localStorage directly to get the last city regardless of TTL.
+- Read `localStorage.getItem('detected_city')`, parse it, extract `.city` if it exists. Fall back to `'nyc'` only if there's truly nothing.
+- Do NOT call `cacheCity()` with the fallback — keep the stale cache so the next successful GPS read will update it naturally.
 
-**`src/components/InviteFriendsModal.tsx`**
-- Line 8: Add `DialogTitle` to the import, add `VisuallyHidden` import
-- Line 180 (inside `DialogContent`, as first child before the `<div className="p-5">`): Add `<VisuallyHidden><DialogTitle>Invite Friends</DialogTitle></VisuallyHidden>`
+Replace lines 162-167:
+```typescript
+} catch (error) {
+  // On GPS failure, keep using the last successfully detected city
+  // rather than overwriting with NYC
+  try {
+    const raw = localStorage.getItem('detected_city');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const lastCity = parsed?.city || raw;
+      if (lastCity === 'nyc' || lastCity === 'la' || lastCity === 'pb') {
+        console.warn('City detection failed, keeping last known city:', lastCity);
+        return lastCity;
+      }
+    }
+  } catch {}
+  console.warn('City detection failed, no previous city — defaulting to NYC');
+  const defaultCity: SupportedCity = 'nyc';
+  cacheCity(defaultCity);
+  return defaultCity;
+}
+```
 
-### 2. Improve Auto-Track Error Handling
+### 2. Clear reminder on check-in as "out" (`src/components/CheckInModal.tsx`)
 
-**`src/lib/auto-venue-tracker.ts`**
-- Lines 361-363: Replace the catch block. Check if error is a geolocation error (error.code === 1/2/3) or geolocation is unavailable or accuracy-related. If so, log at `console.debug` level. Otherwise log the actual `error.message` at `console.error`.
+The reminder key is `'checkin_reminder'` (confirmed from lines 89, 417, 426, 449).
 
-### 3. Add Map Profiles 403 Retry
+**Line 526** — Right after `if (selectedStatus === 'out') {`, add:
+```typescript
+// Clear any pending reminder since user is now checking in
+localStorage.removeItem('checkin_reminder');
+```
 
-**`src/pages/Map.tsx`**
-- Lines 403-405: Change `const { data: allProfiles }` to `let { data: allProfiles, error: profilesError }`. After the call, check if `profilesError` contains a 403. If so, wait 1 second and retry the RPC once. Log the error if retry also fails.
+Also in the private party custom venue path (line 565 area) and the regular venue path (line 586), the reminder is already covered since both are inside the `selectedStatus === 'out'` block — so one clear at line 527 handles both.
 
