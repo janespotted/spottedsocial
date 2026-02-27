@@ -387,7 +387,7 @@ export const createNewVenue = async (
  * Main function: Capture location and derive venue
  * Returns complete location data with venue information and nearby alternatives
  */
-export const GPS_ACCURACY_THRESHOLD_CHECKIN = 50; // meters — reject readings worse than this
+export const GPS_ACCURACY_THRESHOLD_CHECKIN = 150; // meters — indoor/urban GPS rarely does better than 100m
 export const GPS_ACCURACY_THRESHOLD_DEMO = 200; // meters — relaxed for demo mode (indoor/urban)
 
 export const captureLocationWithVenue = async (
