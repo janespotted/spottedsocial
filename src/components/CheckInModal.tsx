@@ -10,7 +10,7 @@ import { MapPin, Edit3, Clock, Bell, X, AlarmClock, ChevronDown, Home } from 'lu
 import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { captureLocationWithVenue, createNewVenue, detectNeighborhoodFromGPS, type LocationData } from '@/lib/location-service';
+import { captureLocationWithVenue, createNewVenue, detectNeighborhoodFromGPS, getCurrentLocation, type LocationData } from '@/lib/location-service';
 
 import { haptic } from '@/lib/haptics';
 import { requestNotificationPermission } from '@/lib/notifications';
@@ -217,10 +217,43 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       }
     } catch (error: any) {
       console.error('Error capturing location:', error);
+      
+      // Auto-retry once on timeout using single-shot fallback
+      const isTimeout = error?.code === 3 || error?.message?.toLowerCase().includes('timeout');
+      if (isTimeout) {
+        console.log('[CheckIn] Timeout on first attempt, retrying with getCurrentLocation...');
+        try {
+          const fallback = await getCurrentLocation();
+          // Re-attempt venue detection with fallback coords
+          const locData = await captureLocationWithVenue(getDemoMode().enabled ? 200 : undefined);
+          setLocationData(locData);
+          if (locData.venueName && locData.venueId) {
+            setDetectedVenue(locData.venueName);
+            setCustomVenue(locData.venueName);
+            setSelectedVenueId(locData.venueId);
+            setShowVenueConfirm(true);
+          } else {
+            setDetectedVenue('');
+            setCustomVenue('');
+            setSelectedVenueId(null);
+            setIsEditingVenue(true);
+            setShowVenueConfirm(true);
+          }
+          setIsDetectingLocation(false);
+          return;
+        } catch (retryError) {
+          console.error('Retry also failed:', retryError);
+        }
+      }
+      
+      const friendlyMessage = isTimeout
+        ? 'Getting your location took a bit longer than expected. Try moving to an open area or check that GPS is enabled.'
+        : error?.message || 'Could not get your location. Please try again.';
+      
       toast({
         variant: 'destructive',
         title: 'Location error',
-        description: error?.message || 'Could not get your location. Please try again.',
+        description: friendlyMessage,
       });
     } finally {
       setIsDetectingLocation(false);
