@@ -358,8 +358,13 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
     };
     trackingState.wasInBackground = false;
 
-  } catch (error) {
-    console.error('Error in auto-track venue:', error);
+  } catch (error: any) {
+    // Geolocation errors (permission denied, position unavailable, timeout) or missing API
+    if (!navigator.geolocation || (error && typeof error.code === 'number' && error.code >= 1 && error.code <= 3)) {
+      console.debug('Auto-track skipped: geolocation not available');
+    } else {
+      console.error('Error in auto-track venue:', error?.message || error);
+    }
   }
 };
 

@@ -5,7 +5,8 @@ import { useDemoMode } from '@/hooks/useDemoMode';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { supabase } from '@/integrations/supabase/client';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@/components/ui/visually-hidden';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -177,6 +178,7 @@ export function InviteFriendsModal() {
       }
     }}>
       <DialogContent className="w-[90%] max-w-[400px] max-h-[80vh] bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
+        <VisuallyHidden><DialogTitle>Invite Friends</DialogTitle></VisuallyHidden>
         <div className="p-5">
           {/* Header */}
           <div className="mb-4">
