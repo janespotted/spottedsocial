@@ -186,39 +186,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const captureAndDeriveVenue = async () => {
     setIsDetectingLocation(true);
     try {
-      // Demo mode: skip GPS and pretend user is at the featured venue
+      // Demo mode: log it but still use real GPS for venue detection
       const demoMode = getDemoMode();
       if (demoMode.enabled) {
-        const demoCity = getCachedCity() || 'nyc';
-        const DEMO_VENUES: Record<string, { name: string; lat: number; lng: number }> = {
-          nyc: { name: 'Le Bain', lat: 40.7414, lng: -74.0078 },
-          la: { name: 'Sound Nightclub', lat: 34.0412, lng: -118.2468 },
-          pb: { name: 'Cucina', lat: 26.7056, lng: -80.0364 },
-        };
-        const venue = DEMO_VENUES[demoCity] || DEMO_VENUES.nyc;
-
-        const { data: venueRow } = await supabase
-          .from('venues')
-          .select('id')
-          .eq('name', venue.name)
-          .maybeSingle();
-
-        const locData: LocationData = {
-          lat: venue.lat,
-          lng: venue.lng,
-          accuracy: 0,
-          timestamp: new Date().toISOString(),
-          venueId: venueRow?.id || null,
-          venueName: venue.name,
-          nearbyVenues: [],
-        };
-        setLocationData(locData);
-        setDetectedVenue(venue.name);
-        setCustomVenue(venue.name);
-        setSelectedVenueId(venueRow?.id || null);
-        setShowVenueConfirm(true);
-        setIsDetectingLocation(false);
-        return;
+        console.log('[Demo] Using real GPS for venue detection');
       }
 
       const locData = await captureLocationWithVenue();
