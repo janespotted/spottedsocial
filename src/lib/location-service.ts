@@ -128,9 +128,9 @@ export const getAccurateLocation = (): Promise<{
       timestamp: number;
     }> = [];
     
-    const MAX_TIME_MS = 5000;      // Max 5 seconds
-    const TARGET_ACCURACY = 30;    // Target 30m accuracy
-    const MIN_READINGS = 2;        // Minimum readings before early exit
+    const MAX_TIME_MS = 3000;      // Max 3 seconds
+    const TARGET_ACCURACY = 100;   // Target 100m accuracy (indoor/urban realistic)
+    const MIN_READINGS = 1;        // Accept first good reading immediately
     
     let watchId: number;
     let timeoutId: ReturnType<typeof setTimeout>;
