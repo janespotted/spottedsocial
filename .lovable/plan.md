@@ -1,24 +1,14 @@
 
 
-## Fix: GPS Accuracy Rejection Blocking Check-In
+## Speed Up Location Detection
 
-### Problem
-The user gets a GPS reading at 105m accuracy, but `captureLocationWithVenue()` rejects anything over 50m (`GPS_ACCURACY_THRESHOLD_CHECKIN = 50`). Indoors / urban environments routinely produce 80-150m accuracy. The user literally cannot check in.
+The slowness is because `getAccurateLocation()` keeps sampling GPS for up to **10 seconds** waiting for a reading under 100m accuracy — but we already accept 150m for check-ins. So it always burns the full 10s timer when indoors.
 
 ### Fix
 
 | File | Change |
 |---|---|
-| `src/lib/location-service.ts` | Raise `GPS_ACCURACY_THRESHOLD_CHECKIN` from `50` to `150` — indoor/urban GPS rarely does better than 100m |
-| `src/components/CheckInModal.tsx` | Also handle the "accuracy too low" error with a retry: on first failure, wait 2s and retry once with `getAccurateLocation()` (a second GPS sampling often improves). If still too low, proceed anyway but let the user pick their venue manually instead of blocking entirely |
+| `src/lib/location-service.ts` | Raise `TARGET_ACCURACY` from `100` to `150` to match `GPS_ACCURACY_THRESHOLD_CHECKIN` — the first reading under 150m will resolve immediately instead of waiting the full 10s |
 
-### Details
-
-**`location-service.ts`:**
-- Change `GPS_ACCURACY_THRESHOLD_CHECKIN` from `50` to `150`
-
-**`CheckInModal.tsx`:**
-- Expand the retry logic to also catch accuracy errors (detect via `error.message.includes('accuracy too low')`)
-- On accuracy failure retry: call `getAccurateLocation()` again, then `captureLocationWithVenue(200)` with a relaxed threshold
-- If retry also fails on accuracy: instead of showing an error toast, proceed to the venue confirmation screen with `isEditingVenue = true` so the user can manually type their venue — don't block the check-in entirely
+One line change. No reliability impact — we already accept 150m readings, so there's no reason to keep sampling for better accuracy we don't need.
 
