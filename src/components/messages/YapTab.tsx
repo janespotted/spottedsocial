@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Mic, MapPin, Pin, Flame } from 'lucide-react';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useUserCity } from '@/hooks/useUserCity';
 import { cn } from '@/lib/utils';
 import { VenueYapThread } from './VenueYapThread';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,6 +34,7 @@ const relativeTime = (dateStr: string) => {
 export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
+  const { city } = useUserCity();
   const [view, setView] = useState<'directory' | 'thread'>(venueNameProp ? 'thread' : 'directory');
   const [threadVenueName, setThreadVenueName] = useState<string | null>(venueNameProp || null);
   const [userVenueName, setUserVenueName] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
     if (view === 'directory') {
       fetchQuotes();
     }
-  }, [view, user, demoEnabled]);
+  }, [view, user, demoEnabled, city]);
 
   const fetchQuotes = async () => {
     setIsLoading(true);
@@ -109,17 +111,24 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       }
       const { data: yapData } = await yapQuery;
 
-      const yaps = yapData || [];
+      const allYaps = yapData || [];
 
-      // Get unique venue names for metadata lookup
-      const venueNames = [...new Set(yaps.map(y => y.venue_name))];
+      // Get unique venue names for metadata lookup — filter to current city
+      const venueNames = [...new Set(allYaps.map(y => y.venue_name))];
       let venueMetaMap = new Map<string, { type: string | null; neighborhood: string | null; id: string }>();
 
       if (venueNames.length > 0) {
-        const { data: venueData } = await supabase
+        let venueQuery = supabase
           .from('venues')
           .select('id, name, type, neighborhood')
           .in('name', venueNames);
+        
+        // Filter venues to current city
+        if (city) {
+          venueQuery = venueQuery.eq('city', city);
+        }
+        
+        const { data: venueData } = await venueQuery;
 
         if (venueData) {
           for (const v of venueData) {
@@ -128,11 +137,9 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         }
 
         // Fetch pinned message counts for these venues
-        const venueIds = venueData?.map(v => v.id).filter(Boolean) || [];
+        const venueIds = [...venueMetaMap.values()].map(v => v.id).filter(Boolean);
         if (venueIds.length > 0) {
-          const now = new Date();
-          const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-          
+          const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
           const { data: pinnedData } = await supabase
             .from('venue_yap_messages')
             .select('venue_id')
@@ -145,7 +152,6 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
             for (const row of pinnedData) {
               counts.set(row.venue_id, (counts.get(row.venue_id) || 0) + 1);
             }
-            // Map venue_id counts back to venue names
             const nameCountMap = new Map<string, number>();
             for (const [name, meta] of venueMetaMap.entries()) {
               const count = counts.get(meta.id);
@@ -155,6 +161,9 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
           }
         }
       }
+
+      // Filter yaps to only include venues in the current city
+      const yaps = allYaps.filter(y => venueMetaMap.has(y.venue_name));
 
       const enrichedQuotes: YapQuote[] = yaps.map(yap => ({
         id: yap.id,
