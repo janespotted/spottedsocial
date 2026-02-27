@@ -14,12 +14,21 @@ export function useUserCity() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const handleCityChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ city: SupportedCity | null }>;
+      if (customEvent.detail.city) {
+        setCity(customEvent.detail.city);
+      }
+    };
+
+    window.addEventListener('cityChanged', handleCityChanged);
+
     const demoMode = getDemoMode();
     const cached = getCachedCity();
     if (demoMode.enabled && cached) {
       setCity(cached);
       setIsLoading(false);
-      return;
+      return () => window.removeEventListener('cityChanged', handleCityChanged);
     }
     if (!cached) {
       detectUserCity().then(detectedCity => {
@@ -37,21 +46,13 @@ export function useUserCity() {
           }
         });
       }, 2000);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('cityChanged', handleCityChanged);
+      };
     }
 
-    const handleCityChanged = (e: Event) => {
-      const customEvent = e as CustomEvent<{ city: SupportedCity | null }>;
-      if (customEvent.detail.city) {
-        setCity(customEvent.detail.city);
-      }
-    };
-
-    window.addEventListener('cityChanged', handleCityChanged);
-
-    return () => {
-      window.removeEventListener('cityChanged', handleCityChanged);
-    };
+    return () => window.removeEventListener('cityChanged', handleCityChanged);
   }, []);
 
   // Force refresh city detection via GPS

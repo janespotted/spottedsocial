@@ -41,6 +41,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const [quotes, setQuotes] = useState<YapQuote[]>([]);
   const [sortMode, setSortMode] = useState<'hot' | 'new'>('hot');
   const [isLoading, setIsLoading] = useState(true);
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   const [pinnedCounts, setPinnedCounts] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -60,6 +61,8 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         .select('venue_name')
         .eq('user_id', user.id)
         .not('venue_name', 'is', null)
+        .not('expires_at', 'is', null)
+        .gt('expires_at', new Date().toISOString())
         .maybeSingle();
       setUserVenueName(data?.venue_name || null);
     };
@@ -98,7 +101,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   }, [view, user, demoEnabled, city]);
 
   const fetchQuotes = async () => {
-    setIsLoading(true);
+    if (!hasFetchedOnce) setIsLoading(true);
     try {
       // userVenueName is now managed by its own useEffect + realtime subscription
       let yapQuery = supabase
@@ -180,6 +183,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       console.error('Error fetching yap quotes:', error);
     } finally {
       setIsLoading(false);
+      setHasFetchedOnce(true);
     }
   };
 
