@@ -128,7 +128,7 @@ export const getAccurateLocation = (): Promise<{
       timestamp: number;
     }> = [];
     
-    const MAX_TIME_MS = 3000;      // Max 3 seconds
+    const MAX_TIME_MS = 10000;     // Max 10 seconds (cold GPS fix can be slow indoors)
     const TARGET_ACCURACY = 100;   // Target 100m accuracy (indoor/urban realistic)
     const MIN_READINGS = 1;        // Accept first good reading immediately
     
@@ -189,7 +189,7 @@ export const getAccurateLocation = (): Promise<{
       },
       {
         enableHighAccuracy: true,
-        timeout: MAX_TIME_MS,
+        timeout: 15000, // Browser-level timeout longer than selection timeout
         maximumAge: 0,
       }
     );
