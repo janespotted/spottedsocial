@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { APP_BASE_URL, getShareableUrl, copyToClipboard } from '@/lib/platform';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,7 +46,7 @@ interface UserPost {
 }
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { unreadCount } = useNotifications();
   
@@ -54,6 +54,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   const [friendsCount, setFriendsCount] = useState(0);
   const [placesCount, setPlacesCount] = useState(0);
   const [isLocationSharing, setIsLocationSharing] = useState(false);
@@ -153,20 +154,42 @@ export default function Profile() {
     };
   }, [user?.id]);
 
-  // Refetch on window focus (navigation back to page)
-  useEffect(() => {
-    const handleFocus = () => {
-      if (user?.id) {
-        fetchProfileData();
-      }
-    };
+  // Refetch night status on window focus (lightweight, avoids full re-fetch)
+  const refreshNightStatus = useCallback(async () => {
+    if (!user?.id) return;
+    const { data: nightStatus } = await supabase
+      .from('night_statuses')
+      .select('status, venue_name, venue_id, planning_neighborhood, is_private_party, party_neighborhood')
+      .eq('user_id', user.id)
+      .not('expires_at', 'is', null)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
 
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    if (nightStatus) {
+      setCurrentStatus(nightStatus.status as 'out' | 'planning' | 'home');
+      setCurrentVenue(nightStatus.venue_name);
+      setPlanningNeighborhood(nightStatus.planning_neighborhood);
+      setIsPrivateParty(nightStatus.is_private_party || false);
+      setPartyNeighborhood(nightStatus.party_neighborhood);
+      setIsLocationSharing(nightStatus.status === 'out' && (!!nightStatus.venue_name || nightStatus.is_private_party));
+    } else {
+      setCurrentStatus(null);
+      setCurrentVenue(null);
+      setPlanningNeighborhood(null);
+      setIsPrivateParty(false);
+      setPartyNeighborhood(null);
+      setIsLocationSharing(false);
+    }
   }, [user?.id]);
 
+  useEffect(() => {
+    const handleFocus = () => { refreshNightStatus(); };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [refreshNightStatus]);
+
   const fetchProfileData = async () => {
-    setLoading(true);
+    if (!hasFetchedOnce) setLoading(true);
     const { data: profileData } = await supabase
       .from('profiles')
       .select('id, display_name, username, avatar_url, bio, home_city, created_at, has_onboarded, is_demo, location_sharing_level, push_enabled')
@@ -263,25 +286,33 @@ export default function Profile() {
     for (const checkin of recentCheckins || []) {
       if (checkin.venue_id && !seenVenues.has(checkin.venue_id)) {
         seenVenues.add(checkin.venue_id);
-        
-        // Fetch venue image
-        const { data: venue } = await supabase
-          .from('venues')
-          .select('google_photo_refs')
-          .eq('id', checkin.venue_id)
-          .maybeSingle();
-        
-        const photoRefs = venue?.google_photo_refs as string[] | null;
-        const imageUrl = photoRefs?.[0] || null;
-        
         uniqueRecentSpots.push({
           venue_id: checkin.venue_id,
           venue_name: checkin.venue_name,
-          venue_image_url: imageUrl,
+          venue_image_url: null,
           visited_at: checkin.created_at || ''
         });
-        
-        if (uniqueRecentSpots.length >= 6) break; // Limit to 6 recent spots
+        if (uniqueRecentSpots.length >= 6) break;
+      }
+    }
+
+    // Batch fetch all venue images in a single query
+    const venueIds = uniqueRecentSpots.map(s => s.venue_id).filter(Boolean);
+    if (venueIds.length > 0) {
+      const { data: venueImages } = await supabase
+        .from('venues')
+        .select('id, google_photo_refs')
+        .in('id', venueIds);
+
+      const imageMap = new Map(
+        (venueImages || []).map(v => {
+          const refs = v.google_photo_refs as string[] | null;
+          return [v.id, refs?.[0] || null];
+        })
+      );
+
+      for (const spot of uniqueRecentSpots) {
+        spot.venue_image_url = imageMap.get(spot.venue_id) || null;
       }
     }
 
@@ -300,6 +331,7 @@ export default function Profile() {
     const resolvedPosts = await resolvePostImageUrls(postsData || []);
     setUserPosts(resolvedPosts);
     setLoading(false);
+    setHasFetchedOnce(true);
   };
 
   const handleLocationSharingChange = async (value: string) => {
@@ -755,10 +787,7 @@ export default function Profile() {
 
         {/* Logout Button at Bottom */}
         <Button
-          onClick={async () => {
-            await supabase.auth.signOut();
-            navigate('/auth');
-          }}
+          onClick={() => signOut()}
           variant="outline"
           className="w-full border-red-500/40 text-red-400 hover:bg-red-500/10 rounded-full"
         >
