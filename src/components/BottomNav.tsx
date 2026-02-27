@@ -84,9 +84,7 @@ export const BottomNav = memo(function BottomNav() {
                       isCenter && 'h-7 w-7'
                     )} 
                   />
-                  {!isCenter && (
-                    <span className="text-xs mt-0.5">{label}</span>
-                  )}
+                  <span className="text-xs mt-0.5">{label}</span>
                 </>
               ) : null}
             </Link>

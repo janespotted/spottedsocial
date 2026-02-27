@@ -93,6 +93,7 @@ export default function Home() {
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
   const [feedMode, setFeedMode] = useState<'newsfeed' | 'plans'>(() => isNightlifeHours() ? 'newsfeed' : 'plans');
   const [showFriendSearch, setShowFriendSearch] = useState(false);
@@ -270,12 +271,15 @@ export default function Home() {
   // Initial data fetch - check-in prompt is now handled by useCheckInPrompt in Layout
   useEffect(() => {
     if (user) {
-      setIsLoading(true);
+      if (!hasFetchedOnce) setIsLoading(true);
       Promise.all([
         fetchFriendsRef.current(),
         fetchPostsRef.current(),
         fetchPlanningFriends(),
-      ]).finally(() => setIsLoading(false));
+      ]).finally(() => {
+        setIsLoading(false);
+        setHasFetchedOnce(true);
+      });
     }
   }, [user, demoEnabled, city]);
 
