@@ -4,13 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 interface SubscriptionConfig {
   onPostsChange?: () => void;
   onLikesChange?: () => void;
+  onNightStatusChange?: () => void;
   // Incremental handlers for better performance
   onNewPost?: (payload: any) => void;
   onPostDeleted?: (payload: any) => void;
 }
 
 export function useRealtimeSubscriptions(config: SubscriptionConfig) {
-  const { onPostsChange, onLikesChange, onNewPost, onPostDeleted } = config;
+  const { onPostsChange, onLikesChange, onNightStatusChange, onNewPost, onPostDeleted } = config;
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const cleanup = useCallback(() => {
@@ -23,7 +24,7 @@ export function useRealtimeSubscriptions(config: SubscriptionConfig) {
   useEffect(() => {
     cleanup();
 
-    if (!onPostsChange && !onLikesChange && !onNewPost && !onPostDeleted) {
+    if (!onPostsChange && !onLikesChange && !onNightStatusChange && !onNewPost && !onPostDeleted) {
       return;
     }
 
@@ -59,11 +60,19 @@ export function useRealtimeSubscriptions(config: SubscriptionConfig) {
       );
     }
 
+    if (onNightStatusChange) {
+      feedRealtimeChannel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'night_statuses' },
+        onNightStatusChange
+      );
+    }
+
     feedRealtimeChannel.subscribe();
     channelRef.current = feedRealtimeChannel;
 
     return cleanup;
-  }, [onPostsChange, onLikesChange, onNewPost, onPostDeleted, cleanup]);
+  }, [onPostsChange, onLikesChange, onNightStatusChange, onNewPost, onPostDeleted, cleanup]);
 
   return { cleanup };
 }

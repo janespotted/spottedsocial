@@ -237,12 +237,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         setIsEditingVenue(true);
         setShowVenueConfirm(true);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error capturing location:', error);
       toast({
         variant: 'destructive',
         title: 'Location error',
-        description: 'Could not get your location. Please try again.',
+        description: error?.message || 'Could not get your location. Please try again.',
       });
     } finally {
       setIsDetectingLocation(false);

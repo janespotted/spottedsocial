@@ -296,6 +296,7 @@ export default function Home() {
   useRealtimeSubscriptions({
     onNewPost: handleIncrementalNewPost,
     onPostDeleted: handleIncrementalDelete,
+    onNightStatusChange: fetchPlanningFriends,
   });
 
   const handlePostDelete = async (postId: string) => {
