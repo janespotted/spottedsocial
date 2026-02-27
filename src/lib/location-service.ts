@@ -388,13 +388,16 @@ export const createNewVenue = async (
  * Returns complete location data with venue information and nearby alternatives
  */
 export const GPS_ACCURACY_THRESHOLD_CHECKIN = 50; // meters — reject readings worse than this
+export const GPS_ACCURACY_THRESHOLD_DEMO = 200; // meters — relaxed for demo mode (indoor/urban)
 
-export const captureLocationWithVenue = async (): Promise<LocationData> => {
+export const captureLocationWithVenue = async (
+  accuracyThreshold: number = GPS_ACCURACY_THRESHOLD_CHECKIN
+): Promise<LocationData> => {
   // Use multi-sample GPS for better accuracy
   const coords = await getAccurateLocation();
   
-  // Gate on GPS accuracy — reject readings worse than 50m
-  if (coords.accuracy > GPS_ACCURACY_THRESHOLD_CHECKIN) {
+  // Gate on GPS accuracy
+  if (coords.accuracy > accuracyThreshold) {
     throw new Error(
       `GPS accuracy too low (${Math.round(coords.accuracy)}m). Move to an open area and try again.`
     );

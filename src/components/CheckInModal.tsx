@@ -192,7 +192,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         console.log('[Demo] Using real GPS for venue detection');
       }
 
-      const locData = await captureLocationWithVenue();
+      const locData = await captureLocationWithVenue(demoMode.enabled ? 200 : undefined);
       console.log('=== VENUE DEBUG ===');
       console.log('GPS coords:', locData.lat, locData.lng);
       console.log('GPS accuracy:', locData.accuracy);
