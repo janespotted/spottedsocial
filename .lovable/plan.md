@@ -1,23 +1,18 @@
 
 
-## Problem
+## Speed up GPS detection
 
-Now that demo mode uses real GPS instead of hardcoded venues, the 50m accuracy gate in `captureLocationWithVenue()` is rejecting your reading (105m). Previously demo mode bypassed GPS entirely so this never triggered.
+The `getAccurateLocation()` function always waits the full 5s timeout because indoor readings rarely hit the 30m target. Three constant tweaks fix this:
 
-Indoor/urban environments routinely produce 80-150m accuracy readings, making the 50m threshold too strict for normal use.
+**`src/lib/location-service.ts`** — in `getAccurateLocation()`:
 
-## Fix: Relax accuracy threshold for demo mode check-ins
+| Constant | Current | New | Why |
+|---|---|---|---|
+| `MAX_TIME_MS` | 5000 | 3000 | Cap worst-case wait |
+| `TARGET_ACCURACY` | 30 | 100 | Indoor readings are 80-150m; accept first usable one instantly |
+| `MIN_READINGS` | 2 | 1 | Don't wait for a second sample if the first is good enough |
 
-**`src/lib/location-service.ts`**
+This means: if the first GPS reading is ≤100m, return immediately (<1s). Otherwise wait up to 3s max instead of 5s.
 
-- Add a new exported constant: `GPS_ACCURACY_THRESHOLD_DEMO = 200` (meters)
-- Add an optional `accuracyThreshold` parameter to `captureLocationWithVenue()` that defaults to the existing 50m
-- Use this parameter instead of the hardcoded `GPS_ACCURACY_THRESHOLD_CHECKIN`
-
-**`src/components/CheckInModal.tsx`**
-
-- When `demoMode.enabled`, call `captureLocationWithVenue(200)` (relaxed threshold)
-- When not in demo mode, call `captureLocationWithVenue()` (keeps strict 50m default)
-
-This way demo users can check in with lower-quality GPS while real check-ins keep the tighter gate.
+**Expected improvement:** ~7s → ~1-3s for the "Detecting location..." phase.
 
