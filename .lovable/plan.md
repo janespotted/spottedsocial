@@ -1,26 +1,49 @@
 
 
-## Pre-Launch Bug Fixes
+## Pre-Launch UX Audit: Remaining Issues
 
-### Fix 1: `useUserCity` event listener race condition
-**File:** `src/hooks/useUserCity.ts`
+### 1. Profile page N+1 query — slow load for "Recent Spots"
+**File:** `src/pages/Profile.tsx` (lines 263-285)
 
-The `cityChanged` event listener (lines 43-54) is unreachable. It's placed after two early-return branches (line 22 `return` and line 40 `return`), so it never registers. Move the event listener registration outside the conditional branches so it always runs.
+The `fetchProfileData` function fetches recent checkins, then loops through each unique venue and fires a **separate Supabase query per venue** to get `google_photo_refs`. With 6 venues, that's 6 sequential round-trips on top of the 5 other queries already in `fetchProfileData`. This makes the profile page noticeably slow.
 
-### Fix 2: Yap "You're at" bar shows expired venues
-**File:** `src/components/messages/YapTab.tsx`
+**Fix:** Collect all unique `venue_id`s first, then do a single `.in('id', venueIds)` query to fetch all venue images in one call.
 
-The `fetchUserVenue` query (lines 58-63) fetches from `night_statuses` without checking `expires_at`. A user whose status expired at 5 AM will still see "You're at Chez Jay" the next day. Add `.not('expires_at', 'is', null).gt('expires_at', new Date().toISOString())` to the query.
+### 2. Profile page refetches everything on window focus
+**File:** `src/pages/Profile.tsx` (lines 157-166)
 
-### Fix 3: Messages tab loading flicker
-**File:** `src/components/messages/YapTab.tsx`
+The `handleFocus` listener calls the full `fetchProfileData()` (which runs ~8 queries) every time the user switches back to the browser tab. This causes a visible loading flash since `setLoading(true)` is called at the top.
 
-The `isLoading` state resets to `true` on every `fetchQuotes` call (line 101), causing the skeleton to flash when switching tabs or when `city` changes. Only show skeleton on initial load; use a separate `isRefreshing` flag for subsequent fetches, or skip showing skeleton if `quotes` already has data.
+**Fix:** Only re-fetch the night status on focus (the thing that actually changes), not the entire profile. Or at minimum, don't set `loading = true` on re-fetches (same pattern as the Yap fix).
+
+### 3. Profile "Log Out" button bypasses `signOut()` from AuthContext
+**File:** `src/pages/Profile.tsx` (lines 757-767)
+
+The logout button directly calls `supabase.auth.signOut()` and then `navigate('/auth')`. But `AuthContext.signOut` (line 100 of AuthContext.tsx) handles Capacitor-specific navigation via `window.history.replaceState`. Using the raw Supabase call means native app users get a full WebView reload/white flash on logout.
+
+**Fix:** Use the `signOut` function from `useAuth()` instead of calling `supabase.auth.signOut()` directly.
+
+### 4. Home page skeleton flashes on city change
+**File:** `src/pages/Home.tsx` (lines 271-280)
+
+The `useEffect` that fetches data has `city` in its dependency array. When city changes, it sets `isLoading = true`, causing the full `FeedSkeleton` to flash even though posts are already loaded. Same pattern as the Yap flicker bug.
+
+**Fix:** Only show skeleton on initial load. Use a `hasFetchedOnce` flag; on subsequent fetches (city change, pull-to-refresh), keep existing posts visible while loading.
+
+### 5. Bottom nav "Map" label is hidden
+**File:** `src/components/BottomNav.tsx` (line 87)
+
+The `isCenter` items (Map) skip rendering the label `<span>`. Every other nav item shows its label except Map — users see an icon with no text, which is inconsistent and confusing.
+
+**Fix:** Remove the `!isCenter &&` guard so the Map label renders like the others.
+
+---
 
 ### Changes Summary
 
 | File | Change |
 |---|---|
-| `src/hooks/useUserCity.ts` | Move `cityChanged` event listener outside conditional branches so it always registers |
-| `src/components/messages/YapTab.tsx` | Add `expires_at` filter to `fetchUserVenue` query; suppress skeleton flicker on refetches |
+| `src/pages/Profile.tsx` | Batch venue image query instead of N+1 loop; use `signOut` from `useAuth()` for logout; skip `setLoading(true)` on re-fetches |
+| `src/pages/Home.tsx` | Add `hasFetchedOnce` flag to prevent skeleton flash on city change |
+| `src/components/BottomNav.tsx` | Show "Map" label under the center icon |
 
