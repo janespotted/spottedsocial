@@ -1,37 +1,26 @@
 
 
-## Analysis: City-Aware Filtering Across the App
+## Pre-Launch Bug Fixes
 
-### What's Already Working
-- **Map** — filters venues by `city` via `.eq('city', cityRef.current)` ✅
-- **Leaderboard** — filters by `city` via `.eq('venues.city', city)` ✅
-- **Plans/Events** — filter by city ✅
-- **Newsfeed** — passes `city` to `useFeed` hook ✅
-- **City detection** — `useUserCity` hook with GPS detection, caching, and manual override already exists ✅
-- **City detection triggers** — runs on app load and uses cache, not polling ✅
+### Fix 1: `useUserCity` event listener race condition
+**File:** `src/hooks/useUserCity.ts`
 
-### What's Missing
+The `cityChanged` event listener (lines 43-54) is unreachable. It's placed after two early-return branches (line 22 `return` and line 40 `return`), so it never registers. Move the event listener registration outside the conditional branches so it always runs.
 
-**1. Yap feed has no city filter**
-The `YapTab.tsx` `fetchQuotes` function queries `yap_messages` without any city constraint. It fetches all non-expired yaps globally and displays them. It should filter yaps to only show venues in the detected city by joining against the `venues` table or filtering by venue name match.
+### Fix 2: Yap "You're at" bar shows expired venues
+**File:** `src/components/messages/YapTab.tsx`
 
-**Fix in `src/components/messages/YapTab.tsx`:**
-- Import `useUserCity` hook
-- After fetching yaps, filter them to only include yaps whose `venue_name` matches a venue in the current city
-- Alternatively, fetch city venues first, then filter yaps client-side (simpler, avoids schema changes)
-- Re-fetch when `city` changes
+The `fetchUserVenue` query (lines 58-63) fetches from `night_statuses` without checking `expires_at`. A user whose status expired at 5 AM will still see "You're at Chez Jay" the next day. Add `.not('expires_at', 'is', null).gt('expires_at', new Date().toISOString())` to the query.
 
-**2. Friends page — no change needed**
-The Friends page shows friend requests, search, and invite links. This is a social graph feature, not a location feature. Filtering friends by city would break the UX (you'd miss friend requests from people in other cities). No change needed here.
+### Fix 3: Messages tab loading flicker
+**File:** `src/components/messages/YapTab.tsx`
 
-**3. Home page friends list — already city-aware**
-The `useFeed` hook already receives `city` and filters posts accordingly. The friends sidebar on Home shows friends who are "out" — these are already filtered by venue name matching city venues.
+The `isLoading` state resets to `true` on every `fetchQuotes` call (line 101), causing the skeleton to flash when switching tabs or when `city` changes. Only show skeleton on initial load; use a separate `isRefreshing` flag for subsequent fetches, or skip showing skeleton if `quotes` already has data.
 
-### Implementation Plan
+### Changes Summary
 
 | File | Change |
 |---|---|
-| `src/components/messages/YapTab.tsx` | Import `useUserCity`, fetch city venues, filter yaps to only show venues in the current city, add `city` to `useEffect` deps |
-
-This is the only actual gap. Everything else requested is already implemented.
+| `src/hooks/useUserCity.ts` | Move `cityChanged` event listener outside conditional branches so it always registers |
+| `src/components/messages/YapTab.tsx` | Add `expires_at` filter to `fetchUserVenue` query; suppress skeleton flicker on refetches |
 
