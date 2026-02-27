@@ -1,14 +1,24 @@
 
 
-## Speed Up Location Detection
+## Fix 3 Audit Issues
 
-The slowness is because `getAccurateLocation()` keeps sampling GPS for up to **10 seconds** waiting for a reading under 100m accuracy — but we already accept 150m for check-ins. So it always burns the full 10s timer when indoors.
+### 1. Add Missing DialogTitle (Accessibility)
 
-### Fix
+**`src/components/PrivatePartyInviteModal.tsx`**
+- Line 7: Add `DialogTitle` to the import from `@/components/ui/dialog`, add new import for `VisuallyHidden` from `@/components/ui/visually-hidden`
+- Line 232 (inside `DialogContent`, as first child before the `<div className="p-5">`): Add `<VisuallyHidden><DialogTitle>Invite Friends to Party</DialogTitle></VisuallyHidden>`
 
-| File | Change |
-|---|---|
-| `src/lib/location-service.ts` | Raise `TARGET_ACCURACY` from `100` to `150` to match `GPS_ACCURACY_THRESHOLD_CHECKIN` — the first reading under 150m will resolve immediately instead of waiting the full 10s |
+**`src/components/InviteFriendsModal.tsx`**
+- Line 8: Add `DialogTitle` to the import, add `VisuallyHidden` import
+- Line 180 (inside `DialogContent`, as first child before the `<div className="p-5">`): Add `<VisuallyHidden><DialogTitle>Invite Friends</DialogTitle></VisuallyHidden>`
 
-One line change. No reliability impact — we already accept 150m readings, so there's no reason to keep sampling for better accuracy we don't need.
+### 2. Improve Auto-Track Error Handling
+
+**`src/lib/auto-venue-tracker.ts`**
+- Lines 361-363: Replace the catch block. Check if error is a geolocation error (error.code === 1/2/3) or geolocation is unavailable or accuracy-related. If so, log at `console.debug` level. Otherwise log the actual `error.message` at `console.error`.
+
+### 3. Add Map Profiles 403 Retry
+
+**`src/pages/Map.tsx`**
+- Lines 403-405: Change `const { data: allProfiles }` to `let { data: allProfiles, error: profilesError }`. After the call, check if `profilesError` contains a 403. If so, wait 1 second and retry the RPC once. Log the error if retry also fails.
 
