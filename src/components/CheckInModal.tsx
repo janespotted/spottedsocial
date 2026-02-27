@@ -218,14 +218,19 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     } catch (error: any) {
       console.error('Error capturing location:', error);
       
-      // Auto-retry once on timeout using single-shot fallback
       const isTimeout = error?.code === 3 || error?.message?.toLowerCase().includes('timeout');
-      if (isTimeout) {
-        console.log('[CheckIn] Timeout on first attempt, retrying with getCurrentLocation...');
+      const isAccuracyError = error?.message?.toLowerCase().includes('accuracy too low');
+      
+      // Auto-retry once on timeout or accuracy failure
+      if (isTimeout || isAccuracyError) {
+        console.log(`[CheckIn] ${isTimeout ? 'Timeout' : 'Accuracy too low'} on first attempt, retrying...`);
         try {
-          const fallback = await getCurrentLocation();
-          // Re-attempt venue detection with fallback coords
-          const locData = await captureLocationWithVenue(getDemoMode().enabled ? 200 : undefined);
+          // Wait 2s for GPS to warm up on accuracy errors
+          if (isAccuracyError) {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+          // Retry with relaxed threshold (200m)
+          const locData = await captureLocationWithVenue(200);
           setLocationData(locData);
           if (locData.venueName && locData.venueId) {
             setDetectedVenue(locData.venueName);
@@ -241,13 +246,26 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           }
           setIsDetectingLocation(false);
           return;
-        } catch (retryError) {
+        } catch (retryError: any) {
           console.error('Retry also failed:', retryError);
+          // If retry also fails on accuracy, let user pick venue manually instead of blocking
+          if (retryError?.message?.toLowerCase().includes('accuracy too low')) {
+            console.log('[CheckIn] Accuracy still low after retry, allowing manual venue entry');
+            setDetectedVenue('');
+            setCustomVenue('');
+            setSelectedVenueId(null);
+            setIsEditingVenue(true);
+            setShowVenueConfirm(true);
+            setIsDetectingLocation(false);
+            return;
+          }
         }
       }
       
       const friendlyMessage = isTimeout
         ? 'Getting your location took a bit longer than expected. Try moving to an open area or check that GPS is enabled.'
+        : isAccuracyError
+        ? 'GPS signal is weak. Try moving to an open area.'
         : error?.message || 'Could not get your location. Please try again.';
       
       toast({
