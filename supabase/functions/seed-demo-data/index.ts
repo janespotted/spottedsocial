@@ -4,7 +4,29 @@ const NYC = [["Le Bain",40.7414,-74.0078,"Meatpacking"],["House of Yes",40.7089,
 const LA = [["Academy LA",34.0479,-118.2565,"DTLA"],["Sound Nightclub",34.0412,-118.2468,"Hollywood"],["Tenants of the Trees",34.0826,-118.2690,"Silver Lake"],["Akbar",34.0894,-118.2714,"Silver Lake"],["Highland Park Bowl",34.1118,-118.1924,"Highland Park"],["The Bungalow",34.0062,-118.4715,"Santa Monica"],["The Dresden",34.1055,-118.2891,"Los Feliz"],["EP & LP",34.0789,-118.3661,"WeHo"]];
 const PB = [["Cucina",26.7056,-80.0364,"Royal Poinciana"],["Mary Lou's",26.7151,-80.0530,"Clematis"],["Respectable Street",26.7140,-80.0555,"Clematis"],["Four",26.7128,-80.0538,"Downtown WPB"],["ER Bradley's",26.7153,-80.0525,"Clematis"]];
 
-const USERS = [["Alex","alex"],["Sam","sam"],["Jordan","jordan"],["Taylor","taylor"],["Morgan","morgan"],["Casey","casey"],["Riley","riley"],["Jamie","jamie"]];
+const DEMO_USERNAMES: Record<string, string[][]> = {
+  nyc: [
+    ["Alex","alex.soho"], ["Sam","sam_les"], ["Jordan","jordan_bk"],
+    ["Taylor","taylor.ev"], ["Morgan","morgan_nyc"], ["Casey","casey.wv"],
+    ["Riley","riley_chels"], ["Jamie","jamie.mpk"],
+    ["Alex","alex_wburg"], ["Sam","sammy.bush"], ["Jordan","jord.midtown"],
+    ["Taylor","tay_soho"]
+  ],
+  la: [
+    ["Alex","alex.weho"], ["Sam","sam_dtla"], ["Jordan","jordan.hwood"],
+    ["Taylor","taylor_sm"], ["Morgan","morgan.west"], ["Casey","casey_slake"],
+    ["Riley","riley.venice"], ["Jamie","jamie_la"],
+    ["Alex","alexx.hwood"], ["Sam","sammy.weho"], ["Jordan","jord_dtla"],
+    ["Taylor","tay.venice"]
+  ],
+  pb: [
+    ["Alex","alex.wpb"], ["Sam","sam_pb"], ["Jordan","jordan.clem"],
+    ["Taylor","taylor_rpb"], ["Morgan","morgan.pb"], ["Casey","casey_wpb"],
+    ["Riley","riley.palm"], ["Jamie","jamie_pb"],
+    ["Alex","alexx.wpb"], ["Sam","sammy.pb"], ["Jordan","jord_clem"],
+    ["Taylor","tay.palm"]
+  ]
+};
 const CAPTIONS = ["Amazing! 🔥","Best night 💯","Vibes ✨","So packed!","DJ killing it 🎵"];
 const DM_CONVOS = [
   [["Are you coming out tonight? 👀","Yeah definitely! Where's everyone at?","We're at {venue}, come through!"],["Omw! Save me a spot 🙌"]],
@@ -59,7 +81,8 @@ Deno.serve(async (req) => {
       
       // Users
       const ts=Date.now(), uids:string[]=[];
-      for(let i=0;i<12;i++){const u=USERS[i%8],id=crypto.randomUUID();uids.push(id);await sb.from('profiles').insert({id,display_name:u[0],username:`${u[1]}_${ts}_${i}`,avatar_url:`https://api.dicebear.com/7.x/avataaars/svg?seed=${u[0]}`,is_demo:true});}
+      const userList = DEMO_USERNAMES[city] || DEMO_USERNAMES['nyc'];
+      for(let i=0;i<12;i++){const u=userList[i];const id=crypto.randomUUID();uids.push(id);await sb.from('profiles').insert({id,display_name:u[0],username:u[1],avatar_url:`https://api.dicebear.com/7.x/avataaars/svg?seed=${u[0]}${i}`,is_demo:true});}
       
       // Friend all real users with demo
       const {data:real}=await sb.from('profiles').select('id').eq('is_demo',false);
