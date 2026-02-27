@@ -7,6 +7,7 @@ import type { SupportedCity } from '@/lib/city-detection';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { calculateExpiryTime } from '@/lib/time-utils';
+import { captureLocationWithVenue } from '@/lib/location-service';
 
 const PENDING_DEMO_KEY = 'pending_demo_activation';
 const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -95,10 +96,27 @@ async function activateDemo(city: SupportedCity, userId: string) {
       return;
     }
 
-    // Auto check-in user at featured venue
-    const venue = FEATURED_VENUES[city];
-    const venueName = await simulateCheckinForDemo(userId, city, venue);
+    // Try real GPS first for venue detection
+    let venueName: string | null = null;
+    try {
+      const locData = await captureLocationWithVenue();
+      if (locData.venueId && locData.venueName) {
+        logger.debug('demo:gps-venue-found', { venue: locData.venueName, accuracy: locData.accuracy });
+        venueName = await simulateCheckinForDemo(userId, city, {
+          name: locData.venueName,
+          lat: locData.lat,
+          lng: locData.lng,
+        });
+      }
+    } catch (e) {
+      logger.debug('demo:gps-failed-using-fallback', { error: String(e) });
+    }
 
+    // Fallback to featured venue if GPS didn't work
+    if (!venueName) {
+      const venue = FEATURED_VENUES[city];
+      venueName = await simulateCheckinForDemo(userId, city, venue);
+    }
     // Clear pending activation
     localStorage.removeItem(PENDING_DEMO_KEY);
 
