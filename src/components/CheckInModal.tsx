@@ -206,6 +206,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         const locData: LocationData = {
           lat: venue.lat,
           lng: venue.lng,
+          accuracy: 0,
           timestamp: new Date().toISOString(),
           venueId: venueRow?.id || null,
           venueName: venue.name,
@@ -221,6 +222,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       }
 
       const locData = await captureLocationWithVenue();
+      console.log('=== VENUE DEBUG ===');
+      console.log('GPS coords:', locData.lat, locData.lng);
+      console.log('GPS accuracy:', locData.accuracy);
+      console.log('Nearby venues returned:', JSON.stringify(locData.nearbyVenues));
+      console.log('Selected venue:', locData.venueName, locData.venueId);
       setLocationData(locData);
       
       if (locData.venueName && locData.venueId) {

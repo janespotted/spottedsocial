@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface LocationData {
   lat: number;
   lng: number;
+  accuracy: number;
   timestamp: string;
   venueId: string | null;
   venueName: string | null;
@@ -411,6 +412,7 @@ export const captureLocationWithVenue = async (): Promise<LocationData> => {
   return {
     lat: coords.lat,
     lng: coords.lng,
+    accuracy: coords.accuracy,
     timestamp,
     venueId: nearestVenue?.id || null,
     venueName: nearestVenue?.name || null,

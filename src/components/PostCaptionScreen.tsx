@@ -65,6 +65,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType, onBack, 
         setLocationData({
           lat: activeStatus.lat || 0,
           lng: activeStatus.lng || 0,
+          accuracy: 0,
           timestamp: new Date().toISOString(),
           venueId: activeStatus.venue_id || undefined,
           venueName: activeStatus.venue_name,
