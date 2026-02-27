@@ -160,9 +160,21 @@ export async function detectUserCity(forceRefresh = false): Promise<SupportedCit
     cacheCity(city);
     return city;
   } catch (error) {
-    console.warn('City detection failed, defaulting to NYC:', error);
-    // 3. Default to NYC on failure
-    const defaultCity = 'nyc';
+    // On GPS failure, keep using the last successfully detected city
+    // rather than overwriting with NYC
+    try {
+      const raw = localStorage.getItem('detected_city');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const lastCity = parsed?.city || raw;
+        if (lastCity === 'nyc' || lastCity === 'la' || lastCity === 'pb') {
+          console.warn('City detection failed, keeping last known city:', lastCity);
+          return lastCity;
+        }
+      }
+    } catch {}
+    console.warn('City detection failed, no previous city — defaulting to NYC');
+    const defaultCity: SupportedCity = 'nyc';
     cacheCity(defaultCity);
     return defaultCity;
   }

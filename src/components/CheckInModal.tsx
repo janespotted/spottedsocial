@@ -524,6 +524,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     setShowVenueConfirm(false);
 
     if (selectedStatus === 'out') {
+      // Clear any pending reminder since user is now checking in
+      localStorage.removeItem('checkin_reminder');
       // Save all location data to profile
       try {
         await supabase
