@@ -402,7 +402,17 @@ export default function Map() {
         if (friendIds.length > 0) {
           // Get friends' profiles with location data via safe RPC function
           // This function properly masks location data based on can_see_location permissions
-          const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+          let { data: allProfiles, error: profilesError } = await supabase.rpc('get_profiles_safe');
+          
+          // Retry once on 403 (auth session may not be ready on cold load)
+          if (profilesError && String(profilesError.code) === '403') {
+            await new Promise(r => setTimeout(r, 1000));
+            const retry = await supabase.rpc('get_profiles_safe');
+            allProfiles = retry.data;
+            if (retry.error) {
+              console.error('Map profiles retry failed:', retry.error.message);
+            }
+          }
           
           // Filter to only friends who are out with valid location data
           let friendProfiles = (allProfiles || [])
