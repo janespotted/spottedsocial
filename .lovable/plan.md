@@ -1,24 +1,24 @@
 
 
-## Fix: Location Timeout Error When Sharing Location
+## Fix: GPS Accuracy Rejection Blocking Check-In
 
-### Root Cause
-`getAccurateLocation()` in `location-service.ts` uses `watchPosition` with a **3-second timeout** (`MAX_TIME_MS = 3000`). On mobile browsers indoors or with weak GPS signal, 3 seconds is far too short for a first GPS fix. The raw `GeolocationPositionError` message ("Timeout expired") bubbles up to the user as an ugly red toast.
+### Problem
+The user gets a GPS reading at 105m accuracy, but `captureLocationWithVenue()` rejects anything over 50m (`GPS_ACCURACY_THRESHOLD_CHECKIN = 50`). Indoors / urban environments routinely produce 80-150m accuracy. The user literally cannot check in.
 
-### Fixes
+### Fix
 
 | File | Change |
 |---|---|
-| `src/lib/location-service.ts` | Increase `getAccurateLocation` timeout from 3s to 10s; increase `watchPosition` timeout option to 15s to give the browser enough time for a cold GPS fix |
-| `src/components/CheckInModal.tsx` | Add automatic retry on timeout (one retry with `getCurrentLocation` fallback before showing error); improve error message to be user-friendly instead of raw browser text |
+| `src/lib/location-service.ts` | Raise `GPS_ACCURACY_THRESHOLD_CHECKIN` from `50` to `150` — indoor/urban GPS rarely does better than 100m |
+| `src/components/CheckInModal.tsx` | Also handle the "accuracy too low" error with a retry: on first failure, wait 2s and retry once with `getAccurateLocation()` (a second GPS sampling often improves). If still too low, proceed anyway but let the user pick their venue manually instead of blocking entirely |
 
 ### Details
 
 **`location-service.ts`:**
-- Change `MAX_TIME_MS` from `3000` to `10000`
-- Change `watchPosition` timeout option from `MAX_TIME_MS` to `15000` (browser-level timeout should be longer than our selection timeout to let readings trickle in)
+- Change `GPS_ACCURACY_THRESHOLD_CHECKIN` from `50` to `150`
 
 **`CheckInModal.tsx`:**
-- In the `catch` block of `captureAndDeriveVenue`, detect timeout errors and auto-retry once using `getCurrentLocation()` (single-shot, 15s timeout) before giving up
-- Replace raw error messages with human-friendly descriptions: "Getting your location took a bit longer than expected. Try moving to an open area or check that GPS is enabled."
+- Expand the retry logic to also catch accuracy errors (detect via `error.message.includes('accuracy too low')`)
+- On accuracy failure retry: call `getAccurateLocation()` again, then `captureLocationWithVenue(200)` with a relaxed threshold
+- If retry also fails on accuracy: instead of showing an error toast, proceed to the venue confirmation screen with `isEditingVenue = true` so the user can manually type their venue — don't block the check-in entirely
 
