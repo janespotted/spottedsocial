@@ -1,20 +1,25 @@
 
 
-## Issue: "Location error - User denied geolocation"
+## Google Sign-In Failure — Diagnosis
 
-This is a browser permission issue — when you tap "Yes I'm out", the app requests GPS access, and your browser is blocking it. The `LocationPermissionPrompt` component already exists but is never wired into the check-in flow.
+The screenshot shows a generic "Google sign-in failed, please try again" error. The current error handler (Auth.tsx line 115-118) swallows the actual error details and shows only a generic message.
+
+**Likely cause**: The preview environment uses a different origin (`id-preview--*.lovable.app`) which may cause the OAuth redirect to fail or the session token exchange to error. Auth logs confirm a `session_not_found` (403) from the preview IP at the same timestamp.
+
+**On your published domain** (`spottedsocial.lovable.app`), Google sign-in is working — the auth logs show a successful Google login from that domain moments later.
 
 ### Fix
 
-**Wire `LocationPermissionPrompt` into `CheckInModal.tsx`:**
+1. **Better error logging** in `handleGoogleSignIn` — log the actual error to console so we can see the real failure reason
+2. **Show the actual error message** instead of generic text, so debugging is easier
+3. **Add a fallback message** noting to try from the published app if in preview
 
-1. Add state for `locationError` type and `showLocationPrompt` boolean
-2. In the `captureAndDeriveVenue` catch block (line 218), when the error is a permission denial (code 1), set the location error state and show the prompt instead of just a toast
-3. In `handleShareLocation` (line 465), also show the prompt on permission error instead of just a toast
-4. Render `<LocationPermissionPrompt>` at the bottom of CheckInModal with an `onRetry` callback that re-triggers `captureAndDeriveVenue`
+### File: `src/pages/Auth.tsx`
 
-This gives users clear instructions on how to enable location access instead of a dismissible toast.
+Update `handleGoogleSignIn` catch block (lines 115-118):
+- `console.error('Google sign-in error:', error)` 
+- Show `error?.message` if available, fall back to generic message
+- Same treatment for `handleAppleSignIn`
 
-### Files changed
-- `src/components/CheckInModal.tsx` — import and render `LocationPermissionPrompt`, add error state, wire catch blocks to show it
+This is a small change — just improving error visibility so we can diagnose the root cause if it recurs on the published domain.
 
