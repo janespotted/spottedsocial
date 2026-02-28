@@ -10,21 +10,33 @@ const DEMO_USERNAMES: Record<string, string[][]> = {
     ["Taylor","taylor.ev"], ["Morgan","morgan_nyc"], ["Casey","casey.wv"],
     ["Riley","riley_chels"], ["Jamie","jamie.mpk"],
     ["Alex","alex_wburg"], ["Sam","sammy.bush"], ["Jordan","jord.midtown"],
-    ["Taylor","tay_soho"]
+    ["Taylor","tay_soho"], ["Drew","drew.nolita"], ["Avery","avery_bk"],
+    ["Quinn","quinn.uws"], ["Reese","reese_les"], ["Blake","blake.hells"],
+    ["Skyler","skyler_gp"], ["Charlie","charlie.wburg"], ["Finley","finley_ev"],
+    ["Hayden","hayden.bk"], ["Emery","emery_soho"], ["Peyton","peyton.chels"],
+    ["Dakota","dakota_mpk"]
   ],
   la: [
     ["Alex","alex.weho"], ["Sam","sam_dtla"], ["Jordan","jordan.hwood"],
     ["Taylor","taylor_sm"], ["Morgan","morgan.west"], ["Casey","casey_slake"],
     ["Riley","riley.venice"], ["Jamie","jamie_la"],
     ["Alex","alexx.hwood"], ["Sam","sammy.weho"], ["Jordan","jord_dtla"],
-    ["Taylor","tay.venice"]
+    ["Taylor","tay.venice"], ["Drew","drew.echo"], ["Avery","avery_hwood"],
+    ["Quinn","quinn.sm"], ["Reese","reese_slake"], ["Blake","blake.dtla"],
+    ["Skyler","skyler_weho"], ["Charlie","charlie.lf"], ["Finley","finley_hp"],
+    ["Hayden","hayden.venice"], ["Emery","emery_hwood"], ["Peyton","peyton.weho"],
+    ["Dakota","dakota_sm"]
   ],
   pb: [
     ["Alex","alex.wpb"], ["Sam","sam_pb"], ["Jordan","jordan.clem"],
     ["Taylor","taylor_rpb"], ["Morgan","morgan.pb"], ["Casey","casey_wpb"],
     ["Riley","riley.palm"], ["Jamie","jamie_pb"],
     ["Alex","alexx.wpb"], ["Sam","sammy.pb"], ["Jordan","jord_clem"],
-    ["Taylor","tay.palm"]
+    ["Taylor","tay.palm"], ["Drew","drew.wpb"], ["Avery","avery_pb"],
+    ["Quinn","quinn.clem"], ["Reese","reese_rpb"], ["Blake","blake.palm"],
+    ["Skyler","skyler_wpb"], ["Charlie","charlie.pb"], ["Finley","finley_clem"],
+    ["Hayden","hayden.wpb"], ["Emery","emery_pb"], ["Peyton","peyton.clem"],
+    ["Dakota","dakota_palm"]
   ]
 };
 const CAPTIONS = ["Amazing! 🔥","Best night 💯","Vibes ✨","So packed!","DJ killing it 🎵"];
@@ -121,7 +133,7 @@ Deno.serve(async (req) => {
       // Users
       const ts=Date.now(), uids:string[]=[];
       const userList = DEMO_USERNAMES[city] || DEMO_USERNAMES['nyc'];
-      for(let i=0;i<12;i++){const u=userList[i];const id=crypto.randomUUID();uids.push(id);await sb.from('profiles').insert({id,display_name:u[0],username:u[1],avatar_url:`https://api.dicebear.com/7.x/avataaars/svg?seed=${u[0]}${i}`,is_demo:true});}
+      for(let i=0;i<24;i++){const u=userList[i];const id=crypto.randomUUID();uids.push(id);await sb.from('profiles').insert({id,display_name:u[0],username:u[1],avatar_url:`https://api.dicebear.com/7.x/avataaars/svg?seed=${u[0]}${i}`,is_demo:true});}
       
       // Friend all real users with demo
       const {data:real}=await sb.from('profiles').select('id').eq('is_demo',false);
@@ -133,21 +145,27 @@ Deno.serve(async (req) => {
       const {data:vens}=await sb.from('venues').select('id,name').in('name',V.map(v=>v.name));
       const vm=new Map((vens||[]).map((v:any)=>[v.name,v.id]));
       
-      // Night statuses - 8 users "out" at venues, clustered at top venues for leaderboard avatars
-      // First 3 users at the #1 venue (e.g. Le Bain for NYC) so avatars stack
+      // Night statuses - 16 users "out" at venues, clustered at top venues for leaderboard avatars
+      // First 4 users at the #1 venue
       const outStatuses = [
-        ...uids.slice(0,3).map(u=>{const v=V[0];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
-        // 2 users at the #2 venue
-        ...uids.slice(3,5).map(u=>{const v=V[1];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
-        // 2 users at the #3 venue
-        ...uids.slice(5,7).map(u=>{const v=V[2];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
-        // 1 user at #4 venue
-        {user_id:uids[7],status:'out',venue_id:vm.get(V[3].name),venue_name:V[3].name,lat:V[3].lat,lng:V[3].lng,expires_at:exp(),is_demo:true},
+        ...uids.slice(0,4).map(u=>{const v=V[0];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
+        // 3 users at the #2 venue
+        ...uids.slice(4,7).map(u=>{const v=V[1];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
+        // 3 users at the #3 venue
+        ...uids.slice(7,10).map(u=>{const v=V[2];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
+        // 2 users at #4 venue
+        ...uids.slice(10,12).map(u=>{const v=V[3];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
+        // 2 users at #5 venue
+        ...uids.slice(12,14).map(u=>{const v=V[4%V.length];return{user_id:u,status:'out',venue_id:vm.get(v.name),venue_name:v.name,lat:v.lat,lng:v.lng,expires_at:exp(),is_demo:true};}),
+        // 1 user at #6 venue
+        {user_id:uids[14],status:'out',venue_id:vm.get(V[5%V.length].name),venue_name:V[5%V.length].name,lat:V[5%V.length].lat,lng:V[5%V.length].lng,expires_at:exp(),is_demo:true},
+        // 1 user at #7 venue
+        {user_id:uids[15],status:'out',venue_id:vm.get(V[6%V.length].name),venue_name:V[6%V.length].name,lat:V[6%V.length].lat,lng:V[6%V.length].lng,expires_at:exp(),is_demo:true},
       ];
       await sb.from('night_statuses').insert(outStatuses);
       
-      // 4 users "planning" (thinking about going out) - users 8-11
-      await sb.from('night_statuses').insert(uids.slice(8,12).map((u,i)=>{const v=V[i%V.length];return{user_id:u,status:'planning',planning_neighborhood:v.hood,planning_visibility:'all_friends',expires_at:exp(),is_demo:true};}));
+      // 8 users "planning" (thinking about going out) - users 16-23
+      await sb.from('night_statuses').insert(uids.slice(16,24).map((u,i)=>{const v=V[i%V.length];return{user_id:u,status:'planning',planning_neighborhood:v.hood,planning_visibility:'all_friends',expires_at:exp(),is_demo:true};}));
       
       // Posts
       await sb.from('posts').insert(Array.from({length:15},()=>{const v=V[Math.floor(Math.random()*V.length)];return{user_id:uids[Math.floor(Math.random()*uids.length)],text:CAPTIONS[Math.floor(Math.random()*5)],venue_id:vm.get(v.name),venue_name:v.name,image_url:Math.random()>0.4?IMG:null,expires_at:exp(),created_at:rec(4),is_demo:true,visibility:'friends'};}));
@@ -196,7 +214,7 @@ Deno.serve(async (req) => {
         }
       }
       
-      return new Response(JSON.stringify({success:true,stats:{users:uids.length,venues:V.length,posts:15,plans:4,events:3,dms:4,city}}),{headers:{...h,'Content-Type':'application/json'}});
+      return new Response(JSON.stringify({success:true,stats:{users:uids.length,venues:V.length,posts:15,plans:4,events:3,dms:4,city,out:16,planning:8}}),{headers:{...h,'Content-Type':'application/json'}});
     } else if (action === 'clear') {
       await sb.from('events').delete().eq('is_demo',true);
       await sb.from('plans').delete().eq('is_demo',true);
