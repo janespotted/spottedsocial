@@ -1,22 +1,33 @@
 
 
-## Fix: InviteFriendsModal (and FriendSearchModal) show "No friends found"
+## Fix: Confetti renders behind venue cards
 
-**Root cause**: Both modals query `profiles` table directly, but RLS only allows reading your own profile or demo profiles. Friend profiles are invisible, so the query returns empty results.
+**Problem**: `canvas-confetti` creates a canvas element on `<body>` with a default z-index of `10`. The VenueInviteConfirmation overlay uses `z-[600]`, so confetti appears behind it.
 
-**Working pattern**: Other components (PrivatePartyInviteModal, NewChatDialog, VenueIdCard) use `useProfilesSafe()` which calls the `get_profiles_safe` RPC — this bypasses the restrictive SELECT policy and returns all visible profiles.
+**Fix**: Pass `zIndex: 9999` to every `confetti()` call in `src/components/VenueInviteConfirmation.tsx`.
 
 ### Changes
 
-**`src/components/InviteFriendsModal.tsx`**:
-- Replace direct `supabase.from('profiles').select(...)` query with `useProfilesSafe()` hook
-- Filter the cached profiles by `friendIds` in-memory (same pattern as PrivatePartyInviteModal)
-- Keep the checkins + night_statuses queries as-is (those tables have correct RLS)
+**`src/components/VenueInviteConfirmation.tsx`** — Add `zIndex: 9999` to both confetti calls inside the `frame()` function (~lines 29-40):
 
-**`src/components/FriendSearchModal.tsx`**:
-- Same fix: replace direct `profiles` query with `useProfilesSafe()` + in-memory filter
+```typescript
+confetti({
+  particleCount: 3,
+  angle: 60,
+  spread: 55,
+  origin: { x: 0, y: 0.6 },
+  colors: ['#a855f7', '#d4ff00', '#ffffff'],
+  zIndex: 9999
+});
+confetti({
+  particleCount: 3,
+  angle: 120,
+  spread: 55,
+  origin: { x: 1, y: 0.6 },
+  colors: ['#a855f7', '#d4ff00', '#ffffff'],
+  zIndex: 9999
+});
+```
 
-### Files changed
-1. `src/components/InviteFriendsModal.tsx`
-2. `src/components/FriendSearchModal.tsx`
+Single file, two-line addition.
 
