@@ -1,20 +1,28 @@
 
 
-## Fix: Map Pin Icons Cut Off at Top
+## Fix: Missing usernames/avatars on feed posts
 
-The teardrop pin is drawn on a canvas that's too short. The circle portion of the pin extends above the canvas boundary (y = -4), so the top gets clipped.
+**Root cause**: The `posts` table has no foreign key constraint from `user_id` to `profiles.id`. Without this FK, the Supabase join syntax `profiles:user_id(display_name, username, avatar_url)` returns an empty array `[]` instead of an object. So `post.profiles?.display_name` resolves to `undefined`, rendering nothing.
 
-**Root cause (line 1127-1134)**: Canvas height is `44px` but the arc center is at y=14 with radius 18, reaching y=-4 — above the canvas.
+**Fix**: Add a foreign key constraint from `posts.user_id` to `profiles.id`.
 
-### Fix in `src/pages/Map.tsx` (lines 1124-1150)
+### Database migration
+```sql
+ALTER TABLE public.posts
+  ADD CONSTRAINT posts_user_id_profiles_fkey
+  FOREIGN KEY (user_id) REFERENCES public.profiles(id);
+```
 
-Add vertical padding to the canvas and offset all drawing down:
+This single change makes the existing Supabase join in `useFeed.ts` (line 164-170) and `Feed.tsx` work correctly — `post.profiles` will return a single object instead of an empty array.
 
-1. Increase canvas height from `size + 8` to `size + 16` (52px total)
-2. Add a `yOffset = 8` to shift all drawing coordinates down by 8px
-3. Apply `yOffset` to the `moveTo`, `bezierCurveTo`, `arc` calls so the full teardrop fits within the canvas
+### Also check: `post_comments`
+The same join pattern is used for comments (line 283-290 in useFeed.ts). If `post_comments` also lacks a FK to profiles, that needs the same fix:
+```sql
+ALTER TABLE public.post_comments
+  ADD CONSTRAINT post_comments_user_id_profiles_fkey
+  FOREIGN KEY (user_id) REFERENCES public.profiles(id);
+```
 
-This ensures the entire pin shape renders within the canvas bounds before being passed to Mapbox as an image.
-
-**File**: `src/pages/Map.tsx` (lines 1124-1150)
+### Files changed
+- **Database only** — no code changes needed. The existing queries already use the correct join syntax.
 
