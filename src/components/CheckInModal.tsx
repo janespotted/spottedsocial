@@ -358,12 +358,24 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if (!user) return;
     
     try {
+      // Get user's actual GPS coordinates for proximity-based Yap access
+      let userLat: number | null = null;
+      let userLng: number | null = null;
+      try {
+        const { getCurrentLocation } = await import('@/lib/location-service');
+        const coords = await getCurrentLocation();
+        userLat = coords.lat;
+        userLng = coords.lng;
+      } catch (locError) {
+        console.warn('[PrivateParty] Could not get GPS coords, storing null:', locError);
+      }
+
       const partyDisplayName = `Private Party (${privatePartyNeighborhood})`;
       const statusData = {
         user_id: user.id,
         status: 'out' as const,
-        lat: null,
-        lng: null,
+        lat: userLat,
+        lng: userLng,
         venue_name: partyDisplayName,
         venue_id: null,
         updated_at: new Date().toISOString(),
