@@ -1119,18 +1119,51 @@ export default function Map() {
         },
       });
 
-      // Individual unclustered pins
+      // Create custom pin images for unclustered venues
+      if (!m.hasImage('venue-pin')) {
+        const size = 36;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size + 8;
+        const ctx = canvas.getContext('2d')!;
+        
+        // Teardrop/pin shape
+        ctx.beginPath();
+        ctx.moveTo(size / 2, size + 4);
+        ctx.bezierCurveTo(size / 2 - 2, size - 4, 0, size / 2, 0, size / 2 - 4);
+        ctx.arc(size / 2, size / 2 - 4, size / 2, Math.PI, 0, false);
+        ctx.bezierCurveTo(size, size / 2, size / 2 + 2, size - 4, size / 2, size + 4);
+        ctx.closePath();
+        ctx.fillStyle = '#a855f7';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // White dot in center
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2 - 4, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        m.addImage('venue-pin', { width: canvas.width, height: canvas.height, data: new Uint8Array(imgData.data.buffer) }, { pixelRatio: 2 });
+      }
+
+      // Individual unclustered pins — symbol layer with custom pin icon
       m.addLayer({
         id: 'venue-unclustered',
-        type: 'circle',
+        type: 'symbol',
         source: 'venues-source',
         filter: ['!', ['has', 'point_count']],
+        layout: {
+          'icon-image': 'venue-pin',
+          'icon-size': 1,
+          'icon-anchor': 'bottom',
+          'icon-allow-overlap': true,
+        },
         paint: {
-          'circle-color': '#a855f7',
-          'circle-radius': 10,
-          'circle-opacity': ['case', ['>', ['get', 'heatScore'], 0], 1, 0.6],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': 'rgba(255,255,255,0.9)',
+          'icon-opacity': ['case', ['>', ['get', 'heatScore'], 0], 1, 0.7],
         },
       });
 
