@@ -1024,32 +1024,12 @@ export default function Map() {
     });
   }, [friends, isLoadingFriends, currentZoom, layerVisibility, relationshipFilter]);
 
-  // Determine how many venues to show based on zoom level
-  const getVisibleVenueCount = (zoom: number): number => {
-    if (zoom < 11) return 25;        // City overview: Top 25 venues
-    if (zoom < 12) return 50;        // Wide view: Top 50 venues
-    if (zoom < 13) return 100;       // Neighborhood view: Top 100 venues
-    if (zoom < 14) return 150;       // Closer: Top 150 venues
-    if (zoom < 15) return 200;       // Close: Top 200 venues
-    return Infinity;                  // All venues at zoom 15+
-  };
-
-  // Filter venues based on selected filter and zoom level
+  // Filter venues based on selected filter — clustering handles density
   const typeFilteredVenues = venueFilter === 'all' 
     ? venues 
     : venues.filter(v => v.type === venueFilter);
   
-  const visibleCount = getVisibleVenueCount(currentZoom);
-  
-  // Separate promoted venues - they're always visible
-  const mapPromotedVenues = typeFilteredVenues.filter(v => v.is_map_promoted);
-  const nonPromotedVenues = typeFilteredVenues.filter(v => !v.is_map_promoted);
-  
-  // Combine: promoted venues first (always shown), then top non-promoted by heat
-  const filteredVenues = [
-    ...mapPromotedVenues,
-    ...nonPromotedVenues.slice(0, Math.max(0, visibleCount - mapPromotedVenues.length))
-  ];
+  const filteredVenues = typeFilteredVenues;
 
   // Render venue markers using Mapbox GL clustering for non-promoted venues
   // and DOM markers for promoted venues (special styling/z-index)
@@ -1147,10 +1127,10 @@ export default function Map() {
         filter: ['!', ['has', 'point_count']],
         paint: {
           'circle-color': '#a855f7',
-          'circle-radius': 8,
-          'circle-opacity': ['case', ['>', ['get', 'heatScore'], 0], 1, 0.5],
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': 'rgba(255,255,255,0.8)',
+          'circle-radius': 10,
+          'circle-opacity': ['case', ['>', ['get', 'heatScore'], 0], 1, 0.6],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': 'rgba(255,255,255,0.9)',
         },
       });
 
