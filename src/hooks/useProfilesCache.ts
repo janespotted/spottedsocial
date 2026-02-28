@@ -9,7 +9,8 @@ export function useProfilesSafe() {
       if (error) throw error;
       return data || [];
     },
-    staleTime: 60_000, // 1 minute
+    staleTime: 30_000, // 30 seconds
     gcTime: 5 * 60_000, // 5 minutes
+    refetchOnWindowFocus: true,
   });
 }
