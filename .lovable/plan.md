@@ -1,59 +1,48 @@
 
 
-## Fix: Private party yaps invisible due to null coordinates
+## Fix: Plans not showing + "Yap about it" button not working
 
-### Root Cause
-Two issues combine to make private party yaps invisible:
+### Issue 1: Plans expire immediately after creation (UTC/local time bug)
 
-1. **Check-in stores null coordinates**: The manual private party check-in flow (`updatePrivatePartyStatus` in `CheckInModal.tsx` line 365-366) sets `lat: null, lng: null` in `night_statuses`.
+**Root Cause**: `CreatePlanDialog.tsx` line ~149-152 calculates `expires_at` using `new Date(planDate)` which creates a UTC midnight date, then applies `setHours(5, 0, 0, 0)` in local time. For users in US timezones (UTC-5 to UTC-8), this creates an expiry time that's already in the past when the plan is posted at night.
 
-2. **Yap posting copies null coords**: `VenueYapThread.tsx` reads `nightStatus.lat` and `nightStatus.lng` (both null) and stores them as `party_lat`/`party_lng` in the yap.
+Example for a PST user posting at 11pm on Feb 27:
+- `new Date("2026-02-27")` = Feb 26 4:00 PM PST (UTC midnight)
+- `+1 day` = Feb 27 4:00 PM PST
+- `setHours(5,0,0,0)` = Feb 27 5:00 AM PST — already 18 hours in the past
 
-3. **RLS blocks visibility**: The `yap_messages` SELECT policy requires `yap_messages.party_lat IS NOT NULL AND yap_messages.party_lng IS NOT NULL` for the proximity check. Since both are null, the yap is invisible to everyone — including the poster.
-
-### Fix (two parts)
-
-**Part 1: Store GPS coordinates in private party check-in**
-
-`src/components/CheckInModal.tsx` — In `updatePrivatePartyStatus`, use the user's actual GPS coordinates instead of null. The privacy jittering is handled separately at the map display layer, so storing real coords here is fine for proximity-based Yap access.
-
-- Get user's current location before updating status
-- Store real `lat`/`lng` in the `night_statuses` upsert (lines 365-366)
-
-**Part 2: RLS policy — allow poster to always see their own yaps**
-
-Update the `yap_messages` SELECT RLS policy to also allow users to see their own private party yaps (as a safety net):
-
-```sql
-DROP POLICY IF EXISTS "Yap messages viewable with privacy" ON public.yap_messages;
-CREATE POLICY "Yap messages viewable with privacy" ON public.yap_messages
-FOR SELECT USING (
-  (is_private_party = false)
-  OR (auth.uid() = user_id)
-  OR (
-    auth.uid() IS NOT NULL
-    AND EXISTS (
-      SELECT 1 FROM night_statuses ns
-      WHERE ns.user_id = auth.uid()
-        AND ns.status = 'out'
-        AND ns.lat IS NOT NULL AND ns.lng IS NOT NULL
-        AND yap_messages.party_lat IS NOT NULL AND yap_messages.party_lng IS NOT NULL
-        AND (6371000 * acos(LEAST(1.0, GREATEST(-1.0,
-          cos(radians(ns.lat)) * cos(radians(yap_messages.party_lat))
-          * cos(radians(yap_messages.party_lng) - radians(ns.lng))
-          + sin(radians(ns.lat)) * sin(radians(yap_messages.party_lat))
-        )))) <= 200
-    )
-  )
-);
+**Fix**: Replace the UTC date constructor with a local date constructor:
+```js
+const [year, month, day] = planDate.split('-').map(Number);
+const expiresAt = new Date(year, month - 1, day + 1, 5, 0, 0, 0);
 ```
 
-**Part 3: Fix the yap posting fallback**
+**File**: `src/components/CreatePlanDialog.tsx`
 
-`src/components/messages/VenueYapThread.tsx` — When `nightStatus.lat`/`lng` are null for a private party, fall back to the user's current GPS position so `party_lat`/`party_lng` are always populated.
+---
 
-### Files changed
-- `supabase/migrations/` — new migration (RLS policy update)
-- `src/components/CheckInModal.tsx` — store GPS coords in manual private party flow
-- `src/components/messages/VenueYapThread.tsx` — GPS fallback when posting private party yaps
+### Issue 2: "Yap about it" button not navigating for private party
+
+**Root Cause**: The `handleShareClick` in `CheckInConfirmation.tsx` calls `closeCheckInConfirmation()` which triggers a React state update. The `navigate` call runs after, but the component's state change and the navigation happen in the same tick. The real problem is that the navigation state `{ venueName: checkInVenueName }` may not match the `userVenueName` in `YapTab`, because:
+- The check-in name from the confirmation is e.g. `"Private Party (Hollywood Hills)"`
+- But `YapTab` reads `userVenueName` from `night_statuses` which builds the name differently: `"Private Party · Hollywood Hills"` (using `·` instead of parentheses)
+
+So `isCheckedInHere` (YapTab line 224) is `false`, the thread opens but with `canPost=false`, and there are no existing yaps to show — making it look like nothing happened.
+
+Additionally, the button may not respond on mobile due to the `onClick` on the backdrop parent intercepting touch events before they reach the button.
+
+**Fix (two parts)**:
+
+1. **`CheckInConfirmation.tsx`**: Use `e.stopPropagation()` on the button to prevent backdrop interference, and navigate first then close to ensure navigation completes.
+
+2. **`CheckInConfirmation.tsx`**: Pass the venue name through navigation state in a normalized way, OR fix the name format mismatch. The simplest fix: pass a `isPrivateParty` flag through the navigation state and let YapTab use the `userVenueName` it already has.
+
+**Files**: `src/components/CheckInConfirmation.tsx`, `src/components/messages/YapTab.tsx`
+
+---
+
+### Summary of changes
+- `src/components/CreatePlanDialog.tsx` — fix expires_at calculation to use local time constructor
+- `src/components/CheckInConfirmation.tsx` — fix "Yap about it" button event handling and private party name mismatch
+- `src/components/messages/YapTab.tsx` — handle navigation state for private party yap thread opening (match against `userVenueName` when it becomes available)
 
