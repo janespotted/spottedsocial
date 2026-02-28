@@ -348,6 +348,12 @@ export const findNearbyVenues = async (
   }
 };
 
+const BLOCKED_VENUE_NAMES = [
+  'private party', 'house party', 'home', 'my place', 'my house',
+  'my apartment', 'apartment', 'house', 'party', 'pregame', 'pre-game',
+  'afterparty', 'after party', 'kickback',
+];
+
 /**
  * Create a new venue at given coordinates
  */
@@ -359,6 +365,10 @@ export const createNewVenue = async (
   type: 'bar' | 'club' | 'lounge'
 ): Promise<string | null> => {
   try {
+    if (BLOCKED_VENUE_NAMES.includes(name.trim().toLowerCase())) {
+      console.warn(`[createNewVenue] Blocked venue name: "${name}"`);
+      return null;
+    }
     const { data, error } = await supabase
       .from('venues')
       .insert({
