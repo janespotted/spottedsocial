@@ -1,28 +1,42 @@
 
 
-## Fix: "Unknown" name in DM thread, swipe freeze, Close Friends empty list
+## Analysis
 
-### Root cause analysis
+I investigated the database thoroughly:
+- Both users are friends (verified friendship row exists)
+- Both have `is_out = true` with valid coordinates  
+- `can_see_location()` returns `true` in BOTH directions
+- All RLS policies are PERMISSIVE and correctly configured
+- Night statuses exist for both users with `status = 'out'`
 
-**1. "Unknown" name in Thread header**
-`Thread.tsx` line 166-177 joins `profiles:user_id` on `dm_thread_members`. The `profiles` table RLS only allows `auth.uid() = id` (own profile) or `is_demo = true`. So querying another user's profile returns null, and the code defaults to `'Unknown'` (line 194).
+The database and permissions are correct. The issue is likely a **client-side caching/timing problem** combined with **inconsistent status resolution logic across surfaces**.
 
-**Fix**: Replace the direct `profiles` join with a lookup against the cached `get_profiles_safe` RPC data (which is a SECURITY DEFINER function that returns all profiles with privacy-filtered fields).
+The timestamp-based priority fix (preferring recent night_status over stale checkins) was only applied to `MyFriendsTab.tsx` — but `FriendSearchModal`, `InviteFriendsModal`, and `Map.tsx` still use the old logic that can misclassify friends.
 
-**2. Swipe freeze / "Opening chat with Jane" stuck**
-In `Messages.tsx`, `location.state?.preselectedUser` is set once when navigating to Messages with a preselected user. When the user navigates back from the thread to `/messages`, React Router preserves `location.state`, so the `preselectedUser` is still set. This triggers `NewChatDialog` to reopen with the loading state. The dialog gets stuck because the thread already exists (the RPC returns the existing thread ID) and navigates again, creating a loop or stale state.
+## Plan
 
-**Fix**: Clear `location.state` after consuming `preselectedUser` using `navigate(location.pathname, { replace: true, state: {} })`. Also ensure the dialog properly resets when closed.
+### 1. Fix FriendSearchModal status resolution
+In `src/components/FriendSearchModal.tsx`:
+- Add `started_at` to checkins query, `updated_at, is_private_party, party_neighborhood` to night_statuses query
+- Apply same timestamp-comparison logic as MyFriendsTab
+- Handle private party display
 
-**3. Close Friends page shows no friends**
-`CloseFriends.tsx` line 61-63 queries `profiles` table directly with `.in('id', friendIds)`. Same RLS issue — only own profile is readable. Returns empty array → shows "Add friends first" even though friends exist.
+### 2. Fix InviteFriendsModal status resolution  
+In `src/components/InviteFriendsModal.tsx`:
+- Same timestamp + private party fixes as above
 
-**Fix**: Use `get_profiles_safe` RPC instead of direct `profiles` query.
+### 3. Force cache invalidation on app focus
+In `src/hooks/useProfilesCache.ts`:
+- Reduce `staleTime` to 30 seconds so data refreshes more aggressively
+- Add `refetchOnWindowFocus: true` to both `useProfilesSafe` and `useFriendIds` so switching back to the app picks up new friendships and status changes immediately
+
+### 4. Add refetchOnWindowFocus to useFriendIds
+In `src/hooks/useFriendIds.ts`:
+- Add `refetchOnWindowFocus: true` to ensure new friendships are detected when switching between devices/windows
 
 ### Files changed
-
-- **`src/pages/Thread.tsx`** — Replace `profiles:user_id` join with `get_profiles_safe` RPC lookup for member names/avatars
-- **`src/pages/Messages.tsx`** — Clear `location.state` after consuming `preselectedUser` to prevent re-triggering on back navigation
-- **`src/components/messages/NewChatDialog.tsx`** — Add guard to prevent re-creation when dialog reopens with stale preselectedUser
-- **`src/pages/CloseFriends.tsx`** — Replace direct `profiles` query with `get_profiles_safe` RPC
+- `src/components/FriendSearchModal.tsx`
+- `src/components/InviteFriendsModal.tsx`  
+- `src/hooks/useProfilesCache.ts`
+- `src/hooks/useFriendIds.ts`
 
