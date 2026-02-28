@@ -1,22 +1,22 @@
 
 
-## Align Invite Friends Modal with Who's Out Formatting
+## Fix: InviteFriendsModal (and FriendSearchModal) show "No friends found"
 
-**Problem**: The Invite Friends modal uses a simpler status fetch (just `night_statuses` without expiry filtering or `checkins` check), so all friends appear under "Other Friends" with no status info. The Who's Out sheet has a more robust status resolution and better visual formatting.
+**Root cause**: Both modals query `profiles` table directly, but RLS only allows reading your own profile or demo profiles. Friend profiles are invisible, so the query returns empty results.
 
-### Changes to `src/components/InviteFriendsModal.tsx`
+**Working pattern**: Other components (PrivatePartyInviteModal, NewChatDialog, VenueIdCard) use `useProfilesSafe()` which calls the `get_profiles_safe` RPC — this bypasses the restrictive SELECT policy and returns all visible profiles.
 
-1. **Fix status fetching** — mirror the FriendSearchModal logic:
-   - Query both `checkins` (active, `ended_at IS NULL`) and `night_statuses` (with `expires_at > now()` filter)
-   - Resolve status: active check-in → "out", night_status "out" → "out", night_status "planning" → "planning", else "home"
+### Changes
 
-2. **Match visual formatting** — adopt FriendSearchModal's row style:
-   - Status sub-text: yellow `📍 At {venue}` for out, purple `🎯 Planning` for planning, gray "Home" for home
-   - Same row layout with `border-b border-[#a855f7]/10` instead of individual card backgrounds
-   - Section headers: `👥 Friends Out Now`, `🔥 Friends Planning 🎯`, `Staying In` — matching Who's Out exactly
+**`src/components/InviteFriendsModal.tsx`**:
+- Replace direct `supabase.from('profiles').select(...)` query with `useProfilesSafe()` hook
+- Filter the cached profiles by `friendIds` in-memory (same pattern as PrivatePartyInviteModal)
+- Keep the checkins + night_statuses queries as-is (those tables have correct RLS)
 
-3. **Remove Collapsible sections** — replace with static grouped sections (matching Who's Out flat list style) wrapped in the same `bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg` container
+**`src/components/FriendSearchModal.tsx`**:
+- Same fix: replace direct `profiles` query with `useProfilesSafe()` + in-memory filter
 
 ### Files changed
-- `src/components/InviteFriendsModal.tsx`
+1. `src/components/InviteFriendsModal.tsx`
+2. `src/components/FriendSearchModal.tsx`
 
