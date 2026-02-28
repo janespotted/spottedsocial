@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { PullToRefresh } from '@/components/PullToRefresh';
 import { cn } from '@/lib/utils';
 import { APP_BASE_URL, getShareableUrl, copyToClipboard } from '@/lib/platform';
 import { useAuth } from '@/contexts/AuthContext';
@@ -416,6 +417,7 @@ export default function Profile() {
   }
 
   return (
+    <PullToRefresh onRefresh={fetchProfileData}>
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
@@ -832,5 +834,6 @@ export default function Profile() {
 
       <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
     </div>
+    </PullToRefresh>
   );
 }

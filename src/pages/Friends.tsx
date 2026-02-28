@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { PullToRefresh } from '@/components/PullToRefresh';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -473,7 +474,14 @@ export default function Friends() {
 
   const pendingCount = requests.length;
 
+  const handleRefresh = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
+    queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+    await Promise.all([fetchRequests(), fetchOrCreateInviteCode(), fetchSuggestedFriends()]);
+  }, [queryClient, fetchRequests, fetchOrCreateInviteCode, fetchSuggestedFriends]);
+
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118]">
       <div className="max-w-[430px] mx-auto pb-24">
         {/* Header */}
@@ -865,5 +873,6 @@ export default function Friends() {
         inviteUrl={getInviteUrl()}
       />
     </div>
+    </PullToRefresh>
   );
 }

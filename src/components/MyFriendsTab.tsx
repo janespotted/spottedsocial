@@ -20,6 +20,8 @@ interface FriendWithStatus {
   status: 'out' | 'planning' | 'hidden';
   venue_name: string | null;
   planning_neighborhood: string | null;
+  is_private_party?: boolean;
+  party_neighborhood?: string | null;
 }
 
 const STATUS_ORDER: Record<string, number> = { out: 0, planning: 1, hidden: 2 };
@@ -61,33 +63,61 @@ export function MyFriendsTab() {
       const now = new Date().toISOString();
 
       const [checkinsRes, nightRes] = await Promise.all([
-        supabase.from('checkins').select('user_id, venue_name').in('user_id', ids).is('ended_at', null),
-        supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name').in('user_id', ids).not('expires_at', 'is', null).gt('expires_at', now),
+        supabase.from('checkins').select('user_id, venue_name, started_at').in('user_id', ids).is('ended_at', null),
+        supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name, updated_at, is_private_party, party_neighborhood').in('user_id', ids).not('expires_at', 'is', null).gt('expires_at', now),
       ]);
 
-      const checkinMap = new Map<string, string>();
-      checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, c.venue_name); });
+      const checkinMap = new Map<string, { venue_name: string; started_at: string | null }>();
+      checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, { venue_name: c.venue_name, started_at: c.started_at }); });
 
-      const nightMap = new Map<string, { status: string; planning_neighborhood: string | null; venue_name: string | null }>();
+      const nightMap = new Map<string, { status: string; planning_neighborhood: string | null; venue_name: string | null; updated_at: string | null; is_private_party: boolean | null; party_neighborhood: string | null }>();
       nightRes.data?.forEach(n => { if (!nightMap.has(n.user_id)) nightMap.set(n.user_id, n); });
 
       const friendsData: FriendWithStatus[] = friendProfiles.map((profile: any) => {
         let status: 'out' | 'planning' | 'hidden' = 'hidden';
         let venue_name: string | null = null;
         let planning_neighborhood: string | null = null;
+        let is_private_party = false;
+        let party_neighborhood: string | null = null;
 
         const activeCheckin = checkinMap.get(profile.id);
         const nightStatus = nightMap.get(profile.id);
 
-        if (activeCheckin) {
+        // Compare timestamps — prefer whichever is more recent
+        const checkinTime = activeCheckin?.started_at ? new Date(activeCheckin.started_at).getTime() : 0;
+        const nightTime = nightStatus?.updated_at ? new Date(nightStatus.updated_at).getTime() : 0;
+
+        if (nightStatus && nightTime >= checkinTime) {
+          if (nightStatus.status === 'out') {
+            status = 'out';
+            if (nightStatus.is_private_party) {
+              is_private_party = true;
+              party_neighborhood = nightStatus.party_neighborhood;
+              venue_name = 'Private Party';
+            } else {
+              venue_name = nightStatus.venue_name || null;
+            }
+          } else if (nightStatus.status === 'planning') {
+            status = 'planning';
+            planning_neighborhood = nightStatus.planning_neighborhood;
+          }
+        } else if (activeCheckin) {
           status = 'out';
-          venue_name = activeCheckin;
-        } else if (nightStatus?.status === 'out') {
-          status = 'out';
-          venue_name = nightStatus.venue_name || null;
-        } else if (nightStatus?.status === 'planning') {
-          status = 'planning';
-          planning_neighborhood = nightStatus.planning_neighborhood;
+          venue_name = activeCheckin.venue_name;
+        } else if (nightStatus) {
+          if (nightStatus.status === 'out') {
+            status = 'out';
+            if (nightStatus.is_private_party) {
+              is_private_party = true;
+              party_neighborhood = nightStatus.party_neighborhood;
+              venue_name = 'Private Party';
+            } else {
+              venue_name = nightStatus.venue_name || null;
+            }
+          } else if (nightStatus.status === 'planning') {
+            status = 'planning';
+            planning_neighborhood = nightStatus.planning_neighborhood;
+          }
         }
 
         return {
@@ -98,6 +128,8 @@ export function MyFriendsTab() {
           status,
           venue_name,
           planning_neighborhood,
+          is_private_party,
+          party_neighborhood,
         };
       });
 
@@ -163,7 +195,7 @@ export function MyFriendsTab() {
         {friend.status === 'out' ? (
           <span className="flex items-center gap-1 text-[#d4ff00] text-xs font-medium">
             <MapPin className="h-3.5 w-3.5" />
-            Out
+            {friend.is_private_party ? 'Party' : 'Out'}
           </span>
         ) : friend.status === 'planning' ? (
           <span className="flex items-center gap-1 text-[#a855f7] text-xs font-medium">
