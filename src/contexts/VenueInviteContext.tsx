@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { useDemoMode } from '@/hooks/useDemoMode';
+
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { logEvent } from '@/lib/event-logger';
@@ -23,7 +23,6 @@ const VenueInviteContext = createContext<VenueInviteContextType | undefined>(und
 
 export function VenueInviteProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const demoEnabled = useDemoMode();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [invitedFriends, setInvitedFriends] = useState<Array<{ id: string; displayName: string; avatarUrl: string | null }>>([]);
@@ -44,24 +43,8 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
     if (!user || !venueName || selectedFriends.length === 0) return;
 
     try {
-      // Conditionally filter out demo users (only in bootstrap mode when demo is OFF)
-      let filteredFriends = selectedFriends;
-      
-      if (!demoEnabled) {
-        const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
-        const friendIds = new Set(selectedFriends.map(f => f.id));
-        const realFriendIds = new Set(
-          (allProfiles || [])
-            .filter(p => friendIds.has(p.id) && !p.is_demo)
-            .map(p => p.id)
-        );
-        filteredFriends = selectedFriends.filter(f => realFriendIds.has(f.id));
-      }
-
-      if (filteredFriends.length === 0) {
-        toast.error('No valid recipients selected');
-        return;
-      }
+      // The modal already filters out demo users, so use selectedFriends directly
+      const filteredFriends = selectedFriends;
 
       // Get current user's profile for first name using safe RPC (own profile is always visible)
       const { data: profiles } = await supabase
