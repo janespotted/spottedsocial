@@ -109,23 +109,8 @@ export default function Profile() {
   useEffect(() => {
     if (user) {
       fetchProfileData();
-      fetchInviteCode();
     }
   }, [user]);
-
-  const fetchInviteCode = async () => {
-    const { data } = await supabase
-      .from('invite_codes')
-      .select('code')
-      .eq('user_id', user?.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (data) {
-      setInviteCode(data.code);
-    }
-  };
 
   const getInviteUrl = () => `${APP_BASE_URL}/invite/${inviteCode}`;
 
@@ -190,26 +175,94 @@ export default function Profile() {
 
   const fetchProfileData = async () => {
     if (!hasFetchedOnce) setLoading(true);
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('id, display_name, username, avatar_url, bio, home_city, created_at, has_onboarded, is_demo, location_sharing_level, push_enabled')
-      .eq('id', user?.id)
-      .single();
 
+    // Batch 1: All independent queries in parallel
+    const [
+      profileResult,
+      nightStatusResult,
+      sentFriendshipsResult,
+      receivedFriendshipsResult,
+      checkinsCountResult,
+      recentCheckinsResult,
+      wishlistResult,
+      postsResult,
+      inviteCodeResult,
+    ] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url, bio, home_city, created_at, has_onboarded, is_demo, location_sharing_level, push_enabled')
+        .eq('id', user?.id)
+        .single(),
+      supabase
+        .from('night_statuses')
+        .select('status, venue_name, venue_id, planning_neighborhood, is_private_party, party_neighborhood')
+        .eq('user_id', user?.id)
+        .not('expires_at', 'is', null)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle(),
+      supabase
+        .from('friendships')
+        .select('id')
+        .eq('user_id', user?.id)
+        .eq('status', 'accepted'),
+      supabase
+        .from('friendships')
+        .select('id')
+        .eq('friend_id', user?.id)
+        .eq('status', 'accepted'),
+      supabase
+        .from('checkins')
+        .select('venue_name')
+        .eq('user_id', user?.id),
+      supabase
+        .from('checkins')
+        .select('venue_id, venue_name, created_at')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('wishlist_places')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('posts')
+        .select('id, image_url, text, created_at, likes_count, comments_count, venue_name')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(12),
+      supabase
+        .from('invite_codes')
+        .select('code')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    // Process profile
+    const profileData = profileResult.data;
     if (profileData) {
       setProfile(profileData);
       setLocationSharingLevel(profileData.location_sharing_level || 'all_friends');
     }
 
-    // Check user's current night status (out, planning, or home)
-    const { data: nightStatus } = await supabase
-      .from('night_statuses')
-      .select('status, venue_name, venue_id, planning_neighborhood, is_private_party, party_neighborhood')
-      .eq('user_id', user?.id)
-      .not('expires_at', 'is', null)
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle();
+    // Process invite code
+    if (inviteCodeResult.data) {
+      setInviteCode(inviteCodeResult.data.code);
+    }
 
+    // Process friends count
+    setFriendsCount((sentFriendshipsResult.data?.length || 0) + (receivedFriendshipsResult.data?.length || 0));
+
+    // Process places count
+    const uniqueVenues = new Set(checkinsCountResult.data?.map(c => c.venue_name));
+    setPlacesCount(uniqueVenues.size);
+
+    // Process wishlist
+    setWishlistPlaces(wishlistResult.data || []);
+
+    // Process night status
+    const nightStatus = nightStatusResult.data;
     if (nightStatus) {
       setCurrentStatus(nightStatus.status as 'out' | 'planning' | 'home');
       setCurrentVenue(nightStatus.venue_name);
@@ -217,18 +270,6 @@ export default function Profile() {
       setIsPrivateParty(nightStatus.is_private_party || false);
       setPartyNeighborhood(nightStatus.party_neighborhood);
       setIsLocationSharing(nightStatus.status === 'out' && (!!nightStatus.venue_name || nightStatus.is_private_party));
-      
-      // Fetch venue neighborhood if user is out
-      if (nightStatus.status === 'out' && nightStatus.venue_id) {
-        const { data: venue } = await supabase
-          .from('venues')
-          .select('neighborhood')
-          .eq('id', nightStatus.venue_id)
-          .maybeSingle();
-        setVenueNeighborhood(venue?.neighborhood || null);
-      } else {
-        setVenueNeighborhood(null);
-      }
     } else {
       setCurrentStatus(null);
       setCurrentVenue(null);
@@ -239,51 +280,10 @@ export default function Profile() {
       setIsLocationSharing(false);
     }
 
-    // Get friends count (both directions)
-    const { data: sentFriendships } = await supabase
-      .from('friendships')
-      .select('id')
-      .eq('user_id', user?.id)
-      .eq('status', 'accepted');
-
-    const { data: receivedFriendships } = await supabase
-      .from('friendships')
-      .select('id')
-      .eq('friend_id', user?.id)
-      .eq('status', 'accepted');
-
-    setFriendsCount((sentFriendships?.length || 0) + (receivedFriendships?.length || 0));
-
-    // Get places count (unique venues from check-ins)
-    const { data: checkins } = await supabase
-      .from('checkins')
-      .select('venue_name')
-      .eq('user_id', user?.id);
-
-    const uniqueVenues = new Set(checkins?.map(c => c.venue_name));
-    setPlacesCount(uniqueVenues.size);
-
-    // Get wishlist places
-    const { data: wishlist } = await supabase
-      .from('wishlist_places')
-      .select('*')
-      .eq('user_id', user?.id)
-      .order('created_at', { ascending: false });
-
-    setWishlistPlaces(wishlist || []);
-
-    // Get recent spots (unique venues from check-ins, most recent first)
-    const { data: recentCheckins } = await supabase
-      .from('checkins')
-      .select('venue_id, venue_name, created_at')
-      .eq('user_id', user?.id)
-      .order('created_at', { ascending: false });
-
-    // Get unique venues (keep first occurrence = most recent)
+    // Process recent spots (unique venues)
     const seenVenues = new Set<string>();
     const uniqueRecentSpots: RecentSpot[] = [];
-
-    for (const checkin of recentCheckins || []) {
+    for (const checkin of recentCheckinsResult.data || []) {
       if (checkin.venue_id && !seenVenues.has(checkin.venue_id)) {
         seenVenues.add(checkin.venue_id);
         uniqueRecentSpots.push({
@@ -296,39 +296,42 @@ export default function Profile() {
       }
     }
 
-    // Batch fetch all venue images in a single query
+    // Batch 2: Dependent queries in parallel
     const venueIds = uniqueRecentSpots.map(s => s.venue_id).filter(Boolean);
-    if (venueIds.length > 0) {
-      const { data: venueImages } = await supabase
-        .from('venues')
-        .select('id, google_photo_refs')
-        .in('id', venueIds);
+    const { resolvePostImageUrls } = await import('@/lib/storage-utils');
 
-      const imageMap = new Map(
-        (venueImages || []).map(v => {
+    const [venueNeighborhoodResult, venueImagesResult, resolvedPosts] = await Promise.all([
+      // Venue neighborhood (depends on nightStatus)
+      nightStatus?.status === 'out' && nightStatus.venue_id
+        ? supabase.from('venues').select('neighborhood').eq('id', nightStatus.venue_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      // Venue images (depends on recentCheckins)
+      venueIds.length > 0
+        ? supabase.from('venues').select('id, google_photo_refs').in('id', venueIds)
+        : Promise.resolve({ data: null }),
+      // Resolve post image URLs (depends on posts)
+      resolvePostImageUrls(postsResult.data || []),
+    ]);
+
+    // Apply venue neighborhood
+    if (nightStatus) {
+      setVenueNeighborhood(venueNeighborhoodResult.data?.neighborhood || null);
+    }
+
+    // Apply venue images to recent spots
+    if (venueImagesResult.data) {
+      const imageMap = new Map<string, string | null>(
+        venueImagesResult.data.map(v => {
           const refs = v.google_photo_refs as string[] | null;
-          return [v.id, refs?.[0] || null];
+          return [v.id, refs?.[0] || null] as [string, string | null];
         })
       );
-
       for (const spot of uniqueRecentSpots) {
         spot.venue_image_url = imageMap.get(spot.venue_id) || null;
       }
     }
 
     setRecentSpots(uniqueRecentSpots);
-
-    // Get user's posts
-    const { data: postsData } = await supabase
-      .from('posts')
-      .select('id, image_url, text, created_at, likes_count, comments_count, venue_name')
-      .eq('user_id', user?.id)
-      .order('created_at', { ascending: false })
-      .limit(12);
-
-    // Resolve signed URLs for post images
-    const { resolvePostImageUrls } = await import('@/lib/storage-utils');
-    const resolvedPosts = await resolvePostImageUrls(postsData || []);
     setUserPosts(resolvedPosts);
     setLoading(false);
     setHasFetchedOnce(true);
@@ -627,7 +630,7 @@ export default function Profile() {
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
               <p className="text-white/60 text-sm">Who can see your location?</p>
               <Select value={locationSharingLevel} onValueChange={handleLocationSharingChange}>
-                <SelectTrigger className="w-auto min-w-[130px] border-[#a855f7]/30 bg-white/5 backdrop-blur-sm text-white rounded-full h-8 text-sm px-3">
+                <SelectTrigger className="w-auto min-w-[150px] border-[#a855f7]/30 bg-white/5 backdrop-blur-sm text-white rounded-full h-8 text-sm px-3">
                   <div className="flex items-center gap-2">
                     <Users className="h-3.5 w-3.5 text-white/60" />
                     <SelectValue />
