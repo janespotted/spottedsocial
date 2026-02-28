@@ -390,6 +390,18 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         isPrivateParty = true;
         partyLat = nightStatus.lat;
         partyLng = nightStatus.lng;
+
+        // Fallback: if night_statuses has null coords, get fresh GPS
+        if (partyLat == null || partyLng == null) {
+          try {
+            const { getCurrentLocation } = await import('@/lib/location-service');
+            const coords = await getCurrentLocation();
+            partyLat = coords.lat;
+            partyLng = coords.lng;
+          } catch (locError) {
+            console.warn('[VenueYapThread] Could not get GPS fallback for private party yap:', locError);
+          }
+        }
       }
 
       const { error } = await supabase.from("yap_messages").insert({
