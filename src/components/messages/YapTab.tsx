@@ -60,14 +60,21 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
     const fetchUserVenue = async () => {
       const { data } = await supabase
         .from('night_statuses')
-        .select('venue_name, is_private_party')
+        .select('venue_name, is_private_party, party_neighborhood')
         .eq('user_id', user.id)
-        .not('venue_name', 'is', null)
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
+        .neq('status', 'home')
         .maybeSingle();
-      setUserVenueName(data?.venue_name || null);
-      setUserIsPrivateParty(data?.is_private_party || false);
+      
+      if (data?.is_private_party) {
+        const displayName = data.venue_name || `Private Party${data.party_neighborhood ? ` · ${data.party_neighborhood}` : ''}`;
+        setUserVenueName(displayName);
+        setUserIsPrivateParty(true);
+      } else {
+        setUserVenueName(data?.venue_name || null);
+        setUserIsPrivateParty(false);
+      }
     };
     
     fetchUserVenue();
@@ -86,8 +93,14 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         (payload: any) => {
           const newRecord = payload.new;
           if (newRecord) {
-            setUserVenueName(newRecord.venue_name || null);
-            setUserIsPrivateParty(newRecord.is_private_party || false);
+            if (newRecord.is_private_party) {
+              const displayName = newRecord.venue_name || `Private Party${newRecord.party_neighborhood ? ` · ${newRecord.party_neighborhood}` : ''}`;
+              setUserVenueName(displayName);
+              setUserIsPrivateParty(true);
+            } else {
+              setUserVenueName(newRecord.venue_name || null);
+              setUserIsPrivateParty(newRecord.is_private_party || false);
+            }
           }
         }
       )
