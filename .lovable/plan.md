@@ -1,27 +1,22 @@
 
 
-## Fix: Demo friendships not being created in seed function
+## Align Invite Friends Modal with Who's Out Formatting
 
-**Root cause**: The `friendships` bulk insert on line 141 of `seed-demo-data/index.ts` silently fails. With 9 real users × 24 demo users = 216 rows, if any row violates the unique constraint `(user_id, friend_id)` (e.g., from a previous partial seed), the entire batch insert fails with no error handling.
+**Problem**: The Invite Friends modal uses a simpler status fetch (just `night_statuses` without expiry filtering or `checkins` check), so all friends appear under "Other Friends" with no status info. The Who's Out sheet has a more robust status resolution and better visual formatting.
 
-### Changes
+### Changes to `src/components/InviteFriendsModal.tsx`
 
-**`supabase/functions/seed-demo-data/index.ts`** (line ~141):
-1. Add `{ onConflict: 'user_id,friend_id' }` to the friendships insert to handle duplicates gracefully
-2. Add error logging so failures aren't silently swallowed
-3. Batch the insert into chunks (Supabase has limits on bulk inserts) — 216 rows at once may exceed payload limits
+1. **Fix status fetching** — mirror the FriendSearchModal logic:
+   - Query both `checkins` (active, `ended_at IS NULL`) and `night_statuses` (with `expires_at > now()` filter)
+   - Resolve status: active check-in → "out", night_status "out" → "out", night_status "planning" → "planning", else "home"
 
-```typescript
-// Replace line 141:
-if(fr.length) {
-  // Insert in batches of 50 to avoid payload limits
-  for(let i=0; i<fr.length; i+=50) {
-    const batch = fr.slice(i, i+50);
-    const { error: fErr } = await sb.from('friendships').upsert(batch, { onConflict: 'user_id,friend_id' });
-    if (fErr) console.error('Friendship insert error:', fErr.message);
-  }
-}
-```
+2. **Match visual formatting** — adopt FriendSearchModal's row style:
+   - Status sub-text: yellow `📍 At {venue}` for out, purple `🎯 Planning` for planning, gray "Home" for home
+   - Same row layout with `border-b border-[#a855f7]/10` instead of individual card backgrounds
+   - Section headers: `👥 Friends Out Now`, `🔥 Friends Planning 🎯`, `Staying In` — matching Who's Out exactly
 
-No other file changes needed — once friendships are properly created, the `useFriendIds` hook will return demo user IDs, and the Invite Friends modal will populate correctly.
+3. **Remove Collapsible sections** — replace with static grouped sections (matching Who's Out flat list style) wrapped in the same `bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg` container
+
+### Files changed
+- `src/components/InviteFriendsModal.tsx`
 
