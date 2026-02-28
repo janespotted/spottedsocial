@@ -20,6 +20,9 @@ import { toast } from 'sonner';
 import { CityBadge } from '@/components/CityBadge';
 import { ProfileSkeleton } from '@/components/ProfileSkeleton';
 import { QuickStatusSheet } from '@/components/QuickStatusSheet';
+import { useDemoMode } from '@/hooks/useDemoMode';
+import { useFriendIds } from '@/hooks/useFriendIds';
+import { useProfilesSafe } from '@/hooks/useProfilesCache';
 
 
 interface WishlistPlace {
@@ -52,6 +55,9 @@ export default function Profile() {
   
   useAutoVenueTracking(); // Trigger auto-venue tracking on profile view
   const navigate = useNavigate();
+  const demoEnabled = useDemoMode();
+  const { data: friendIds } = useFriendIds(user?.id);
+  const { data: allProfiles } = useProfilesSafe();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
@@ -251,8 +257,15 @@ export default function Profile() {
       setInviteCode(inviteCodeResult.data.code);
     }
 
-    // Process friends count
-    setFriendsCount((sentFriendshipsResult.data?.length || 0) + (receivedFriendshipsResult.data?.length || 0));
+    // Process friends count — filter out demo users when demo mode is off
+    const rawCount = (sentFriendshipsResult.data?.length || 0) + (receivedFriendshipsResult.data?.length || 0);
+    if (!demoEnabled && friendIds && allProfiles) {
+      const demoProfileIds = new Set(allProfiles.filter((p: any) => p.is_demo).map((p: any) => p.id));
+      const realFriendCount = friendIds.filter(id => !demoProfileIds.has(id)).length;
+      setFriendsCount(realFriendCount);
+    } else {
+      setFriendsCount(rawCount);
+    }
 
     // Process places count
     const uniqueVenues = new Set(checkinsCountResult.data?.map(c => c.venue_name));

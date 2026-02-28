@@ -16,6 +16,7 @@ import { haptic } from '@/lib/haptics';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import spottedLogo from '@/assets/spotted-s-logo.png';
+import { MyFriendsTab } from '@/components/MyFriendsTab';
 
 interface SearchResult {
   id: string;
@@ -56,7 +57,7 @@ export default function Friends() {
   
   // Tab state - check for navigation state
   const initialTab = (location.state as any)?.tab || 'requests';
-  const [activeTab, setActiveTab] = useState<'requests' | 'find' | 'invite'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'requests' | 'friends' | 'find' | 'invite'>(initialTab);
   
   // Friend requests state
   const [requests, setRequests] = useState<FriendRequest[]>([]);
@@ -508,6 +509,12 @@ export default function Friends() {
                 )}
               </TabsTrigger>
               <TabsTrigger 
+                value="friends" 
+                className="flex-1 rounded-xl data-[state=active]:bg-[#a855f7] data-[state=active]:text-white text-white/60"
+              >
+                Friends
+              </TabsTrigger>
+              <TabsTrigger 
                 value="find" 
                 className="flex-1 rounded-xl data-[state=active]:bg-[#a855f7] data-[state=active]:text-white text-white/60"
               >
@@ -631,6 +638,11 @@ export default function Friends() {
                 </Button>
               </div>
             )}
+          </TabsContent>
+
+          {/* Friends Tab */}
+          <TabsContent value="friends">
+            <MyFriendsTab />
           </TabsContent>
 
           {/* Find Tab */}
