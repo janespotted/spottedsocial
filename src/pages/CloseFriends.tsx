@@ -57,16 +57,13 @@ export default function CloseFriends() {
         return;
       }
 
-      // Get friend profiles (include is_demo for filtering)
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, username, avatar_url, is_demo')
-        .in('id', friendIds);
+      // Use get_profiles_safe RPC to bypass RLS restrictions on profiles table
+      const { data: allSafeProfiles } = await supabase.rpc('get_profiles_safe');
+      const profiles = (allSafeProfiles || []).filter((p: any) => friendIds.includes(p.id));
 
-      // Filter out demo users in bootstrap mode (when demo mode is OFF)
       const filteredProfiles = (bootstrapEnabled && !demoEnabled)
-        ? (profiles || []).filter((p: any) => !p.is_demo)
-        : (profiles || []);
+        ? profiles.filter((p: any) => !p.is_demo)
+        : profiles;
 
       // Get close friends list
       const { data: closeFriends } = await supabase

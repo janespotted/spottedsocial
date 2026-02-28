@@ -63,14 +63,13 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
 
   useEffect(() => {
     // If we have a preselected user, automatically create thread
-    if (open && preselectedUser && user && !isCreatingRef.current) {
+    // Guard: only trigger once per preselectedUser change
+    if (open && preselectedUser && user && !isCreatingRef.current && !isCreatingThread) {
       isCreatingRef.current = true;
       setIsCreatingThread(true);
       createThreadWithPreselectedUser().finally(() => {
-        // Only reset if dialog is still open (prevents race conditions)
-        if (!open) {
-          isCreatingRef.current = false;
-        }
+        isCreatingRef.current = false;
+        setIsCreatingThread(false);
       });
     }
   }, [open, preselectedUser, user]);

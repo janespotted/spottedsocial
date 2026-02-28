@@ -34,20 +34,28 @@ export default function Messages() {
   const [showFriendSearch, setShowFriendSearch] = useState(false);
 
   useEffect(() => {
+    const state = location.state;
+    if (!state) return;
+
     // Check if we have a preselected user from navigation state
-    if (location.state?.preselectedUser) {
-      setPreselectedUser(location.state.preselectedUser);
+    if (state.preselectedUser) {
+      setPreselectedUser(state.preselectedUser);
       setActiveTab('messages');
     }
     // Check if we should open a specific tab (e.g., from bell icon)
-    if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
+    if (state.activeTab) {
+      setActiveTab(state.activeTab);
     }
     // Check if we have a venue name for Yap
-    if (location.state?.venueName) {
-      setYapVenueName(location.state.venueName);
-      setYapIsPrivateParty(!!location.state.isPrivateParty);
+    if (state.venueName) {
+      setYapVenueName(state.venueName);
+      setYapIsPrivateParty(!!state.isPrivateParty);
       setActiveTab('yap');
+    }
+
+    // Clear location.state to prevent re-triggering on back navigation
+    if (state.preselectedUser || state.activeTab || state.venueName) {
+      navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state]);
 

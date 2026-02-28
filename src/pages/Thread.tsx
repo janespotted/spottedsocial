@@ -162,43 +162,46 @@ export default function Thread() {
 
     const isGroup = threadData?.is_group || false;
 
-    // Get all other members info
+    // Get all other members' user_ids
     const { data: members } = await supabase
       .from('dm_thread_members')
-      .select(`
-        user_id,
-        profiles:user_id (
-          display_name,
-          username,
-          avatar_url
-        )
-      `)
+      .select('user_id')
       .eq('thread_id', threadId)
       .neq('user_id', user?.id);
 
     if (members && members.length > 0) {
+      const memberIds = members.map(m => m.user_id);
+
+      // Use get_profiles_safe RPC to bypass RLS restrictions
+      const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+      const profileMap = new Map(
+        (allProfiles || []).map((p: any) => [p.id, p])
+      );
+
       // Build member map for message sender lookup
       const newMemberMap = new Map<string, ThreadMember>();
       const allMembers: ThreadMember[] = [];
 
-      for (const member of members) {
+      for (const memberId of memberIds) {
+        const profile = profileMap.get(memberId);
+
         // Get their venue
         const { data: status } = await supabase
           .from('night_statuses')
           .select('venue_name, venue_id')
-          .eq('user_id', member.user_id)
+          .eq('user_id', memberId)
           .maybeSingle();
 
         const memberData: ThreadMember = {
-          user_id: member.user_id,
-          display_name: (member.profiles as any)?.display_name || 'Unknown',
-          username: (member.profiles as any)?.username || '',
-          avatar_url: (member.profiles as any)?.avatar_url || null,
+          user_id: memberId,
+          display_name: profile?.display_name || 'Unknown',
+          username: profile?.username || '',
+          avatar_url: profile?.avatar_url || null,
           venue_name: status?.venue_name || null,
           venue_id: status?.venue_id || null,
         };
 
-        newMemberMap.set(member.user_id, memberData);
+        newMemberMap.set(memberId, memberData);
         allMembers.push(memberData);
       }
 
