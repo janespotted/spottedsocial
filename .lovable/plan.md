@@ -1,34 +1,35 @@
 
 
-## Fix: Map crashes with "Style is not done loading"
+## Fix: West side venues missing + orphaned pin dots
 
-The clustering code added in the previous change calls `map.addSource()` and `map.addLayer()` without checking if the Mapbox style has finished loading. When the useEffect fires before style load completes, it throws "Style is not done loading" and the PageErrorBoundary catches it.
+### Root cause
 
-### Change (`src/pages/Map.tsx`)
+1. **Missing west side venues**: `getVisibleVenueCount()` limits displayed venues by heat score ranking. At zoom 12 only 50 venues show, at zoom 13 only 100. Since venues are sorted by `heatScore` descending and west side venues have 0 heat (no check-ins), they get sliced off. Santa Monica (30), Venice (30), Manhattan Beach (19) = 79 venues that never make the cut until zoom 15+.
 
-In the venue markers useEffect (line ~1057), add an early return if the style isn't loaded:
+2. **Orphaned dots**: The `venue-unclustered` layer renders individual purple circles (8px radius, no icon/badge). These are venues that aren't within any cluster radius at that zoom level — they look like stray dots because they're small circles with no label. This is expected clustering behavior but looks buggy.
 
-```typescript
-if (!map.current) return;
-const m = map.current;
-if (!m.isStyleLoaded()) return;  // ← add this guard
-```
+### Changes
 
-Also guard the `layerVisibility === 'friends'` cleanup block similarly — `removeLayer`/`removeSource` also require style to be loaded:
+#### 1. Remove `visibleCount` slicing — let clustering handle density (`src/pages/Map.tsx`)
 
-```typescript
-if (layerVisibility === 'friends') {
-  venueMarkersRef.current.forEach(marker => marker.remove());
-  venueMarkersRef.current.clear();
-  if (m.isStyleLoaded()) {
-    if (m.getLayer('venue-cluster-count')) m.removeLayer('venue-cluster-count');
-    if (m.getLayer('venue-clusters')) m.removeLayer('venue-clusters');
-    if (m.getLayer('venue-unclustered')) m.removeLayer('venue-unclustered');
-    if (m.getSource('venues-source')) m.removeSource('venues-source');
-  }
-  return;
-}
-```
+The whole point of clustering is to handle venue density at any zoom level. The `getVisibleVenueCount` function was designed for DOM-based markers (performance concern). With GeoJSON source + native clustering, Mapbox handles thousands of features efficiently. 
 
-This is a two-line fix that prevents the crash entirely. The useEffect will re-run when venues/map state changes, and by that time the style will be loaded.
+- Remove `getVisibleVenueCount` function (lines 1028-1035)
+- Change `filteredVenues` to include ALL `typeFilteredVenues` (no slicing):
+  ```typescript
+  const filteredVenues = typeFilteredVenues;
+  ```
+- Remove the `visibleCount` variable and the promoted/non-promoted slicing logic (lines 1042-1052)
+- Keep promoted venue separation only inside the useEffect for DOM marker rendering
+
+#### 2. Improve unclustered pin styling to not look orphaned (`src/pages/Map.tsx`)
+
+Make individual unclustered pins more visible and consistent with cluster circles:
+- Increase `circle-radius` from 8 to 10
+- Add a subtle label for unclustered pins or increase stroke width to 2 to match cluster styling
+- This makes solo pins look intentional rather than like rendering artifacts
+
+### Technical note
+
+With clustering enabled, Mapbox GL internally tiles and indexes the GeoJSON data using supercluster. 339 venues is trivial — even 10,000+ features perform well. The per-zoom slicing was only needed for the old DOM marker approach.
 
