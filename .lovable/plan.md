@@ -1,22 +1,13 @@
 
 
-## Three Fixes
+## Two Fixes
 
-### 1. Venue invite "No valid recipients" — still broken
-The code at line 52-56 still queries `profiles_public` which is a view on the `profiles` table with RLS. RLS blocks reading other users' rows, so Jane's row returns nothing and she gets filtered out.
+### 1. Venue invite "No valid recipients" — root cause
+The `InviteFriendsModal` already filters demo users out of the selectable list when demo mode is off. The second filter inside `sendInvites()` in `VenueInviteContext.tsx` is redundant — it re-fetches all profiles via RPC and re-filters, which can fail due to data/timing mismatches. Since the modal guarantees only valid friends can be selected, remove the redundant demo filtering block from `sendInvites` entirely. Just send invites to whoever was selected.
 
-**Fix**: Replace the `profiles_public` query with `get_profiles_safe` RPC (which is `SECURITY DEFINER` and bypasses RLS). Filter the results in JS.
-
-### 2. Thread header cut off at top
-Line 353 in `Thread.tsx` — the sticky header div is missing safe-area padding.
-
-**Fix**: Add `pt-[max(env(safe-area-inset-top),12px)]` to the sticky header div.
-
-### 3. Add Event dialog — convert to smooth full-screen overlay
-`CreateEventDialog.tsx` uses a vaul `Drawer`. Convert it to a full-screen `fixed inset-0` overlay with `animate-fade-in`, matching the pattern now used by Share a Plan and FriendSearchModal. Add `ArrowLeft` back button in header.
+### 2. Thread header — already fixed
+The Thread.tsx header already has `pt-[max(env(safe-area-inset-top),12px)]` applied (confirmed at line 353). No change needed here.
 
 ### Files changed
-- `src/contexts/VenueInviteContext.tsx` — replace `profiles_public` query with `get_profiles_safe` RPC
-- `src/pages/Thread.tsx` — add safe-area top padding to header
-- `src/components/CreateEventDialog.tsx` — convert from Drawer to full-screen overlay
+- `src/contexts/VenueInviteContext.tsx` — remove the `if (!demoEnabled) { ... }` filtering block (lines 50-59), just use `selectedFriends` directly as `filteredFriends`
 
