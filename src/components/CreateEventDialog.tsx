@@ -1,11 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Search, Calendar, Clock, FileText, Link } from 'lucide-react';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
+import { MapPin, Search, Calendar, Clock, FileText, Link, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -77,6 +71,11 @@ export function CreateEventDialog({ open, onOpenChange, onEventCreated }: Create
     setTicketUrl('');
   };
 
+  const handleClose = () => {
+    resetForm();
+    onOpenChange(false);
+  };
+
   const handleSubmit = async () => {
     if (!user) {
       toast.error('Please sign in to add events');
@@ -96,12 +95,10 @@ export function CreateEventDialog({ open, onOpenChange, onEventCreated }: Create
     setIsSubmitting(true);
 
     try {
-      // Expire at 5am the day after the event
       const expiresAt = new Date(eventDate);
       expiresAt.setDate(expiresAt.getDate() + 1);
       expiresAt.setHours(5, 0, 0, 0);
 
-      // Create the event
       const { data: eventData, error: eventError } = await supabase
         .from('events')
         .insert({
@@ -123,7 +120,6 @@ export function CreateEventDialog({ open, onOpenChange, onEventCreated }: Create
 
       if (eventError) throw eventError;
 
-      // Auto-RSVP as "going"
       if (eventData) {
         await supabase.from('event_rsvps').insert({
           event_id: eventData.id,
@@ -133,8 +129,7 @@ export function CreateEventDialog({ open, onOpenChange, onEventCreated }: Create
       }
 
       toast.success('Event added! Your friends can now see it 🎉');
-      resetForm();
-      onOpenChange(false);
+      handleClose();
       onEventCreated();
     } catch (error) {
       console.error('Error creating event:', error);
@@ -152,14 +147,21 @@ export function CreateEventDialog({ open, onOpenChange, onEventCreated }: Create
     };
   });
 
-  return (
-    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
-      <DrawerContent className="bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] border-transparent max-h-[85vh]">
-        <DrawerHeader className="pb-2 flex-shrink-0">
-          <DrawerTitle className="text-foreground text-center">Add an Event</DrawerTitle>
-        </DrawerHeader>
+  if (!open) return null;
 
-        <div className="px-4 pb-6 flex flex-col flex-1 min-h-0 overflow-auto">
+  return (
+    <div className="fixed inset-0 z-[500] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] animate-fade-in">
+      <div className="max-w-[430px] mx-auto min-h-screen flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 border-b border-border/20">
+          <button onClick={handleClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="h-6 w-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-foreground">Add an Event</h1>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4">
           {/* Venue Selection */}
           {selectedVenue ? (
             <div 
@@ -185,7 +187,7 @@ export function CreateEventDialog({ open, onOpenChange, onEventCreated }: Create
                   autoFocus
                 />
               </div>
-              <div className="mt-3 space-y-0.5 max-h-[200px] overflow-y-auto">
+              <div className="mt-3 space-y-0.5 max-h-[60vh] overflow-y-auto">
                 {filteredVenues.slice(0, 15).map(venue => (
                   <div
                     key={venue.id}
@@ -294,7 +296,7 @@ export function CreateEventDialog({ open, onOpenChange, onEventCreated }: Create
             </div>
           )}
         </div>
-      </DrawerContent>
-    </Drawer>
+      </div>
+    </div>
   );
 }

@@ -48,14 +48,13 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
       let filteredFriends = selectedFriends;
       
       if (!demoEnabled) {
-        const friendIds = selectedFriends.map(f => f.id);
-        const { data: realProfiles } = await supabase
-          .from('profiles_public')
-          .select('id')
-          .in('id', friendIds)
-          .eq('is_demo', false);
-
-        const realFriendIds = new Set(realProfiles?.map(p => p.id) || []);
+        const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+        const friendIds = new Set(selectedFriends.map(f => f.id));
+        const realFriendIds = new Set(
+          (allProfiles || [])
+            .filter(p => friendIds.has(p.id) && !p.is_demo)
+            .map(p => p.id)
+        );
         filteredFriends = selectedFriends.filter(f => realFriendIds.has(f.id));
       }
 
