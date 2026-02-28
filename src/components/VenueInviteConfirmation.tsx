@@ -29,14 +29,16 @@ export function VenueInviteConfirmation() {
           angle: 60,
           spread: 55,
           origin: { x: 0, y: 0.6 },
-          colors: ['#a855f7', '#d4ff00', '#ffffff']
+          colors: ['#a855f7', '#d4ff00', '#ffffff'],
+          zIndex: 9999
         });
         confetti({
           particleCount: 3,
           angle: 120,
           spread: 55,
           origin: { x: 1, y: 0.6 },
-          colors: ['#a855f7', '#d4ff00', '#ffffff']
+          colors: ['#a855f7', '#d4ff00', '#ffffff'],
+          zIndex: 9999
         });
 
         if (Date.now() < end) {
