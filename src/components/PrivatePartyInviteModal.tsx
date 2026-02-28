@@ -149,7 +149,13 @@ export function PrivatePartyInviteModal({
         message: `${myName} invited you to a private party in ${neighborhood}! 🏠`,
       }));
 
-      await supabase.from('notifications').insert(notifications);
+      await supabase.rpc('create_notifications_batch', {
+        p_notifications: notifications.map(n => ({
+          receiver_id: n.receiver_id,
+          type: n.type,
+          message: n.message,
+        })),
+      });
 
       haptic.success();
       toast.success(`Invited ${selectedFriends.size} friend${selectedFriends.size > 1 ? 's' : ''}!`);

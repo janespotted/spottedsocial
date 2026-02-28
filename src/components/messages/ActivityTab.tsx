@@ -440,11 +440,10 @@ export function ActivityTab() {
 
     // Send acceptance notification back
     if (!activity.user_id.startsWith('demo-')) {
-      await supabase.from('notifications').insert({
-        sender_id: user.id,
-        receiver_id: activity.user_id,
-        type: 'meetup_accepted',
-        message: `${myName} is down to meet up! 🎉`,
+      await supabase.rpc('create_notification', {
+        p_receiver_id: activity.user_id,
+        p_type: 'meetup_accepted',
+        p_message: `${myName} is down to meet up! 🎉`,
       });
       
       // Log invite accepted
@@ -475,11 +474,10 @@ export function ActivityTab() {
 
     // Send acceptance notification back
     if (!activity.user_id.startsWith('demo-')) {
-      await supabase.from('notifications').insert({
-        sender_id: user.id,
-        receiver_id: activity.user_id,
-        type: 'venue_invite_accepted',
-        message: `${myName} is down for ${activity.subtitle}! 🎉`,
+      await supabase.rpc('create_notification', {
+        p_receiver_id: activity.user_id,
+        p_type: 'venue_invite_accepted',
+        p_message: `${myName} is down for ${activity.subtitle}! 🎉`,
       });
       
       // Log invite accepted

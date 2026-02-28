@@ -46,11 +46,10 @@ export function PrivatePartyCard({
       const myName = profile?.display_name?.split(' ')[0] || 'Someone';
 
       // Send address request notification
-      await supabase.from('notifications').insert({
-        sender_id: user.id,
-        receiver_id: hostId,
-        type: 'address_request',
-        message: `${myName} wants to come to your party! 🏠`,
+      await supabase.rpc('create_notification', {
+        p_receiver_id: hostId,
+        p_type: 'address_request',
+        p_message: `${myName} wants to come to your party! 🏠`,
       });
 
       haptic.success();
