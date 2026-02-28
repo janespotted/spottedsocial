@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useVisibilityRefresh } from '@/hooks/useVisibilityRefresh';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -94,6 +95,14 @@ export default function Friends() {
       fetchRequests();
     }
   }, [user]);
+
+  // Auto-refresh on tab/app return
+  useVisibilityRefresh(() => {
+    if (user) {
+      fetchRequests();
+      fetchSuggestedFriends();
+    }
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -82,6 +82,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
   const [isUserPlanning, setIsUserPlanning] = useState(false);
+  const [isUserOut, setIsUserOut] = useState(false);
   const [userProfile, setUserProfile] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
   const [userPlanningNeighborhood, setUserPlanningNeighborhood] = useState<string | null>(null);
   const [userPlanningVisibility, setUserPlanningVisibility] = useState<string | null>(null);
@@ -110,6 +111,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
       
       const userStatus = userStatusResult.data;
       setIsUserPlanning(userStatus?.status === 'planning');
+      setIsUserOut(userStatus?.status === 'out');
       setUserPlanningNeighborhood(userStatus?.planning_neighborhood || null);
       setUserPlanningVisibility(userStatus?.planning_visibility || null);
       
@@ -618,6 +620,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
           friends={planningFriends} 
           variant="card" 
           isUserPlanning={isUserPlanning}
+          isUserOut={isUserOut}
           onJoinPlanning={handleJoinPlanning}
           onLeavePlanning={handleLeavePlanning}
           showJoinOption={true}

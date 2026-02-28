@@ -157,9 +157,9 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType, onBack, 
   };
 
   const handleShare = async () => {
-    const validation = validatePostText(caption);
-    if (!validation.success) {
-      toast.error(validation.error || 'Invalid caption');
+    const trimmedCaption = caption.trim();
+    if (trimmedCaption.length > 500) {
+      toast.error('Caption must be less than 500 characters');
       return;
     }
     if (!user) return;
@@ -175,7 +175,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType, onBack, 
 
       const { error } = await supabase.from('posts').insert({
         user_id: user.id,
-        text: validation.data!,
+        text: trimmedCaption,
         image_url: imageUrl,
         media_type: mediaType,
         venue_name: locationData?.venueName || location || null,
@@ -221,7 +221,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType, onBack, 
         <span className="text-white font-semibold">New Post</span>
         <Button
           onClick={handleShare}
-          disabled={loading || !caption.trim()}
+          disabled={loading}
           size="sm"
           className="bg-white text-[#1a0f2e] hover:bg-white/90 font-semibold px-5 rounded-full disabled:opacity-40"
         >

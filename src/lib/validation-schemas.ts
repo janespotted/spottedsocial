@@ -5,8 +5,9 @@ export const postSchema = z.object({
   text: z
     .string()
     .trim()
-    .min(1, { message: 'Caption cannot be empty' })
-    .max(500, { message: 'Caption must be less than 500 characters' }),
+    .max(500, { message: 'Caption must be less than 500 characters' })
+    .optional()
+    .default(''),
   venue_name: z
     .string()
     .trim()

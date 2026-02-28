@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useVisibilityRefresh } from '@/hooks/useVisibilityRefresh';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
@@ -114,6 +115,11 @@ export default function Leaderboard() {
       fetchLeaderboard();
     }
   }, [user, demoEnabled, bootstrapEnabled, city, selectedNeighborhood]);
+
+  // Auto-refresh on tab/app return
+  useVisibilityRefresh(() => {
+    if (user) fetchLeaderboard();
+  });
 
   const fetchLeaderboard = async () => {
     setIsLoading(true);
