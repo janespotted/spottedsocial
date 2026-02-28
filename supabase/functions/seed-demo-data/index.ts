@@ -48,7 +48,46 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', {headers:h});
 
   try {
-    const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {auth:{autoRefreshToken:false,persistSession:false}});
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    // SECURITY: Require admin authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...h, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+    if (authError || !user) {
+      console.error('Authentication failed:', authError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...h, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: hasAdmin, error: roleError } = await authClient.rpc('has_role', {
+      _user_id: user.id,
+      _role: 'admin',
+    });
+    if (roleError || !hasAdmin) {
+      console.error('Admin role check failed:', roleError?.message || 'User is not admin');
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: Admin role required' }),
+        { status: 403, headers: { ...h, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Admin ${user.id} triggering seed-demo-data`);
+
+    const sb = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {auth:{autoRefreshToken:false,persistSession:false}});
     const {action, city='nyc', userId} = await req.json();
 
     if (action === 'seed') {
