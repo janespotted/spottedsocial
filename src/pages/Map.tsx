@@ -44,6 +44,8 @@ interface FriendLocation {
     avatar_url: string | null;
   };
   relationshipType?: 'close' | 'direct' | 'mutual';
+  is_private_party?: boolean;
+  party_neighborhood?: string | null;
 }
 
 interface Venue {
@@ -431,12 +433,13 @@ export default function Map() {
           // Get friends' night statuses to determine status type (including planning_neighborhood)
           const { data: statuses } = await supabase
             .from('night_statuses')
-            .select('user_id, venue_name, status, planning_neighborhood')
+            .select('user_id, venue_name, status, planning_neighborhood, is_private_party, party_neighborhood, lat, lng')
             .in('user_id', friendIds)
             .not('expires_at', 'is', null)
             .gt('expires_at', new Date().toISOString());
 
           const venueMap: Record<string, string> = {};
+          const privatePartyMap: Record<string, { is_private_party: boolean; party_neighborhood: string | null; lat: number | null; lng: number | null }> = {};
           const planningFriendsData: { user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[] = [];
           
           statuses?.forEach(s => {
@@ -457,6 +460,15 @@ export default function Map() {
               }
             } else if (s.venue_name) {
               venueMap[s.user_id] = s.venue_name;
+            }
+            // Track private party data
+            if (s.is_private_party) {
+              privatePartyMap[s.user_id] = {
+                is_private_party: true,
+                party_neighborhood: s.party_neighborhood || null,
+                lat: s.lat || null,
+                lng: s.lng || null,
+              };
             }
           });
           
@@ -502,17 +514,36 @@ export default function Map() {
           }
 
           // RLS policies handle visibility filtering - no client-side filtering needed
-          friendLocations = (friendProfiles || []).map((friend: any) => ({
-            user_id: friend.id,
-            lat: friend.last_known_lat,
-            lng: friend.last_known_lng,
-            venue_name: venueMap[friend.id] || 'Out',
-            profiles: {
-              display_name: friend.display_name || 'Unknown',
-              avatar_url: friend.avatar_url,
-            },
-            relationshipType: relationshipTypes[friend.id] || 'direct',
-          }));
+          friendLocations = (friendProfiles || []).map((friend: any) => {
+            const ppData = privatePartyMap[friend.id];
+            const isPrivateParty = ppData?.is_private_party === true;
+            
+            // For private party friends, jitter coordinates for privacy (~1km precision)
+            let lat = friend.last_known_lat;
+            let lng = friend.last_known_lng;
+            if (isPrivateParty && ppData?.lat && ppData?.lng) {
+              lat = Math.round(ppData.lat * 100) / 100 + (Math.random() - 0.5) * 0.002;
+              lng = Math.round(ppData.lng * 100) / 100 + (Math.random() - 0.5) * 0.002;
+            }
+            
+            const venueName = isPrivateParty
+              ? `Private Party${ppData?.party_neighborhood ? ` (${ppData.party_neighborhood})` : ''}`
+              : venueMap[friend.id] || 'Out';
+
+            return {
+              user_id: friend.id,
+              lat,
+              lng,
+              venue_name: venueName,
+              profiles: {
+                display_name: friend.display_name || 'Unknown',
+                avatar_url: friend.avatar_url,
+              },
+              relationshipType: relationshipTypes[friend.id] || 'direct',
+              is_private_party: isPrivateParty,
+              party_neighborhood: ppData?.party_neighborhood || null,
+            };
+          });
         }
       }
 
@@ -822,6 +853,58 @@ export default function Map() {
       friendMarkersRef.current.set(friend.user_id, marker);
     };
 
+    // Helper to create house icon marker for private party friends
+    const createHouseMarker = (friend: FriendLocation, lng: number, lat: number) => {
+      const el = document.createElement('div');
+      el.className = 'friend-marker house-marker';
+      el.style.width = '40px';
+      el.style.height = '40px';
+      el.style.cursor = 'pointer';
+      el.style.zIndex = getZIndex(friend.relationshipType);
+      
+      const ringColors = {
+        close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.35)' },
+        direct: { border: '#a855f7', shadow: 'rgba(168, 85, 247, 0.35)' },
+        mutual: { border: '#6366f1', shadow: 'rgba(99, 102, 241, 0.35)' },
+      };
+      
+      const colors = ringColors[friend.relationshipType || 'direct'];
+      const tooltip = friend.party_neighborhood 
+        ? `${escapeHtml(friend.profiles?.display_name)} — ${escapeHtml(friend.party_neighborhood)}`
+        : escapeHtml(friend.profiles?.display_name);
+      
+      el.innerHTML = `
+        <div style="position: relative; width: 100%; height: 100%;" title="${tooltip}">
+          <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${colors.border}; box-shadow: 0 0 8px ${colors.shadow}; background: rgba(26, 15, 46, 0.95);"></div>
+          <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${colors.border}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/>
+              <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            </svg>
+          </div>
+        </div>
+      `;
+
+      el.addEventListener('click', () => {
+        const friendCardData: FriendCardData = {
+          userId: friend.user_id,
+          displayName: friend.profiles?.display_name || 'Friend',
+          avatarUrl: friend.profiles?.avatar_url || null,
+          venueName: friend.venue_name,
+          lat: friend.lat,
+          lng: friend.lng,
+          relationshipType: friend.relationshipType,
+        };
+        openFriendCard(friendCardData);
+      });
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([lng, lat])
+        .addTo(map.current!);
+
+      friendMarkersRef.current.set(friend.user_id, marker);
+    };
+
     // Render clusters
     clusters.forEach((cluster) => {
       const clusterKey = `cluster-${cluster.map(f => f.user_id).sort().join('-')}`;
@@ -931,7 +1014,11 @@ export default function Map() {
       } else {
         // Single friend - render individually (no offset needed since clusters handle 2+)
         cluster.forEach((friend) => {
-          createAvatarMarker(friend, friend.lng, friend.lat);
+          if (friend.is_private_party) {
+            createHouseMarker(friend, friend.lng, friend.lat);
+          } else {
+            createAvatarMarker(friend, friend.lng, friend.lat);
+          }
         });
       }
     });
