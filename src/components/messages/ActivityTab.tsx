@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target, Heart, TrendingUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useDemoMode } from '@/hooks/useDemoMode';
-import { useBootstrapMode } from '@/hooks/useBootstrapMode';
+import { useBootstrapMode } from '@/hooks/useBootstrapMode'; // kept for bootstrapEnabled in fetchAll dependency
 import { useUserCity } from '@/hooks/useUserCity';
 import { getDemoUsersForCity, getPromotedVenuesForCity } from '@/lib/demo-data';
 import type { SupportedCity } from '@/lib/city-detection';
@@ -181,15 +181,15 @@ export function ActivityTab() {
       const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
       let senderProfiles = allProfiles.filter((p: any) => senderIds.includes(p.id));
       
-      // In bootstrap mode (not demo mode), filter out demo users
-      if (bootstrapEnabled && !demoEnabled) {
+      // Filter out demo users when demo mode is off
+      if (!demoEnabled) {
         senderProfiles = senderProfiles.filter((p: any) => !p.is_demo);
       }
       
       const profileMap = new Map(senderProfiles?.map((p: any) => [p.id, p]) || []);
       
-      // Filter invites to only those from non-demo users in bootstrap mode
-      const filteredInvites = (bootstrapEnabled && !demoEnabled)
+      // Filter invites to only those from non-demo users when demo mode is off
+      const filteredInvites = !demoEnabled
         ? realInvitesResult.data.filter(invite => profileMap.has(invite.sender_id))
         : realInvitesResult.data;
       
@@ -256,8 +256,8 @@ export function ActivityTab() {
           .eq('venue_id', randomVenue.id)
           .is('ended_at', null);
         
-        // In bootstrap mode (not demo), only count real check-ins
-        if (bootstrapEnabled && !demoEnabled) {
+        // Only count real check-ins when demo mode is off
+        if (!demoEnabled) {
           checkInQuery = checkInQuery.eq('is_demo', false);
         }
         
@@ -362,13 +362,9 @@ export function ActivityTab() {
         .limit(10);
 
       if (checkIns?.length) {
-        // In bootstrap mode (not demo mode), filter out check-ins from demo users
-        const filteredCheckIns = (bootstrapEnabled && !demoEnabled)
-          ? checkIns.filter(checkIn => {
-              // Check if user is demo - we need to look up in profiles
-              // For now, filter by checking if the user_id matches any demo pattern
-              return !checkIn.is_demo;
-            })
+        // Filter out demo check-ins when demo mode is off
+        const filteredCheckIns = !demoEnabled
+          ? checkIns.filter(checkIn => !checkIn.is_demo)
           : checkIns;
         
         const checkInActivities: Activity[] = filteredCheckIns.map(checkIn => ({

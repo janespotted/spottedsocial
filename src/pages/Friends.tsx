@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +52,7 @@ export default function Friends() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
+  const demoEnabled = useDemoMode();
   
   // Tab state - check for navigation state
   const initialTab = (location.state as any)?.tab || 'requests';
@@ -162,6 +164,9 @@ export default function Friends() {
           const profile = profiles?.[0];
 
           if (!profile) return null;
+          
+          // Filter out demo users when demo mode is off
+          if (!demoEnabled && profile.is_demo) return null;
 
           const mutualFriends = await getMutualFriends(req.user_id);
           return {
@@ -322,13 +327,18 @@ export default function Friends() {
       
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, display_name, username, avatar_url')
+        .select('id, display_name, username, avatar_url, is_demo')
         .in('id', topSuggestionIds);
       
-      const suggestions = profiles?.map(p => ({
-        ...p,
-        mutual_count: mutualCounts[p.id] || 0
-      })).sort((a, b) => b.mutual_count - a.mutual_count) || [];
+      const suggestions = (profiles || [])
+        .filter(p => demoEnabled || !p.is_demo)
+        .map(p => ({
+          id: p.id,
+          display_name: p.display_name,
+          username: p.username,
+          avatar_url: p.avatar_url,
+          mutual_count: mutualCounts[p.id] || 0
+        })).sort((a, b) => b.mutual_count - a.mutual_count);
       
       setSuggestedFriends(suggestions);
     } catch (error) {
@@ -368,6 +378,7 @@ export default function Friends() {
       if (data) {
         const filtered = data.filter((profile: any) => 
           profile.id !== user?.id &&
+          (!demoEnabled ? !profile.is_demo : true) &&
           (profile.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
            profile.display_name?.toLowerCase().includes(searchQuery.toLowerCase()))
         ).slice(0, 10);

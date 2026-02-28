@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -29,15 +30,21 @@ export function ShareToDMModal({ post, open, onOpenChange }: ShareToDMModalProps
   const { user } = useAuth();
   const { data: friendIds } = useFriendIds(user?.id);
   const { data: allProfiles } = useProfilesSafe();
+  const demoEnabled = useDemoMode();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [search, setSearch] = useState('');
   const [sending, setSending] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && friendIds && allProfiles) {
-      const filtered = allProfiles
-        .filter((p: any) => friendIds.includes(p.id))
-        .map((p: any) => ({
+      let profiles = allProfiles.filter((p: any) => friendIds.includes(p.id));
+      
+      // Filter out demo users when demo mode is off
+      if (!demoEnabled) {
+        profiles = profiles.filter((p: any) => !p.is_demo);
+      }
+      
+      const filtered = profiles.map((p: any) => ({
           id: p.id,
           display_name: p.display_name,
           username: p.username,
@@ -45,7 +52,7 @@ export function ShareToDMModal({ post, open, onOpenChange }: ShareToDMModalProps
         }));
       setFriends(filtered);
     }
-  }, [open, friendIds, allProfiles]);
+  }, [open, friendIds, allProfiles, demoEnabled]);
 
   const handleSend = useCallback(async (friendId: string) => {
     if (!user || !post) return;
