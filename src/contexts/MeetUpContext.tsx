@@ -142,20 +142,16 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
         message 
       });
 
-      // Insert notification
-      const { data: insertedNotification, error: insertError } = await supabase
-        .from('notifications')
-        .insert({
-          sender_id: user.id,
-          receiver_id: userId,
-          type: 'meetup_request',
-          message: message,
-          is_read: false
-        })
-        .select()
-        .single();
+      // Insert notification via RPC
+      const { data: insertedNotifications, error: insertError } = await supabase
+        .rpc('create_notification', {
+          p_receiver_id: userId,
+          p_type: 'meetup_request',
+          p_message: message,
+        });
 
       if (insertError) throw insertError;
+      const insertedNotification = insertedNotifications?.[0];
 
       console.log('Meet up notification created successfully:', insertedNotification);
 

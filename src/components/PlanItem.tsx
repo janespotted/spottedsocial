@@ -212,11 +212,10 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
           const firstName = myProfile?.display_name?.split(' ')[0] || 'Someone';
           const message = `${firstName} is down for your plan at ${plan.venue_name}! 🎉`;
           
-          await supabase.from('notifications').insert({
-            sender_id: currentUserId,
-            receiver_id: plan.user_id,
-            type: 'plan_down',
-            message: message,
+          await supabase.rpc('create_notification', {
+            p_receiver_id: plan.user_id,
+            p_type: 'plan_down',
+            p_message: message,
           });
         }
         

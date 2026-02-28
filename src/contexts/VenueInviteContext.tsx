@@ -80,9 +80,13 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
       }));
 
       const { data: insertedNotifications, error } = await supabase
-        .from('notifications')
-        .insert(notifications)
-        .select();
+        .rpc('create_notifications_batch', {
+          p_notifications: notifications.map(n => ({
+            receiver_id: n.receiver_id,
+            type: n.type,
+            message: n.message,
+          })),
+        });
 
       if (error) throw error;
 

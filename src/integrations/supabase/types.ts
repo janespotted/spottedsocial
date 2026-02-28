@@ -2326,6 +2326,44 @@ export type Database = {
         Args: { group_name?: string; member_ids: string[] }
         Returns: string
       }
+      create_notification: {
+        Args: { p_message: string; p_receiver_id: string; p_type: string }
+        Returns: {
+          created_at: string | null
+          id: string
+          is_demo: boolean | null
+          is_read: boolean | null
+          message: string
+          receiver_id: string
+          sender_id: string
+          type: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notifications"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      create_notifications_batch: {
+        Args: { p_notifications: Json }
+        Returns: {
+          created_at: string | null
+          id: string
+          is_demo: boolean | null
+          is_read: boolean | null
+          message: string
+          receiver_id: string
+          sender_id: string
+          type: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notifications"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       find_nearby_venues: {
         Args: {
           max_results?: number
