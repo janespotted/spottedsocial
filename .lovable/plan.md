@@ -1,33 +1,23 @@
 
 
-## Fix: Confetti renders behind venue cards
+## Add Yap Board for Private Parties
 
-**Problem**: `canvas-confetti` creates a canvas element on `<body>` with a default z-index of `10`. The VenueInviteConfirmation overlay uses `z-[600]`, so confetti appears behind it.
-
-**Fix**: Pass `zIndex: 9999` to every `confetti()` call in `src/components/VenueInviteConfirmation.tsx`.
+**Problem**: The Yap directory feed explicitly filters out private party yaps (line 111: `.eq('is_private_party', false)`), and private parties don't have venue entries in the `venues` table, so they also fail the city-based metadata lookup. Users at private parties have no way to see or participate in a Yap board for their party.
 
 ### Changes
 
-**`src/components/VenueInviteConfirmation.tsx`** — Add `zIndex: 9999` to both confetti calls inside the `frame()` function (~lines 29-40):
+**`src/components/messages/YapTab.tsx`**:
 
-```typescript
-confetti({
-  particleCount: 3,
-  angle: 60,
-  spread: 55,
-  origin: { x: 0, y: 0.6 },
-  colors: ['#a855f7', '#d4ff00', '#ffffff'],
-  zIndex: 9999
-});
-confetti({
-  particleCount: 3,
-  angle: 120,
-  spread: 55,
-  origin: { x: 1, y: 0.6 },
-  colors: ['#a855f7', '#d4ff00', '#ffffff'],
-  zIndex: 9999
-});
-```
+1. **Include private party yaps in the feed** — Remove the `.eq('is_private_party', false)` filter. Instead, run a second query for private party yaps (where `is_private_party = true`) and merge them into the feed.
 
-Single file, two-line addition.
+2. **Handle missing venue metadata for private parties** — Private parties don't exist in the `venues` table. For yaps where `is_private_party = true`, use the `venue_name` as-is (it will be something like "Private Party") and pull the neighborhood from the yap's associated `night_statuses` or from a `party_neighborhood` field if stored on the yap.
+
+3. **Show private party entries in the directory** — Display private party yap cards with a house icon instead of the map pin, and show the neighborhood as the location context (e.g., "🏠 Private Party · Hollywood").
+
+4. **Allow thread access** — When a user taps a private party yap card, open a `VenueYapThread` using the private party's venue_name. The existing `VenueYapThread` component already supports private party yaps (it checks `is_private_party` when posting).
+
+5. **Update "You're at" bar** — If the user's `night_status` has `is_private_party = true`, show "You're at Private Party" with the house icon instead of the map pin.
+
+### Files changed
+- `src/components/messages/YapTab.tsx`
 
