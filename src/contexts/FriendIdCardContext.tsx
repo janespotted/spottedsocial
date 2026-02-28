@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from './AuthContext';
 
 export interface FriendCardData {
   userId: string;
@@ -20,8 +22,14 @@ const FriendIdCardContext = createContext<FriendIdCardContextType | undefined>(u
 
 export function FriendIdCardProvider({ children }: { children: ReactNode }) {
   const [selectedFriend, setSelectedFriend] = useState<FriendCardData | null>(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const openFriendCard = (friend: FriendCardData) => {
+    if (user && friend.userId === user.id) {
+      navigate('/profile');
+      return;
+    }
     setSelectedFriend(friend);
   };
 
