@@ -1,35 +1,77 @@
 
 
-## Fix: West side venues missing + orphaned pin dots
+## Fix: Style unclustered venue markers as pins
 
-### Root cause
+### Change (`src/pages/Map.tsx`)
 
-1. **Missing west side venues**: `getVisibleVenueCount()` limits displayed venues by heat score ranking. At zoom 12 only 50 venues show, at zoom 13 only 100. Since venues are sorted by `heatScore` descending and west side venues have 0 heat (no check-ins), they get sliced off. Santa Monica (30), Venice (30), Manhattan Beach (19) = 79 venues that never make the cut until zoom 15+.
+Replace the `venue-unclustered` circle layer with a symbol layer using a custom SVG pin image rendered to canvas.
 
-2. **Orphaned dots**: The `venue-unclustered` layer renders individual purple circles (8px radius, no icon/badge). These are venues that aren't within any cluster radius at that zoom level — they look like stray dots because they're small circles with no label. This is expected clustering behavior but looks buggy.
+#### 1. Create and register a custom pin image before adding layers (after `addSource`, before `addLayer` calls, ~line 1089)
 
-### Changes
+Generate a teardrop pin shape via canvas:
+```typescript
+// Create pin image if not already loaded
+if (!m.hasImage('venue-pin')) {
+  const size = 36;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size + 8; // taller for teardrop
+  const ctx = canvas.getContext('2d')!;
+  
+  // Teardrop/pin shape
+  ctx.beginPath();
+  ctx.moveTo(size / 2, size + 4); // bottom point
+  ctx.bezierCurveTo(size / 2 - 2, size - 4, 0, size / 2, 0, size / 2 - 4);
+  ctx.arc(size / 2, size / 2 - 4, size / 2, Math.PI, 0, false);
+  ctx.bezierCurveTo(size, size / 2, size / 2 + 2, size - 4, size / 2, size + 4);
+  ctx.closePath();
+  ctx.fillStyle = '#a855f7';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  
+  // White dot in center
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2 - 4, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  
+  m.addImage('venue-pin', canvas, { pixelRatio: 2 });
+}
+```
 
-#### 1. Remove `visibleCount` slicing — let clustering handle density (`src/pages/Map.tsx`)
+Also create a "hot" variant for venues with heat > 0:
+```typescript
+if (!m.hasImage('venue-pin-hot')) {
+  // Same shape but full opacity, slightly brighter
+  // ... same canvas code with full opacity fill
+  m.addImage('venue-pin-hot', canvas, { pixelRatio: 2 });
+}
+```
 
-The whole point of clustering is to handle venue density at any zoom level. The `getVisibleVenueCount` function was designed for DOM-based markers (performance concern). With GeoJSON source + native clustering, Mapbox handles thousands of features efficiently. 
+#### 2. Replace the `venue-unclustered` circle layer (lines 1122-1135) with a symbol layer
 
-- Remove `getVisibleVenueCount` function (lines 1028-1035)
-- Change `filteredVenues` to include ALL `typeFilteredVenues` (no slicing):
-  ```typescript
-  const filteredVenues = typeFilteredVenues;
-  ```
-- Remove the `visibleCount` variable and the promoted/non-promoted slicing logic (lines 1042-1052)
-- Keep promoted venue separation only inside the useEffect for DOM marker rendering
+```typescript
+m.addLayer({
+  id: 'venue-unclustered',
+  type: 'symbol',
+  source: 'venues-source',
+  filter: ['!', ['has', 'point_count']],
+  layout: {
+    'icon-image': 'venue-pin',
+    'icon-size': 1,
+    'icon-anchor': 'bottom',
+    'icon-allow-overlap': true,
+  },
+  paint: {
+    'icon-opacity': ['case', ['>', ['get', 'heatScore'], 0], 1, 0.7],
+  },
+});
+```
 
-#### 2. Improve unclustered pin styling to not look orphaned (`src/pages/Map.tsx`)
-
-Make individual unclustered pins more visible and consistent with cluster circles:
-- Increase `circle-radius` from 8 to 10
-- Add a subtle label for unclustered pins or increase stroke width to 2 to match cluster styling
-- This makes solo pins look intentional rather than like rendering artifacts
-
-### Technical note
-
-With clustering enabled, Mapbox GL internally tiles and indexes the GeoJSON data using supercluster. 339 venues is trivial — even 10,000+ features perform well. The per-zoom slicing was only needed for the old DOM marker approach.
+#### 3. No other changes
+- Cluster circles stay as-is (they look good)
+- Click/cursor handlers stay the same (they reference `venue-unclustered` layer which keeps the same ID)
+- Promoted DOM markers unchanged
 
