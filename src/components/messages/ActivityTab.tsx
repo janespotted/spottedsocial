@@ -23,7 +23,7 @@ import { ActivitySkeleton } from './MessagesSkeleton';
 
 interface Activity {
   id: string;
-  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment' | 'city_pulse';
+  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment' | 'city_pulse' | 'meetup_accepted' | 'venue_invite_accepted' | 'dm_message';
   title: string;
   subtitle?: string;
   timestamp: string;
@@ -33,6 +33,7 @@ interface Activity {
   venue_id?: string;
   action?: 'meet_up' | 'view' | 'accept_decline' | 'message';
   isAtVenue?: boolean;
+  notificationId?: string;
 }
 
 // Session-based frequency limiting for city pulse (max 2 per session)
@@ -164,7 +165,7 @@ export function ActivityTab() {
       supabase.from('notifications')
         .select(`id, type, message, created_at, sender_id, is_read`)
         .eq('receiver_id', user?.id)
-        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment'])
+        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment', 'meetup_accepted', 'venue_invite_accepted'])
         .order('created_at', { ascending: false })
         .limit(30),
     ]);
@@ -198,6 +199,8 @@ export function ActivityTab() {
         const isVenueInvite = invite.type === 'venue_invite';
         const isPostLike = invite.type === 'post_like';
         const isPostComment = invite.type === 'post_comment';
+        const isMeetupAccepted = invite.type === 'meetup_accepted';
+        const isVenueInviteAccepted = invite.type === 'venue_invite_accepted';
         
         // Extract venue name from message like "X invited you to VenueName."
         const venueMatch = invite.message.match(/invited you to (.+?)\.?\s*(?:Want to go\?)?$/i);
@@ -208,17 +211,25 @@ export function ActivityTab() {
         if (isVenueInvite) activityType = 'venue_invite';
         if (isPostLike) activityType = 'post_like';
         if (isPostComment) activityType = 'post_comment';
+        if (isMeetupAccepted) activityType = 'meetup_accepted';
+        if (isVenueInviteAccepted) activityType = 'venue_invite_accepted';
         
         return {
           id: invite.id,
           type: activityType,
           title: profile?.display_name || 'Someone',
-          subtitle: isVenueInvite ? venueName : isPostLike ? 'liked your post' : isPostComment ? invite.message : 'Meet Up',
+          subtitle: isVenueInvite ? venueName 
+            : isPostLike ? 'liked your post' 
+            : isPostComment ? invite.message 
+            : isMeetupAccepted ? 'is down to meet up! 🎉'
+            : isVenueInviteAccepted ? invite.message
+            : 'Meet Up',
           timestamp: invite.created_at || new Date().toISOString(),
           avatar_url: profile?.avatar_url,
           user_id: invite.sender_id,
           display_name: profile?.display_name,
           isAtVenue: isVenueInvite && userCurrentVenue ? venueName.toLowerCase() === userCurrentVenue : false,
+          notificationId: invite.id,
         };
       });
       activityList.push(...realActivities);
@@ -404,6 +415,52 @@ export function ActivityTab() {
         });
       }
     }
+
+    // Fetch recent DMs from friends as activity items
+    if (friendIds.length > 0) {
+      const { data: recentDms } = await supabase
+        .from('dm_messages')
+        .select('id, sender_id, text, created_at, thread_id')
+        .in('sender_id', friendIds)
+        .neq('sender_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (recentDms?.length) {
+        // Deduplicate: one DM per sender (most recent)
+        const seenSenders = new Map<string, typeof recentDms[0]>();
+        for (const dm of recentDms) {
+          if (!seenSenders.has(dm.sender_id)) {
+            seenSenders.set(dm.sender_id, dm);
+          }
+        }
+        const uniqueDms = Array.from(seenSenders.values());
+
+        const dmProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+        const dmProfileMap = new Map(dmProfiles.map((p: any) => [p.id, p]));
+
+        const dmActivities: Activity[] = uniqueDms.map(dm => {
+          const profile = dmProfileMap.get(dm.sender_id);
+          const preview = dm.text.length > 40 ? dm.text.slice(0, 40) + '...' : dm.text;
+          return {
+            id: `dm-${dm.id}`,
+            type: 'dm_message' as const,
+            title: profile?.display_name || 'Someone',
+            subtitle: preview,
+            timestamp: dm.created_at || new Date().toISOString(),
+            avatar_url: profile?.avatar_url || null,
+            user_id: dm.sender_id,
+            display_name: profile?.display_name || 'Someone',
+            action: 'message' as const,
+          };
+        });
+
+        setActivities(prev => {
+          const merged = [...prev, ...dmActivities];
+          return merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        });
+      }
+    }
   };
 
   const getTimeAgo = (date: string) => {
@@ -426,8 +483,13 @@ export function ActivityTab() {
         return <Heart className="h-5 w-5 text-red-500 fill-red-500" />;
       case 'post_comment':
         return <MessageCircle className="h-5 w-5 text-blue-400" />;
+      case 'meetup_accepted':
+      case 'venue_invite_accepted':
+        return <Heart className="h-5 w-5 text-[#d4ff00]" />;
+      case 'dm_message':
+        return <MessageCircle className="h-5 w-5 text-[#a855f7]" />;
       case 'city_pulse':
-        return <MapPin className="h-5 w-5 text-white/40" />; // Muted, ambient signal
+        return <MapPin className="h-5 w-5 text-white/40" />;
       default:
         return null;
     }
@@ -460,6 +522,11 @@ export function ActivityTab() {
         p_message: `${myName} is down to meet up! 🎉`,
       });
       
+      // Mark the original notification as read
+      if (activity.notificationId) {
+        await supabase.from('notifications').update({ is_read: true }).eq('id', activity.notificationId);
+      }
+      
       // Log invite accepted
       logEvent('invite_accepted', {
         type: 'meetup_request',
@@ -467,6 +534,9 @@ export function ActivityTab() {
         sender_name: activity.display_name,
       });
     }
+
+    // Remove from activity list
+    setActivities(prev => prev.filter(a => a.id !== activity.id));
 
     // Show confirmation card
     triggerConfirmation(
@@ -494,6 +564,11 @@ export function ActivityTab() {
         p_message: `${myName} is down for ${activity.subtitle}! 🎉`,
       });
       
+      // Mark the original notification as read
+      if (activity.notificationId) {
+        await supabase.from('notifications').update({ is_read: true }).eq('id', activity.notificationId);
+      }
+      
       // Log invite accepted
       logEvent('invite_accepted', {
         type: 'venue_invite',
@@ -502,6 +577,9 @@ export function ActivityTab() {
         venue_name: activity.subtitle,
       });
     }
+
+    // Remove from activity list
+    setActivities(prev => prev.filter(a => a.id !== activity.id));
 
     // Show confirmation card
     triggerConfirmation(
@@ -519,9 +597,9 @@ export function ActivityTab() {
     navigate('/messages', {
       state: {
         preselectedUser: {
-          userId: activity.user_id,
-          displayName: activity.display_name,
-          avatarUrl: activity.avatar_url || null,
+          id: activity.user_id,
+          display_name: activity.display_name,
+          avatar_url: activity.avatar_url || null,
         }
       }
     });
@@ -707,6 +785,8 @@ export function ActivityTab() {
         const trending = activities.filter(a => a.type === 'trending');
         const postEngagement = activities.filter(a => a.type === 'post_like' || a.type === 'post_comment');
         const cityPulse = activities.filter(a => a.type === 'city_pulse');
+        const acceptedInvites = activities.filter(a => a.type === 'meetup_accepted' || a.type === 'venue_invite_accepted');
+        const dmMessages = activities.filter(a => a.type === 'dm_message');
 
         // Special muted style for city pulse
         const PULSE_CARD_STYLE = 'bg-[#1a0f2e]/40 border border-white/10';
@@ -812,6 +892,24 @@ export function ActivityTab() {
                     </span>
                   </div>
                 )}
+                {(activity.type === 'meetup_accepted' || activity.type === 'venue_invite_accepted') && (
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-[#d4ff00] block text-xs mt-0.5">{activity.subtitle}</span>
+                  </div>
+                )}
+                {activity.type === 'dm_message' && (
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-white/70 block text-xs mt-0.5 line-clamp-1">messaged you: {activity.subtitle}</span>
+                  </div>
+                )}
               </div>
 
               {/* Actions - fixed on right */}
@@ -866,12 +964,33 @@ export function ActivityTab() {
                   </Button>
                 )}
 
+                {(activity.type === 'meetup_accepted' || activity.type === 'venue_invite_accepted') && (
+                  <Button
+                    onClick={() => handleOpenChat(activity)}
+                    size="sm"
+                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5 mr-1" />
+                    Chat
+                  </Button>
+                )}
+
+                {activity.type === 'dm_message' && (
+                  <Button
+                    onClick={() => handleOpenChat(activity)}
+                    size="sm"
+                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                  >
+                    View
+                  </Button>
+                )}
+
               </div>
             </div>
           </div>
         );
 
-        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0;
+        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0 || acceptedInvites.length > 0 || dmMessages.length > 0;
 
         return hasContent ? (
           <div className="space-y-5">
@@ -891,6 +1010,30 @@ export function ActivityTab() {
           </div>
         )}
       </div>
+
+            {/* Section: Accepted Invites */}
+            {acceptedInvites.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  Accepted
+                </h3>
+                <div className="space-y-3">
+                  {acceptedInvites.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
+
+            {/* Section: Messages */}
+            {dmMessages.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  Messages
+                </h3>
+                <div className="space-y-3">
+                  {dmMessages.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
 
             {/* Section 2: Post Engagement (Likes & Comments) */}
             {postEngagement.length > 0 && (
