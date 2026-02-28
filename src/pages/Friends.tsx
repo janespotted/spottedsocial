@@ -498,7 +498,14 @@ export default function Friends() {
         </header>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => {
+          const tab = v as any;
+          setActiveTab(tab);
+          if (tab === 'friends') {
+            queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
+            queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+          }
+        }} className="w-full">
           <div className="px-4 pt-4">
             <TabsList className="w-full bg-[#1a0f2e]/80 border border-[#a855f7]/30 p-1 rounded-2xl">
               <TabsTrigger 

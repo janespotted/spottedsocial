@@ -1,29 +1,32 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
 import { supabase } from '@/integrations/supabase/client';
+import { PullToRefresh } from '@/components/PullToRefresh';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, X, Home, MapPin, Target } from 'lucide-react';
+import { Search, X, MapPin, Target, EyeOff } from 'lucide-react';
 
 interface FriendWithStatus {
   id: string;
   display_name: string;
   username: string;
   avatar_url: string | null;
-  status: 'out' | 'planning' | 'home';
+  status: 'out' | 'planning' | 'hidden';
   venue_name: string | null;
   planning_neighborhood: string | null;
 }
 
-const STATUS_ORDER: Record<string, number> = { out: 0, planning: 1, home: 2 };
+const STATUS_ORDER: Record<string, number> = { out: 0, planning: 1, hidden: 2 };
 
 export function MyFriendsTab() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { openFriendCard } = useFriendIdCard();
   const demoEnabled = useDemoMode();
   const { data: friendIds } = useFriendIds(user?.id);
@@ -49,7 +52,7 @@ export function MyFriendsTab() {
     }
   }, [user, friendProfiles]);
 
-  const fetchStatuses = async () => {
+  const fetchStatuses = useCallback(async () => {
     if (!user || friendProfiles.length === 0) { setFriends([]); setIsLoading(false); return; }
     setIsLoading(true);
 
@@ -69,7 +72,7 @@ export function MyFriendsTab() {
       nightRes.data?.forEach(n => { if (!nightMap.has(n.user_id)) nightMap.set(n.user_id, n); });
 
       const friendsData: FriendWithStatus[] = friendProfiles.map((profile: any) => {
-        let status: 'out' | 'planning' | 'home' = 'home';
+        let status: 'out' | 'planning' | 'hidden' = 'hidden';
         let venue_name: string | null = null;
         let planning_neighborhood: string | null = null;
 
@@ -109,7 +112,13 @@ export function MyFriendsTab() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, friendProfiles]);
+
+  const handleRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
+    await queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+    await fetchStatuses();
+  }, [queryClient, fetchStatuses]);
 
   const filteredFriends = useMemo(() =>
     friends.filter(f =>
@@ -128,7 +137,7 @@ export function MyFriendsTab() {
 
   const outFriends = filteredFriends.filter(f => f.status === 'out');
   const planningFriends = filteredFriends.filter(f => f.status === 'planning');
-  const homeFriends = filteredFriends.filter(f => f.status === 'home');
+  const hiddenFriends = filteredFriends.filter(f => f.status === 'hidden');
 
   const renderRow = (friend: FriendWithStatus) => (
     <button
@@ -162,9 +171,8 @@ export function MyFriendsTab() {
             Planning
           </span>
         ) : (
-          <span className="flex items-center gap-1 text-white/30 text-xs">
-            <Home className="h-3.5 w-3.5" />
-            Home
+          <span className="flex items-center gap-1 text-white/20 text-xs">
+            <EyeOff className="h-3.5 w-3.5" />
           </span>
         )}
       </div>
@@ -172,6 +180,7 @@ export function MyFriendsTab() {
   );
 
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="px-4 py-4 space-y-3">
       {/* Search */}
       <div className="relative">
@@ -231,18 +240,19 @@ export function MyFriendsTab() {
             </>
           )}
 
-          {homeFriends.length > 0 && (
+          {hiddenFriends.length > 0 && (
             <>
               <div className="px-3 py-2 bg-[#1a0f2e]/50 border-t border-[#a855f7]/10">
                 <p className="text-white/70 text-xs font-semibold uppercase tracking-wider">
-                  🏠 Home <span className="text-white/50">({homeFriends.length})</span>
+                  😴 Not sharing <span className="text-white/50">({hiddenFriends.length})</span>
                 </p>
               </div>
-              {homeFriends.map(renderRow)}
+              {hiddenFriends.map(renderRow)}
             </>
           )}
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }
