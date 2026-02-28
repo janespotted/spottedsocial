@@ -1,33 +1,28 @@
 
 
-## Fix: Friend status showing "home" for private party + no refresh on Friends tab
+## Fix: Wrong venue showing for private party friend + Add pull-to-refresh everywhere
 
-### Problem 1: Friend at private party shows as "home"
-The friend's `location_sharing_level` is set to `close_friends`, so the `night_statuses` RLS blocks regular friends from seeing their status. The query returns no rows, and the code defaults to "home". This is privacy working as intended, but the label is misleading.
+### Problem 1: "Le Bain" showing instead of private party
+In `MyFriendsTab.tsx`, the status resolution checks `checkins` (active, `ended_at IS NULL`) **before** `night_statuses`. When a friend switches to a private party, their old venue checkin may never get ended, so the stale checkin at "Le Bain" takes priority. Additionally, the `night_statuses` query doesn't select `is_private_party` or `party_neighborhood` fields, so private parties can't be displayed correctly.
 
-**Fix**: Not a bug — this is the privacy setting. However, for friends whose status is blocked by privacy, we should not show "Home" (which is a false claim). Instead show no status indicator or a neutral label.
+**Fix in `MyFriendsTab.tsx`**:
+- Select `updated_at, is_private_party, party_neighborhood` from `night_statuses`
+- Select `started_at` from `checkins`
+- When both a checkin and night_status exist, compare timestamps — prefer whichever is more recent
+- For private party statuses, show "Private Party" instead of the venue name
+- For the "out" status display, show venue name if available, or "Out" if not
 
-**Actually** — on second look, the real issue may be that the `night_statuses` query in `MyFriendsTab` is blocked by RLS for a newly-added friend because `can_see_location` depends on `is_direct_friend` which checks the `friendships` table. If the friendship row exists and is accepted, it should work for `all_friends` level — but this user has `close_friends` level. So the friend genuinely can't see their status. This is correct behavior but the "Home" label is wrong — we should show nothing or "Unknown".
+### Problem 2: No pull-to-refresh on Profile, Notifications, Friends (requests/find/invite tabs)
+Currently only Home, Feed, Leaderboard, MessagesTab, and MyFriendsTab have pull-to-refresh. Missing from: Profile, Notifications, Friends page (overall).
 
-### Problem 2: Other person (request sender) doesn't see new friend
-When person A accepts B's request, A's cache is invalidated. But B (the sender) has no way to know the request was accepted — their `friend-ids` cache is stale and the Friends page has no pull-to-refresh or auto-refresh.
-
-**Fix**: 
-1. Add pull-to-refresh to the My Friends tab
-2. Auto-refetch `friend-ids` when the Friends page is focused/navigated to (use React Query `refetchOnWindowFocus` or refetch on tab switch)
-
-### Changes
-
-**`src/components/MyFriendsTab.tsx`**:
-- Add pull-to-refresh support using the existing `PullToRefresh` component
-- Refetch `friend-ids` query when the tab mounts/becomes visible
-- Change "Home" status label to show nothing for friends whose status can't be determined (or keep "Home" but it's technically a privacy gap — the safer approach is to not claim they're home)
-
-**`src/pages/Friends.tsx`**:
-- Invalidate `friend-ids` cache when the "Friends" tab is selected, ensuring fresh data
-- Add a subtle refresh mechanism
+**Fix**: Add `PullToRefresh` wrapper to:
+- `src/pages/Profile.tsx` — wrap main content, refresh profile data + friends count
+- `src/pages/Notifications.tsx` — wrap notifications list, refetch notifications
+- `src/pages/Friends.tsx` — wrap the entire tabs content area so all tabs get pull-to-refresh (requests tab refetches requests, find tab refetches search, invite tab refetches invite code)
 
 ### Files changed
-- `src/components/MyFriendsTab.tsx` — add pull-to-refresh + refetch on mount
-- `src/pages/Friends.tsx` — trigger refetch when switching to Friends tab
+- `src/components/MyFriendsTab.tsx` — fix status resolution to prefer recent night_status over stale checkins, handle private party display
+- `src/pages/Profile.tsx` — add PullToRefresh
+- `src/pages/Notifications.tsx` — add PullToRefresh
+- `src/pages/Friends.tsx` — add PullToRefresh wrapping tabs content
 
