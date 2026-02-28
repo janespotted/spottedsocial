@@ -630,7 +630,7 @@ export default function Profile() {
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
               <p className="text-white/60 text-sm">Who can see your location?</p>
               <Select value={locationSharingLevel} onValueChange={handleLocationSharingChange}>
-                <SelectTrigger className="w-auto min-w-[150px] border-[#a855f7]/30 bg-white/5 backdrop-blur-sm text-white rounded-full h-8 text-sm px-3">
+                <SelectTrigger className="w-auto min-w-[170px] border-[#a855f7]/30 bg-white/5 backdrop-blur-sm text-white rounded-full h-8 text-sm px-3">
                   <div className="flex items-center gap-2">
                     <Users className="h-3.5 w-3.5 text-white/60" />
                     <SelectValue />
