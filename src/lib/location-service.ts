@@ -454,27 +454,59 @@ export const getVenueById = async (venueId: string) => {
 };
 
 /**
- * Detect neighborhood from GPS coordinates by finding the nearest venue
+ * Reverse geocode coordinates to get neighborhood/locality name via Mapbox
+ */
+export const reverseGeocodeNeighborhood = async (lat: number, lng: number): Promise<string | null> => {
+  try {
+    const token = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN;
+    if (!token) return null;
+
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=neighborhood,locality,place&access_token=${token}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const features: Array<{ place_type: string[]; text: string }> = data.features || [];
+
+    // Prefer neighborhood → locality → place
+    for (const type of ['neighborhood', 'locality', 'place']) {
+      const match = features.find(f => f.place_type.includes(type));
+      if (match) {
+        console.log(`[reverseGeocode] Detected ${type}: "${match.text}"`);
+        return match.text;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error reverse geocoding:', error);
+    return null;
+  }
+};
+
+/**
+ * Detect neighborhood from GPS coordinates using Mapbox reverse geocoding,
+ * falling back to nearest venue neighborhood
  */
 export const detectNeighborhoodFromGPS = async (city: string): Promise<string | null> => {
   try {
     const coords = await getCurrentLocation();
-    
-    // Find nearest venue within a large radius (50km) just to get neighborhood
+
+    // Try Mapbox reverse geocoding first
+    const geocoded = await reverseGeocodeNeighborhood(coords.lat, coords.lng);
+    if (geocoded) return geocoded;
+
+    // Fallback: find nearest venue's neighborhood
     const { data, error } = await supabase.rpc('find_nearest_venue', {
       user_lat: coords.lat,
       user_lng: coords.lng,
-      radius_meters: 50000, // 50km radius
+      radius_meters: 50000,
     });
 
     if (error) throw error;
     
     if (data && data.length > 0) {
-      // Get the venue to find its neighborhood
       const venue = await getVenueById(data[0].venue_id);
-      if (venue?.neighborhood) {
-        return venue.neighborhood;
-      }
+      if (venue?.neighborhood) return venue.neighborhood;
     }
 
     return null;
