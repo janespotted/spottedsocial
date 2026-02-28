@@ -1,56 +1,44 @@
 
 
-## Migration: Replace venue owner checkins policy with privacy-respecting RPC
+## Fix: Hide demo users everywhere when demo mode is off
 
-### What this does
-Drops the direct RLS policy that lets venue owners query checkins freely, and replaces it with a `SECURITY DEFINER` function (`get_venue_checkins`) that masks user identity based on their privacy settings via `can_see_location`.
+### Problem
+Several components still show demo users when demo mode is disabled:
+1. **ShareToDMModal** — no demo filtering at all
+2. **Friends page** — friend requests, search results, and suggested friends all include demo profiles
+3. **FindFriendsOnboarding** — search results include demo profiles
+4. **MessagesTab** — uses `bootstrapEnabled && !demoEnabled` instead of just `!demoEnabled`
+5. **ActivityTab** — same inconsistent `bootstrapEnabled && !demoEnabled` pattern
 
-### SQL to execute
-```sql
-DROP POLICY IF EXISTS "Venue owners can view checkins for their venues" ON public.checkins;
+### Changes
 
-CREATE OR REPLACE FUNCTION public.get_venue_checkins(p_venue_id uuid)
-RETURNS TABLE (
-  id uuid,
-  user_id uuid,
-  display_name text,
-  avatar_url text,
-  venue_name text,
-  started_at timestamptz,
-  ended_at timestamptz
-)
-LANGUAGE plpgsql
-STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF NOT is_venue_owner(auth.uid(), p_venue_id) AND NOT has_role(auth.uid(), 'admin') THEN
-    RAISE EXCEPTION 'Not authorized';
-  END IF;
-  RETURN QUERY
-  SELECT 
-    c.id,
-    CASE WHEN can_see_location(auth.uid(), c.user_id) THEN c.user_id ELSE NULL END,
-    CASE WHEN can_see_location(auth.uid(), c.user_id) THEN p.display_name ELSE 'Anonymous' END,
-    CASE WHEN can_see_location(auth.uid(), c.user_id) THEN p.avatar_url ELSE NULL END,
-    c.venue_name,
-    c.started_at,
-    c.ended_at
-  FROM checkins c
-  LEFT JOIN profiles p ON p.id = c.user_id
-  WHERE c.venue_id = p_venue_id
-  ORDER BY c.started_at DESC
-  LIMIT 100;
-END;
-$$;
+**`src/components/ShareToDMModal.tsx`**
+- Add `useDemoMode` hook import
+- Filter `allProfiles` to exclude `is_demo = true` profiles when demo mode is off (in the `useEffect` that builds the friends list)
 
-GRANT EXECUTE ON FUNCTION public.get_venue_checkins(uuid) TO authenticated;
-```
+**`src/pages/Friends.tsx`**
+- Add `useDemoMode` hook
+- `fetchRequests`: After fetching pending friend requests, filter out requests from demo users (check profile `is_demo`) when demo mode is off
+- `searchUsers`: Filter out demo profiles from `get_profiles_safe` results when demo mode is off
+- `fetchSuggestedFriends`: Filter the final suggestions list to exclude demo profiles when demo mode is off
 
-### Impact
-- **Business dashboard** (`BusinessDashboard.tsx`): Currently queries `checkins` table directly with `.eq('venue_id', selectedVenueId)`. After this migration, the direct query still works for aggregate counts (the other SELECT RLS policies remain), but if the dashboard needs user-level detail it should call `get_venue_checkins` RPC instead.
-- No immediate code changes needed since the dashboard only fetches `created_at` for analytics aggregation, which is covered by remaining RLS policies.
+**`src/components/FindFriendsOnboarding.tsx`**
+- Add `useDemoMode` hook
+- Filter search results from `get_profiles_safe` to exclude demo profiles when demo mode is off
+
+**`src/components/messages/MessagesTab.tsx`**
+- Simplify filter from `bootstrapEnabled && !demoEnabled` to just `!demoEnabled` (remove bootstrap dependency)
+
+**`src/components/messages/ActivityTab.tsx`**
+- Same simplification: replace all `bootstrapEnabled && !demoEnabled` checks with `!demoEnabled`
+
+### Pattern
+Every component will use the same check: `if (!demoEnabled) { filter out is_demo === true }`. No bootstrap mode dependency needed — demo visibility is solely controlled by the demo mode toggle.
 
 ### Files changed
-- New database migration only
+- `src/components/ShareToDMModal.tsx`
+- `src/pages/Friends.tsx`
+- `src/components/FindFriendsOnboarding.tsx`
+- `src/components/messages/MessagesTab.tsx`
+- `src/components/messages/ActivityTab.tsx`
 
