@@ -1,28 +1,23 @@
 
 
-## Fix: Missing usernames/avatars on feed posts
+## Fix: Empty Map in Demo Mode — Profiles RLS Blocking Demo Data
 
-**Root cause**: The `posts` table has no foreign key constraint from `user_id` to `profiles.id`. Without this FK, the Supabase join syntax `profiles:user_id(display_name, username, avatar_url)` returns an empty array `[]` instead of an object. So `post.profiles?.display_name` resolves to `undefined`, rendering nothing.
+**Root cause**: The `profiles` table has a SELECT RLS policy that only allows `auth.uid() = id` (users can only read their own profile). When the map queries `night_statuses` with `profiles!inner(display_name, avatar_url, is_demo)`, PostgREST joins to `profiles` but RLS blocks reading other users' profiles. The `!inner` join then filters out all rows, returning an empty result.
 
-**Fix**: Add a foreign key constraint from `posts.user_id` to `profiles.id`.
+This affects all queries that join `night_statuses` → `profiles` for demo users (map markers, planning friends, etc.).
 
-### Database migration
+### Fix
+
+**Database migration**: Add a SELECT policy on `profiles` allowing authenticated users to read demo profiles:
+
 ```sql
-ALTER TABLE public.posts
-  ADD CONSTRAINT posts_user_id_profiles_fkey
-  FOREIGN KEY (user_id) REFERENCES public.profiles(id);
+CREATE POLICY "Demo profiles are readable by authenticated users"
+  ON public.profiles FOR SELECT
+  TO authenticated
+  USING (is_demo = true);
 ```
 
-This single change makes the existing Supabase join in `useFeed.ts` (line 164-170) and `Feed.tsx` work correctly — `post.profiles` will return a single object instead of an empty array.
+This is safe because demo profiles contain no real PII — they're synthetic seed data. The existing policy (`auth.uid() = id`) continues to gate access to real user profiles.
 
-### Also check: `post_comments`
-The same join pattern is used for comments (line 283-290 in useFeed.ts). If `post_comments` also lacks a FK to profiles, that needs the same fix:
-```sql
-ALTER TABLE public.post_comments
-  ADD CONSTRAINT post_comments_user_id_profiles_fkey
-  FOREIGN KEY (user_id) REFERENCES public.profiles(id);
-```
-
-### Files changed
-- **Database only** — no code changes needed. The existing queries already use the correct join syntax.
+No code changes needed — the existing queries will start working once the RLS policy is added.
 
