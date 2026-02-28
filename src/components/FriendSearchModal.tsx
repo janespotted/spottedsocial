@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
@@ -6,15 +6,8 @@ import { useFriendIds } from '@/hooks/useFriendIds';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, X, Home } from 'lucide-react';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
+import { Search, X, ArrowLeft, Home } from 'lucide-react';
 
 interface Friend {
   id: string;
@@ -43,8 +36,8 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
   const [friends, setFriends] = useState<Friend[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Filter profiles to only friends
   const friendProfiles = useMemo(() => {
     if (!allProfiles || !cachedFriendIds) return [];
     const friendSet = new Set(cachedFriendIds);
@@ -62,6 +55,13 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
     }
     if (!open) setSearch('');
   }, [open, user, friendProfiles]);
+
+  useEffect(() => {
+    if (open) {
+      // Small delay to let the overlay render before focusing
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [open]);
 
   const fetchStatuses = async () => {
     if (!user || friendProfiles.length === 0) { setFriends([]); setIsLoading(false); return; }
@@ -95,7 +95,6 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
         const activeCheckin = checkinMap.get(profile.id);
         const nightStatus = nightMap.get(profile.id);
 
-        // Use timestamp-based priority: prefer whichever is more recent
         const checkinTime = activeCheckin?.started_at ? new Date(activeCheckin.started_at).getTime() : 0;
         const nightTime = nightStatus?.updated_at ? new Date(nightStatus.updated_at).getTime() : 0;
 
@@ -166,17 +165,17 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
     <button
       key={friend.id}
       onClick={() => handleSelectFriend(friend)}
-      className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+      className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
     >
-      <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
+      <Avatar className="w-9 h-9 border-2 border-[#a855f7]/40">
         <AvatarImage src={friend.avatar_url || undefined} />
-        <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+        <AvatarFallback className="bg-[#a855f7]/20 text-white text-xs">
           {friend.display_name[0]}
         </AvatarFallback>
       </Avatar>
 
       <div className="flex-1 min-w-0 text-left">
-        <p className="text-white font-semibold text-sm truncate">
+        <p className="text-white font-medium text-sm truncate">
           {friend.display_name}
         </p>
         {friend.status === 'out' ? (
@@ -194,95 +193,99 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
     </button>
   );
 
+  if (!open) return null;
+
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
-      <DrawerContent className="bg-[#1a0f2e] border-t border-[#a855f7]/30 max-h-[85vh]">
-        <DrawerHeader className="pb-1">
-          <DrawerTitle className="text-foreground text-center text-base">Who's Out</DrawerTitle>
-        </DrawerHeader>
-
-        <div className="px-4 pb-6 flex flex-col flex-1 min-h-0 overflow-hidden">
-          {/* Search */}
-          <div className="relative flex-shrink-0">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search friends..."
-              className="bg-white/5 border-white/10 text-foreground placeholder:text-white/30 rounded-xl pl-10 h-10 text-sm"
-              autoFocus
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                <X className="h-3.5 w-3.5 text-white/30 hover:text-white/50" />
-              </button>
-            )}
-          </div>
-
-          {/* Friends List */}
-          <div className="flex-1 mt-3 overflow-y-auto">
-            {isLoading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 p-3">
-                  <Skeleton className="h-10 w-10 rounded-full bg-white/5" />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-3.5 w-24 bg-white/5" />
-                    <Skeleton className="h-3 w-16 bg-white/5" />
-                  </div>
-                </div>
-              ))
-            ) : filteredFriends.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                <Search className="h-6 w-6 text-white/20 mb-3" />
-                <p className="text-sm text-white/40">
-                  {search ? 'No friends found' : 'Your friend list is empty'}
-                </p>
-              </div>
-            ) : (
-              <div className="bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg overflow-hidden">
-                {/* Friends Out Now */}
-                {outFriends.length > 0 && (
-                  <>
-                    <div className="px-3 py-2">
-                      <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider">
-                        👥 Friends Out Now
-                        <span className="text-white/50 ml-1">({outFriends.length})</span>
-                      </h3>
-                    </div>
-                    {outFriends.map(renderFriendRow)}
-                  </>
-                )}
-
-                {/* Friends Planning */}
-                {planningFriends.length > 0 && (
-                  <>
-                    <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
-                      <p className="text-white/70 text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider">
-                        🔥 Friends Planning 🎯
-                        <span className="text-white/50 normal-case tracking-normal">({planningFriends.length})</span>
-                      </p>
-                    </div>
-                    {planningFriends.map(renderFriendRow)}
-                  </>
-                )}
-
-                {/* Staying In */}
-                {homeFriends.length > 0 && (
-                  <>
-                    <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
-                      <p className="text-white/70 text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider">
-                        <Home className="h-3.5 w-3.5 text-white/50 inline mr-0.5" /> Staying In
-                        <span className="text-white/50 normal-case tracking-normal">({homeFriends.length})</span>
-                      </p>
-                    </div>
-                    {homeFriends.map(renderFriendRow)}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+    <div className="fixed inset-0 bg-[#0a0118] z-[500] flex flex-col animate-fade-in" style={{ touchAction: 'auto' }}>
+      {/* Search Header */}
+      <div className="flex items-center gap-3 px-4 py-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
+        <button
+          onClick={() => { onOpenChange(false); setSearch(''); }}
+          className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors flex-shrink-0"
+        >
+          <ArrowLeft className="w-5 h-5 text-white" />
+        </button>
+        <div className="flex-1 bg-[#2d1b4e]/80 border border-[#a855f7]/30 rounded-xl px-4 py-2.5 flex items-center gap-2">
+          <Search className="w-4 h-4 text-white/40" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search friends..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-transparent text-white text-sm flex-1 outline-none placeholder:text-white/40"
+          />
+          {search && (
+            <button onClick={() => setSearch('')}>
+              <X className="w-4 h-4 text-white/40 hover:text-white transition-colors" />
+            </button>
+          )}
         </div>
-      </DrawerContent>
-    </Drawer>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-4 pb-8">
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-3">
+                <Skeleton className="h-9 w-9 rounded-full bg-white/5" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3.5 w-24 bg-white/5" />
+                  <Skeleton className="h-3 w-16 bg-white/5" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredFriends.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-white/40 text-sm">
+              {search ? 'No friends found' : 'Your friend list is empty'}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Friends Out Now */}
+            {outFriends.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">
+                  👥 Friends Out Now
+                  <span className="text-white/50 ml-1">({outFriends.length})</span>
+                </h3>
+                <div className="space-y-1">
+                  {outFriends.map(renderFriendRow)}
+                </div>
+              </div>
+            )}
+
+            {/* Friends Planning */}
+            {planningFriends.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">
+                  🔥 Friends Planning 🎯
+                  <span className="text-white/50 ml-1">({planningFriends.length})</span>
+                </h3>
+                <div className="space-y-1">
+                  {planningFriends.map(renderFriendRow)}
+                </div>
+              </div>
+            )}
+
+            {/* Staying In */}
+            {homeFriends.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Home className="h-3.5 w-3.5 text-white/50" /> Staying In
+                  <span className="text-white/50">({homeFriends.length})</span>
+                </h3>
+                <div className="space-y-1">
+                  {homeFriends.map(renderFriendRow)}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
