@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useFriendIds } from '@/hooks/useFriendIds';
+import { useProfilesSafe } from '@/hooks/useProfilesCache';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -36,53 +38,44 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
   const { user } = useAuth();
   const { openFriendCard } = useFriendIdCard();
   const demoEnabled = useDemoMode();
+  const { data: cachedFriendIds } = useFriendIds(user?.id);
+  const { data: allProfiles } = useProfilesSafe();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
+  // Filter profiles to only friends
+  const friendProfiles = useMemo(() => {
+    if (!allProfiles || !cachedFriendIds) return [];
+    const friendSet = new Set(cachedFriendIds);
+    let filtered = allProfiles.filter(p => friendSet.has(p.id));
+    if (!demoEnabled) filtered = filtered.filter(p => !p.is_demo);
+    return filtered;
+  }, [allProfiles, cachedFriendIds, demoEnabled]);
+
   useEffect(() => {
-    if (open && user) {
-      fetchFriends();
+    if (open && user && friendProfiles.length > 0) {
+      fetchStatuses();
+    } else if (open && friendProfiles.length === 0 && allProfiles) {
+      setFriends([]);
+      setIsLoading(false);
     }
     if (!open) setSearch('');
-  }, [open, user]);
+  }, [open, user, friendProfiles]);
 
-  const fetchFriends = async () => {
-    if (!user) return;
+  const fetchStatuses = async () => {
+    if (!user || friendProfiles.length === 0) { setFriends([]); setIsLoading(false); return; }
     setIsLoading(true);
 
     try {
-      const [sentResult, receivedResult] = await Promise.all([
-        supabase.from('friendships').select('friend_id').eq('user_id', user.id).eq('status', 'accepted'),
-        supabase.from('friendships').select('user_id').eq('friend_id', user.id).eq('status', 'accepted'),
-      ]);
-
-      const friendIds = [...new Set([
-        ...(sentResult.data?.map(f => f.friend_id) || []),
-        ...(receivedResult.data?.map(f => f.user_id) || []),
-      ])];
-
-      if (friendIds.length === 0) {
-        setFriends([]);
-        setIsLoading(false);
-        return;
-      }
-
+      const friendIds = friendProfiles.map(p => p.id);
       const now = new Date().toISOString();
-      let profileQuery = supabase
-        .from('profiles')
-        .select('id, display_name, username, avatar_url, is_demo')
-        .in('id', friendIds);
-      if (!demoEnabled) profileQuery = profileQuery.eq('is_demo', false);
 
-      const [profilesRes, checkinsRes, nightRes, storiesRes] = await Promise.all([
-        profileQuery,
+      const [checkinsRes, nightRes, storiesRes] = await Promise.all([
         supabase.from('checkins').select('user_id, venue_name').in('user_id', friendIds).is('ended_at', null),
         supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
         supabase.from('stories').select('user_id').in('user_id', friendIds).gt('expires_at', now),
       ]);
-
-      if (!profilesRes.data) { setFriends([]); setIsLoading(false); return; }
 
       const checkinMap = new Map<string, string>();
       checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, c.venue_name); });
@@ -93,7 +86,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
       const storySet = new Set<string>();
       storiesRes.data?.forEach(s => storySet.add(s.user_id));
 
-      const friendsData: Friend[] = profilesRes.data.map(profile => {
+      const friendsData: Friend[] = friendProfiles.map(profile => {
         let status: 'out' | 'planning' | 'home' = 'home';
         let venue_name: string | null = null;
         let planning_neighborhood: string | null = null;
