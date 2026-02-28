@@ -338,12 +338,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if (!user) return;
     
     try {
+      const partyDisplayName = `Private Party (${privatePartyNeighborhood})`;
       const statusData = {
         user_id: user.id,
         status: 'out' as const,
         lat: null,
         lng: null,
-        venue_name: null,
+        venue_name: partyDisplayName,
         venue_id: null,
         updated_at: new Date().toISOString(),
         expires_at: calculateExpiryTime(),
