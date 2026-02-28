@@ -163,7 +163,7 @@ export function useFeed(options: UseFeedOptions) {
         .from('posts')
         .select(`
           *,
-          profiles:user_id (
+          profiles!posts_user_id_profiles_fkey (
             display_name,
             username,
             avatar_url
@@ -242,7 +242,7 @@ export function useFeed(options: UseFeedOptions) {
       .from('posts')
       .select(`
         *,
-        profiles:user_id (
+        profiles!posts_user_id_profiles_fkey (
           display_name,
           username,
           avatar_url
@@ -283,7 +283,7 @@ export function useFeed(options: UseFeedOptions) {
       .from('post_comments')
       .select(`
         *,
-        profiles:user_id (
+        profiles!post_comments_user_id_profiles_fkey (
           display_name,
           username,
           avatar_url
