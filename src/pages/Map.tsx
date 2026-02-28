@@ -134,6 +134,7 @@ export default function Map() {
   const [showPlanningReady, setShowPlanningReady] = useState(false);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const planningReadyShownRef = useRef(false);
+  const [styleLoaded, setStyleLoaded] = useState(false);
   
   // Use ref for city to prevent callback recreation
   const cityRef = useRef(city);
@@ -639,6 +640,14 @@ export default function Map() {
       setFocusMode(prev => !prev);
     });
 
+    // Track style loaded state for venue rendering
+    map.current.on('style.load', () => {
+      setStyleLoaded(true);
+    });
+    if (map.current.isStyleLoaded()) {
+      setStyleLoaded(true);
+    }
+
     // Listen for custom event to center map on venue
     const handleCenterMapOnVenue = (e: Event) => {
       const customEvent = e as CustomEvent<{ lat: number; lng: number }>;
@@ -1036,7 +1045,7 @@ export default function Map() {
   useEffect(() => {
     if (!map.current) return;
     const m = map.current;
-    if (!m.isStyleLoaded()) return;
+    if (!styleLoaded) return;
 
     // If friends-only mode, remove everything
     if (layerVisibility === 'friends') {
@@ -1245,7 +1254,7 @@ export default function Map() {
 
       venueMarkersRef.current.set(venue.id, marker);
     });
-  }, [filteredVenues, friends, layerVisibility]);
+  }, [filteredVenues, friends, layerVisibility, styleLoaded]);
 
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
     const R = 3959; // Earth's radius in miles
