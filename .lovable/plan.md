@@ -1,25 +1,20 @@
 
 
-## Google Sign-In Failure — Diagnosis
+## Fix: Map Pin Icons Cut Off at Top
 
-The screenshot shows a generic "Google sign-in failed, please try again" error. The current error handler (Auth.tsx line 115-118) swallows the actual error details and shows only a generic message.
+The teardrop pin is drawn on a canvas that's too short. The circle portion of the pin extends above the canvas boundary (y = -4), so the top gets clipped.
 
-**Likely cause**: The preview environment uses a different origin (`id-preview--*.lovable.app`) which may cause the OAuth redirect to fail or the session token exchange to error. Auth logs confirm a `session_not_found` (403) from the preview IP at the same timestamp.
+**Root cause (line 1127-1134)**: Canvas height is `44px` but the arc center is at y=14 with radius 18, reaching y=-4 — above the canvas.
 
-**On your published domain** (`spottedsocial.lovable.app`), Google sign-in is working — the auth logs show a successful Google login from that domain moments later.
+### Fix in `src/pages/Map.tsx` (lines 1124-1150)
 
-### Fix
+Add vertical padding to the canvas and offset all drawing down:
 
-1. **Better error logging** in `handleGoogleSignIn` — log the actual error to console so we can see the real failure reason
-2. **Show the actual error message** instead of generic text, so debugging is easier
-3. **Add a fallback message** noting to try from the published app if in preview
+1. Increase canvas height from `size + 8` to `size + 16` (52px total)
+2. Add a `yOffset = 8` to shift all drawing coordinates down by 8px
+3. Apply `yOffset` to the `moveTo`, `bezierCurveTo`, `arc` calls so the full teardrop fits within the canvas
 
-### File: `src/pages/Auth.tsx`
+This ensures the entire pin shape renders within the canvas bounds before being passed to Mapbox as an image.
 
-Update `handleGoogleSignIn` catch block (lines 115-118):
-- `console.error('Google sign-in error:', error)` 
-- Show `error?.message` if available, fall back to generic message
-- Same treatment for `handleAppleSignIn`
-
-This is a small change — just improving error visibility so we can diagnose the root cause if it recurs on the published domain.
+**File**: `src/pages/Map.tsx` (lines 1124-1150)
 
