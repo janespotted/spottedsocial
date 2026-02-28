@@ -24,6 +24,7 @@ interface NotificationsContextType {
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   dismissLatest: () => void;
+  showBanner: (notification: Notification) => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
@@ -166,17 +167,22 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     setLatestNotification(null);
   };
 
+  const showBanner = (notification: Notification) => {
+    setLatestNotification(notification);
+  };
+
   return (
     <NotificationsContext.Provider
-      value={{
-        notifications,
-        unreadCount,
-        latestNotification,
-        markAsRead,
-        markAllAsRead,
-        dismissLatest
-      }}
-    >
+        value={{
+          notifications,
+          unreadCount,
+          latestNotification,
+          markAsRead,
+          markAllAsRead,
+          dismissLatest,
+          showBanner,
+        }}
+      >
       {children}
     </NotificationsContext.Provider>
   );
