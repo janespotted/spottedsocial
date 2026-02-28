@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useVenueInvite } from '@/contexts/VenueInviteContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useFriendIds } from '@/hooks/useFriendIds';
+import { useProfilesSafe } from '@/hooks/useProfilesCache';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@/components/ui/visually-hidden';
@@ -29,40 +30,39 @@ export function InviteFriendsModal() {
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
   const { data: cachedFriendIds } = useFriendIds(user?.id);
+  const { data: allProfiles, isLoading: profilesLoading } = useProfilesSafe();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
+  // Filter profiles to only friends
+  const friendProfiles = useMemo(() => {
+    if (!allProfiles || !cachedFriendIds) return [];
+    const friendSet = new Set(cachedFriendIds);
+    let filtered = allProfiles.filter(p => friendSet.has(p.id));
+    if (!demoEnabled) filtered = filtered.filter(p => !p.is_demo);
+    return filtered;
+  }, [allProfiles, cachedFriendIds, demoEnabled]);
+
   useEffect(() => {
-    if (showInviteModal && user) {
-      fetchFriends();
-    } else {
+    if (showInviteModal && user && friendProfiles.length > 0) {
+      fetchStatuses();
+    } else if (!showInviteModal) {
       setSelectedFriends(new Set());
     }
-  }, [showInviteModal, user]);
+  }, [showInviteModal, user, friendProfiles]);
 
-  const fetchFriends = async () => {
-    if (!user) return;
+  const fetchStatuses = async () => {
+    if (!user || friendProfiles.length === 0) { setFriends([]); return; }
     setLoading(true);
     try {
-      const friendIds = cachedFriendIds || [];
-      if (friendIds.length === 0) { setFriends([]); return; }
-
+      const friendIds = friendProfiles.map(p => p.id);
       const now = new Date().toISOString();
 
-      let profileQuery = supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url, is_demo')
-        .in('id', friendIds);
-      if (!demoEnabled) profileQuery = profileQuery.eq('is_demo', false);
-
-      const [profilesRes, checkinsRes, nightRes] = await Promise.all([
-        profileQuery,
+      const [checkinsRes, nightRes] = await Promise.all([
         supabase.from('checkins').select('user_id, venue_name').in('user_id', friendIds).is('ended_at', null),
         supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
       ]);
-
-      if (!profilesRes.data) { setFriends([]); return; }
 
       const checkinMap = new Map<string, string>();
       checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, c.venue_name); });
@@ -73,7 +73,7 @@ export function InviteFriendsModal() {
       const seenNames = new Set<string>();
       const friendsData: Friend[] = [];
 
-      for (const profile of profilesRes.data) {
+      for (const profile of friendProfiles) {
         if (seenNames.has(profile.display_name)) continue;
         seenNames.add(profile.display_name);
 
