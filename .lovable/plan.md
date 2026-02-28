@@ -1,42 +1,39 @@
 
 
-## Analysis
+## Plan: Auto-refresh, optional caption, and planning button text fix
 
-I investigated the database thoroughly:
-- Both users are friends (verified friendship row exists)
-- Both have `is_out = true` with valid coordinates  
-- `can_see_location()` returns `true` in BOTH directions
-- All RLS policies are PERMISSIVE and correctly configured
-- Night statuses exist for both users with `status = 'out'`
+### 1. Add visibility-based auto-refresh to Home page
+The feed data (`posts`, `planningFriends`, `friends`) only fetches on mount and via realtime. When switching tabs or returning to the app, stale data persists.
 
-The database and permissions are correct. The issue is likely a **client-side caching/timing problem** combined with **inconsistent status resolution logic across surfaces**.
+**`src/pages/Home.tsx`**:
+- Add a `visibilitychange` listener that re-fetches `fetchPosts`, `fetchFriends`, and `fetchPlanningFriends` when the document becomes visible again (with a 30-second throttle to avoid spam)
+- Also add `focus` event listener as fallback for browsers that don't fire visibilitychange reliably
 
-The timestamp-based priority fix (preferring recent night_status over stale checkins) was only applied to `MyFriendsTab.tsx` — but `FriendSearchModal`, `InviteFriendsModal`, and `Map.tsx` still use the old logic that can misclassify friends.
+**`src/pages/Friends.tsx`**, **`src/pages/Map.tsx`**, **`src/pages/Leaderboard.tsx`**:
+- Add similar `visibilitychange` refetch for their primary data queries
 
-## Plan
+### 2. Make caption optional for posts
+**`src/lib/validation-schemas.ts`**:
+- Change `postSchema.text` from `.min(1)` to `.min(0)` (or make it optional) so empty captions are allowed
 
-### 1. Fix FriendSearchModal status resolution
-In `src/components/FriendSearchModal.tsx`:
-- Add `started_at` to checkins query, `updated_at, is_private_party, party_neighborhood` to night_statuses query
-- Apply same timestamp-comparison logic as MyFriendsTab
-- Handle private party display
+**`src/components/PostCaptionScreen.tsx`**:
+- Remove `disabled={!caption.trim()}` from the Share button so users can post without a caption
+- Update `handleShare` to skip validation when caption is empty, or just allow empty string through validation
 
-### 2. Fix InviteFriendsModal status resolution  
-In `src/components/InviteFriendsModal.tsx`:
-- Same timestamp + private party fixes as above
+### 3. Change "I'm in" to "+ Back to Planning Mode" when user is already out
+**`src/components/FriendsPlanning.tsx`** (line ~400-409):
+- The bottom CTA currently shows `showJoinOption && !isUserPlanning`. Need to also check if the user is currently "out" (has active night status with `status = 'out'`)
+- Add a new prop `isUserOut?: boolean` to `FriendsPlanningProps`
+- When `isUserOut` is true, change button text from "I'm in" to "+ Back to Planning Mode"
 
-### 3. Force cache invalidation on app focus
-In `src/hooks/useProfilesCache.ts`:
-- Reduce `staleTime` to 30 seconds so data refreshes more aggressively
-- Add `refetchOnWindowFocus: true` to both `useProfilesSafe` and `useFriendIds` so switching back to the app picks up new friendships and status changes immediately
-
-### 4. Add refetchOnWindowFocus to useFriendIds
-In `src/hooks/useFriendIds.ts`:
-- Add `refetchOnWindowFocus: true` to ensure new friendships are detected when switching between devices/windows
+**`src/pages/Home.tsx`**:
+- Pass `isUserOut` prop to `FriendsPlanning` based on the user's current night status (check if they have an active `status = 'out'` record)
 
 ### Files changed
-- `src/components/FriendSearchModal.tsx`
-- `src/components/InviteFriendsModal.tsx`  
-- `src/hooks/useProfilesCache.ts`
-- `src/hooks/useFriendIds.ts`
+- `src/pages/Home.tsx` — visibility-based refetch + pass `isUserOut` prop
+- `src/pages/Friends.tsx` — visibility-based refetch
+- `src/pages/Map.tsx` — visibility-based refetch
+- `src/lib/validation-schemas.ts` — make caption optional
+- `src/components/PostCaptionScreen.tsx` — allow posting without caption
+- `src/components/FriendsPlanning.tsx` — conditional button text based on user status
 
