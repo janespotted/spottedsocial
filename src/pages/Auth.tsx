@@ -113,7 +113,9 @@ export default function Auth() {
 
       if (error) throw error;
     } catch (error: any) {
-      setGoogleError('Google sign-in failed, please try again');
+      console.error('Google sign-in error:', error);
+      const message = error?.message || 'Google sign-in failed, please try again';
+      setGoogleError(window.location.hostname.includes('preview') ? `${message} — Try from the published app instead.` : message);
       setGoogleLoading(false);
     }
   };
@@ -129,7 +131,9 @@ export default function Auth() {
 
       if (error) throw error;
     } catch (error: any) {
-      setAppleError('Apple sign-in failed, please try again');
+      console.error('Apple sign-in error:', error);
+      const message = error?.message || 'Apple sign-in failed, please try again';
+      setAppleError(window.location.hostname.includes('preview') ? `${message} — Try from the published app instead.` : message);
       setAppleLoading(false);
     }
   };
