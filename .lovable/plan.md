@@ -1,17 +1,19 @@
 
 
-## Fix: Always show "I'm at a Private Party" button in venue confirmation
+## Plan
 
-**Problem**: The "I'm at a Private Party" button in the venue confirmation screen is only shown when no venue is detected (`!detectedVenue`, line 971). When GPS finds a nearby venue, the button is hidden. The user's GPS detected a venue named "Private party" and was shown the standard venue confirm flow without the option to enter the private party neighborhood flow.
+### 1. Delete the rogue "Private party" venue from the database
+Run SQL via insert tool:
+```sql
+DELETE FROM venues WHERE id = 'ce3629c9-b742-4079-a327-87a53ac06bef';
+```
+Confirmed it exists: name = "Private party".
 
-**Fix** (`src/components/CheckInModal.tsx`):
+### 2. Add blocklist to `createNewVenue()` in `src/lib/location-service.ts` (line 354)
+Add a `BLOCKED_VENUE_NAMES` array before the function. At the top of `createNewVenue()`, check `name.trim().toLowerCase()` against the list. If matched, log a warning and return `null` without inserting.
 
-Move the "I'm at a Private Party" button out of the `!detectedVenue` conditional block so it always appears in VenueConfirmContent, regardless of whether a venue was detected. Place it below the confirm button (after line 1022) with a divider, so the flow is:
+Blocked terms: `private party`, `house party`, `home`, `my place`, `my house`, `my apartment`, `apartment`, `house`, `party`, `pregame`, `pre-game`, `afterparty`, `after party`, `kickback`.
 
-1. Venue confirmation (detected or manual)
-2. Confirm button
-3. Divider ("or")
-4. "I'm at a Private Party" button
-
-This ensures users can always switch to the private party flow from the venue confirmation screen.
+### 3. Keep the "I'm at a Private Party" button
+No changes needed — the button added in the last diff (lines 1024-1036 of CheckInModal.tsx) stays as-is.
 
