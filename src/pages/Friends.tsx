@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
@@ -50,6 +51,7 @@ type FriendshipStatus = 'none' | 'pending' | 'accepted';
 export default function Friends() {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
@@ -252,6 +254,8 @@ export default function Friends() {
     haptic.success();
     toast.success('Friend request accepted!');
     setRequests(requests.filter(r => r.id !== requestId));
+    queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
+    queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
   };
 
   const declineRequest = async (requestId: string) => {
