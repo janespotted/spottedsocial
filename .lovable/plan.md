@@ -1,22 +1,18 @@
 
 
-## Add Yap Board for Private Parties
+## Fix: Private Party Yap — pinned at top only, not in public feed
 
-**Problem**: The Yap directory feed explicitly filters out private party yaps (line 111: `.eq('is_private_party', false)`), and private parties don't have venue entries in the `venues` table, so they also fail the city-based metadata lookup. Users at private parties have no way to see or participate in a Yap board for their party.
+**Problem**: Private party yaps are currently mixed into the public Yap directory feed. They should only appear via the "You're at" bar when the user is checked into a private party — identical to how real venues work.
 
 ### Changes
 
 **`src/components/messages/YapTab.tsx`**:
 
-1. **Include private party yaps in the feed** — Remove the `.eq('is_private_party', false)` filter. Instead, run a second query for private party yaps (where `is_private_party = true`) and merge them into the feed.
+1. **Remove the private party yap query** — Delete the second query (lines 121-130) that fetches `is_private_party = true` yaps and all related private party enrichment logic (neighborhood lookup from `night_statuses`, `enrichedPrivate` array, merge into quotes).
 
-2. **Handle missing venue metadata for private parties** — Private parties don't exist in the `venues` table. For yaps where `is_private_party = true`, use the `venue_name` as-is (it will be something like "Private Party") and pull the neighborhood from the yap's associated `night_statuses` or from a `party_neighborhood` field if stored on the yap.
+2. **Keep the "You're at" bar working for private parties** — The existing `userVenueName` + `userIsPrivateParty` state already handles this correctly. When a user is at a private party, the bar shows with the Home icon and links to the `VenueYapThread`. No changes needed here.
 
-3. **Show private party entries in the directory** — Display private party yap cards with a house icon instead of the map pin, and show the neighborhood as the location context (e.g., "🏠 Private Party · Hollywood").
-
-4. **Allow thread access** — When a user taps a private party yap card, open a `VenueYapThread` using the private party's venue_name. The existing `VenueYapThread` component already supports private party yaps (it checks `is_private_party` when posting).
-
-5. **Update "You're at" bar** — If the user's `night_status` has `is_private_party = true`, show "You're at Private Party" with the house icon instead of the map pin.
+3. **Result**: Private party Yap boards are accessible only through the "You're at" shortcut bar (pinned at top), never visible in the public directory feed.
 
 ### Files changed
 - `src/components/messages/YapTab.tsx`
