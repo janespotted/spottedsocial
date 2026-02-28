@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Mic, MapPin, Pin, Flame } from 'lucide-react';
+import { Mic, MapPin, Pin, Flame, Home } from 'lucide-react';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useUserCity } from '@/hooks/useUserCity';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ interface YapQuote {
   venue_neighborhood: string | null;
   venue_type: string | null;
   created_at: string;
+  is_private_party?: boolean;
 }
 
 const relativeTime = (dateStr: string) => {
@@ -38,6 +39,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const [view, setView] = useState<'directory' | 'thread'>(venueNameProp ? 'thread' : 'directory');
   const [threadVenueName, setThreadVenueName] = useState<string | null>(venueNameProp || null);
   const [userVenueName, setUserVenueName] = useState<string | null>(null);
+  const [userIsPrivateParty, setUserIsPrivateParty] = useState(false);
   const [quotes, setQuotes] = useState<YapQuote[]>([]);
   const [sortMode, setSortMode] = useState<'hot' | 'new'>('hot');
   const [isLoading, setIsLoading] = useState(true);
@@ -58,13 +60,14 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
     const fetchUserVenue = async () => {
       const { data } = await supabase
         .from('night_statuses')
-        .select('venue_name')
+        .select('venue_name, is_private_party')
         .eq('user_id', user.id)
         .not('venue_name', 'is', null)
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
         .maybeSingle();
       setUserVenueName(data?.venue_name || null);
+      setUserIsPrivateParty(data?.is_private_party || false);
     };
     
     fetchUserVenue();
@@ -84,6 +87,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
           const newRecord = payload.new;
           if (newRecord) {
             setUserVenueName(newRecord.venue_name || null);
+            setUserIsPrivateParty(newRecord.is_private_party || false);
           }
         }
       )
@@ -103,10 +107,10 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const fetchQuotes = async () => {
     if (!hasFetchedOnce) setIsLoading(true);
     try {
-      // userVenueName is now managed by its own useEffect + realtime subscription
+      // Fetch regular venue yaps
       let yapQuery = supabase
         .from('yap_messages')
-        .select('id, text, score, venue_name, created_at')
+        .select('id, text, score, venue_name, created_at, is_private_party')
         .gt('expires_at', new Date().toISOString())
         .eq('is_private_party', false);
       if (!demoEnabled) {
@@ -114,10 +118,22 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       }
       const { data: yapData } = await yapQuery;
 
-      const allYaps = yapData || [];
+      // Fetch private party yaps separately
+      let ppYapQuery = supabase
+        .from('yap_messages')
+        .select('id, text, score, venue_name, created_at, is_private_party')
+        .gt('expires_at', new Date().toISOString())
+        .eq('is_private_party', true);
+      if (!demoEnabled) {
+        ppYapQuery = ppYapQuery.eq('is_demo', false);
+      }
+      const { data: ppYapData } = await ppYapQuery;
+
+      const regularYaps = yapData || [];
+      const privatePartyYaps = ppYapData || [];
 
       // Get unique venue names for metadata lookup — filter to current city
-      const venueNames = [...new Set(allYaps.map(y => y.venue_name))];
+      const venueNames = [...new Set(regularYaps.map(y => y.venue_name))];
       let venueMetaMap = new Map<string, { type: string | null; neighborhood: string | null; id: string }>();
 
       if (venueNames.length > 0) {
@@ -165,10 +181,30 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         }
       }
 
-      // Filter yaps to only include venues in the current city
-      const yaps = allYaps.filter(y => venueMetaMap.has(y.venue_name));
+      // Filter regular yaps to only include venues in the current city
+      const filteredRegularYaps = regularYaps.filter(y => venueMetaMap.has(y.venue_name));
 
-      const enrichedQuotes: YapQuote[] = yaps.map(yap => ({
+      // Get neighborhood info for private party yaps from night_statuses
+      const ppVenueNames = [...new Set(privatePartyYaps.map(y => y.venue_name))];
+      let ppNeighborhoodMap = new Map<string, string | null>();
+      if (ppVenueNames.length > 0) {
+        const { data: statusData } = await supabase
+          .from('night_statuses')
+          .select('venue_name, party_neighborhood')
+          .in('venue_name', ppVenueNames)
+          .eq('is_private_party', true)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', new Date().toISOString());
+        if (statusData) {
+          for (const s of statusData) {
+            if (s.venue_name && s.party_neighborhood) {
+              ppNeighborhoodMap.set(s.venue_name, s.party_neighborhood);
+            }
+          }
+        }
+      }
+
+      const enrichedRegular: YapQuote[] = filteredRegularYaps.map(yap => ({
         id: yap.id,
         text: yap.text,
         score: yap.score,
@@ -176,9 +212,21 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         venue_neighborhood: venueMetaMap.get(yap.venue_name)?.neighborhood || null,
         venue_type: venueMetaMap.get(yap.venue_name)?.type || null,
         created_at: yap.created_at,
+        is_private_party: false,
       }));
 
-      setQuotes(enrichedQuotes);
+      const enrichedPrivate: YapQuote[] = privatePartyYaps.map(yap => ({
+        id: yap.id,
+        text: yap.text,
+        score: yap.score,
+        venue_name: yap.venue_name,
+        venue_neighborhood: ppNeighborhoodMap.get(yap.venue_name) || null,
+        venue_type: 'private_party',
+        created_at: yap.created_at,
+        is_private_party: true,
+      }));
+
+      setQuotes([...enrichedRegular, ...enrichedPrivate]);
     } catch (error) {
       console.error('Error fetching yap quotes:', error);
     } finally {
@@ -255,7 +303,10 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
           onClick={() => openThread(userVenueName)}
           className="w-full flex items-center justify-between bg-white/[0.06] backdrop-blur-sm rounded-2xl px-4 py-2.5 active:bg-white/[0.10] transition-colors animate-fade-in"
         >
-          <span className="text-white text-sm flex items-center gap-1"><MapPin className="h-4 w-4 text-[#d4ff00] inline" /> You're at <span className="font-semibold">{userVenueName}</span></span>
+          <span className="text-white text-sm flex items-center gap-1">
+            {userIsPrivateParty ? <Home className="h-4 w-4 text-[#d4ff00] inline" /> : <MapPin className="h-4 w-4 text-[#d4ff00] inline" />}
+            {' '}You're at <span className="font-semibold">{userVenueName}</span>
+          </span>
           <span className="bg-[#d4ff00] text-[#1a0f2e] font-bold text-xs px-3 py-1 rounded-full">View</span>
         </button>
       )}
@@ -295,6 +346,8 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
             const showVenueHeader = grouped && firstInGroup;
             const showVenueLine = !grouped;
             const venuePinnedCount = pinnedCounts.get(quote.venue_name) || 0;
+            const isPartyYap = quote.is_private_party;
+            const LocationIcon = isPartyYap ? Home : MapPin;
 
             return (
               <div key={quote.id} className="animate-fade-in" style={{ animationDelay: `${index * 40}ms` }}>
@@ -305,7 +358,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                       onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
                       className="text-xs flex items-center gap-1 hover:text-white/70 transition-colors"
                     >
-                      <MapPin className="h-3.5 w-3.5 text-[#d4ff00] inline" /> <span className="font-semibold text-white/70">{quote.venue_name}</span>
+                      <LocationIcon className="h-3.5 w-3.5 text-[#d4ff00] inline" /> <span className="font-semibold text-white/70">{quote.venue_name}</span>
                       {quote.venue_neighborhood && <span className="text-white/40">· {quote.venue_neighborhood}</span>}
                     </button>
                     {venuePinnedCount > 0 && firstInGroup && (
@@ -341,7 +394,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
                         className="text-xs hover:text-white/60 transition-colors"
                         onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
                       >
-                        <MapPin className="h-3.5 w-3.5 text-[#d4ff00] inline" /> <span className="font-semibold text-white">{quote.venue_name}</span>
+                        <LocationIcon className="h-3.5 w-3.5 text-[#d4ff00] inline" /> <span className="font-semibold text-white">{quote.venue_name}</span>
                         {quote.venue_neighborhood && <span className="text-white/40"> · {quote.venue_neighborhood}</span>}
                       </p>
                       {venuePinnedCount > 0 && (
