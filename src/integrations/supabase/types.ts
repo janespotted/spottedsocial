@@ -1596,6 +1596,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "venue_buzz_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_buzz_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "venue_buzz_messages_venue_id_fkey"
             columns: ["venue_id"]
             isOneToOne: false
