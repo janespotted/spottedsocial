@@ -138,7 +138,13 @@ Deno.serve(async (req) => {
       // Friend all real users with demo
       const {data:real}=await sb.from('profiles').select('id').eq('is_demo',false);
       const fr=(real||[]).flatMap((r:any)=>uids.map(d=>({user_id:r.id,friend_id:d,status:'accepted'})));
-      if(fr.length) await sb.from('friendships').insert(fr);
+      if(fr.length) {
+        for(let i=0; i<fr.length; i+=50) {
+          const batch = fr.slice(i, i+50);
+          const { error: fErr } = await sb.from('friendships').upsert(batch, { onConflict: 'user_id,friend_id' });
+          if (fErr) console.error('Friendship insert error:', fErr.message);
+        }
+      }
       
       // Venues - upsert then fetch IDs separately (upsert may not return on conflict)
       await sb.from('venues').upsert(V.map(v=>({name:v.name,lat:v.lat,lng:v.lng,neighborhood:v.hood,is_demo:true,popularity_rank:v.rank,city})),{onConflict:'name'});
