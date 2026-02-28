@@ -22,6 +22,7 @@ import { useUserCity } from '@/hooks/useUserCity';
 import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
 import { useKeyboardAware } from '@/hooks/useKeyboardAware';
 import { PrivatePartyInviteModal } from '@/components/PrivatePartyInviteModal';
+import { LocationPermissionPrompt } from '@/components/LocationPermissionPrompt';
 import { VisuallyHidden } from '@/components/ui/visually-hidden';
 import {
   DropdownMenu,
@@ -56,6 +57,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const [locationErrorType, setLocationErrorType] = useState<'permission_denied' | 'position_unavailable' | 'timeout' | 'not_supported'>('permission_denied');
   const [showVenueConfirm, setShowVenueConfirm] = useState(false);
   const [showPlanningNeighborhood, setShowPlanningNeighborhood] = useState(false);
   const [showPlanningPrivacy, setShowPlanningPrivacy] = useState(false);
@@ -218,6 +221,14 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     } catch (error: any) {
       console.error('Error capturing location:', error);
       
+      // Check for permission denied (GeolocationPositionError code 1)
+      if (error?.code === 1) {
+        setLocationErrorType('permission_denied');
+        setShowLocationPrompt(true);
+        setIsDetectingLocation(false);
+        return;
+      }
+      
       const isTimeout = error?.code === 3 || error?.message?.toLowerCase().includes('timeout');
       const isAccuracyError = error?.message?.toLowerCase().includes('accuracy too low');
       
@@ -248,6 +259,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           return;
         } catch (retryError: any) {
           console.error('Retry also failed:', retryError);
+          if (retryError?.code === 1) {
+            setLocationErrorType('permission_denied');
+            setShowLocationPrompt(true);
+            setIsDetectingLocation(false);
+            return;
+          }
           // If retry also fails on accuracy, let user pick venue manually instead of blocking
           if (retryError?.message?.toLowerCase().includes('accuracy too low')) {
             console.log('[CheckIn] Accuracy still low after retry, allowing manual venue entry');
@@ -262,17 +279,20 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         }
       }
       
-      const friendlyMessage = isTimeout
-        ? 'Getting your location took a bit longer than expected. Try moving to an open area or check that GPS is enabled.'
-        : isAccuracyError
-        ? 'GPS signal is weak. Try moving to an open area.'
-        : error?.message || 'Could not get your location. Please try again.';
-      
-      toast({
-        variant: 'destructive',
-        title: 'Location error',
-        description: friendlyMessage,
-      });
+      // Show location prompt for position unavailable or timeout
+      if (error?.code === 2) {
+        setLocationErrorType('position_unavailable');
+        setShowLocationPrompt(true);
+      } else if (isTimeout) {
+        setLocationErrorType('timeout');
+        setShowLocationPrompt(true);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Location error',
+          description: error?.message || 'Could not get your location. Please try again.',
+        });
+      }
     } finally {
       setIsDetectingLocation(false);
     }
@@ -469,11 +489,16 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if ('geolocation' in navigator) {
       captureAndDeriveVenue().catch((error) => {
         setIsDetectingLocation(false);
-        toast({
-          variant: 'destructive',
-          title: 'Turn on location to share where you are',
-          description: 'Location permission is required to share your location.',
-        });
+        if (error?.code === 1) {
+          setLocationErrorType('permission_denied');
+          setShowLocationPrompt(true);
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Turn on location to share where you are',
+            description: 'Location permission is required to share your location.',
+          });
+        }
       });
     }
   };
@@ -1482,6 +1507,17 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         address={privatePartyAddress}
         onAddressChange={setPrivatePartyAddress}
         onInvitesSent={handlePrivatePartyInvitesSent}
+      />
+
+      {/* Location Permission Prompt */}
+      <LocationPermissionPrompt
+        open={showLocationPrompt}
+        onOpenChange={setShowLocationPrompt}
+        errorType={locationErrorType}
+        onRetry={() => {
+          setShowLocationPrompt(false);
+          captureAndDeriveVenue();
+        }}
       />
     </>
   );
