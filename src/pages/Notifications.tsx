@@ -1,6 +1,8 @@
+import { useCallback } from 'react';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { PullToRefresh } from '@/components/PullToRefresh';
 import { ArrowLeft, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -13,7 +15,14 @@ export default function Notifications() {
     markAsRead(notificationId);
   };
 
+  const handleRefresh = useCallback(async () => {
+    // NotificationsContext fetches on mount; re-trigger by toggling
+    window.dispatchEvent(new Event('focus'));
+    await new Promise(r => setTimeout(r, 500));
+  }, []);
+
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
@@ -93,5 +102,6 @@ export default function Notifications() {
         )}
       </div>
     </div>
+    </PullToRefresh>
   );
 }
