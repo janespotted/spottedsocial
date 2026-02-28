@@ -23,7 +23,7 @@ import { ActivitySkeleton } from './MessagesSkeleton';
 
 interface Activity {
   id: string;
-  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment' | 'city_pulse' | 'meetup_accepted' | 'venue_invite_accepted' | 'dm_message';
+  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment' | 'city_pulse' | 'meetup_accepted' | 'venue_invite_accepted' | 'dm_message' | 'venue_yap';
   title: string;
   subtitle?: string;
   timestamp: string;
@@ -165,7 +165,7 @@ export function ActivityTab() {
       supabase.from('notifications')
         .select(`id, type, message, created_at, sender_id, is_read`)
         .eq('receiver_id', user?.id)
-        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment', 'meetup_accepted', 'venue_invite_accepted'])
+        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment', 'meetup_accepted', 'venue_invite_accepted', 'venue_yap'])
         .order('created_at', { ascending: false })
         .limit(30),
     ]);
@@ -201,6 +201,7 @@ export function ActivityTab() {
         const isPostComment = invite.type === 'post_comment';
         const isMeetupAccepted = invite.type === 'meetup_accepted';
         const isVenueInviteAccepted = invite.type === 'venue_invite_accepted';
+        const isVenueYap = invite.type === 'venue_yap';
         
         // Extract venue name from message like "X invited you to VenueName."
         const venueMatch = invite.message.match(/invited you to (.+?)\.?\s*(?:Want to go\?)?$/i);
@@ -213,6 +214,7 @@ export function ActivityTab() {
         if (isPostComment) activityType = 'post_comment';
         if (isMeetupAccepted) activityType = 'meetup_accepted';
         if (isVenueInviteAccepted) activityType = 'venue_invite_accepted';
+        if (isVenueYap) activityType = 'venue_yap';
         
         return {
           id: invite.id,
@@ -223,6 +225,7 @@ export function ActivityTab() {
             : isPostComment ? invite.message 
             : isMeetupAccepted ? 'is down to meet up! 🎉'
             : isVenueInviteAccepted ? invite.message
+            : isVenueYap ? invite.message
             : 'Meet Up',
           timestamp: invite.created_at || new Date().toISOString(),
           avatar_url: profile?.avatar_url,
@@ -486,6 +489,8 @@ export function ActivityTab() {
       case 'meetup_accepted':
       case 'venue_invite_accepted':
         return <Heart className="h-5 w-5 text-[#d4ff00]" />;
+      case 'venue_yap':
+        return <MessageCircle className="h-5 w-5 text-amber-400" />;
       case 'dm_message':
         return <MessageCircle className="h-5 w-5 text-[#a855f7]" />;
       case 'city_pulse':
@@ -787,6 +792,7 @@ export function ActivityTab() {
         const cityPulse = activities.filter(a => a.type === 'city_pulse');
         const acceptedInvites = activities.filter(a => a.type === 'meetup_accepted' || a.type === 'venue_invite_accepted');
         const dmMessages = activities.filter(a => a.type === 'dm_message');
+        const venueYaps = activities.filter(a => a.type === 'venue_yap');
 
         // Special muted style for city pulse
         const PULSE_CARD_STYLE = 'bg-[#1a0f2e]/40 border border-white/10';
@@ -990,7 +996,7 @@ export function ActivityTab() {
           </div>
         );
 
-        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0 || acceptedInvites.length > 0 || dmMessages.length > 0;
+        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0 || acceptedInvites.length > 0 || dmMessages.length > 0 || venueYaps.length > 0;
 
         return hasContent ? (
           <div className="space-y-5">
@@ -1019,6 +1025,18 @@ export function ActivityTab() {
                 </h3>
                 <div className="space-y-3">
                   {acceptedInvites.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
+
+            {/* Section: Yaps at Your Location */}
+            {venueYaps.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  💬 Yaps at Your Spot
+                </h3>
+                <div className="space-y-3">
+                  {venueYaps.map(renderActivityCard)}
                 </div>
               </div>
             )}

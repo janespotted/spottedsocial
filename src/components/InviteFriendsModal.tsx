@@ -172,22 +172,23 @@ export function InviteFriendsModal() {
     <Dialog open={showInviteModal} onOpenChange={(open) => {
       if (!open) { closeInviteModal(); setSelectedFriends(new Set()); }
     }}>
-      <DialogContent className="w-[90%] max-w-[400px] max-h-[80vh] bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
+      <DialogContent className="w-[90%] max-w-[400px] max-h-[80vh] bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden flex flex-col">
         <VisuallyHidden><DialogTitle>Invite Friends</DialogTitle></VisuallyHidden>
-        <div className="p-5">
-          <div className="mb-4">
+        <div className="flex flex-col flex-1 min-h-0">
+          {/* Header */}
+          <div className="p-5 pb-2">
             <h2 className="text-xl font-bold text-white">Invite Friends</h2>
             <p className="text-sm text-white/60">to {venueName}</p>
           </div>
 
-          <ScrollArea className="h-[400px] mb-4">
+          {/* Scrollable content */}
+          <ScrollArea className="flex-1 min-h-0 px-5">
             {loading ? (
               <div className="text-center text-white/50 py-8">Loading friends...</div>
             ) : friends.length === 0 ? (
               <div className="text-center text-white/50 py-8">No friends found</div>
             ) : (
               <div className="bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg overflow-hidden">
-                {/* Friends Out Now */}
                 {outFriends.length > 0 && (
                   <>
                     <div className="px-3 py-2">
@@ -199,8 +200,6 @@ export function InviteFriendsModal() {
                     {outFriends.map(renderFriendRow)}
                   </>
                 )}
-
-                {/* Friends Planning */}
                 {planningFriends.length > 0 && (
                   <>
                     <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
@@ -212,8 +211,6 @@ export function InviteFriendsModal() {
                     {planningFriends.map(renderFriendRow)}
                   </>
                 )}
-
-                {/* Staying In */}
                 {homeFriends.length > 0 && (
                   <>
                     <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
@@ -227,47 +224,50 @@ export function InviteFriendsModal() {
                 )}
               </div>
             )}
+
+            {/* Invite from Contacts */}
+            <div className="border-t border-white/10 pt-4 mt-4 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Share2 className="h-4 w-4 text-[#d4ff00]" />
+                <span className="font-semibold text-white text-sm">Invite from Contacts</span>
+              </div>
+              <p className="text-white/50 text-xs mb-3">
+                Invite friends who aren't on Spotted yet via text message
+              </p>
+              <Button
+                onClick={async () => {
+                  if (!user) return;
+                  haptic.light();
+                  try {
+                    const { data: profile } = await supabase.rpc('get_profile_safe', { target_user_id: user.id });
+                    const senderName = profile?.[0]?.display_name?.split(' ')[0] || 'Your friend';
+                    const code = await getOrCreateInviteCode(user.id);
+                    const link = getInviteLink(code, venueId || undefined);
+                    await triggerSmsInvite({ senderName, venueName: venueName || undefined, inviteLink: link });
+                  } catch (err) {
+                    console.error('SMS invite error:', err);
+                    toast.error('Could not open share sheet');
+                  }
+                }}
+                variant="outline"
+                className="w-full border-[#d4ff00]/40 text-[#d4ff00] hover:bg-[#d4ff00]/10"
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Send Text Invite
+              </Button>
+            </div>
           </ScrollArea>
 
-          {/* Invite from Contacts */}
-          <div className="border-t border-white/10 pt-4 mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Share2 className="h-4 w-4 text-[#d4ff00]" />
-              <span className="font-semibold text-white text-sm">Invite from Contacts</span>
-            </div>
-            <p className="text-white/50 text-xs mb-3">
-              Invite friends who aren't on Spotted yet via text message
-            </p>
+          {/* Fixed bottom button */}
+          <div className="p-5 pt-3 border-t border-white/10">
             <Button
-              onClick={async () => {
-                if (!user) return;
-                haptic.light();
-                try {
-                  const { data: profile } = await supabase.rpc('get_profile_safe', { target_user_id: user.id });
-                  const senderName = profile?.[0]?.display_name?.split(' ')[0] || 'Your friend';
-                  const code = await getOrCreateInviteCode(user.id);
-                  const link = getInviteLink(code, venueId || undefined);
-                  await triggerSmsInvite({ senderName, venueName: venueName || undefined, inviteLink: link });
-                } catch (err) {
-                  console.error('SMS invite error:', err);
-                  toast.error('Could not open share sheet');
-                }
-              }}
-              variant="outline"
-              className="w-full border-[#d4ff00]/40 text-[#d4ff00] hover:bg-[#d4ff00]/10"
+              onClick={handleSendInvites}
+              disabled={selectedFriends.size === 0}
+              className="w-full bg-[#a855f7] hover:bg-[#a855f7]/90 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Share2 className="h-4 w-4 mr-2" />
-              Send Text Invite
+              Send Invites {selectedFriends.size > 0 && `(${selectedFriends.size})`}
             </Button>
           </div>
-
-          <Button
-            onClick={handleSendInvites}
-            disabled={selectedFriends.size === 0}
-            className="w-full bg-[#a855f7] hover:bg-[#a855f7]/90 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Send Invites {selectedFriends.size > 0 && `(${selectedFriends.size})`}
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

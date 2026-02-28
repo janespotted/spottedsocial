@@ -10,6 +10,7 @@ import { useNotifications } from '@/contexts/NotificationsContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useCheckInPrompt } from '@/hooks/useCheckInPrompt';
 import { useVenueArrivalNudge } from '@/hooks/useVenueArrivalNudge';
+import { useYapNotifications } from '@/hooks/useYapNotifications';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { showBrowserNotification } from '@/lib/notifications';
@@ -31,6 +32,9 @@ export function Layout({ children }: LayoutProps) {
   
   // Venue arrival detection (runs on all pages)
   useVenueArrivalNudge();
+  
+  // Yap notifications at user's current venue
+  useYapNotifications();
   
   // Map page needs full width and flex layout
   const isMapPage = location.pathname === '/map';
