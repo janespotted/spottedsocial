@@ -1020,6 +1020,20 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         >
           {detectedVenue ? 'Confirm' : 'Enter Venue Manually'}
         </Button>
+
+        {/* Always show Private Party option */}
+        <div className="flex items-center gap-3 py-2">
+          <div className="flex-1 h-px bg-white/20" />
+          <span className="text-white/40 text-sm">or</span>
+          <div className="flex-1 h-px bg-white/20" />
+        </div>
+        <Button
+          onClick={handlePrivatePartyFromVenueConfirm}
+          className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#6366f1] to-[#4f46e5] text-white border border-[#6366f1]/40 hover:from-[#818cf8] hover:to-[#6366f1] hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-200"
+        >
+          <Home className="w-5 h-5 mr-2" />
+          I'm at a Private Party
+        </Button>
       </div>
     );
   };
