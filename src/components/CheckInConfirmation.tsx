@@ -135,9 +135,17 @@ export function CheckInConfirmation() {
     }
   };
 
-  const handleShareClick = () => {
+  const handleShareClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Navigate first, then close — ensures navigation state is processed
+    navigate('/messages', { 
+      state: { 
+        activeTab: 'yap', 
+        venueName: checkInVenueName,
+        isPrivateParty: checkInIsPrivateParty 
+      } 
+    });
     closeCheckInConfirmation();
-    navigate('/messages', { state: { activeTab: 'yap', venueName: checkInVenueName } });
   };
 
   const getPrivacyLabel = (level: string): string => {
