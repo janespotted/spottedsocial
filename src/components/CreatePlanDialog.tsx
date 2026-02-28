@@ -168,10 +168,9 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
 
     try {
       // Expire at 5am the day AFTER the plan date (matches nightlife rollover)
-      const planDateObj = new Date(planDate);
-      planDateObj.setDate(planDateObj.getDate() + 1);
-      planDateObj.setHours(5, 0, 0, 0);
-      const expiresAt = planDateObj;
+      // Use local date constructor to avoid UTC midnight parsing bug
+      const [year, month, day] = planDate.split('-').map(Number);
+      const expiresAt = new Date(year, month - 1, day + 1, 5, 0, 0, 0);
 
       const { data: plan, error } = await supabase.from('plans').insert({
         user_id: userId,

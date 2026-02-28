@@ -30,6 +30,7 @@ export default function Messages() {
   const [activeTab, setActiveTab] = useState<TabType>('messages');
   const [preselectedUser, setPreselectedUser] = useState<PreselectedUser | null>(null);
   const [yapVenueName, setYapVenueName] = useState<string | undefined>(undefined);
+  const [yapIsPrivateParty, setYapIsPrivateParty] = useState(false);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function Messages() {
     // Check if we have a venue name for Yap
     if (location.state?.venueName) {
       setYapVenueName(location.state.venueName);
+      setYapIsPrivateParty(!!location.state.isPrivateParty);
       setActiveTab('yap');
     }
   }, [location.state]);
@@ -141,7 +143,7 @@ export default function Messages() {
             onClearPreselection={() => setPreselectedUser(null)}
           />
         )}
-        {activeTab === 'yap' && <YapTab venueName={yapVenueName} />}
+        {activeTab === 'yap' && <YapTab venueName={yapVenueName} isPrivatePartyNav={yapIsPrivateParty} />}
         {activeTab === 'activity' && <ActivityTab />}
       </div>
 

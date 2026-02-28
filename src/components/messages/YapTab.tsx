@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface YapTabProps {
   venueName?: string;
+  isPrivatePartyNav?: boolean;
 }
 
 interface YapQuote {
@@ -32,7 +33,7 @@ const relativeTime = (dateStr: string) => {
   return `${hours}h`;
 };
 
-export function YapTab({ venueName: venueNameProp }: YapTabProps) {
+export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabProps) {
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
   const { city } = useUserCity();
@@ -46,12 +47,17 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   const [pinnedCounts, setPinnedCounts] = useState<Map<string, number>>(new Map());
 
+  // When navigating from private party check-in, use the user's actual venue name
+  // from night_statuses (which has the correct format) instead of the prop
   useEffect(() => {
-    if (venueNameProp) {
+    if (isPrivatePartyNav && userVenueName) {
+      setThreadVenueName(userVenueName);
+      setView('thread');
+    } else if (venueNameProp && !isPrivatePartyNav) {
       setThreadVenueName(venueNameProp);
       setView('thread');
     }
-  }, [venueNameProp]);
+  }, [venueNameProp, isPrivatePartyNav, userVenueName]);
 
   // Fetch user's current venue independently from quotes
   useEffect(() => {
