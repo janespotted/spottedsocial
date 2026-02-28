@@ -145,8 +145,8 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
       const profiles = allProfiles.filter((p: any) => otherUserIds.includes(p.id));
       const statuses = statusesResult.data || [];
 
-      // In bootstrap mode (not demo mode), filter out demo users
-      const filteredProfiles = (bootstrapEnabled && !demoEnabled) 
+      // Filter out demo users when demo mode is off
+      const filteredProfiles = !demoEnabled 
         ? profiles.filter((p: any) => !p.is_demo)
         : profiles;
 

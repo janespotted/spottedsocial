@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,7 @@ const REQUIRED_INVITES = 1;
 export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboardingProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const demoEnabled = useDemoMode();
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -176,6 +178,7 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
       if (data) {
         const filtered = data.filter((profile: any) => 
           profile.id !== user?.id &&
+          (!demoEnabled ? !profile.is_demo : true) &&
           (profile.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
            profile.display_name?.toLowerCase().includes(searchQuery.toLowerCase()))
         ).slice(0, 5);
