@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.send-weekend-rally]
 verify_jwt = true
+
+[functions.fix-venue-coordinates]
+verify_jwt = false

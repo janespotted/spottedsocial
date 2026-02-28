@@ -1051,101 +1051,184 @@ export default function Map() {
     ...nonPromotedVenues.slice(0, Math.max(0, visibleCount - mapPromotedVenues.length))
   ];
 
-  // Render venue markers with smart diffing (like friend avatars)
+  // Render venue markers using Mapbox GL clustering for non-promoted venues
+  // and DOM markers for promoted venues (special styling/z-index)
   useEffect(() => {
     if (!map.current) return;
+    const m = map.current;
 
-    // If friends-only mode, clear venue markers and don't render
+    // If friends-only mode, remove everything
     if (layerVisibility === 'friends') {
       venueMarkersRef.current.forEach(marker => marker.remove());
       venueMarkersRef.current.clear();
+      // Remove cluster layers/source if they exist
+      if (m.getLayer('venue-cluster-count')) m.removeLayer('venue-cluster-count');
+      if (m.getLayer('venue-clusters')) m.removeLayer('venue-clusters');
+      if (m.getLayer('venue-unclustered')) m.removeLayer('venue-unclustered');
+      if (m.getSource('venues-source')) m.removeSource('venues-source');
       return;
     }
 
-    // Debug log promoted venues
+    // Separate promoted vs non-promoted
     const promotedVenues = filteredVenues.filter(v => v.is_map_promoted);
+    const nonPromotedVenues = filteredVenues.filter(v => !v.is_map_promoted);
+
+    // Debug log promoted venues
     if (promotedVenues.length > 0) {
       console.log(`[map:promoted] Rendering ${promotedVenues.length} promoted venue(s):`, promotedVenues.map(v => v.name));
     }
 
-    // Get current venue IDs from the filtered venues array
-    const currentVenueIds = new Set(filteredVenues.map(v => v.id));
+    // === GeoJSON clustering for non-promoted venues ===
+    const geojson: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: nonPromotedVenues.map((venue, index) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [venue.lng, venue.lat] },
+        properties: {
+          id: venue.id,
+          name: venue.name,
+          heatScore: venue.heatScore,
+          isTopHot: index < 3 && venue.heatScore > 0,
+        },
+      })),
+    };
 
-    // Remove markers for venues no longer in the filtered list
+    if (m.getSource('venues-source')) {
+      // Update existing source data
+      (m.getSource('venues-source') as mapboxgl.GeoJSONSource).setData(geojson);
+    } else {
+      // Add source with clustering
+      m.addSource('venues-source', {
+        type: 'geojson',
+        data: geojson,
+        cluster: true,
+        clusterMaxZoom: 14,
+        clusterRadius: 50,
+      });
+
+      // Cluster circles
+      m.addLayer({
+        id: 'venue-clusters',
+        type: 'circle',
+        source: 'venues-source',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': '#a855f7',
+          'circle-radius': ['step', ['get', 'point_count'], 18, 10, 24, 50, 30],
+          'circle-opacity': 0.85,
+          'circle-stroke-width': 2,
+          'circle-stroke-color': 'rgba(255,255,255,0.8)',
+        },
+      });
+
+      // Cluster count labels
+      m.addLayer({
+        id: 'venue-cluster-count',
+        type: 'symbol',
+        source: 'venues-source',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': '{point_count_abbreviated}',
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+          'text-size': 13,
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#ffffff',
+        },
+      });
+
+      // Individual unclustered pins
+      m.addLayer({
+        id: 'venue-unclustered',
+        type: 'circle',
+        source: 'venues-source',
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color': '#a855f7',
+          'circle-radius': 8,
+          'circle-opacity': ['case', ['>', ['get', 'heatScore'], 0], 1, 0.5],
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': 'rgba(255,255,255,0.8)',
+        },
+      });
+
+      // Click handler for clusters - zoom in
+      m.on('click', 'venue-clusters', (e) => {
+        const features = m.queryRenderedFeatures(e.point, { layers: ['venue-clusters'] });
+        if (!features.length) return;
+        const clusterId = features[0].properties?.cluster_id;
+        const source = m.getSource('venues-source') as mapboxgl.GeoJSONSource;
+        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+          if (err) return;
+          const coords = (features[0].geometry as GeoJSON.Point).coordinates;
+          m.easeTo({ center: [coords[0], coords[1]] as [number, number], zoom: (zoom ?? 14) + 1 });
+        });
+      });
+
+      // Click handler for individual pins
+      m.on('click', 'venue-unclustered', (e) => {
+        const features = m.queryRenderedFeatures(e.point, { layers: ['venue-unclustered'] });
+        if (!features.length) return;
+        const venueId = features[0].properties?.id;
+        if (venueId) openVenueCard(venueId);
+      });
+
+      // Cursor styling
+      m.on('mouseenter', 'venue-clusters', () => { m.getCanvas().style.cursor = 'pointer'; });
+      m.on('mouseleave', 'venue-clusters', () => { m.getCanvas().style.cursor = ''; });
+      m.on('mouseenter', 'venue-unclustered', () => { m.getCanvas().style.cursor = 'pointer'; });
+      m.on('mouseleave', 'venue-unclustered', () => { m.getCanvas().style.cursor = ''; });
+    }
+
+    // === DOM markers for promoted venues only ===
+    const currentPromotedIds = new Set(promotedVenues.map(v => v.id));
+
+    // Remove stale promoted markers
     venueMarkersRef.current.forEach((marker, venueId) => {
-      if (!currentVenueIds.has(venueId)) {
+      if (!currentPromotedIds.has(venueId)) {
         marker.remove();
         venueMarkersRef.current.delete(venueId);
       }
     });
 
-    // Add or update markers for current filtered venues
-    filteredVenues.forEach((venue, index) => {
-      const existingMarker = venueMarkersRef.current.get(venue.id);
-      
-      // Check if marker needs visual update (promotion status changed)
-      const markerNeedsRestyle = existingMarker && 
-        existingMarker.getElement().dataset.promoted !== String(venue.is_map_promoted || false);
-
-      if (existingMarker && !markerNeedsRestyle) {
-        // Update existing marker position only (no recreation)
-        existingMarker.setLngLat([venue.lng, venue.lat]);
-      } else {
-        // Remove old marker if it needs restyling
-        if (existingMarker) {
-          existingMarker.remove();
-          venueMarkersRef.current.delete(venue.id);
-        }
-        
-        // Create new marker only if doesn't exist
-        const isTopHot = index < 3 && venue.heatScore > 0;
-        const isMapPromoted = venue.is_map_promoted || false;
-        // Balanced pin sizes - visible but smaller than friends
-        const containerSize = isMapPromoted ? 50 : 40;
-        const pinSize = isMapPromoted ? 38 : 30;
-        const opacity = venue.heatScore > 0 ? 1 : 0.5;
-
-        const el = document.createElement('div');
-        el.className = 'venue-marker';
-         el.style.width = `${isMapPromoted ? 58 : containerSize}px`;
-         el.style.height = `${isMapPromoted ? 58 : containerSize}px`;
-        el.style.cursor = 'pointer';
-        el.style.zIndex = isMapPromoted ? '30' : '12';
-        el.dataset.promoted = String(isMapPromoted);
-        
-        el.innerHTML = `
-          <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-             ${isMapPromoted ? `<div class="promoted-halo" style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(212, 255, 0, 0.12) 0%, transparent 65%);"></div>` : ''}
-             ${isTopHot && !isMapPromoted ? `<div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, transparent 70%);"></div>` : ''}
-             <div style="width: ${pinSize}px; height: ${pinSize}px; background: #a855f7; border-radius: 50%; opacity: ${opacity}; box-shadow: 0 0 ${isMapPromoted ? '8px' : (isTopHot ? '6px' : '3px')} ${isMapPromoted ? 'rgba(212, 255, 0, 0.15)' : `rgba(168, 85, 247, ${isTopHot ? '0.5' : '0.3'})`}; display: flex; align-items: center; justify-content: center; border: 1.5px solid rgba(255, 255, 255, 0.8);">
-              <svg width="${pinSize * 0.5}" height="${pinSize * 0.5}" viewBox="0 0 24 24" fill="white">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-              </svg>
-            </div>
-          </div>
-        `;
-
-        el.addEventListener('click', () => {
-          openVenueCard(venue.id);
-        });
-
-        const marker = new mapboxgl.Marker({ 
-          element: el, 
-          anchor: 'center' 
-        })
-          .setLngLat([venue.lng, venue.lat])
-          .addTo(map.current!);
-
-        // Force wrapper z-index for promoted venues to ensure they render above friend markers
-        if (isMapPromoted) {
-          const wrapper = marker.getElement()?.parentElement;
-          if (wrapper) {
-            wrapper.style.zIndex = '30';
-          }
-        }
-
-        venueMarkersRef.current.set(venue.id, marker);
+    // Add/update promoted venue markers
+    promotedVenues.forEach((venue) => {
+      const existing = venueMarkersRef.current.get(venue.id);
+      if (existing) {
+        existing.setLngLat([venue.lng, venue.lat]);
+        return;
       }
+
+      const el = document.createElement('div');
+      el.className = 'venue-marker';
+      el.style.width = '58px';
+      el.style.height = '58px';
+      el.style.cursor = 'pointer';
+      el.style.zIndex = '30';
+      el.dataset.promoted = 'true';
+
+      el.innerHTML = `
+        <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+          <div class="promoted-halo" style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(212, 255, 0, 0.12) 0%, transparent 65%);"></div>
+          <div style="width: 38px; height: 38px; background: #a855f7; border-radius: 50%; box-shadow: 0 0 8px rgba(212, 255, 0, 0.15); display: flex; align-items: center; justify-content: center; border: 1.5px solid rgba(255, 255, 255, 0.8);">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="white">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+          </div>
+        </div>
+      `;
+
+      el.addEventListener('click', () => openVenueCard(venue.id));
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([venue.lng, venue.lat])
+        .addTo(m);
+
+      const wrapper = marker.getElement()?.parentElement;
+      if (wrapper) wrapper.style.zIndex = '30';
+
+      venueMarkersRef.current.set(venue.id, marker);
     });
   }, [filteredVenues, friends, layerVisibility]);
 
