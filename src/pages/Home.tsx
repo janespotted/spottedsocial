@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useVisibilityRefresh } from '@/hooks/useVisibilityRefresh';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
@@ -268,7 +269,7 @@ export default function Home() {
     })));
   };
 
-  // Initial data fetch - check-in prompt is now handled by useCheckInPrompt in Layout
+  // Initial data fetch
   useEffect(() => {
     if (user) {
       if (!hasFetchedOnce) setIsLoading(true);
@@ -282,6 +283,15 @@ export default function Home() {
       });
     }
   }, [user, demoEnabled, city]);
+
+  // Auto-refresh when returning to the app / switching tabs
+  useVisibilityRefresh(() => {
+    if (user) {
+      fetchFriendsRef.current();
+      fetchPostsRef.current();
+      fetchPlanningFriends();
+    }
+  });
 
   // Auto-switch to Plans tab when weekend rally is active
   useEffect(() => {

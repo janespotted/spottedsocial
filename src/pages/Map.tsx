@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useVisibilityRefresh } from '@/hooks/useVisibilityRefresh';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard, FriendCardData } from '@/contexts/FriendIdCardContext';
@@ -156,6 +157,11 @@ export default function Map() {
       fetchFriendsLocations();
     }
   }, [user, demoEnabled, city]);
+
+  // Auto-refresh on tab/app return
+  useVisibilityRefresh(() => {
+    if (user) fetchFriendsLocationsRef.current?.();
+  });
 
   // Debounced fetch to prevent thundering herd on realtime events
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
