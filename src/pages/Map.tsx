@@ -1122,17 +1122,18 @@ export default function Map() {
       // Create custom pin images for unclustered venues
       if (!m.hasImage('venue-pin')) {
         const size = 36;
+        const yOffset = 8;
         const canvas = document.createElement('canvas');
         canvas.width = size;
-        canvas.height = size + 8;
+        canvas.height = size + 16;
         const ctx = canvas.getContext('2d')!;
         
         // Teardrop/pin shape
         ctx.beginPath();
-        ctx.moveTo(size / 2, size + 4);
-        ctx.bezierCurveTo(size / 2 - 2, size - 4, 0, size / 2, 0, size / 2 - 4);
-        ctx.arc(size / 2, size / 2 - 4, size / 2, Math.PI, 0, false);
-        ctx.bezierCurveTo(size, size / 2, size / 2 + 2, size - 4, size / 2, size + 4);
+        ctx.moveTo(size / 2, size + 4 + yOffset);
+        ctx.bezierCurveTo(size / 2 - 2, size - 4 + yOffset, 0, size / 2 + yOffset, 0, size / 2 - 4 + yOffset);
+        ctx.arc(size / 2, size / 2 - 4 + yOffset, size / 2, Math.PI, 0, false);
+        ctx.bezierCurveTo(size, size / 2 + yOffset, size / 2 + 2, size - 4 + yOffset, size / 2, size + 4 + yOffset);
         ctx.closePath();
         ctx.fillStyle = '#a855f7';
         ctx.fill();
@@ -1142,7 +1143,7 @@ export default function Map() {
         
         // White dot in center
         ctx.beginPath();
-        ctx.arc(size / 2, size / 2 - 4, 5, 0, Math.PI * 2);
+        ctx.arc(size / 2, size / 2 - 4 + yOffset, 5, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         
