@@ -2468,6 +2468,18 @@ export type Database = {
           username: string
         }[]
       }
+      get_venue_checkins: {
+        Args: { p_venue_id: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          ended_at: string
+          id: string
+          started_at: string
+          user_id: string
+          venue_name: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
