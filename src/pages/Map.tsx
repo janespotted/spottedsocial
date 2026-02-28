@@ -1056,6 +1056,7 @@ export default function Map() {
   useEffect(() => {
     if (!map.current) return;
     const m = map.current;
+    if (!m.isStyleLoaded()) return;
 
     // If friends-only mode, remove everything
     if (layerVisibility === 'friends') {
