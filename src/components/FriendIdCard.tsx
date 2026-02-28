@@ -152,15 +152,33 @@ export function FriendIdCard() {
 
       const canSeeLocation = canSeeData || false;
 
-      // First check if user is in planning mode
-      const { data: nightStatus } = await supabase
-        .from('night_statuses')
-        .select('status, planning_neighborhood')
-        .eq('user_id', selectedFriend.userId)
-        .not('expires_at', 'is', null)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle();
+      // Fetch night status and active check-in in parallel
+      const [nightStatusRes, activeCheckInRes] = await Promise.all([
+        supabase
+          .from('night_statuses')
+          .select('status, planning_neighborhood, venue_name, is_private_party, party_neighborhood, updated_at, lat, lng')
+          .eq('user_id', selectedFriend.userId)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', new Date().toISOString())
+          .maybeSingle(),
+        supabase
+          .from('checkins')
+          .select('venue_name, lat, lng, last_updated_at, started_at')
+          .eq('user_id', selectedFriend.userId)
+          .is('ended_at', null)
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
+      const nightStatus = nightStatusRes.data;
+      const activeCheckIn = activeCheckInRes.data;
+
+      // Compare timestamps to determine which is more recent
+      const checkinTime = activeCheckIn?.started_at ? new Date(activeCheckIn.started_at).getTime() : 0;
+      const nightTime = nightStatus?.updated_at ? new Date(nightStatus.updated_at).getTime() : 0;
+
+      // Planning status always takes priority
       if (nightStatus?.status === 'planning') {
         setUserStatus({
           isOut: false,
@@ -178,18 +196,43 @@ export function FriendIdCard() {
         return;
       }
 
-      // Fetch the most recent active check-in (ended_at is null)
-      const { data: activeCheckIn } = await supabase
-        .from('checkins')
-        .select('venue_name, lat, lng, last_updated_at')
-        .eq('user_id', selectedFriend.userId)
-        .is('ended_at', null)
-        .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Night status 'out' is more recent than checkin — use it
+      if (nightStatus?.status === 'out' && nightTime >= checkinTime && canSeeLocation) {
+        if (nightStatus.is_private_party) {
+          const neighborhood = nightStatus.party_neighborhood;
+          setUserStatus({
+            isOut: true,
+            currentVenue: 'Private Party',
+            lastUpdatedAt: nightStatus.updated_at,
+            lastEndedAt: null,
+            lat: nightStatus.lat,
+            lng: nightStatus.lng,
+            canSeeLocation: true
+          });
+          setStatusSubtitle(neighborhood ? `@ Private Party · ${neighborhood}` : '@ Private Party');
+        } else {
+          const venueName = nightStatus.venue_name || 'Out';
+          const minutesAgo = Math.floor((Date.now() - nightTime) / 60000);
+          const timeAgo = minutesAgo < 1 ? 'just now' : 
+                         minutesAgo < 60 ? `${minutesAgo} min ago` : 
+                         `${Math.floor(minutesAgo / 60)} hr ago`;
+          setUserStatus({
+            isOut: true,
+            currentVenue: venueName,
+            lastUpdatedAt: nightStatus.updated_at,
+            lastEndedAt: null,
+            lat: nightStatus.lat,
+            lng: nightStatus.lng,
+            canSeeLocation: true
+          });
+          setStatusSubtitle(`@ ${venueName} • ${timeAgo}`);
+          if (venueName !== 'Out') fetchFriendsAtVenue(venueName);
+        }
+        return;
+      }
 
+      // Active check-in is more recent
       if (activeCheckIn && canSeeLocation) {
-        // User is currently out at a venue
         const lastUpdated = new Date(activeCheckIn.last_updated_at);
         const minutesAgo = Math.floor((Date.now() - lastUpdated.getTime()) / 60000);
         
@@ -208,8 +251,6 @@ export function FriendIdCard() {
                        `${Math.floor(minutesAgo / 60)} hr ago`;
         
         setStatusSubtitle(`@ ${activeCheckIn.venue_name} • ${timeAgo}`);
-        
-        // Fetch friends at this venue
         fetchFriendsAtVenue(activeCheckIn.venue_name);
       } else if (!canSeeLocation) {
         // Location sharing is OFF or viewer doesn't have permission

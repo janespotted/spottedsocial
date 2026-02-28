@@ -367,17 +367,35 @@ export function ActivityTab() {
           ? checkIns.filter(checkIn => !checkIn.is_demo)
           : checkIns;
         
-        const checkInActivities: Activity[] = filteredCheckIns.map(checkIn => ({
-          id: checkIn.id,
-          type: 'check_in' as const,
-          title: `${checkIn.profiles?.display_name} arrived at the`,
-          subtitle: checkIn.venue_name,
-          timestamp: checkIn.created_at || new Date().toISOString(),
-          avatar_url: checkIn.profiles?.avatar_url,
-          user_id: checkIn.user_id,
-          display_name: checkIn.profiles?.display_name,
-          action: 'meet_up' as const,
-        }));
+        // Deduplicate: keep only the most recent check-in per user
+        const seenUsers = new Map<string, typeof filteredCheckIns[0]>();
+        for (const checkIn of filteredCheckIns) {
+          const existing = seenUsers.get(checkIn.user_id);
+          if (!existing || new Date(checkIn.created_at || 0).getTime() > new Date(existing.created_at || 0).getTime()) {
+            seenUsers.set(checkIn.user_id, checkIn);
+          }
+        }
+        const uniqueCheckIns = Array.from(seenUsers.values());
+
+        // Use cached profiles as fallback for missing profile data
+        const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+        const profileMap = new Map(allProfiles.map((p: any) => [p.id, p]));
+        
+        const checkInActivities: Activity[] = uniqueCheckIns.map(checkIn => {
+          const profileName = checkIn.profiles?.display_name || profileMap.get(checkIn.user_id)?.display_name || 'Friend';
+          const profileAvatar = checkIn.profiles?.avatar_url || profileMap.get(checkIn.user_id)?.avatar_url || null;
+          return {
+            id: checkIn.id,
+            type: 'check_in' as const,
+            title: `${profileName} arrived at the`,
+            subtitle: checkIn.venue_name,
+            timestamp: checkIn.created_at || new Date().toISOString(),
+            avatar_url: profileAvatar,
+            user_id: checkIn.user_id,
+            display_name: profileName,
+            action: 'meet_up' as const,
+          };
+        });
         
         // Merge check-ins with existing activities
         setActivities(prev => {
