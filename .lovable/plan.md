@@ -1,30 +1,26 @@
 
 
-## Fix: Friends count includes demo users + Add "My Friends" list tab
+## Fix: Friend request acceptance fails silently due to RLS
 
-### Problems
-1. **Profile page friends count** (`Profile.tsx` line 255): Counts ALL accepted friendships without filtering out demo users when demo mode is off — shows 24 instead of the real count.
-2. **No "My Friends" list**: The Friends page only has Requests/Find/Invite tabs. There's no way to see your actual friends in a list. Need to add a "My Friends" tab.
-3. **Stale data after accepting request**: After accepting a friend request on the Friends page, the profile page's friends count and the new friends list won't reflect the change until a full refetch.
+### Root Cause
+The `friendships` UPDATE RLS policy only allows `auth.uid() = user_id` to update rows. But when you **receive** a friend request, your ID is in the `friend_id` column, not `user_id`. So the update to `status = 'accepted'` is silently blocked by RLS — the toast says "accepted" but nothing changes in the database, and the request reappears on refresh.
 
 ### Changes
 
-**`src/pages/Profile.tsx`** — Filter demo friendships from count
-- Import `useDemoMode`
-- After fetching sent/received friendships (line 255), cross-reference with profiles to exclude demo users when demo mode is off
-- Simplest approach: fetch friend IDs, then check profiles for `is_demo` flag, subtract demo friends from count
+**Database migration** — Fix the UPDATE RLS policy to also allow the `friend_id` to update the friendship (specifically to accept/decline):
+```sql
+DROP POLICY "Users can update own friendships" ON public.friendships;
+CREATE POLICY "Users can update own friendships" ON public.friendships
+FOR UPDATE USING (
+  (auth.uid() = user_id) OR (auth.uid() = friend_id)
+);
+```
 
-**`src/pages/Friends.tsx`** — Add "My Friends" tab
-- Add a 4th tab "My Friends" between Requests and Find
-- Fetch all accepted friendships + their profiles (reuse `useFriendIds` + `useProfilesSafe` pattern)
-- Filter out demo profiles when demo mode is off
-- Display as a scrollable list with avatars, names, status indicators (out/planning/home)
-- Tapping a friend opens their FriendIdCard
-- Show status like FriendSearchModal does (out at venue, planning, home)
-
-**Tab layout update**: Change tabs from `Requests | Find | Invite` to `Requests | Friends | Find | Invite`
+**`src/pages/Friends.tsx`** — After accepting a request, invalidate the `friend-ids` and `profiles-safe` query caches so the My Friends tab, map, and profile count update immediately:
+- Import `useQueryClient` from `@tanstack/react-query`
+- After successful accept, call `queryClient.invalidateQueries({ queryKey: ['friend-ids'] })`
 
 ### Files changed
-- `src/pages/Profile.tsx` — filter demo users from friends count
-- `src/pages/Friends.tsx` — add "My Friends" tab with full friends list, filter demo from count
+- `supabase/migrations/` — new migration (fix friendships UPDATE RLS)
+- `src/pages/Friends.tsx` — invalidate caches after accept
 
