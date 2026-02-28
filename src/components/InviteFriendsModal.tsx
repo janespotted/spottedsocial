@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useVenueInvite } from '@/contexts/VenueInviteContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
-import { useProfilesSafe } from '@/hooks/useProfilesCache';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -11,8 +10,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, MapPin, Target, Share2 } from 'lucide-react';
+import { Home, Share2 } from 'lucide-react';
 import { getOrCreateInviteCode, getInviteLink, triggerSmsInvite } from '@/lib/sms-invite';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -21,7 +19,7 @@ interface Friend {
   id: string;
   display_name: string;
   avatar_url: string | null;
-  status: 'planning' | 'out' | 'heading_out' | 'home' | 'off' | null;
+  status: 'out' | 'planning' | 'home';
   venue_name: string | null;
   planning_neighborhood: string | null;
 }
@@ -30,13 +28,10 @@ export function InviteFriendsModal() {
   const { showInviteModal, closeInviteModal, sendInvites, venueName, venueId } = useVenueInvite();
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
-  const { data: allProfilesData } = useProfilesSafe();
   const { data: cachedFriendIds } = useFriendIds(user?.id);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [planningOpen, setPlanningOpen] = useState(true);
-  const [outOpen, setOutOpen] = useState(true);
 
   useEffect(() => {
     if (showInviteModal && user) {
@@ -48,54 +43,68 @@ export function InviteFriendsModal() {
 
   const fetchFriends = async () => {
     if (!user) return;
-
     setLoading(true);
     try {
       const friendIds = cachedFriendIds || [];
+      if (friendIds.length === 0) { setFriends([]); return; }
 
-      if (friendIds.length === 0) {
-        setFriends([]);
-        return;
-      }
+      const now = new Date().toISOString();
 
-      // Fetch night statuses
-      const { data: nightStatuses } = await supabase
-        .from('night_statuses')
-        .select('user_id, status, venue_name, planning_neighborhood')
-        .in('user_id', friendIds);
+      let profileQuery = supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url, is_demo')
+        .in('id', friendIds);
+      if (!demoEnabled) profileQuery = profileQuery.eq('is_demo', false);
 
-      const statusMap = new Map(
-        (nightStatuses || []).map(ns => [ns.user_id, ns])
-      );
+      const [profilesRes, checkinsRes, nightRes] = await Promise.all([
+        profileQuery,
+        supabase.from('checkins').select('user_id, venue_name').in('user_id', friendIds).is('ended_at', null),
+        supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
+      ]);
 
-      // Use cached profiles
-      let profiles = (allProfilesData || [])
-        .filter((p: any) => friendIds.includes(p.id))
-        .sort((a: any, b: any) => a.display_name.localeCompare(b.display_name));
+      if (!profilesRes.data) { setFriends([]); return; }
 
-      if (!demoEnabled) {
-        profiles = profiles.filter((p: any) => p.is_demo === false);
-      }
+      const checkinMap = new Map<string, string>();
+      checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, c.venue_name); });
+
+      const nightMap = new Map<string, { status: string; planning_neighborhood: string | null; venue_name: string | null }>();
+      nightRes.data?.forEach(n => { if (!nightMap.has(n.user_id)) nightMap.set(n.user_id, n); });
 
       const seenNames = new Set<string>();
-      const uniqueFriends: Friend[] = [];
+      const friendsData: Friend[] = [];
 
-      for (const profile of profiles) {
+      for (const profile of profilesRes.data) {
         if (seenNames.has(profile.display_name)) continue;
         seenNames.add(profile.display_name);
 
-        const nightStatus = statusMap.get(profile.id);
-        uniqueFriends.push({
-          id: profile.id,
-          display_name: profile.display_name,
-          avatar_url: profile.avatar_url,
-          status: nightStatus?.status || null,
-          venue_name: nightStatus?.venue_name || null,
-          planning_neighborhood: nightStatus?.planning_neighborhood || null,
-        });
+        let status: 'out' | 'planning' | 'home' = 'home';
+        let venue_name: string | null = null;
+        let planning_neighborhood: string | null = null;
+
+        const activeCheckin = checkinMap.get(profile.id);
+        const nightStatus = nightMap.get(profile.id);
+
+        if (activeCheckin) {
+          status = 'out';
+          venue_name = activeCheckin;
+        } else if (nightStatus?.status === 'out') {
+          status = 'out';
+          venue_name = nightStatus.venue_name || null;
+        } else if (nightStatus?.status === 'planning') {
+          status = 'planning';
+          planning_neighborhood = nightStatus.planning_neighborhood;
+        }
+
+        friendsData.push({ id: profile.id, display_name: profile.display_name, avatar_url: profile.avatar_url, status, venue_name, planning_neighborhood });
       }
 
-      setFriends(uniqueFriends);
+      const STATUS_ORDER: Record<string, number> = { out: 0, planning: 1, home: 2 };
+      friendsData.sort((a, b) => {
+        const diff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+        return diff !== 0 ? diff : a.display_name.localeCompare(b.display_name);
+      });
+
+      setFriends(friendsData);
     } catch (error) {
       console.error('Error fetching friends:', error);
     } finally {
@@ -105,66 +114,45 @@ export function InviteFriendsModal() {
 
   const handleToggleFriend = (friendId: string) => {
     const newSelected = new Set(selectedFriends);
-    if (newSelected.has(friendId)) {
-      newSelected.delete(friendId);
-    } else {
-      newSelected.add(friendId);
-    }
+    if (newSelected.has(friendId)) newSelected.delete(friendId);
+    else newSelected.add(friendId);
     setSelectedFriends(newSelected);
   };
 
   const handleSendInvites = async () => {
     const selected = friends.filter(f => selectedFriends.has(f.id));
-    await sendInvites(selected.map(f => ({
-      id: f.id,
-      displayName: f.display_name,
-      avatarUrl: f.avatar_url
-    })));
+    await sendInvites(selected.map(f => ({ id: f.id, displayName: f.display_name, avatarUrl: f.avatar_url })));
   };
 
-  // Split friends into planning and out groups
+  const outFriends = friends.filter(f => f.status === 'out');
   const planningFriends = friends.filter(f => f.status === 'planning');
-  const outFriends = friends.filter(f => f.status === 'out' || f.status === 'heading_out');
-  const otherFriends = friends.filter(f => f.status !== 'planning' && f.status !== 'out' && f.status !== 'heading_out');
+  const homeFriends = friends.filter(f => f.status === 'home');
 
   const renderFriendRow = (friend: Friend) => (
     <button
       key={friend.id}
       onClick={() => handleToggleFriend(friend.id)}
-      className="w-full flex items-center gap-3 p-3 bg-[#2d1b4e]/30 rounded-xl hover:bg-[#2d1b4e]/50 transition-colors"
+      className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
     >
-      <Checkbox 
+      <Checkbox
         checked={selectedFriends.has(friend.id)}
         onCheckedChange={() => handleToggleFriend(friend.id)}
         className="border-[#a855f7]"
       />
-      <Avatar className="w-10 h-10">
+      <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
         <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
-        <AvatarFallback className="bg-[#a855f7] text-white">
+        <AvatarFallback className="bg-[#a855f7] text-white text-sm">
           {friend.display_name[0]}
         </AvatarFallback>
       </Avatar>
-      <div className="flex-1 text-left">
-        <span className="text-white font-medium block">
-          {friend.display_name}
-        </span>
-        {friend.status === 'planning' && (
-          <span className="text-[#d4ff00] text-sm flex items-center gap-1">
-            <Target className="h-3 w-3" />
-            Planning{friend.planning_neighborhood ? ` (${friend.planning_neighborhood})` : ' tonight'}
-          </span>
-        )}
-        {(friend.status === 'out' || friend.status === 'heading_out') && friend.venue_name && (
-          <span className="text-[#d4ff00] text-sm flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            At {friend.venue_name}
-          </span>
-        )}
-        {friend.status !== 'planning' && friend.status !== 'out' && friend.status !== 'heading_out' && friend.venue_name && (
-          <span className="text-white/50 text-sm flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            At {friend.venue_name}
-          </span>
+      <div className="flex-1 min-w-0 text-left">
+        <p className="text-white font-semibold text-sm truncate">{friend.display_name}</p>
+        {friend.status === 'out' ? (
+          <p className="text-[#d4ff00] text-xs truncate">📍 At {friend.venue_name || 'Nearby'}</p>
+        ) : friend.status === 'planning' ? (
+          <p className="text-[#a855f7] text-xs truncate">🎯 Planning{friend.planning_neighborhood ? ` (${friend.planning_neighborhood})` : ' tonight'}</p>
+        ) : (
+          <p className="text-white/40 text-xs">Home</p>
         )}
       </div>
     </button>
@@ -172,85 +160,59 @@ export function InviteFriendsModal() {
 
   return (
     <Dialog open={showInviteModal} onOpenChange={(open) => {
-      if (!open) {
-        closeInviteModal();
-        setSelectedFriends(new Set());
-      }
+      if (!open) { closeInviteModal(); setSelectedFriends(new Set()); }
     }}>
       <DialogContent className="w-[90%] max-w-[400px] max-h-[80vh] bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
         <VisuallyHidden><DialogTitle>Invite Friends</DialogTitle></VisuallyHidden>
         <div className="p-5">
-          {/* Header */}
           <div className="mb-4">
             <h2 className="text-xl font-bold text-white">Invite Friends</h2>
             <p className="text-sm text-white/60">to {venueName}</p>
           </div>
 
-          {/* Friends List */}
           <ScrollArea className="h-[400px] mb-4">
             {loading ? (
               <div className="text-center text-white/50 py-8">Loading friends...</div>
             ) : friends.length === 0 ? (
               <div className="text-center text-white/50 py-8">No friends found</div>
             ) : (
-              <div className="space-y-4">
-                {/* Planning Friends Section */}
-                {planningFriends.length > 0 && (
-                  <Collapsible open={planningOpen} onOpenChange={setPlanningOpen}>
-                    <CollapsibleTrigger className="w-full flex items-center justify-between py-2 px-1 hover:bg-white/5 rounded-lg transition-colors">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🔥</span>
-                        <span className="font-semibold text-white">Friends Planning</span>
-                        <span className="text-lg">🎯</span>
-                        <span className="text-white/50 text-sm">({planningFriends.length})</span>
-                      </div>
-                      <ChevronDown className={`h-5 w-5 text-white/60 transition-transform duration-200 ${planningOpen ? 'rotate-180' : ''}`} />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-2">
-                      <div className="space-y-2">
-                        {planningFriends.map(renderFriendRow)}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-
-                {/* Divider */}
-                {planningFriends.length > 0 && outFriends.length > 0 && (
-                  <div className="border-t border-white/10 my-2" />
-                )}
-
-                {/* Out Friends Section */}
+              <div className="bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg overflow-hidden">
+                {/* Friends Out Now */}
                 {outFriends.length > 0 && (
-                  <Collapsible open={outOpen} onOpenChange={setOutOpen}>
-                    <CollapsibleTrigger className="w-full flex items-center justify-between py-2 px-1 hover:bg-white/5 rounded-lg transition-colors">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🎉</span>
-                        <span className="font-semibold text-white">Friends Out</span>
-                        <span className="text-white/50 text-sm">({outFriends.length})</span>
-                      </div>
-                      <ChevronDown className={`h-5 w-5 text-white/60 transition-transform duration-200 ${outOpen ? 'rotate-180' : ''}`} />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-2">
-                      <div className="space-y-2">
-                        {outFriends.map(renderFriendRow)}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
+                  <>
+                    <div className="px-3 py-2">
+                      <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider">
+                        👥 Friends Out Now
+                        <span className="text-white/50 ml-1">({outFriends.length})</span>
+                      </h3>
+                    </div>
+                    {outFriends.map(renderFriendRow)}
+                  </>
                 )}
 
-                {/* Other Friends (home or no status) */}
-                {otherFriends.length > 0 && (
+                {/* Friends Planning */}
+                {planningFriends.length > 0 && (
                   <>
-                    {(planningFriends.length > 0 || outFriends.length > 0) && (
-                      <div className="border-t border-white/10 my-2" />
-                    )}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 py-2 px-1">
-                        <span className="font-semibold text-white/70">Other Friends</span>
-                        <span className="text-white/40 text-sm">({otherFriends.length})</span>
-                      </div>
-                      {otherFriends.map(renderFriendRow)}
+                    <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
+                      <p className="text-white/70 text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider">
+                        🔥 Friends Planning 🎯
+                        <span className="text-white/50 normal-case tracking-normal">({planningFriends.length})</span>
+                      </p>
                     </div>
+                    {planningFriends.map(renderFriendRow)}
+                  </>
+                )}
+
+                {/* Staying In */}
+                {homeFriends.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
+                      <p className="text-white/70 text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider">
+                        <Home className="h-3.5 w-3.5 text-white/50 inline mr-0.5" /> Staying In
+                        <span className="text-white/50 normal-case tracking-normal">({homeFriends.length})</span>
+                      </p>
+                    </div>
+                    {homeFriends.map(renderFriendRow)}
                   </>
                 )}
               </div>
@@ -271,16 +233,11 @@ export function InviteFriendsModal() {
                 if (!user) return;
                 haptic.light();
                 try {
-                  const { data: profile } = await supabase
-                    .rpc('get_profile_safe', { target_user_id: user.id });
+                  const { data: profile } = await supabase.rpc('get_profile_safe', { target_user_id: user.id });
                   const senderName = profile?.[0]?.display_name?.split(' ')[0] || 'Your friend';
                   const code = await getOrCreateInviteCode(user.id);
                   const link = getInviteLink(code, venueId || undefined);
-                  await triggerSmsInvite({
-                    senderName,
-                    venueName: venueName || undefined,
-                    inviteLink: link,
-                  });
+                  await triggerSmsInvite({ senderName, venueName: venueName || undefined, inviteLink: link });
                 } catch (err) {
                   console.error('SMS invite error:', err);
                   toast.error('Could not open share sheet');
@@ -294,7 +251,6 @@ export function InviteFriendsModal() {
             </Button>
           </div>
 
-          {/* Send Button */}
           <Button
             onClick={handleSendInvites}
             disabled={selectedFriends.size === 0}
