@@ -27,8 +27,9 @@ export function useFriendIds(userId: string | undefined) {
 
       return [...new Set(friendIds)];
     },
-    staleTime: 2 * 60_000, // 2 minutes
+    staleTime: 30_000, // 30 seconds
     gcTime: 5 * 60_000,
     enabled: !!userId,
+    refetchOnWindowFocus: true,
   });
 }

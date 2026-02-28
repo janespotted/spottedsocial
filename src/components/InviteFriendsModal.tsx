@@ -60,14 +60,14 @@ export function InviteFriendsModal() {
       const now = new Date().toISOString();
 
       const [checkinsRes, nightRes] = await Promise.all([
-        supabase.from('checkins').select('user_id, venue_name').in('user_id', friendIds).is('ended_at', null),
-        supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
+        supabase.from('checkins').select('user_id, venue_name, started_at').in('user_id', friendIds).is('ended_at', null),
+        supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name, updated_at, is_private_party, party_neighborhood').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
       ]);
 
-      const checkinMap = new Map<string, string>();
-      checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, c.venue_name); });
+      const checkinMap = new Map<string, { venue_name: string; started_at: string | null }>();
+      checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, { venue_name: c.venue_name, started_at: c.started_at }); });
 
-      const nightMap = new Map<string, { status: string; planning_neighborhood: string | null; venue_name: string | null }>();
+      const nightMap = new Map<string, { status: string; planning_neighborhood: string | null; venue_name: string | null; updated_at: string | null; is_private_party: boolean | null; party_neighborhood: string | null }>();
       nightRes.data?.forEach(n => { if (!nightMap.has(n.user_id)) nightMap.set(n.user_id, n); });
 
       const seenNames = new Set<string>();
@@ -84,9 +84,19 @@ export function InviteFriendsModal() {
         const activeCheckin = checkinMap.get(profile.id);
         const nightStatus = nightMap.get(profile.id);
 
-        if (activeCheckin) {
+        const checkinTime = activeCheckin?.started_at ? new Date(activeCheckin.started_at).getTime() : 0;
+        const nightTime = nightStatus?.updated_at ? new Date(nightStatus.updated_at).getTime() : 0;
+
+        if (nightStatus?.status === 'out' && nightTime >= checkinTime) {
           status = 'out';
-          venue_name = activeCheckin;
+          if (nightStatus.is_private_party) {
+            venue_name = nightStatus.party_neighborhood ? `Private Party (${nightStatus.party_neighborhood})` : 'Private Party';
+          } else {
+            venue_name = nightStatus.venue_name || null;
+          }
+        } else if (activeCheckin) {
+          status = 'out';
+          venue_name = activeCheckin.venue_name;
         } else if (nightStatus?.status === 'out') {
           status = 'out';
           venue_name = nightStatus.venue_name || null;
