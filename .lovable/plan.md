@@ -1,25 +1,28 @@
 
 
-## Fix: Friend ID Card shows stale venue + Activity tab shows duplicate/broken check-ins
+## Fix: "Unknown" name in DM thread, swipe freeze, Close Friends empty list
 
-### Problem 1: Friend ID Card shows "Le Bain" instead of private party
-`FriendIdCard.fetchUserStatus()` (line 156) queries `night_statuses` but only selects `status, planning_neighborhood` — it doesn't check for `is_private_party` or the `out` status with a venue. It then falls through to `checkins` and finds the stale "Le Bain" check-in (never ended). Same timestamp comparison fix needed here as was done in `MyFriendsTab`.
+### Root cause analysis
 
-**Fix in `src/components/FriendIdCard.tsx`**:
-- Expand `night_statuses` query to select `status, planning_neighborhood, venue_name, is_private_party, party_neighborhood, updated_at`
-- Handle `status === 'out'` from night_statuses (not just `planning`)
-- When night_status is `out` and is more recent than the active checkin, use it instead
-- For private parties: show "@ Private Party (Neighborhood)" instead of the stale checkin venue
+**1. "Unknown" name in Thread header**
+`Thread.tsx` line 166-177 joins `profiles:user_id` on `dm_thread_members`. The `profiles` table RLS only allows `auth.uid() = id` (own profile) or `is_demo = true`. So querying another user's profile returns null, and the code defaults to `'Unknown'` (line 194).
 
-### Problem 2: Activity tab shows every check-in per user (duplicates) with missing name/avatar
-The check-in query (line 350-362) fetches the last 10 check-ins from friends with no deduplication — if a friend has 3 check-ins, all 3 show up. The `profiles` join via `profiles:user_id` may also fail silently due to RLS, returning null `display_name` and `avatar_url`.
+**Fix**: Replace the direct `profiles` join with a lookup against the cached `get_profiles_safe` RPC data (which is a SECURITY DEFINER function that returns all profiles with privacy-filtered fields).
 
-**Fix in `src/components/messages/ActivityTab.tsx`**:
-- After fetching check-ins, deduplicate by `user_id` — keep only the most recent check-in per friend
-- Use the cached `profiles-safe` data (already available via queryClient) as fallback when the join returns null profiles
-- For private party check-ins (venue_name = 'Private Party'), display appropriately
+**2. Swipe freeze / "Opening chat with Jane" stuck**
+In `Messages.tsx`, `location.state?.preselectedUser` is set once when navigating to Messages with a preselected user. When the user navigates back from the thread to `/messages`, React Router preserves `location.state`, so the `preselectedUser` is still set. This triggers `NewChatDialog` to reopen with the loading state. The dialog gets stuck because the thread already exists (the RPC returns the existing thread ID) and navigates again, creating a loop or stale state.
+
+**Fix**: Clear `location.state` after consuming `preselectedUser` using `navigate(location.pathname, { replace: true, state: {} })`. Also ensure the dialog properly resets when closed.
+
+**3. Close Friends page shows no friends**
+`CloseFriends.tsx` line 61-63 queries `profiles` table directly with `.in('id', friendIds)`. Same RLS issue — only own profile is readable. Returns empty array → shows "Add friends first" even though friends exist.
+
+**Fix**: Use `get_profiles_safe` RPC instead of direct `profiles` query.
 
 ### Files changed
-- `src/components/FriendIdCard.tsx` — fix status resolution to check night_statuses `out` status + private party before falling back to checkins
-- `src/components/messages/ActivityTab.tsx` — deduplicate check-ins to one per user, fix missing profile data
+
+- **`src/pages/Thread.tsx`** — Replace `profiles:user_id` join with `get_profiles_safe` RPC lookup for member names/avatars
+- **`src/pages/Messages.tsx`** — Clear `location.state` after consuming `preselectedUser` to prevent re-triggering on back navigation
+- **`src/components/messages/NewChatDialog.tsx`** — Add guard to prevent re-creation when dialog reopens with stale preselectedUser
+- **`src/pages/CloseFriends.tsx`** — Replace direct `profiles` query with `get_profiles_safe` RPC
 
