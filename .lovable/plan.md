@@ -1,21 +1,16 @@
 
 
-## Fix: Tapping own username navigates to profile instead of opening Friend ID Card
+## Two Issues
 
-### Problem
-Tapping your own name/avatar anywhere (feed, comments, etc.) opens a Friend ID Card of yourself, which is wrong. It should navigate to your profile page.
+### 1. "Who's Going Out Tonight" → "Planning on Going Out"
+In `src/components/FriendsPlanning.tsx` line 211, rename the heading text.
 
-### Solution
-Modify `FriendIdCardContext.tsx` to add the self-check directly in `openFriendCard`. Since the context wraps the whole app, adding `useAuth` and `useNavigate` there handles all 17+ call sites at once — no per-component changes needed.
+### 2. "No valid recipients selected" toast when inviting Jane
+**Root cause**: In `VenueInviteContext.tsx` (lines 50-60), when demo mode is off, `sendInvites` queries the `profiles` table to filter out demo users. But the `profiles` table has strict RLS — you can only read your own profile or demo profiles. So querying for Jane's profile with `.eq('is_demo', false)` returns nothing (RLS blocks it), Jane gets filtered out, and you get the error.
 
-### Change
-
-**`src/contexts/FriendIdCardContext.tsx`**:
-- Import `useAuth` and `useNavigate`
-- In `openFriendCard`, check if `friend.userId === user?.id`
-  - If yes: call `navigate('/profile')` instead of setting state
-  - If no: proceed as before (open the card)
+**Fix**: Replace the `profiles` table query with a query to `profiles_public` (a view with no RLS restrictions), which already has the `is_demo` column. This lets the demo-user filter work correctly without hitting RLS.
 
 ### Files changed
-- `src/contexts/FriendIdCardContext.tsx`
+- `src/components/FriendsPlanning.tsx` — rename heading
+- `src/contexts/VenueInviteContext.tsx` — change `from('profiles')` to `from('profiles_public')` in the demo-user filter query
 
