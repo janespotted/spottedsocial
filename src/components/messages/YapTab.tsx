@@ -118,19 +118,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       }
       const { data: yapData } = await yapQuery;
 
-      // Fetch private party yaps separately
-      let ppYapQuery = supabase
-        .from('yap_messages')
-        .select('id, text, score, venue_name, created_at, is_private_party')
-        .gt('expires_at', new Date().toISOString())
-        .eq('is_private_party', true);
-      if (!demoEnabled) {
-        ppYapQuery = ppYapQuery.eq('is_demo', false);
-      }
-      const { data: ppYapData } = await ppYapQuery;
-
       const regularYaps = yapData || [];
-      const privatePartyYaps = ppYapData || [];
 
       // Get unique venue names for metadata lookup — filter to current city
       const venueNames = [...new Set(regularYaps.map(y => y.venue_name))];
@@ -184,26 +172,6 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
       // Filter regular yaps to only include venues in the current city
       const filteredRegularYaps = regularYaps.filter(y => venueMetaMap.has(y.venue_name));
 
-      // Get neighborhood info for private party yaps from night_statuses
-      const ppVenueNames = [...new Set(privatePartyYaps.map(y => y.venue_name))];
-      let ppNeighborhoodMap = new Map<string, string | null>();
-      if (ppVenueNames.length > 0) {
-        const { data: statusData } = await supabase
-          .from('night_statuses')
-          .select('venue_name, party_neighborhood')
-          .in('venue_name', ppVenueNames)
-          .eq('is_private_party', true)
-          .not('expires_at', 'is', null)
-          .gt('expires_at', new Date().toISOString());
-        if (statusData) {
-          for (const s of statusData) {
-            if (s.venue_name && s.party_neighborhood) {
-              ppNeighborhoodMap.set(s.venue_name, s.party_neighborhood);
-            }
-          }
-        }
-      }
-
       const enrichedRegular: YapQuote[] = filteredRegularYaps.map(yap => ({
         id: yap.id,
         text: yap.text,
@@ -215,18 +183,7 @@ export function YapTab({ venueName: venueNameProp }: YapTabProps) {
         is_private_party: false,
       }));
 
-      const enrichedPrivate: YapQuote[] = privatePartyYaps.map(yap => ({
-        id: yap.id,
-        text: yap.text,
-        score: yap.score,
-        venue_name: yap.venue_name,
-        venue_neighborhood: ppNeighborhoodMap.get(yap.venue_name) || null,
-        venue_type: 'private_party',
-        created_at: yap.created_at,
-        is_private_party: true,
-      }));
-
-      setQuotes([...enrichedRegular, ...enrichedPrivate]);
+      setQuotes(enrichedRegular);
     } catch (error) {
       console.error('Error fetching yap quotes:', error);
     } finally {
