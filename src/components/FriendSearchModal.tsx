@@ -70,9 +70,10 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
     try {
       const friendIds = friendProfiles.map(p => p.id);
       const now = new Date().toISOString();
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
       const [checkinsRes, nightRes, storiesRes] = await Promise.all([
-        supabase.from('checkins').select('user_id, venue_name, started_at').in('user_id', friendIds).is('ended_at', null),
+        supabase.from('checkins').select('user_id, venue_name, started_at').in('user_id', friendIds).is('ended_at', null).gt('started_at', twentyFourHoursAgo).order('started_at', { ascending: false }),
         supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name, updated_at, is_private_party, party_neighborhood').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
         supabase.from('stories').select('user_id').in('user_id', friendIds).gt('expires_at', now),
       ]);
