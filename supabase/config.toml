@@ -7,16 +7,19 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.seed-demo-data]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-push]
 verify_jwt = true
 
 [functions.send-daily-nudge]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-weekend-rally]
 verify_jwt = true
 
 [functions.fix-venue-coordinates]
-verify_jwt = false
+verify_jwt = true
+
+[functions.refresh-leaderboard-energy]
+verify_jwt = true
