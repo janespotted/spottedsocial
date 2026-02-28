@@ -50,7 +50,7 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
       if (!demoEnabled) {
         const friendIds = selectedFriends.map(f => f.id);
         const { data: realProfiles } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('id')
           .in('id', friendIds)
           .eq('is_demo', false);

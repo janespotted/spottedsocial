@@ -208,7 +208,7 @@ export function FriendsPlanning({
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <span className="text-lg">👀</span>
-          <h3 className="text-white font-semibold text-sm">Who's Going Out Tonight</h3>
+          <h3 className="text-white font-semibold text-sm">Planning on Going Out</h3>
         </div>
         
         {/* Stacked avatar preview */}
