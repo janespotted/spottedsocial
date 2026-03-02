@@ -47,6 +47,7 @@ interface UserStatus {
   lat: number | null;
   lng: number | null;
   canSeeLocation: boolean;
+  isPrivateParty: boolean;
 }
 
 export function FriendIdCard() {
@@ -187,7 +188,8 @@ export function FriendIdCard() {
           lastEndedAt: null,
           lat: null,
           lng: null,
-          canSeeLocation: true
+          canSeeLocation: true,
+          isPrivateParty: false
         });
         const neighborhoodText = nightStatus.planning_neighborhood 
           ? `🎯 Planning tonight — thinking: ${nightStatus.planning_neighborhood}`
@@ -207,7 +209,8 @@ export function FriendIdCard() {
             lastEndedAt: null,
             lat: nightStatus.lat,
             lng: nightStatus.lng,
-            canSeeLocation: true
+            canSeeLocation: true,
+            isPrivateParty: true
           });
           setStatusSubtitle(neighborhood ? `@ Private Party · ${neighborhood}` : '@ Private Party');
         } else {
@@ -223,7 +226,8 @@ export function FriendIdCard() {
             lastEndedAt: null,
             lat: nightStatus.lat,
             lng: nightStatus.lng,
-            canSeeLocation: true
+            canSeeLocation: true,
+            isPrivateParty: false
           });
           setStatusSubtitle(`@ ${venueName} • ${timeAgo}`);
           if (venueName !== 'Out') fetchFriendsAtVenue(venueName);
@@ -243,7 +247,8 @@ export function FriendIdCard() {
           lastEndedAt: null,
           lat: activeCheckIn.lat,
           lng: activeCheckIn.lng,
-          canSeeLocation: true
+          canSeeLocation: true,
+          isPrivateParty: false
         });
 
         const timeAgo = minutesAgo < 1 ? 'just now' : 
@@ -261,7 +266,8 @@ export function FriendIdCard() {
           lastEndedAt: null,
           lat: null,
           lng: null,
-          canSeeLocation: false
+          canSeeLocation: false,
+          isPrivateParty: false
         });
         setStatusSubtitle('Location hidden');
       } else {
@@ -285,7 +291,8 @@ export function FriendIdCard() {
             lastEndedAt: lastCheckIn.ended_at,
             lat: null,
             lng: null,
-            canSeeLocation: true
+            canSeeLocation: true,
+            isPrivateParty: false
           });
 
           const timeAgo = hoursAgo < 1 ? 'less than an hour ago' : 
@@ -301,7 +308,8 @@ export function FriendIdCard() {
             lastEndedAt: null,
             lat: null,
             lng: null,
-            canSeeLocation: true
+            canSeeLocation: true,
+            isPrivateParty: false
           });
           setStatusSubtitle('In for the night');
         }
@@ -483,6 +491,19 @@ export function FriendIdCard() {
     }
   };
 
+  const handlePrivatePartyClick = () => {
+    closeFriendCard();
+    navigate('/map', {
+      state: {
+        flyTo: {
+          lat: userStatus?.lat,
+          lng: userStatus?.lng,
+          zoom: 15,
+        }
+      }
+    });
+  };
+
   const handleBlockUser = async () => {
     if (!selectedFriend || !user) return;
 
@@ -638,7 +659,7 @@ export function FriendIdCard() {
                     <>
                       {userStatus?.isOut && userStatus.currentVenue ? (
                         <button
-                          onClick={() => handleVenueClick(userStatus.currentVenue!)}
+                          onClick={() => userStatus.isPrivateParty ? handlePrivatePartyClick() : handleVenueClick(userStatus.currentVenue!)}
                           className="text-[#d4ff00] text-base font-medium leading-tight mb-1 hover:underline text-left"
                         >
                           {statusSubtitle}
