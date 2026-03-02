@@ -95,6 +95,68 @@ Deno.serve(async (req) => {
       console.log(`✅ Cleared ${clearedStatuses?.length || 0} expired night statuses`)
     }
 
+    // 5. Delete expired posts
+    const { data: deletedPosts, error: postsError } = await supabase
+      .from('posts')
+      .delete()
+      .lt('expires_at', cutoff)
+      .select('id')
+
+    if (postsError) {
+      console.error('Error deleting expired posts:', postsError)
+    } else {
+      console.log(`✅ Deleted ${deletedPosts?.length || 0} expired posts`)
+    }
+
+    // 6. Delete expired yap messages
+    const { data: deletedYaps, error: yapsError } = await supabase
+      .from('yap_messages')
+      .delete()
+      .lt('expires_at', cutoff)
+      .select('id')
+
+    if (yapsError) {
+      console.error('Error deleting expired yaps:', yapsError)
+    } else {
+      console.log(`✅ Deleted ${deletedYaps?.length || 0} expired yap messages`)
+    }
+
+    // 7. Reset planning statuses to home
+    const { data: clearedPlanning, error: planningError } = await supabase
+      .from('night_statuses')
+      .update({
+        status: 'home',
+        venue_name: null,
+        venue_id: null,
+        lat: null,
+        lng: null,
+        expires_at: null,
+        planning_neighborhood: null,
+        planning_visibility: null,
+      })
+      .eq('status', 'planning')
+      .lt('updated_at', cutoff)
+      .select('id')
+
+    if (planningError) {
+      console.error('Error clearing planning statuses:', planningError)
+    } else {
+      console.log(`✅ Cleared ${clearedPlanning?.length || 0} planning statuses`)
+    }
+
+    // 8. Delete expired plans (based on their own expires_at, not the 5am cutoff)
+    const { data: deletedPlans, error: plansError } = await supabase
+      .from('plans')
+      .delete()
+      .lt('expires_at', now.toISOString())
+      .select('id')
+
+    if (plansError) {
+      console.error('Error deleting expired plans:', plansError)
+    } else {
+      console.log(`✅ Deleted ${deletedPlans?.length || 0} expired plans`)
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -102,6 +164,10 @@ Deno.serve(async (req) => {
         ended_checkins: endedCheckins?.length || 0,
         deleted_dms: deletedDMs?.length || 0,
         cleared_statuses: clearedStatuses?.length || 0,
+        deleted_posts: deletedPosts?.length || 0,
+        deleted_yaps: deletedYaps?.length || 0,
+        cleared_planning: clearedPlanning?.length || 0,
+        deleted_plans: deletedPlans?.length || 0,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
