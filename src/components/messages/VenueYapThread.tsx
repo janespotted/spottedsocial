@@ -299,10 +299,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
       await supabase.from("yap_votes").insert({ yap_id: yapId, user_id: user!.id, vote_type: voteType });
     }
 
-    await supabase
-      .from("yap_messages")
-      .update({ score: currentMessage.score + scoreDelta })
-      .eq("id", yapId);
+    await supabase.rpc('increment_yap_score', { p_yap_id: yapId, p_delta: scoreDelta });
     setMessages((prev) =>
       prev.map((m) =>
         m.id === yapId
