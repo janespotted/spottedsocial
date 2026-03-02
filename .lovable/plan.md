@@ -1,43 +1,59 @@
 
 
-## Fix: Bootstrap mode should use detected city, not hardcode NYC
+## Current State: Web Push Notifications
 
-### Root Cause
-`getBootstrapMode()` is synchronous and falls back to `'nyc'` before async GPS detection completes. An LA user sees NYC leaderboard data on first load until GPS resolves.
+The infrastructure is fully built and the VAPID keys are configured. Here's the gap:
 
-### Solution
-Two changes needed:
+### What works
+- Service worker registered on web (`sw.js`)
+- `usePushNotifications` hook handles subscribe/unsubscribe with VAPID
+- `send-push` edge function implements full RFC 8291 Web Push encryption + APNs
+- VAPID keys are set as secrets
 
-**1. `src/lib/bootstrap-config.ts`** — When `getBootstrapMode()` has no cached city, don't commit to NYC. Instead, return a neutral fallback and let the city update reactively once GPS resolves.
+### The problem: most notification flows never trigger push
 
-Actually, the simpler fix: make `getBootstrapMode()` respect the city from `useUserCity` by having the consuming components pass the detected city rather than reading it independently. But that's a larger refactor.
+`triggerPushNotification()` is only called in **2 places**:
+1. `VenueInviteContext.tsx` (venue invites)
+2. `MeetUpContext.tsx` (meetup requests)
 
-**Simplest fix:** In `getBootstrapMode()`, change the fallback from hardcoded `'nyc'` to also check the `detected_city` localStorage key (which `useUserCity` writes to on first GPS detection). This way both caches stay in sync:
+But notifications are created in **8+ places** via `create_notification` / `create_notifications_batch` RPC — and these **never call push**:
 
-```typescript
-// Line 46 of bootstrap-config.ts — currently:
-const city = getCachedCity() || 'nyc';
+| Flow | File | Push triggered? |
+|------|------|----------------|
+| Venue invite | `VenueInviteContext.tsx` | Yes |
+| Meetup request | `MeetUpContext.tsx` | Yes |
+| Rally nudge | `Friends.tsx` | **No** |
+| Rally nudge | `MyFriendsTab.tsx` | **No** |
+| Plan "I'm down" | `PlanItem.tsx` | **No** |
+| Private party invite | `PrivatePartyInviteModal.tsx` | **No** |
+| Meetup accepted | `ActivityTab.tsx` | **No** |
+| Venue invite accepted | `ActivityTab.tsx` | **No** |
+| Address request | `PrivatePartyCard.tsx` | **No** |
+| Venue yap | `useYapNotifications.ts` | **No** |
+| Post liked (DB trigger) | `notify_post_liked()` | **No** |
+| Post commented (DB trigger) | `notify_post_commented()` | **No** |
+| Invite accepted (DB trigger) | `notify_inviter_on_signup()` | **No** |
 
-// Change to: also check the detected_city key directly
-const city = getCachedCity() || 'nyc'; // getCachedCity already reads detected_city
-```
+### Fix approach
 
-Wait — `getCachedCity()` reads from `detected_city` in localStorage, which is the same key that `detectUserCity()` writes to. So the real issue is just timing: on a **true first visit**, there's no cached city yet because GPS hasn't fired.
+**For client-side flows (6 files):** Add `triggerPushNotification()` calls after each `create_notification` / `create_notifications_batch` RPC call, matching the existing pattern in MeetUpContext.
 
-**2. `src/hooks/useBootstrapMode.ts`** — Listen for the `cityChanged` event (dispatched by `cacheCity()` after GPS resolves) and update the bootstrap city reactively. Currently it only listens for `bootstrapModeChanged` and `storage`, not `cityChanged`.
+**For DB trigger flows (3 triggers):** These insert notifications server-side — the client never sees the inserted row. The cleanest fix is to add a **database trigger** on the `notifications` table that automatically calls the `send-push` edge function via `pg_net` (Supabase's HTTP extension). However, `pg_net` may not be available. The simpler alternative is to leave DB-trigger notifications (post likes, comments, invite accepted) as in-app only for now, and add push to the 6 client-side flows.
 
 ### Changes
 
 | File | Change |
 |------|--------|
-| `src/hooks/useBootstrapMode.ts` | Add listener for `cityChanged` event so bootstrap city updates when GPS detects LA/PB |
-| `src/lib/bootstrap-config.ts` | No change needed — `getCachedCity()` already reads the right key; the issue is purely timing |
+| `src/pages/Friends.tsx` | Add `triggerPushNotification` after rally notification RPC |
+| `src/components/MyFriendsTab.tsx` | Add `triggerPushNotification` after rally notification RPC |
+| `src/components/PlanItem.tsx` | Add `triggerPushNotification` after "I'm down" notification RPC |
+| `src/components/PrivatePartyInviteModal.tsx` | Add `triggerPushNotification` for each party invite notification |
+| `src/components/PrivatePartyCard.tsx` | Add `triggerPushNotification` after address request notification |
+| `src/components/messages/ActivityTab.tsx` | Add `triggerPushNotification` after meetup_accepted and venue_invite_accepted RPCs |
 
-This way, an LA user on first load:
-1. Briefly sees NYC data (unavoidable — GPS takes ~1-2s)
-2. GPS resolves → `cacheCity('la')` fires `cityChanged` event
-3. `useBootstrapMode` catches the event → updates city to `'la'`
-4. Leaderboard re-renders with LA venue data
+Also need to add `'rally'`, `'plan_down'`, `'address_request'`, `'private_party_invite'` to the `VALID_NOTIFICATION_TYPES` array in `send-push/index.ts`, since it currently rejects any type not in its allowlist.
 
-The brief NYC flash is acceptable since GPS must complete first. If we want zero flash, we'd need to show a loading state until city is detected, but that adds friction.
+| File | Change |
+|------|--------|
+| `supabase/functions/send-push/index.ts` | Add missing notification types to `VALID_NOTIFICATION_TYPES` |
 
