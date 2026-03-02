@@ -235,7 +235,7 @@ export default function Auth() {
              <img 
                src={spottedLogo} 
                alt="Spotted" 
-               className="w-14 h-14 object-contain drop-shadow-[0_0_15px_rgba(212,255,0,0.5)]"
+               className="w-14 h-14 object-contain drop-shadow-[0_0_15px_rgba(212,255,0,0.5)] logo-blend"
              />
            </div>
            

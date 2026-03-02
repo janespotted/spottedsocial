@@ -178,7 +178,7 @@ export default function Feed() {
               onClick={openCheckIn} 
               className="hover:scale-110 transition-transform"
             >
-              <img src={spottedLogo} alt="Go live" className="h-14 w-14 object-contain" />
+              <img src={spottedLogo} alt="Go live" className="h-14 w-14 object-contain logo-blend" />
             </button>
           </div>
         </div>

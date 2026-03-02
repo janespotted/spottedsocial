@@ -752,7 +752,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         <img 
           src={spottedLogo} 
           alt="Spotted" 
-          className="h-10 w-10 object-contain drop-shadow-[0_0_8px_rgba(212,255,0,0.5)]" 
+          className="h-10 w-10 object-contain drop-shadow-[0_0_8px_rgba(212,255,0,0.5)] logo-blend" 
         />
       </div>
 
@@ -836,7 +836,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const ShareLocationContent = () => (
     <div className="relative p-6 space-y-6">
-      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain logo-blend" />
       
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-white">Share Your Location With:</h3>
@@ -955,7 +955,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
     return (
       <div className="relative p-6 space-y-6">
-        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain logo-blend" />
         
         <div className="space-y-2">
           <h3 className="text-xl font-semibold text-white">
@@ -1067,7 +1067,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     
     return (
       <div className="relative p-6 space-y-6">
-        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain logo-blend" />
         
         <div className="space-y-2">
           <h3 className="text-xl font-semibold text-white">Share what area you're thinking tonight?</h3>
@@ -1120,7 +1120,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const PlanningPrivacyContent = () => (
     <div className="relative p-6 space-y-6">
-      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain logo-blend" />
       
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-white">Who can see you're planning to go out?</h3>
@@ -1195,7 +1195,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const PrivatePartyPrivacyContent = () => (
     <div className="relative p-6 space-y-6">
-      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain logo-blend" />
       
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
@@ -1278,7 +1278,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if (isDetectingNeighborhood) {
       return (
         <div className="relative p-6 space-y-6">
-          <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+          <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain logo-blend" />
           
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
@@ -1304,7 +1304,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if (privatePartyNeighborhood && !showNeighborhoodManualSelect) {
       return (
         <div className="relative p-6 space-y-6">
-          <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+          <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain logo-blend" />
           
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
@@ -1343,7 +1343,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     // Manual selection fallback
     return (
       <div className="relative p-6 space-y-6">
-        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
+        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain logo-blend" />
         
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">

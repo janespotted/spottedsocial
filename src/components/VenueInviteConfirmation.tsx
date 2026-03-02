@@ -159,7 +159,7 @@ export function VenueInviteConfirmation() {
           <img 
             src={spottedLogo} 
             alt="Spotted" 
-            className="absolute top-4 right-4 w-12 h-12"
+            className="absolute top-4 right-4 w-12 h-12 logo-blend"
           />
 
           {/* Main Content */}

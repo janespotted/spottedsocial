@@ -113,7 +113,7 @@
              <ArrowLeft className="h-5 w-5" />
            </Button>
            <div className="flex items-center gap-2">
-             <img src={spottedLogo} alt="Spotted" className="h-8 w-8" />
+             <img src={spottedLogo} alt="Spotted" className="h-8 w-8 logo-blend" />
              <h1 className="text-xl font-semibold text-white">
                {user ? 'Claim Your Venue' : 'Business Sign In'}
              </h1>

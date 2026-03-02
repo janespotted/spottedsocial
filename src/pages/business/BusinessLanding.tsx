@@ -68,7 +68,7 @@
          {/* Header */}
          <div className="text-center mb-8">
            <div className="flex justify-center mb-4">
-             <img src={spottedLogo} alt="Spotted" className="h-16 w-16" />
+             <img src={spottedLogo} alt="Spotted" className="h-16 w-16 logo-blend" />
            </div>
            <h1 className="text-2xl font-bold text-white mb-2">
              Spotted for Business

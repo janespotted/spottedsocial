@@ -117,7 +117,7 @@ export function ImDownConfirmation() {
 
           {/* Spotted S - Top Right */}
           <div className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center">
-            <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain" />
+            <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain logo-blend" />
           </div>
 
           {/* Center Content */}
