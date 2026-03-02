@@ -15,15 +15,20 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    // Calculate today's 5am boundary in UTC
-    // The cron runs at 9:10 UTC (5:10am ET), so "today's 5am ET" = today 9:00 UTC
+    // Calculate today's 5am ET boundary, DST-aware
     const now = new Date()
-    const fiveAmToday = new Date(now)
-    fiveAmToday.setUTCHours(9, 0, 0, 0) // 9:00 UTC = 5:00 AM ET
-    
-    // If somehow running before 9 UTC, use yesterday's 9 UTC
+    // Parse current time as ET to get the right date in ET
+    const etStr = now.toLocaleString('en-US', { timeZone: 'America/New_York' })
+    const etNow = new Date(etStr)
+    // Set to 5:00 AM in ET "local" representation
+    etNow.setHours(5, 0, 0, 0)
+    // Compute UTC↔ET offset: (real UTC ms) - (ET-as-local ms)
+    const offsetMs = now.getTime() - new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })).getTime()
+    // Convert 5AM ET back to real UTC
+    const fiveAmToday = new Date(etNow.getTime() + offsetMs)
+    // If we haven't hit 5AM ET yet, use yesterday's
     if (now < fiveAmToday) {
-      fiveAmToday.setUTCDate(fiveAmToday.getUTCDate() - 1)
+      fiveAmToday.setTime(fiveAmToday.getTime() - 86400000)
     }
 
     const cutoff = fiveAmToday.toISOString()
