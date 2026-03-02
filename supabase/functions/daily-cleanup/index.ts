@@ -15,18 +15,34 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    // Calculate today's 5am boundary in UTC
-    // The cron runs at 9:10 UTC (5:10am ET), so "today's 5am ET" = today 9:00 UTC
+    // Calculate today's 5 AM ET boundary, DST-aware
     const now = new Date()
-    const fiveAmToday = new Date(now)
-    fiveAmToday.setUTCHours(9, 0, 0, 0) // 9:00 UTC = 5:00 AM ET
-    
-    // If somehow running before 9 UTC, use yesterday's 9 UTC
-    if (now < fiveAmToday) {
-      fiveAmToday.setUTCDate(fiveAmToday.getUTCDate() - 1)
+    const etFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    })
+    const parts = etFormatter.formatToParts(now)
+    const etYear = parts.find(p => p.type === 'year')!.value
+    const etMonth = parts.find(p => p.type === 'month')!.value
+    const etDay = parts.find(p => p.type === 'day')!.value
+    const etHour = parseInt(parts.find(p => p.type === 'hour')!.value)
+
+    // Build "now" as interpreted in ET (no TZ), then compare to real UTC to get offset
+    const etNowLocal = new Date(`${etYear}-${etMonth}-${etDay}T${String(etHour).padStart(2, '0')}:${parts.find(p => p.type === 'minute')!.value}:${parts.find(p => p.type === 'second')!.value}`)
+    const offsetMs = now.getTime() - etNowLocal.getTime()
+
+    // Build 5:00 AM ET today, then convert to UTC using the same offset
+    const fiveAmETLocal = new Date(`${etYear}-${etMonth}-${etDay}T05:00:00`)
+    const fiveAmUTC = new Date(fiveAmETLocal.getTime() + offsetMs)
+
+    // If we're before 5 AM ET, use yesterday's 5 AM
+    if (now < fiveAmUTC) {
+      fiveAmUTC.setTime(fiveAmUTC.getTime() - 86400000)
     }
 
-    const cutoff = fiveAmToday.toISOString()
+    const cutoff = fiveAmUTC.toISOString()
     console.log(`🧹 5am cleanup running. Cutoff: ${cutoff}`)
 
     // 1. Clear stale locations on profiles
