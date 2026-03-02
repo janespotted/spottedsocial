@@ -1,18 +1,24 @@
 
 
-## Fix: Replace buggy local `calculateExpiryTime` with shared utility
+## Fix: Logo Black Background Still Visible
 
 ### Problem
-The local `calculateExpiryTime` in `CheckInModal.tsx` (lines 181-187) always adds 1 day before setting 5am, so check-ins between midnight and 5am expire ~27 hours later instead of at 5am the same morning. The correct version already exists in `@/lib/time-utils`.
+The `.logo-blend` class with `mix-blend-mode: screen` is defined inside `@layer utilities` (line 292-294 of `src/index.css`), but it's not effectively removing the black background. This is likely because:
+1. The `@layer utilities` may give lower cascade priority in certain contexts
+2. Backdrop-blur and other effects on parent elements can create isolation contexts that prevent blend modes from working against the visual background
 
-### Changes in `src/components/CheckInModal.tsx`
+### Solution
+Move the `.logo-blend` rule **outside** all `@layer` blocks (making it a global rule with higher cascade priority) and ensure it works reliably:
 
-1. **Add import** (after line 19 or nearby):
-   ```typescript
-   import { calculateExpiryTime } from '@/lib/time-utils';
-   ```
+**`src/index.css`** — Remove lines 290-294 from inside the `@layer utilities` block, and add at the end of the file (after all `@layer` blocks):
 
-2. **Delete lines 181-187** — the local `calculateExpiryTime` function.
+```css
+/* Logo transparency — outside @layer for maximum specificity */
+.logo-blend {
+  mix-blend-mode: screen !important;
+}
+```
 
-No other files change. All existing call sites within CheckInModal already reference `calculateExpiryTime()` by name, so they'll pick up the imported version automatically.
+### Files changed
+- `src/index.css` — move `.logo-blend` outside `@layer utilities`
 
