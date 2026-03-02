@@ -504,6 +504,20 @@ export function FriendIdCard() {
     });
   };
 
+  const handleNameClick = () => {
+    if (!userStatus?.lat || !userStatus?.lng) return;
+    closeFriendCard();
+    navigate('/map', {
+      state: {
+        flyTo: {
+          lat: userStatus.lat,
+          lng: userStatus.lng,
+          zoom: 15,
+        }
+      }
+    });
+  };
+
   const handleBlockUser = async () => {
     if (!selectedFriend || !user) return;
 
@@ -620,9 +634,18 @@ export function FriendIdCard() {
                 {/* User Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 pr-8">
-                    <h2 className="text-xl font-bold text-white leading-tight">
-                      {selectedFriend.displayName}
-                    </h2>
+                    {userStatus?.lat && userStatus?.lng ? (
+                      <button
+                        onClick={handleNameClick}
+                        className="text-xl font-bold text-white leading-tight hover:underline cursor-pointer text-left"
+                      >
+                        {selectedFriend.displayName}
+                      </button>
+                    ) : (
+                      <h2 className="text-xl font-bold text-white leading-tight">
+                        {selectedFriend.displayName}
+                      </h2>
+                    )}
                     {selectedFriend.relationshipType === 'close' && (
                       <span className="text-xs bg-[#d4ff00]/20 text-[#d4ff00] px-2 py-0.5 rounded-full whitespace-nowrap">
                         Close Friend
