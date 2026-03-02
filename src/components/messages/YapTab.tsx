@@ -227,7 +227,9 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
   };
 
   if (view === 'thread' && threadVenueName) {
-    const isCheckedInHere = userVenueName === threadVenueName;
+    // If we navigated here from a check-in confirmation (venueNameProp provided),
+    // trust that the user is checked in — skip the async race condition
+    const isCheckedInHere = venueNameProp ? true : userVenueName === threadVenueName;
     return (
       <VenueYapThread
         venueName={threadVenueName}
