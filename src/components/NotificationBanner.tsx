@@ -44,6 +44,8 @@ export function NotificationBanner() {
           }
         }
       });
+    } else if (latestNotification.type === 'venue_yap') {
+      navigate('/messages', { state: { activeTab: 'yap' } });
     } else {
       navigate('/messages', { state: { activeTab: 'activity' } });
     }
