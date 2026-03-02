@@ -421,9 +421,17 @@ export function ActivityTab() {
 
       if (checkIns?.length) {
         // Filter out demo check-ins when demo mode is off
-        const filteredCheckIns = !demoEnabled
+        const demoFiltered = !demoEnabled
           ? checkIns.filter(checkIn => !checkIn.is_demo)
           : checkIns;
+        
+        // Filter out stale check-ins (last_updated_at > 2 hours ago)
+        const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+        const filteredCheckIns = demoFiltered.filter(c => {
+          const lastUpdate = c.last_updated_at || c.started_at;
+          if (!lastUpdate) return false;
+          return Date.now() - new Date(lastUpdate).getTime() < TWO_HOURS_MS;
+        });
         
         // Deduplicate: keep only the most recent check-in per user
         const seenUsers = new Map<string, typeof filteredCheckIns[0]>();

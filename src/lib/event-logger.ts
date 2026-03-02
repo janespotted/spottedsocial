@@ -8,7 +8,8 @@ export type EventType =
   | 'invite_received'
   | 'invite_accepted'
   | 'invite_declined'
-  | 'private_party_checkin';
+  | 'private_party_checkin'
+  | 'auto_checkout_stale';
 
 /**
  * Lightweight event logger for internal debugging
