@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { logEvent } from '@/lib/event-logger';
+import { isFromTonight } from '@/lib/time-context';
 
 interface Notification {
   id: string;
@@ -66,11 +67,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           profiles?.map(p => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url }]) || []
         );
 
-        // Attach profiles without additional queries
-        const notificationsWithProfiles = data.map(notification => ({
-          ...notification,
-          sender_profile: profileMap.get(notification.sender_id) || undefined
-        }));
+        // Attach profiles and filter to tonight only (5am boundary)
+        const notificationsWithProfiles = data
+          .filter(notification => isFromTonight(notification.created_at))
+          .map(notification => ({
+            ...notification,
+            sender_profile: profileMap.get(notification.sender_id) || undefined
+          }));
 
         setNotifications(notificationsWithProfiles);
       } else if (data) {

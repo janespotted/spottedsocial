@@ -157,6 +157,19 @@ Deno.serve(async (req) => {
       console.log(`✅ Deleted ${deletedPlans?.length || 0} expired plans`)
     }
 
+    // 9. Delete expired notifications (from prior nights)
+    const { data: deletedNotifs, error: notifsError } = await supabase
+      .from('notifications')
+      .delete()
+      .lt('created_at', cutoff)
+      .select('id')
+
+    if (notifsError) {
+      console.error('Error deleting expired notifications:', notifsError)
+    } else {
+      console.log(`✅ Deleted ${deletedNotifs?.length || 0} expired notifications`)
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -168,6 +181,7 @@ Deno.serve(async (req) => {
         deleted_yaps: deletedYaps?.length || 0,
         cleared_planning: clearedPlanning?.length || 0,
         deleted_plans: deletedPlans?.length || 0,
+        deleted_notifications: deletedNotifs?.length || 0,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
