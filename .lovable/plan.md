@@ -1,52 +1,73 @@
 
 
-## Plan: Fix Yap Upvote Not Persisting + Restyle Yap Activity Card
+## Implementation: Fix Check-In Prompt Repeating
 
-### Problem 1: Score stays at 0 after upvoting
+**File: `src/hooks/useCheckInPrompt.ts`** — Replace entire contents:
 
-The `handleVote` function in `VenueYapThread.tsx` inserts into `yap_votes` (works — RLS allows inserts) then tries to UPDATE `yap_messages.score`. But there is **no UPDATE RLS policy on `yap_messages`**, so the update silently fails. The local state updates optimistically but the DB never changes, so on refresh it's back to 0.
+```typescript
+import { useEffect, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCheckIn } from '@/contexts/CheckInContext';
+import { isNightlifeHours } from '@/lib/time-context';
+import { supabase } from '@/integrations/supabase/client';
 
-**Fix — two options (use both for robustness):**
+const SESSION_KEY = 'checkin_prompt_session';
+const STORAGE_KEY = 'checkin_prompt_last_shown';
+const COOLDOWN_MS = 2 * 60 * 60 * 1000; // 2 hours
 
-1. **Add an RLS policy** allowing authenticated users to update the `score` column on `yap_messages`:
-   ```sql
-   CREATE POLICY "Authenticated users can update yap score"
-     ON yap_messages FOR UPDATE
-     USING (auth.uid() IS NOT NULL)
-     WITH CHECK (auth.uid() IS NOT NULL);
-   ```
+export function useCheckInPrompt() {
+  const { user } = useAuth();
+  const { openCheckIn } = useCheckIn();
 
-2. **Better long-term**: Create a database function `increment_yap_score(p_yap_id uuid, p_delta int)` that runs with `SECURITY DEFINER` so it bypasses RLS. This is safer since users can only adjust score through the controlled function, not arbitrarily update other fields. The function would:
-   ```sql
-   CREATE OR REPLACE FUNCTION increment_yap_score(p_yap_id uuid, p_delta int)
-   RETURNS void AS $$
-   BEGIN
-     UPDATE yap_messages SET score = score + p_delta WHERE id = p_yap_id;
-   END;
-   $$ LANGUAGE plpgsql SECURITY DEFINER;
-   ```
-   Then in `VenueYapThread.tsx`, replace the direct update with:
-   ```typescript
-   await supabase.rpc('increment_yap_score', { p_yap_id: yapId, p_delta: scoreDelta });
-   ```
+  const checkAndPrompt = useCallback(async () => {
+    if (!user?.id) return;
+    if (!isNightlifeHours()) return;
 
-I recommend option 2 (SECURITY DEFINER function) as it's more secure — prevents users from arbitrarily setting scores.
+    // Guard 1: localStorage 2-hour cooldown
+    const lastShown = localStorage.getItem(STORAGE_KEY);
+    if (lastShown && Date.now() - Number(lastShown) < COOLDOWN_MS) return;
 
-### Problem 2: Yap activity card is orange — should match app theme
+    // Guard 2: Skip if user already has active out/planning status
+    try {
+      const { data } = await supabase
+        .from('night_statuses')
+        .select('status, expires_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-The "Yaps at Your Spot" card uses `amber-400`/`amber-500` styling. Change to match the app's purple/lime theme:
+      if (data?.status && data.status !== 'home' && data.expires_at && new Date(data.expires_at) > new Date()) {
+        return;
+      }
+    } catch {
+      // If query fails, continue to show prompt as fallback
+    }
 
-**`src/components/messages/ActivityTab.tsx`**:
-- Change yap icon circle from `bg-amber-500/20 border-amber-400/60` → `bg-purple-500/20 border-purple-400/60`
-- Change icon color from `text-amber-400` → `text-[#d4ff00]`
-- Change subtitle text from `text-amber-400` → `text-[#d4ff00]`
-- Change "View" button from `bg-amber-500` → `bg-[#d4ff00] text-black`
+    // Guard 3: Only show once per session (tab lifetime)
+    const shownThisSession = sessionStorage.getItem(SESSION_KEY);
+    if (shownThisSession) return;
 
-### Files Changed
+    sessionStorage.setItem(SESSION_KEY, 'true');
+    localStorage.setItem(STORAGE_KEY, String(Date.now()));
+    openCheckIn();
+  }, [user?.id, openCheckIn]);
 
-| File | Change |
-|------|--------|
-| Migration SQL | Create `increment_yap_score` function (SECURITY DEFINER) |
-| `src/components/messages/VenueYapThread.tsx` | Replace direct score UPDATE with `supabase.rpc('increment_yap_score', ...)` |
-| `src/components/messages/ActivityTab.tsx` | Restyle yap activity card from amber/orange to purple/lime theme |
+  useEffect(() => {
+    if (user?.id) {
+      const timer = setTimeout(checkAndPrompt, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [user?.id, checkAndPrompt]);
 
+  return { checkAndPrompt };
+}
+```
+
+### What changes
+
+- **Add import** for `supabase` client
+- **Make `checkAndPrompt` async**
+- **Add Guard 1**: Check `localStorage` cooldown — if shown within 2 hours, skip
+- **Add Guard 2**: Query `night_statuses` — if user is already `out` or `planning` with valid `expires_at`, skip
+- **Keep Guard 3**: Existing `sessionStorage` once-per-tab check remains as final guard
+
+Single file change, no database migration needed.
