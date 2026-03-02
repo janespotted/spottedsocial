@@ -1,104 +1,64 @@
 
 
-## Plan: Clean Up Notification Copy, Thread Header, and Anonymous Yap Notifications
+## Plan: Fix "Yap About It" Button Not Working
 
-Three issues to fix across 3 files.
+### Root Cause
 
----
+The button click navigates to `/messages` with `location.state`, but if the user is already on `/messages`, react-router may not reliably trigger the `location.state` effect. The immediate state-clearing navigation (`navigate(location.pathname, { replace: true, state: {} })`) can also race with the initial state consumption.
 
-### 1. Fix "Invites to You" copy — venue_invite should say "inviting you to"
+### Fix: Use localStorage as a Reliable Transport
 
-**`src/components/messages/ActivityTab.tsx`** — line 906-913
+Instead of relying solely on `location.state` (which has timing issues with same-page navigation), store the yap intent in localStorage. Messages.tsx reads from both sources.
 
-Currently the venue_invite card shows:
-> **Jane**  
-> @The Victorian
+**`src/components/CheckInConfirmation.tsx`** — `handleShareClick`:
+- Before navigating, write `yap_nav_venue` and `yap_nav_private_party` to localStorage
+- Remove `setPhase('celebration')` (unnecessary since we're navigating away)
 
-Change to:
-> **Jane**  
-> is inviting you to The Victorian
-
-```tsx
-{activity.type === 'venue_invite' && (
-  <div className="text-white text-sm">
-    <div className="flex items-center gap-2">
-      <span className="font-semibold">{activity.display_name}</span>
-      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
-    </div>
-    <span className="text-[#d4ff00] block text-xs mt-0.5">inviting you to {activity.subtitle}</span>
-  </div>
-)}
+```typescript
+const handleShareClick = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  const venueName = checkInVenueName;
+  const isPrivateParty = checkInIsPrivateParty;
+  // Store in localStorage as reliable transport
+  if (venueName) {
+    localStorage.setItem('yap_nav_venue', venueName);
+    localStorage.setItem('yap_nav_private_party', String(!!isPrivateParty));
+  }
+  closeCheckInConfirmation();
+  navigate('/messages', { state: { activeTab: 'yap', venueName, isPrivateParty } });
+};
 ```
 
----
+**`src/pages/Messages.tsx`** — useEffect:
+- Also check localStorage for `yap_nav_venue` on mount/state change as a fallback
+- Clear localStorage keys after reading
 
-### 2. Make "Yaps at Your Spot" anonymous — no username
+```typescript
+useEffect(() => {
+  const state = location.state;
+  // Check localStorage fallback for yap navigation
+  const lsVenue = localStorage.getItem('yap_nav_venue');
+  const lsPrivateParty = localStorage.getItem('yap_nav_private_party') === 'true';
 
-**`src/components/messages/ActivityTab.tsx`** — line 987-995
-
-Currently shows "Jane" with avatar. Change to anonymous: hide the avatar, don't show the display name, just show "New yap @ [venue]".
-
-```tsx
-{activity.type === 'venue_yap' && (
-  <div className="text-white text-sm">
-    <div className="flex items-center gap-2">
-      <span className="font-semibold">New yap</span>
-      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
-    </div>
-    <span className="text-amber-400 block text-xs mt-0.5 line-clamp-1">{activity.subtitle || 'at your spot'}</span>
-  </div>
-)}
+  if (state?.venueName || lsVenue) {
+    const venue = state?.venueName || lsVenue;
+    const isPrivateParty = state?.isPrivateParty ?? lsPrivateParty;
+    setYapVenueName(venue);
+    setYapIsPrivateParty(!!isPrivateParty);
+    setYapNavKey(prev => prev + 1);
+    setActiveTab('yap');
+    // Clean up
+    localStorage.removeItem('yap_nav_venue');
+    localStorage.removeItem('yap_nav_private_party');
+  }
+  // ...rest of existing state handling
+}, [location.state]);
 ```
 
-Also update the avatar/icon section in `renderActivityCard` (~line 866-892): for `venue_yap` type, show a generic chat icon instead of the sender's avatar. And update `useYapNotifications.ts` line 95 to remove the yapper's name from the notification message.
-
-**`src/hooks/useYapNotifications.ts`** — line 80-101
-
-Change the banner message from `"💬 Jane yapped at The Victorian: ..."` to `"💬 New yap at The Victorian: ..."`. Remove the profile fetch since we no longer need the name, and don't pass `sender_profile` to the banner.
-
----
-
-### 3. Fix Thread header getting cut off
-
-**`src/pages/Thread.tsx`** — line 357-358
-
-The header `pt-[max(env(safe-area-inset-top),12px)]` with `p-4` inside works, but the content gets visually cramped. Add more top padding to the inner container:
-
-```tsx
-<div className="flex items-center justify-between px-4 py-3">
-```
-
-And for the 1:1 chat header (line 486-499), the venue name badge is pushed to the far right and can overflow. Move it below the username instead of inline:
-
-```tsx
-<div className="flex-1 min-w-0 text-left">
-  <h2 className="font-semibold text-white truncate">{otherMember?.display_name}</h2>
-  <div className="flex items-center gap-2">
-    <p className="text-white/60 text-sm truncate">@{otherMember?.username}</p>
-    {otherMember?.venue_name && (
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleVenueClick(otherMember.venue_name!, otherMember.venue_id);
-        }}
-        className="text-[#d4ff00] text-xs font-medium hover:text-[#d4ff00]/80 transition-colors truncate max-w-[140px]"
-      >
-        @{otherMember.venue_name}
-      </button>
-    )}
-  </div>
-</div>
-```
-
-Remove the separate venue button that was outside the text container (line 490-499).
-
----
-
-### Summary
+### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/components/messages/ActivityTab.tsx` | venue_invite copy → "inviting you to"; venue_yap → anonymous with icon |
-| `src/hooks/useYapNotifications.ts` | Remove username from yap banner message |
-| `src/pages/Thread.tsx` | Clean up header layout, move venue badge inline with username |
+| `src/components/CheckInConfirmation.tsx` | Write yap intent to localStorage, remove `setPhase`, close before navigating |
+| `src/pages/Messages.tsx` | Read from localStorage as fallback, clean up after reading |
 
