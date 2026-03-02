@@ -12,6 +12,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import spottedLogo from '@/assets/spotted-s-logo.png';
+import { isFromTonight } from '@/lib/time-context';
 import { logger } from '@/lib/logger';
 import { MessageInput } from '@/components/MessageInput';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
@@ -229,9 +230,12 @@ export default function Thread() {
       .order('created_at', { ascending: true });
 
     if (data) {
+      // Filter to only show messages from the current night window (5am boundary)
+      const tonightMessages = data.filter(msg => isFromTonight(msg.created_at));
+      
       // Generate signed URLs for messages with images
       const messagesWithSignedUrls = await Promise.all(
-        data.map(async (msg) => {
+        tonightMessages.map(async (msg) => {
           if (msg.image_url && !msg.image_url.startsWith('http')) {
             // It's a file path, generate signed URL
             const { data: signedData } = await supabase.storage

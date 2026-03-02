@@ -13,6 +13,7 @@ import { MessagesSkeleton } from './MessagesSkeleton';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { getCachedCity } from '@/lib/city-detection';
+import { isFromTonight } from '@/lib/time-context';
 
 interface ThreadMember {
   user_id: string;
@@ -154,9 +155,10 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
       const profileMap = new Map(filteredProfiles.map((p: any) => [p.id, p]));
       const statusMap = new Map(statuses.map(s => [s.user_id, s.venue_name]));
       
-      // Group messages by thread and get latest
+      // Filter messages to only tonight's window, then group by thread and get latest
+      const tonightMessages = allMessages.filter(msg => isFromTonight(msg.created_at));
       const latestMessageByThread = new Map<string, typeof allMessages[0]>();
-      for (const msg of allMessages) {
+      for (const msg of tonightMessages) {
         if (!latestMessageByThread.has(msg.thread_id)) {
           latestMessageByThread.set(msg.thread_id, msg);
         }
