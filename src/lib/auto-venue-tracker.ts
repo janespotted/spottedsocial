@@ -16,7 +16,6 @@ interface LastCheckin {
 
 interface TrackingState {
   lastGPS: { lat: number; lng: number; timestamp: string } | null;
-  wasInBackground: boolean;
   lastTrackTime: number;
   lastManualCheckinTime: number;
 }
@@ -28,7 +27,6 @@ const MANUAL_CHECKIN_COOLDOWN_MS = 30 * 60 * 1000;
 
 const trackingState: TrackingState = {
   lastGPS: null,
-  wasInBackground: false,
   lastTrackTime: 0,
   lastManualCheckinTime: 0,
 };
@@ -42,11 +40,12 @@ export const markManualCheckin = (): void => {
   console.log('🔒 Manual checkin marked — auto-tracking paused for 30 min');
 };
 
-// Detect if app was in background
+// On foreground return, reset debounce so next autoTrackVenue call proceeds immediately
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      trackingState.wasInBackground = true;
+    if (!document.hidden) {
+      // App returned to foreground — bypass debounce so next call proceeds
+      trackingState.lastTrackTime = 0;
     }
   });
 }
@@ -273,13 +272,6 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
       return;
     }
 
-    // Check if app was in background
-    if (trackingState.wasInBackground) {
-      console.log('🔵 App was in background, skipping auto-update');
-      trackingState.wasInBackground = false;
-      return;
-    }
-
     // Calculate speed if we have previous GPS data
     if (trackingState.lastGPS) {
       const speed = calculateSpeed(
@@ -356,7 +348,6 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
       lng: locationData.lng,
       timestamp: locationData.timestamp,
     };
-    trackingState.wasInBackground = false;
 
   } catch (error: any) {
     // Geolocation errors (permission denied, position unavailable, timeout) or missing API
