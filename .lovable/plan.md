@@ -1,26 +1,22 @@
 
 
-## Fix: Private Party venue tap navigates to map
+## Tap Friend Name → Fly to Their Location on Map
 
-### Problem
-When a friend is at a private party, tapping their venue text ("@ Private Party · SoHo") on the Friend ID Card calls `handleVenueClick("Private Party")`, which queries the `venues` table for a venue named "Private Party" — no match, nothing happens.
+### What changes
+Make the friend's display name on the Friend ID Card tappable. Tapping it closes the card and navigates to `/map` with a `flyTo` state containing the friend's coordinates — the same pattern already used for private party taps.
 
-### Fix — `src/components/FriendIdCard.tsx`
+### `src/components/FriendIdCard.tsx`
 
-**Add a `isPrivateParty` flag** derived from userStatus. The night_statuses query already fetches `is_private_party` (line 159) and sets `currentVenue` to `'Private Party'` (line 205). Track this in the `UserStatus` interface.
-
-**Add `isPrivateParty: boolean` to the `UserStatus` interface** (line 42). Set it to `true` when `nightStatus.is_private_party` is true (line 201), `false` everywhere else.
-
-**Modify the venue tap handler at line 639-645**: When `userStatus.isPrivateParty` is true, instead of calling `handleVenueClick`, navigate to `/map` with the friend's coordinates passed via route state:
-
+**Add a `handleNameClick` function** (next to `handlePrivatePartyClick`):
 ```typescript
-const handlePrivatePartyClick = () => {
+const handleNameClick = () => {
+  if (!userStatus?.lat || !userStatus?.lng) return;
   closeFriendCard();
   navigate('/map', {
     state: {
       flyTo: {
-        lat: userStatus?.lat,
-        lng: userStatus?.lng,
+        lat: userStatus.lat,
+        lng: userStatus.lng,
         zoom: 15,
       }
     }
@@ -28,13 +24,11 @@ const handlePrivatePartyClick = () => {
 };
 ```
 
-In the JSX (line 639-645), split the click handler:
-- If `userStatus.isPrivateParty` → call `handlePrivatePartyClick`
-- Otherwise → call `handleVenueClick(userStatus.currentVenue!)`
+**Make the name `<h2>` a tappable button** (~line 623-625): Wrap or replace the `<h2>` with a `<button>` that calls `handleNameClick`. Only make it tappable when the friend has a known location (`userStatus?.lat && userStatus?.lng`). Style it with `hover:underline cursor-pointer` to hint interactivity; fall back to a plain `<h2>` when no location is available.
 
-**Update `src/pages/Map.tsx`** to read `flyTo` from `location.state` and fly the map camera to those coordinates on mount (if present). Use `map.flyTo({ center: [lng, lat], zoom })` inside an effect that watches for the state.
+### No changes to Map.tsx
+The `flyTo` route state handler already exists from the private party feature — it will work automatically.
 
 ### Files changed
-- `src/components/FriendIdCard.tsx` — add isPrivateParty to UserStatus, add private party tap handler
-- `src/pages/Map.tsx` — read flyTo from route state and animate map camera
+- `src/components/FriendIdCard.tsx` — add name click handler, make name tappable
 
