@@ -289,9 +289,6 @@ All colors MUST be HSL.
 
   /* Map venue promoted pulse animation */
 
-  .logo-blend {
-    mix-blend-mode: screen;
-  }
 }
 
 /* Map venue promoted pulse animation - must be at global scope */
@@ -353,4 +350,9 @@ All colors MUST be HSL.
     user-select: text;
     font-size: 16px; /* Prevents iOS auto-zoom on focus */
   }
+}
+
+/* Logo transparency — outside @layer for maximum specificity */
+.logo-blend {
+  mix-blend-mode: screen !important;
 }
