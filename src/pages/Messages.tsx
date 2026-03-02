@@ -91,7 +91,7 @@ export default function Messages() {
               onClick={openCheckIn}
               className="hover:scale-110 transition-transform"
             >
-              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
+              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain logo-blend" />
             </button>
           </div>
         </div>

@@ -288,6 +288,10 @@ All colors MUST be HSL.
    }
 
   /* Map venue promoted pulse animation */
+
+  .logo-blend {
+    mix-blend-mode: screen;
+  }
 }
 
 /* Map venue promoted pulse animation - must be at global scope */

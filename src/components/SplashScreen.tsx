@@ -7,7 +7,7 @@ export function SplashScreen() {
         <img 
           src={spottedLogo} 
           alt="Spotted" 
-          className="w-20 h-20 object-contain"
+          className="w-20 h-20 object-contain logo-blend"
         />
         <h1 className="text-2xl font-bold text-white">Spotted</h1>
       </div>

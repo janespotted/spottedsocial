@@ -71,7 +71,7 @@ export const BottomNav = memo(function BottomNav() {
                   src={spottedLogo}
                   alt="Profile"
                   className={cn(
-                    'h-10 w-10 object-contain transition-all',
+                    'h-10 w-10 object-contain transition-all logo-blend',
                     isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]'
                   )}
                 />
