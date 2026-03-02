@@ -1,118 +1,172 @@
 
 
-## Plan: Fix Notification Routing, Stale Data, Yap Bugs, and Realtime Updates
+## Plan: Staleness Detection + "Still Here?" Push Nudge
 
-This addresses 6 issues across multiple files.
-
----
-
-### 1. Delete the standalone `/notifications` page
-
-The Activity Center in Messages is the canonical notification page. Remove:
-
-- **Delete `src/pages/Notifications.tsx`**
-- **`src/App.tsx`**: Remove the import (line 40) and the `/notifications` route (lines 226-233). Redirect `/notifications` to `/messages` with `activeTab: 'activity'` state (or just remove the route — it'll hit the 404).
+This plan adds two layers: (1) automatic filtering/checkout of stale check-ins (2h), and (2) a "still here?" push notification with auto-checkout on no response.
 
 ---
 
-### 2. Fix NotificationBanner routing by type
+### Piece 1: Staleness Detection & Auto-Checkout
 
-**`src/components/NotificationBanner.tsx`** — update `handleBannerTap`:
+#### 1a. Add 2-hour staleness filter to Map's `fetchFriendsLocations`
 
-- `dm_message` → navigate to `/messages` with `preselectedUser` (already correct)
-- `meetup_request`, `venue_invite`, `meetup_accepted`, `venue_invite_accepted` → navigate to `/messages` with `activeTab: 'activity'` (already correct)  
-- `venue_yap` → navigate to `/messages` with `activeTab: 'yap'` (currently goes to activity — **fix this**)
+**`src/pages/Map.tsx` (~line 442-449)**
 
-Change line 48 to check `isYapType` first and route to yap tab.
+Add a `last_location_at` freshness check alongside the existing `isFromTonight` filter:
 
----
-
-### 3. Fix "Yaps at Your Spot" showing avatar but no text
-
-**`src/components/messages/ActivityTab.tsx`** — the `renderActivityCard` function (lines 825-953) has render blocks for every activity type **except `venue_yap`**. That's why it shows avatar + empty content.
-
-Add a `venue_yap` rendering block after the `rally` block (~line 952):
-
-```tsx
-{activity.type === 'venue_yap' && (
-  <div className="text-white text-sm">
-    <div className="flex items-center gap-2">
-      <span className="font-semibold">{activity.display_name}</span>
-      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
-    </div>
-    <span className="text-amber-400 block text-xs mt-0.5 line-clamp-1">{activity.subtitle}</span>
-  </div>
-)}
+```typescript
+// Add: filter out friends whose last_location_at is >2 hours old
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+friendProfiles = friendProfiles.filter((p: any) => {
+  if (!p.last_location_at) return false;
+  const age = Date.now() - new Date(p.last_location_at).getTime();
+  return age < TWO_HOURS_MS;
+});
 ```
 
-Also add a "View" action button for `venue_yap` in the actions section (~line 1040) that navigates to the yap tab.
+This goes after the existing `isFromTonight` filter at line 442-449, before demo filtering.
 
----
+#### 1b. Add 2-hour staleness filter to ActivityTab "Friends Out Now"
 
-### 4. Fix "Yap about it" button staleness
+**`src/components/messages/ActivityTab.tsx` (~line 407-420)**
 
-**`src/components/CheckInConfirmation.tsx`** — the `handleShareClick` (line 145) navigates to `/messages` with `activeTab: 'yap'` and `venueName`. The issue is that `venueName` is captured from `checkInVenueName` which may be stale if the confirmation was opened before the check-in completed in the DB.
+After the checkins query with `is('ended_at', null)` and `gte('started_at', tonightCutoff)`, add client-side filter:
 
-Fix: Capture `checkInVenueName` before clearing state. The current code already does this (line 147), but `closeCheckInConfirmation()` on line 150 resets state. Move `closeCheckInConfirmation()` **after** navigate to prevent the race:
-
-```tsx
-const handleShareClick = (e: React.MouseEvent) => {
-  e.stopPropagation();
-  const venueName = checkInVenueName;
-  const isPrivateParty = checkInIsPrivateParty;
-  setPhase('celebration');
-  navigate('/messages', { 
-    state: { activeTab: 'yap', venueName, isPrivateParty } 
-  });
-  // Close AFTER navigation state is set
-  setTimeout(() => closeCheckInConfirmation(), 100);
-};
+```typescript
+// Filter out stale check-ins (last_updated_at > 2 hours ago)
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+const freshCheckIns = filteredCheckIns.filter(c => {
+  const lastUpdate = c.last_updated_at || c.started_at;
+  if (!lastUpdate) return false;
+  return Date.now() - new Date(lastUpdate).getTime() < TWO_HOURS_MS;
+});
 ```
 
----
+Use `freshCheckIns` instead of `filteredCheckIns` for the deduplication step.
 
-### 5. Add realtime subscriptions to Activity Center
+#### 1c. Auto-checkout stale users in `useAutoVenueTracking`
 
-**`src/components/messages/ActivityTab.tsx`** — currently fetches data only on mount/dependency change. No realtime updates.
+**`src/hooks/useAutoVenueTracking.ts`**
 
-Add realtime subscriptions for:
-- `notifications` table (INSERT for current user's `receiver_id`) → refetch activities
-- `checkins` table (INSERT/UPDATE) → refetch friends out section
-- `night_statuses` table (INSERT/UPDATE) → refetch planning friends
+In the heartbeat's `start()` function (after confirming user status is 'out'), add a staleness check:
 
-Use a debounced `fetchAll()` call when any of these fire, with a 2-second throttle to prevent spam.
+```typescript
+// Before starting heartbeat, check if current checkin is stale (>2h)
+const { data: activeCheckin } = await supabase
+  .from('checkins')
+  .select('started_at, last_updated_at')
+  .eq('user_id', user.id)
+  .is('ended_at', null)
+  .order('started_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
 
-```tsx
-useEffect(() => {
-  if (!user) return;
-  
-  let debounceTimer: ReturnType<typeof setTimeout>;
-  const debouncedRefresh = () => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => { fetchAll(); fetchPlanningFriends(); }, 2000);
-  };
-
-  const channel = supabase
-    .channel('activity-realtime')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `receiver_id=eq.${user.id}` }, debouncedRefresh)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, debouncedRefresh)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, debouncedRefresh)
-    .subscribe();
-
-  return () => {
-    clearTimeout(debounceTimer);
-    supabase.removeChannel(channel);
-  };
-}, [user]);
+if (activeCheckin) {
+  const lastActivity = activeCheckin.last_updated_at || activeCheckin.started_at;
+  const age = Date.now() - new Date(lastActivity).getTime();
+  if (age > 2 * 60 * 60 * 1000) {
+    // Auto-checkout: end checkin, clear profile, reset status
+    await supabase.from('checkins').update({ ended_at: new Date().toISOString() })
+      .eq('user_id', user.id).is('ended_at', null);
+    await supabase.from('profiles').update({
+      is_out: false, last_known_lat: null, last_known_lng: null, last_location_at: null
+    }).eq('id', user.id);
+    await supabase.from('night_statuses').update({
+      status: 'home', venue_name: null, venue_id: null, lat: null, lng: null, expires_at: null
+    }).eq('user_id', user.id);
+    logEvent('auto_checkout_stale', { reason: '2h_no_activity' });
+    return; // Don't start heartbeat
+  }
+}
 ```
 
-Also add `useVisibilityRefresh` to ActivityTab for auto-refresh on tab return.
+Also add `logEvent` import to this file.
 
 ---
 
-### 6. Add realtime to Messages page (status updates without refresh)
+### Piece 2: "Still Here?" Push Nudge
 
-**`src/pages/Messages.tsx`** — check if it already has realtime for the active tab. The ActivityTab change above handles realtime for the activity tab. The MessagesTab and YapTab already have their own subscriptions. This should resolve the "why do I have to refresh" issue.
+#### 2a. Schedule reminder on check-in
+
+**`src/components/CheckInModal.tsx` (~line 558-623, inside `handleVenueConfirm` for 'out' status)**
+
+After a successful check-in, save the still-here timer:
+
+```typescript
+// Schedule "still here?" check for 2 hours from now
+localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
+localStorage.setItem('still_here_venue', finalVenueName);
+```
+
+Add this after `startLocationTracking` (line 575) and before the `showOutConfirmation` calls.
+
+Also clear the timer when user goes home (in `stopLocationTracking` ~line 165):
+
+```typescript
+localStorage.removeItem('still_here_check');
+localStorage.removeItem('still_here_venue');
+```
+
+#### 2b. Check the timer in Layout.tsx
+
+**`src/components/Layout.tsx`**
+
+Extend the existing reminder-check `useEffect` (line 42-66) to also handle the `still_here_check` timer:
+
+```typescript
+// Check "still here?" timer
+const stillHereTime = localStorage.getItem('still_here_check');
+if (stillHereTime && Date.now() >= Number(stillHereTime)) {
+  const venueName = localStorage.getItem('still_here_venue') || 'your spot';
+  // Set a 30-minute auto-checkout deadline
+  if (!localStorage.getItem('still_here_deadline')) {
+    localStorage.setItem('still_here_deadline', String(Date.now() + 30 * 60 * 1000));
+  }
+  showBrowserNotification(
+    `Still at ${venueName}?`,
+    'Tap to confirm or head home'
+  );
+  localStorage.removeItem('still_here_check');
+  // Show in-app prompt (reuse check-in modal or toast with actions)
+}
+
+// Check auto-checkout deadline (30 min after nudge with no response)
+const deadline = localStorage.getItem('still_here_deadline');
+if (deadline && Date.now() >= Number(deadline)) {
+  localStorage.removeItem('still_here_deadline');
+  localStorage.removeItem('still_here_venue');
+  // Perform auto-checkout
+  performAutoCheckout(user);
+}
+```
+
+#### 2c. Create `performAutoCheckout` utility
+
+**New file: `src/lib/auto-checkout.ts`**
+
+```typescript
+export async function performAutoCheckout(userId: string) {
+  await supabase.from('checkins').update({ ended_at: new Date().toISOString() })
+    .eq('user_id', userId).is('ended_at', null);
+  await supabase.from('profiles').update({
+    is_out: false, last_known_lat: null, last_known_lng: null, last_location_at: null
+  }).eq('id', userId);
+  await supabase.from('night_statuses').update({
+    status: 'home', venue_name: null, venue_id: null, lat: null, lng: null, expires_at: null
+  }).eq('user_id', userId);
+  logEvent('auto_checkout_stale', { reason: 'still_here_no_response' });
+}
+```
+
+#### 2d. "Yes, still here" and "No, heading home" actions
+
+**`src/components/Layout.tsx`**
+
+When the still-here nudge fires, show a toast with two action buttons:
+- **Yes, still here**: refresh `last_location_at` to now, update `checkins.last_updated_at`, clear `still_here_deadline`, set a new `still_here_check` for 2 more hours
+- **No, heading home**: call `performAutoCheckout`, clear all still-here localStorage keys
+
+Use `sonner` toast with action buttons for the in-app prompt.
 
 ---
 
@@ -120,9 +174,11 @@ Also add `useVisibilityRefresh` to ActivityTab for auto-refresh on tab return.
 
 | File | Change |
 |------|--------|
-| `src/pages/Notifications.tsx` | **Delete** |
-| `src/App.tsx` | Remove `/notifications` route + import |
-| `src/components/NotificationBanner.tsx` | Route yap banners to yap tab |
-| `src/components/messages/ActivityTab.tsx` | Add `venue_yap` rendering; add realtime subscriptions; add visibility refresh |
-| `src/components/CheckInConfirmation.tsx` | Fix Yap button race condition |
+| `src/pages/Map.tsx` | Add 2h staleness filter in `fetchFriendsLocations` |
+| `src/components/messages/ActivityTab.tsx` | Add 2h staleness filter for "Friends Out Now" check-ins |
+| `src/hooks/useAutoVenueTracking.ts` | Add stale checkin detection + auto-checkout on heartbeat start |
+| `src/components/CheckInModal.tsx` | Schedule `still_here_check` on check-in; clear on go-home |
+| `src/components/Layout.tsx` | Check still-here timer; show nudge toast; auto-checkout on deadline |
+| `src/lib/auto-checkout.ts` | New shared utility for auto-checkout logic |
+| `src/lib/event-logger.ts` | Add `auto_checkout_stale` to EventType union |
 
