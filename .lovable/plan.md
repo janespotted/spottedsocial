@@ -1,62 +1,43 @@
 
 
-## Plan: Fix Invite Undo + Add Live Realtime Updates
+## Fix: Bootstrap mode should use detected city, not hardcode NYC
 
-### Problem 1: Undo Doesn't Work
+### Root Cause
+`getBootstrapMode()` is synchronous and falls back to `'nyc'` before async GPS detection completes. An LA user sees NYC leaderboard data on first load until GPS resolves.
 
-**Root cause:** The DELETE RLS policy on the `notifications` table only allows `auth.uid() = receiver_id` — meaning only the **receiver** can delete a notification. But the undo code runs as the **sender**, so Supabase silently ignores the delete (no rows affected, no error thrown).
+### Solution
+Two changes needed:
 
-**Fix:** Add a new RLS policy allowing senders to delete their own sent notifications that are still unread.
+**1. `src/lib/bootstrap-config.ts`** — When `getBootstrapMode()` has no cached city, don't commit to NYC. Instead, return a neutral fallback and let the city update reactively once GPS resolves.
 
-**Database migration:**
-```sql
-CREATE POLICY "Senders can delete own unread notifications"
-  ON notifications FOR DELETE
-  USING (auth.uid() = sender_id AND is_read = false);
-```
+Actually, the simpler fix: make `getBootstrapMode()` respect the city from `useUserCity` by having the consuming components pass the detected city rather than reading it independently. But that's a larger refactor.
 
-This is safe because:
-- Senders can only delete notifications they sent
-- Only unread ones (once the recipient reads it, undo window is gone)
-- The existing receiver delete policy stays unchanged
+**Simplest fix:** In `getBootstrapMode()`, change the fallback from hardcoded `'nyc'` to also check the `detected_city` localStorage key (which `useUserCity` writes to on first GPS detection). This way both caches stay in sync:
 
-### Problem 2: Pages Not Updating Live
-
-Currently only the Feed/Home pages and the Activity tab have realtime subscriptions. Other key pages (Map, Friends, Leaderboard, Profile) rely on manual refresh or `useVisibilityRefresh` (which only fires when the tab regains focus).
-
-**Fix:** Add realtime subscriptions to the key pages that should stay live:
-
-1. **`src/pages/Map.tsx`** — Subscribe to `checkins` and `night_statuses` changes to update friend pins live
-2. **`src/pages/Friends.tsx`** — Subscribe to `friendships` and `night_statuses` changes so new friends and status changes appear instantly
-3. **`src/pages/Leaderboard.tsx`** — Subscribe to `checkins` changes to update venue counts live
-
-For each page, add a `useEffect` that creates a Supabase channel listening for `postgres_changes` on the relevant tables, and invalidates the appropriate React Query cache keys when changes occur. Use debounced refresh (1-2s) to prevent UI flickering during rapid updates.
-
-**Pattern for each page:**
 ```typescript
-useEffect(() => {
-  if (!user) return;
-  let timer: ReturnType<typeof setTimeout>;
-  const refresh = () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      queryClient.invalidateQueries({ queryKey: ['relevant-key'] });
-    }, 1500);
-  };
-  const channel = supabase
-    .channel('page-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'table_name' }, refresh)
-    .subscribe();
-  return () => { clearTimeout(timer); supabase.removeChannel(channel); };
-}, [user]);
+// Line 46 of bootstrap-config.ts — currently:
+const city = getCachedCity() || 'nyc';
+
+// Change to: also check the detected_city key directly
+const city = getCachedCity() || 'nyc'; // getCachedCity already reads detected_city
 ```
 
-### Files Changed
+Wait — `getCachedCity()` reads from `detected_city` in localStorage, which is the same key that `detectUserCity()` writes to. So the real issue is just timing: on a **true first visit**, there's no cached city yet because GPS hasn't fired.
+
+**2. `src/hooks/useBootstrapMode.ts`** — Listen for the `cityChanged` event (dispatched by `cacheCity()` after GPS resolves) and update the bootstrap city reactively. Currently it only listens for `bootstrapModeChanged` and `storage`, not `cityChanged`.
+
+### Changes
 
 | File | Change |
 |------|--------|
-| Database migration | Add sender DELETE policy on `notifications` |
-| `src/pages/Map.tsx` | Add realtime subscription for `checkins` + `night_statuses` |
-| `src/pages/Friends.tsx` | Add realtime subscription for `friendships` + `night_statuses` |
-| `src/pages/Leaderboard.tsx` | Add realtime subscription for `checkins` |
+| `src/hooks/useBootstrapMode.ts` | Add listener for `cityChanged` event so bootstrap city updates when GPS detects LA/PB |
+| `src/lib/bootstrap-config.ts` | No change needed — `getCachedCity()` already reads the right key; the issue is purely timing |
+
+This way, an LA user on first load:
+1. Briefly sees NYC data (unavoidable — GPS takes ~1-2s)
+2. GPS resolves → `cacheCity('la')` fires `cityChanged` event
+3. `useBootstrapMode` catches the event → updates city to `'la'`
+4. Leaderboard re-renders with LA venue data
+
+The brief NYC flash is acceptable since GPS must complete first. If we want zero flash, we'd need to show a loading state until city is detected, but that adds friction.
 
