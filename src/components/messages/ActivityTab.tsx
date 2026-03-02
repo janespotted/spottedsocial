@@ -369,6 +369,15 @@ export function ActivityTab() {
 
     // Fetch check-ins from friends in background (progressive enhancement)
     if (friendIds.length > 0) {
+      // Calculate tonight's 5am cutoff for filtering
+      const now = new Date();
+      const tonightCutoff = new Date(now);
+      if (now.getHours() < 5) {
+        // Before 5am: cutoff is 5am yesterday
+        tonightCutoff.setDate(tonightCutoff.getDate() - 1);
+      }
+      tonightCutoff.setHours(5, 0, 0, 0);
+
       const { data: checkIns } = await supabase
         .from('checkins')
         .select(`
@@ -379,6 +388,8 @@ export function ActivityTab() {
           )
         `)
         .in('user_id', friendIds)
+        .is('ended_at', null)
+        .gte('started_at', tonightCutoff.toISOString())
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -444,10 +455,18 @@ export function ActivityTab() {
             seenSenders.set(dm.sender_id, dm);
           }
         }
-        const uniqueDms = Array.from(seenSenders.values());
+        let uniqueDms = Array.from(seenSenders.values());
 
         const dmProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
         const dmProfileMap = new Map(dmProfiles.map((p: any) => [p.id, p]));
+
+        // Filter out DMs from demo users when demo mode is off
+        if (!demoEnabled) {
+          uniqueDms = uniqueDms.filter(dm => {
+            const profile = dmProfileMap.get(dm.sender_id);
+            return !profile?.is_demo;
+          });
+        }
 
         const dmActivities: Activity[] = uniqueDms.map(dm => {
           const profile = dmProfileMap.get(dm.sender_id);
@@ -536,9 +555,9 @@ export function ActivityTab() {
         p_message: `${myName} is down to meet up! 🎉`,
       });
       
-      // Mark the original notification as read
+      // Delete the original notification so it doesn't reappear
       if (activity.notificationId) {
-        await supabase.from('notifications').update({ is_read: true }).eq('id', activity.notificationId);
+        await supabase.from('notifications').delete().eq('id', activity.notificationId);
       }
       
       // Log invite accepted
@@ -578,9 +597,9 @@ export function ActivityTab() {
         p_message: `${myName} is down for ${activity.subtitle}! 🎉`,
       });
       
-      // Mark the original notification as read
+      // Delete the original notification so it doesn't reappear
       if (activity.notificationId) {
-        await supabase.from('notifications').update({ is_read: true }).eq('id', activity.notificationId);
+        await supabase.from('notifications').delete().eq('id', activity.notificationId);
       }
       
       // Log invite accepted
