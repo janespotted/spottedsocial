@@ -27,6 +27,7 @@ export function CheckInConfirmation() {
   const [phase, setPhase] = useState<'celebration' | 'yap_prompt'>('celebration');
 
   const handleDismissAndNavigate = () => {
+    setPhase('celebration');
     closeCheckInConfirmation();
     navigate('/map');
   };
@@ -49,9 +50,15 @@ export function CheckInConfirmation() {
     
     if (showCheckInConfirmation) {
       fetchProfile();
-      setPhase('celebration');
     }
   }, [user, showCheckInConfirmation]);
+
+  // Reset phase every time confirmation opens
+  useEffect(() => {
+    if (showCheckInConfirmation) {
+      setPhase('celebration');
+    }
+  }, [showCheckInConfirmation]);
 
   useEffect(() => {
     if (showCheckInConfirmation && checkInConfirmationType === 'out' && (checkInVenueId || checkInIsPrivateParty)) {
@@ -137,15 +144,17 @@ export function CheckInConfirmation() {
 
   const handleShareClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Navigate first, then close — ensures navigation state is processed
+    const venueName = checkInVenueName;
+    const isPrivateParty = checkInIsPrivateParty;
+    setPhase('celebration');
+    closeCheckInConfirmation();
     navigate('/messages', { 
       state: { 
         activeTab: 'yap', 
-        venueName: checkInVenueName,
-        isPrivateParty: checkInIsPrivateParty 
+        venueName,
+        isPrivateParty 
       } 
     });
-    closeCheckInConfirmation();
   };
 
   const getPrivacyLabel = (level: string): string => {
