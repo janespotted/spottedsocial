@@ -121,6 +121,27 @@ export default function Leaderboard() {
     if (user) fetchLeaderboard();
   });
 
+  // Realtime subscription for live updates
+  useEffect(() => {
+    if (!user) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        fetchLeaderboard();
+      }, 1500);
+    };
+    const channel = supabase
+      .channel('leaderboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh)
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const fetchLeaderboard = async () => {
     setIsLoading(true);
     try {
