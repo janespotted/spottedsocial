@@ -1,80 +1,128 @@
 
 
-## Plan: Fix Multiple Notification, Demo Data, and Activity Issues
+## Plan: Fix Notification Routing, Stale Data, Yap Bugs, and Realtime Updates
 
-This addresses 5 distinct bugs.
-
----
-
-### Bug 1: No banner notification when receiving a DM
-
-**Root cause:** The `NotificationBanner` only handles notification types from the `notifications` table. DMs go into `dm_messages` — there's no realtime listener that triggers a banner when a new DM arrives.
-
-**Fix in `src/contexts/NotificationsContext.tsx`:**
-- Add a second realtime subscription on `dm_messages` table filtered by threads the user is a member of
-- When a new DM arrives from someone else, fetch the sender's profile and create a synthetic notification object with type `dm_message`, then call `setLatestNotification()` to trigger the banner
-
-**Fix in `src/components/NotificationBanner.tsx`:**
-- Add `dm_message` to `supportedTypes` array
-- Add a blue/purple styling branch for DM banners
-- On tap, navigate to `/messages` with the sender as `preselectedUser` (opens the DM thread directly)
+This addresses 6 issues across multiple files.
 
 ---
 
-### Bug 2: Avatar pictures not loading on notification banners
+### 1. Delete the standalone `/notifications` page
 
-**Root cause:** The `NotificationBanner` uses `latestNotification.sender_profile?.avatar_url` which comes from the `profiles` table. Avatar images are stored in the public `avatars` bucket as full URLs — this should work. The issue is that for realtime notifications, the profile fetch on line 101-105 queries the `profiles` table directly, but RLS may block access to non-friend profiles. Additionally, for notifications fetched on load, profiles are fetched without issue.
+The Activity Center in Messages is the canonical notification page. Remove:
 
-**Fix in `src/contexts/NotificationsContext.tsx`:**
-- Change the realtime profile fetch (line 101) to use `rpc('get_profile_safe', { target_user_id: ... })` instead of direct table query, which bypasses RLS restrictions
-- This ensures `avatar_url` and `display_name` are always populated
-
----
-
-### Bug 3: Demo data showing in Activity Center when demo mode is OFF
-
-**Root cause:** The Activity Tab at line 182-199 filters notifications by checking if the sender profile exists in the cached `profiles-safe` data and filtering out `is_demo` users. However, the notification query itself (line 167-173) fetches ALL notifications from the DB regardless of whether the sender is a demo user. The filtering relies on cached profiles being available — if the cache is empty, all notifications pass through.
-
-**Fix in `src/components/messages/ActivityTab.tsx`:**
-- After fetching notifications, also batch-fetch sender profiles from DB (not just cache) when demo mode is off
-- Filter out any notification whose sender has `is_demo = true` when `demoEnabled` is false
-- For the DM activities section (line 430+), also filter DMs from demo users when demo mode is off
+- **Delete `src/pages/Notifications.tsx`**
+- **`src/App.tsx`**: Remove the import (line 40) and the `/notifications` route (lines 226-233). Redirect `/notifications` to `/messages` with `activeTab: 'activity'` state (or just remove the route — it'll hit the 404).
 
 ---
 
-### Bug 4: "Friends Out Now" showing friends from 5+ days ago
+### 2. Fix NotificationBanner routing by type
 
-**Root cause:** The check-ins query at line 372-383 has NO time filter — it fetches the 10 most recent check-ins from friends regardless of when they occurred. It also doesn't filter by `ended_at IS NULL` (active check-ins only).
+**`src/components/NotificationBanner.tsx`** — update `handleBannerTap`:
 
-**Fix in `src/components/messages/ActivityTab.tsx` (line 372-383):**
-- Add `.is('ended_at', null)` to only show active (not ended) check-ins
-- Add `.gte('started_at', tonightCutoff)` using `isFromTonight` logic to only show tonight's check-ins
-- The `tonightCutoff` is calculated as "5am today" or "5am yesterday" depending on current time (reuse the ephemeral boundary logic)
+- `dm_message` → navigate to `/messages` with `preselectedUser` (already correct)
+- `meetup_request`, `venue_invite`, `meetup_accepted`, `venue_invite_accepted` → navigate to `/messages` with `activeTab: 'activity'` (already correct)  
+- `venue_yap` → navigate to `/messages` with `activeTab: 'yap'` (currently goes to activity — **fix this**)
 
----
-
-### Bug 5: Accepted meetup/invite should show banner with message option, and original invite should disappear
-
-**Root cause (banner):** The `NotificationBanner` already handles `meetup_accepted` and `venue_invite_accepted` types with emerald styling and a PartyPopper icon. However, there's no "Message" action button on the banner — it just shows text.
-
-**Root cause (disappear):** When a user accepts a meetup (line 553), `setActivities(prev => prev.filter(a => a.id !== activity.id))` removes it locally. This works. But if the user navigates away and comes back, the notification is re-fetched because it's still in the DB (only marked as `is_read`, not deleted). The activity card reappears.
-
-**Fix in `src/components/NotificationBanner.tsx`:**
-- For accepted types, show the sender's avatar (fetch profile) instead of just the PartyPopper icon
-- Add a "Message" button on the banner that opens a DM with the sender
-- Keep the PartyPopper as a smaller badge overlay
-
-**Fix in `src/components/messages/ActivityTab.tsx`:**
-- When accepting a meetup/venue invite, delete the notification from the DB (not just mark as read) so it doesn't reappear on reload
-- Filter out `is_read` meetup_request and venue_invite notifications from the activity list (accepted = read = hide)
+Change line 48 to check `isYapType` first and route to yap tab.
 
 ---
 
-### Summary of files to change
+### 3. Fix "Yaps at Your Spot" showing avatar but no text
 
-| File | Changes |
-|------|---------|
-| `src/contexts/NotificationsContext.tsx` | Add DM realtime listener; fix profile fetch to use RPC |
-| `src/components/NotificationBanner.tsx` | Add `dm_message` type; show avatar on accepted banners; add Message button |
-| `src/components/messages/ActivityTab.tsx` | Filter demo data properly; add tonight-only filter for check-ins; delete notifications on accept |
+**`src/components/messages/ActivityTab.tsx`** — the `renderActivityCard` function (lines 825-953) has render blocks for every activity type **except `venue_yap`**. That's why it shows avatar + empty content.
+
+Add a `venue_yap` rendering block after the `rally` block (~line 952):
+
+```tsx
+{activity.type === 'venue_yap' && (
+  <div className="text-white text-sm">
+    <div className="flex items-center gap-2">
+      <span className="font-semibold">{activity.display_name}</span>
+      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+    </div>
+    <span className="text-amber-400 block text-xs mt-0.5 line-clamp-1">{activity.subtitle}</span>
+  </div>
+)}
+```
+
+Also add a "View" action button for `venue_yap` in the actions section (~line 1040) that navigates to the yap tab.
+
+---
+
+### 4. Fix "Yap about it" button staleness
+
+**`src/components/CheckInConfirmation.tsx`** — the `handleShareClick` (line 145) navigates to `/messages` with `activeTab: 'yap'` and `venueName`. The issue is that `venueName` is captured from `checkInVenueName` which may be stale if the confirmation was opened before the check-in completed in the DB.
+
+Fix: Capture `checkInVenueName` before clearing state. The current code already does this (line 147), but `closeCheckInConfirmation()` on line 150 resets state. Move `closeCheckInConfirmation()` **after** navigate to prevent the race:
+
+```tsx
+const handleShareClick = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  const venueName = checkInVenueName;
+  const isPrivateParty = checkInIsPrivateParty;
+  setPhase('celebration');
+  navigate('/messages', { 
+    state: { activeTab: 'yap', venueName, isPrivateParty } 
+  });
+  // Close AFTER navigation state is set
+  setTimeout(() => closeCheckInConfirmation(), 100);
+};
+```
+
+---
+
+### 5. Add realtime subscriptions to Activity Center
+
+**`src/components/messages/ActivityTab.tsx`** — currently fetches data only on mount/dependency change. No realtime updates.
+
+Add realtime subscriptions for:
+- `notifications` table (INSERT for current user's `receiver_id`) → refetch activities
+- `checkins` table (INSERT/UPDATE) → refetch friends out section
+- `night_statuses` table (INSERT/UPDATE) → refetch planning friends
+
+Use a debounced `fetchAll()` call when any of these fire, with a 2-second throttle to prevent spam.
+
+```tsx
+useEffect(() => {
+  if (!user) return;
+  
+  let debounceTimer: ReturnType<typeof setTimeout>;
+  const debouncedRefresh = () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => { fetchAll(); fetchPlanningFriends(); }, 2000);
+  };
+
+  const channel = supabase
+    .channel('activity-realtime')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `receiver_id=eq.${user.id}` }, debouncedRefresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, debouncedRefresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, debouncedRefresh)
+    .subscribe();
+
+  return () => {
+    clearTimeout(debounceTimer);
+    supabase.removeChannel(channel);
+  };
+}, [user]);
+```
+
+Also add `useVisibilityRefresh` to ActivityTab for auto-refresh on tab return.
+
+---
+
+### 6. Add realtime to Messages page (status updates without refresh)
+
+**`src/pages/Messages.tsx`** — check if it already has realtime for the active tab. The ActivityTab change above handles realtime for the activity tab. The MessagesTab and YapTab already have their own subscriptions. This should resolve the "why do I have to refresh" issue.
+
+---
+
+### Summary of files changed
+
+| File | Change |
+|------|--------|
+| `src/pages/Notifications.tsx` | **Delete** |
+| `src/App.tsx` | Remove `/notifications` route + import |
+| `src/components/NotificationBanner.tsx` | Route yap banners to yap tab |
+| `src/components/messages/ActivityTab.tsx` | Add `venue_yap` rendering; add realtime subscriptions; add visibility refresh |
+| `src/components/CheckInConfirmation.tsx` | Fix Yap button race condition |
 
