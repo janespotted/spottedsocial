@@ -2487,6 +2487,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_yap_score: {
+        Args: { p_delta: number; p_yap_id: string }
+        Returns: undefined
+      }
       is_any_venue_owner: { Args: { check_user_id: string }; Returns: boolean }
       is_close_friend: {
         Args: { target_user_id: string; viewer_id: string }

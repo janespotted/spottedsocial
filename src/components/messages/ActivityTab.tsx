@@ -550,7 +550,7 @@ export function ActivityTab() {
       case 'venue_invite_accepted':
         return <Heart className="h-5 w-5 text-[#d4ff00]" />;
       case 'venue_yap':
-        return <MessageCircle className="h-5 w-5 text-amber-400" />;
+        return <MessageCircle className="h-5 w-5 text-[#d4ff00]" />;
       case 'rally':
         return <Megaphone className="h-5 w-5 text-[#d4ff00]" />;
       case 'dm_message':
@@ -869,8 +869,8 @@ export function ActivityTab() {
                     {getActivityIcon(activity.type)}
                   </div>
                 ) : activity.type === 'venue_yap' ? (
-                  <div className="w-11 h-11 rounded-full bg-amber-500/20 border-2 border-amber-400/60 flex items-center justify-center">
-                    <MessageCircle className="h-5 w-5 text-amber-400" />
+                  <div className="w-11 h-11 rounded-full bg-purple-500/20 border-2 border-purple-400/60 flex items-center justify-center">
+                    <MessageCircle className="h-5 w-5 text-[#d4ff00]" />
                   </div>
                 ) : activity.avatar_url !== undefined ? (
                   <button
@@ -994,7 +994,7 @@ export function ActivityTab() {
                       <span className="font-semibold">New yap</span>
                       <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
                     </div>
-                    <span className="text-amber-400 block text-xs mt-0.5 line-clamp-1">{activity.subtitle || 'at your spot'}</span>
+                    <span className="text-[#d4ff00] block text-xs mt-0.5 line-clamp-1">{activity.subtitle || 'at your spot'}</span>
                   </div>
                 )}
               </div>
@@ -1089,7 +1089,7 @@ export function ActivityTab() {
                   <Button
                     onClick={() => navigate('/messages', { state: { activeTab: 'yap' } })}
                     size="sm"
-                    className="h-8 bg-amber-500 hover:bg-amber-500/80 text-white rounded-full px-4 text-xs font-medium"
+                    className="h-8 bg-[#d4ff00] hover:bg-[#d4ff00]/80 text-black rounded-full px-4 text-xs font-medium"
                   >
                     View
                   </Button>
