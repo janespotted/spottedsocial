@@ -184,6 +184,25 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
     }
   };
 
+  const resolveYapMediaUrl = async (imageUrl: string | null): Promise<string | null> => {
+    if (!imageUrl) return null;
+    // Legacy: old public URLs from when bucket was public
+    if (imageUrl.includes('/storage/v1/object/public/yap-media/')) {
+      const path = imageUrl.split('/storage/v1/object/public/yap-media/')[1];
+      if (path) {
+        const { data } = await supabase.storage.from('yap-media').createSignedUrl(path, 3600);
+        return data?.signedUrl || null;
+      }
+    }
+    // Relative path (new format) — generate signed URL
+    if (!imageUrl.startsWith('http')) {
+      const { data } = await supabase.storage.from('yap-media').createSignedUrl(imageUrl, 3600);
+      return data?.signedUrl || null;
+    }
+    // Already a signed URL or external URL
+    return imageUrl;
+  };
+
   const fetchYapMessages = async () => {
     setIsLoading(true);
     try {
@@ -206,7 +225,17 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
       }
 
       const filteredYaps = yaps.filter((y) => !blockedUserIds.has(y.user_id));
-      const initialMessages: YapMessage[] = filteredYaps.map((msg) => ({ ...msg, user_vote: null }));
+
+      // Resolve signed URLs for yap media (bucket is now private)
+      const resolvedYaps = await Promise.all(
+        filteredYaps.map(async (msg) => ({
+          ...msg,
+          image_url: await resolveYapMediaUrl(msg.image_url),
+          user_vote: null as "up" | "down" | null,
+        }))
+      );
+
+      const initialMessages: YapMessage[] = resolvedYaps;
 
       if (sortBy === "hot") {
         initialMessages.sort((a, b) =>
@@ -319,10 +348,8 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
       console.error("Upload error:", error);
       return null;
     }
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("yap-media").getPublicUrl(filePath);
-    return { url: publicUrl, type: mediaType };
+    // Store the relative path; signed URLs are resolved at render time
+    return { url: filePath, type: mediaType };
   };
 
   const handlePostYap = async () => {
