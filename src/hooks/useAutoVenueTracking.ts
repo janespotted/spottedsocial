@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { autoTrackVenue } from '@/lib/auto-venue-tracker';
 import { supabase } from '@/integrations/supabase/client';
+import { performAutoCheckout } from '@/lib/auto-checkout';
 
 // Global tracking state to prevent duplicate calls across all hook instances
 let lastGlobalTrackTime = 0;
@@ -66,6 +67,28 @@ export const useAutoVenueTracking = () => {
         .gt('expires_at', new Date().toISOString())
         .maybeSingle();
       if (cancelled || data?.status !== 'out') return;
+
+      // Check if current checkin is stale (>2h with no activity)
+      const { data: activeCheckin } = await supabase
+        .from('checkins')
+        .select('started_at, last_updated_at')
+        .eq('user_id', user.id)
+        .is('ended_at', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (activeCheckin) {
+        const lastActivity = activeCheckin.last_updated_at || activeCheckin.started_at;
+        if (lastActivity) {
+          const age = Date.now() - new Date(lastActivity).getTime();
+          if (age > 2 * 60 * 60 * 1000) {
+            await performAutoCheckout(user.id, '2h_no_activity');
+            return; // Don't start heartbeat
+          }
+        }
+      }
+
       heartbeat(); // immediate first tick
       intervalId = setInterval(heartbeat, 60000);
     };

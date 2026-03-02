@@ -168,6 +168,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       locationIntervalRef.current = null;
     }
 
+    // Clear still-here nudge timers
+    localStorage.removeItem('still_here_check');
+    localStorage.removeItem('still_here_venue');
+    localStorage.removeItem('still_here_deadline');
+
     await supabase
       .from('profiles')
       .update({ 
@@ -573,6 +578,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
         // Start tracking location updates
         startLocationTracking(locationData.lat, locationData.lng);
+
+        // Schedule "still here?" check for 2 hours from now
+        localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
+        localStorage.setItem('still_here_venue', finalVenueName);
 
         // For custom venues (no DB venue ID), detect neighborhood and set as private party
         if (isCustomVenue && !finalVenueId) {

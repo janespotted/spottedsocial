@@ -439,14 +439,17 @@ export default function Map() {
           
           // Filter to only friends who are out with valid location data
           // Also filter out stale locations (not from tonight's window)
+          const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
           let friendProfiles = (allProfiles || [])
-            .filter((p: any) => 
-              friendIds.includes(p.id) && 
-              p.is_out === true && 
-              p.last_known_lat !== null && 
-              p.last_known_lng !== null &&
-              isFromTonight(p.last_location_at)
-            );
+            .filter((p: any) => {
+              if (!friendIds.includes(p.id) || p.is_out !== true) return false;
+              if (p.last_known_lat === null || p.last_known_lng === null) return false;
+              if (!isFromTonight(p.last_location_at)) return false;
+              // Filter out friends whose location is >2 hours stale
+              if (!p.last_location_at) return false;
+              const age = Date.now() - new Date(p.last_location_at).getTime();
+              return age < TWO_HOURS_MS;
+            });
           
           // Only filter out demo users when demo mode is OFF (bootstrap mode)
           if (!demoEnabled) {
