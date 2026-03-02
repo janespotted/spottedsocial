@@ -1,16 +1,24 @@
 
 
-## Fix: Duplicate Notifications in Activity Tab
+## Fix: "Post a Yap" Button Does Nothing After Check-In
 
 ### Root Cause
-`ActivityTab.tsx` has **two identical `useEffect` hooks** (lines 133-137 and 626-631) with the same dependencies `[user, demoEnabled, bootstrapEnabled, city]` that both call `fetchAll()`. This causes the entire fetch pipeline to run twice, and since check-ins and DMs are merged via `setActivities(prev => [...prev, ...new])`, they accumulate duplicates.
+When you check in at a venue and tap "Yap about it," the app navigates to the Yap thread correctly. However, the posting input doesn't appear because of a race condition:
 
-### Additional Issue
-The ActivityTab's notification query (line 165) does not filter by the 5am boundary, so old notifications from previous nights still appear (the DB still has Feb 28 entries).
+1. The YapTab determines if you can post by comparing your current venue (fetched async from the database) against the thread's venue name
+2. When you first land on the Yap thread, that async fetch hasn't completed yet — so it thinks you're not at the venue
+3. You see "Head here to post" instead of the text input, making it look like nothing works
 
-### Changes
+### Fix
 
-**`src/components/messages/ActivityTab.tsx`**:
-1. Remove the duplicate `useEffect` at lines 626-631 — merge `fetchPlanningFriends()` into the single existing effect at line 133
-2. Add `isFromTonight` filter to the notifications query results (line 179) so stale notifications from prior nights are excluded, matching what we did in `NotificationsContext`
+**`src/components/messages/YapTab.tsx`**:
+- When the component receives `venueName` via navigation state (meaning the user just came from a check-in confirmation), pass `canPost={true}` directly instead of waiting for the async `night_statuses` lookup
+- This is safe because the user just checked in — the confirmation screen wouldn't show the "Yap about it" button otherwise
+- Keep the async fetch as a fallback for when users navigate to a thread manually from the directory
+
+**`src/components/messages/VenueYapThread.tsx`**:
+- No changes needed — the `handlePostYap` function already works correctly once `canPost` is `true`
+
+### Files changed
+- `src/components/messages/YapTab.tsx` — when `venueNameProp` is provided (navigation from check-in), set `canPost={true}` instead of relying solely on the async venue name comparison
 
