@@ -32,7 +32,7 @@ export function NotificationBanner() {
   const handleBannerTap = () => {
     markAsRead(latestNotification.id);
     dismissLatest();
-    navigate('/notifications');
+    navigate('/messages', { state: { activeTab: 'activity' } });
   };
 
   const isAcceptedType = latestNotification.type === 'meetup_accepted' || latestNotification.type === 'venue_invite_accepted';
