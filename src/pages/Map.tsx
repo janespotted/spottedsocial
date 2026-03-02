@@ -48,7 +48,19 @@ interface FriendLocation {
   relationshipType?: 'close' | 'direct' | 'mutual';
   is_private_party?: boolean;
   party_neighborhood?: string | null;
+  last_location_at?: string | null;
 }
+
+const getStalenessMins = (lastLocationAt?: string | null): number => {
+  if (!lastLocationAt) return 999;
+  return (Date.now() - new Date(lastLocationAt).getTime()) / 60000;
+};
+
+const formatLastSeen = (mins: number): string => {
+  if (mins < 5) return 'Now';
+  if (mins < 60) return `${Math.round(mins)} min ago`;
+  return `${Math.round(mins / 60)}h ago`;
+};
 
 interface Venue {
   id: string;
@@ -552,6 +564,7 @@ export default function Map() {
               relationshipType: relationshipTypes[friend.id] || 'direct',
               is_private_party: isPrivateParty,
               party_neighborhood: ppData?.party_neighborhood || null,
+              last_location_at: friend.last_location_at || null,
             };
           });
         }
@@ -762,10 +775,13 @@ export default function Map() {
       return;
     }
 
-    // Apply relationship filter
-    const filteredFriends = relationshipFilter === 'close'
+    // Apply relationship filter, then filter out >60 min stale for markers
+    const filteredByRelationship = relationshipFilter === 'close'
       ? friends.filter(f => f.relationshipType === 'close')
       : friends;
+
+    // Only render markers for friends with location < 60 min old
+    const filteredFriends = filteredByRelationship.filter(f => getStalenessMins(f.last_location_at) < 60);
 
     // At high zoom (18+), don't cluster - show all individual avatars
     const shouldCluster = currentZoom < 18;
@@ -823,6 +839,12 @@ export default function Map() {
       el.style.height = '40px';
       el.style.cursor = 'pointer';
       el.style.zIndex = getZIndex(friend.relationshipType);
+      
+      // Dim markers for 15-60 min stale locations
+      const staleMins = getStalenessMins(friend.last_location_at);
+      if (staleMins >= 15) {
+        el.style.opacity = '0.5';
+      }
       
       const ringColors = {
         close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.35)', badge: '💛' },
@@ -1766,11 +1788,13 @@ export default function Map() {
                   <div>
                     <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">👥 Friends Out Now</h3>
                     <div className="space-y-1">
-                      {friends.map((friend) => (
+                      {friends.map((friend) => {
+                        const staleMins = getStalenessMins(friend.last_location_at);
+                        return (
                         <button
                           key={friend.user_id}
                           onClick={() => handleFriendSearchSelect(friend)}
-                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
+                          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors ${staleMins >= 60 ? 'opacity-50' : ''}`}
                         >
                           <Avatar className="w-9 h-9 border-2 border-[#a855f7]/40">
                             <AvatarImage src={friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`} />
@@ -1781,9 +1805,13 @@ export default function Map() {
                           <div className="flex-1 text-left">
                             <p className="text-white font-medium text-sm">{friend.profiles?.display_name}</p>
                             <p className="text-[#d4ff00] text-xs">📍 {friend.venue_name}</p>
+                            {staleMins >= 5 && (
+                              <p className="text-white/40 text-xs">Last seen {formatLastSeen(staleMins)}</p>
+                            )}
                           </div>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1795,11 +1823,13 @@ export default function Map() {
                   <div className="mb-6">
                     <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">People</h3>
                     <div className="space-y-1">
-                      {searchPeopleResults.map((friend) => (
+                      {searchPeopleResults.map((friend) => {
+                        const staleMins = getStalenessMins(friend.last_location_at);
+                        return (
                         <button
                           key={friend.user_id}
                           onClick={() => handleFriendSearchSelect(friend)}
-                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
+                          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors ${staleMins >= 60 ? 'opacity-50' : ''}`}
                         >
                           <Avatar className="w-9 h-9 border-2 border-[#a855f7]/40">
                             <AvatarImage src={friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`} />
@@ -1810,9 +1840,13 @@ export default function Map() {
                           <div className="flex-1 text-left">
                             <p className="text-white font-medium text-sm">{friend.profiles?.display_name}</p>
                             <p className="text-[#d4ff00] text-xs">📍 {friend.venue_name}</p>
+                            {staleMins >= 5 && (
+                              <p className="text-white/40 text-xs">Last seen {formatLastSeen(staleMins)}</p>
+                            )}
                           </div>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1938,11 +1972,14 @@ export default function Map() {
           {showFriendsList && (
             <div className="mb-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] max-h-96 overflow-y-auto relative z-[200]">
               {/* Friends Out Section */}
-              {friendsWithDistances.map((friend) => (
+              {friendsWithDistances.map((friend) => {
+                const staleMins = getStalenessMins(friend.last_location_at);
+                const isVeryStale = staleMins >= 60;
+                return (
                 <button
                   key={friend.user_id}
                   onClick={() => handleFriendClick(friend)}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10"
+                  className={`w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 ${isVeryStale ? 'opacity-50' : ''}`}
                 >
                   {/* Avatar */}
                   <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50 relative">
@@ -1975,6 +2012,11 @@ export default function Map() {
                     <p className="text-[#d4ff00] text-xs truncate">
                       📍 At {friend.venue_name || 'Nearby'}
                     </p>
+                    {staleMins >= 5 && (
+                      <p className="text-white/40 text-xs">
+                        Last seen {formatLastSeen(staleMins)}
+                      </p>
+                    )}
                   </div>
 
                   {/* Distance */}
@@ -1982,7 +2024,8 @@ export default function Map() {
                     {friend.distance} mi
                   </span>
                 </button>
-              ))}
+                );
+              })}
 
               {/* Friends Planning Section */}
               {planningFriends.length > 0 && (
