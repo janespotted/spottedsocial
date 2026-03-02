@@ -14,7 +14,7 @@ export interface BootstrapConfig {
 }
 
 const BOOTSTRAP_CONFIG: BootstrapConfig = {
-  enabled: true, // Toggle this to disable bootstrap mode
+  enabled: false, // Toggle this to enable bootstrap mode for testing
   thresholds: {
     totalUsers: 1000,      // Disable when you hit 1k users
     dailyActive: 100,      // Or 100 daily active users
@@ -43,7 +43,7 @@ export function getBootstrapMode(): BootstrapModeState {
   
   // Default: bootstrap mode is ON with detected/cached city
   const city = getCachedCity() || 'nyc';
-  return { enabled: true, city };
+  return { enabled: false, city };
 }
 
 export function setBootstrapMode(enabled: boolean): void {
