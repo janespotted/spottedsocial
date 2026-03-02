@@ -85,6 +85,15 @@ function AutoTracker({ onReady }: { onReady: () => void }) {
   return null;
 }
 
+// Only render DemoActivator for @spotted.com users or pending activations
+function GatedDemoActivator() {
+  const { user } = useAuth();
+  const hasPending = localStorage.getItem('pending_demo_activation');
+  const isInternal = user?.email?.endsWith('@spotted.com');
+  if (!isInternal && !hasPending) return null;
+  return <DemoActivator />;
+}
+
 function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
 
@@ -92,7 +101,7 @@ function AppContent() {
     <>
       {showSplash && <SplashScreen />}
       <AutoTracker onReady={() => setShowSplash(false)} />
-      <DemoActivator />
+      <GatedDemoActivator />
       <FriendIdCard />
       <VenueIdCard />
       <MeetUpConfirmation />
