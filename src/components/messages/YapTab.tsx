@@ -47,17 +47,22 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   const [pinnedCounts, setPinnedCounts] = useState<Map<string, number>>(new Map());
 
-  // When navigating from private party check-in, use the user's actual venue name
-  // from night_statuses (which has the correct format) instead of the prop
+  // Always respond to venueNameProp changes — ensures "Yap about it" button works
+  // even if YapTab was already mounted from a previous navigation
+  useEffect(() => {
+    if (venueNameProp) {
+      setThreadVenueName(venueNameProp);
+      setView('thread');
+    }
+  }, [venueNameProp]);
+
+  // For private party nav, also update when async userVenueName resolves
   useEffect(() => {
     if (isPrivatePartyNav && userVenueName) {
       setThreadVenueName(userVenueName);
       setView('thread');
-    } else if (venueNameProp && !isPrivatePartyNav) {
-      setThreadVenueName(venueNameProp);
-      setView('thread');
     }
-  }, [venueNameProp, isPrivatePartyNav, userVenueName]);
+  }, [isPrivatePartyNav, userVenueName]);
 
   // Fetch user's current venue independently from quotes
   useEffect(() => {
