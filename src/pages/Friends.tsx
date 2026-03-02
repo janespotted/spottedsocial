@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Copy, Users, Search, UserPlus, QrCode, Check, Loader2, Clock, ChevronRight, MessageCircle, Link2, X, Heart } from 'lucide-react';
+import { ArrowLeft, Copy, Users, Search, UserPlus, QrCode, Check, Loader2, Clock, ChevronRight, ChevronDown, MessageCircle, Link2, X, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
@@ -59,13 +59,13 @@ export default function Friends() {
   const { openFriendCard } = useFriendIdCard();
   const demoEnabled = useDemoMode();
   
-  // Tab state - check for navigation state
-  const initialTab = (location.state as any)?.tab || 'requests';
-  const [activeTab, setActiveTab] = useState<'requests' | 'friends' | 'find' | 'invite'>(initialTab);
+  const initialTab = (location.state as any)?.tab === 'invite' ? 'invite' : 'friends';
+  const [activeTab, setActiveTab] = useState<'friends' | 'invite'>(initialTab);
   
   // Friend requests state
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
+  const [requestsExpanded, setRequestsExpanded] = useState(false);
   
   // Invite link state
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -177,8 +177,6 @@ export default function Friends() {
           const profile = profiles?.[0];
 
           if (!profile) return null;
-          
-          // Filter out demo users when demo mode is off
           if (!demoEnabled && profile.is_demo) return null;
 
           const mutualFriends = await getMutualFriends(req.user_id);
@@ -239,7 +237,6 @@ export default function Friends() {
     ];
 
     const mutualIds = myFriendIds.filter(id => theirFriendIds.includes(id));
-
     if (mutualIds.length === 0) return [];
 
     const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
@@ -286,7 +283,6 @@ export default function Friends() {
   const getMutualText = (mutuals: any[]) => {
     if (mutuals.length === 0) return '';
     if (mutuals.length === 1) return `Friends with ${mutuals[0].display_name}`;
-    
     const first = mutuals[0].display_name.split(' ')[0];
     const rest = mutuals.length - 1;
     return `Friends with ${first} and ${rest} other${rest > 1 ? 's' : ''}`;
@@ -489,6 +485,8 @@ export default function Friends() {
     await Promise.all([fetchRequests(), fetchOrCreateInviteCode(), fetchSuggestedFriends()]);
   }, [queryClient, fetchRequests, fetchOrCreateInviteCode, fetchSuggestedFriends]);
 
+  const isSearching = searchQuery.trim().length >= 2;
+
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118]">
@@ -516,7 +514,7 @@ export default function Friends() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => {
-          const tab = v as any;
+          const tab = v as 'friends' | 'invite';
           setActiveTab(tab);
           if (tab === 'friends') {
             queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
@@ -524,280 +522,97 @@ export default function Friends() {
           }
         }} className="w-full">
           <div className="px-4 pt-4">
-            <TabsList className="w-full bg-[#1a0f2e]/80 border border-[#a855f7]/30 p-1 rounded-2xl">
+            <TabsList className="w-full bg-[#1a0f2e]/80 border border-[#a855f7]/30 p-1 rounded-2xl flex justify-center">
               <TabsTrigger 
-                value="requests" 
-                className="flex-1 rounded-xl data-[state=active]:bg-[#a855f7] data-[state=active]:text-white text-white/60"
+                value="friends" 
+                className="flex-1 rounded-xl data-[state=active]:bg-[#d4ff00] data-[state=active]:text-[#0a0118] data-[state=active]:font-bold text-white/60"
               >
-                Requests
+                Friends
                 {pendingCount > 0 && (
-                  <Badge className="ml-2 bg-[#d4ff00] text-[#0a0118] text-xs px-1.5 py-0">
+                  <Badge className="ml-2 bg-[#a855f7] text-white text-xs px-1.5 py-0">
                     {pendingCount}
                   </Badge>
                 )}
               </TabsTrigger>
               <TabsTrigger 
-                value="friends" 
-                className="flex-1 rounded-xl data-[state=active]:bg-[#a855f7] data-[state=active]:text-white text-white/60"
-              >
-                Friends
-              </TabsTrigger>
-              <TabsTrigger 
-                value="find" 
-                className="flex-1 rounded-xl data-[state=active]:bg-[#a855f7] data-[state=active]:text-white text-white/60"
-              >
-                Find
-              </TabsTrigger>
-              <TabsTrigger 
                 value="invite" 
-                className="flex-1 rounded-xl data-[state=active]:bg-[#a855f7] data-[state=active]:text-white text-white/60"
+                className="flex-1 rounded-xl data-[state=active]:bg-[#d4ff00] data-[state=active]:text-[#0a0118] data-[state=active]:font-bold text-white/60"
               >
                 Invite
               </TabsTrigger>
             </TabsList>
           </div>
 
-          {/* Requests Tab */}
-          <TabsContent value="requests" className="px-4 py-4 space-y-4">
-            {/* Manage Close Friends Button */}
-            <button
-              onClick={() => navigate('/profile/close-friends')}
-              className="w-full flex items-center justify-center gap-2 bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 text-white hover:bg-[#a855f7]/20 transition-colors"
-            >
-              <Heart className="h-5 w-5 text-[#d4ff00]" />
-              <span>Manage Close Friends</span>
-            </button>
-
-            {loadingRequests ? (
-              <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl p-5">
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 text-[#a855f7] animate-spin" />
-                </div>
-              </div>
-            ) : requests.length > 0 ? (
-              <div className="space-y-3">
-                {requests.map((request) => (
-                  <div
-                    key={request.id}
-                    className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => openFriendCard({
-                          userId: request.user_id,
-                          displayName: request.display_name,
-                          avatarUrl: request.avatar_url,
-                        })}
-                        className="transition-transform hover:scale-110"
-                      >
-                        <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
-                          <AvatarImage src={request.avatar_url || undefined} />
-                          <AvatarFallback className="bg-[#1a0f2e] text-white">
-                            {request.display_name[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                      </button>
-
-                      <div className="flex-1 min-w-0">
-                        <button
-                          onClick={() => openFriendCard({
-                            userId: request.user_id,
-                            displayName: request.display_name,
-                            avatarUrl: request.avatar_url,
-                          })}
-                          className="text-left hover:opacity-80 transition-opacity"
-                        >
-                          <h3 className="font-semibold text-white">{request.display_name}</h3>
-                        </button>
-                        {request.mutual_friends.length > 0 && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <div className="flex -space-x-2">
-                              {request.mutual_friends.slice(0, 2).map((friend, idx) => (
-                                <Avatar key={idx} className="h-5 w-5 border border-[#1a0f2e]">
-                                  <AvatarImage src={friend.avatar_url || undefined} />
-                                  <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                                    {friend.display_name[0]}
-                                  </AvatarFallback>
-                                </Avatar>
-                              ))}
-                            </div>
-                            <p className="text-white/60 text-xs ml-1">
-                              {getMutualText(request.mutual_friends)}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => acceptRequest(request.id)}
-                          variant="outline"
-                          className="border-[#a855f7] text-white hover:bg-[#a855f7]/20 rounded-full px-4"
-                        >
-                          Confirm
-                        </Button>
-                        <button
-                          onClick={() => declineRequest(request.id)}
-                          className="text-white/60 hover:text-white transition-colors"
-                        >
-                          <X className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-                <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
-                  <UserPlus className="h-10 w-10 text-[#a855f7]/60" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  No pending requests
-                </h3>
-                <p className="text-white/50 text-sm max-w-xs mb-6">
-                  Search for friends or share your invite link.
-                </p>
-                <Button
-                  onClick={() => setActiveTab('find')}
-                  className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6"
-                >
-                  Find Friends
-                </Button>
-              </div>
-            )}
-          </TabsContent>
-
           {/* Friends Tab */}
-          <TabsContent value="friends">
-            <MyFriendsTab />
-          </TabsContent>
-
-          {/* Find Tab */}
-          <TabsContent value="find" className="px-4 py-4 space-y-5">
-            {/* Search Section */}
-            <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl p-5 space-y-4">
-              <div className="flex items-center gap-4 mb-2">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center">
-                  <Search className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-white text-lg">Find on Spotted</h3>
-                  <p className="text-white/50 text-sm">Search for friends already on the app</p>
-                </div>
-              </div>
-              
+          <TabsContent value="friends" className="px-4 py-4 space-y-3">
+            {/* Search bar + Close Friends link */}
+            <div className="space-y-2">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by name or username..."
-                  className="pl-11 py-5 bg-[#0a0118]/50 border-[#a855f7]/20 rounded-2xl text-white placeholder:text-white/40 focus:border-[#a855f7]/50"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl pl-10 h-10 text-sm"
                 />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                    <X className="h-3.5 w-3.5 text-white/30 hover:text-white/50" />
+                  </button>
+                )}
               </div>
-
-              {searching && (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="h-5 w-5 text-[#a855f7] animate-spin" />
-                </div>
-              )}
-
-              {searchResults.length > 0 && (
-                <div className="space-y-3">
-                  {searchResults.map((result) => {
-                    const buttonState = getButtonState(result.id);
-                    const ButtonIcon = buttonState.icon;
-                    
-                    return (
-                      <div
-                        key={result.id}
-                        className="flex items-center gap-3 p-3 bg-[#0a0118]/50 rounded-2xl border border-[#a855f7]/10"
-                      >
-                        <Avatar className="h-11 w-11 border-2 border-[#a855f7]/40">
-                          <AvatarImage src={result.avatar_url || undefined} />
-                          <AvatarFallback className="bg-[#2d1b4e] text-white">
-                            {result.display_name?.[0] || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-white truncate">{result.display_name}</p>
-                          <p className="text-white/50 text-sm truncate">@{result.username}</p>
-                        </div>
-                        <Button
-                          onClick={() => sendFriendRequest(result.id)}
-                          size="sm"
-                          disabled={buttonState.disabled}
-                          variant={buttonState.variant}
-                          className={buttonState.disabled 
-                            ? "border-[#a855f7]/40 text-white/60 rounded-xl"
-                            : "bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl"
-                          }
-                        >
-                          <ButtonIcon className="h-4 w-4 mr-1" />
-                          {buttonState.label}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {searchQuery.length >= 2 && !searching && searchResults.length === 0 && (
-                <p className="text-white/50 text-sm text-center py-4">
-                  No users found. Invite them with your link!
-                </p>
-              )}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => navigate('/profile/close-friends')}
+                  className="flex items-center gap-1 text-[#a855f7] text-xs hover:text-[#a855f7]/80 transition-colors"
+                >
+                  <Heart className="h-3 w-3" />
+                  Manage Close Friends
+                </button>
+              </div>
             </div>
 
-            {/* People You May Know Section */}
-            {(loadingSuggestions || suggestedFriends.length > 0) && (
+            {/* Search results (when searching) */}
+            {isSearching && (
               <div className="space-y-3">
-                <h3 className="font-semibold text-white text-lg px-1">People You May Know</h3>
-                
-                {loadingSuggestions ? (
-                  <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl p-5">
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="h-5 w-5 text-[#a855f7] animate-spin" />
-                    </div>
+                {searching && (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 text-[#a855f7] animate-spin" />
                   </div>
-                ) : (
-                  <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl overflow-hidden">
-                    {suggestedFriends.map((friend, index) => {
-                      const buttonState = getButtonState(friend.id);
+                )}
+
+                {!searching && searchResults.length > 0 && (
+                  <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl overflow-hidden">
+                    {searchResults.map((result) => {
+                      const buttonState = getButtonState(result.id);
                       const ButtonIcon = buttonState.icon;
                       
                       return (
                         <div
-                          key={friend.id}
-                          className={`flex items-center gap-3 p-4 ${
-                            index !== suggestedFriends.length - 1 ? 'border-b border-white/10' : ''
-                          }`}
+                          key={result.id}
+                          className="flex items-center gap-3 p-3 border-b border-[#a855f7]/10 last:border-b-0"
                         >
-                          <Avatar className="h-12 w-12 border-2 border-[#a855f7]/40">
-                            <AvatarImage src={friend.avatar_url || undefined} />
-                            <AvatarFallback className="bg-[#2d1b4e] text-white">
-                              {friend.display_name?.[0] || 'U'}
+                          <Avatar className="h-11 w-11 border-2 border-[#a855f7]/40">
+                            <AvatarImage src={result.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
+                              {result.display_name?.[0] || 'U'}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-white truncate">{friend.display_name}</p>
-                            <p className="text-white/50 text-sm flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {friend.mutual_count} mutual friend{friend.mutual_count !== 1 ? 's' : ''}
-                            </p>
+                            <p className="font-medium text-white text-sm truncate">{result.display_name}</p>
+                            <p className="text-white/40 text-xs truncate">@{result.username}</p>
                           </div>
                           <Button
-                            onClick={() => sendFriendRequest(friend.id)}
+                            onClick={() => sendFriendRequest(result.id)}
                             size="sm"
                             disabled={buttonState.disabled}
                             variant={buttonState.variant}
                             className={buttonState.disabled 
-                              ? "border-[#a855f7]/40 text-white/60 rounded-xl"
-                              : "bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl"
+                              ? "border-[#a855f7]/40 text-white/60 rounded-xl text-xs"
+                              : "bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl text-xs"
                             }
                           >
-                            <ButtonIcon className="h-4 w-4 mr-1" />
+                            <ButtonIcon className="h-3.5 w-3.5 mr-1" />
                             {buttonState.label}
                           </Button>
                         </div>
@@ -805,7 +620,175 @@ export default function Friends() {
                     })}
                   </div>
                 )}
+
+                {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
+                  <p className="text-white/50 text-sm text-center py-4">
+                    No users found. Invite them with your link!
+                  </p>
+                )}
               </div>
+            )}
+
+            {/* Non-search content */}
+            {!isSearching && (
+              <>
+                {/* Pending requests banner */}
+                {!loadingRequests && pendingCount > 0 && (
+                  <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl overflow-hidden">
+                    <button
+                      onClick={() => setRequestsExpanded(!requestsExpanded)}
+                      className="w-full flex items-center justify-between p-3.5 hover:bg-[#a855f7]/10 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
+                          <UserPlus className="h-4 w-4 text-[#a855f7]" />
+                        </div>
+                        <span className="text-white text-sm font-medium">
+                          You have {pendingCount} friend request{pendingCount !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      {requestsExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-white/40" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-white/40" />
+                      )}
+                    </button>
+
+                    {requestsExpanded && (
+                      <div className="border-t border-[#a855f7]/10">
+                        {requests.map((request) => (
+                          <div
+                            key={request.id}
+                            className="flex items-center gap-3 p-3.5 border-b border-[#a855f7]/10 last:border-b-0"
+                          >
+                            <button
+                              onClick={() => openFriendCard({
+                                userId: request.user_id,
+                                displayName: request.display_name,
+                                avatarUrl: request.avatar_url,
+                              })}
+                              className="transition-transform hover:scale-110"
+                            >
+                              <Avatar className="h-11 w-11 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
+                                <AvatarImage src={request.avatar_url || undefined} />
+                                <AvatarFallback className="bg-[#1a0f2e] text-white text-sm">
+                                  {request.display_name[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                            </button>
+
+                            <div className="flex-1 min-w-0">
+                              <button
+                                onClick={() => openFriendCard({
+                                  userId: request.user_id,
+                                  displayName: request.display_name,
+                                  avatarUrl: request.avatar_url,
+                                })}
+                                className="text-left hover:opacity-80 transition-opacity"
+                              >
+                                <h3 className="font-semibold text-white text-sm">{request.display_name}</h3>
+                              </button>
+                              {request.mutual_friends.length > 0 && (
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <div className="flex -space-x-2">
+                                    {request.mutual_friends.slice(0, 2).map((friend, idx) => (
+                                      <Avatar key={idx} className="h-4 w-4 border border-[#1a0f2e]">
+                                        <AvatarImage src={friend.avatar_url || undefined} />
+                                        <AvatarFallback className="bg-[#2d1b4e] text-white text-[8px]">
+                                          {friend.display_name[0]}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    ))}
+                                  </div>
+                                  <p className="text-white/50 text-xs ml-0.5">
+                                    {getMutualText(request.mutual_friends)}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                onClick={() => acceptRequest(request.id)}
+                                variant="outline"
+                                size="sm"
+                                className="border-[#a855f7] text-white hover:bg-[#a855f7]/20 rounded-full px-3 text-xs"
+                              >
+                                Confirm
+                              </Button>
+                              <button
+                                onClick={() => declineRequest(request.id)}
+                                className="text-white/60 hover:text-white transition-colors"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Friend list (MyFriendsTab content) */}
+                <MyFriendsTab />
+
+                {/* People You May Know */}
+                {(loadingSuggestions || suggestedFriends.length > 0) && (
+                  <div className="space-y-3 pt-2">
+                    <h3 className="font-semibold text-white text-sm px-1">People You May Know</h3>
+                    
+                    {loadingSuggestions ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 text-[#a855f7] animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl overflow-hidden">
+                        {suggestedFriends.map((friend, index) => {
+                          const buttonState = getButtonState(friend.id);
+                          const ButtonIcon = buttonState.icon;
+                          
+                          return (
+                            <div
+                              key={friend.id}
+                              className={`flex items-center gap-3 p-3 ${
+                                index !== suggestedFriends.length - 1 ? 'border-b border-[#a855f7]/10' : ''
+                              }`}
+                            >
+                              <Avatar className="h-11 w-11 border-2 border-[#a855f7]/40">
+                                <AvatarImage src={friend.avatar_url || undefined} />
+                                <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
+                                  {friend.display_name?.[0] || 'U'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-white text-sm truncate">{friend.display_name}</p>
+                                <p className="text-white/40 text-xs flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {friend.mutual_count} mutual friend{friend.mutual_count !== 1 ? 's' : ''}
+                                </p>
+                              </div>
+                              <Button
+                                onClick={() => sendFriendRequest(friend.id)}
+                                size="sm"
+                                disabled={buttonState.disabled}
+                                variant={buttonState.variant}
+                                className={buttonState.disabled 
+                                  ? "border-[#a855f7]/40 text-white/60 rounded-xl text-xs"
+                                  : "bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl text-xs"
+                                }
+                              >
+                                <ButtonIcon className="h-3.5 w-3.5 mr-1" />
+                                {buttonState.label}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </TabsContent>
 
