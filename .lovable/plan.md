@@ -1,27 +1,25 @@
 
 
-## 5am Cleanup — Complete Ephemeral Data Wipe
+## Plan: Expire Notifications at 5am + Backfill with Friend Activity
 
-### Current State
-The `daily-cleanup` edge function currently handles: stale locations, stale check-ins, expired DMs, and expired night statuses. But it's **missing** cleanup for:
-- **Posts** (have `expires_at` but never deleted server-side)
-- **Yap messages** (have `expires_at` but never deleted server-side)
-- **Planning statuses** (night_statuses where status='planning' should reset at 5am regardless of expires_at)
-- **Plans** already have `expires_at` and are filtered client-side, but expired plans are never deleted from the database
-
-Client-side queries already filter by `expires_at > now()` for posts, yaps, and plans — so users don't see stale data. But the data lingers in the database forever.
+### Problem
+1. Notifications like "X wants to meet up" persist across nights — they should be wiped at 5am
+2. When notifications list is empty, it feels dead — should show general friend activity like "Jon spotted at X venue"
 
 ### Changes
 
-**`supabase/functions/daily-cleanup/index.ts`** — add 4 new cleanup steps:
+**1. `supabase/functions/daily-cleanup/index.ts`** — Add step 9: delete all notifications created before the 5am cutoff
+```
+// 9. Delete expired notifications
+await supabase.from('notifications').delete().lt('created_at', cutoff)
+```
 
-1. **Delete expired posts** — delete from `posts` where `expires_at < cutoff`
-2. **Delete expired yap messages** — delete from `yap_messages` where `expires_at < cutoff`
-3. **Reset all planning statuses** — update `night_statuses` where `status = 'planning'` and `updated_at < cutoff` → set status to `'home'`, clear fields
-4. **Delete expired plans** — delete from `plans` where `expires_at < now()` (plans expire based on their event time, not the 5am cutoff)
+**2. `src/contexts/NotificationsContext.tsx`** — Client-side filter: only fetch notifications from after the most recent 5am boundary (using `isFromTonight` from `time-context`), so stale ones disappear immediately without waiting for the cron
 
-Plans are special: they should persist until the event time passes (their `expires_at` is set to 5am the day after the plan_date), so we delete based on `expires_at < now()` rather than the 5am cutoff.
+**3. `src/pages/Notifications.tsx`** — When the notifications list is empty, fetch recent friend check-ins and display them as "spotted at" activity items (e.g., "Jon spotted at The Rooftop Bar"). This uses the same check-in data the ActivityTab already fetches, styled as notification rows with the friend's avatar.
 
 ### Files changed
-- `supabase/functions/daily-cleanup/index.ts` — add expired posts, yaps, planning statuses, and plans cleanup
+- `supabase/functions/daily-cleanup/index.ts` — add notification deletion step
+- `src/contexts/NotificationsContext.tsx` — filter fetched notifications by 5am boundary
+- `src/pages/Notifications.tsx` — add friend check-in backfill when no notifications exist
 
