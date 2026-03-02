@@ -15,6 +15,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, MapPin, Target, Home, Flame } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { triggerPushNotification } from '@/lib/push-notifications';
 
 interface Friend {
   id: string;
@@ -149,13 +150,25 @@ export function PrivatePartyInviteModal({
         message: `${myName} invited you to a private party in ${neighborhood}! 🏠`,
       }));
 
-      await supabase.rpc('create_notifications_batch', {
+      const { data: notifResults } = await supabase.rpc('create_notifications_batch', {
         p_notifications: notifications.map(n => ({
           receiver_id: n.receiver_id,
           type: n.type,
           message: n.message,
         })),
       });
+
+      // Trigger push for each notification
+      const notifArray = Array.isArray(notifResults) ? notifResults : [];
+      for (const notif of notifArray) {
+        triggerPushNotification({
+          id: notif.id,
+          receiver_id: notif.receiver_id,
+          sender_id: user.id,
+          type: 'private_party_invite',
+          message: notif.message,
+        });
+      }
 
       haptic.success();
       toast.success(`Invited ${selectedFriends.size} friend${selectedFriends.size > 1 ? 's' : ''}!`);

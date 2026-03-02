@@ -9,6 +9,7 @@ import { Home, MessageCircle, X, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { triggerPushNotification } from '@/lib/push-notifications';
 
 interface PrivatePartyCardProps {
   hostId: string;
@@ -46,11 +47,23 @@ export function PrivatePartyCard({
       const myName = profile?.display_name?.split(' ')[0] || 'Someone';
 
       // Send address request notification
-      await supabase.rpc('create_notification', {
+      const message = `${myName} wants to come to your party! 🏠`;
+      const { data: notifData } = await supabase.rpc('create_notification', {
         p_receiver_id: hostId,
         p_type: 'address_request',
-        p_message: `${myName} wants to come to your party! 🏠`,
+        p_message: message,
       });
+
+      const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+      if (notif) {
+        triggerPushNotification({
+          id: notif.id,
+          receiver_id: hostId,
+          sender_id: user.id,
+          type: 'address_request',
+          message,
+        });
+      }
 
       haptic.success();
       toast.success('Address request sent!');

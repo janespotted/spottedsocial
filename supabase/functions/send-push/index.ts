@@ -31,6 +31,11 @@ const VALID_NOTIFICATION_TYPES = [
   'dm',
   'meetup_accepted',
   'venue_invite_accepted',
+  'rally',
+  'plan_down',
+  'address_request',
+  'private_party_invite',
+  'venue_yap',
 ] as const;
 
 // UUID v4 regex pattern

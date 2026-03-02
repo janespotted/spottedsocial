@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, X, MapPin, Target, Megaphone, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { triggerPushNotification } from '@/lib/push-notifications';
 
 interface FriendWithStatus {
   id: string;
@@ -49,12 +50,25 @@ export function MyFriendsTab() {
     if (!user || ralliedIds.has(friendId)) return;
     const senderName = currentUserProfile?.display_name || 'Someone';
     try {
-      const { error } = await supabase.rpc('create_notification', {
+      const message = `${senderName} wants you to rally. Come out tonight! 👋`;
+      const { data: notifData, error } = await supabase.rpc('create_notification', {
         p_receiver_id: friendId,
         p_type: 'rally',
-        p_message: `${senderName} wants you to rally. Come out tonight! 👋`,
+        p_message: message,
       });
       if (error) throw error;
+      
+      const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+      if (notif) {
+        triggerPushNotification({
+          id: notif.id,
+          receiver_id: friendId,
+          sender_id: user.id,
+          type: 'rally',
+          message,
+        });
+      }
+      
       setRalliedIds(prev => new Set(prev).add(friendId));
       toast.success('Rally sent! 📣');
     } catch (err) {
