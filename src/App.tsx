@@ -37,7 +37,6 @@ import ResetPassword from "./pages/ResetPassword";
 import InviteLanding from "./pages/InviteLanding";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
-import Notifications from "./pages/Notifications";
 import Home from "./pages/Home";
 import Map from "./pages/Map";
 import Leaderboard from "./pages/Leaderboard";
@@ -223,14 +222,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/notifications"
-          element={
-            <ProtectedRoute>
-              <Notifications />
-            </ProtectedRoute>
-          }
-        />
+        {/* /notifications removed — Activity Center in Messages is the canonical notification page */}
         <Route
           path="/friends"
           element={

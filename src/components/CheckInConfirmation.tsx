@@ -147,7 +147,6 @@ export function CheckInConfirmation() {
     const venueName = checkInVenueName;
     const isPrivateParty = checkInIsPrivateParty;
     setPhase('celebration');
-    closeCheckInConfirmation();
     navigate('/messages', { 
       state: { 
         activeTab: 'yap', 
@@ -155,6 +154,8 @@ export function CheckInConfirmation() {
         isPrivateParty 
       } 
     });
+    // Close AFTER navigation state is set to prevent race condition
+    setTimeout(() => closeCheckInConfirmation(), 100);
   };
 
   const getPrivacyLabel = (level: string): string => {

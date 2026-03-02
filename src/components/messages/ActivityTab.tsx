@@ -138,6 +138,32 @@ export function ActivityTab() {
     }
   }, [user, demoEnabled, bootstrapEnabled, city]);
 
+  // Realtime subscriptions for live updates
+  useEffect(() => {
+    if (!user) return;
+    
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    const debouncedRefresh = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchAll();
+        fetchPlanningFriends();
+      }, 2000);
+    };
+
+    const channel = supabase
+      .channel('activity-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `receiver_id=eq.${user.id}` }, debouncedRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, debouncedRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, debouncedRefresh)
+      .subscribe();
+
+    return () => {
+      clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const fetchAll = async () => {
     setIsLoading(true);
     try {
@@ -950,6 +976,15 @@ export function ActivityTab() {
                     <span className="text-[#d4ff00] block text-xs mt-0.5">wants you to rally! Come out tonight 👋</span>
                   </div>
                 )}
+                {activity.type === 'venue_yap' && (
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-amber-400 block text-xs mt-0.5 line-clamp-1">{activity.subtitle || 'posted in yap'}</span>
+                  </div>
+                )}
               </div>
 
               {/* Actions - fixed on right */}
@@ -1036,6 +1071,16 @@ export function ActivityTab() {
                       Message
                     </Button>
                   </div>
+                )}
+
+                {activity.type === 'venue_yap' && (
+                  <Button
+                    onClick={() => navigate('/messages', { state: { activeTab: 'yap' } })}
+                    size="sm"
+                    className="h-8 bg-amber-500 hover:bg-amber-500/80 text-white rounded-full px-4 text-xs font-medium"
+                  >
+                    View
+                  </Button>
                 )}
 
               </div>
