@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CityBadge } from '@/components/CityBadge';
 import { logger } from '@/lib/logger';
 import { escapeHtml, escapeUrl } from '@/lib/html-escape';
+import { isFromTonight } from '@/lib/time-context';
 import { QuickStatusSheet } from '@/components/QuickStatusSheet';
 import { UpdateSpotSheet } from '@/components/UpdateSpotSheet';
 import { VenueMoveBanner } from '@/components/VenueMoveBanner';
@@ -424,12 +425,14 @@ export default function Map() {
           }
           
           // Filter to only friends who are out with valid location data
+          // Also filter out stale locations (not from tonight's window)
           let friendProfiles = (allProfiles || [])
             .filter((p: any) => 
               friendIds.includes(p.id) && 
               p.is_out === true && 
               p.last_known_lat !== null && 
-              p.last_known_lng !== null
+              p.last_known_lng !== null &&
+              isFromTonight(p.last_location_at)
             );
           
           // Only filter out demo users when demo mode is OFF (bootstrap mode)
