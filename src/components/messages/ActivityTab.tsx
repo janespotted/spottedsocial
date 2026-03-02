@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { isVenueOpen, VenueHours } from '@/lib/venue-hours';
+import { isFromTonight } from '@/lib/time-context';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -133,6 +134,7 @@ export function ActivityTab() {
   useEffect(() => {
     if (user) {
       fetchAll();
+      fetchPlanningFriends();
     }
   }, [user, demoEnabled, bootstrapEnabled, city]);
 
@@ -176,8 +178,10 @@ export function ActivityTab() {
     const activityList: Activity[] = [];
 
     // Add real notifications/invites with sender profile lookup using safe RPC
-    if (realInvitesResult.data?.length) {
-      const senderIds = [...new Set(realInvitesResult.data.map(n => n.sender_id))];
+    // Filter to tonight only (5am boundary)
+    const tonightInvites = realInvitesResult.data?.filter(n => isFromTonight(n.created_at)) || [];
+    if (tonightInvites.length) {
+      const senderIds = [...new Set(tonightInvites.map(n => n.sender_id))];
       // Use cached profiles
       const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
       let senderProfiles = allProfiles.filter((p: any) => senderIds.includes(p.id));
@@ -191,8 +195,8 @@ export function ActivityTab() {
       
       // Filter invites to only those from non-demo users when demo mode is off
       const filteredInvites = !demoEnabled
-        ? realInvitesResult.data.filter(invite => profileMap.has(invite.sender_id))
-        : realInvitesResult.data;
+        ? tonightInvites.filter(invite => profileMap.has(invite.sender_id))
+        : tonightInvites;
       
       const realActivities: Activity[] = filteredInvites.map(invite => {
         const profile = profileMap.get(invite.sender_id);
@@ -623,12 +627,8 @@ export function ActivityTab() {
 
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
 
-  useEffect(() => {
-    if (user) {
-      fetchAll();
-      fetchPlanningFriends();
-    }
-  }, [user, demoEnabled, bootstrapEnabled, city]);
+
+
 
   const fetchPlanningFriends = async () => {
     if (!user) return;
