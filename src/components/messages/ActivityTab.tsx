@@ -13,7 +13,7 @@ import { toast } from '@/hooks/use-toast';
 import { logEvent } from '@/lib/event-logger';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target, Heart, TrendingUp } from 'lucide-react';
+import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target, Heart, TrendingUp, Megaphone } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode'; // kept for bootstrapEnabled in fetchAll dependency
@@ -24,7 +24,7 @@ import { ActivitySkeleton } from './MessagesSkeleton';
 
 interface Activity {
   id: string;
-  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment' | 'city_pulse' | 'meetup_accepted' | 'venue_invite_accepted' | 'dm_message' | 'venue_yap';
+  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment' | 'city_pulse' | 'meetup_accepted' | 'venue_invite_accepted' | 'dm_message' | 'venue_yap' | 'rally';
   title: string;
   subtitle?: string;
   timestamp: string;
@@ -167,7 +167,7 @@ export function ActivityTab() {
       supabase.from('notifications')
         .select(`id, type, message, created_at, sender_id, is_read`)
         .eq('receiver_id', user?.id)
-        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment', 'meetup_accepted', 'venue_invite_accepted', 'venue_yap'])
+        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment', 'meetup_accepted', 'venue_invite_accepted', 'venue_yap', 'rally'])
         .order('created_at', { ascending: false })
         .limit(30),
     ]);
@@ -206,6 +206,7 @@ export function ActivityTab() {
         const isMeetupAccepted = invite.type === 'meetup_accepted';
         const isVenueInviteAccepted = invite.type === 'venue_invite_accepted';
         const isVenueYap = invite.type === 'venue_yap';
+        const isRally = invite.type === 'rally';
         
         // Extract venue name from message like "X invited you to VenueName."
         const venueMatch = invite.message.match(/invited you to (.+?)\.?\s*(?:Want to go\?)?$/i);
@@ -219,6 +220,7 @@ export function ActivityTab() {
         if (isMeetupAccepted) activityType = 'meetup_accepted';
         if (isVenueInviteAccepted) activityType = 'venue_invite_accepted';
         if (isVenueYap) activityType = 'venue_yap';
+        if (isRally) activityType = 'rally';
         
         return {
           id: invite.id,
@@ -230,6 +232,7 @@ export function ActivityTab() {
             : isMeetupAccepted ? 'is down to meet up! 🎉'
             : isVenueInviteAccepted ? invite.message
             : isVenueYap ? invite.message
+            : isRally ? invite.message
             : 'Meet Up',
           timestamp: invite.created_at || new Date().toISOString(),
           avatar_url: profile?.avatar_url,
@@ -495,6 +498,8 @@ export function ActivityTab() {
         return <Heart className="h-5 w-5 text-[#d4ff00]" />;
       case 'venue_yap':
         return <MessageCircle className="h-5 w-5 text-amber-400" />;
+      case 'rally':
+        return <Megaphone className="h-5 w-5 text-[#d4ff00]" />;
       case 'dm_message':
         return <MessageCircle className="h-5 w-5 text-[#a855f7]" />;
       case 'city_pulse':
@@ -793,6 +798,7 @@ export function ActivityTab() {
         const acceptedInvites = activities.filter(a => a.type === 'meetup_accepted' || a.type === 'venue_invite_accepted');
         const dmMessages = activities.filter(a => a.type === 'dm_message');
         const venueYaps = activities.filter(a => a.type === 'venue_yap');
+        const rallies = activities.filter(a => a.type === 'rally');
 
         // Special muted style for city pulse
         const PULSE_CARD_STYLE = 'bg-[#1a0f2e]/40 border border-white/10';
@@ -916,6 +922,15 @@ export function ActivityTab() {
                     <span className="text-white/70 block text-xs mt-0.5 line-clamp-1">messaged you: {activity.subtitle}</span>
                   </div>
                 )}
+                {activity.type === 'rally' && (
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-[#d4ff00] block text-xs mt-0.5">wants you to rally! Come out tonight 👋</span>
+                  </div>
+                )}
               </div>
 
               {/* Actions - fixed on right */}
@@ -991,12 +1006,25 @@ export function ActivityTab() {
                   </Button>
                 )}
 
+                {activity.type === 'rally' && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => handleOpenChat(activity)}
+                      size="sm"
+                      className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)]"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 mr-1" />
+                      Message
+                    </Button>
+                  </div>
+                )}
+
               </div>
             </div>
           </div>
         );
 
-        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0 || acceptedInvites.length > 0 || dmMessages.length > 0 || venueYaps.length > 0;
+        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0 || acceptedInvites.length > 0 || dmMessages.length > 0 || venueYaps.length > 0 || rallies.length > 0;
 
         return hasContent ? (
           <div className="space-y-5">
@@ -1016,6 +1044,18 @@ export function ActivityTab() {
           </div>
         )}
       </div>
+
+            {/* Section: Rallies */}
+            {rallies.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  📣 Rallies
+                </h3>
+                <div className="space-y-3">
+                  {rallies.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
 
             {/* Section: Accepted Invites */}
             {acceptedInvites.length > 0 && (
