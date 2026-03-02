@@ -1,34 +1,19 @@
 
 
-## Tap Friend Name → Fly to Their Location on Map
+## Fix: Replace buggy local `calculateExpiryTime` with correct import
 
-### What changes
-Make the friend's display name on the Friend ID Card tappable. Tapping it closes the card and navigates to `/map` with a `flyTo` state containing the friend's coordinates — the same pattern already used for private party taps.
+### Problem
+The local `calculateExpiryTime` at lines 181-187 always adds 1 day, so check-ins between midnight and 5am expire ~27 hours later. The correct version in `src/lib/time-utils.ts` checks `if (now.getHours() < 5)` and sets 5am today.
 
-### `src/components/FriendIdCard.tsx`
+### Changes in `src/components/CheckInModal.tsx`
 
-**Add a `handleNameClick` function** (next to `handlePrivatePartyClick`):
-```typescript
-const handleNameClick = () => {
-  if (!userStatus?.lat || !userStatus?.lng) return;
-  closeFriendCard();
-  navigate('/map', {
-    state: {
-      flyTo: {
-        lat: userStatus.lat,
-        lng: userStatus.lng,
-        zoom: 15,
-      }
-    }
-  });
-};
-```
+1. **Add import** at line 17 area:
+   ```typescript
+   import { calculateExpiryTime } from '@/lib/time-utils';
+   ```
 
-**Make the name `<h2>` a tappable button** (~line 623-625): Wrap or replace the `<h2>` with a `<button>` that calls `handleNameClick`. Only make it tappable when the friend has a known location (`userStatus?.lat && userStatus?.lng`). Style it with `hover:underline cursor-pointer` to hint interactivity; fall back to a plain `<h2>` when no location is available.
-
-### No changes to Map.tsx
-The `flyTo` route state handler already exists from the private party feature — it will work automatically.
+2. **Delete lines 181-187** — the local `calculateExpiryTime` function. All call sites resolve to the imported version.
 
 ### Files changed
-- `src/components/FriendIdCard.tsx` — add name click handler, make name tappable
+- `src/components/CheckInModal.tsx`
 
