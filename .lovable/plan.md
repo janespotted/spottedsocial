@@ -1,37 +1,104 @@
 
 
-## Plan: Fix Stale "Yap About It" Button
+## Plan: Clean Up Notification Copy, Thread Header, and Anonymous Yap Notifications
 
-### Root Cause
+Three issues to fix across 3 files.
 
-The `handleShareClick` in `CheckInConfirmation.tsx` captures `checkInVenueName` from context at click-time. There are two failure modes:
+---
 
-1. **Private party venue name mismatch**: When checking in to a private party, `showOutConfirmation` is called with a display name like `"Private Party (Wilshire)"`. But in the YapTab, the `isPrivatePartyNav=true` path (line 52-55) waits for `userVenueName` from an async DB fetch. If the async fetch hasn't completed yet, `threadVenueName` and `view` rely solely on their initial `useState` values — which only work on first mount. If the YapTab was previously mounted, the `useState` won't reinitialize.
+### 1. Fix "Invites to You" copy — venue_invite should say "inviting you to"
 
-2. **React state not updating on re-navigation**: If the user was already on `/messages` with the yap tab open, navigating again with new state won't remount YapTab. The `venueNameProp` prop might be the same string or the effect dependencies haven't changed, so the effect at line 52-60 doesn't fire.
+**`src/components/messages/ActivityTab.tsx`** — line 906-913
 
-### Fix (2 files)
+Currently the venue_invite card shows:
+> **Jane**  
+> @The Victorian
 
-**`src/components/CheckInConfirmation.tsx`**:
-- In `handleShareClick`, fall back to fetching the venue name from `night_statuses` if `checkInVenueName` is falsy, ensuring navigation always has a valid venue name.
+Change to:
+> **Jane**  
+> is inviting you to The Victorian
 
-**`src/components/messages/YapTab.tsx`**:
-- Add a `key` prop to force remount when `venueNameProp` changes, OR add a separate effect that always responds to `venueNameProp` changes regardless of `isPrivatePartyNav`:
-  ```tsx
-  // When venueNameProp changes (new navigation), always update view
-  useEffect(() => {
-    if (venueNameProp) {
-      setThreadVenueName(venueNameProp);
-      setView('thread');
-    }
-  }, [venueNameProp]);
-  ```
-- This replaces the current conditional logic that delays setting the thread for private parties, ensuring the button *always* opens the thread immediately.
+```tsx
+{activity.type === 'venue_invite' && (
+  <div className="text-white text-sm">
+    <div className="flex items-center gap-2">
+      <span className="font-semibold">{activity.display_name}</span>
+      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+    </div>
+    <span className="text-[#d4ff00] block text-xs mt-0.5">inviting you to {activity.subtitle}</span>
+  </div>
+)}
+```
 
-**`src/pages/Messages.tsx`**:
-- Add a timestamp to `yapVenueName` state or use a counter to force YapTab remount via `key` prop when navigating from check-in confirmation:
-  ```tsx
-  {activeTab === 'yap' && <YapTab key={yapNavKey} venueName={yapVenueName} isPrivatePartyNav={yapIsPrivateParty} />}
-  ```
-  where `yapNavKey` increments each time the yap navigation state arrives.
+---
+
+### 2. Make "Yaps at Your Spot" anonymous — no username
+
+**`src/components/messages/ActivityTab.tsx`** — line 987-995
+
+Currently shows "Jane" with avatar. Change to anonymous: hide the avatar, don't show the display name, just show "New yap @ [venue]".
+
+```tsx
+{activity.type === 'venue_yap' && (
+  <div className="text-white text-sm">
+    <div className="flex items-center gap-2">
+      <span className="font-semibold">New yap</span>
+      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+    </div>
+    <span className="text-amber-400 block text-xs mt-0.5 line-clamp-1">{activity.subtitle || 'at your spot'}</span>
+  </div>
+)}
+```
+
+Also update the avatar/icon section in `renderActivityCard` (~line 866-892): for `venue_yap` type, show a generic chat icon instead of the sender's avatar. And update `useYapNotifications.ts` line 95 to remove the yapper's name from the notification message.
+
+**`src/hooks/useYapNotifications.ts`** — line 80-101
+
+Change the banner message from `"💬 Jane yapped at The Victorian: ..."` to `"💬 New yap at The Victorian: ..."`. Remove the profile fetch since we no longer need the name, and don't pass `sender_profile` to the banner.
+
+---
+
+### 3. Fix Thread header getting cut off
+
+**`src/pages/Thread.tsx`** — line 357-358
+
+The header `pt-[max(env(safe-area-inset-top),12px)]` with `p-4` inside works, but the content gets visually cramped. Add more top padding to the inner container:
+
+```tsx
+<div className="flex items-center justify-between px-4 py-3">
+```
+
+And for the 1:1 chat header (line 486-499), the venue name badge is pushed to the far right and can overflow. Move it below the username instead of inline:
+
+```tsx
+<div className="flex-1 min-w-0 text-left">
+  <h2 className="font-semibold text-white truncate">{otherMember?.display_name}</h2>
+  <div className="flex items-center gap-2">
+    <p className="text-white/60 text-sm truncate">@{otherMember?.username}</p>
+    {otherMember?.venue_name && (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleVenueClick(otherMember.venue_name!, otherMember.venue_id);
+        }}
+        className="text-[#d4ff00] text-xs font-medium hover:text-[#d4ff00]/80 transition-colors truncate max-w-[140px]"
+      >
+        @{otherMember.venue_name}
+      </button>
+    )}
+  </div>
+</div>
+```
+
+Remove the separate venue button that was outside the text container (line 490-499).
+
+---
+
+### Summary
+
+| File | Change |
+|------|--------|
+| `src/components/messages/ActivityTab.tsx` | venue_invite copy → "inviting you to"; venue_yap → anonymous with icon |
+| `src/hooks/useYapNotifications.ts` | Remove username from yap banner message |
+| `src/pages/Thread.tsx` | Clean up header layout, move venue badge inline with username |
 
