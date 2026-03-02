@@ -1,77 +1,47 @@
 
 
-## Three Changes: Logo Compression, Code Splitting, DST-aware Cleanup
+## Fix: Remove Black Background from Spotted S Logo
 
-### 1. Compress `src/assets/spotted-s-logo.png`
+### Problem
+The previous compression of `spotted-s-logo.png` stripped its alpha channel (transparency), giving it a black background. This is visible in the top-right header icon and the bottom nav across all pages.
 
-Replace the 1.4MB PNG with an optimized version. Since I cannot run image compression tools directly, I'll convert it to a much smaller WebP file programmatically or replace it with a compressed PNG. The logo is imported across 18 files — all imports reference `@/assets/spotted-s-logo.png`, so I'll keep the same filename to avoid touching every import.
+### Solution
+Apply `mix-blend-mode: screen` via CSS to all `<img>` tags that render the logo. The `screen` blend mode makes black pixels fully transparent against any background, perfectly restoring the original look without needing to re-export the image.
 
-**Approach**: Replace the file with a highly compressed PNG (quantized, stripped metadata) targeting under 50KB. The logo is a simple "S" icon so aggressive compression is feasible without quality loss.
+### Changes
 
-### 2. Code splitting with `React.lazy()` in `src/App.tsx`
+**Every file that renders the logo** (18 files total) — add `mix-blend-mode: screen` to the `<img>` className. However, to avoid touching 18 files, the cleaner approach is:
 
-Replace static imports with lazy imports for: Map, Admin, DemoSettings, Leaderboard, Messages, Thread, Friends, BusinessDashboard, BusinessPromote, BusinessYap, BusinessEvents, BusinessAuth, BusinessLanding.
-
-Keep eager: Home, Auth, Feed, Profile (plus small pages like ResetPassword, InviteLanding, Terms, Privacy, NotFound, Settings, EditProfile, CloseFriends, Notifications).
-
-Add a `Suspense` wrapper around `<Routes>` with the same spinner used in `ProtectedRoute`:
-
-```typescript
-const LazyFallback = () => (
-  <div className="flex min-h-screen items-center justify-center bg-background">
-    <div className="text-center">
-      <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
-      <p className="text-muted-foreground">Loading...</p>
-    </div>
-  </div>
-);
-```
-
-### 3. DST-aware 5AM cutoff in `supabase/functions/daily-cleanup/index.ts`
-
-Replace the hardcoded `setUTCHours(9, 0, 0, 0)` with dynamic timezone detection:
-
-```typescript
-// Get current ET date string to find today's 5AM ET
-const etNow = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
-const etDate = new Date(etNow);
-// Set to 5:00 AM ET
-etDate.setHours(5, 0, 0, 0);
-// Convert back to UTC by computing the offset
-const fiveAmEtStr = etDate.toLocaleString('en-US', { timeZone: 'America/New_York' });
-// Build a proper UTC date from the ET 5AM
-const fiveAmET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-fiveAmET.setHours(5, 0, 0, 0);
-// Get UTC offset: difference between UTC now and ET now
-const utcNow = new Date();
-const etNowDate = new Date(utcNow.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-const offsetMs = utcNow.getTime() - etNowDate.getTime();
-const fiveAmUtc = new Date(fiveAmET.getTime() + offsetMs);
-```
-
-Simpler approach — parse ET time, set to 5AM, convert back:
-
-```typescript
-const now = new Date();
-// Parse current time as ET
-const etStr = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
-const etNow = new Date(etStr);
-// Set to 5:00 AM today in ET
-etNow.setHours(5, 0, 0, 0);
-// Compute UTC offset (UTC - ET)
-const offsetMs = now.getTime() - new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })).getTime();
-// Convert 5AM ET back to UTC
-const fiveAmToday = new Date(etNow.getTime() + offsetMs);
-// If we haven't hit 5AM ET yet, use yesterday's
-if (now < fiveAmToday) {
-  fiveAmToday.setTime(fiveAmToday.getTime() - 86400000);
+**`src/index.css`** — Add a single utility class:
+```css
+.logo-blend {
+  mix-blend-mode: screen;
 }
 ```
 
-This automatically handles EST (UTC-5) vs EDT (UTC-4).
+Then add `logo-blend` to every `<img src={spottedLogo}>` className across these files:
+- `src/pages/Home.tsx`
+- `src/pages/Profile.tsx`
+- `src/pages/Feed.tsx`
+- `src/pages/Map.tsx`
+- `src/pages/Leaderboard.tsx`
+- `src/pages/Messages.tsx`
+- `src/pages/Thread.tsx`
+- `src/pages/Friends.tsx`
+- `src/pages/Auth.tsx`
+- `src/pages/business/BusinessLanding.tsx`
+- `src/pages/business/BusinessAuth.tsx`
+- `src/components/BottomNav.tsx`
+- `src/components/SplashScreen.tsx`
+- `src/components/CheckInModal.tsx`
+- `src/components/CheckInConfirmation.tsx`
+- `src/components/MeetUpConfirmation.tsx`
+- `src/components/ImDownConfirmation.tsx`
+- `src/components/VenueInviteConfirmation.tsx`
+
+**Alternative (fewer edits):** Instead of a utility class, use a global CSS rule targeting all images with that src. But since Vite hashes asset URLs, the utility class approach is more reliable.
 
 ### Files changed
-- `src/assets/spotted-s-logo.png` — compressed to under 50KB
-- `src/App.tsx` — lazy imports + Suspense fallback
-- `supabase/functions/daily-cleanup/index.ts` — DST-aware 5AM ET cutoff
+- `src/index.css` — add `.logo-blend` utility
+- All 18 files above — add `logo-blend` to the logo `<img>` className
 
