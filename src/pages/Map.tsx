@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import { FriendsPlanning } from '@/components/FriendsPlanning';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { useToast } from '@/hooks/use-toast';
 import { CityBadge } from '@/components/CityBadge';
@@ -84,6 +84,7 @@ export default function Map() {
   const { city } = useUserCity();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { unreadCount } = useNotifications();
   
   // Venue arrival nudge with shift detection callback
@@ -670,7 +671,29 @@ export default function Map() {
       setStyleLoaded(true);
     }
 
-    // Listen for custom event to center map on venue
+    // Handle flyTo from route state (e.g., private party tap)
+    const flyToState = (location.state as any)?.flyTo;
+    if (flyToState?.lat && flyToState?.lng) {
+      const flyToCoords = flyToState;
+      map.current.once('load', () => {
+        map.current?.flyTo({
+          center: [flyToCoords.lng, flyToCoords.lat],
+          zoom: flyToCoords.zoom || 15,
+          duration: 1500,
+        });
+      });
+      // If already loaded, fly immediately
+      if (map.current.loaded()) {
+        map.current.flyTo({
+          center: [flyToState.lng, flyToState.lat],
+          zoom: flyToState.zoom || 15,
+          duration: 1500,
+        });
+      }
+      // Clear the state so it doesn't re-trigger
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+
     const handleCenterMapOnVenue = (e: Event) => {
       const customEvent = e as CustomEvent<{ lat: number; lng: number }>;
       if (map.current && customEvent.detail) {
