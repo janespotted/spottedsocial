@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Copy, Users, Search, UserPlus, QrCode, Check, Loader2, Clock, ChevronRight, ChevronDown, MessageCircle, Link2, X, Heart } from 'lucide-react';
+import { ArrowLeft, Copy, Users, Search, UserPlus, QrCode, Check, Loader2, Clock, ChevronRight, ChevronDown, MessageCircle, Link2, X, Heart, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
@@ -77,6 +77,29 @@ export default function Friends() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [friendshipStatuses, setFriendshipStatuses] = useState<Record<string, FriendshipStatus>>({});
+  const [ralliedIds, setRalliedIds] = useState<Set<string>>(new Set());
+
+  // Get current user's display name for rally message
+  const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+  const currentUserProfile = allProfiles.find((p: any) => p.id === user?.id);
+
+  const handleRally = useCallback(async (friendId: string) => {
+    if (!user || ralliedIds.has(friendId)) return;
+    const senderName = currentUserProfile?.display_name || 'Someone';
+    try {
+      const { error } = await supabase.rpc('create_notification', {
+        p_receiver_id: friendId,
+        p_type: 'rally',
+        p_message: `${senderName} wants you to rally. Come out tonight! 👋`,
+      });
+      if (error) throw error;
+      setRalliedIds(prev => new Set(prev).add(friendId));
+      toast.success('Rally sent! 📣');
+    } catch (err) {
+      console.error('Rally failed:', err);
+      toast.error('Could not send rally');
+    }
+  }, [user, ralliedIds, currentUserProfile]);
   
   // QR modal state
   const [showQRModal, setShowQRModal] = useState(false);
@@ -602,19 +625,37 @@ export default function Friends() {
                             <p className="font-medium text-white text-sm truncate">{result.display_name}</p>
                             <p className="text-white/40 text-xs truncate">@{result.username}</p>
                           </div>
-                          <Button
-                            onClick={() => sendFriendRequest(result.id)}
-                            size="sm"
-                            disabled={buttonState.disabled}
-                            variant={buttonState.variant}
-                            className={buttonState.disabled 
-                              ? "border-[#a855f7]/40 text-white/60 rounded-xl text-xs"
-                              : "bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl text-xs"
-                            }
-                          >
-                            <ButtonIcon className="h-3.5 w-3.5 mr-1" />
-                            {buttonState.label}
-                          </Button>
+                          {friendshipStatuses[result.id] === 'accepted' ? (
+                            ralliedIds.has(result.id) ? (
+                              <span className="flex items-center gap-1 text-[#d4ff00]/60 text-xs font-medium px-2">
+                                <Check className="h-3.5 w-3.5" />
+                                Rallied
+                              </span>
+                            ) : (
+                              <Button
+                                onClick={() => handleRally(result.id)}
+                                size="sm"
+                                className="bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl text-xs"
+                              >
+                                <Megaphone className="h-3.5 w-3.5 mr-1" />
+                                Rally
+                              </Button>
+                            )
+                          ) : (
+                            <Button
+                              onClick={() => sendFriendRequest(result.id)}
+                              size="sm"
+                              disabled={buttonState.disabled}
+                              variant={buttonState.variant}
+                              className={buttonState.disabled 
+                                ? "border-[#a855f7]/40 text-white/60 rounded-xl text-xs"
+                                : "bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl text-xs"
+                              }
+                            >
+                              <ButtonIcon className="h-3.5 w-3.5 mr-1" />
+                              {buttonState.label}
+                            </Button>
+                          )}
                         </div>
                       );
                     })}

@@ -10,7 +10,8 @@ import { PullToRefresh } from '@/components/PullToRefresh';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, X, MapPin, Target, EyeOff } from 'lucide-react';
+import { Search, X, MapPin, Target, Megaphone, Check } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface FriendWithStatus {
   id: string;
@@ -36,6 +37,31 @@ export function MyFriendsTab() {
   const [friends, setFriends] = useState<FriendWithStatus[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [ralliedIds, setRalliedIds] = useState<Set<string>>(new Set());
+
+  // Get current user's display name for rally message
+  const currentUserProfile = useMemo(() => {
+    if (!allProfiles || !user) return null;
+    return allProfiles.find((p: any) => p.id === user.id);
+  }, [allProfiles, user]);
+
+  const handleRally = useCallback(async (friendId: string) => {
+    if (!user || ralliedIds.has(friendId)) return;
+    const senderName = currentUserProfile?.display_name || 'Someone';
+    try {
+      const { error } = await supabase.rpc('create_notification', {
+        p_receiver_id: friendId,
+        p_type: 'rally',
+        p_message: `${senderName} wants you to rally. Come out tonight! 👋`,
+      });
+      if (error) throw error;
+      setRalliedIds(prev => new Set(prev).add(friendId));
+      toast.success('Rally sent! 📣');
+    } catch (err) {
+      console.error('Rally failed:', err);
+      toast.error('Could not send rally');
+    }
+  }, [user, ralliedIds, currentUserProfile]);
 
   const friendProfiles = useMemo(() => {
     if (!allProfiles || !friendIds) return [];
@@ -202,10 +228,19 @@ export function MyFriendsTab() {
             <Target className="h-3.5 w-3.5" />
             Planning
           </span>
-        ) : (
-          <span className="flex items-center gap-1 text-white/20 text-xs">
-            <EyeOff className="h-3.5 w-3.5" />
+        ) : ralliedIds.has(friend.id) ? (
+          <span className="flex items-center gap-1 text-[#d4ff00]/60 text-xs font-medium">
+            <Check className="h-3.5 w-3.5" />
+            Rallied
           </span>
+        ) : (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleRally(friend.id); }}
+            className="flex items-center gap-1 text-[#d4ff00] text-xs font-medium hover:text-[#d4ff00]/80 transition-colors"
+          >
+            <Megaphone className="h-3.5 w-3.5" />
+            Rally
+          </button>
         )}
       </div>
     </button>
