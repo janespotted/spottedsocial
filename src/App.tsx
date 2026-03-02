@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { SplashScreen } from "./components/SplashScreen";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
@@ -32,8 +32,6 @@ import { DemoActivator } from "./components/DemoActivator";
 import { useAuth } from "./contexts/AuthContext";
 import { autoTrackVenue } from "./lib/auto-venue-tracker";
 import { logger } from "./lib/logger";
-
-// Eager imports (critical path)
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import InviteLanding from "./pages/InviteLanding";
@@ -41,39 +39,28 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Notifications from "./pages/Notifications";
 import Home from "./pages/Home";
+import Map from "./pages/Map";
+import Leaderboard from "./pages/Leaderboard";
 import Feed from "./pages/Feed";
+import Messages from "./pages/Messages";
+import Thread from "./pages/Thread";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import CloseFriends from "./pages/CloseFriends";
+import DemoSettings from "./pages/DemoSettings";
 import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
-
-// Lazy imports (code-split)
-const Map = lazy(() => import("./pages/Map"));
-const Leaderboard = lazy(() => import("./pages/Leaderboard"));
-const Messages = lazy(() => import("./pages/Messages"));
-const Thread = lazy(() => import("./pages/Thread"));
-const Friends = lazy(() => import("./pages/Friends"));
-const DemoSettings = lazy(() => import("./pages/DemoSettings"));
-const Admin = lazy(() => import("./pages/Admin"));
-const BusinessLanding = lazy(() => import("./pages/business/BusinessLanding"));
-const BusinessAuth = lazy(() => import("./pages/business/BusinessAuth"));
-const BusinessDashboard = lazy(() => import("./pages/business/BusinessDashboard"));
-const BusinessPromote = lazy(() => import("./pages/business/BusinessPromote"));
-const BusinessYap = lazy(() => import("./pages/business/BusinessYap"));
-const BusinessEvents = lazy(() => import("./pages/business/BusinessEvents"));
+import Friends from "./pages/Friends";
+import BusinessLanding from "./pages/business/BusinessLanding";
+import BusinessAuth from "./pages/business/BusinessAuth";
+import BusinessDashboard from "./pages/business/BusinessDashboard";
+import BusinessPromote from "./pages/business/BusinessPromote";
+import BusinessYap from "./pages/business/BusinessYap";
+import BusinessEvents from "./pages/business/BusinessEvents";
 import { BusinessRoute } from "./components/business/BusinessRoute";
 
 const queryClient = new QueryClient();
-
-const LazyFallback = () => (
-  <div className="flex min-h-screen items-center justify-center bg-background">
-    <div className="text-center">
-      <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
-      <p className="text-muted-foreground">Loading...</p>
-    </div>
-  </div>
-);
 
 // Component to trigger auto-tracking on app open
 function AutoTracker({ onReady }: { onReady: () => void }) {
@@ -115,7 +102,6 @@ function AppContent() {
       <ImDownConfirmation />
       <NotificationBanner />
       <VenueArrivalPrompt />
-      <Suspense fallback={<LazyFallback />}>
       <Routes>
         {/* Public routes */}
         <Route path="/auth" element={<Auth />} />
@@ -309,7 +295,6 @@ function AppContent() {
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
-      </Suspense>
     </>
   );
 }

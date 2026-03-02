@@ -29,7 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
-import { SpottedLogo } from '@/components/SpottedLogo';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { CityBadge } from '@/components/CityBadge';
 import { FeedSkeleton } from '@/components/FeedSkeleton';
@@ -362,7 +362,7 @@ export default function Home() {
               onClick={openCheckIn}
               className="hover:scale-110 transition-transform"
             >
-              <SpottedLogo className="h-12 w-12" />
+              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
             </button>
           </div>
         </div>

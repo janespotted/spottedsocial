@@ -20,7 +20,7 @@ import { CreatePostDialog } from '@/components/CreatePostDialog';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
-import { SpottedLogo } from '@/components/SpottedLogo';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { toast } from 'sonner';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import {
@@ -178,7 +178,7 @@ export default function Feed() {
               onClick={openCheckIn} 
               className="hover:scale-110 transition-transform"
             >
-              <SpottedLogo className="h-14 w-14" />
+              <img src={spottedLogo} alt="Go live" className="h-14 w-14 object-contain" />
             </button>
           </div>
         </div>

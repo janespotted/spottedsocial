@@ -8,7 +8,7 @@ import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { SpottedLogo } from '@/components/SpottedLogo';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode, Camera, Search, Heart, MessageCircle } from 'lucide-react';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
 import { NotificationBadge } from '@/components/NotificationBadge';
@@ -451,7 +451,7 @@ export default function Profile() {
               onClick={openCheckIn}
               className="hover:scale-110 transition-transform"
             >
-              <SpottedLogo className="h-12 w-12" />
+              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
             </button>
           </div>
         </div>

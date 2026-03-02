@@ -11,7 +11,7 @@ import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
-import { SpottedLogo } from '@/components/SpottedLogo';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { ChevronUp, ChevronDown, Bell, BarChart3, ChevronRight, Search } from 'lucide-react';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
 import { NotificationBadge } from '@/components/NotificationBadge';
@@ -513,7 +513,7 @@ export default function Leaderboard() {
               onClick={openCheckIn} 
               className="hover:scale-110 transition-transform"
             >
-              <SpottedLogo className="h-12 w-12" />
+              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
             </button>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
-import { SpottedLogo } from '@/components/SpottedLogo';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Camera, MessageCircle } from 'lucide-react';
 
 export function CheckInConfirmation() {
@@ -192,7 +192,7 @@ export function CheckInConfirmation() {
 
             {/* Spotted S - Top Right */}
             <div className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center">
-              <SpottedLogo className="w-full h-full" />
+              <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain" />
             </div>
 
             {/* Center Content */}
@@ -252,7 +252,7 @@ export function CheckInConfirmation() {
 
           {/* Spotted S - Top Right */}
           <div className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center">
-            <SpottedLogo className="w-full h-full" />
+            <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain" />
           </div>
 
           {/* Center Content */}

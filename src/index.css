@@ -288,7 +288,6 @@ All colors MUST be HSL.
    }
 
   /* Map venue promoted pulse animation */
-
 }
 
 /* Map venue promoted pulse animation - must be at global scope */
@@ -351,4 +350,3 @@ All colors MUST be HSL.
     font-size: 16px; /* Prevents iOS auto-zoom on focus */
   }
 }
-

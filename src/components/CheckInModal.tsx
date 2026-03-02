@@ -8,7 +8,7 @@ import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
 import { MapPin, Edit3, Clock, Bell, X, AlarmClock, ChevronDown, Home } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { SpottedLogo } from '@/components/SpottedLogo';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { captureLocationWithVenue, createNewVenue, detectNeighborhoodFromGPS, getCurrentLocation, type LocationData } from '@/lib/location-service';
 
@@ -17,7 +17,6 @@ import { requestNotificationPermission } from '@/lib/notifications';
 import { logEvent } from '@/lib/event-logger';
 import { markManualCheckin } from '@/lib/auto-venue-tracker';
 import { getDemoMode } from '@/lib/demo-data';
-import { calculateExpiryTime } from '@/lib/time-utils';
 import { getCachedCity } from '@/lib/city-detection';
 import { useUserCity } from '@/hooks/useUserCity';
 import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
@@ -179,6 +178,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       .eq('id', user?.id);
   };
 
+  const calculateExpiryTime = () => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(5, 0, 0, 0);
+    return tomorrow.toISOString();
+  };
 
   // Capture location and derive venue using location service
   const captureAndDeriveVenue = async () => {
@@ -743,7 +749,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       {/* Header */}
       <div className="relative w-full flex items-start justify-between pt-4">
         <h1 className="text-2xl font-light tracking-[0.3em] text-white/90">Spotted</h1>
-        <SpottedLogo className="h-10 w-10 drop-shadow-[0_0_8px_rgba(212,255,0,0.5)]" />
+        <img 
+          src={spottedLogo} 
+          alt="Spotted" 
+          className="h-10 w-10 object-contain drop-shadow-[0_0_8px_rgba(212,255,0,0.5)]" 
+        />
       </div>
 
       {/* Main Content */}
@@ -826,7 +836,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const ShareLocationContent = () => (
     <div className="relative p-6 space-y-6">
-      <SpottedLogo className="absolute top-4 right-4 h-10 w-10" />
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
       
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-white">Share Your Location With:</h3>
@@ -945,7 +955,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
     return (
       <div className="relative p-6 space-y-6">
-        <SpottedLogo className="absolute top-4 right-4 h-10 w-10" />
+        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
         
         <div className="space-y-2">
           <h3 className="text-xl font-semibold text-white">
@@ -1057,7 +1067,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     
     return (
       <div className="relative p-6 space-y-6">
-        <SpottedLogo className="absolute top-4 right-4 h-10 w-10" />
+        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
         
         <div className="space-y-2">
           <h3 className="text-xl font-semibold text-white">Share what area you're thinking tonight?</h3>
@@ -1110,7 +1120,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const PlanningPrivacyContent = () => (
     <div className="relative p-6 space-y-6">
-      <SpottedLogo className="absolute top-4 right-4 h-10 w-10" />
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
       
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-white">Who can see you're planning to go out?</h3>
@@ -1185,7 +1195,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const PrivatePartyPrivacyContent = () => (
     <div className="relative p-6 space-y-6">
-      <SpottedLogo className="absolute top-4 right-4 h-10 w-10" />
+      <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
       
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
@@ -1268,7 +1278,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if (isDetectingNeighborhood) {
       return (
         <div className="relative p-6 space-y-6">
-          <SpottedLogo className="absolute top-4 right-4 h-10 w-10" />
+          <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
           
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
@@ -1294,7 +1304,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if (privatePartyNeighborhood && !showNeighborhoodManualSelect) {
       return (
         <div className="relative p-6 space-y-6">
-          <SpottedLogo className="absolute top-4 right-4 h-10 w-10" />
+          <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
           
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
@@ -1333,7 +1343,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     // Manual selection fallback
     return (
       <div className="relative p-6 space-y-6">
-        <SpottedLogo className="absolute top-4 right-4 h-10 w-10" />
+        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
         
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 rounded-2xl bg-[#6366f1]/20 flex items-center justify-center">
