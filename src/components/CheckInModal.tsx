@@ -17,6 +17,7 @@ import { requestNotificationPermission } from '@/lib/notifications';
 import { logEvent } from '@/lib/event-logger';
 import { markManualCheckin } from '@/lib/auto-venue-tracker';
 import { getDemoMode } from '@/lib/demo-data';
+import { calculateExpiryTime } from '@/lib/time-utils';
 import { getCachedCity } from '@/lib/city-detection';
 import { useUserCity } from '@/hooks/useUserCity';
 import { CITY_NEIGHBORHOODS } from '@/lib/city-neighborhoods';
@@ -178,13 +179,6 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       .eq('id', user?.id);
   };
 
-  const calculateExpiryTime = () => {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(5, 0, 0, 0);
-    return tomorrow.toISOString();
-  };
 
   // Capture location and derive venue using location service
   const captureAndDeriveVenue = async () => {
