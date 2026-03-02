@@ -146,16 +146,13 @@ export function CheckInConfirmation() {
     e.stopPropagation();
     const venueName = checkInVenueName;
     const isPrivateParty = checkInIsPrivateParty;
-    setPhase('celebration');
-    navigate('/messages', { 
-      state: { 
-        activeTab: 'yap', 
-        venueName,
-        isPrivateParty 
-      } 
-    });
-    // Close AFTER navigation state is set to prevent race condition
-    setTimeout(() => closeCheckInConfirmation(), 100);
+    // Store in localStorage as reliable transport
+    if (venueName) {
+      localStorage.setItem('yap_nav_venue', venueName);
+      localStorage.setItem('yap_nav_private_party', String(!!isPrivateParty));
+    }
+    closeCheckInConfirmation();
+    navigate('/messages', { state: { activeTab: 'yap', venueName, isPrivateParty } });
   };
 
   const getPrivacyLabel = (level: string): string => {

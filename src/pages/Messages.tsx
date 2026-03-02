@@ -36,27 +36,29 @@ export default function Messages() {
 
   useEffect(() => {
     const state = location.state;
-    if (!state) return;
+    // Check localStorage fallback for yap navigation
+    const lsVenue = localStorage.getItem('yap_nav_venue');
+    const lsPrivateParty = localStorage.getItem('yap_nav_private_party') === 'true';
 
-    // Check if we have a preselected user from navigation state
-    if (state.preselectedUser) {
-      setPreselectedUser(state.preselectedUser);
-      setActiveTab('messages');
-    }
-    // Check if we should open a specific tab (e.g., from bell icon)
-    if (state.activeTab) {
-      setActiveTab(state.activeTab);
-    }
-    // Check if we have a venue name for Yap
-    if (state.venueName) {
-      setYapVenueName(state.venueName);
-      setYapIsPrivateParty(!!state.isPrivateParty);
+    if (state?.venueName || lsVenue) {
+      const venue = state?.venueName || lsVenue;
+      const isPrivateParty = state?.isPrivateParty ?? lsPrivateParty;
+      setYapVenueName(venue);
+      setYapIsPrivateParty(!!isPrivateParty);
       setYapNavKey(prev => prev + 1);
       setActiveTab('yap');
+      // Clean up
+      localStorage.removeItem('yap_nav_venue');
+      localStorage.removeItem('yap_nav_private_party');
+    } else if (state?.preselectedUser) {
+      setPreselectedUser(state.preselectedUser);
+      setActiveTab('messages');
+    } else if (state?.activeTab) {
+      setActiveTab(state.activeTab);
     }
 
     // Clear location.state to prevent re-triggering on back navigation
-    if (state.preselectedUser || state.activeTab || state.venueName) {
+    if (state?.preselectedUser || state?.activeTab || state?.venueName) {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state]);
