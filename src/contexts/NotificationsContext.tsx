@@ -16,6 +16,8 @@ interface Notification {
     display_name: string;
     avatar_url: string | null;
   };
+  // Extra fields for DM banners
+  thread_id?: string;
 }
 
 interface NotificationsContextType {
@@ -54,17 +56,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       }
 
       if (data && data.length > 0) {
-        // Batch fetch all sender profiles in ONE query (fixes N+1)
+        // Batch fetch all sender profiles in ONE query using safe RPC
         const senderIds = [...new Set(data.map(n => n.sender_id).filter(Boolean))];
         
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, display_name, avatar_url')
-          .in('id', senderIds);
+        const { data: profiles } = await supabase.rpc('get_profiles_safe');
 
-        // Create lookup map for O(1) access
+        // Create lookup map for O(1) access - filter to only senders we need
         const profileMap = new Map(
-          profiles?.map(p => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url }]) || []
+          profiles?.filter(p => senderIds.includes(p.id)).map(p => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url }]) || []
         );
 
         // Attach profiles and filter to tonight only (5am boundary)
@@ -83,8 +82,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     fetchNotifications();
 
-    // Subscribe to realtime updates
-    const channel = supabase
+    // Subscribe to realtime notification updates
+    const notifChannel = supabase
       .channel('notifications-changes')
       .on(
         'postgres_changes',
@@ -97,18 +96,17 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         async (payload) => {
           console.log('New notification received (realtime):', payload);
           
-          // Fetch sender profile
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('display_name, avatar_url')
-            .eq('id', payload.new.sender_id)
-            .single();
+          // Fetch sender profile using safe RPC (bypasses RLS)
+          const { data: profileData } = await supabase.rpc('get_profile_safe', { 
+            target_user_id: payload.new.sender_id 
+          });
+          const profile = profileData?.[0];
 
           console.log('Sender profile fetched:', profile);
 
           const newNotification = {
             ...payload.new,
-            sender_profile: profile || undefined
+            sender_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined
           } as Notification;
 
           console.log('Setting latest notification:', newNotification);
@@ -128,12 +126,67 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       )
       .subscribe();
 
+    // Subscribe to DM messages for banner notifications
+    const dmChannel = supabase
+      .channel('dm-banner-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'dm_messages',
+        },
+        async (payload) => {
+          const newMsg = payload.new as { id: string; sender_id: string; text: string; created_at: string; thread_id: string };
+          
+          // Ignore own messages
+          if (newMsg.sender_id === user.id) return;
+
+          // Check if user is a member of this thread
+          const { data: membership } = await supabase
+            .from('dm_thread_members')
+            .select('id')
+            .eq('thread_id', newMsg.thread_id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (!membership) return;
+
+          // Fetch sender profile using safe RPC
+          const { data: profileData } = await supabase.rpc('get_profile_safe', { 
+            target_user_id: newMsg.sender_id 
+          });
+          const profile = profileData?.[0];
+
+          const preview = newMsg.text.length > 50 ? newMsg.text.slice(0, 50) + '...' : newMsg.text;
+
+          const syntheticNotification: Notification = {
+            id: `dm-${newMsg.id}`,
+            sender_id: newMsg.sender_id,
+            receiver_id: user.id,
+            type: 'dm_message',
+            message: preview,
+            is_read: false,
+            created_at: newMsg.created_at || new Date().toISOString(),
+            sender_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined,
+            thread_id: newMsg.thread_id,
+          };
+
+          setLatestNotification(syntheticNotification);
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(notifChannel);
+      supabase.removeChannel(dmChannel);
     };
   }, [user]);
 
   const markAsRead = async (notificationId: string) => {
+    // Skip for synthetic DM notifications
+    if (notificationId.startsWith('dm-')) return;
+    
     const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
