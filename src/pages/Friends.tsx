@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Copy, Users, Search, UserPlus, QrCode, Check, Loader2, Clock, ChevronRight, ChevronDown, MessageCircle, Link2, X, Heart, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { triggerPushNotification } from '@/lib/push-notifications';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import spottedLogo from '@/assets/spotted-s-logo.png';
@@ -87,12 +88,26 @@ export default function Friends() {
     if (!user || ralliedIds.has(friendId)) return;
     const senderName = currentUserProfile?.display_name || 'Someone';
     try {
-      const { error } = await supabase.rpc('create_notification', {
+      const message = `${senderName} wants you to rally. Come out tonight! 👋`;
+      const { data: notifData, error } = await supabase.rpc('create_notification', {
         p_receiver_id: friendId,
         p_type: 'rally',
-        p_message: `${senderName} wants you to rally. Come out tonight! 👋`,
+        p_message: message,
       });
       if (error) throw error;
+      
+      // Trigger push notification
+      const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+      if (notif) {
+        triggerPushNotification({
+          id: notif.id,
+          receiver_id: friendId,
+          sender_id: user.id,
+          type: 'rally',
+          message,
+        });
+      }
+      
       setRalliedIds(prev => new Set(prev).add(friendId));
       toast.success('Rally sent! 📣');
     } catch (err) {

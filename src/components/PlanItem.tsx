@@ -25,6 +25,7 @@ import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { format, isToday, isTomorrow, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { triggerPushNotification } from '@/lib/push-notifications';
 import confetti from 'canvas-confetti';
 
 const formatTimeTo12Hour = (time: string) => {
@@ -212,11 +213,22 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
           const firstName = myProfile?.display_name?.split(' ')[0] || 'Someone';
           const message = `${firstName} is down for your plan at ${plan.venue_name}! 🎉`;
           
-          await supabase.rpc('create_notification', {
+          const { data: notifData } = await supabase.rpc('create_notification', {
             p_receiver_id: plan.user_id,
             p_type: 'plan_down',
             p_message: message,
           });
+          
+          const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+          if (notif) {
+            triggerPushNotification({
+              id: notif.id,
+              receiver_id: plan.user_id,
+              sender_id: currentUserId,
+              type: 'plan_down',
+              message,
+            });
+          }
         }
         
         await fetchDowns();

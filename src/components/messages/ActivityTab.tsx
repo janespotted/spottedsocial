@@ -11,6 +11,7 @@ import { useImDown } from '@/contexts/ImDownContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { logEvent } from '@/lib/event-logger';
+import { triggerPushNotification } from '@/lib/push-notifications';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target, Heart, TrendingUp, Megaphone } from 'lucide-react';
@@ -583,11 +584,23 @@ export function ActivityTab() {
 
     // Send acceptance notification back
     if (!activity.user_id.startsWith('demo-')) {
-      await supabase.rpc('create_notification', {
+      const acceptMessage = `${myName} is down to meet up! 🎉`;
+      const { data: notifData } = await supabase.rpc('create_notification', {
         p_receiver_id: activity.user_id,
         p_type: 'meetup_accepted',
-        p_message: `${myName} is down to meet up! 🎉`,
+        p_message: acceptMessage,
       });
+      
+      const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+      if (notif) {
+        triggerPushNotification({
+          id: notif.id,
+          receiver_id: activity.user_id,
+          sender_id: user.id,
+          type: 'meetup_accepted',
+          message: acceptMessage,
+        });
+      }
       
       // Delete the original notification so it doesn't reappear
       if (activity.notificationId) {
@@ -625,11 +638,23 @@ export function ActivityTab() {
 
     // Send acceptance notification back
     if (!activity.user_id.startsWith('demo-')) {
-      await supabase.rpc('create_notification', {
+      const acceptMessage = `${myName} is down for ${activity.subtitle}! 🎉`;
+      const { data: notifData } = await supabase.rpc('create_notification', {
         p_receiver_id: activity.user_id,
         p_type: 'venue_invite_accepted',
-        p_message: `${myName} is down for ${activity.subtitle}! 🎉`,
+        p_message: acceptMessage,
       });
+      
+      const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+      if (notif) {
+        triggerPushNotification({
+          id: notif.id,
+          receiver_id: activity.user_id,
+          sender_id: user.id,
+          type: 'venue_invite_accepted',
+          message: acceptMessage,
+        });
+      }
       
       // Delete the original notification so it doesn't reappear
       if (activity.notificationId) {

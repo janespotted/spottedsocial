@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationsContext';
+import { triggerPushNotification } from '@/lib/push-notifications';
 
 const YAP_NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes between yap banners
 
@@ -93,11 +94,23 @@ export function useYapNotifications() {
 
             // Also create a notification in DB for the activity center
             try {
-              await supabase.rpc('create_notification', {
+              const yapMessage = `💬 New yap at ${locationLabel}: "${yapPreview}"`;
+              const { data: notifData } = await supabase.rpc('create_notification', {
                 p_receiver_id: user.id,
                 p_type: 'venue_yap',
-                p_message: `💬 New yap at ${locationLabel}: "${yapPreview}"`,
+                p_message: yapMessage,
               });
+              
+              const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+              if (notif) {
+                triggerPushNotification({
+                  id: notif.id,
+                  receiver_id: user.id,
+                  sender_id: newYap.user_id,
+                  type: 'venue_yap',
+                  message: yapMessage,
+                });
+              }
             } catch (err) {
               // Non-critical — banner already shown
               console.error('Failed to create yap activity entry:', err);
