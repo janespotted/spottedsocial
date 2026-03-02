@@ -127,6 +127,30 @@ export default function Friends() {
     }
   });
 
+  // Realtime subscription for live updates
+  useEffect(() => {
+    if (!user) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        fetchRequests();
+        fetchSuggestedFriends();
+        queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
+        queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+      }, 1500);
+    };
+    const channel = supabase
+      .channel('friends-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh)
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchQuery.trim().length >= 2) {
