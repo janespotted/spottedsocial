@@ -9,7 +9,7 @@
  import { toast } from 'sonner';
  import { ArrowLeft, Loader2, Building2, Clock } from 'lucide-react';
  import { ClaimVenueForm } from '@/components/business/ClaimVenueForm';
- import spottedLogo from '@/assets/spotted-s-logo.png';
+ import { SpottedLogo } from '@/components/SpottedLogo';
  
  interface PendingClaim {
    id: string;
@@ -113,7 +113,7 @@
              <ArrowLeft className="h-5 w-5" />
            </Button>
            <div className="flex items-center gap-2">
-             <img src={spottedLogo} alt="Spotted" className="h-8 w-8 logo-blend" />
+             <SpottedLogo className="h-8 w-8" />
              <h1 className="text-xl font-semibold text-white">
                {user ? 'Claim Your Venue' : 'Business Sign In'}
              </h1>

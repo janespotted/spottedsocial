@@ -14,7 +14,7 @@ import { getRedirectOrigin, APP_BASE_URL } from '@/lib/platform';
 import { Mail, Lock, User, AtSign, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { SpottedLogo } from '@/components/SpottedLogo';
 
 interface InviterInfo {
   display_name: string;
@@ -232,11 +232,7 @@ export default function Auth() {
          <CardHeader className="space-y-3 text-center pt-8 pb-4">
            {/* Logo with glow effect */}
            <div className="flex justify-center mb-2">
-             <img 
-               src={spottedLogo} 
-               alt="Spotted" 
-               className="w-14 h-14 object-contain drop-shadow-[0_0_15px_rgba(212,255,0,0.5)] logo-blend"
-             />
+              <SpottedLogo className="w-14 h-14 drop-shadow-[0_0_15px_rgba(212,255,0,0.5)]" />
            </div>
            
            <CardTitle className="text-4xl font-light tracking-[0.25em] text-foreground">

@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { SpottedLogo } from '@/components/SpottedLogo';
 import { isFromTonight } from '@/lib/time-context';
 import { logger } from '@/lib/logger';
 import { MessageInput } from '@/components/MessageInput';
@@ -505,7 +505,7 @@ export default function Thread() {
               onClick={openCheckIn}
               className="hover:scale-110 transition-transform"
             >
-              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain logo-blend" />
+              <SpottedLogo className="h-12 w-12" />
             </button>
           </div>
         </div>

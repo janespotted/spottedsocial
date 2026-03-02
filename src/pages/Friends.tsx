@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { QRCodeModal } from '@/components/QRCodeModal';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { SpottedLogo } from '@/components/SpottedLogo';
 import { MyFriendsTab } from '@/components/MyFriendsTab';
 
 interface SearchResult {
@@ -530,7 +530,7 @@ export default function Friends() {
               onClick={openCheckIn}
               className="hover:scale-110 transition-transform"
             >
-              <img src={spottedLogo} alt="Go live" className="h-10 w-10 object-contain logo-blend" />
+              <SpottedLogo className="h-10 w-10" />
             </button>
           </div>
         </header>

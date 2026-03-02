@@ -352,7 +352,3 @@ All colors MUST be HSL.
   }
 }
 
-/* Logo transparency — outside @layer for maximum specificity */
-.logo-blend {
-  mix-blend-mode: screen !important;
-}
