@@ -33,9 +33,13 @@ export function useBootstrapMode() {
     // Also listen for custom event (when bootstrap mode is toggled in same tab)
     window.addEventListener('bootstrapModeChanged', checkBootstrapMode);
 
+    // Listen for city detection (GPS resolved) so bootstrap city updates reactively
+    window.addEventListener('cityChanged', checkBootstrapMode);
+
     return () => {
       window.removeEventListener('storage', checkBootstrapMode);
       window.removeEventListener('bootstrapModeChanged', checkBootstrapMode);
+      window.removeEventListener('cityChanged', checkBootstrapMode);
     };
   }, []);
 
