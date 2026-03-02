@@ -355,7 +355,7 @@ export default function Thread() {
       <div className="max-w-[430px] mx-auto min-h-screen flex flex-col">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
-          <div className="flex items-center justify-between p-4">
+          <div className="flex items-center justify-between px-4 py-3">
             <button 
               onClick={() => navigate('/messages')}
               className="text-white/60 hover:text-white transition-colors"
@@ -485,19 +485,21 @@ export default function Thread() {
                 </Avatar>
                 <div className="flex-1 min-w-0 text-left">
                   <h2 className="font-semibold text-white truncate">{otherMember?.display_name}</h2>
-                  <p className="text-white/60 text-sm truncate">@{otherMember?.username}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-white/60 text-sm truncate">@{otherMember?.username}</p>
+                    {otherMember?.venue_name && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleVenueClick(otherMember.venue_name!, otherMember.venue_id);
+                        }}
+                        className="text-[#d4ff00] text-xs font-medium hover:text-[#d4ff00]/80 transition-colors truncate max-w-[140px]"
+                      >
+                        @{otherMember.venue_name}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {otherMember?.venue_name && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleVenueClick(otherMember.venue_name!, otherMember.venue_id);
-                    }}
-                    className="text-[#d4ff00] text-sm font-medium hover:text-[#d4ff00]/80 transition-colors"
-                  >
-                    @{otherMember.venue_name}
-                  </button>
-                )}
               </button>
             )}
 

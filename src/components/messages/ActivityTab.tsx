@@ -868,6 +868,10 @@ export function ActivityTab() {
                   <div className="w-11 h-11 rounded-full bg-[#a855f7]/20 border-2 border-[#a855f7]/60 flex items-center justify-center shadow-[0_0_16px_rgba(168,85,247,0.4)]">
                     {getActivityIcon(activity.type)}
                   </div>
+                ) : activity.type === 'venue_yap' ? (
+                  <div className="w-11 h-11 rounded-full bg-amber-500/20 border-2 border-amber-400/60 flex items-center justify-center">
+                    <MessageCircle className="h-5 w-5 text-amber-400" />
+                  </div>
                 ) : activity.avatar_url !== undefined ? (
                   <button
                     onClick={() => activity.user_id && openFriendCard({
@@ -909,7 +913,7 @@ export function ActivityTab() {
                       <span className="font-semibold">{activity.display_name}</span>
                       <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
                     </div>
-                    <span className="text-[#d4ff00] block text-xs mt-0.5">@{activity.subtitle}</span>
+                    <span className="text-[#d4ff00] block text-xs mt-0.5">inviting you to {activity.subtitle}</span>
                   </div>
                 )}
                 {activity.type === 'check_in' && (
@@ -987,10 +991,10 @@ export function ActivityTab() {
                 {activity.type === 'venue_yap' && (
                   <div className="text-white text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="font-semibold">New yap</span>
                       <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
                     </div>
-                    <span className="text-amber-400 block text-xs mt-0.5 line-clamp-1">{activity.subtitle || 'posted in yap'}</span>
+                    <span className="text-amber-400 block text-xs mt-0.5 line-clamp-1">{activity.subtitle || 'at your spot'}</span>
                   </div>
                 )}
               </div>
