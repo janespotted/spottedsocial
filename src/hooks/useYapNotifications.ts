@@ -70,14 +70,8 @@ export function useYapNotifications() {
             if (now - lastNotifiedRef.current < YAP_NOTIFICATION_COOLDOWN_MS) return;
             lastNotifiedRef.current = now;
 
-            // Get yapper's display name
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('display_name, avatar_url')
-              .eq('id', newYap.user_id)
-              .single();
 
-            const yapperName = profile?.display_name || 'Someone';
+
             const locationLabel = nightStatus.is_private_party
               ? `your private party${nightStatus.party_neighborhood ? ` (${nightStatus.party_neighborhood})` : ''}`
               : venueName;
@@ -86,19 +80,15 @@ export function useYapNotifications() {
               ? (newYap.text.length > 40 ? newYap.text.slice(0, 40) + '…' : newYap.text)
               : '📸 shared media';
 
-            // Show banner immediately (client-side only, no DB insert needed for banner)
+            // Show banner immediately (anonymous — no username)
             showBanner({
               id: `yap-${newYap.id}`,
               sender_id: newYap.user_id,
               receiver_id: user.id,
               type: 'venue_yap',
-              message: `💬 ${yapperName} yapped at ${locationLabel}: "${yapPreview}"`,
+              message: `💬 New yap at ${locationLabel}: "${yapPreview}"`,
               is_read: false,
               created_at: new Date().toISOString(),
-              sender_profile: profile ? {
-                display_name: profile.display_name,
-                avatar_url: profile.avatar_url,
-              } : undefined,
             });
 
             // Also create a notification in DB for the activity center
@@ -106,7 +96,7 @@ export function useYapNotifications() {
               await supabase.rpc('create_notification', {
                 p_receiver_id: user.id,
                 p_type: 'venue_yap',
-                p_message: `💬 ${yapperName} yapped at ${locationLabel}: "${yapPreview}"`,
+                p_message: `💬 New yap at ${locationLabel}: "${yapPreview}"`,
               });
             } catch (err) {
               // Non-critical — banner already shown
