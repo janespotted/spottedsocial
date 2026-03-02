@@ -1,47 +1,18 @@
 
 
-## Fix: Remove Black Background from Spotted S Logo
+## Fix: Replace buggy local `calculateExpiryTime` with shared utility
 
 ### Problem
-The previous compression of `spotted-s-logo.png` stripped its alpha channel (transparency), giving it a black background. This is visible in the top-right header icon and the bottom nav across all pages.
+The local `calculateExpiryTime` in `CheckInModal.tsx` (lines 181-187) always adds 1 day before setting 5am, so check-ins between midnight and 5am expire ~27 hours later instead of at 5am the same morning. The correct version already exists in `@/lib/time-utils`.
 
-### Solution
-Apply `mix-blend-mode: screen` via CSS to all `<img>` tags that render the logo. The `screen` blend mode makes black pixels fully transparent against any background, perfectly restoring the original look without needing to re-export the image.
+### Changes in `src/components/CheckInModal.tsx`
 
-### Changes
+1. **Add import** (after line 19 or nearby):
+   ```typescript
+   import { calculateExpiryTime } from '@/lib/time-utils';
+   ```
 
-**Every file that renders the logo** (18 files total) — add `mix-blend-mode: screen` to the `<img>` className. However, to avoid touching 18 files, the cleaner approach is:
+2. **Delete lines 181-187** — the local `calculateExpiryTime` function.
 
-**`src/index.css`** — Add a single utility class:
-```css
-.logo-blend {
-  mix-blend-mode: screen;
-}
-```
-
-Then add `logo-blend` to every `<img src={spottedLogo}>` className across these files:
-- `src/pages/Home.tsx`
-- `src/pages/Profile.tsx`
-- `src/pages/Feed.tsx`
-- `src/pages/Map.tsx`
-- `src/pages/Leaderboard.tsx`
-- `src/pages/Messages.tsx`
-- `src/pages/Thread.tsx`
-- `src/pages/Friends.tsx`
-- `src/pages/Auth.tsx`
-- `src/pages/business/BusinessLanding.tsx`
-- `src/pages/business/BusinessAuth.tsx`
-- `src/components/BottomNav.tsx`
-- `src/components/SplashScreen.tsx`
-- `src/components/CheckInModal.tsx`
-- `src/components/CheckInConfirmation.tsx`
-- `src/components/MeetUpConfirmation.tsx`
-- `src/components/ImDownConfirmation.tsx`
-- `src/components/VenueInviteConfirmation.tsx`
-
-**Alternative (fewer edits):** Instead of a utility class, use a global CSS rule targeting all images with that src. But since Vite hashes asset URLs, the utility class approach is more reliable.
-
-### Files changed
-- `src/index.css` — add `.logo-blend` utility
-- All 18 files above — add `logo-blend` to the logo `<img>` className
+No other files change. All existing call sites within CheckInModal already reference `calculateExpiryTime()` by name, so they'll pick up the imported version automatically.
 
