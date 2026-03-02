@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus, MapPin } from 'lucide-react';
+import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus, MapPin, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -275,6 +275,35 @@ export default function Settings() {
               <div className="text-left">
                 <h3 className="font-semibold text-white">Help & Support</h3>
                 <p className="text-white/60 text-sm">Get help or contact support</p>
+              </div>
+            </div>
+          </button>
+        </Card>
+
+        {/* Replay Onboarding Section */}
+        <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
+          <button
+            onClick={async () => {
+              if (!user) return;
+              const { error } = await supabase
+                .from('profiles')
+                .update({ has_onboarded: false })
+                .eq('id', user.id);
+              if (error) {
+                toast.error('Failed to reset onboarding');
+                return;
+              }
+              navigate('/');
+            }}
+            className="w-full flex items-center justify-between p-4 hover:bg-[#a855f7]/10 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#d4ff00]/20 flex items-center justify-center">
+                <RotateCcw className="h-5 w-5 text-[#d4ff00]" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-white">Replay Onboarding</h3>
+                <p className="text-white/60 text-sm">Review the welcome tutorial</p>
               </div>
             </div>
           </button>
