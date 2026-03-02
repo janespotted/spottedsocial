@@ -1,28 +1,18 @@
 
 
-## Plan: Simplify Friends Page to 2 Tabs
+## Fix: Stale "Yap about it" and "Maybe later" Buttons
 
-### Overview
-Consolidate the 4-tab Friends page (Requests, Friends, Find, Invite) into 2 tabs: **Friends** (default) and **Invite**.
+### Root Cause
+The `phase` state in `CheckInConfirmation.tsx` never resets back to `'celebration'`. After the first check-in cycle, `phase` stays at `'yap_prompt'`. On subsequent check-ins, the yap prompt renders immediately in a stale state — the component skips the celebration animation entirely and the buttons can appear before the context values are fully committed, making them unresponsive.
 
-### Changes — `src/pages/Friends.tsx` only
+### Fix — `src/components/CheckInConfirmation.tsx`
 
-**Tab structure**: Replace 4 TabsTriggers with 2 centered ones ("Friends" and "Invite"), keeping the yellow/green active highlight style.
+1. **Reset `phase` when confirmation opens**: Add a `useEffect` that resets `phase` to `'celebration'` whenever `showCheckInConfirmation` transitions to `true`. This ensures every check-in starts fresh with the celebration animation, then transitions to yap prompt after 2.5s.
 
-**"Friends" tab content** (combines old Requests, Friends, and Find tabs):
+2. **Capture venue data in handler closures**: In `handleShareClick`, capture `checkInVenueName` and `checkInIsPrivateParty` into local variables before calling `navigate` and `closeCheckInConfirmation`, preventing any race between the navigation state and the context cleanup.
 
-1. **Unified search bar** at the top — placeholder "Search by name or username...". When empty, shows the friend list below. When typing (2+ chars), searches both existing friends AND all Spotted users in one results list (friends show status, non-friends show Add button). Reuses the existing `searchUsers` + `MyFriendsTab` filtering logic.
+3. **Same for "Maybe later"**: Ensure `handleDismissAndNavigate` calls `closeCheckInConfirmation()` cleanly and resets phase.
 
-2. **Pending requests banner** — If `requests.length > 0`, show a compact card: "You have X friend requests" with a chevron. Tapping expands an inline list of request cards (same accept/decline UI as current Requests tab). When no requests, banner is hidden entirely.
-
-3. **"Manage Close Friends" link** — Small text button near the search bar area (e.g., right-aligned below search), navigates to `/profile/close-friends`.
-
-4. **Friend list** — Render `MyFriendsTab` content inline (Out Now → Planning → Not Sharing sections), exactly as current.
-
-**"Invite" tab**: No changes — keep as-is (lines 813-874).
-
-**State changes**: Default tab becomes `'friends'` instead of `'requests'`. Remove the `'find'` and `'requests'` tab values. The `suggestedFriends` "People You May Know" section moves into the Friends tab, shown below the friend list when search is empty.
-
-### Files modified
-- `src/pages/Friends.tsx` — restructure tabs, merge search + requests + friends into one tab
+### Files changed
+- `src/components/CheckInConfirmation.tsx`
 
