@@ -4,7 +4,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { cn } from '@/lib/utils';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { SpottedLogo } from '@/components/SpottedLogo';
 import { MessagesTab } from '@/components/messages/MessagesTab';
 import { YapTab } from '@/components/messages/YapTab';
 import { ActivityTab } from '@/components/messages/ActivityTab';
@@ -91,7 +91,7 @@ export default function Messages() {
               onClick={openCheckIn}
               className="hover:scale-110 transition-transform"
             >
-              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain logo-blend" />
+              <SpottedLogo className="h-12 w-12" />
             </button>
           </div>
         </div>

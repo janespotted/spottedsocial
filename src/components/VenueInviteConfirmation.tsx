@@ -9,7 +9,7 @@ import { Undo2, MessageCircle } from 'lucide-react';
 import { haptic } from '@/lib/haptics';
 import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { SpottedLogo } from '@/components/SpottedLogo';
 
 export function VenueInviteConfirmation() {
   const { showConfirmation, invitedFriends, venueName, closeConfirmation } = useVenueInvite();
@@ -156,11 +156,7 @@ export function VenueInviteConfirmation() {
           )}
 
           {/* Spotted Logo - Top Right */}
-          <img 
-            src={spottedLogo} 
-            alt="Spotted" 
-            className="absolute top-4 right-4 w-12 h-12 logo-blend"
-          />
+          <SpottedLogo className="absolute top-4 right-4 w-12 h-12" />
 
           {/* Main Content */}
           <div className="text-center pt-4">

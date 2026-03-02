@@ -3,7 +3,7 @@ import { Home, MapPin, BarChart3, MessageSquare } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useInputFocusState, useInputFocus } from '@/contexts/InputFocusContext';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { SpottedLogo } from '@/components/SpottedLogo';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
@@ -67,11 +67,9 @@ export const BottomNav = memo(function BottomNav() {
               )}
             >
               {isSpecial ? (
-                <img 
-                  src={spottedLogo}
-                  alt="Profile"
+                <SpottedLogo
                   className={cn(
-                    'h-10 w-10 object-contain transition-all logo-blend',
+                    'h-10 w-10 transition-all',
                     isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]'
                   )}
                 />

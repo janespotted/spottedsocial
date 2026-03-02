@@ -5,7 +5,7 @@
  import { Button } from '@/components/ui/button';
  import { Card, CardContent } from '@/components/ui/card';
  import { Building2, BarChart3, Megaphone, MessageSquare, ArrowRight, Loader2 } from 'lucide-react';
- import spottedLogo from '@/assets/spotted-s-logo.png';
+ import { SpottedLogo } from '@/components/SpottedLogo';
  
  export default function BusinessLanding() {
    const navigate = useNavigate();
@@ -68,7 +68,7 @@
          {/* Header */}
          <div className="text-center mb-8">
            <div className="flex justify-center mb-4">
-             <img src={spottedLogo} alt="Spotted" className="h-16 w-16 logo-blend" />
+             <SpottedLogo className="h-16 w-16" />
            </div>
            <h1 className="text-2xl font-bold text-white mb-2">
              Spotted for Business

@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MessageCircle, X } from 'lucide-react';
 import { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { SpottedLogo } from '@/components/SpottedLogo';
 import { haptic } from '@/lib/haptics';
 
 export function ImDownConfirmation() {
@@ -117,7 +117,7 @@ export function ImDownConfirmation() {
 
           {/* Spotted S - Top Right */}
           <div className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center">
-            <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain logo-blend" />
+            <SpottedLogo className="w-full h-full" />
           </div>
 
           {/* Center Content */}
