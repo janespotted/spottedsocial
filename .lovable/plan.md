@@ -1,64 +1,52 @@
 
 
-## Plan: Fix "Yap About It" Button Not Working
+## Plan: Fix Yap Upvote Not Persisting + Restyle Yap Activity Card
 
-### Root Cause
+### Problem 1: Score stays at 0 after upvoting
 
-The button click navigates to `/messages` with `location.state`, but if the user is already on `/messages`, react-router may not reliably trigger the `location.state` effect. The immediate state-clearing navigation (`navigate(location.pathname, { replace: true, state: {} })`) can also race with the initial state consumption.
+The `handleVote` function in `VenueYapThread.tsx` inserts into `yap_votes` (works — RLS allows inserts) then tries to UPDATE `yap_messages.score`. But there is **no UPDATE RLS policy on `yap_messages`**, so the update silently fails. The local state updates optimistically but the DB never changes, so on refresh it's back to 0.
 
-### Fix: Use localStorage as a Reliable Transport
+**Fix — two options (use both for robustness):**
 
-Instead of relying solely on `location.state` (which has timing issues with same-page navigation), store the yap intent in localStorage. Messages.tsx reads from both sources.
+1. **Add an RLS policy** allowing authenticated users to update the `score` column on `yap_messages`:
+   ```sql
+   CREATE POLICY "Authenticated users can update yap score"
+     ON yap_messages FOR UPDATE
+     USING (auth.uid() IS NOT NULL)
+     WITH CHECK (auth.uid() IS NOT NULL);
+   ```
 
-**`src/components/CheckInConfirmation.tsx`** — `handleShareClick`:
-- Before navigating, write `yap_nav_venue` and `yap_nav_private_party` to localStorage
-- Remove `setPhase('celebration')` (unnecessary since we're navigating away)
+2. **Better long-term**: Create a database function `increment_yap_score(p_yap_id uuid, p_delta int)` that runs with `SECURITY DEFINER` so it bypasses RLS. This is safer since users can only adjust score through the controlled function, not arbitrarily update other fields. The function would:
+   ```sql
+   CREATE OR REPLACE FUNCTION increment_yap_score(p_yap_id uuid, p_delta int)
+   RETURNS void AS $$
+   BEGIN
+     UPDATE yap_messages SET score = score + p_delta WHERE id = p_yap_id;
+   END;
+   $$ LANGUAGE plpgsql SECURITY DEFINER;
+   ```
+   Then in `VenueYapThread.tsx`, replace the direct update with:
+   ```typescript
+   await supabase.rpc('increment_yap_score', { p_yap_id: yapId, p_delta: scoreDelta });
+   ```
 
-```typescript
-const handleShareClick = (e: React.MouseEvent) => {
-  e.stopPropagation();
-  const venueName = checkInVenueName;
-  const isPrivateParty = checkInIsPrivateParty;
-  // Store in localStorage as reliable transport
-  if (venueName) {
-    localStorage.setItem('yap_nav_venue', venueName);
-    localStorage.setItem('yap_nav_private_party', String(!!isPrivateParty));
-  }
-  closeCheckInConfirmation();
-  navigate('/messages', { state: { activeTab: 'yap', venueName, isPrivateParty } });
-};
-```
+I recommend option 2 (SECURITY DEFINER function) as it's more secure — prevents users from arbitrarily setting scores.
 
-**`src/pages/Messages.tsx`** — useEffect:
-- Also check localStorage for `yap_nav_venue` on mount/state change as a fallback
-- Clear localStorage keys after reading
+### Problem 2: Yap activity card is orange — should match app theme
 
-```typescript
-useEffect(() => {
-  const state = location.state;
-  // Check localStorage fallback for yap navigation
-  const lsVenue = localStorage.getItem('yap_nav_venue');
-  const lsPrivateParty = localStorage.getItem('yap_nav_private_party') === 'true';
+The "Yaps at Your Spot" card uses `amber-400`/`amber-500` styling. Change to match the app's purple/lime theme:
 
-  if (state?.venueName || lsVenue) {
-    const venue = state?.venueName || lsVenue;
-    const isPrivateParty = state?.isPrivateParty ?? lsPrivateParty;
-    setYapVenueName(venue);
-    setYapIsPrivateParty(!!isPrivateParty);
-    setYapNavKey(prev => prev + 1);
-    setActiveTab('yap');
-    // Clean up
-    localStorage.removeItem('yap_nav_venue');
-    localStorage.removeItem('yap_nav_private_party');
-  }
-  // ...rest of existing state handling
-}, [location.state]);
-```
+**`src/components/messages/ActivityTab.tsx`**:
+- Change yap icon circle from `bg-amber-500/20 border-amber-400/60` → `bg-purple-500/20 border-purple-400/60`
+- Change icon color from `text-amber-400` → `text-[#d4ff00]`
+- Change subtitle text from `text-amber-400` → `text-[#d4ff00]`
+- Change "View" button from `bg-amber-500` → `bg-[#d4ff00] text-black`
 
 ### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/components/CheckInConfirmation.tsx` | Write yap intent to localStorage, remove `setPhase`, close before navigating |
-| `src/pages/Messages.tsx` | Read from localStorage as fallback, clean up after reading |
+| Migration SQL | Create `increment_yap_score` function (SECURITY DEFINER) |
+| `src/components/messages/VenueYapThread.tsx` | Replace direct score UPDATE with `supabase.rpc('increment_yap_score', ...)` |
+| `src/components/messages/ActivityTab.tsx` | Restyle yap activity card from amber/orange to purple/lime theme |
 
