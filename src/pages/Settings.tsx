@@ -141,18 +141,14 @@ export default function Settings() {
                 </p>
               </div>
             </div>
-            {isSupported && permission !== 'denied' && (
+            {permission === 'denied' ? (
+              <X className="h-5 w-5 text-red-400" />
+            ) : (
               <Switch
                 checked={isSubscribed}
                 onCheckedChange={handlePushToggle}
                 disabled={isToggling}
               />
-            )}
-            {permission === 'denied' && (
-              <X className="h-5 w-5 text-red-400" />
-            )}
-            {!isSupported && (
-              <span className="text-white/40 text-xs">Browser not supported</span>
             )}
           </div>
         </Card>

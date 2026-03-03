@@ -120,12 +120,8 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
   const native = isNativePlatform();
 
-  const isSupported = native || (
-    typeof window !== 'undefined' && 
-    'serviceWorker' in navigator && 
-    'PushManager' in window &&
-    'Notification' in window
-  );
+  // Always report supported so the toggle is visible; handle errors at subscribe time
+  const isSupported = true;
 
   // Check current subscription status
   const checkSubscription = useCallback(async () => {
