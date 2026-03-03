@@ -4,17 +4,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { triggerPushNotification } from '@/lib/push-notifications';
 
-const YAP_NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes between yap banners
-
 /**
  * Subscribes to realtime yap_messages at the user's current venue/private party.
- * When a new yap from another user is detected, it shows a banner
- * and creates an activity center entry.
+ * When the first yap from another user is detected at a venue since check-in,
+ * it shows a banner and creates an activity center entry.
+ * Uses once-per-venue logic: only notifies once per venue session.
  */
 export function useYapNotifications() {
   const { user } = useAuth();
   const { showBanner } = useNotifications();
-  const lastNotifiedRef = useRef<number>(0);
+  // Track which venue we've already notified for — reset when venue changes
+  const notifiedForVenueRef = useRef<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
@@ -35,10 +35,19 @@ export function useYapNotifications() {
       if (cancelled || !nightStatus || nightStatus.status !== 'out') return;
 
       const venueName = nightStatus.is_private_party
-        ? null // private parties don't filter by venue_name
+        ? null
         : nightStatus.venue_name;
 
       if (!venueName && !nightStatus.is_private_party) return;
+
+      const venueKey = nightStatus.is_private_party
+        ? `private-party-${nightStatus.party_neighborhood || 'unknown'}`
+        : venueName!;
+
+      // If venue changed, reset the notified flag
+      if (notifiedForVenueRef.current !== venueKey) {
+        notifiedForVenueRef.current = null; // Allow notification for new venue
+      }
 
       // Clean up previous channel
       if (channelRef.current) {
@@ -66,12 +75,9 @@ export function useYapNotifications() {
             // Don't notify for own yaps
             if (newYap.user_id === user.id) return;
 
-            // Throttle notifications
-            const now = Date.now();
-            if (now - lastNotifiedRef.current < YAP_NOTIFICATION_COOLDOWN_MS) return;
-            lastNotifiedRef.current = now;
-
-
+            // Once-per-venue: skip if already notified for this venue session
+            if (notifiedForVenueRef.current === venueKey) return;
+            notifiedForVenueRef.current = venueKey;
 
             const locationLabel = nightStatus.is_private_party
               ? `your private party${nightStatus.party_neighborhood ? ` (${nightStatus.party_neighborhood})` : ''}`
@@ -81,20 +87,21 @@ export function useYapNotifications() {
               ? (newYap.text.length > 40 ? newYap.text.slice(0, 40) + '…' : newYap.text)
               : '📸 shared media';
 
-            // Show banner immediately (anonymous — no username)
+            const yapMessage = `Yap @${locationLabel} "${yapPreview}"`;
+
+            // Show banner immediately
             showBanner({
               id: `yap-${newYap.id}`,
               sender_id: newYap.user_id,
               receiver_id: user.id,
               type: 'venue_yap',
-              message: `💬 New yap at ${locationLabel}: "${yapPreview}"`,
+              message: yapMessage,
               is_read: false,
               created_at: new Date().toISOString(),
             });
 
             // Also create a notification in DB for the activity center
             try {
-              const yapMessage = `💬 New yap at ${locationLabel}: "${yapPreview}"`;
               const { data: notifData } = await supabase.rpc('create_notification', {
                 p_receiver_id: user.id,
                 p_type: 'venue_yap',

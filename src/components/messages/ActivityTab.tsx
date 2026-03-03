@@ -391,6 +391,30 @@ export function ActivityTab() {
       }
     }
 
+    // Fetch top yap at user's current venue
+    if (userCurrentVenue) {
+      const { data: topYap } = await supabase
+        .from('yap_messages')
+        .select('id, text, venue_name, score, created_at')
+        .eq('venue_name', currentStatusResult.data?.venue_name || '')
+        .neq('user_id', user?.id || '')
+        .gt('expires_at', new Date().toISOString())
+        .order('score', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (topYap && topYap.text) {
+        const preview = topYap.text.length > 40 ? topYap.text.slice(0, 40) + '…' : topYap.text;
+        activityList.push({
+          id: `top-yap-${topYap.id}`,
+          type: 'venue_yap',
+          title: `Top Yap @${topYap.venue_name}`,
+          subtitle: `"${preview}"`,
+          timestamp: topYap.created_at || new Date().toISOString(),
+        });
+      }
+    }
+
     // Set initial activities immediately (fast render with real invites/demo/trending)
     setActivities(activityList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
 
