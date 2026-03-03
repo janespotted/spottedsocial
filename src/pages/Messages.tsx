@@ -35,8 +35,7 @@ export default function Messages() {
   const [showFriendSearch, setShowFriendSearch] = useState(false);
 
   useEffect(() => {
-    const state = location.state;
-    // Check localStorage fallback for yap navigation
+    const state = location.state as any;
     const lsVenue = localStorage.getItem('yap_nav_venue');
     const lsPrivateParty = localStorage.getItem('yap_nav_private_party') === 'true';
 
@@ -47,21 +46,18 @@ export default function Messages() {
       setYapIsPrivateParty(!!isPrivateParty);
       setYapNavKey(prev => prev + 1);
       setActiveTab('yap');
-      // Clean up
       localStorage.removeItem('yap_nav_venue');
       localStorage.removeItem('yap_nav_private_party');
+      navigate(location.pathname, { replace: true, state: {} });
     } else if (state?.preselectedUser) {
       setPreselectedUser(state.preselectedUser);
       setActiveTab('messages');
+      navigate(location.pathname, { replace: true, state: {} });
     } else if (state?.activeTab) {
       setActiveTab(state.activeTab);
-    }
-
-    // Clear location.state to prevent re-triggering on back navigation
-    if (state?.preselectedUser || state?.activeTab || state?.venueName) {
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state]);
+  }, [location.key]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
