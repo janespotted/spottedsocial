@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { ReportDialog } from './ReportDialog';
 import { VenueHoursDisplay, getHoursDisplayString } from '@/lib/venue-hours';
 import type { VenueHours } from '@/lib/venue-hours';
+import { getVenuePhotoUrl } from '@/lib/venue-photo-url';
  import { VenueEventsSection } from './VenueEventsSection';
 
 interface VenueData {
@@ -141,7 +142,8 @@ export function VenueIdCard() {
       if (venueData) {
         // Set cached photos if available
         if (venueData.google_photo_refs && Array.isArray(venueData.google_photo_refs)) {
-          setGooglePhotos(venueData.google_photo_refs.filter((p): p is string => typeof p === 'string'));
+          const refs = venueData.google_photo_refs.filter((p): p is string => typeof p === 'string');
+          setGooglePhotos(refs.map((_, i) => getVenuePhotoUrl(selectedVenueId, i)));
         }
         
         if (venueData.google_rating) {
@@ -186,9 +188,9 @@ export function VenueIdCard() {
         setVenueHours(null);
       }
 
-      // Set Google data with safe extraction
+      // Set Google data — convert refs to proxy URLs
       const photos = extractArraySafe(data, 'google_photo_refs');
-      setGooglePhotos(photos);
+      setGooglePhotos(photos.map((_, i) => getVenuePhotoUrl(selectedVenueId!, i)));
 
       if (data?.google_rating) {
         setGoogleRating(data.google_rating);

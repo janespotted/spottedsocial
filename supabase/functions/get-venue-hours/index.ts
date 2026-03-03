@@ -151,10 +151,8 @@ serve(async (req) => {
     const rating = result?.rating;
     const userRatingsTotal = result?.user_ratings_total;
 
-    // Build photo URLs from references (max 10)
-    const photoUrls = photos.slice(0, 10).map((photo: any) => {
-      return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photo.photo_reference}&key=${googleApiKey}`;
-    });
+    // Store raw photo_reference strings (no API key) — max 10
+    const photoRefs = photos.slice(0, 10).map((photo: any) => photo.photo_reference).filter(Boolean);
 
     if (!openingHours) {
       console.log('No operating hours available for', venue.name);
@@ -165,7 +163,7 @@ serve(async (req) => {
           google_place_id: placeId,
           google_rating: rating || null,
           google_user_ratings_total: userRatingsTotal || null,
-          google_photo_refs: photoUrls.length > 0 ? photoUrls : null,
+          google_photo_refs: photoRefs.length > 0 ? photoRefs : null,
           hours_last_updated: new Date().toISOString()
         })
         .eq('id', venueId);
@@ -180,7 +178,7 @@ serve(async (req) => {
           operating_hours: null,
           google_rating: rating || null,
           google_user_ratings_total: userRatingsTotal || null,
-          google_photo_refs: photoUrls.length > 0 ? photoUrls : null
+          google_photo_refs: photoRefs.length > 0 ? photoRefs : null
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -216,7 +214,7 @@ serve(async (req) => {
         operating_hours: operatingHours,
         google_rating: rating || null,
         google_user_ratings_total: userRatingsTotal || null,
-        google_photo_refs: photoUrls.length > 0 ? photoUrls : null,
+        google_photo_refs: photoRefs.length > 0 ? photoRefs : null,
         hours_last_updated: new Date().toISOString()
       })
       .eq('id', venueId);
@@ -233,7 +231,7 @@ serve(async (req) => {
         operating_hours: operatingHours,
         google_rating: rating || null,
         google_user_ratings_total: userRatingsTotal || null,
-        google_photo_refs: photoUrls.length > 0 ? photoUrls : null,
+        google_photo_refs: photoRefs.length > 0 ? photoRefs : null,
         cached: false 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

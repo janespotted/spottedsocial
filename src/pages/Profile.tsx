@@ -24,6 +24,7 @@ import { QuickStatusSheet } from '@/components/QuickStatusSheet';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
+import { getVenuePhotoUrl } from '@/lib/venue-photo-url';
 
 
 interface WishlistPlace {
@@ -337,7 +338,8 @@ export default function Profile() {
       const imageMap = new Map<string, string | null>(
         venueImagesResult.data.map(v => {
           const refs = v.google_photo_refs as string[] | null;
-          return [v.id, refs?.[0] || null] as [string, string | null];
+          // Use proxy URL for first photo instead of raw ref/URL
+          return [v.id, refs && refs.length > 0 ? getVenuePhotoUrl(v.id, 0) : null] as [string, string | null];
         })
       );
       for (const spot of uniqueRecentSpots) {
