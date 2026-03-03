@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, Clock, Calendar, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { MessageCircle, ChevronUp, ChevronDown, MapPin, Users, Lock, Send, Clock, Calendar, MoreHorizontal, Pencil, Trash2, X } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,6 +109,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
   const [isTogglingDown, setIsTogglingDown] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDownUsersPopup, setShowDownUsersPopup] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
@@ -507,45 +508,53 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
         </p>
       )}
 
-      {/* Single "I'm Down" Pill */}
-      <button
-        onClick={handleToggleDown}
-        disabled={isTogglingDown}
-        className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-300 mb-3 ${
-          isDown 
-            ? 'bg-[#bfe600] text-black hover:bg-[#b0d600] shadow-[0_0_8px_rgba(212,255,0,0.25)]' 
-            : 'bg-primary/20 text-primary hover:bg-primary/30'
-        }`}
-      >
-        <span>🎉</span>
-        {isDown && currentUserDown?.user && (
-          <Avatar className="h-5 w-5 border border-black/20">
-            <AvatarImage src={currentUserDown.user.avatar_url || ''} />
-            <AvatarFallback className="bg-black/20 text-black text-[8px]">
-              {currentUserDown.user.display_name?.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
-        )}
-        {downs.length > 1 && (
-          <div className="flex -space-x-1.5 ml-0.5">
-            {downs.filter(d => d.user_id !== currentUserId).slice(0, 3).map((down) => (
-              <Avatar key={down.id} className="h-5 w-5 border border-black/20">
-                <AvatarImage src={down.user?.avatar_url || ''} />
+      {/* "I'm Down" Pill - hidden for plan owner */}
+      <div className="flex items-center gap-2 mb-3">
+        {!isOwner && (
+          <button
+            onClick={handleToggleDown}
+            disabled={isTogglingDown}
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-300 ${
+              isDown 
+                ? 'bg-[#bfe600] text-black hover:bg-[#b0d600] shadow-[0_0_8px_rgba(212,255,0,0.25)]' 
+                : 'bg-primary/20 text-primary hover:bg-primary/30'
+            }`}
+          >
+            <span>🎉</span>
+            {isDown && currentUserDown?.user && (
+              <Avatar className="h-5 w-5 border border-black/20">
+                <AvatarImage src={currentUserDown.user.avatar_url || ''} />
                 <AvatarFallback className="bg-black/20 text-black text-[8px]">
-                  {down.user?.display_name?.charAt(0)}
+                  {currentUserDown.user.display_name?.charAt(0)}
                 </AvatarFallback>
               </Avatar>
-            ))}
-          </div>
+            )}
+            <span>
+              {isDown ? "You're down!" : "I'm down!"}
+            </span>
+          </button>
         )}
-        <span>
-          {downs.length === 0 
-            ? "I'm down!" 
-            : isDown && downs.length === 1 
-              ? "You're down!" 
-              : `${downs.length} down`}
-        </span>
-      </button>
+
+        {/* Clickable down count (visible to everyone when there are downs) */}
+        {downs.length > 0 && (
+          <button
+            onClick={() => setShowDownUsersPopup(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+          >
+            <div className="flex -space-x-1.5">
+              {downs.slice(0, 3).map((down) => (
+                <Avatar key={down.id} className="h-5 w-5 border border-background">
+                  <AvatarImage src={down.user?.avatar_url || ''} />
+                  <AvatarFallback className="bg-primary/20 text-primary text-[8px]">
+                    {down.user?.display_name?.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+              ))}
+            </div>
+            <span>{downs.length} down</span>
+          </button>
+        )}
+      </div>
 
       {/* Footer */}
       <div className="flex items-center justify-between">
@@ -644,6 +653,46 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
             >
               <Send className="w-4 h-4" />
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Down Users Popup */}
+      {showDownUsersPopup && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60" onClick={() => setShowDownUsersPopup(false)}>
+          <div className="bg-background border border-border rounded-2xl w-[90%] max-w-sm p-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-foreground">Who's Down ({downs.length})</h3>
+              <button onClick={() => setShowDownUsersPopup(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {downs.map((down) => (
+                <button
+                  key={down.id}
+                  className="flex items-center gap-3 w-full text-left hover:bg-primary/10 rounded-xl p-2 transition-colors"
+                  onClick={() => {
+                    setShowDownUsersPopup(false);
+                    if (down.user) {
+                      openFriendCard({
+                        userId: down.user_id,
+                        displayName: down.user.display_name,
+                        avatarUrl: down.user.avatar_url,
+                      });
+                    }
+                  }}
+                >
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={down.user?.avatar_url || ''} />
+                    <AvatarFallback className="bg-primary/20 text-primary text-sm">
+                      {down.user?.display_name?.charAt(0) || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium text-foreground">{down.user?.display_name || 'Unknown'}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

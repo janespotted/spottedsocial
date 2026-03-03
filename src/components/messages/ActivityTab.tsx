@@ -25,7 +25,7 @@ import { ActivitySkeleton } from './MessagesSkeleton';
 
 interface Activity {
   id: string;
-  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment' | 'city_pulse' | 'meetup_accepted' | 'venue_invite_accepted' | 'dm_message' | 'venue_yap' | 'rally';
+  type: 'check_in' | 'trending' | 'friend_request' | 'meet_up' | 'accepted_invite' | 'venue_invite' | 'post_like' | 'post_comment' | 'city_pulse' | 'meetup_accepted' | 'venue_invite_accepted' | 'dm_message' | 'venue_yap' | 'rally' | 'plan_down';
   title: string;
   subtitle?: string;
   timestamp: string;
@@ -194,7 +194,7 @@ export function ActivityTab() {
       supabase.from('notifications')
         .select(`id, type, message, created_at, sender_id, is_read`)
         .eq('receiver_id', user?.id)
-        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment', 'meetup_accepted', 'venue_invite_accepted', 'venue_yap', 'rally'])
+        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment', 'meetup_accepted', 'venue_invite_accepted', 'venue_yap', 'rally', 'plan_down'])
         .order('created_at', { ascending: false })
         .limit(30),
     ]);
@@ -234,6 +234,7 @@ export function ActivityTab() {
         const isVenueInviteAccepted = invite.type === 'venue_invite_accepted';
         const isVenueYap = invite.type === 'venue_yap';
         const isRally = invite.type === 'rally';
+        const isPlanDown = invite.type === 'plan_down';
         
         // Extract venue name from message like "X invited you to VenueName."
         const venueMatch = invite.message.match(/invited you to (.+?)\.?\s*(?:Want to go\?)?$/i);
@@ -248,6 +249,7 @@ export function ActivityTab() {
         if (isVenueInviteAccepted) activityType = 'venue_invite_accepted';
         if (isVenueYap) activityType = 'venue_yap';
         if (isRally) activityType = 'rally';
+        if (isPlanDown) activityType = 'plan_down';
         
         return {
           id: invite.id,
@@ -260,6 +262,7 @@ export function ActivityTab() {
             : isVenueInviteAccepted ? invite.message
             : isVenueYap ? invite.message
             : isRally ? invite.message
+            : isPlanDown ? invite.message
             : 'Meet Up',
           timestamp: invite.created_at || new Date().toISOString(),
           avatar_url: profile?.avatar_url,
@@ -578,6 +581,8 @@ export function ActivityTab() {
         return <MessageCircle className="h-5 w-5 text-[#d4ff00]" />;
       case 'rally':
         return <Megaphone className="h-5 w-5 text-[#d4ff00]" />;
+      case 'plan_down':
+        return <span className="text-lg">🎉</span>;
       case 'dm_message':
         return <MessageCircle className="h-5 w-5 text-[#a855f7]" />;
       case 'city_pulse':
