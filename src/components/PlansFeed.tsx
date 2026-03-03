@@ -461,6 +461,27 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
      fetchEvents();
   }, [userId, demoEnabled]);
 
+  // Realtime subscription for plans and plan_downs
+  useEffect(() => {
+    const channel = supabase
+      .channel('plans-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'plans' },
+        () => fetchPlans()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'plan_downs' },
+        () => fetchPlans()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, demoEnabled]);
+
   const handlePlanCreated = () => {
     setShowCreateDialog(false);
     fetchPlans();

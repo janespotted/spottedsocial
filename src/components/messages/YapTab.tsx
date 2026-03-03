@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Mic, MapPin, Pin, Flame, Home } from 'lucide-react';
+import { isFromTonight } from '@/lib/time-context';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useUserCity } from '@/hooks/useUserCity';
 import { cn } from '@/lib/utils';
@@ -128,6 +129,29 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
     }
   }, [view, user, demoEnabled, city]);
 
+  // Realtime subscription for yap_messages changes
+  useEffect(() => {
+    if (view !== 'directory') return;
+
+    const channel = supabase
+      .channel('yap-directory-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'yap_messages' },
+        () => fetchQuotes()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'yap_messages' },
+        () => fetchQuotes()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [view, user, demoEnabled, city]);
+
   const fetchQuotes = async () => {
     if (!hasFetchedOnce) setIsLoading(true);
     try {
@@ -193,8 +217,8 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
         }
       }
 
-      // Filter regular yaps to only include venues in the current city
-      const filteredRegularYaps = regularYaps.filter(y => venueMetaMap.has(y.venue_name));
+      // Filter regular yaps to only include venues in the current city AND from tonight
+      const filteredRegularYaps = regularYaps.filter(y => venueMetaMap.has(y.venue_name) && isFromTonight(y.created_at));
 
       const enrichedRegular: YapQuote[] = filteredRegularYaps.map(yap => ({
         id: yap.id,
