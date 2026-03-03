@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.com.spotted.app",
+        "paths": [
+          "/invite/*",
+          "/auth/*"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "TEAMID.com.spotted.app"
+    ]
+  }
+}

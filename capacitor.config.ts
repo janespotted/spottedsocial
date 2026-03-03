@@ -7,7 +7,12 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'automatic',
     backgroundColor: '#0a0118',
-  }
+  },
+  plugins: {
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
+  },
 };
 
 export default config;
