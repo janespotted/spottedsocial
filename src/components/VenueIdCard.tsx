@@ -93,6 +93,7 @@ export function VenueIdCard() {
   const [venueHours, setVenueHours] = useState<VenueHoursDisplay | null>(null);
   const [loadingHours, setLoadingHours] = useState(false);
   const [googlePhotos, setGooglePhotos] = useState<string[]>([]);
+  const [yapMedia, setYapMedia] = useState<{ url: string; media_type: string }[]>([]);
   
   const [googleRating, setGoogleRating] = useState<number | null>(null);
   const [googleRatingsCount, setGoogleRatingsCount] = useState<number>(0);
@@ -110,6 +111,7 @@ export function VenueIdCard() {
     if (selectedVenueId) {
       fetchVenueData();
       fetchVenueHours();
+      fetchYapMedia();
     }
   }, [selectedVenueId]);
 
@@ -380,6 +382,49 @@ export function VenueIdCard() {
     }
   };
 
+  const fetchYapMedia = async () => {
+    if (!selectedVenueId) return;
+    try {
+      // First get venue name
+      const { data: venueRow } = await supabase
+        .from('venues')
+        .select('name')
+        .eq('id', selectedVenueId)
+        .single();
+      if (!venueRow) return;
+
+      const { data: yaps } = await supabase
+        .from('yap_messages')
+        .select('image_url, media_type')
+        .eq('venue_name', venueRow.name)
+        .not('image_url', 'is', null)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (!yaps || yaps.length === 0) {
+        setYapMedia([]);
+        return;
+      }
+
+      const mediaItems: { url: string; media_type: string }[] = [];
+      for (const yap of yaps) {
+        if (!yap.image_url) continue;
+        const path = yap.image_url;
+        const { data: signedData } = await supabase.storage
+          .from('yap-media')
+          .createSignedUrl(path, 3600);
+        if (signedData?.signedUrl) {
+          mediaItems.push({ url: signedData.signedUrl, media_type: yap.media_type || 'image' });
+        }
+      }
+      setYapMedia(mediaItems);
+    } catch (err) {
+      console.error('Error fetching yap media:', err);
+      setYapMedia([]);
+    }
+  };
+
   const fetchHotYap = async (venueName: string) => {
     try {
       const { data } = await supabase
@@ -587,32 +632,41 @@ export function VenueIdCard() {
                 </DropdownMenu>
                 <div className="flex-1 min-h-0 overflow-y-auto">
                   <div className="p-5">
-              {/* Photo Carousel - Google photos */}
+              {/* Photo Carousel - Google photos + Yap media */}
               {(() => {
-                const allCarouselPhotos = [...googlePhotos];
+                const allCarouselItems: { type: 'google' | 'yap'; url: string; mediaType: string }[] = [
+                  ...googlePhotos.map(url => ({ type: 'google' as const, url, mediaType: 'image' })),
+                  ...yapMedia.map(m => ({ type: 'yap' as const, url: m.url, mediaType: m.media_type })),
+                ];
                 
-                
-                return allCarouselPhotos.length > 0 ? (
+                return allCarouselItems.length > 0 ? (
                   <div className="relative mb-4 -mx-5 -mt-5">
                     <Carousel className="w-full">
                       <CarouselContent>
-                        {allCarouselPhotos.map((photoUrl, index) => {
-                          return (
-                            <CarouselItem key={index}>
-                              <div className="relative w-full h-56 overflow-hidden">
+                        {allCarouselItems.map((item, index) => (
+                          <CarouselItem key={index}>
+                            <div className="relative w-full h-56 overflow-hidden">
+                              {item.mediaType === 'video' ? (
+                                <video
+                                  src={item.url}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                  playsInline
+                                  controls
+                                />
+                              ) : (
                                 <img
-                                  src={photoUrl}
+                                  src={item.url}
                                   alt={`${venue.name} photo ${index + 1}`}
                                   className="w-full h-full object-cover"
                                 />
-                                {/* Dark gradient overlay at bottom */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                              </div>
-                            </CarouselItem>
-                          );
-                        })}
+                              )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                            </div>
+                          </CarouselItem>
+                        ))}
                       </CarouselContent>
-                      {allCarouselPhotos.length > 1 && (
+                      {allCarouselItems.length > 1 && (
                         <>
                           <CarouselPrevious className="left-2 bg-white/90 hover:bg-white border-none" />
                           <CarouselNext className="right-2 bg-white/90 hover:bg-white border-none" />
@@ -621,7 +675,6 @@ export function VenueIdCard() {
                     </Carousel>
                   </div>
                 ) : (
-                  /* Fallback gradient if no photos */
                   <div className="relative mb-4 -mx-5 -mt-5">
                     <div className="w-full h-56 bg-gradient-to-br from-[#a855f7]/40 to-[#d4ff00]/40" />
                   </div>
