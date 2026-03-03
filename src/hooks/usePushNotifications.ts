@@ -17,6 +17,15 @@ interface UsePushNotificationsReturn {
 // VAPID public key from environment
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
+function swReadyWithTimeout(ms = 3000): Promise<ServiceWorkerRegistration> {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('SW ready timeout')), ms)
+    ),
+  ]);
+}
+
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
@@ -138,10 +147,14 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         setIsSubscribed(subscribed);
         setPermission(subscribed ? 'granted' : 'default');
       } else {
-        setPermission(Notification.permission);
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await (registration as any).pushManager.getSubscription();
-        setIsSubscribed(!!subscription);
+      setPermission(Notification.permission);
+        try {
+          const registration = await swReadyWithTimeout();
+          const subscription = await (registration as any).pushManager.getSubscription();
+          setIsSubscribed(!!subscription);
+        } catch {
+          setIsSubscribed(false);
+        }
       }
       logger.info('push:check_subscription', { isSubscribed, native });
     } catch (error) {
@@ -234,7 +247,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         return false;
       }
 
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await swReadyWithTimeout(5000);
       const subscription = await (registration as any).pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
@@ -282,7 +295,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       }
 
       // Web push flow
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await swReadyWithTimeout(5000);
       const subscription = await (registration as any).pushManager.getSubscription();
 
       if (subscription) {
