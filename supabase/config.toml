@@ -6,6 +6,9 @@ verify_jwt = true
 [functions.get-venue-hours]
 verify_jwt = true
 
+[functions.get-venue-photo]
+verify_jwt = false
+
 [functions.seed-demo-data]
 verify_jwt = true
 
