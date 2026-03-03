@@ -145,7 +145,7 @@ export default function Settings() {
               <Switch
                 checked={isSubscribed}
                 onCheckedChange={handlePushToggle}
-                disabled={isLoading || isToggling}
+                disabled={isToggling}
               />
             )}
             {permission === 'denied' && (
