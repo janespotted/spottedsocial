@@ -379,6 +379,7 @@ export default function Map() {
             lat: status.lat,
             lng: status.lng,
             venue_name: status.venue_name || 'Out',
+            last_location_at: new Date().toISOString(),
             profiles: {
               display_name: status.profiles?.display_name || 'Unknown',
               avatar_url: status.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${status.profiles?.display_name}`,
