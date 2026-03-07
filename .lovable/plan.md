@@ -1,19 +1,18 @@
 
 
-## Problem
+## Plan: Fix demo friend avatars not showing on map
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+### Root Cause
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+When demo mode is on, friend locations are built from `night_statuses` (lines 370-388) but **don't include `last_location_at`**. The marker rendering code (line 810) filters out any friend where `getStalenessMins(last_location_at) >= 60`. Since `last_location_at` is `undefined` for demo friends, `getStalenessMins` returns 999 → all demo markers are silently filtered out.
 
-## Fix
+### Fix
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
-
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
+**`src/pages/Map.tsx`** — Set `last_location_at` to the current time (`new Date().toISOString()`) when mapping demo friend locations (line 377). This makes demo friends appear "just seen" and pass the staleness filter.
 
 | File | Change |
 |------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+| `src/pages/Map.tsx` (line ~377-388) | Add `last_location_at: new Date().toISOString()` to the demo friend location mapping |
+
+Single-line addition. No other files, DB changes, or RLS updates needed. Non-demo (real) friends are unaffected since they follow a completely separate code path.
 
