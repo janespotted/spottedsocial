@@ -1,19 +1,33 @@
 
 
-## Problem
+## Plan: Prevent demo users from appearing in Messages & Activity when demo mode is off
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+### Root Cause
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+The `useFriendIds` hook fetches ALL accepted friendships — including friendships with demo users created during demo activation. Downstream components (MessagesTab, ActivityTab) try to filter demo users by checking `is_demo` on cached profiles, but this is fragile:
+1. The profiles cache (`profiles-safe`) may not be loaded yet when filtering runs
+2. Profile lookups can miss entries, causing demo content to slip through
+3. DM threads with demo users persist in the database regardless of demo mode
 
-## Fix
+### Fix: Filter demo users at the source — `useFriendIds`
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
+**`src/hooks/useFriendIds.ts`** — Join against profiles to exclude `is_demo = true` users when demo mode is off. Since RLS prevents direct profile queries, use the `get_profiles_safe` RPC (already cached) to filter.
 
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
+Changes:
+- Accept a `demoEnabled` parameter
+- After fetching friend IDs, cross-reference with cached `get_profiles_safe` data to exclude demo users when `demoEnabled` is false
+- This eliminates demo users from ALL downstream consumers (Messages, Activity, Map, etc.)
+
+**`src/components/messages/MessagesTab.tsx`** — Pass `demoEnabled` to `useFriendIds` (already has the hook). The existing profile-based filtering becomes a redundant safety net.
+
+**`src/components/messages/ActivityTab.tsx`** — Same: the `friendIds` list used for DM queries will already exclude demo users, so demo DMs won't be fetched at all.
+
+**All call sites of `useFriendIds`** — Update to pass `demoEnabled` from `useDemoMode()`.
 
 | File | Change |
 |------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+| `src/hooks/useFriendIds.ts` | Add `demoEnabled` param; filter out `is_demo` friends using profiles cache when demo is off |
+| All files importing `useFriendIds` | Pass `demoEnabled` argument |
+
+This is a defense-in-depth fix. The existing per-component `is_demo` filtering stays as a safety net, but the primary filter now happens at the friend ID level so demo users never enter the pipeline.
 
