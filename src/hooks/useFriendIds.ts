@@ -1,9 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useDemoMode } from '@/hooks/useDemoMode';
 
 export function useFriendIds(userId: string | undefined) {
+  const demoEnabled = useDemoMode();
+  const queryClient = useQueryClient();
+
   return useQuery({
-    queryKey: ['friend-ids', userId],
+    queryKey: ['friend-ids', userId, demoEnabled],
     queryFn: async () => {
       if (!userId) return [];
       
@@ -25,9 +29,39 @@ export function useFriendIds(userId: string | undefined) {
         ...(receivedResult.data?.map(f => f.user_id) || []),
       ];
 
-      return [...new Set(friendIds)];
+      const uniqueIds = [...new Set(friendIds)];
+
+      // Filter out demo users when demo mode is off
+      if (!demoEnabled) {
+        const profiles = queryClient.getQueryData<any[]>(['profiles-safe']);
+        if (profiles) {
+          const demoUserIds = new Set(
+            profiles.filter((p: any) => p.is_demo).map((p: any) => p.id)
+          );
+          return uniqueIds.filter(id => !demoUserIds.has(id));
+        }
+        // If profiles not cached yet, fetch them
+        try {
+          const freshProfiles = await queryClient.fetchQuery({
+            queryKey: ['profiles-safe'],
+            queryFn: async () => {
+              const { data } = await supabase.rpc('get_profiles_safe');
+              return data || [];
+            },
+            staleTime: 30_000,
+          });
+          const demoUserIds = new Set(
+            freshProfiles.filter((p: any) => p.is_demo).map((p: any) => p.id)
+          );
+          return uniqueIds.filter(id => !demoUserIds.has(id));
+        } catch {
+          return uniqueIds;
+        }
+      }
+
+      return uniqueIds;
     },
-    staleTime: 30_000, // 30 seconds
+    staleTime: 30_000,
     gcTime: 5 * 60_000,
     enabled: !!userId,
     refetchOnWindowFocus: true,
