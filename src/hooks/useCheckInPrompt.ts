@@ -69,7 +69,7 @@ export function useCheckInPrompt() {
     // Capacitor native app state listener
     let removeNativeListener: (() => void) | null = null;
     if (isNativePlatform()) {
-      import('@capacitor/core').then(({ App }) => {
+      import('@capacitor/app').then(({ App }) => {
         App.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
             setTimeout(checkAndPrompt, 800);
