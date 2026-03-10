@@ -129,13 +129,49 @@ export default function Thread() {
     }
   };
 
+  // Mark thread as read
+  const markAsRead = useCallback(async () => {
+    if (!threadId || !user) return;
+    await supabase
+      .from('dm_read_receipts')
+      .upsert(
+        { thread_id: threadId, user_id: user.id, last_read_at: new Date().toISOString() },
+        { onConflict: 'thread_id,user_id' }
+      );
+  }, [threadId, user]);
+
   useEffect(() => {
     if (threadId && user) {
       fetchThreadData();
       fetchMessages();
       fetchCurrentUserProfile();
-      const cleanup = subscribeToMessages();
-      return cleanup;
+      markAsRead();
+      const cleanupMessages = subscribeToMessages();
+
+      // Subscribe to read receipts for "Seen" indicator
+      const readChannel = supabase
+        .channel(`read_${threadId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'dm_read_receipts',
+            filter: `thread_id=eq.${threadId}`,
+          },
+          (payload) => {
+            const row = payload.new as any;
+            if (row && row.user_id !== user.id) {
+              setOtherReadAt(row.last_read_at);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        cleanupMessages();
+        supabase.removeChannel(readChannel);
+      };
     }
   }, [threadId, user]);
 
