@@ -826,7 +826,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
                         <video
                           src={msg.image_url}
                           controls
-                          className="max-h-64 w-full rounded-lg object-cover border border-[#a855f7]/20"
+                          className="w-full h-64 rounded-lg object-cover border border-[#a855f7]/20"
                           preload="metadata"
                         />
                       ) : (
