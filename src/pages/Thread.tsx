@@ -589,58 +589,79 @@ export default function Thread() {
             </div>
 
             {/* Messages in group */}
-            {group.messages.map((message) => {
+            {group.messages.map((message, msgIdx) => {
               const isCurrentUser = message.sender_id === user?.id;
               const sender = !isCurrentUser ? memberMap.get(message.sender_id) : null;
-              
-              return (
-                <div
-                  key={message.id}
-                  className={`flex items-end gap-2 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
-                >
-                  {!isCurrentUser && (
-                    <button
-                      onClick={() => sender && openFriendCard({
-                        userId: sender.user_id,
-                        displayName: sender.display_name,
-                        avatarUrl: sender.avatar_url,
-                        venueName: sender.venue_name || undefined,
-                      })}
-                      className="hover:opacity-80 transition-opacity"
-                    >
-                      <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.4)]">
-                        <AvatarImage src={sender?.avatar_url || otherMember?.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
-                          {sender?.display_name?.[0] || otherMember?.display_name?.[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    </button>
-                  )}
 
-                  <div className="flex flex-col max-w-[75%]">
-                    {/* Show sender name in group chats */}
-                    {groupInfo && !isCurrentUser && sender && (
-                      <span className="text-white/50 text-xs mb-1 ml-1">{sender.display_name.split(' ')[0]}</span>
+              // Determine if this is the last message sent by current user in the entire thread
+              const isLastSentByMe = isCurrentUser && (() => {
+                // Find the very last message sent by current user across all groups
+                for (let g = groupMessages().length - 1; g >= 0; g--) {
+                  const grp = groupMessages()[g];
+                  for (let m = grp.messages.length - 1; m >= 0; m--) {
+                    if (grp.messages[m].sender_id === user?.id) {
+                      return grp.messages[m].id === message.id;
+                    }
+                  }
+                }
+                return false;
+              })();
+
+              const showSeen = isLastSentByMe && !groupInfo && bothShowReceipts && otherReadAt && 
+                new Date(otherReadAt) >= new Date(message.created_at);
+
+              return (
+                <div key={message.id}>
+                  <div
+                    className={`flex items-end gap-2 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {!isCurrentUser && (
+                      <button
+                        onClick={() => sender && openFriendCard({
+                          userId: sender.user_id,
+                          displayName: sender.display_name,
+                          avatarUrl: sender.avatar_url,
+                          venueName: sender.venue_name || undefined,
+                        })}
+                        className="hover:opacity-80 transition-opacity"
+                      >
+                        <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.4)]">
+                          <AvatarImage src={sender?.avatar_url || otherMember?.avatar_url || undefined} />
+                          <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                            {sender?.display_name?.[0] || otherMember?.display_name?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
                     )}
-                    <div
-                      className={`rounded-2xl overflow-hidden ${
-                        isCurrentUser
-                          ? 'bg-[#4c2f6e] text-white rounded-br-sm'
-                          : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
-                      }`}
-                    >
-                      {message.image_url && (
-                        <img 
-                          src={message.image_url} 
-                          alt="Shared image" 
-                          className="w-full max-w-[250px] rounded-t-2xl"
-                        />
+
+                    <div className="flex flex-col max-w-[75%]">
+                      {/* Show sender name in group chats */}
+                      {groupInfo && !isCurrentUser && sender && (
+                        <span className="text-white/50 text-xs mb-1 ml-1">{sender.display_name.split(' ')[0]}</span>
                       )}
-                      {message.text && (
-                        <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
-                      )}
+                      <div
+                        className={`rounded-2xl overflow-hidden ${
+                          isCurrentUser
+                            ? 'bg-[#4c2f6e] text-white rounded-br-sm'
+                            : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
+                        }`}
+                      >
+                        {message.image_url && (
+                          <img 
+                            src={message.image_url} 
+                            alt="Shared image" 
+                            className="w-full max-w-[250px] rounded-t-2xl"
+                          />
+                        )}
+                        {message.text && (
+                          <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  {showSeen && (
+                    <p className="text-white/40 text-xs text-right mt-1 mr-1">Seen</p>
+                  )}
                 </div>
               );
             })}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus, MapPin, RotateCcw } from 'lucide-react';
+import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus, MapPin, RotateCcw, Eye } from 'lucide-react';
+import { ReadReceiptsToggle } from '@/components/settings/ReadReceiptsToggle';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';

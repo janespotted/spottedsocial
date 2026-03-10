@@ -207,10 +207,11 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
         // For 1:1 chats, get the venue of the other person
         const venueName = members.length === 1 ? statusMap.get(members[0].user_id) || null : null;
 
-        // Calculate unread: if last message is from other user and within 30 min
+        // Calculate unread using read receipts
+        const myLastRead = readReceiptMap.get(thread_id);
         const isUnread = latestMessage && 
                         latestMessage.sender_id !== user.id && 
-                        (Date.now() - new Date(latestMessage.created_at).getTime() < 30 * 60000);
+                        (!myLastRead || new Date(latestMessage.created_at) > new Date(myLastRead));
 
         threadsData.push({
           id: thread_id,
