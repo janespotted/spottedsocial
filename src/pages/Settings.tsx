@@ -222,6 +222,9 @@ export default function Settings() {
           </Card>
         )}
 
+        {/* Read Receipts Section */}
+        <ReadReceiptsToggle userId={user?.id} />
+
         {/* Activity Notifications Section */}
         <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
           <button
