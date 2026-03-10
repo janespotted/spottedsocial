@@ -261,6 +261,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
   const goBackToDirectory = () => {
     setView('directory');
     setThreadVenueName(null);
+    setThreadPartyId(null);
   };
 
   if (view === 'thread' && threadVenueName) {
