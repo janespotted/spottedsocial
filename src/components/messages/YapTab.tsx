@@ -114,9 +114,11 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
               const displayName = newRecord.venue_name || `Private Party${newRecord.party_neighborhood ? ` · ${newRecord.party_neighborhood}` : ''}`;
               setUserVenueName(displayName);
               setUserIsPrivateParty(true);
+              setUserNightStatusId(newRecord.id);
             } else {
               setUserVenueName(newRecord.venue_name || null);
               setUserIsPrivateParty(newRecord.is_private_party || false);
+              setUserNightStatusId(null);
             }
           }
         }
