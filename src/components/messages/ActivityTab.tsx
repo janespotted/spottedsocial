@@ -906,6 +906,7 @@ export function ActivityTab() {
         const dmMessages = activities.filter(a => a.type === 'dm_message');
         const venueYaps = activities.filter(a => a.type === 'venue_yap');
         const rallies = activities.filter(a => a.type === 'rally');
+        const planDowns = activities.filter(a => a.type === 'plan_down');
 
         // Special muted style for city pulse
         const PULSE_CARD_STYLE = 'bg-[#1a0f2e]/40 border border-white/10';
