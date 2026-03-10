@@ -212,7 +212,11 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
         .select(`*, profiles:user_id (display_name, avatar_url)`)
         .gt("expires_at", new Date().toISOString());
 
-      if (demoMode) {
+      if (partyId) {
+        // Private party: filter by unique party_id
+        query = query.eq("party_id", partyId);
+        if (!demoMode) query = query.eq("is_demo", false);
+      } else if (demoMode) {
         query = query.or(`venue_name.eq.${venueName},is_demo.eq.true`);
       } else {
         query = query.eq("venue_name", venueName).eq("is_demo", false);
