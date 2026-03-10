@@ -99,7 +99,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
       console.log('Found', threadIds.length, 'threads');
 
       // Step 2: Batch fetch ALL data in parallel
-      const [threadsResult, allMembersResult, allMessagesResult] = await Promise.all([
+      const [threadsResult, allMembersResult, allMessagesResult, readReceiptsResult] = await Promise.all([
         // Get thread info (is_group, name)
         supabase
           .from('dm_threads')
