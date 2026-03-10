@@ -252,8 +252,9 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  const openThread = (name: string) => {
+  const openThread = (name: string, pId?: string | null) => {
     setThreadVenueName(name);
+    setThreadPartyId(pId || null);
     setView('thread');
   };
 
