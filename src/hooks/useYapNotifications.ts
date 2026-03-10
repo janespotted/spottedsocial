@@ -26,7 +26,7 @@ export function useYapNotifications() {
       // Get user's current venue from night_statuses
       const { data: nightStatus } = await supabase
         .from('night_statuses')
-        .select('venue_name, venue_id, is_private_party, party_neighborhood, status')
+        .select('id, venue_name, venue_id, is_private_party, party_neighborhood, status')
         .eq('user_id', user.id)
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
@@ -40,8 +40,9 @@ export function useYapNotifications() {
 
       if (!venueName && !nightStatus.is_private_party) return;
 
+      // Use night_statuses.id as unique key for private parties
       const venueKey = nightStatus.is_private_party
-        ? `private-party-${nightStatus.party_neighborhood || 'unknown'}`
+        ? `private-party-${nightStatus.id}`
         : venueName!;
 
       // If venue changed, reset the notified flag
@@ -54,9 +55,9 @@ export function useYapNotifications() {
         supabase.removeChannel(channelRef.current);
       }
 
-      // Subscribe to yap_messages for this venue
+      // Subscribe to yap_messages for this venue — use party_id for private parties
       const filterValue = nightStatus.is_private_party
-        ? `is_private_party=eq.true`
+        ? `party_id=eq.${nightStatus.id}`
         : `venue_name=eq.${venueName}`;
 
       const channel = supabase

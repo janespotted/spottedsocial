@@ -61,11 +61,12 @@ interface VenueYapThreadProps {
   venueName: string;
   canPost: boolean;
   onBack: () => void;
+  partyId?: string | null;
 }
 
 const VENUE_COOLDOWN_MS = 30_000;
 
-export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadProps) {
+export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYapThreadProps) {
   const { user } = useAuth();
   const demoMode = useDemoMode();
   const [messages, setMessages] = useState<YapMessage[]>([]);
@@ -145,7 +146,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
       const cleanup = subscribeToYaps();
       return cleanup;
     }
-  }, [venueName, sortBy, demoMode, user]);
+  }, [venueName, partyId, sortBy, demoMode, user]);
 
   useEffect(() => {
     if (blockedUserIds.size > 0) fetchYapMessages();
@@ -211,7 +212,11 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         .select(`*, profiles:user_id (display_name, avatar_url)`)
         .gt("expires_at", new Date().toISOString());
 
-      if (demoMode) {
+      if (partyId) {
+        // Private party: filter by unique party_id
+        query = query.eq("party_id", partyId);
+        if (!demoMode) query = query.eq("is_demo", false);
+      } else if (demoMode) {
         query = query.or(`venue_name.eq.${venueName},is_demo.eq.true`);
       } else {
         query = query.eq("venue_name", venueName).eq("is_demo", false);
@@ -268,11 +273,14 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
   };
 
   const subscribeToYaps = () => {
+    const filterValue = partyId
+      ? `party_id=eq.${partyId}`
+      : `venue_name=eq.${venueName}`;
     const channel = supabase
       .channel("yap-changes")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "yap_messages", filter: `venue_name=eq.${venueName}` },
+        { event: "*", schema: "public", table: "yap_messages", filter: filterValue },
         () => fetchYapMessages(),
       )
       .subscribe();
@@ -403,10 +411,11 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
       let isPrivateParty = false;
       let partyLat: number | null = null;
       let partyLng: number | null = null;
+      let resolvedPartyId: string | null = partyId || null;
 
       const { data: nightStatus } = await supabase
         .from("night_statuses")
-        .select("is_private_party, lat, lng")
+        .select("id, is_private_party, lat, lng")
         .eq("user_id", user!.id)
         .maybeSingle();
 
@@ -414,6 +423,8 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         isPrivateParty = true;
         partyLat = nightStatus.lat;
         partyLng = nightStatus.lng;
+        // Use night_statuses.id as unique party identifier
+        if (!resolvedPartyId) resolvedPartyId = nightStatus.id;
 
         // Fallback: if night_statuses has null coords, get fresh GPS
         if (partyLat == null || partyLng == null) {
@@ -442,6 +453,7 @@ export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadPro
         is_private_party: isPrivateParty,
         party_lat: partyLat,
         party_lng: partyLng,
+        party_id: resolvedPartyId,
       });
 
       if (error) throw error;

@@ -40,8 +40,10 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
   const { city } = useUserCity();
   const [view, setView] = useState<'directory' | 'thread'>(venueNameProp ? 'thread' : 'directory');
   const [threadVenueName, setThreadVenueName] = useState<string | null>(venueNameProp || null);
+  const [threadPartyId, setThreadPartyId] = useState<string | null>(null);
   const [userVenueName, setUserVenueName] = useState<string | null>(null);
   const [userIsPrivateParty, setUserIsPrivateParty] = useState(false);
+  const [userNightStatusId, setUserNightStatusId] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<YapQuote[]>([]);
   const [sortMode, setSortMode] = useState<'hot' | 'new'>('hot');
   const [isLoading, setIsLoading] = useState(true);
@@ -61,9 +63,10 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
   useEffect(() => {
     if (isPrivatePartyNav && userVenueName) {
       setThreadVenueName(userVenueName);
+      setThreadPartyId(userNightStatusId);
       setView('thread');
     }
-  }, [isPrivatePartyNav, userVenueName]);
+  }, [isPrivatePartyNav, userVenueName, userNightStatusId]);
 
   // Fetch user's current venue independently from quotes
   useEffect(() => {
@@ -72,7 +75,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
     const fetchUserVenue = async () => {
       const { data } = await supabase
         .from('night_statuses')
-        .select('venue_name, is_private_party, party_neighborhood')
+        .select('id, venue_name, is_private_party, party_neighborhood')
         .eq('user_id', user.id)
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
@@ -83,9 +86,11 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
         const displayName = data.venue_name || `Private Party${data.party_neighborhood ? ` · ${data.party_neighborhood}` : ''}`;
         setUserVenueName(displayName);
         setUserIsPrivateParty(true);
+        setUserNightStatusId(data.id);
       } else {
         setUserVenueName(data?.venue_name || null);
         setUserIsPrivateParty(false);
+        setUserNightStatusId(null);
       }
     };
     
@@ -109,9 +114,11 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
               const displayName = newRecord.venue_name || `Private Party${newRecord.party_neighborhood ? ` · ${newRecord.party_neighborhood}` : ''}`;
               setUserVenueName(displayName);
               setUserIsPrivateParty(true);
+              setUserNightStatusId(newRecord.id);
             } else {
               setUserVenueName(newRecord.venue_name || null);
               setUserIsPrivateParty(newRecord.is_private_party || false);
+              setUserNightStatusId(null);
             }
           }
         }
@@ -245,14 +252,16 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  const openThread = (name: string) => {
+  const openThread = (name: string, pId?: string | null) => {
     setThreadVenueName(name);
+    setThreadPartyId(pId || null);
     setView('thread');
   };
 
   const goBackToDirectory = () => {
     setView('directory');
     setThreadVenueName(null);
+    setThreadPartyId(null);
   };
 
   if (view === 'thread' && threadVenueName) {
@@ -264,6 +273,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
         venueName={threadVenueName}
         canPost={isCheckedInHere}
         onBack={goBackToDirectory}
+        partyId={threadPartyId}
       />
     );
   }
@@ -307,7 +317,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
       {/* You're At compact bar */}
       {userVenueName && (
         <button
-          onClick={() => openThread(userVenueName)}
+          onClick={() => openThread(userVenueName, userIsPrivateParty ? userNightStatusId : null)}
           className="w-full flex items-center justify-between bg-white/[0.06] backdrop-blur-sm rounded-2xl px-4 py-2.5 active:bg-white/[0.10] transition-colors animate-fade-in"
         >
           <span className="text-white text-sm flex items-center gap-1">
