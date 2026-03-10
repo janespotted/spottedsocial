@@ -1220,6 +1220,18 @@ export function ActivityTab() {
               </div>
             )}
 
+            {/* Section: Down for Your Plans */}
+            {planDowns.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  🎉 Down for Your Plans
+                </h3>
+                <div className="space-y-3">
+                  {planDowns.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
+
             {/* Section: Yaps at Your Location */}
             {venueYaps.length > 0 && (
               <div className="space-y-3">
