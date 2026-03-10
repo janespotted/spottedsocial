@@ -1,19 +1,44 @@
 
 
-## Problem
+## Fix: Unique Yap Feeds for Each Private Party
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+### Problem
+Private party Yap feeds are grouped by `venue_name` (e.g., "Private Party · Wilshire"), so all private parties with the same neighborhood share one Yap thread. Named venues are fine since they have unique names.
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+### Approach
+Add a `party_id` column to `yap_messages` that stores the `night_statuses.id` of the private party check-in. For private parties, query/filter by `party_id` instead of `venue_name`. Named venues continue using `venue_name`.
 
-## Fix
+### Changes
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
+**1. Database Migration**
+- Add nullable `party_id UUID` column to `yap_messages`
 
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
+**2. `src/components/messages/VenueYapThread.tsx`**
+- Accept new prop `partyId?: string` alongside `venueName`
+- When posting a private party yap: look up the user's `night_statuses.id` and store it as `party_id`
+- `fetchYapMessages`: if `partyId` is provided, filter by `party_id=eq.{partyId}` instead of `venue_name`
+- `subscribeToYaps`: same filter change for realtime
 
-| File | Change |
-|------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+**3. `src/components/messages/YapTab.tsx`**
+- When fetching user venue from `night_statuses`, also store the `night_statuses.id` as `userPartyId`
+- Pass `partyId` to `VenueYapThread` when opening a private party thread
+- Private party yaps in the directory: group by `party_id` instead of `venue_name`
+- `fetchQuotes`: for private party yaps, include `party_id` in the select, group by it
+
+**4. `src/hooks/useYapNotifications.ts`**
+- For private party notifications: filter realtime subscription by `party_id` matching the user's current `night_statuses.id`, not by `is_private_party=eq.true`
+
+**5. `src/pages/Messages.tsx`**
+- Pass `partyId` through navigation state alongside `venueName` and `isPrivateParty`
+
+### Data Flow
+```text
+Check-in → night_statuses row (id = abc-123)
+                ↓
+User posts yap → yap_messages.party_id = abc-123
+                ↓
+Thread filter → WHERE party_id = 'abc-123' (not venue_name)
+```
+
+Named venues remain unchanged — they continue filtering by `venue_name`.
 
