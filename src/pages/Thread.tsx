@@ -62,6 +62,8 @@ export default function Thread() {
   
   // Map sender_id to member info for group chats
   const [memberMap, setMemberMap] = useState<Map<string, ThreadMember>>(new Map());
+  const [otherReadAt, setOtherReadAt] = useState<string | null>(null);
+  const [bothShowReceipts, setBothShowReceipts] = useState(false);
 
   // Typing indicator
   const { typingUsers, setTyping } = useTypingIndicator(threadId, user?.id, memberMap);
