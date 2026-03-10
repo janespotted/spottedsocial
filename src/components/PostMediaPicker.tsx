@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { X, Camera, Image } from 'lucide-react';
-import { captureSelfie, pickFromGallery, isNativePlatform } from '@/lib/camera-service';
+import { capturePhoto, pickFromGallery, isNativePlatform } from '@/lib/camera-service';
 import { toast } from 'sonner';
 
 interface PostMediaPickerProps {
