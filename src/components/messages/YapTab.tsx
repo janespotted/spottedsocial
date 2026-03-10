@@ -63,9 +63,10 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
   useEffect(() => {
     if (isPrivatePartyNav && userVenueName) {
       setThreadVenueName(userVenueName);
+      setThreadPartyId(userNightStatusId);
       setView('thread');
     }
-  }, [isPrivatePartyNav, userVenueName]);
+  }, [isPrivatePartyNav, userVenueName, userNightStatusId]);
 
   // Fetch user's current venue independently from quotes
   useEffect(() => {
