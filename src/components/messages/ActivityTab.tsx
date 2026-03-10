@@ -1052,6 +1052,15 @@ export function ActivityTab() {
                     <span className="text-[#d4ff00] block text-xs mt-0.5 line-clamp-1">{activity.subtitle || 'at your spot'}</span>
                   </div>
                 )}
+                {activity.type === 'plan_down' && (
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-[#d4ff00] block text-xs mt-0.5">{activity.subtitle}</span>
+                  </div>
+                )}
               </div>
 
               {/* Actions - fixed on right */}
