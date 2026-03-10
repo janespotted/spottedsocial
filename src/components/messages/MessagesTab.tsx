@@ -128,6 +128,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
       const threadInfoMap = new Map((threadsResult.data || []).map(t => [t.id, t]));
       const allMembers = allMembersResult.data || [];
       const allMessages = allMessagesResult.data || [];
+      const readReceiptMap = new Map((readReceiptsResult.data || []).map(r => [r.thread_id, r.last_read_at]));
 
       // Get unique other user IDs
       const otherUserIds = [...new Set(allMembers.map(m => m.user_id))];
