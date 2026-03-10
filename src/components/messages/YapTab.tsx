@@ -273,6 +273,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
         venueName={threadVenueName}
         canPost={isCheckedInHere}
         onBack={goBackToDirectory}
+        partyId={threadPartyId}
       />
     );
   }
