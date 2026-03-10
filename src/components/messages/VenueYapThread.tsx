@@ -146,7 +146,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
       const cleanup = subscribeToYaps();
       return cleanup;
     }
-  }, [venueName, sortBy, demoMode, user]);
+  }, [venueName, partyId, sortBy, demoMode, user]);
 
   useEffect(() => {
     if (blockedUserIds.size > 0) fetchYapMessages();
