@@ -1,19 +1,14 @@
 
 
-## Problem
+## Plan: Remove Yap prompt from check-in confirmation
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+Remove the "What's [venue] like tonight? → Yap about it" phase that appears after the confetti celebration. The check-in confirmation will just show the confetti celebration card and dismiss on tap, same as it does for planning check-ins.
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+### Changes in `src/components/CheckInConfirmation.tsx`
 
-## Fix
-
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
-
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
-
-| File | Change |
-|------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+1. **Remove the `phase` state** and all references to `'yap_prompt'`
+2. **Remove the yap prompt timeout** (lines 95-98) — the confetti effect for venue check-ins will just run without transitioning to a second screen
+3. **Remove the entire yap prompt render block** (the `if (phase === 'yap_prompt' ...)` section ~lines 145-185)
+4. **Remove `handleShareClick`** function and related imports (`MessageCircle`)
+5. Keep confetti + tap-to-dismiss celebration card as the only confirmation UI for all check-in types
 
