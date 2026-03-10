@@ -334,6 +334,10 @@ export default function Thread() {
             newMsg.image_url = signedData?.signedUrl || null;
           }
           setMessages((prev) => [...prev, newMsg]);
+          // Mark as read when receiving new messages from others
+          if (newMsg.sender_id !== user?.id) {
+            markAsRead();
+          }
         }
       )
       .subscribe();
