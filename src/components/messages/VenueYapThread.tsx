@@ -411,10 +411,11 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
       let isPrivateParty = false;
       let partyLat: number | null = null;
       let partyLng: number | null = null;
+      let resolvedPartyId: string | null = partyId || null;
 
       const { data: nightStatus } = await supabase
         .from("night_statuses")
-        .select("is_private_party, lat, lng")
+        .select("id, is_private_party, lat, lng")
         .eq("user_id", user!.id)
         .maybeSingle();
 
@@ -422,6 +423,8 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
         isPrivateParty = true;
         partyLat = nightStatus.lat;
         partyLng = nightStatus.lng;
+        // Use night_statuses.id as unique party identifier
+        if (!resolvedPartyId) resolvedPartyId = nightStatus.id;
 
         // Fallback: if night_statuses has null coords, get fresh GPS
         if (partyLat == null || partyLng == null) {
@@ -450,6 +453,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
         is_private_party: isPrivateParty,
         party_lat: partyLat,
         party_lng: partyLng,
+        party_id: resolvedPartyId,
       });
 
       if (error) throw error;

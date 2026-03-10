@@ -317,7 +317,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
       {/* You're At compact bar */}
       {userVenueName && (
         <button
-          onClick={() => openThread(userVenueName)}
+          onClick={() => openThread(userVenueName, userIsPrivateParty ? userNightStatusId : null)}
           className="w-full flex items-center justify-between bg-white/[0.06] backdrop-blur-sm rounded-2xl px-4 py-2.5 active:bg-white/[0.10] transition-colors animate-fade-in"
         >
           <span className="text-white text-sm flex items-center gap-1">
