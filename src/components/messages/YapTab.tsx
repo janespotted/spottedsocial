@@ -75,7 +75,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
     const fetchUserVenue = async () => {
       const { data } = await supabase
         .from('night_statuses')
-        .select('venue_name, is_private_party, party_neighborhood')
+        .select('id, venue_name, is_private_party, party_neighborhood')
         .eq('user_id', user.id)
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
@@ -86,9 +86,11 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
         const displayName = data.venue_name || `Private Party${data.party_neighborhood ? ` · ${data.party_neighborhood}` : ''}`;
         setUserVenueName(displayName);
         setUserIsPrivateParty(true);
+        setUserNightStatusId(data.id);
       } else {
         setUserVenueName(data?.venue_name || null);
         setUserIsPrivateParty(false);
+        setUserNightStatusId(null);
       }
     };
     
