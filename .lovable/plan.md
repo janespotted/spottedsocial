@@ -1,27 +1,19 @@
 
 
-## Plan: Add Read Receipts to Messages
+## Problem
 
-The database already has a `dm_read_receipts` table (thread_id, user_id, last_read_at) and a `show_read_receipts` boolean on profiles. Neither is used in code yet.
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-### How it works
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
-1. **Mark as read** — When a user opens a thread, upsert their read receipt (`dm_read_receipts`) with the current timestamp. This runs on mount and whenever new messages arrive from others.
+## Fix
 
-2. **Show "Seen" indicator** — In 1:1 chats, below the last message sent by the current user, show "Seen" if the other user's `last_read_at` is after that message's `created_at`. Subscribe to realtime changes on `dm_read_receipts` so the indicator appears live.
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-3. **Respect privacy toggle** — Only show "Seen" if BOTH users have `show_read_receipts` enabled. The sender's own read receipt is always written (so the other person can see it), but the UI only renders the label when both parties opt in.
-
-### Files to modify
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
 
 | File | Change |
 |------|--------|
-| `src/pages/Thread.tsx` | Upsert read receipt on mount/new messages. Fetch other user's last_read_at. Subscribe to realtime updates on `dm_read_receipts`. Render "Seen" under the last sent message when applicable. |
-| `src/pages/Settings.tsx` | Add a "Read Receipts" toggle that updates `profiles.show_read_receipts`. |
-| `src/components/messages/MessagesTab.tsx` | Use read receipts to improve unread detection (replace the 30-min heuristic with actual read state). |
-
-### UI detail
-
-- "Seen" text appears in `text-white/40 text-xs` below the last outgoing message bubble, right-aligned
-- Only shown in 1:1 threads (not group chats for v1)
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 

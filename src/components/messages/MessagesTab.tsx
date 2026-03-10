@@ -99,7 +99,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
       console.log('Found', threadIds.length, 'threads');
 
       // Step 2: Batch fetch ALL data in parallel
-      const [threadsResult, allMembersResult, allMessagesResult] = await Promise.all([
+      const [threadsResult, allMembersResult, allMessagesResult, readReceiptsResult] = await Promise.all([
         // Get thread info (is_group, name)
         supabase
           .from('dm_threads')
@@ -117,11 +117,18 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
           .select('thread_id, text, created_at, sender_id')
           .in('thread_id', threadIds)
           .order('created_at', { ascending: false }),
+        // Get read receipts for current user
+        supabase
+          .from('dm_read_receipts')
+          .select('thread_id, last_read_at')
+          .eq('user_id', user.id)
+          .in('thread_id', threadIds),
       ]);
 
       const threadInfoMap = new Map((threadsResult.data || []).map(t => [t.id, t]));
       const allMembers = allMembersResult.data || [];
       const allMessages = allMessagesResult.data || [];
+      const readReceiptMap = new Map((readReceiptsResult.data || []).map(r => [r.thread_id, r.last_read_at]));
 
       // Get unique other user IDs
       const otherUserIds = [...new Set(allMembers.map(m => m.user_id))];
@@ -200,10 +207,11 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
         // For 1:1 chats, get the venue of the other person
         const venueName = members.length === 1 ? statusMap.get(members[0].user_id) || null : null;
 
-        // Calculate unread: if last message is from other user and within 30 min
+        // Calculate unread using read receipts
+        const myLastRead = readReceiptMap.get(thread_id);
         const isUnread = latestMessage && 
                         latestMessage.sender_id !== user.id && 
-                        (Date.now() - new Date(latestMessage.created_at).getTime() < 30 * 60000);
+                        (!myLastRead || new Date(latestMessage.created_at) > new Date(myLastRead));
 
         threadsData.push({
           id: thread_id,

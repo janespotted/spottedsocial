@@ -62,6 +62,8 @@ export default function Thread() {
   
   // Map sender_id to member info for group chats
   const [memberMap, setMemberMap] = useState<Map<string, ThreadMember>>(new Map());
+  const [otherReadAt, setOtherReadAt] = useState<string | null>(null);
+  const [bothShowReceipts, setBothShowReceipts] = useState(false);
 
   // Typing indicator
   const { typingUsers, setTyping } = useTypingIndicator(threadId, user?.id, memberMap);
@@ -127,13 +129,49 @@ export default function Thread() {
     }
   };
 
+  // Mark thread as read
+  const markAsRead = useCallback(async () => {
+    if (!threadId || !user) return;
+    await supabase
+      .from('dm_read_receipts')
+      .upsert(
+        { thread_id: threadId, user_id: user.id, last_read_at: new Date().toISOString() },
+        { onConflict: 'thread_id,user_id' }
+      );
+  }, [threadId, user]);
+
   useEffect(() => {
     if (threadId && user) {
       fetchThreadData();
       fetchMessages();
       fetchCurrentUserProfile();
-      const cleanup = subscribeToMessages();
-      return cleanup;
+      markAsRead();
+      const cleanupMessages = subscribeToMessages();
+
+      // Subscribe to read receipts for "Seen" indicator
+      const readChannel = supabase
+        .channel(`read_${threadId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'dm_read_receipts',
+            filter: `thread_id=eq.${threadId}`,
+          },
+          (payload) => {
+            const row = payload.new as any;
+            if (row && row.user_id !== user.id) {
+              setOtherReadAt(row.last_read_at);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        cleanupMessages();
+        supabase.removeChannel(readChannel);
+      };
     }
   }, [threadId, user]);
 
@@ -218,6 +256,31 @@ export default function Thread() {
       } else {
         setGroupInfo(null);
         setOtherMember(allMembers[0]);
+
+        // Fetch read receipt privacy settings for 1:1 chats
+        const otherUserId = allMembers[0]?.user_id;
+        if (otherUserId && user) {
+          // Check if both users have read receipts enabled
+          const { data: privacyData } = await supabase
+            .from('profiles')
+            .select('show_read_receipts')
+            .in('id', [user.id, otherUserId]);
+
+          const allEnabled = privacyData?.every(p => p.show_read_receipts) ?? false;
+          setBothShowReceipts(allEnabled);
+
+          // Fetch other user's last read timestamp
+          const { data: receipt } = await supabase
+            .from('dm_read_receipts')
+            .select('last_read_at')
+            .eq('thread_id', threadId!)
+            .eq('user_id', otherUserId)
+            .maybeSingle();
+
+          if (receipt) {
+            setOtherReadAt(receipt.last_read_at);
+          }
+        }
       }
     }
   };
@@ -271,6 +334,10 @@ export default function Thread() {
             newMsg.image_url = signedData?.signedUrl || null;
           }
           setMessages((prev) => [...prev, newMsg]);
+          // Mark as read when receiving new messages from others
+          if (newMsg.sender_id !== user?.id) {
+            markAsRead();
+          }
         }
       )
       .subscribe();
@@ -522,58 +589,79 @@ export default function Thread() {
             </div>
 
             {/* Messages in group */}
-            {group.messages.map((message) => {
+            {group.messages.map((message, msgIdx) => {
               const isCurrentUser = message.sender_id === user?.id;
               const sender = !isCurrentUser ? memberMap.get(message.sender_id) : null;
-              
-              return (
-                <div
-                  key={message.id}
-                  className={`flex items-end gap-2 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
-                >
-                  {!isCurrentUser && (
-                    <button
-                      onClick={() => sender && openFriendCard({
-                        userId: sender.user_id,
-                        displayName: sender.display_name,
-                        avatarUrl: sender.avatar_url,
-                        venueName: sender.venue_name || undefined,
-                      })}
-                      className="hover:opacity-80 transition-opacity"
-                    >
-                      <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.4)]">
-                        <AvatarImage src={sender?.avatar_url || otherMember?.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
-                          {sender?.display_name?.[0] || otherMember?.display_name?.[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    </button>
-                  )}
 
-                  <div className="flex flex-col max-w-[75%]">
-                    {/* Show sender name in group chats */}
-                    {groupInfo && !isCurrentUser && sender && (
-                      <span className="text-white/50 text-xs mb-1 ml-1">{sender.display_name.split(' ')[0]}</span>
+              // Determine if this is the last message sent by current user in the entire thread
+              const isLastSentByMe = isCurrentUser && (() => {
+                // Find the very last message sent by current user across all groups
+                for (let g = groupMessages().length - 1; g >= 0; g--) {
+                  const grp = groupMessages()[g];
+                  for (let m = grp.messages.length - 1; m >= 0; m--) {
+                    if (grp.messages[m].sender_id === user?.id) {
+                      return grp.messages[m].id === message.id;
+                    }
+                  }
+                }
+                return false;
+              })();
+
+              const showSeen = isLastSentByMe && !groupInfo && bothShowReceipts && otherReadAt && 
+                new Date(otherReadAt) >= new Date(message.created_at);
+
+              return (
+                <div key={message.id}>
+                  <div
+                    className={`flex items-end gap-2 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {!isCurrentUser && (
+                      <button
+                        onClick={() => sender && openFriendCard({
+                          userId: sender.user_id,
+                          displayName: sender.display_name,
+                          avatarUrl: sender.avatar_url,
+                          venueName: sender.venue_name || undefined,
+                        })}
+                        className="hover:opacity-80 transition-opacity"
+                      >
+                        <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.4)]">
+                          <AvatarImage src={sender?.avatar_url || otherMember?.avatar_url || undefined} />
+                          <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
+                            {sender?.display_name?.[0] || otherMember?.display_name?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
                     )}
-                    <div
-                      className={`rounded-2xl overflow-hidden ${
-                        isCurrentUser
-                          ? 'bg-[#4c2f6e] text-white rounded-br-sm'
-                          : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
-                      }`}
-                    >
-                      {message.image_url && (
-                        <img 
-                          src={message.image_url} 
-                          alt="Shared image" 
-                          className="w-full max-w-[250px] rounded-t-2xl"
-                        />
+
+                    <div className="flex flex-col max-w-[75%]">
+                      {/* Show sender name in group chats */}
+                      {groupInfo && !isCurrentUser && sender && (
+                        <span className="text-white/50 text-xs mb-1 ml-1">{sender.display_name.split(' ')[0]}</span>
                       )}
-                      {message.text && (
-                        <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
-                      )}
+                      <div
+                        className={`rounded-2xl overflow-hidden ${
+                          isCurrentUser
+                            ? 'bg-[#4c2f6e] text-white rounded-br-sm'
+                            : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
+                        }`}
+                      >
+                        {message.image_url && (
+                          <img 
+                            src={message.image_url} 
+                            alt="Shared image" 
+                            className="w-full max-w-[250px] rounded-t-2xl"
+                          />
+                        )}
+                        {message.text && (
+                          <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  {showSeen && (
+                    <p className="text-white/40 text-xs text-right mt-1 mr-1">Seen</p>
+                  )}
                 </div>
               );
             })}
