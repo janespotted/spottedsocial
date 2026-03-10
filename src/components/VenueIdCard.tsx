@@ -492,9 +492,9 @@ export function VenueIdCard() {
 
   const handleMapPinClick = () => {
     if (venue) {
-      // Open Apple Maps with directions from current location to venue
-      const appleMapsUrl = `https://maps.apple.com/?daddr=${venue.lat},${venue.lng}&dirflg=d`;
-      openExternalUrl(appleMapsUrl);
+      // Open Google Maps directions (avoids iOS deep-linking to native Apple Maps)
+      const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
+      openExternalUrl(mapsUrl);
     }
   };
 
