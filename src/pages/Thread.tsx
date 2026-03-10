@@ -256,6 +256,31 @@ export default function Thread() {
       } else {
         setGroupInfo(null);
         setOtherMember(allMembers[0]);
+
+        // Fetch read receipt privacy settings for 1:1 chats
+        const otherUserId = allMembers[0]?.user_id;
+        if (otherUserId && user) {
+          // Check if both users have read receipts enabled
+          const { data: privacyData } = await supabase
+            .from('profiles')
+            .select('show_read_receipts')
+            .in('id', [user.id, otherUserId]);
+
+          const allEnabled = privacyData?.every(p => p.show_read_receipts) ?? false;
+          setBothShowReceipts(allEnabled);
+
+          // Fetch other user's last read timestamp
+          const { data: receipt } = await supabase
+            .from('dm_read_receipts')
+            .select('last_read_at')
+            .eq('thread_id', threadId!)
+            .eq('user_id', otherUserId)
+            .maybeSingle();
+
+          if (receipt) {
+            setOtherReadAt(receipt.last_read_at);
+          }
+        }
       }
     }
   };
