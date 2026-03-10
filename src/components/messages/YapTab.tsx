@@ -40,8 +40,10 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
   const { city } = useUserCity();
   const [view, setView] = useState<'directory' | 'thread'>(venueNameProp ? 'thread' : 'directory');
   const [threadVenueName, setThreadVenueName] = useState<string | null>(venueNameProp || null);
+  const [threadPartyId, setThreadPartyId] = useState<string | null>(null);
   const [userVenueName, setUserVenueName] = useState<string | null>(null);
   const [userIsPrivateParty, setUserIsPrivateParty] = useState(false);
+  const [userNightStatusId, setUserNightStatusId] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<YapQuote[]>([]);
   const [sortMode, setSortMode] = useState<'hot' | 'new'>('hot');
   const [isLoading, setIsLoading] = useState(true);
