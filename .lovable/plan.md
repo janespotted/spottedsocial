@@ -1,19 +1,18 @@
 
 
-## Problem
+## Wire Up Native Camera/Gallery for Newsfeed Posts on iOS
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+### Problem
+`PostMediaPicker` calls `captureSelfie()` on native iOS, which forces the **front camera** and **mirrors** the image. For newsfeed posts, users typically want the rear camera without mirroring. The gallery path also redundantly re-creates the file from the preview when `pickFromGallery` already returns a `File`.
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+### Changes
 
-## Fix
+**`src/components/PostMediaPicker.tsx`**
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
+1. Import `capturePhoto` instead of `captureSelfie` from `camera-service`
+2. `handleNativeCapture` — call `capturePhoto()` (rear camera, no mirror) instead of `captureSelfie()`. Use the returned `result.file` directly instead of re-fetching the preview blob.
+3. `handleNativeGallery` — use `result.file` directly from `pickFromGallery()` instead of re-fetching.
+4. Add error toast if native capture/gallery returns null (user cancelled or permission denied).
 
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
-
-| File | Change |
-|------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+This is a 2-line import change + updating the two native handler functions (~10 lines total).
 
