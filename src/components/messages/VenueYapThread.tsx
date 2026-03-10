@@ -61,11 +61,12 @@ interface VenueYapThreadProps {
   venueName: string;
   canPost: boolean;
   onBack: () => void;
+  partyId?: string | null;
 }
 
 const VENUE_COOLDOWN_MS = 30_000;
 
-export function VenueYapThread({ venueName, canPost, onBack }: VenueYapThreadProps) {
+export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYapThreadProps) {
   const { user } = useAuth();
   const demoMode = useDemoMode();
   const [messages, setMessages] = useState<YapMessage[]>([]);
