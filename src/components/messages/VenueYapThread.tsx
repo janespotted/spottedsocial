@@ -273,11 +273,14 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
   };
 
   const subscribeToYaps = () => {
+    const filterValue = partyId
+      ? `party_id=eq.${partyId}`
+      : `venue_name=eq.${venueName}`;
     const channel = supabase
       .channel("yap-changes")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "yap_messages", filter: `venue_name=eq.${venueName}` },
+        { event: "*", schema: "public", table: "yap_messages", filter: filterValue },
         () => fetchYapMessages(),
       )
       .subscribe();
