@@ -1,0 +1,1 @@
+ALTER TABLE public.yap_messages ADD COLUMN party_id uuid;

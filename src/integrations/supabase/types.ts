@@ -2176,6 +2176,7 @@ export type Database = {
           is_private_party: boolean | null
           is_promoted: boolean | null
           media_type: string | null
+          party_id: string | null
           party_lat: number | null
           party_lng: number | null
           score: number | null
@@ -2195,6 +2196,7 @@ export type Database = {
           is_private_party?: boolean | null
           is_promoted?: boolean | null
           media_type?: string | null
+          party_id?: string | null
           party_lat?: number | null
           party_lng?: number | null
           score?: number | null
@@ -2214,6 +2216,7 @@ export type Database = {
           is_private_party?: boolean | null
           is_promoted?: boolean | null
           media_type?: string | null
+          party_id?: string | null
           party_lat?: number | null
           party_lng?: number | null
           score?: number | null
