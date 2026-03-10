@@ -117,6 +117,12 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
           .select('thread_id, text, created_at, sender_id')
           .in('thread_id', threadIds)
           .order('created_at', { ascending: false }),
+        // Get read receipts for current user
+        supabase
+          .from('dm_read_receipts')
+          .select('thread_id, last_read_at')
+          .eq('user_id', user.id)
+          .in('thread_id', threadIds),
       ]);
 
       const threadInfoMap = new Map((threadsResult.data || []).map(t => [t.id, t]));
