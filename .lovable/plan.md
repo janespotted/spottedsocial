@@ -1,25 +1,19 @@
 
 
-## Fix: Maps Opens Native Apple Maps Instead of In-App Browser
+## Problem
 
-### Problem
-`VenueIdCard.tsx` uses `https://maps.apple.com/` URLs for directions. On iOS, these deep-link directly into the native Apple Maps app, pulling the user out of Spotted entirely.
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-### Fix
-Replace the Apple Maps URL with a Google Maps URL (`https://www.google.com/maps/dir/`). Google Maps web URLs open in the in-app browser (via Capacitor's `Browser.open`) on iOS, keeping the user in the app experience.
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
-### Change
+## Fix
 
-**`src/components/VenueIdCard.tsx`** — `handleMapPinClick` (~line 493-499)
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-Replace:
-```ts
-const appleMapsUrl = `https://maps.apple.com/?daddr=${venue.lat},${venue.lng}&dirflg=d`;
-```
-With:
-```ts
-const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
-```
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
 
-Single line change, no other files affected.
+| File | Change |
+|------|--------|
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 
