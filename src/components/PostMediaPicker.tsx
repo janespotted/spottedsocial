@@ -13,13 +13,11 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleNativeCapture = async () => {
-    const result = await captureSelfie();
+    const result = await capturePhoto();
     if (result) {
-      // Convert preview to file
-      const res = await fetch(result.preview);
-      const blob = await res.blob();
-      const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-      onMediaSelect(file, result.preview);
+      onMediaSelect(result.file, result.preview);
+    } else {
+      toast('Photo cancelled or permission denied');
     }
   };
 
