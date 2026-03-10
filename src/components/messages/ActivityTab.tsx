@@ -906,6 +906,7 @@ export function ActivityTab() {
         const dmMessages = activities.filter(a => a.type === 'dm_message');
         const venueYaps = activities.filter(a => a.type === 'venue_yap');
         const rallies = activities.filter(a => a.type === 'rally');
+        const planDowns = activities.filter(a => a.type === 'plan_down');
 
         // Special muted style for city pulse
         const PULSE_CARD_STYLE = 'bg-[#1a0f2e]/40 border border-white/10';
@@ -1051,6 +1052,15 @@ export function ActivityTab() {
                     <span className="text-[#d4ff00] block text-xs mt-0.5 line-clamp-1">{activity.subtitle || 'at your spot'}</span>
                   </div>
                 )}
+                {activity.type === 'plan_down' && (
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-[#d4ff00] block text-xs mt-0.5">{activity.subtitle}</span>
+                  </div>
+                )}
               </div>
 
               {/* Actions - fixed on right */}
@@ -1149,12 +1159,23 @@ export function ActivityTab() {
                   </Button>
                 )}
 
+                {activity.type === 'plan_down' && (
+                  <Button
+                    onClick={() => handleOpenChat(activity)}
+                    size="sm"
+                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)]"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5 mr-1" />
+                    Chat
+                  </Button>
+                )}
+
               </div>
             </div>
           </div>
         );
 
-        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0 || acceptedInvites.length > 0 || dmMessages.length > 0 || venueYaps.length > 0 || rallies.length > 0;
+        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0 || acceptedInvites.length > 0 || dmMessages.length > 0 || venueYaps.length > 0 || rallies.length > 0 || planDowns.length > 0;
 
         return hasContent ? (
           <div className="space-y-5">
@@ -1195,6 +1216,18 @@ export function ActivityTab() {
                 </h3>
                 <div className="space-y-3">
                   {acceptedInvites.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
+
+            {/* Section: Down for Your Plans */}
+            {planDowns.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  🎉 Down for Your Plans
+                </h3>
+                <div className="space-y-3">
+                  {planDowns.map(renderActivityCard)}
                 </div>
               </div>
             )}
