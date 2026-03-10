@@ -24,10 +24,9 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
   const handleNativeGallery = async () => {
     const result = await pickFromGallery();
     if (result) {
-      const res = await fetch(result.preview);
-      const blob = await res.blob();
-      const file = new File([blob], `gallery-${Date.now()}.jpg`, { type: 'image/jpeg' });
-      onMediaSelect(file, result.preview);
+      onMediaSelect(result.file, result.preview);
+    } else {
+      toast('Gallery cancelled or permission denied');
     }
   };
 
