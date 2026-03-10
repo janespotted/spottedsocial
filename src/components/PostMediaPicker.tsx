@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { X, Camera, Image } from 'lucide-react';
-import { captureSelfie, pickFromGallery, isNativePlatform } from '@/lib/camera-service';
+import { capturePhoto, pickFromGallery, isNativePlatform } from '@/lib/camera-service';
 import { toast } from 'sonner';
 
 interface PostMediaPickerProps {
@@ -13,23 +13,20 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleNativeCapture = async () => {
-    const result = await captureSelfie();
+    const result = await capturePhoto();
     if (result) {
-      // Convert preview to file
-      const res = await fetch(result.preview);
-      const blob = await res.blob();
-      const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-      onMediaSelect(file, result.preview);
+      onMediaSelect(result.file, result.preview);
+    } else {
+      toast('Photo cancelled or permission denied');
     }
   };
 
   const handleNativeGallery = async () => {
     const result = await pickFromGallery();
     if (result) {
-      const res = await fetch(result.preview);
-      const blob = await res.blob();
-      const file = new File([blob], `gallery-${Date.now()}.jpg`, { type: 'image/jpeg' });
-      onMediaSelect(file, result.preview);
+      onMediaSelect(result.file, result.preview);
+    } else {
+      toast('Gallery cancelled or permission denied');
     }
   };
 
