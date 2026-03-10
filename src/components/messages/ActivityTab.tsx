@@ -1159,6 +1159,17 @@ export function ActivityTab() {
                   </Button>
                 )}
 
+                {activity.type === 'plan_down' && (
+                  <Button
+                    onClick={() => handleOpenChat(activity)}
+                    size="sm"
+                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)]"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5 mr-1" />
+                    Chat
+                  </Button>
+                )}
+
               </div>
             </div>
           </div>
