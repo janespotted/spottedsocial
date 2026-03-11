@@ -1,22 +1,19 @@
 
 
-## Make email the primary sign-in method
+## Problem
 
-Remove the collapsible wrapper and empty social sign-in section. The email form becomes the default visible content directly inside CardContent.
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-### Changes — `src/pages/Auth.tsx`
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
-1. **Remove unused imports**: `Collapsible`, `CollapsibleContent`, `CollapsibleTrigger`, `ChevronDown`, `cn` (if not used elsewhere), and the `emailFormOpen` state variable.
+## Fix
 
-2. **Replace lines 290-429** (from `<CardContent>` through the closing `</Collapsible>`) with the form rendered directly — no collapsible, no "or use email" divider, no empty social buttons div:
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-```tsx
-<CardContent className="space-y-5 px-6 pb-8">
-  <form onSubmit={handleAuth} className="space-y-4">
-    {/* signup fields, email, password, terms, buttons — same as current form content */}
-  </form>
-</CardContent>
-```
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
 
-No logic changes. Just unwrapping the form from the collapsible container so it's immediately visible.
+| File | Change |
+|------|--------|
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 

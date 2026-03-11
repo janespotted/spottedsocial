@@ -11,9 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { loginSchema, signupSchema } from '@/lib/auth-validation';
 import { getRedirectOrigin, APP_BASE_URL } from '@/lib/platform';
-import { Mail, Lock, User, AtSign, ChevronDown } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cn } from '@/lib/utils';
+import { Mail, Lock, User, AtSign } from 'lucide-react';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 
 interface InviterInfo {
@@ -43,7 +41,7 @@ export default function Auth() {
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [appleLoading, setAppleLoading] = useState(false);
   const [appleError, setAppleError] = useState<string | null>(null);
-  const [emailFormOpen, setEmailFormOpen] = useState(false);
+  
   const [inviter, setInviter] = useState<InviterInfo | null>(null);
   const navigate = useNavigate();
 
@@ -288,26 +286,7 @@ export default function Auth() {
           </CardDescription>
         </CardHeader>
          <CardContent className="space-y-5 px-6 pb-8">
-          {/* Social sign-in buttons */}
-          <div className="space-y-3">
-            {/* Google sign-in hidden for beta — re-enable by uncommenting */}
-          </div>
-
-          {/* Collapsible Email Form */}
-          <Collapsible open={emailFormOpen} onOpenChange={setEmailFormOpen}>
-            <CollapsibleTrigger asChild>
-              <button className="flex items-center gap-4 py-3 w-full group cursor-pointer">
-                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-                <span className="text-muted-foreground text-sm font-medium px-2 flex items-center gap-1 group-hover:text-primary transition-colors">
-                  or use email
-                  <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", emailFormOpen && "rotate-180")} />
-                </span>
-                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-              </button>
-            </CollapsibleTrigger>
-
-            <CollapsibleContent>
-              <form onSubmit={handleAuth} className="space-y-4 pt-2">
+          <form onSubmit={handleAuth} className="space-y-4">
             {!isLogin && (
               <>
                 <div className="space-y-2">
@@ -424,9 +403,7 @@ export default function Auth() {
             >
               {isLogin ? 'Don\'t have an account? Sign up' : 'Already have an account? Sign in'}
             </Button>
-              </form>
-            </CollapsibleContent>
-          </Collapsible>
+          </form>
         </CardContent>
         
         {/* Business Portal Link */}
