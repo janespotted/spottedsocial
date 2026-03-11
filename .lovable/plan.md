@@ -1,21 +1,19 @@
 
 
-## Fix CheckInConfirmation Modal Dismissal
+## Problem
 
-Three targeted changes in `src/components/CheckInConfirmation.tsx`:
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-1. **Line 6-8**: Remove `useNavigate` import and `spottedLogo` import; add `X` from `lucide-react`
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
-2. **Lines 20, 24-27**: Remove `navigate` declaration. Change `handleDismissAndNavigate` to just call `closeCheckInConfirmation()` — no navigation.
+## Fix
 
-3. **Line 101**: Add `onClick={e => e.stopPropagation()}` to the inner card div so taps on the card don't bubble to the backdrop.
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-4. **Lines 115-117**: Replace the Spotted logo with an X close button:
-   ```tsx
-   <button onClick={closeCheckInConfirmation} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30">
-     <X className="h-5 w-5 text-white" />
-   </button>
-   ```
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
 
-Single file edit, no other changes needed.
+| File | Change |
+|------|--------|
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 

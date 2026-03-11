@@ -3,9 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { X } from 'lucide-react';
 
 export function CheckInConfirmation() {
   const { 
@@ -17,13 +16,11 @@ export function CheckInConfirmation() {
     closeCheckInConfirmation 
   } = useCheckIn();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>('');
 
-  const handleDismissAndNavigate = () => {
+  const handleDismiss = () => {
     closeCheckInConfirmation();
-    navigate('/map');
   };
 
   // Fetch user profile
@@ -72,7 +69,7 @@ export function CheckInConfirmation() {
 
   const handleBackdropClick = (e: React.MouseEvent | React.TouchEvent) => {
     if (e.target === e.currentTarget) {
-      handleDismissAndNavigate();
+      handleDismiss();
     }
   };
 
@@ -98,7 +95,7 @@ export function CheckInConfirmation() {
       onTouchEnd={handleBackdropClick}
     >
       <div className="w-[90%] max-w-md">
-        <div className="relative bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in">
+        <div className="relative bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in" onClick={e => e.stopPropagation()}>
           {isOut ? (
             <Avatar className="absolute top-6 left-6 h-12 w-12 border-2 border-white shadow-lg">
               <AvatarImage src={avatarUrl || undefined} />
@@ -112,9 +109,9 @@ export function CheckInConfirmation() {
             </div>
           )}
 
-          <div className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center">
-            <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain" />
-          </div>
+          <button onClick={closeCheckInConfirmation} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">
+            <X className="h-5 w-5 text-white" />
+          </button>
 
           <div className="flex flex-col items-center text-center mt-4 mb-6">
             <div className="text-7xl mb-4 animate-bounce">{emoji}</div>
