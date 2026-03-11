@@ -16,13 +16,11 @@ export function CheckInConfirmation() {
     closeCheckInConfirmation 
   } = useCheckIn();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>('');
 
-  const handleDismissAndNavigate = () => {
+  const handleDismiss = () => {
     closeCheckInConfirmation();
-    navigate('/map');
   };
 
   // Fetch user profile
