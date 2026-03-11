@@ -373,3 +373,10 @@ All colors MUST be HSL.
 *::-webkit-scrollbar {
   display: none !important;
 }
+
+/* iOS momentum scrolling for all scrollable containers */
+*,
+*::before,
+*::after {
+  -webkit-overflow-scrolling: touch !important;
+}
