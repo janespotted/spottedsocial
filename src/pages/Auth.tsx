@@ -11,9 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { loginSchema, signupSchema } from '@/lib/auth-validation';
 import { getRedirectOrigin, APP_BASE_URL } from '@/lib/platform';
-import { Mail, Lock, User, AtSign, ChevronDown } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cn } from '@/lib/utils';
+import { Mail, Lock, User, AtSign } from 'lucide-react';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 
 interface InviterInfo {
