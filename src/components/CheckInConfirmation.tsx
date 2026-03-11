@@ -115,7 +115,7 @@ export function CheckInConfirmation() {
             </div>
           )}
 
-          <button onClick={closeCheckInConfirmation} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">
+          <button onClick={closeCheckInConfirmation} onTouchEnd={(e) => { e.stopPropagation(); closeCheckInConfirmation(); }} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">
             <X className="h-5 w-5 text-white" />
           </button>
 
