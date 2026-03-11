@@ -180,3 +180,11 @@ export async function pickFromGallery(): Promise<CapturedMedia | null> {
 export function isNativePlatform(): boolean {
   return Capacitor.isNativePlatform();
 }
+export function isNativePlatform(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+// ← paste captureVideo() here
+export async function captureVideo(): Promise<CapturedMedia | null> {
+  ...
+}
