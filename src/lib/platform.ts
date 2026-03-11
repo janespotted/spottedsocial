@@ -28,7 +28,8 @@ export const APP_BASE_URL = 'https://spottedsocial.lovable.app';
  * On native, uses the published APP_BASE_URL so OAuth callbacks work.
  */
 export const getRedirectOrigin = (): string => {
-  return isNativePlatform() ? APP_BASE_URL : window.location.origin;
+  const origin = isNativePlatform() ? APP_BASE_URL : window.location.origin;
+  return `${origin}/~oauth/callback`;
 };
 
 /**
