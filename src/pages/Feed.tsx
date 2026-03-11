@@ -140,7 +140,7 @@ export default function Feed() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24" style={{ overscrollBehaviorY: 'none' }}>
       {!isOnline && (
         <div className="bg-yellow-500/20 text-yellow-500 text-center py-2 text-sm">
           You're offline. Showing cached data.
