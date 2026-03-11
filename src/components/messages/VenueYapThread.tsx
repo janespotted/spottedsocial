@@ -865,7 +865,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
                           <div className="flex-1 bg-white/[0.04] rounded-lg p-3">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-semibold text-white text-sm">
-                                {comment.author_handle || `User${comment.id.slice(0, 6)}`}
+                                Anonymous
                               </span>
                               <span className="text-white/40 text-xs">{getTimeAgo(comment.created_at)}</span>
                             </div>
