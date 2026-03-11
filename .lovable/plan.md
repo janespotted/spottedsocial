@@ -1,19 +1,19 @@
 
 
-## Fix Feed Camera Button on iOS
+## Problem
 
-**Problem**: The feed's `PostMediaPicker` uses Capacitor's `Camera.getPhoto()` API on native platforms, which is failing on iOS. Meanwhile, Yap's image upload works because it uses a simple `<input type="file">` element that iOS handles natively.
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-**Solution**: Replace the Capacitor camera API calls in `PostMediaPicker` with the same `<input type="file">` pattern used by Yap's `VenueYapThread`.
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
-### Changes — `src/components/PostMediaPicker.tsx`
+## Fix
 
-Remove the imports and calls to `capturePhoto`, `pickFromGallery`, and `isNativePlatform` from `camera-service.ts`. Replace with:
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-- A hidden `<input type="file" accept="image/*,video/*" capture="environment">` for the camera option (triggers native camera on iOS)
-- A hidden `<input type="file" accept="image/*,video/*">` for the gallery option (opens photo picker on iOS)
-- Both wired to the same file validation and preview logic already in `handleFileSelect`
-- The "Take a Photo" and "Choose from Gallery" buttons simply trigger `.click()` on the respective inputs — keeping the gesture synchronous (critical for iOS Safari security)
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
 
-This matches the Yap implementation exactly: direct `<input type="file">` click from user gesture, no async Capacitor plugin calls in between.
+| File | Change |
+|------|--------|
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 
