@@ -319,8 +319,10 @@ All colors MUST be HSL.
 
 /* iOS Safe Area Insets for notched devices */
 @supports (padding: max(0px)) {
-  body {
+  #root {
     padding-top: env(safe-area-inset-top);
+  }
+  body {
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
