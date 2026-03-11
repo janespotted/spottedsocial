@@ -69,7 +69,7 @@ export function CheckInConfirmation() {
 
   const handleBackdropClick = (e: React.MouseEvent | React.TouchEvent) => {
     if (e.target === e.currentTarget) {
-      handleDismissAndNavigate();
+      handleDismiss();
     }
   };
 
