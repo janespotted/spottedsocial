@@ -39,8 +39,6 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
-  const [appleLoading, setAppleLoading] = useState(false);
-  const [appleError, setAppleError] = useState<string | null>(null);
   
   const [inviter, setInviter] = useState<InviterInfo | null>(null);
   const navigate = useNavigate();
@@ -118,43 +116,6 @@ export default function Auth() {
     }
   };
 
-  const handleAppleSignIn = async () => {
-    window.alert('[AppleAuth] Handler fired. redirect_uri: ' + getRedirectOrigin());
-    setAppleLoading(true);
-    setAppleError(null);
-
-    try {
-      sessionStorage.setItem('apple_auth_debug', JSON.stringify({
-        started: Date.now(),
-        redirectUri: getRedirectOrigin(),
-      }));
-      
-      const result = await lovable.auth.signInWithOAuth("apple", {
-        redirect_uri: getRedirectOrigin(),
-      });
-
-      console.log('[AppleAuth] signInWithOAuth result:', JSON.stringify({
-        redirected: (result as any)?.redirected,
-        hasError: !!result?.error,
-        errorMessage: result?.error?.message,
-        hasTokens: !!(result as any)?.tokens,
-        keys: Object.keys(result || {}),
-      }));
-
-      if (result?.error) throw result.error;
-    } catch (error: any) {
-      console.error('[AppleAuth] Error:', error);
-      console.error('[AppleAuth] Error details:', JSON.stringify({
-        message: error?.message,
-        status: error?.status,
-        name: error?.name,
-        stack: error?.stack?.split('\n').slice(0, 3),
-      }));
-      const message = error?.message || 'Apple sign-in failed, please try again';
-      setAppleError(window.location.hostname.includes('preview') ? `${message} — Try from the published app instead.` : message);
-      setAppleLoading(false);
-    }
-  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
