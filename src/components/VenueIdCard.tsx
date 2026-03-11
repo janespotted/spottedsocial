@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getShareableUrl, copyToClipboard, openExternalUrl } from '@/lib/platform';
+import { getShareableUrl, copyToClipboard, openExternalUrl, isNativePlatform } from '@/lib/platform';
+import { Capacitor } from '@capacitor/core';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueInvite } from '@/contexts/VenueInviteContext';
@@ -492,9 +493,13 @@ export function VenueIdCard() {
 
   const handleMapPinClick = () => {
     if (venue) {
-      // Open Google Maps directions (avoids iOS deep-linking to native Apple Maps)
-      const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
-      openExternalUrl(mapsUrl);
+      if (isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+        const mapsUrl = `maps://?daddr=${venue.lat},${venue.lng}`;
+        window.open(mapsUrl, '_self');
+      } else {
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
+        openExternalUrl(mapsUrl);
+      }
     }
   };
 

@@ -12,6 +12,7 @@ import { YapSkeleton } from "./MessagesSkeleton";
 import { validateYapText, validateYapCommentText } from "@/lib/validation-schemas";
 import { checkAndRecordRateLimit, getRateLimitMessage } from "@/lib/rate-limit";
 import { LoginPromptSheet } from "@/components/LoginPromptSheet";
+import { calculateExpiryTime } from "@/lib/time-utils";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -385,11 +386,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
     setIsPosting(true);
     try {
       const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
-      const now = new Date();
-      const expiry = new Date(now);
-      expiry.setDate(expiry.getDate() + 1);
-      expiry.setHours(5, 0, 0, 0);
-      if (now.getHours() >= 5) expiry.setDate(expiry.getDate() + 1);
+      const expiresAt = calculateExpiryTime();
 
       let mediaUrl: string | null = null;
       let mediaType: string | null = null;
@@ -447,7 +444,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
         author_handle: handle,
         score: 0,
         comments_count: 0,
-        expires_at: expiry.toISOString(),
+        expires_at: expiresAt,
         image_url: mediaUrl,
         media_type: mediaType,
         is_private_party: isPrivateParty,
@@ -818,7 +815,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
               <div className="flex gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">{msg.author_handle || `User${msg.id.slice(0, 6)}`}</span>
+                    <span className="font-bold text-white">Anonymous</span>
                     <span className="text-white/40 text-sm">{getTimeAgo(msg.created_at)}</span>
                     <button
                       onClick={() => {
@@ -838,14 +835,14 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
                         <video
                           src={msg.image_url}
                           controls
-                          className="w-full h-64 rounded-lg object-cover border border-[#a855f7]/20"
+                          className="w-full max-h-96 rounded-lg object-contain border border-[#a855f7]/20"
                           preload="metadata"
                         />
                       ) : (
                         <img
                           src={msg.image_url}
                           alt="Yap media"
-                          className="w-full h-64 rounded-lg object-cover border border-[#a855f7]/20"
+                          className="w-full max-h-96 rounded-lg object-contain border border-[#a855f7]/20"
                           loading="lazy"
                         />
                       )}
@@ -869,7 +866,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
                           <div className="flex-1 bg-white/[0.04] rounded-lg p-3">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-semibold text-white text-sm">
-                                {comment.author_handle || `User${comment.id.slice(0, 6)}`}
+                                Anonymous
                               </span>
                               <span className="text-white/40 text-xs">{getTimeAgo(comment.created_at)}</span>
                             </div>
