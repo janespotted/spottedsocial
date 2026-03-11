@@ -362,3 +362,14 @@ All colors MUST be HSL.
     font-size: 16px; /* Prevents iOS auto-zoom on focus */
   }
 }
+
+/* Global scrollbar hide — outside @layer for maximum specificity */
+*,
+*::before,
+*::after {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+*::-webkit-scrollbar {
+  display: none !important;
+}
