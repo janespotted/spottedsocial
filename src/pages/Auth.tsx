@@ -39,8 +39,6 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
-  const [appleLoading, setAppleLoading] = useState(false);
-  const [appleError, setAppleError] = useState<string | null>(null);
   
   const [inviter, setInviter] = useState<InviterInfo | null>(null);
   const navigate = useNavigate();
