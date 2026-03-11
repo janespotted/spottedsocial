@@ -51,30 +51,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Single source of truth: onAuthStateChange handles both initial session
-    // restoration (INITIAL_SESSION) and subsequent auth events.
-    // No separate getSession() call — it races with onAuthStateChange and
-    // can resolve to null before OAuth tokens are processed, causing
-    // ProtectedRoute to redirect back to /auth.
+    console.log('[AuthDebug] useEffect mount, pathname:', window.location.pathname);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('[AuthDebug] onAuthStateChange fired');
+        console.log('[AuthDebug]   event:', event);
+        console.log('[AuthDebug]   session user:', session?.user?.id ?? 'null');
+        console.log('[AuthDebug]   pathname:', window.location.pathname);
+
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
 
-        // Process pending invite on sign in (covers email confirmation and login)
+        console.log('[AuthDebug]   loading set to false, user:', session?.user?.id ?? 'null');
+
         if (event === 'SIGNED_IN' && session?.user) {
-          // Log user login event
           logEvent('user_login', { method: 'auth_state_change' });
           
-          // Defer to avoid Supabase deadlock
           setTimeout(() => {
             processPendingInvite(session.user.id);
           }, 0);
           
-          // Navigate to home from auth/callback paths
           const path = window.location.pathname;
+          console.log('[AuthDebug]   SIGNED_IN navigation check, path:', path);
           if (path === '/auth' || path.startsWith('/~oauth') || path === '/') {
+            console.log('[AuthDebug]   Navigating to /');
             if (isNativePlatform()) {
               window.history.replaceState(null, '', '/');
               window.dispatchEvent(new PopStateEvent('popstate'));
