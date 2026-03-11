@@ -1,19 +1,29 @@
 
 
-## Problem
+## Fix Build Errors + Hide Scrollbars
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+### Build Errors
+The `process` and `NodeJS` namespace errors are because `@types/node` isn't referenced. Fix by adding `"types": ["node"]` to `tsconfig.app.json` compilerOptions. The package is likely already installed (Vite depends on it).
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+### Scrollbars
+The current `index.css` already has global scrollbar hiding on `*` selector (lines ~155-162). The styles are correct but they're inside `@layer base` which has lower specificity. Moving the scrollbar rules outside `@layer base` or adding them at global scope will ensure they override everything.
 
-## Fix
+### Changes
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
+**`tsconfig.app.json`** — Add `"types": ["node"]` to compilerOptions.
 
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
+**`src/index.css`** — Add a global (non-layered) scrollbar-hide rule at the end of the file to ensure it overrides all component styles:
+```css
+*,
+*::before,
+*::after {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+*::-webkit-scrollbar {
+  display: none !important;
+}
+```
 
-| File | Change |
-|------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+Two files, no layout or spacing changes.
 
