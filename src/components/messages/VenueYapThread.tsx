@@ -385,11 +385,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
     setIsPosting(true);
     try {
       const handle = `User${Math.floor(100000 + Math.random() * 900000)}`;
-      const now = new Date();
-      const expiry = new Date(now);
-      expiry.setDate(expiry.getDate() + 1);
-      expiry.setHours(5, 0, 0, 0);
-      if (now.getHours() >= 5) expiry.setDate(expiry.getDate() + 1);
+      const expiresAt = calculateExpiryTime();
 
       let mediaUrl: string | null = null;
       let mediaType: string | null = null;
