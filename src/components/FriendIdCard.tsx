@@ -167,6 +167,7 @@ export function FriendIdCard() {
           .select('venue_name, lat, lng, last_updated_at, started_at')
           .eq('user_id', selectedFriend.userId)
           .is('ended_at', null)
+          .gt('started_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
           .order('started_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
