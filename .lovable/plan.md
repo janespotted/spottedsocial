@@ -1,19 +1,20 @@
 
 
-## Problem
+## Fix Feed Header Rubber-Band Bounce on iOS
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+The header at line 151 uses `sticky top-0` which moves with the page during iOS rubber-band overscroll. Need to switch to `fixed` positioning and add `overscroll-behavior-y: none` to the scroll container.
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+### Changes — `src/pages/Feed.tsx`
 
-## Fix
+1. **Header (line 151)**: Change from `sticky top-0` to `fixed top-0 left-0 right-0` and add `pt-[env(safe-area-inset-top)]` so it sits under the notch correctly.
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
+2. **Content below header**: Add a spacer div after the header to push content down by the header's height (since `fixed` removes it from flow). Approximate height ~120px, but we'll use a matching div.
 
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
+3. **Outer container (line 143)**: Add `overscroll-behavior-y: none` via inline style to prevent iOS rubber-band pull on the whole page.
 
-| File | Change |
-|------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+### Summary of line changes
+
+- **Line 143**: Add `overscroll-behavior-y: none` style to the outer div
+- **Line 151**: Replace `sticky top-0` with `fixed top-0 left-0 right-0` and add safe-area padding
+- **After line 185**: Insert a spacer div to account for the fixed header height
 
