@@ -390,7 +390,7 @@ export default function Auth() {
                className="w-full h-12 bg-primary hover:bg-primary/90 shadow-[0_0_20px_hsl(var(--primary)/0.5)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.7)] transition-all text-primary-foreground font-semibold rounded-xl"
               disabled={loading}
             >
-              {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Sign Up'}
+              {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Create Account'}
             </Button>
             <Button
               type="button"
