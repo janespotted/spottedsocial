@@ -51,27 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[AuthDebug] useEffect mount, pathname:', window.location.pathname);
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('[AuthDebug] onAuthStateChange fired');
-        console.log('[AuthDebug]   event:', event);
-        console.log('[AuthDebug]   session user:', session?.user?.id ?? 'null');
-        console.log('[AuthDebug]   pathname:', window.location.pathname);
-
-        const appleDebug = sessionStorage.getItem('apple_auth_debug');
-        if (appleDebug) {
-          console.log('[AppleAuth] Pre-redirect state:', appleDebug);
-          console.log('[AppleAuth] Return event:', event, 'session:', !!session);
-          sessionStorage.removeItem('apple_auth_debug');
-        }
-
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
-
-        console.log('[AuthDebug]   loading set to false, user:', session?.user?.id ?? 'null');
 
         if (event === 'SIGNED_IN' && session?.user) {
           logEvent('user_login', { method: 'auth_state_change' });
@@ -81,9 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }, 0);
           
           const path = window.location.pathname;
-          console.log('[AuthDebug]   SIGNED_IN navigation check, path:', path);
           if (path === '/auth' || path.startsWith('/~oauth') || path === '/') {
-            console.log('[AuthDebug]   Navigating to /');
             if (isNativePlatform()) {
               window.history.replaceState(null, '', '/');
               window.dispatchEvent(new PopStateEvent('popstate'));
