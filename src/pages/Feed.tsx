@@ -183,6 +183,7 @@ export default function Feed() {
           </div>
         </div>
       </div>
+      <div style={{ height: 'calc(120px + env(safe-area-inset-top, 0px))' }} />
 
       {/* Posts Feed */}
       <PullToRefresh onRefresh={async () => { await fetchPosts(); }}>
