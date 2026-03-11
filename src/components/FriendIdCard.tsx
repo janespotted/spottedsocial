@@ -13,6 +13,7 @@ import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { ReportDialog } from '@/components/ReportDialog';
+import { isFromTonight } from '@/lib/time-context';
 import { toast } from 'sonner';
 import { CreatePlanDialog } from '@/components/CreatePlanDialog';
 import { getOrCreateInviteCode, getInviteLink, triggerSmsInvite } from '@/lib/sms-invite';
