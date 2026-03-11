@@ -1,30 +1,19 @@
 
 
-## Fix: Safe Area Inset at Top
+## Problem
 
-### Problem
-`padding-top: env(safe-area-inset-top)` is currently on `body` inside an `@supports` block, but this doesn't reliably push content down when child elements use `min-h-[100dvh]` or full-screen gradient backgrounds — content renders behind the notch/Dynamic Island.
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-### Fix
-Move `padding-top: env(safe-area-inset-top)` from `body` to `#root` in `src/index.css`. The `#root` div is the app shell wrapper for all routes (Layout-wrapped and standalone pages like Auth/NotFound), so this single change covers everything.
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
-### Change
+## Fix
 
-**`src/index.css`** (~line 320-326)
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-Replace the `@supports` block's `body` padding-top with `#root` padding-top:
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
 
-```css
-@supports (padding: max(0px)) {
-  #root {
-    padding-top: env(safe-area-inset-top);
-  }
-  body {
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-}
-```
-
-One file, one block changed. `viewport-fit=cover` in `index.html` stays untouched.
+| File | Change |
+|------|--------|
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 
