@@ -109,9 +109,9 @@ export function CheckInConfirmation() {
             </div>
           )}
 
-          <div className="absolute top-6 right-6 w-12 h-12 flex items-center justify-center">
-            <img src={spottedLogo} alt="Spotted" className="w-full h-full object-contain" />
-          </div>
+          <button onClick={closeCheckInConfirmation} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">
+            <X className="h-5 w-5 text-white" />
+          </button>
 
           <div className="flex flex-col items-center text-center mt-4 mb-6">
             <div className="text-7xl mb-4 animate-bounce">{emoji}</div>
