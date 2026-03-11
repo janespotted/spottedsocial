@@ -140,7 +140,7 @@ export default function Feed() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24" style={{ overscrollBehaviorY: 'none' }}>
       {!isOnline && (
         <div className="bg-yellow-500/20 text-yellow-500 text-center py-2 text-sm">
           You're offline. Showing cached data.
@@ -148,7 +148,7 @@ export default function Feed() {
       )}
 
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-start justify-between px-6 pt-6 pb-3">
           <div>
             <div className="flex items-center gap-3 mb-1">
@@ -183,6 +183,7 @@ export default function Feed() {
           </div>
         </div>
       </div>
+      <div style={{ height: 'calc(120px + env(safe-area-inset-top, 0px))' }} />
 
       {/* Posts Feed */}
       <PullToRefresh onRefresh={async () => { await fetchPosts(); }}>
