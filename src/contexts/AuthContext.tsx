@@ -60,6 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[AuthDebug]   session user:', session?.user?.id ?? 'null');
         console.log('[AuthDebug]   pathname:', window.location.pathname);
 
+        const appleDebug = sessionStorage.getItem('apple_auth_debug');
+        if (appleDebug) {
+          console.log('[AppleAuth] Pre-redirect state:', appleDebug);
+          console.log('[AppleAuth] Return event:', event, 'session:', !!session);
+          sessionStorage.removeItem('apple_auth_debug');
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);

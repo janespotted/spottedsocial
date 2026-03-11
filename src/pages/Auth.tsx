@@ -121,12 +121,15 @@ export default function Auth() {
   };
 
   const handleAppleSignIn = async () => {
+    window.alert('[AppleAuth] Handler fired. redirect_uri: ' + getRedirectOrigin());
     setAppleLoading(true);
     setAppleError(null);
 
     try {
-      console.log('[AppleAuth] Starting Apple sign-in...');
-      console.log('[AppleAuth] redirect_uri:', getRedirectOrigin());
+      sessionStorage.setItem('apple_auth_debug', JSON.stringify({
+        started: Date.now(),
+        redirectUri: getRedirectOrigin(),
+      }));
       
       const result = await lovable.auth.signInWithOAuth("apple", {
         redirect_uri: getRedirectOrigin(),
