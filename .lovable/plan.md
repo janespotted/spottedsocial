@@ -1,19 +1,23 @@
 
 
-## Problem
+## Add Momentum Scrolling to All Scrollable Containers
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+### Problem
+`-webkit-overflow-scrolling: touch` is set on `*` inside `@layer base`, which has low specificity. It also only works on elements that already have `overflow: auto` or `overflow: scroll`. Content stops abruptly on iOS because the momentum property isn't being applied with enough specificity.
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+### Fix
+Add a global rule **outside** `@layer` (at the end of the file, near the existing scrollbar-hide block) that targets all elements with overflow behavior and forces momentum scrolling:
 
-## Fix
+**`src/index.css`** — append after the existing global scrollbar-hide block (~line 370):
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
+```css
+/* iOS momentum scrolling for all scrollable containers */
+*,
+*::before,
+*::after {
+  -webkit-overflow-scrolling: touch !important;
+}
+```
 
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
-
-| File | Change |
-|------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+This ensures every scrollable container gets momentum scrolling regardless of specificity conflicts. No layout or content changes.
 
