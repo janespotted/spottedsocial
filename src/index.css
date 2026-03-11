@@ -334,10 +334,10 @@ All colors MUST be HSL.
 
 /* Mobile optimizations */
 @media (max-width: 768px) {
-  /* Prevent text size adjustment on orientation change */
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    background-color: #0a0118;
   }
 
   /* Smoother scrolling on iOS */
