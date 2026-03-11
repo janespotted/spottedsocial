@@ -41,7 +41,7 @@ export default function Auth() {
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [appleLoading, setAppleLoading] = useState(false);
   const [appleError, setAppleError] = useState<string | null>(null);
-  const [emailFormOpen, setEmailFormOpen] = useState(false);
+  
   const [inviter, setInviter] = useState<InviterInfo | null>(null);
   const navigate = useNavigate();
 
