@@ -70,7 +70,7 @@ export function CheckInConfirmation() {
     return () => clearInterval(interval);
   }, [showCheckInConfirmation]);
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = (e: React.MouseEvent | React.TouchEvent) => {
     if (e.target === e.currentTarget) {
       handleDismissAndNavigate();
     }
@@ -93,8 +93,9 @@ export function CheckInConfirmation() {
 
   return (
     <div 
-      className="fixed inset-0 z-[600] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in"
+      className="fixed inset-0 z-[600] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in cursor-pointer"
       onClick={handleBackdropClick}
+      onTouchEnd={handleBackdropClick}
     >
       <div className="w-[90%] max-w-md">
         <div className="relative bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in">
