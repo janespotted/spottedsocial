@@ -70,7 +70,7 @@ export function CheckInConfirmation() {
     return () => clearInterval(interval);
   }, [showCheckInConfirmation]);
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = (e: React.MouseEvent | React.TouchEvent) => {
     if (e.target === e.currentTarget) {
       handleDismissAndNavigate();
     }
