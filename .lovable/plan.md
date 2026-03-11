@@ -1,65 +1,19 @@
 
 
-## Diagnosis
+## Problem
 
-The button wiring and handler code are both correct. The most likely explanation for **zero console output on click** is that `lovable.auth.signInWithOAuth("apple", ...)` performs a **full-page redirect** to Apple's OAuth page *before* the subsequent `console.log` lines execute. The first two logs (`Starting...` and `redirect_uri:`) should fire, but if the redirect is near-instant, the browser may flush the page before the console renders them.
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-The `cloud-auth-js` library's `signInWithOAuth` likely calls `window.location.assign(...)` internally, which unloads the page immediately — wiping any pending console output.
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
-## Plan
+## Fix
 
-### 1. Add a synchronous `alert()` gate before the OAuth call
-Temporarily replace the first console.log with `window.alert('[AppleAuth] About to call signInWithOAuth')`. An alert blocks execution and proves the handler fires. This definitively separates "handler not called" from "page redirects too fast to see logs."
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-**File:** `src/pages/Auth.tsx` — `handleAppleSignIn` function (line ~128)
-
-```typescript
-// Add before the OAuth call:
-window.alert('[AppleAuth] Handler fired. redirect_uri: ' + getRedirectOrigin());
-```
-
-### 2. If alert fires → the handler works, redirect is just fast
-Remove the alert and instead persist debug state to `sessionStorage` before the redirect, then read it back on return:
-
-**Before OAuth call:**
-```typescript
-sessionStorage.setItem('apple_auth_debug', JSON.stringify({
-  started: Date.now(),
-  redirectUri: getRedirectOrigin(),
-}));
-```
-
-**In AuthContext.tsx `onAuthStateChange`:**
-```typescript
-const debugInfo = sessionStorage.getItem('apple_auth_debug');
-if (debugInfo) {
-  console.log('[AppleAuth] Pre-redirect state:', debugInfo);
-  console.log('[AppleAuth] Return event:', event, 'session:', !!session);
-  sessionStorage.removeItem('apple_auth_debug');
-}
-```
-
-This captures the full round-trip: what was sent before redirect, and what came back after.
-
-### 3. If alert does NOT fire → module-level crash
-Add a top-level try/catch around the `lovable` import in Auth.tsx to catch any silent module initialization errors:
-
-```typescript
-let lovableAuth: typeof import('@/integrations/lovable');
-try {
-  lovableAuth = await import('@/integrations/lovable');
-  console.log('[AppleAuth] lovable module loaded OK');
-} catch (e) {
-  console.error('[AppleAuth] lovable module failed to load:', e);
-}
-```
-
-### Summary of changes
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
 
 | File | Change |
 |------|--------|
-| `src/pages/Auth.tsx` | Add `window.alert()` gate + `sessionStorage` debug breadcrumb before OAuth redirect |
-| `src/contexts/AuthContext.tsx` | Read `sessionStorage` breadcrumb on auth state change to log the return trip |
-
-Two tiny, temporary debug additions. No logic changes.
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 
