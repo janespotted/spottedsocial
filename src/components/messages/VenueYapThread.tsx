@@ -814,7 +814,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
               <div className="flex gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">{msg.author_handle || `User${msg.id.slice(0, 6)}`}</span>
+                    <span className="font-bold text-white">Anonymous</span>
                     <span className="text-white/40 text-sm">{getTimeAgo(msg.created_at)}</span>
                     <button
                       onClick={() => {
