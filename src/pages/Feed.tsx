@@ -148,7 +148,7 @@ export default function Feed() {
       )}
 
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-start justify-between px-6 pt-6 pb-3">
           <div>
             <div className="flex items-center gap-3 mb-1">
