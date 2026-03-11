@@ -282,7 +282,7 @@ export function FriendIdCard() {
           .limit(1)
           .maybeSingle();
 
-        if (lastCheckIn && canSeeLocation) {
+        if (lastCheckIn && canSeeLocation && isFromTonight(lastCheckIn.ended_at)) {
           const hoursAgo = Math.floor((Date.now() - new Date(lastCheckIn.ended_at).getTime()) / 3600000);
           
           setUserStatus({
