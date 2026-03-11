@@ -1,36 +1,19 @@
 
 
-## Fix CheckInConfirmation: X button + keyboard
+## Problem
 
-### Problem Analysis
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-1. **X button not working on iOS**: The backdrop's `onTouchEnd={handleBackdropClick}` is likely interfering with the button's `onClick` on touch devices. Touch events fire before click events, and the touchEnd handler on the ancestor can prevent the click from reaching the button.
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
-2. **Keyboard appearing**: No input exists in this component, but the previously focused input (from CheckInModal or elsewhere) may retain focus. Need to blur active element on mount.
+## Fix
 
-### Changes — `src/components/CheckInConfirmation.tsx`
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-1. **Remove `onTouchEnd` from backdrop** — it's redundant with `onClick` and causes touch event conflicts on iOS that prevent the X button from working.
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
 
-2. **Add `onTouchEnd={e => e.stopPropagation()}` to inner card** alongside the existing `onClick` stopPropagation, so touch events from the card (including the X button) don't bubble.
-
-3. **Change X button to use `onTouchEnd` + `onClick`** for reliable iOS dismissal:
-   ```tsx
-   <button 
-     onClick={closeCheckInConfirmation}
-     onTouchEnd={(e) => { e.stopPropagation(); closeCheckInConfirmation(); }}
-     ...
-   >
-   ```
-
-4. **Add useEffect to blur active element on mount** — prevents keyboard from appearing:
-   ```tsx
-   useEffect(() => {
-     if (showCheckInConfirmation) {
-       (document.activeElement as HTMLElement)?.blur?.();
-     }
-   }, [showCheckInConfirmation]);
-   ```
-
-Single file edit.
+| File | Change |
+|------|--------|
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 

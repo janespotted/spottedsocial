@@ -44,6 +44,13 @@ export function CheckInConfirmation() {
     }
   }, [user, showCheckInConfirmation]);
 
+  // Blur active element to prevent keyboard from appearing
+  useEffect(() => {
+    if (showCheckInConfirmation) {
+      (document.activeElement as HTMLElement)?.blur?.();
+    }
+  }, [showCheckInConfirmation]);
+
   useEffect(() => {
     if (!showCheckInConfirmation) return;
 
@@ -92,10 +99,9 @@ export function CheckInConfirmation() {
     <div 
       className="fixed inset-0 z-[600] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex items-center justify-center animate-fade-in cursor-pointer"
       onClick={handleBackdropClick}
-      onTouchEnd={handleBackdropClick}
     >
       <div className="w-[90%] max-w-md">
-        <div className="relative bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in" onClick={e => e.stopPropagation()}>
+        <div className="relative bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in" onClick={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
           {isOut ? (
             <Avatar className="absolute top-6 left-6 h-12 w-12 border-2 border-white shadow-lg">
               <AvatarImage src={avatarUrl || undefined} />
@@ -109,7 +115,7 @@ export function CheckInConfirmation() {
             </div>
           )}
 
-          <button onClick={closeCheckInConfirmation} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">
+          <button onClick={closeCheckInConfirmation} onTouchEnd={(e) => { e.stopPropagation(); closeCheckInConfirmation(); }} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">
             <X className="h-5 w-5 text-white" />
           </button>
 
