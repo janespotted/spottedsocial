@@ -51,7 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener
+    // Single source of truth: onAuthStateChange handles both initial session
+    // restoration (INITIAL_SESSION) and subsequent auth events.
+    // No separate getSession() call — it races with onAuthStateChange and
+    // can resolve to null before OAuth tokens are processed, causing
+    // ProtectedRoute to redirect back to /auth.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -68,10 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             processPendingInvite(session.user.id);
           }, 0);
           
-          // Navigate without full page reload (avoids WebView white flash on Capacitor)
-          if (window.location.pathname === '/auth') {
+          // Navigate to home from auth/callback paths
+          const path = window.location.pathname;
+          if (path === '/auth' || path.startsWith('/~oauth') || path === '/') {
             if (isNativePlatform()) {
-              // Use history API to avoid full WebView reload in Capacitor
               window.history.replaceState(null, '', '/');
               window.dispatchEvent(new PopStateEvent('popstate'));
             } else {
@@ -81,13 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
 
     return () => subscription.unsubscribe();
   }, []);
