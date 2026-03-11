@@ -12,6 +12,7 @@ import { YapSkeleton } from "./MessagesSkeleton";
 import { validateYapText, validateYapCommentText } from "@/lib/validation-schemas";
 import { checkAndRecordRateLimit, getRateLimitMessage } from "@/lib/rate-limit";
 import { LoginPromptSheet } from "@/components/LoginPromptSheet";
+import { calculateExpiryTime } from "@/lib/time-utils";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
