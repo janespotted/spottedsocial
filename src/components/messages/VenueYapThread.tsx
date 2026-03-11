@@ -444,7 +444,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
         author_handle: handle,
         score: 0,
         comments_count: 0,
-        expires_at: expiry.toISOString(),
+        expires_at: expiresAt,
         image_url: mediaUrl,
         media_type: mediaType,
         is_private_party: isPrivateParty,
