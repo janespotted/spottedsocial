@@ -286,26 +286,7 @@ export default function Auth() {
           </CardDescription>
         </CardHeader>
          <CardContent className="space-y-5 px-6 pb-8">
-          {/* Social sign-in buttons */}
-          <div className="space-y-3">
-            {/* Google sign-in hidden for beta — re-enable by uncommenting */}
-          </div>
-
-          {/* Collapsible Email Form */}
-          <Collapsible open={emailFormOpen} onOpenChange={setEmailFormOpen}>
-            <CollapsibleTrigger asChild>
-              <button className="flex items-center gap-4 py-3 w-full group cursor-pointer">
-                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-                <span className="text-muted-foreground text-sm font-medium px-2 flex items-center gap-1 group-hover:text-primary transition-colors">
-                  or use email
-                  <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", emailFormOpen && "rotate-180")} />
-                </span>
-                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-              </button>
-            </CollapsibleTrigger>
-
-            <CollapsibleContent>
-              <form onSubmit={handleAuth} className="space-y-4 pt-2">
+          <form onSubmit={handleAuth} className="space-y-4">
             {!isLogin && (
               <>
                 <div className="space-y-2">
