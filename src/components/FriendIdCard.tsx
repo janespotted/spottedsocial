@@ -13,6 +13,7 @@ import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { ReportDialog } from '@/components/ReportDialog';
+import { isFromTonight } from '@/lib/time-context';
 import { toast } from 'sonner';
 import { CreatePlanDialog } from '@/components/CreatePlanDialog';
 import { getOrCreateInviteCode, getInviteLink, triggerSmsInvite } from '@/lib/sms-invite';
@@ -167,6 +168,7 @@ export function FriendIdCard() {
           .select('venue_name, lat, lng, last_updated_at, started_at')
           .eq('user_id', selectedFriend.userId)
           .is('ended_at', null)
+          .gt('started_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
           .order('started_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -281,7 +283,7 @@ export function FriendIdCard() {
           .limit(1)
           .maybeSingle();
 
-        if (lastCheckIn && canSeeLocation) {
+        if (lastCheckIn && canSeeLocation && isFromTonight(lastCheckIn.ended_at)) {
           const hoursAgo = Math.floor((Date.now() - new Date(lastCheckIn.ended_at).getTime()) / 3600000);
           
           setUserStatus({

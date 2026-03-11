@@ -190,7 +190,7 @@ export function ActivityTab() {
     const cachedFriendIds: string[] = queryClient.getQueryData(['friend-ids', user?.id]) || [];
 
     const [currentStatusResult, realInvitesResult] = await Promise.all([
-      supabase.from('night_statuses').select('venue_name').eq('user_id', user?.id).eq('status', 'out').maybeSingle(),
+      supabase.from('night_statuses').select('venue_name').eq('user_id', user?.id).eq('status', 'out').not('expires_at', 'is', null).gt('expires_at', new Date().toISOString()).maybeSingle(),
       supabase.from('notifications')
         .select(`id, type, message, created_at, sender_id, is_read`)
         .eq('receiver_id', user?.id)

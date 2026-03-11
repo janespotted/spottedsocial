@@ -96,7 +96,9 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
     const { data: statusesData } = await supabase
       .from('night_statuses')
       .select('user_id, venue_name')
-      .in('user_id', friendIds);
+      .in('user_id', friendIds)
+      .not('expires_at', 'is', null)
+      .gt('expires_at', new Date().toISOString());
 
     let profiles = allProfiles.filter((p: any) => friendIds.includes(p.id));
     

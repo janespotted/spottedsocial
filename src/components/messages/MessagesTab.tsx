@@ -146,7 +146,9 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
         supabase
           .from('night_statuses')
           .select('user_id, venue_name')
-          .in('user_id', otherUserIds),
+          .in('user_id', otherUserIds)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', new Date().toISOString()),
       ]);
 
       const allProfiles = profilesResult || [];
@@ -235,8 +237,11 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
         return new Date(b.last_message.created_at).getTime() - new Date(a.last_message.created_at).getTime();
       });
 
-      console.log('✅ Optimized fetch complete:', threadsData.length, 'threads');
-      setThreads(threadsData);
+      // Hide threads with no tonight messages
+      const visibleThreads = threadsData.filter(t => t.last_message !== null);
+
+      console.log('✅ Optimized fetch complete:', visibleThreads.length, 'threads');
+      setThreads(visibleThreads);
 
       // Auto-seed DMs if in demo mode and inbox is empty
       if (demoEnabled && threadsData.length === 0 && !hasTriedDemoSeed.current) {
