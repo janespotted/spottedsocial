@@ -1,19 +1,30 @@
 
 
-## Problem
+## Fix Stale Check-in Data Across Messages, Friend ID Card, and Related Components
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+### Problem
+After the 5am reset, several components still show stale venue/check-in data:
+- **MessagesTab**: Shows thread list entries with old venue names, and threads from previous nights still appear (even though messages are cleared)
+- **NewChatDialog**: Shows friends' venue status without checking expiry
+- **FriendIdCard**: Active checkin query has no tonight filter; "last ended check-in" can show data from days ago
+- **ActivityTab**: Fetches night status without expiry check
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+### Changes
 
-## Fix
+#### 1. `src/components/messages/MessagesTab.tsx`
+- Add `expires_at` filter to the `night_statuses` query (line ~147-149): `.not('expires_at', 'is', null).gt('expires_at', new Date().toISOString())`
+- Only show threads that have messages from tonight (already filters messages via `isFromTonight`, but threads with zero tonight messages still render — hide those)
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
+#### 2. `src/components/messages/NewChatDialog.tsx`
+- Add `expires_at` filter to the `night_statuses` query (line ~96-99): `.not('expires_at', 'is', null).gt('expires_at', new Date().toISOString())`
 
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
+#### 3. `src/components/FriendIdCard.tsx`
+- **Active checkin query** (line ~165-172): Add `.gt('started_at', twentyFourHoursAgo)` to prevent zombie check-ins from days/weeks ago showing as active
+- **Last ended check-in query** (line ~275-282): Add tonight filter using `isFromTonight` — if the ended check-in is from a previous night, show "Not out tonight" instead of stale venue data
 
-| File | Change |
-|------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+#### 4. `src/components/messages/ActivityTab.tsx`
+- Add `expires_at` filter to the night status query (line ~193): `.not('expires_at', 'is', null).gt('expires_at', new Date().toISOString())`
+
+### Summary
+All components will consistently filter check-in/venue data by expiry, matching what the map already does. After 5am, no stale venue names or thread entries from previous nights will appear.
 
