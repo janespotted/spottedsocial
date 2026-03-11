@@ -146,7 +146,9 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
         supabase
           .from('night_statuses')
           .select('user_id, venue_name')
-          .in('user_id', otherUserIds),
+          .in('user_id', otherUserIds)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', new Date().toISOString()),
       ]);
 
       const allProfiles = profilesResult || [];
