@@ -44,6 +44,13 @@ export function CheckInConfirmation() {
     }
   }, [user, showCheckInConfirmation]);
 
+  // Blur active element to prevent keyboard from appearing
+  useEffect(() => {
+    if (showCheckInConfirmation) {
+      (document.activeElement as HTMLElement)?.blur?.();
+    }
+  }, [showCheckInConfirmation]);
+
   useEffect(() => {
     if (!showCheckInConfirmation) return;
 
