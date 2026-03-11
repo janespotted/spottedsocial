@@ -23,7 +23,7 @@ export default function Auth() {
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get('invite');
   
-  const [isLogin, setIsLogin] = useState(!inviteCode); // Default to signup if invite code present
+  const [isLogin, setIsLogin] = useState(false);
 
   // Store invite code in localStorage for processing after email confirmation
   useEffect(() => {
