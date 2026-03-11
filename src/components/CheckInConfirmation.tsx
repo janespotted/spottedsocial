@@ -95,7 +95,7 @@ export function CheckInConfirmation() {
       onTouchEnd={handleBackdropClick}
     >
       <div className="w-[90%] max-w-md">
-        <div className="relative bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in">
+        <div className="relative bg-gradient-to-br from-[#8b5cf6] via-[#7c3aed] to-[#6b21a8] rounded-3xl p-8 shadow-[0_0_80px_rgba(139,92,246,0.6),0_0_40px_rgba(124,58,237,0.8)] animate-scale-in" onClick={e => e.stopPropagation()}>
           {isOut ? (
             <Avatar className="absolute top-6 left-6 h-12 w-12 border-2 border-white shadow-lg">
               <AvatarImage src={avatarUrl || undefined} />
