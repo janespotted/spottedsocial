@@ -3,9 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { X } from 'lucide-react';
 
 export function CheckInConfirmation() {
   const { 
