@@ -493,9 +493,13 @@ export function VenueIdCard() {
 
   const handleMapPinClick = () => {
     if (venue) {
-      // Open Google Maps directions (avoids iOS deep-linking to native Apple Maps)
-      const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
-      openExternalUrl(mapsUrl);
+      if (isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+        const mapsUrl = `maps://?daddr=${venue.lat},${venue.lng}`;
+        window.open(mapsUrl, '_self');
+      } else {
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
+        openExternalUrl(mapsUrl);
+      }
     }
   };
 

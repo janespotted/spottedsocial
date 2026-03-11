@@ -54,6 +54,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const isMobile = useIsMobile();
   const { city, refreshCity, isLoading: isDetectingCity } = useUserCity();
   const { handleInputFocus } = useKeyboardAware();
+
+  // Dismiss keyboard when modal closes
+  useEffect(() => {
+    if (!open) {
+      (document.activeElement as HTMLElement)?.blur();
+    }
+  }, [open]);
   const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home' | 'planning' | 'private_party'>('home');
   
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
