@@ -259,7 +259,7 @@ export default function DemoSettings() {
   return (
     <div className="min-h-screen bg-[#1a0f2e]">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
+      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
         <div className="max-w-[430px] mx-auto flex items-center gap-4 p-6">
           <button
             onClick={() => navigate(-1)}

@@ -36,6 +36,7 @@ const VALID_NOTIFICATION_TYPES = [
   'address_request',
   'private_party_invite',
   'venue_yap',
+  'friend_checkin',
 ] as const;
 
 // UUID v4 regex pattern
@@ -586,6 +587,8 @@ function getNotificationContent(type: string, message: string, _senderName?: str
       return { title: '🎉 Meet Up Accepted!', body: message, url: '/messages?tab=activity' };
     case 'venue_invite_accepted':
       return { title: '📍 Invite Accepted!', body: message, url: '/messages?tab=activity' };
+    case 'friend_checkin':
+      return { title: '📍 Friend Checked In', body: message, url: '/' };
     default:
       return { title: 'Spotted', body: message, url: '/' };
   }

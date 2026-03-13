@@ -85,9 +85,10 @@ export default function Settings() {
 
   const getPushStatus = () => {
     if (!isSupported) return { label: 'Not supported', color: 'text-white/40' };
-    if (permission === 'denied') return { label: 'Blocked in browser', color: 'text-red-400' };
+    if (isLoading) return { label: 'Checking...', color: 'text-white/40' };
+    if (permission === 'denied') return { label: 'Blocked in settings', color: 'text-red-400' };
     if (isSubscribed) return { label: 'Enabled', color: 'text-green-400' };
-    return { label: 'Disabled', color: 'text-white/60' };
+    return { label: 'Tap to enable', color: 'text-white/60' };
   };
 
   const pushStatus = getPushStatus();
@@ -96,7 +97,7 @@ export default function Settings() {
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
       <div className="max-w-[430px] mx-auto pb-24">
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
+        <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
         <div className="flex items-center gap-4 px-4 py-6">
           <button
             onClick={() => navigate('/profile')}
@@ -148,7 +149,7 @@ export default function Settings() {
               <Switch
                 checked={isSubscribed}
                 onCheckedChange={handlePushToggle}
-                disabled={isToggling}
+                disabled={isToggling || isLoading}
               />
             )}
           </div>

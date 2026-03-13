@@ -474,8 +474,8 @@ export default function Leaderboard() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-32">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
-        <div className="flex items-start justify-between p-6">
+      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
+        <div className="flex items-start justify-between px-6 pt-3 pb-3">
           <div>
             <div>
               <div className="flex items-center gap-3 mb-1">

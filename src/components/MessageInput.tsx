@@ -44,7 +44,7 @@ export const MessageInput = memo(function MessageInput({
   }, [onImageUpload]);
 
   return (
-    <div className="sticky bottom-0 bg-[#1a0f2e]/95 backdrop-blur border-t border-[#a855f7]/20 p-4">
+    <div className="sticky bottom-[var(--keyboard-height,0px)] bg-[#1a0f2e]/95 backdrop-blur border-t border-[#a855f7]/20 p-4 transition-[bottom] duration-200 ease-out">
       <input
         type="file"
         ref={cameraInputRef}

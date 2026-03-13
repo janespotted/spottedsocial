@@ -1,48 +1,61 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 
 export function useKeyboardAware() {
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const initialViewportHeight = useRef<number>(window.innerHeight);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Native: use Capacitor Keyboard plugin for accurate height + events
+    if (Capacitor.isNativePlatform()) {
+      const showListener = Keyboard.addListener('keyboardWillShow', (info) => {
+        const height = info.keyboardHeight;
+        setKeyboardHeight(height);
+        setIsKeyboardOpen(true);
+        document.documentElement.style.setProperty('--keyboard-height', `${height}px`);
+      });
+
+      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
+        setKeyboardHeight(0);
+        setIsKeyboardOpen(false);
+        document.documentElement.style.setProperty('--keyboard-height', '0px');
+      });
+
+      return () => {
+        showListener.then(h => h.remove());
+        hideListener.then(h => h.remove());
+      };
+    }
+
+    // Web fallback: use visualViewport
     const viewport = window.visualViewport;
     if (!viewport) return;
 
-    // Store initial height
     initialViewportHeight.current = viewport.height;
+    let debounceTimer: NodeJS.Timeout | null = null;
 
     const handleResize = () => {
-      // Debounce to prevent jitter during typing
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-      
-      debounceRef.current = setTimeout(() => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
         const heightDiff = initialViewportHeight.current - viewport.height;
-        // Keyboard is considered open if viewport shrunk by more than 150px
         const open = heightDiff > 150;
         setIsKeyboardOpen(open);
         setKeyboardHeight(open ? heightDiff : 0);
+        document.documentElement.style.setProperty('--keyboard-height', open ? `${heightDiff}px` : '0px');
       }, 100);
     };
 
     viewport.addEventListener('resize', handleResize);
-    viewport.addEventListener('scroll', handleResize);
-    
     return () => {
       viewport.removeEventListener('resize', handleResize);
-      viewport.removeEventListener('scroll', handleResize);
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, []);
 
   const scrollInputIntoView = useCallback((inputElement: HTMLInputElement | HTMLTextAreaElement | null) => {
     if (inputElement) {
-      // Delay to allow keyboard to fully open
       setTimeout(() => {
         inputElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 300);
@@ -53,10 +66,10 @@ export function useKeyboardAware() {
     scrollInputIntoView(e.target);
   }, [scrollInputIntoView]);
 
-  return { 
-    isKeyboardOpen, 
-    keyboardHeight, 
+  return {
+    isKeyboardOpen,
+    keyboardHeight,
     scrollInputIntoView,
-    handleInputFocus
+    handleInputFocus,
   };
 }

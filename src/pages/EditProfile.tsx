@@ -174,7 +174,7 @@ export default function EditProfile() {
       <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
         <div className="max-w-[430px] mx-auto min-h-screen pb-24">
           {/* Header */}
-          <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20">
+          <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
             <div className="flex items-center justify-between p-6">
               <button 
                 onClick={() => navigate('/profile')}

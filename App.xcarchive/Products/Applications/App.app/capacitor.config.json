@@ -1,0 +1,26 @@
+{
+	"appId": "com.spotted.app",
+	"appName": "Spotted",
+	"webDir": "dist",
+	"ios": {
+		"contentInset": "automatic",
+		"backgroundColor": "#0a0118"
+	},
+	"plugins": {
+		"PushNotifications": {
+			"presentationOptions": [
+				"badge",
+				"sound",
+				"alert"
+			]
+		}
+	},
+	"packageClassList": [
+		"CAPBrowserPlugin",
+		"CAPCameraPlugin",
+		"ClipboardPlugin",
+		"HapticsPlugin",
+		"PushNotificationsPlugin",
+		"SharePlugin"
+	]
+}

@@ -50,16 +50,19 @@ async function subscribeNative(userId: string): Promise<boolean> {
     // Request permission
     const permResult = await PushNotifications.requestPermissions();
     if (permResult.receive !== 'granted') {
-      logger.info('push:native_permission_denied');
+      logger.info('push:native_permission_denied', { receive: permResult.receive });
       return false;
     }
 
-    // Register with APNs
-    await PushNotifications.register();
-
-    // Listen for registration token
+    // Add listeners BEFORE calling register to avoid missing the event
     return new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => {
+        logger.error('push:registration_timeout');
+        resolve(false);
+      }, 10000);
+
       PushNotifications.addListener('registration', async (token) => {
+        clearTimeout(timeout);
         logger.info('push:native_registered', { token: token.value.slice(0, 8) + '…' });
 
         const { error } = await supabase
@@ -79,9 +82,13 @@ async function subscribeNative(userId: string): Promise<boolean> {
       });
 
       PushNotifications.addListener('registrationError', (err) => {
-        logger.error('push:native_registration_error', { error: String(err) });
+        clearTimeout(timeout);
+        logger.error('push:native_registration_error', { error: JSON.stringify(err) });
         resolve(false);
       });
+
+      // Register AFTER listeners are in place
+      PushNotifications.register();
     });
   } catch (error) {
     logger.error('push:native_subscribe_error', { error: String(error) });
@@ -132,7 +139,20 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
     try {
       if (native) {
-        // On native, check if we have a stored token
+        // On native, check current permission status and stored token
+        try {
+          const { PushNotifications } = await import('@capacitor/push-notifications');
+          const permStatus = await PushNotifications.checkPermissions();
+          if (permStatus.receive === 'denied') {
+            setPermission('denied');
+            setIsSubscribed(false);
+            return;
+          }
+          setPermission(permStatus.receive === 'granted' ? 'granted' : 'default');
+        } catch {
+          setPermission('default');
+        }
+
         const { data } = await supabase
           .from('profiles')
           .select('apns_device_token, push_enabled')
@@ -141,7 +161,6 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
         const subscribed = !!(data?.apns_device_token && data?.push_enabled);
         setIsSubscribed(subscribed);
-        setPermission(subscribed ? 'granted' : 'default');
       } else {
       setPermission(Notification.permission);
         try {

@@ -4,6 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useKeyboardAware } from "./hooks/useKeyboardAware";
+import { isNativePlatform } from "./lib/platform";
+import { supabase } from "./integrations/supabase/client";
 import { SplashScreen } from "./components/SplashScreen";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
@@ -61,6 +64,12 @@ import { BusinessRoute } from "./components/business/BusinessRoute";
 
 const queryClient = new QueryClient();
 
+// Initializes keyboard height CSS variable globally
+function KeyboardManager() {
+  useKeyboardAware();
+  return null;
+}
+
 // Component to trigger auto-tracking on app open
 function AutoTracker({ onReady }: { onReady: () => void }) {
   const { user, loading } = useAuth();
@@ -77,6 +86,57 @@ function AutoTracker({ onReady }: { onReady: () => void }) {
       logger.debug('app:open', { userId: user.id });
       logger.setUserId(user.id);
       autoTrackVenue(user.id);
+
+      // Auto-register push notifications on app open
+      if (isNativePlatform()) {
+        (async () => {
+          try {
+            const { PushNotifications } = await import('@capacitor/push-notifications');
+
+            // Remove any stale listeners before adding new ones
+            await PushNotifications.removeAllListeners();
+
+            const perm = await PushNotifications.checkPermissions();
+            logger.info('push:permission_check', { receive: perm.receive });
+
+            // Request permission if never asked
+            let granted = perm.receive === 'granted';
+            if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+              const result = await PushNotifications.requestPermissions();
+              granted = result.receive === 'granted';
+              logger.info('push:permission_result', { receive: result.receive });
+            }
+
+            if (!granted) {
+              logger.info('push:not_granted, skipping registration');
+              return;
+            }
+
+            // Add listener BEFORE calling register to avoid missing the event
+            PushNotifications.addListener('registration', async (token) => {
+              logger.info('push:token_received', { token: token.value.slice(0, 8) + '…' });
+              const { error } = await supabase
+                .from('profiles')
+                .update({ apns_device_token: token.value, push_enabled: true })
+                .eq('id', user.id);
+              if (error) {
+                logger.error('push:save_token_failed', { error: error.message });
+              } else {
+                logger.info('push:auto_registered');
+              }
+            });
+
+            PushNotifications.addListener('registrationError', (err) => {
+              logger.error('push:registration_error', { error: JSON.stringify(err) });
+            });
+
+            await PushNotifications.register();
+            logger.info('push:register_called');
+          } catch (err) {
+            logger.error('push:auto_register_failed', { error: String(err) });
+          }
+        })();
+      }
     } else {
       logger.setUserId(null);
     }
@@ -99,6 +159,7 @@ function AppContent() {
 
   return (
     <>
+      <KeyboardManager />
       {showSplash && <SplashScreen />}
       <AutoTracker onReady={() => setShowSplash(false)} />
       <GatedDemoActivator />

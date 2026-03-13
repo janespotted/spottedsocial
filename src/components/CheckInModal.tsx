@@ -17,6 +17,7 @@ import { requestNotificationPermission } from '@/lib/notifications';
 import { logEvent } from '@/lib/event-logger';
 import { calculateExpiryTime } from '@/lib/time-utils';
 import { markManualCheckin } from '@/lib/auto-venue-tracker';
+import { triggerPushNotification } from '@/lib/push-notifications';
 import { getDemoMode } from '@/lib/demo-data';
 import { getCachedCity } from '@/lib/city-detection';
 import { useUserCity } from '@/hooks/useUserCity';
@@ -704,7 +705,54 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         
         // Mark manual checkin to prevent auto-tracker from overwriting
         markManualCheckin();
-        
+
+        // Notify friends about check-in (best-effort, non-blocking)
+        (async () => {
+          try {
+            // Get accepted friends (both directions)
+            const { data: friendships } = await supabase
+              .from('friendships')
+              .select('user_id, friend_id')
+              .or(`user_id.eq.${user!.id},friend_id.eq.${user!.id}`)
+              .eq('status', 'accepted');
+
+            if (!friendships?.length) return;
+
+            const friendIds = friendships.map(f =>
+              f.user_id === user!.id ? f.friend_id : f.user_id
+            );
+
+            // Get current user's display name
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('display_name')
+              .eq('id', user!.id)
+              .single();
+
+            const displayName = profile?.display_name || 'A friend';
+            const message = `${displayName} just checked in at ${venue}`;
+
+            // Insert notifications for all friends and trigger push for each
+            const notifications = friendIds.map(friendId => ({
+              sender_id: user!.id,
+              receiver_id: friendId,
+              type: 'friend_checkin',
+              message,
+            }));
+
+            const { data: inserted } = await supabase
+              .from('notifications')
+              .insert(notifications)
+              .select('id, receiver_id, sender_id, type, message');
+
+            inserted?.forEach(notif => {
+              triggerPushNotification(notif);
+            });
+          } catch (err) {
+            console.warn('Friend checkin notifications failed:', err);
+          }
+        })();
+
         // Log location update
         logEvent('location_update', {
           venue_id: venueId,

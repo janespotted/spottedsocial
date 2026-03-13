@@ -5,10 +5,14 @@ const config: CapacitorConfig = {
   appName: 'Spotted',
   webDir: 'dist',
   ios: {
-    contentInset: 'automatic',
+    contentInset: 'never',
     backgroundColor: '#0a0118',
   },
   plugins: {
+    Keyboard: {
+      resize: 'none',
+      scroll: false,
+    },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
