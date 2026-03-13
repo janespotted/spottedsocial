@@ -177,6 +177,28 @@ export async function pickFromGallery(): Promise<CapturedMedia | null> {
   }
 }
 
+export async function captureVideo(): Promise<CapturedMedia | null> {
+  try {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'video/*';
+      input.capture = 'environment';
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) { resolve(null); return; }
+        const preview = URL.createObjectURL(file);
+        resolve({ file, preview });
+      };
+      input.oncancel = () => resolve(null);
+      input.click();
+    });
+  } catch (error) {
+    console.error('Error capturing video:', error);
+    return null;
+  }
+}
+
 export function isNativePlatform(): boolean {
   return Capacitor.isNativePlatform();
 }
