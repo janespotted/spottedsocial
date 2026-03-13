@@ -1,3 +1,4 @@
+import { Keyboard } from '@capacitor/keyboard';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,9 +20,11 @@ export function CheckInConfirmation() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>('');
 
-  const handleDismiss = () => {
-    closeCheckInConfirmation();
-  };
+ const handleDismiss = () => {
+  Keyboard.hide().catch(() => {});
+  closeCheckInConfirmation();
+};
+ 
 
   // Fetch user profile
   useEffect(() => {
@@ -117,8 +120,7 @@ export function CheckInConfirmation() {
             </div>
           )}
 
-          <button onClick={closeCheckInConfirmation} onTouchEnd={(e) => { e.stopPropagation(); closeCheckInConfirmation(); }} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">
-            <X className="h-5 w-5 text-white" />
+<button onClick={handleDismiss} onTouchEnd={(e) => { e.stopPropagation(); handleDismiss(); }} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">            <X className="h-5 w-5 text-white" />
           </button>
 
           <div className="flex flex-col items-center text-center mt-4 mb-6">
