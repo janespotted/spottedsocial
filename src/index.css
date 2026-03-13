@@ -328,7 +328,7 @@ All colors MUST be HSL.
   }
 }
 
-#root {
+html, body, #root {
   background-color: #0a0118;
 }
 

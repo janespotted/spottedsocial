@@ -39,7 +39,7 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
       <input
         ref={cameraInputRef}
         type="file"
-        accept="image/*,video/*"
+        accept="image/*"
         capture="environment"
         onChange={handleFileSelect}
         className="hidden"
@@ -47,7 +47,7 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
       <input
         ref={galleryInputRef}
         type="file"
-        accept="image/*,video/*"
+        accept="image/*"
         onChange={handleFileSelect}
         className="hidden"
       />

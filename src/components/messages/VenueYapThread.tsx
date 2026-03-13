@@ -321,15 +321,12 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
   const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-    if (!isImage && !isVideo) {
-      toast.error("Only images and videos are supported");
+    if (!file.type.startsWith("image/")) {
+      toast.error("Only images are supported");
       return;
     }
-    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast.error(`File too large. Max ${isVideo ? "50MB" : "10MB"}`);
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File too large. Max 10MB.");
       return;
     }
     setMediaFile(file);
@@ -720,11 +717,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
           />
           {mediaPreview && (
             <div className="relative mt-2 inline-block">
-              {mediaFile?.type.startsWith("video/") ? (
-                <video src={mediaPreview} className="max-h-40 rounded-lg border border-[#a855f7]/20" muted />
-              ) : (
-                <img src={mediaPreview} alt="Preview" className="max-h-40 rounded-lg border border-[#a855f7]/20" />
-              )}
+              <img src={mediaPreview} alt="Preview" className="max-h-40 rounded-lg border border-[#a855f7]/20" />
               <button
                 onClick={clearMedia}
                 className="absolute -top-2 -right-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-full p-1"
@@ -738,7 +731,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,video/*"
+                accept="image/*"
                 onChange={handleMediaSelect}
                 className="hidden"
               />

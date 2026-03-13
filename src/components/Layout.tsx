@@ -128,9 +128,9 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className={cn(
-      "min-h-[100dvh] bg-background flex flex-col",
-      !isMapPage && "pb-[calc(4rem+env(safe-area-inset-bottom,0px))]"
-    )}>
+  "min-h-[100dvh] bg-[#0a0118] flex flex-col pt-[env(safe-area-inset-top,0px)]",
+  !isMapPage && "pb-[calc(4rem+env(safe-area-inset-bottom,0px))]"
+)}>
       <OfflineBanner />
       <main className={cn(
         "flex-1 flex flex-col",
