@@ -35,8 +35,10 @@ const VALID_NOTIFICATION_TYPES = [
   "plan_down",
   "address_request",
   "private_party_invite",
-  "venue_yap",
-  "friend_checkin",
+  "'venue_yap',
+  'friend_checkin',
+  'post_like',
+  'post_comment',
 ] as const;
 
 // UUID v4 regex pattern
@@ -561,6 +563,10 @@ function getNotificationContent(
       return { title: "📍 Invite Accepted!", body: message, url: "/messages?tab=activity" };
     case "friend_checkin":
       return { title: "📍 Friend Checked In", body: message, url: "/" };
+    case 'post_like':
+  return { title: '❤️ Post Liked', body: message, url: '/feed' };
+case 'post_comment':
+  return { title: '💬 New Comment', body: message, url: '/feed' };
     default:
       return { title: "Spotted", body: message, url: "/" };
   }
