@@ -530,7 +530,7 @@ async function sendApnsPush(
     console.log('Sending APNs push to device:', deviceToken.substring(0, 8) + '...');
 
     const response = await fetch(
-      `https://api.push.apple.com/3/device/${deviceToken}`,
+      ``https://api.development.push.apple.com/3/device/${deviceToken}`,
       {
         method: 'POST',
         headers: {
