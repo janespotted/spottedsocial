@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.spotted.app',
+  appId: 'com.janereynolds.spotted',
   appName: 'Spotted',
   webDir: 'dist',
   ios: {
