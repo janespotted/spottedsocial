@@ -1,35 +1,19 @@
 
 
-# Fix: DM Push Notifications Not Triggering
+## Problem
 
-## Root Cause
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-The `notifications` table has an RLS INSERT policy called **"Only server can create notifications"** with `with_check: false`, which **blocks all client-side inserts**. 
-
-The DM flow in `Thread.tsx` (line 390) does a direct `supabase.from('notifications').insert(...)` — this silently fails due to RLS, so `triggerPushNotification()` is never called.
-
-Other notification flows (meetup, venue invite, check-in) work because they use the `create_notification` RPC function, which is `SECURITY DEFINER` and bypasses RLS.
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
 ## Fix
 
-Update `Thread.tsx` to use the existing `create_notification` RPC instead of a direct insert. This RPC already exists and handles authentication.
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-### Changes
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
 
-**`src/pages/Thread.tsx`** — Replace the direct notification insert (lines 388-406) with:
-- Call `supabase.rpc('create_notification', ...)` for each recipient
-- Extract the returned notification to call `triggerPushNotification()`
-- Filter out the sender from `recipientIds` in group chats (line 383 currently includes all members)
-
-### Technical Detail
-
-```text
-Current (broken):
-  supabase.from('notifications').insert({...})  →  blocked by RLS  →  no push
-
-Fixed:
-  supabase.rpc('create_notification', {...})  →  SECURITY DEFINER bypasses RLS  →  push fires
-```
-
-No database migrations needed. No edge function changes needed.
+| File | Change |
+|------|--------|
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 

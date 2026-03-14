@@ -380,20 +380,21 @@ export default function Thread() {
 
     const recipientIds: string[] = [];
     if (groupInfo) {
-      recipientIds.push(...groupInfo.members.map(m => m.user_id));
+      recipientIds.push(...groupInfo.members.filter(m => m.user_id !== user.id).map(m => m.user_id));
     } else if (otherMember) {
       recipientIds.push(otherMember.user_id);
     }
 
-    // Fire-and-forget push notifications for each recipient
+    // Fire-and-forget push notifications for each recipient via RPC (bypasses RLS)
     for (const receiverId of recipientIds) {
-      supabase.from('notifications').insert({
-        sender_id: user.id,
-        receiver_id: receiverId,
-        type: 'dm',
-        message: `${senderName}: ${messagePreview}`,
-      }).select().single().then(({ data: notif }) => {
-        if (notif) {
+      supabase.rpc('create_notification', {
+        p_sender_id: user.id,
+        p_receiver_id: receiverId,
+        p_type: 'dm',
+        p_message: `${senderName}: ${messagePreview}`,
+      }).then(({ data }) => {
+        const notif = Array.isArray(data) ? data[0] : data;
+        if (notif && notif.id) {
           triggerPushNotification({
             id: notif.id,
             receiver_id: receiverId,
