@@ -1,19 +1,18 @@
 
 
-## Problem
+## Fix: Update APNS_AUTH_KEY with correct full-length key
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+The uploaded `.p8` file confirms the key body is **164 characters**. The previously stored secret was only 96 characters (truncated during paste).
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+### Steps
 
-## Fix
+1. **Update the `APNS_AUTH_KEY` secret** with the exact 164-character base64 string extracted from the uploaded file (no PEM headers, no newlines)
+2. **Redeploy the `send-push` edge function** so it picks up the new secret value
+3. **Test** by triggering a push notification from the iOS device
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
-
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
-
-| File | Change |
+| Step | Action |
 |------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+| Update secret | Set `APNS_AUTH_KEY` to the full 164-char key from the .p8 file |
+| Redeploy | Deploy `send-push` edge function |
+| Verify | Trigger notification and check logs for successful APNs delivery |
 
