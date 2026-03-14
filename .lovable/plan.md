@@ -1,21 +1,19 @@
 
 
-# Fix APNS_AUTH_KEY — Wrong Value Stored
-
 ## Problem
-The edge function logs show:
-```
-APNs key length after cleaning: 10 chars
-```
-A valid `.p8` private key is **~164 base64 characters**. The current `APNS_AUTH_KEY` secret contains only 10 characters — it appears the Key ID was accidentally stored in this field, or the value was truncated.
 
-The error `DOMExceptionDataError: expected valid PKCS#8 data` confirms the key data is invalid/too short.
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
 ## Fix
 
-1. Re-prompt you to update `APNS_AUTH_KEY` with the correct value
-2. To get the correct value: open your `.p8` file in a text editor, delete the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines, then remove all newlines so it's one continuous string (~164 characters)
-3. Redeploy the `send-push` edge function
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-No code changes needed — just a secret value correction and redeployment.
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
+
+| File | Change |
+|------|--------|
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 

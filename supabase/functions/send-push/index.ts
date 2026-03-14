@@ -438,10 +438,16 @@ async function sendWebPush(
 // Strip PEM headers/footers and whitespace from a .p8 key,
 // returning pure base64 suitable for decoding.
 function cleanPemKey(raw: string): string {
-  return raw
+  let cleaned = raw
     .replace(/-----BEGIN PRIVATE KEY-----/g, "")
     .replace(/-----END PRIVATE KEY-----/g, "")
     .replace(/\s/g, "");
+  // Convert URL-safe base64 to standard base64
+  cleaned = cleaned.replace(/-/g, "+").replace(/_/g, "/");
+  // Add padding if needed
+  const padding = (4 - (cleaned.length % 4)) % 4;
+  cleaned += "=".repeat(padding);
+  return cleaned;
 }
 
 async function createApnsJwt(keyId: string, teamId: string, authKeyRaw: string): Promise<string> {
