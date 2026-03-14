@@ -1,6 +1,18 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 
+// Write a debug log to the database so we can see what's happening on TestFlight
+async function pushDebugLog(stage: string, detail: Record<string, unknown>) {
+  try {
+    await supabase.from('push_logs').insert({
+      stage,
+      detail,
+    });
+  } catch {
+    // ignore - table might not exist yet
+  }
+}
+
 /**
  * Triggers push notification via edge function
  * Called after inserting a notification into the database
@@ -13,13 +25,26 @@ export async function triggerPushNotification(notification: {
   message: string;
 }): Promise<void> {
   try {
-    console.log('[PUSH] Invoking send-push edge function:', {
+    // Check auth session first
+    const { data: { session } } = await supabase.auth.getSession();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+
+    await pushDebugLog('invoke_start', {
       notification_id: notification.id,
       receiver_id: notification.receiver_id,
       sender_id: notification.sender_id,
       type: notification.type,
+      has_session: !!session,
+      supabase_url: supabaseUrl.slice(0, 30),
     });
 
+    if (!session) {
+      await pushDebugLog('invoke_skip_no_session', { notification_id: notification.id });
+      logger.warn('push:no_session', { notification_id: notification.id });
+      return;
+    }
+
+    // Try supabase.functions.invoke first
     const { data, error } = await supabase.functions.invoke('send-push', {
       body: {
         notification_id: notification.id,
@@ -31,15 +56,56 @@ export async function triggerPushNotification(notification: {
     });
 
     if (error) {
-      console.error('[PUSH] Edge function error:', error.message);
-      logger.warn('push:trigger_failed', { error: error.message, notification_id: notification.id });
+      await pushDebugLog('invoke_error', {
+        notification_id: notification.id,
+        error: error.message,
+        context: String(error.context || ''),
+      });
+
+      // Fallback: try raw fetch in case supabase client has CORS issues
+      try {
+        const functionUrl = `${supabaseUrl}/functions/v1/send-push`;
+        const res = await fetch(functionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
+          },
+          body: JSON.stringify({
+            notification_id: notification.id,
+            receiver_id: notification.receiver_id,
+            sender_id: notification.sender_id,
+            type: notification.type,
+            message: notification.message,
+          }),
+        });
+
+        const resText = await res.text();
+        await pushDebugLog('fetch_fallback', {
+          notification_id: notification.id,
+          status: res.status,
+          ok: res.ok,
+          body: resText.slice(0, 200),
+        });
+      } catch (fetchErr) {
+        await pushDebugLog('fetch_fallback_error', {
+          notification_id: notification.id,
+          error: String(fetchErr),
+        });
+      }
     } else {
-      console.log('[PUSH] Edge function response:', JSON.stringify(data));
+      await pushDebugLog('invoke_success', {
+        notification_id: notification.id,
+        response: data,
+      });
       logger.info('push:triggered', { notification_id: notification.id, type: notification.type });
     }
   } catch (err) {
-    // Don't throw - push is best-effort, shouldn't break the main flow
-    console.error('[PUSH] Exception calling edge function:', String(err));
+    await pushDebugLog('invoke_exception', {
+      notification_id: notification.id,
+      error: String(err),
+    });
     logger.error('push:trigger_error', { error: String(err) });
   }
 }
