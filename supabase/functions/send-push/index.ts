@@ -35,10 +35,10 @@ const VALID_NOTIFICATION_TYPES = [
   "plan_down",
   "address_request",
   "private_party_invite",
-  "'venue_yap',
-  'friend_checkin',
-  'post_like',
-  'post_comment',
+  "venue_yap",
+  "friend_checkin",
+  "post_like",
+  "post_comment",
 ] as const;
 
 // UUID v4 regex pattern
@@ -435,7 +435,16 @@ async function sendWebPush(
 // APNs Push Notification Implementation
 // ============================================================================
 
-async function createApnsJwt(keyId: string, teamId: string, authKeyBase64: string): Promise<string> {
+// Strip PEM headers/footers and whitespace from a .p8 key,
+// returning pure base64 suitable for decoding.
+function cleanPemKey(raw: string): string {
+  return raw
+    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+    .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\s/g, "");
+}
+
+async function createApnsJwt(keyId: string, teamId: string, authKeyRaw: string): Promise<string> {
   const header = { alg: "ES256", kid: keyId };
   const payload = {
     iss: teamId,
@@ -446,8 +455,10 @@ async function createApnsJwt(keyId: string, teamId: string, authKeyBase64: strin
   const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
-  // Decode the base64-encoded .p8 key (PEM contents without header/footer)
-  const keyData = base64ToUint8Array(authKeyBase64);
+  // Accept either raw .p8 file contents (with PEM headers) or bare base64
+  const cleanedKey = cleanPemKey(authKeyRaw);
+  console.log("APNs key length after cleaning:", cleanedKey.length, "chars");
+  const keyData = base64ToUint8Array(cleanedKey);
 
   const privateKey = await crypto.subtle.importKey(
     "pkcs8",
@@ -484,7 +495,9 @@ async function sendApnsPush(
   }
 
   try {
+    console.log("APNs config:", { keyId, teamId, bundleId, tokenPrefix: deviceToken.substring(0, 8) });
     const jwt = await createApnsJwt(keyId, teamId, authKey);
+    console.log("APNs JWT created successfully, length:", jwt.length);
 
     const apnsPayload = {
       aps: {
@@ -500,9 +513,11 @@ async function sendApnsPush(
       type: notificationPayload.type,
     };
 
-    console.log("Sending APNs push to device:", deviceToken.substring(0, 8) + "...");
+    const apnsHost = Deno.env.get("APNS_SANDBOX") === "true" ? "api.development.push.apple.com" : "api.push.apple.com";
 
-    const response = await fetch(`https://api.development.push.apple.com/3/device/${deviceToken}`, {
+    console.log("Sending APNs push to device:", deviceToken.substring(0, 8) + "...", "(host:", apnsHost + ")");
+
+    const response = await fetch(`https://${apnsHost}/3/device/${deviceToken}`, {
       method: "POST",
       headers: {
         Authorization: `bearer ${jwt}`,
@@ -563,10 +578,10 @@ function getNotificationContent(
       return { title: "📍 Invite Accepted!", body: message, url: "/messages?tab=activity" };
     case "friend_checkin":
       return { title: "📍 Friend Checked In", body: message, url: "/" };
-    case 'post_like':
-  return { title: '❤️ Post Liked', body: message, url: '/feed' };
-case 'post_comment':
-  return { title: '💬 New Comment', body: message, url: '/feed' };
+    case "post_like":
+      return { title: "❤️ Post Liked", body: message, url: "/feed" };
+    case "post_comment":
+      return { title: "💬 New Comment", body: message, url: "/feed" };
     default:
       return { title: "Spotted", body: message, url: "/" };
   }
