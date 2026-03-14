@@ -1,19 +1,29 @@
 
 
+# Fix Push Notifications: Align App Identity + Strengthen Token Refresh
+
 ## Problem
+- `capacitor.config.ts` has `appId: 'com.spotted.app'` but the iOS project uses `com.janereynolds.spotted` -- this mismatch causes APNs token/topic conflicts
+- Token registration only runs on initial mount, not on app resume from background
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+## Changes
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+### 1. Update `capacitor.config.ts` (line 4)
+Change `appId` from `'com.spotted.app'` to `'com.janereynolds.spotted'`
 
-## Fix
+### 2. Strengthen token refresh in `src/App.tsx` AutoTracker component
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
+Extract the push registration logic into a reusable `registerPushToken` function. Then:
 
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
+- Call it on mount (existing behavior, in the `[user]` effect)
+- Add a **new effect** that listens for `visibilitychange` and Capacitor `appStateChange` events to re-run `registerPushToken` when the app comes to foreground
+- Add a throttle (e.g. 60s) to avoid spamming registration on rapid tab switches
+- Enhanced logging in the registration listener:
+  - Log `tokenPrefix` (first 8 chars), `tokenLength`, `userId` prefix on token received
+  - Log confirmation with `tokenPrefix` and `userId` on successful save
+  - Log explicit failure details on save error
 
-| File | Change |
-|------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+### Technical Detail
+
+The foreground resume listener will use Capacitor's `App.addListener('appStateChange')` for native and `document.addEventListener('visibilitychange')` for web. Both will call the same `registerPushToken(user)` function with the 60-second throttle guard.
 
