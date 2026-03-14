@@ -739,6 +739,13 @@ Deno.serve(async (req) => {
     // Send via APNs if device token exists
     if (hasApns) {
       results.apns = await sendApnsPush(receiverProfile.apns_device_token as string, notificationPayload);
+
+      // Token hygiene: clear stale APNs token on terminal failures
+      if (results.apns === false) {
+        // Re-check the last error reason from logs isn't sufficient,
+        // so we pass receiver_id into cleanup logic below
+        console.log("APNs push failed for receiver:", receiver_id, "— will check for stale token cleanup");
+      }
     }
 
     const success = results.web === true || results.apns === true;
