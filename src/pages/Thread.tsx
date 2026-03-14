@@ -392,10 +392,11 @@ export default function Thread() {
         p_receiver_id: receiverId,
         p_type: 'dm',
         p_message: `${senderName}: ${messagePreview}`,
-      }).then(({ data: notifId }) => {
-        if (notifId) {
+      }).then(({ data }) => {
+        const notif = Array.isArray(data) ? data[0] : data;
+        if (notif && notif.id) {
           triggerPushNotification({
-            id: notifId,
+            id: notif.id,
             receiver_id: receiverId,
             sender_id: user.id,
             type: 'dm',
