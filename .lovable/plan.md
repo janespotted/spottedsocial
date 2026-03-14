@@ -1,32 +1,16 @@
 
 
-## Fix: APNs Push Notifications for Xcode Debug Builds
+## Fix: Redeploy the send-push edge function
 
-### Root Causes
+### Root Cause
+The `send-push` edge function currently deployed is an older build. The logs show `Sending APNs push to device: AD27456C...` without the `(host: ...)` suffix that exists on line 518 of the current source code. This means the deployed version predates the `APNS_SANDBOX` environment variable check on line 516 — it's always hitting the production APNs endpoint regardless of the secret we set.
 
-1. **Wrong APNs endpoint**: The `send-push` edge function defaults to the production APNs server (`api.push.apple.com`), but your Xcode debug build registers a sandbox device token. Apple returns `403 BadEnvironmentKeyInToken`.
+### Fix
+Force a redeployment of `supabase/functions/send-push/index.ts` by making a small change (e.g., adding a comment or updating a log line). Lovable auto-deploys edge functions when the file is modified.
 
-2. **Bundle ID mismatch (likely)**: Xcode signs the app with bundle ID `com.janereynolds.spotted-`, but the `APNS_BUNDLE_ID` secret is probably set to `com.spotted.app`. The `apns-topic` header must match the bundle ID of the installed app.
-
-### Changes
-
-#### 1. Add `APNS_SANDBOX` secret
-Set a new secret `APNS_SANDBOX` with value `true`. This tells the edge function to use `api.development.push.apple.com` instead of the production endpoint.
-
-#### 2. Update `APNS_BUNDLE_ID` secret
-Update the `APNS_BUNDLE_ID` secret value to `com.janereynolds.spotted-` to match your Xcode signing configuration.
-
-#### 3. No code changes needed
-The `send-push` edge function already has the sandbox routing logic on line 516. It just needs the secret to be set.
-
-### After fixing
-Once you set those two secrets, the push flow becomes:
-- App registers with APNs sandbox → gets sandbox device token → saves to `apns_device_token` in profiles
-- Edge function reads `APNS_SANDBOX=true` → sends to `api.development.push.apple.com` with matching bundle ID
-- Apple accepts the push
-
-### Important note for production
-When you ship to TestFlight/App Store, you'll need to either:
-- Remove the `APNS_SANDBOX` secret (or set it to `false`)
-- Update `APNS_BUNDLE_ID` back to your production bundle ID
+### After deploying
+The user needs to:
+1. Re-build and install the app from Xcode onto their phone
+2. Go to Settings in the app, toggle Push Notifications **off then on** to re-register the device token (ensures a fresh token is saved)
+3. Trigger a notification (send a DM, etc.) and verify it arrives
 
