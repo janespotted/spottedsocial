@@ -64,79 +64,137 @@ import { BusinessRoute } from "./components/business/BusinessRoute";
 const queryClient = new QueryClient();
 
 // Component to trigger auto-tracking on app open
+// Extracted push registration with 60s throttle
+const lastPushRegisterRef = { current: 0 };
+
+async function registerPushToken(user: { id: string }) {
+  if (!isNativePlatform()) return;
+
+  const now = Date.now();
+  if (now - lastPushRegisterRef.current < 60_000) {
+    logger.debug('push:throttled', { userId: user.id.slice(0, 8) });
+    return;
+  }
+  lastPushRegisterRef.current = now;
+
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+
+    // Remove stale listeners before adding new ones
+    await PushNotifications.removeAllListeners();
+
+    const perm = await PushNotifications.checkPermissions();
+    logger.info('push:permission_check', { receive: perm.receive });
+
+    let granted = perm.receive === 'granted';
+    if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+      const result = await PushNotifications.requestPermissions();
+      granted = result.receive === 'granted';
+      logger.info('push:permission_result', { receive: result.receive });
+    }
+
+    if (!granted) {
+      logger.info('push:not_granted, skipping registration');
+      return;
+    }
+
+    PushNotifications.addListener('registration', async (token) => {
+      const tokenValue = token.value;
+      logger.info('push:token_received', {
+        tokenPrefix: tokenValue.slice(0, 8),
+        tokenLength: tokenValue.length,
+        userId: user.id.slice(0, 8),
+      });
+
+      const { error, data } = await supabase
+        .from('profiles')
+        .update({ apns_device_token: tokenValue, push_enabled: true })
+        .eq('id', user.id)
+        .select('id')
+        .single();
+
+      if (error) {
+        logger.error('push:save_token_failed', {
+          error: error.message,
+          code: error.code,
+          tokenPrefix: tokenValue.slice(0, 8),
+          userId: user.id.slice(0, 8),
+        });
+      } else {
+        logger.info('push:token_saved', {
+          tokenPrefix: tokenValue.slice(0, 8),
+          userId: user.id.slice(0, 8),
+          profileId: data?.id?.slice(0, 8),
+        });
+      }
+    });
+
+    PushNotifications.addListener('registrationError', (err) => {
+      logger.error('push:registration_error', { error: JSON.stringify(err) });
+    });
+
+    await PushNotifications.register();
+    logger.info('push:register_called', { userId: user.id.slice(0, 8) });
+  } catch (err) {
+    logger.error('push:auto_register_failed', { error: String(err) });
+  }
+}
+
 function AutoTracker({ onReady }: { onReady: () => void }) {
   const { user, loading } = useAuth();
 
   useEffect(() => {
     if (!loading) {
-      // Auth state resolved, hide splash
       onReady();
     }
   }, [loading, onReady]);
 
+  // Initial registration + auto-track on user change
   useEffect(() => {
     if (user) {
       logger.debug('app:open', { userId: user.id });
       logger.setUserId(user.id);
       autoTrackVenue(user.id);
-
-      // Auto-register push notifications on app open
-      if (isNativePlatform()) {
-        (async () => {
-          try {
-            const { PushNotifications } = await import('@capacitor/push-notifications');
-
-            // Remove any stale listeners before adding new ones
-            await PushNotifications.removeAllListeners();
-
-            // Always call requestPermissions – on a fresh install this triggers
-            // the iOS permission popup; if already granted it returns immediately.
-            const permResult = await PushNotifications.requestPermissions();
-            logger.info('push:permission_result', { receive: permResult.receive });
-
-            if (permResult.receive !== 'granted') {
-              logger.info('push:not_granted, skipping registration');
-              return;
-            }
-
-            // Add listener BEFORE calling register to avoid missing the event
-            PushNotifications.addListener('registration', async (token) => {
-              const tokenValue = token.value;
-              logger.info('push:token_received', {
-                tokenPrefix: tokenValue.slice(0, 8),
-                tokenLength: tokenValue.length,
-                userId: user.id.slice(0, 8),
-              });
-
-              // Always upsert the token to ensure it's fresh
-              const { error, data } = await supabase
-                .from('profiles')
-                .update({ apns_device_token: tokenValue, push_enabled: true })
-                .eq('id', user.id)
-                .select('id')
-                .single();
-
-              if (error) {
-                logger.error('push:save_token_failed', { error: error.message, code: error.code });
-              } else {
-                logger.info('push:token_saved_confirmed', { profileId: data?.id?.slice(0, 8) });
-              }
-            });
-
-            PushNotifications.addListener('registrationError', (err) => {
-              logger.error('push:registration_error', { error: JSON.stringify(err) });
-            });
-
-            await PushNotifications.register();
-            logger.info('push:register_called');
-          } catch (err) {
-            logger.error('push:auto_register_failed', { error: String(err) });
-          }
-        })();
-      }
+      registerPushToken(user);
     } else {
       logger.setUserId(null);
     }
+  }, [user]);
+
+  // Re-register push token on foreground resume
+  useEffect(() => {
+    if (!user) return;
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        registerPushToken(user);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    let appStateCleanup: (() => void) | undefined;
+
+    if (isNativePlatform()) {
+      (async () => {
+        try {
+          const { App: CapApp } = await import('@capacitor/app');
+          const listener = await CapApp.addListener('appStateChange', ({ isActive }) => {
+            if (isActive) {
+              registerPushToken(user);
+            }
+          });
+          appStateCleanup = () => listener.remove();
+        } catch (err) {
+          logger.error('push:appstate_listener_failed', { error: String(err) });
+        }
+      })();
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      appStateCleanup?.();
+    };
   }, [user]);
 
   return null;
