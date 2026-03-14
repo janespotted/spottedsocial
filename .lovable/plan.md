@@ -1,18 +1,21 @@
 
 
-## Fix: Update APNS_AUTH_KEY with correct full-length key
+## Plan: Fix build error and redeploy send-push
 
-The uploaded `.p8` file confirms the key body is **164 characters**. The previously stored secret was only 96 characters (truncated during paste).
+### 1. Fix TypeScript build error in `src/lib/push-notifications.ts`
 
-### Steps
+The `.insert()` call on line 8 needs the object wrapped in an array to satisfy the TypeScript overload:
 
-1. **Update the `APNS_AUTH_KEY` secret** with the exact 164-character base64 string extracted from the uploaded file (no PEM headers, no newlines)
-2. **Redeploy the `send-push` edge function** so it picks up the new secret value
-3. **Test** by triggering a push notification from the iOS device
+```typescript
+await supabase.from('push_logs').insert([{ stage, detail }]);
+```
+
+### 2. Redeploy `send-push` edge function
+
+Use `supabase--deploy_edge_functions` to redeploy `send-push` with the updated CORS headers.
 
 | Step | Action |
 |------|--------|
-| Update secret | Set `APNS_AUTH_KEY` to the full 164-char key from the .p8 file |
-| Redeploy | Deploy `send-push` edge function |
-| Verify | Trigger notification and check logs for successful APNs delivery |
+| Fix build | Wrap `.insert()` argument in array in `push-notifications.ts` |
+| Deploy | Redeploy `send-push` edge function |
 
