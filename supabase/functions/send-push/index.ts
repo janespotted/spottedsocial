@@ -513,9 +513,10 @@ async function sendApnsPush(
       type: notificationPayload.type,
     };
 
-    const apnsHost = Deno.env.get("APNS_SANDBOX") === "true" ? "api.development.push.apple.com" : "api.push.apple.com";
+    const isSandbox = Deno.env.get("APNS_SANDBOX") === "true";
+    const apnsHost = isSandbox ? "api.development.push.apple.com" : "api.push.apple.com";
 
-    console.log("Sending APNs push to device:", deviceToken.substring(0, 8) + "...", "(host:", apnsHost + ")");
+    console.log(`Sending APNs push to device: ${deviceToken.substring(0, 8)}... (host: ${apnsHost}, sandbox: ${isSandbox}, bundle: ${bundleId})`);
 
     const response = await fetch(`https://${apnsHost}/3/device/${deviceToken}`, {
       method: "POST",
