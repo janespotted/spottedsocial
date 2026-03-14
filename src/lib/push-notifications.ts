@@ -4,10 +4,7 @@ import { logger } from '@/lib/logger';
 // Write a debug log to the database so we can see what's happening on TestFlight
 async function pushDebugLog(stage: string, detail: Record<string, unknown>) {
   try {
-    await supabase.from('push_logs').insert({
-      stage,
-      detail,
-    });
+    await supabase.from('push_logs').insert([{ stage, detail }]);
   } catch {
     // ignore - table might not exist yet
   }
