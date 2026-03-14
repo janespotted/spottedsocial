@@ -388,7 +388,6 @@ export default function Thread() {
     // Fire-and-forget push notifications for each recipient via RPC (bypasses RLS)
     for (const receiverId of recipientIds) {
       supabase.rpc('create_notification', {
-        p_sender_id: user.id,
         p_receiver_id: receiverId,
         p_type: 'dm',
         p_message: `${senderName}: ${messagePreview}`,
