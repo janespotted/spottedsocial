@@ -1,8 +1,8 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 interface PushPayload {
@@ -23,20 +23,20 @@ interface PushSubscription {
 
 // Valid notification types - must be one of these
 const VALID_NOTIFICATION_TYPES = [
-  'meetup_request',
-  'venue_invite',
-  'friend_request',
-  'friend_accepted',
-  'invite_accepted',
-  'dm',
-  'meetup_accepted',
-  'venue_invite_accepted',
-  'rally',
-  'plan_down',
-  'address_request',
-  'private_party_invite',
-  'venue_yap',
-  'friend_checkin',
+  "meetup_request",
+  "venue_invite",
+  "friend_request",
+  "friend_accepted",
+  "invite_accepted",
+  "dm",
+  "meetup_accepted",
+  "venue_invite_accepted",
+  "rally",
+  "plan_down",
+  "address_request",
+  "private_party_invite",
+  "venue_yap",
+  "friend_checkin",
 ] as const;
 
 // UUID v4 regex pattern
@@ -51,46 +51,55 @@ const MAX_NOTIFICATION_ID_LENGTH = 100;
  * dangerous characters. This prevents XSS if push notifications render HTML.
  */
 function sanitizeMessage(message: string): string {
-  return message
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;')
-    // Remove control characters except newlines and tabs
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  return (
+    message
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;")
+      .replace(/\//g, "&#x2F;")
+      // Remove control characters except newlines and tabs
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+  );
 }
 
 function validatePayload(payload: unknown): { valid: boolean; error?: string; sanitizedMessage?: string } {
-  if (!payload || typeof payload !== 'object') {
-    return { valid: false, error: 'Invalid payload format' };
+  if (!payload || typeof payload !== "object") {
+    return { valid: false, error: "Invalid payload format" };
   }
 
   const p = payload as Record<string, unknown>;
 
   // Validate notification_id
-  if (typeof p.notification_id !== 'string' || p.notification_id.length === 0 || p.notification_id.length > MAX_NOTIFICATION_ID_LENGTH) {
-    return { valid: false, error: 'Invalid notification_id' };
+  if (
+    typeof p.notification_id !== "string" ||
+    p.notification_id.length === 0 ||
+    p.notification_id.length > MAX_NOTIFICATION_ID_LENGTH
+  ) {
+    return { valid: false, error: "Invalid notification_id" };
   }
 
   // Validate receiver_id is valid UUID
-  if (typeof p.receiver_id !== 'string' || !UUID_REGEX.test(p.receiver_id)) {
-    return { valid: false, error: 'Invalid receiver_id format' };
+  if (typeof p.receiver_id !== "string" || !UUID_REGEX.test(p.receiver_id)) {
+    return { valid: false, error: "Invalid receiver_id format" };
   }
 
   // Validate sender_id is valid UUID
-  if (typeof p.sender_id !== 'string' || !UUID_REGEX.test(p.sender_id)) {
-    return { valid: false, error: 'Invalid sender_id format' };
+  if (typeof p.sender_id !== "string" || !UUID_REGEX.test(p.sender_id)) {
+    return { valid: false, error: "Invalid sender_id format" };
   }
 
   // Validate type is one of allowed values
-  if (typeof p.type !== 'string' || !VALID_NOTIFICATION_TYPES.includes(p.type as typeof VALID_NOTIFICATION_TYPES[number])) {
-    return { valid: false, error: `Invalid notification type. Must be one of: ${VALID_NOTIFICATION_TYPES.join(', ')}` };
+  if (
+    typeof p.type !== "string" ||
+    !VALID_NOTIFICATION_TYPES.includes(p.type as (typeof VALID_NOTIFICATION_TYPES)[number])
+  ) {
+    return { valid: false, error: `Invalid notification type. Must be one of: ${VALID_NOTIFICATION_TYPES.join(", ")}` };
   }
 
   // Validate message length
-  if (typeof p.message !== 'string' || p.message.length === 0 || p.message.length > MAX_MESSAGE_LENGTH) {
+  if (typeof p.message !== "string" || p.message.length === 0 || p.message.length > MAX_MESSAGE_LENGTH) {
     return { valid: false, error: `Message must be between 1 and ${MAX_MESSAGE_LENGTH} characters` };
   }
 
@@ -104,13 +113,14 @@ function validateSubscriptionEndpoint(endpoint: string): boolean {
   try {
     const url = new URL(endpoint);
     // Must be HTTPS and from a known push service
-    return url.protocol === 'https:' && (
-      url.hostname.endsWith('.push.apple.com') ||
-      url.hostname.endsWith('.googleapis.com') ||
-      url.hostname.endsWith('.mozilla.com') ||
-      url.hostname.endsWith('.microsoft.com') ||
-      url.hostname.endsWith('.windows.com') ||
-      url.hostname.includes('push') // Generic fallback for other push services
+    return (
+      url.protocol === "https:" &&
+      (url.hostname.endsWith(".push.apple.com") ||
+        url.hostname.endsWith(".googleapis.com") ||
+        url.hostname.endsWith(".mozilla.com") ||
+        url.hostname.endsWith(".microsoft.com") ||
+        url.hostname.endsWith(".windows.com") ||
+        url.hostname.includes("push")) // Generic fallback for other push services
     );
   } catch {
     return false;
@@ -123,9 +133,9 @@ function validateSubscriptionEndpoint(endpoint: string): boolean {
 
 // Convert URL-safe base64 to standard base64
 function urlBase64ToBase64(urlBase64: string): string {
-  let base64 = urlBase64.replace(/-/g, '+').replace(/_/g, '/');
+  let base64 = urlBase64.replace(/-/g, "+").replace(/_/g, "/");
   const padding = (4 - (base64.length % 4)) % 4;
-  base64 += '='.repeat(padding);
+  base64 += "=".repeat(padding);
   return base64;
 }
 
@@ -141,7 +151,7 @@ function base64ToUint8Array(base64: string): Uint8Array {
 
 // Convert Uint8Array to base64
 function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = '';
+  let binary = "";
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
@@ -161,93 +171,72 @@ async function createVapidJwt(
   subject: string,
   vapidPrivateKeyBase64: string,
   vapidPublicKeyBase64: string,
-  expiration: number
+  expiration: number,
 ): Promise<string> {
-  const header = { typ: 'JWT', alg: 'ES256' };
+  const header = { typ: "JWT", alg: "ES256" };
   const payload = {
     aud: audience,
     exp: expiration,
     sub: subject,
   };
 
-  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
   // Import private key for signing
   const privateKeyBytes = base64ToUint8Array(urlBase64ToBase64(vapidPrivateKeyBase64));
-  
+
   // Get public key bytes
   const publicKeyBytes = base64ToUint8Array(urlBase64ToBase64(vapidPublicKeyBase64));
-  
+
   // Extract x and y from uncompressed public key (starts with 0x04)
   const x = publicKeyBytes.slice(1, 33);
   const y = publicKeyBytes.slice(33, 65);
-  
+
   const jwk = {
-    kty: 'EC',
-    crv: 'P-256',
-    x: uint8ArrayToBase64(x).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_'),
-    y: uint8ArrayToBase64(y).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_'),
-    d: uint8ArrayToBase64(privateKeyBytes).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_'),
+    kty: "EC",
+    crv: "P-256",
+    x: uint8ArrayToBase64(x).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"),
+    y: uint8ArrayToBase64(y).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"),
+    d: uint8ArrayToBase64(privateKeyBytes).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"),
   };
 
-  const privateKey = await crypto.subtle.importKey(
-    'jwk',
-    jwk,
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    false,
-    ['sign']
-  );
+  const privateKey = await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
 
   // Sign the token
   const signatureBuffer = await crypto.subtle.sign(
-    { name: 'ECDSA', hash: 'SHA-256' },
+    { name: "ECDSA", hash: "SHA-256" },
     privateKey,
-    new TextEncoder().encode(unsignedToken)
+    new TextEncoder().encode(unsignedToken),
   );
 
   // Convert signature to URL-safe base64
   const signatureBytes = new Uint8Array(signatureBuffer);
-  const signatureB64 = uint8ArrayToBase64(signatureBytes).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  
+  const signatureB64 = uint8ArrayToBase64(signatureBytes).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+
   return `${unsignedToken}.${signatureB64}`;
 }
 
 // HKDF for key derivation
-async function hkdf(
-  salt: Uint8Array,
-  ikm: Uint8Array,
-  info: Uint8Array,
-  length: number
-): Promise<Uint8Array> {
+async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
   const saltBuffer = salt.length ? toArrayBuffer(salt) : new ArrayBuffer(32);
   const ikmBuffer = toArrayBuffer(ikm);
-  
-  const key = await crypto.subtle.importKey(
-    'raw',
-    saltBuffer,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  
-  const prkBuffer = await crypto.subtle.sign('HMAC', key, ikmBuffer);
+
+  const key = await crypto.subtle.importKey("raw", saltBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+
+  const prkBuffer = await crypto.subtle.sign("HMAC", key, ikmBuffer);
   const prk = new Uint8Array(prkBuffer);
-  
-  const prkKey = await crypto.subtle.importKey(
-    'raw',
-    toArrayBuffer(prk),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  
+
+  const prkKey = await crypto.subtle.importKey("raw", toArrayBuffer(prk), { name: "HMAC", hash: "SHA-256" }, false, [
+    "sign",
+  ]);
+
   const infoWithCounter = new Uint8Array(info.length + 1);
   infoWithCounter.set(info);
   infoWithCounter[info.length] = 1;
-  
-  const outputBuffer = await crypto.subtle.sign('HMAC', prkKey, toArrayBuffer(infoWithCounter));
+
+  const outputBuffer = await crypto.subtle.sign("HMAC", prkKey, toArrayBuffer(infoWithCounter));
   const output = new Uint8Array(outputBuffer);
   return output.slice(0, length);
 }
@@ -265,45 +254,41 @@ function createInfo(type: string, context: Uint8Array): Uint8Array {
 // Encrypt payload using Web Push encryption (RFC 8291 / aes128gcm)
 async function encryptPayload(
   payload: string,
-  subscription: PushSubscription
+  subscription: PushSubscription,
 ): Promise<{ ciphertext: Uint8Array; salt: Uint8Array; localPublicKey: Uint8Array }> {
   // Generate ephemeral key pair for ECDH
-  const localKeyPair = await crypto.subtle.generateKey(
-    { name: 'ECDH', namedCurve: 'P-256' },
-    true,
-    ['deriveBits']
-  );
-  
+  const localKeyPair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+
   // Export local public key in uncompressed format
-  const localPublicKeyRaw = await crypto.subtle.exportKey('raw', localKeyPair.publicKey);
+  const localPublicKeyRaw = await crypto.subtle.exportKey("raw", localKeyPair.publicKey);
   const localPublicKey = new Uint8Array(localPublicKeyRaw);
-  
+
   // Import subscriber's public key
   const p256dhBytes = base64ToUint8Array(urlBase64ToBase64(subscription.keys.p256dh));
   const subscriberPublicKey = await crypto.subtle.importKey(
-    'raw',
+    "raw",
     toArrayBuffer(p256dhBytes),
-    { name: 'ECDH', namedCurve: 'P-256' },
+    { name: "ECDH", namedCurve: "P-256" },
     false,
-    []
+    [],
   );
-  
+
   // Derive shared secret via ECDH
   const sharedSecretBuffer = await crypto.subtle.deriveBits(
-    { name: 'ECDH', public: subscriberPublicKey },
+    { name: "ECDH", public: subscriberPublicKey },
     localKeyPair.privateKey,
-    256
+    256,
   );
   const sharedSecret = new Uint8Array(sharedSecretBuffer);
-  
+
   // Get auth secret from subscription
   const authSecret = base64ToUint8Array(urlBase64ToBase64(subscription.keys.auth));
-  
+
   // Generate random salt
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  
+
   // Build key info
-  const keyInfoData = new TextEncoder().encode('WebPush: info\0');
+  const keyInfoData = new TextEncoder().encode("WebPush: info\0");
   const keyInfo = new Uint8Array(keyInfoData.length + 1 + 2 + p256dhBytes.length + 2 + localPublicKey.length);
   let offset = 0;
   keyInfo.set(keyInfoData, offset);
@@ -315,40 +300,34 @@ async function encryptPayload(
   keyInfo[offset++] = 0;
   keyInfo[offset++] = localPublicKey.length;
   keyInfo.set(localPublicKey, offset);
-  
+
   // Derive PRK from auth secret and shared secret
-  const prk = await hkdf(authSecret, sharedSecret, new TextEncoder().encode('WebPush: info\0'), 32);
-  
+  const prk = await hkdf(authSecret, sharedSecret, new TextEncoder().encode("WebPush: info\0"), 32);
+
   // Derive content encryption key
-  const cekInfo = createInfo('Content-Encoding: aes128gcm', new Uint8Array(0));
+  const cekInfo = createInfo("Content-Encoding: aes128gcm", new Uint8Array(0));
   const cek = await hkdf(salt, prk, cekInfo, 16);
-  
+
   // Derive nonce
-  const nonceInfo = createInfo('Content-Encoding: nonce', new Uint8Array(0));
+  const nonceInfo = createInfo("Content-Encoding: nonce", new Uint8Array(0));
   const nonce = await hkdf(salt, prk, nonceInfo, 12);
-  
+
   // Import CEK for AES-GCM
-  const aesKey = await crypto.subtle.importKey(
-    'raw',
-    toArrayBuffer(cek),
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt']
-  );
-  
+  const aesKey = await crypto.subtle.importKey("raw", toArrayBuffer(cek), { name: "AES-GCM" }, false, ["encrypt"]);
+
   // Add padding delimiter (0x02) to payload
   const payloadBytes = new TextEncoder().encode(payload);
   const paddedPayload = new Uint8Array(payloadBytes.length + 1);
   paddedPayload.set(payloadBytes);
   paddedPayload[payloadBytes.length] = 2; // Delimiter
-  
+
   // Encrypt
   const encryptedBuffer = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: toArrayBuffer(nonce) },
+    { name: "AES-GCM", iv: toArrayBuffer(nonce) },
     aesKey,
-    toArrayBuffer(paddedPayload)
+    toArrayBuffer(paddedPayload),
   );
-  
+
   return {
     ciphertext: new Uint8Array(encryptedBuffer),
     salt,
@@ -357,11 +336,7 @@ async function encryptPayload(
 }
 
 // Build aes128gcm body
-function buildAes128GcmBody(
-  salt: Uint8Array,
-  localPublicKey: Uint8Array,
-  ciphertext: Uint8Array
-): ArrayBuffer {
+function buildAes128GcmBody(salt: Uint8Array, localPublicKey: Uint8Array, ciphertext: Uint8Array): ArrayBuffer {
   // Header: salt (16) + rs (4) + idlen (1) + keyid (65 for P-256)
   const recordSize = 4096;
   const header = new Uint8Array(16 + 4 + 1 + localPublicKey.length);
@@ -373,25 +348,25 @@ function buildAes128GcmBody(
   header[19] = recordSize & 0xff;
   header[20] = localPublicKey.length;
   header.set(localPublicKey, 21);
-  
+
   // Combine header and ciphertext
   const body = new Uint8Array(header.length + ciphertext.length);
   body.set(header);
   body.set(ciphertext, header.length);
-  
+
   return toArrayBuffer(body);
 }
 
 // Send Web Push notification with proper VAPID and encryption
 async function sendWebPush(
   subscription: PushSubscription,
-  payload: { title: string; body: string; url?: string; tag?: string; type?: string }
+  payload: { title: string; body: string; url?: string; tag?: string; type?: string },
 ): Promise<boolean> {
-  const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
-  const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
+  const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
+  const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
 
   if (!vapidPublicKey || !vapidPrivateKey) {
-    console.error('VAPID keys not configured');
+    console.error("VAPID keys not configured");
     return false;
   }
 
@@ -399,57 +374,57 @@ async function sendWebPush(
     // Parse endpoint URL for audience
     const endpointUrl = new URL(subscription.endpoint);
     const audience = `${endpointUrl.protocol}//${endpointUrl.host}`;
-    
+
     // Create VAPID JWT (expires in 12 hours)
-    const expiration = Math.floor(Date.now() / 1000) + (12 * 60 * 60);
+    const expiration = Math.floor(Date.now() / 1000) + 12 * 60 * 60;
     const jwt = await createVapidJwt(
       audience,
-      'mailto:support@spotted.app',
+      "mailto:support@spotted.app",
       vapidPrivateKey,
       vapidPublicKey,
-      expiration
+      expiration,
     );
-    
+
     // Encrypt the payload
     const payloadString = JSON.stringify(payload);
     const { ciphertext, salt, localPublicKey } = await encryptPayload(payloadString, subscription);
-    
+
     // Build the encrypted body
     const body = buildAes128GcmBody(salt, localPublicKey, ciphertext);
-    
+
     // Prepare VAPID public key for Crypto-Key header
     const vapidKeyBytes = base64ToUint8Array(urlBase64ToBase64(vapidPublicKey));
-    const vapidKeyB64 = uint8ArrayToBase64(vapidKeyBytes).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-    
-    console.log('Sending web push to:', subscription.endpoint);
-    
+    const vapidKeyB64 = uint8ArrayToBase64(vapidKeyBytes).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+
+    console.log("Sending web push to:", subscription.endpoint);
+
     const response = await fetch(subscription.endpoint, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/octet-stream',
-        'Content-Encoding': 'aes128gcm',
-        'TTL': '86400',
-        'Authorization': `vapid t=${jwt}, k=${vapidKeyB64}`,
+        "Content-Type": "application/octet-stream",
+        "Content-Encoding": "aes128gcm",
+        TTL: "86400",
+        Authorization: `vapid t=${jwt}, k=${vapidKeyB64}`,
       },
       body: body,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Web push failed:', response.status, errorText);
-      
+      console.error("Web push failed:", response.status, errorText);
+
       // If subscription is gone, return false to trigger cleanup
       if (response.status === 404 || response.status === 410) {
-        console.log('Subscription expired or invalid');
+        console.log("Subscription expired or invalid");
       }
-      
+
       return false;
     }
 
-    console.log('Web push sent successfully');
+    console.log("Web push sent successfully");
     return true;
   } catch (err) {
-    console.error('Web push error:', err);
+    console.error("Web push error:", err);
     return false;
   }
 }
@@ -458,55 +433,51 @@ async function sendWebPush(
 // APNs Push Notification Implementation
 // ============================================================================
 
-async function createApnsJwt(
-  keyId: string,
-  teamId: string,
-  authKeyBase64: string
-): Promise<string> {
-  const header = { alg: 'ES256', kid: keyId };
+async function createApnsJwt(keyId: string, teamId: string, authKeyBase64: string): Promise<string> {
+  const header = { alg: "ES256", kid: keyId };
   const payload = {
     iss: teamId,
     iat: Math.floor(Date.now() / 1000),
   };
 
-  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
   // Decode the base64-encoded .p8 key (PEM contents without header/footer)
   const keyData = base64ToUint8Array(authKeyBase64);
 
   const privateKey = await crypto.subtle.importKey(
-    'pkcs8',
+    "pkcs8",
     toArrayBuffer(keyData),
-    { name: 'ECDSA', namedCurve: 'P-256' },
+    { name: "ECDSA", namedCurve: "P-256" },
     false,
-    ['sign']
+    ["sign"],
   );
 
   const signatureBuffer = await crypto.subtle.sign(
-    { name: 'ECDSA', hash: 'SHA-256' },
+    { name: "ECDSA", hash: "SHA-256" },
     privateKey,
-    new TextEncoder().encode(unsignedToken)
+    new TextEncoder().encode(unsignedToken),
   );
 
   const signatureBytes = new Uint8Array(signatureBuffer);
-  const signatureB64 = uint8ArrayToBase64(signatureBytes).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const signatureB64 = uint8ArrayToBase64(signatureBytes).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 
   return `${unsignedToken}.${signatureB64}`;
 }
 
 async function sendApnsPush(
   deviceToken: string,
-  notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string }
+  notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string },
 ): Promise<boolean> {
-  const keyId = Deno.env.get('APNS_KEY_ID');
-  const teamId = Deno.env.get('APNS_TEAM_ID');
-  const authKey = Deno.env.get('APNS_AUTH_KEY');
-  const bundleId = Deno.env.get('APNS_BUNDLE_ID');
+  const keyId = Deno.env.get("APNS_KEY_ID");
+  const teamId = Deno.env.get("APNS_TEAM_ID");
+  const authKey = Deno.env.get("APNS_AUTH_KEY");
+  const bundleId = Deno.env.get("APNS_BUNDLE_ID");
 
   if (!keyId || !teamId || !authKey || !bundleId) {
-    console.log('APNs secrets not configured, skipping APNs push');
+    console.log("APNs secrets not configured, skipping APNs push");
     return false;
   }
 
@@ -519,37 +490,34 @@ async function sendApnsPush(
           title: notificationPayload.title,
           body: notificationPayload.body,
         },
-        sound: 'default',
+        sound: "default",
         badge: 1,
-        'thread-id': notificationPayload.type || 'default',
+        "thread-id": notificationPayload.type || "default",
       },
       url: notificationPayload.url,
       type: notificationPayload.type,
     };
 
-    console.log('Sending APNs push to device:', deviceToken.substring(0, 8) + '...');
+    console.log("Sending APNs push to device:", deviceToken.substring(0, 8) + "...");
 
-    const response = await fetch(
-      ``https://api.development.push.apple.com/3/device/${deviceToken}`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `bearer ${jwt}`,
-          'apns-topic': bundleId,
-          'apns-push-type': 'alert',
-          'apns-priority': '10',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(apnsPayload),
-      }
-    );
+    const response = await fetch(`https://api.development.push.apple.com/3/device/${deviceToken}`, {
+      method: "POST",
+      headers: {
+        Authorization: `bearer ${jwt}`,
+        "apns-topic": bundleId,
+        "apns-push-type": "alert",
+        "apns-priority": "10",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(apnsPayload),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('APNs push failed:', response.status, errorText);
+      console.error("APNs push failed:", response.status, errorText);
 
       if (response.status === 410) {
-        console.log('APNs device token is no longer active');
+        console.log("APNs device token is no longer active");
       }
 
       return false;
@@ -557,10 +525,10 @@ async function sendApnsPush(
 
     // Consume body to prevent resource leak
     await response.text();
-    console.log('APNs push sent successfully');
+    console.log("APNs push sent successfully");
     return true;
   } catch (err) {
-    console.error('APNs push error:', err);
+    console.error("APNs push error:", err);
     return false;
   }
 }
@@ -569,28 +537,32 @@ async function sendApnsPush(
 // Notification Content
 // ============================================================================
 
-function getNotificationContent(type: string, message: string, _senderName?: string): { title: string; body: string; url: string } {
+function getNotificationContent(
+  type: string,
+  message: string,
+  _senderName?: string,
+): { title: string; body: string; url: string } {
   switch (type) {
-    case 'meetup_request':
-      return { title: '🎉 Meet Up Request!', body: message, url: '/messages?tab=activity' };
-    case 'venue_invite':
-      return { title: '📍 Venue Invite!', body: message, url: '/messages?tab=activity' };
-    case 'friend_request':
-      return { title: '👋 Friend Request', body: message, url: '/profile/friend-requests' };
-    case 'friend_accepted':
-      return { title: '🎊 Friend Accepted!', body: message, url: '/messages' };
-    case 'invite_accepted':
-      return { title: '🎉 Invite Accepted!', body: message, url: '/profile' };
-    case 'dm':
-      return { title: '💬 New Message', body: message, url: '/messages' };
-    case 'meetup_accepted':
-      return { title: '🎉 Meet Up Accepted!', body: message, url: '/messages?tab=activity' };
-    case 'venue_invite_accepted':
-      return { title: '📍 Invite Accepted!', body: message, url: '/messages?tab=activity' };
-    case 'friend_checkin':
-      return { title: '📍 Friend Checked In', body: message, url: '/' };
+    case "meetup_request":
+      return { title: "🎉 Meet Up Request!", body: message, url: "/messages?tab=activity" };
+    case "venue_invite":
+      return { title: "📍 Venue Invite!", body: message, url: "/messages?tab=activity" };
+    case "friend_request":
+      return { title: "👋 Friend Request", body: message, url: "/profile/friend-requests" };
+    case "friend_accepted":
+      return { title: "🎊 Friend Accepted!", body: message, url: "/messages" };
+    case "invite_accepted":
+      return { title: "🎉 Invite Accepted!", body: message, url: "/profile" };
+    case "dm":
+      return { title: "💬 New Message", body: message, url: "/messages" };
+    case "meetup_accepted":
+      return { title: "🎉 Meet Up Accepted!", body: message, url: "/messages?tab=activity" };
+    case "venue_invite_accepted":
+      return { title: "📍 Invite Accepted!", body: message, url: "/messages?tab=activity" };
+    case "friend_checkin":
+      return { title: "📍 Friend Checked In", body: message, url: "/" };
     default:
-      return { title: 'Spotted', body: message, url: '/' };
+      return { title: "Spotted", body: message, url: "/" };
   }
 }
 
@@ -599,51 +571,54 @@ function getNotificationContent(type: string, message: string, _senderName?: str
 // ============================================================================
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify JWT
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized: Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized: Missing authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const token = authHeader.replace("Bearer ", "");
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized: Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const rawPayload = await req.json();
     const validation = validatePayload(rawPayload);
     if (!validation.valid) {
-      return new Response(
-        JSON.stringify({ error: `Bad Request: ${validation.error}` }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: `Bad Request: ${validation.error}` }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const payload = rawPayload as PushPayload;
 
     // Verify sender matches authenticated user
     if (payload.sender_id !== user.id) {
-      return new Response(
-        JSON.stringify({ error: 'Forbidden: sender_id must match authenticated user' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Forbidden: sender_id must match authenticated user" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const { receiver_id, sender_id, type } = payload;
@@ -651,16 +626,15 @@ Deno.serve(async (req) => {
 
     // Get receiver's push subscription AND apns token
     const { data: receiverProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('push_subscription, push_enabled, display_name, apns_device_token')
-      .eq('id', receiver_id)
+      .from("profiles")
+      .select("push_subscription, push_enabled, display_name, apns_device_token")
+      .eq("id", receiver_id)
       .single();
 
     if (profileError || !receiverProfile) {
-      return new Response(
-        JSON.stringify({ success: false, reason: 'receiver_not_found' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, reason: "receiver_not_found" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Check if push is enabled and at least one channel exists
@@ -668,21 +642,16 @@ Deno.serve(async (req) => {
     const hasApns = !!receiverProfile.apns_device_token;
 
     if (!receiverProfile.push_enabled || (!hasWebPush && !hasApns)) {
-      console.log('Push not enabled or no subscription/token for user:', receiver_id);
-      return new Response(
-        JSON.stringify({ success: false, reason: 'push_not_enabled' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.log("Push not enabled or no subscription/token for user:", receiver_id);
+      return new Response(JSON.stringify({ success: false, reason: "push_not_enabled" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Get sender's name
-    const { data: senderProfile } = await supabase
-      .from('profiles')
-      .select('display_name')
-      .eq('id', sender_id)
-      .single();
+    const { data: senderProfile } = await supabase.from("profiles").select("display_name").eq("id", sender_id).single();
 
-    const senderName = senderProfile?.display_name || 'Someone';
+    const senderName = senderProfile?.display_name || "Someone";
     const content = getNotificationContent(type, message, senderName);
     const notificationPayload = {
       ...content,
@@ -698,32 +667,28 @@ Deno.serve(async (req) => {
       if (subscription.endpoint && validateSubscriptionEndpoint(subscription.endpoint)) {
         results.web = await sendWebPush(subscription, notificationPayload);
       } else {
-        console.error('Invalid web push subscription endpoint');
+        console.error("Invalid web push subscription endpoint");
         results.web = false;
       }
     }
 
     // Send via APNs if device token exists
     if (hasApns) {
-      results.apns = await sendApnsPush(
-        receiverProfile.apns_device_token as string,
-        notificationPayload
-      );
+      results.apns = await sendApnsPush(receiverProfile.apns_device_token as string, notificationPayload);
     }
 
-    const success = (results.web === true) || (results.apns === true);
-    console.log('Push notification results:', { receiver_id, type, ...results });
+    const success = results.web === true || results.apns === true;
+    console.log("Push notification results:", { receiver_id, type, ...results });
 
-    return new Response(
-      JSON.stringify({ success, channels: results }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ success, channels: results }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
-    console.error('Error in send-push function:', err);
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error("Error in send-push function:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
