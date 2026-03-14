@@ -1,19 +1,23 @@
 
 
-## Problem
+# Update APNS_KEY_ID and APNS_AUTH_KEY Secrets
 
-The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
+Both secrets already exist and need to be re-entered with corrected values.
 
-This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
+## What you need to prepare
 
-## Fix
+1. **APNS_KEY_ID**: Go to [Apple Developer → Keys](https://developer.apple.com/account/resources/authkeys/list), find your APNs key, and copy the **Key ID** (a 10-character alphanumeric string like `ABC1234DEF`).
 
-**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
+2. **APNS_AUTH_KEY**: Open your `.p8` file in a text editor, then:
+   - Delete the `-----BEGIN PRIVATE KEY-----` line
+   - Delete the `-----END PRIVATE KEY-----` line
+   - Remove all newlines so it's **one continuous string**
+   - The result should be exactly **164 characters** of base64
 
-**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
+## Implementation
 
-| File | Change |
-|------|--------|
-| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
-| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
+Once you switch to implementation mode, I will use the secret update tool to prompt you for each value in order:
+1. First prompt: `APNS_KEY_ID`
+2. Second prompt: `APNS_AUTH_KEY`
+3. Redeploy the `send-push` edge function so it picks up the new values
 
