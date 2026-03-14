@@ -1,18 +1,22 @@
 
 
-## Fix: Update APNS_AUTH_KEY with correct full-length key
+## Plan: Fix build error and redeploy send-push
 
-The uploaded `.p8` file confirms the key body is **164 characters**. The previously stored secret was only 96 characters (truncated during paste).
+Two issues need fixing:
 
-### Steps
+### 1. Build error in `daily-cleanup/index.ts` (line 207)
+`error` is typed as `unknown` in TypeScript strict mode. Fix: cast `error` before accessing `.message`.
 
-1. **Update the `APNS_AUTH_KEY` secret** with the exact 164-character base64 string extracted from the uploaded file (no PEM headers, no newlines)
-2. **Redeploy the `send-push` edge function** so it picks up the new secret value
-3. **Test** by triggering a push notification from the iOS device
+| File | Line | Change |
+|------|------|--------|
+| `supabase/functions/daily-cleanup/index.ts` | 207 | `error.message` → `(error as Error).message` |
 
-| Step | Action |
-|------|--------|
-| Update secret | Set `APNS_AUTH_KEY` to the full 164-char key from the .p8 file |
-| Redeploy | Deploy `send-push` edge function |
-| Verify | Trigger notification and check logs for successful APNs delivery |
+### 2. Redeploy `send-push`
+The hardcoded fallback key is already in the code (line 553) but the function needs redeployment. After fixing the build error, redeploy `send-push` so the fallback key is active at runtime.
+
+### After deployment
+Trigger a push notification from your iOS device. Logs should show:
+- `APNs key source: fallback (env length: 16)`
+- `APNs key length after cleaning: ~164 chars`
+- `APNs JWT created successfully`
 
