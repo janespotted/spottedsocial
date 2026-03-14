@@ -1,31 +1,19 @@
 
 
-## Push Notifications for DM Messages: Show Sender Name + Preview
+## Problem
 
-### Problem
-1. **No push notification is sent for DMs** — `Thread.tsx` inserts into `dm_messages` but never calls `triggerPushNotification`. The in-app banner works via realtime subscription, but native/web push notifications are never fired.
-2. **Generic notification content** — `getNotificationContent` shows "💬 New Message" without the sender's name.
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-### Plan
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
-#### 1. Trigger push notification when sending a DM (Thread.tsx)
-After successfully inserting a `dm_messages` row, create a notification record and call `triggerPushNotification` for each recipient in the thread (excluding the sender). For group chats, notify all other members.
+## Fix
 
-- Insert a notification with `type: 'dm'`, `message` containing the sender's name + message preview (e.g. `"Jane: Hey are you coming tonight?"`)
-- Call `triggerPushNotification` with that notification
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-#### 2. Update notification content in send-push edge function
-Change `getNotificationContent` for the `'dm'` case to use the sender's name in the title:
-```
-case "dm":
-  return { title: `💬 ${senderName}`, body: message, url: "/messages" };
-```
-This way the push notification shows "💬 Jane" as the title and the message preview as the body.
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
 
-#### 3. Pass sender name to edge function (already works)
-The edge function already fetches `senderName` from the profiles table (line 674-676) and passes it to `getNotificationContent`. The `_senderName` parameter just needs to be used instead of ignored.
-
-### Files Changed
-- `src/pages/Thread.tsx` — Add push notification trigger after sending a DM
-- `supabase/functions/send-push/index.ts` — Update `getNotificationContent` for `'dm'` type to include sender name in title
+| File | Change |
+|------|--------|
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 

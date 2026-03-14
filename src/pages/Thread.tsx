@@ -14,6 +14,7 @@ import { z } from 'zod';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { isFromTonight } from '@/lib/time-context';
 import { logger } from '@/lib/logger';
+import { triggerPushNotification } from '@/lib/push-notifications';
 import { MessageInput } from '@/components/MessageInput';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 
@@ -370,7 +371,40 @@ export default function Thread() {
     }
 
     logger.dm(threadId!, otherMember?.user_id || 'unknown');
-  }, [user, threadId, otherMember]);
+
+    // Trigger push notifications for all other thread members
+    const senderName = currentUserProfile?.display_name || 'Someone';
+    const messagePreview = validation.data.text.length > 100 
+      ? validation.data.text.substring(0, 100) + '...' 
+      : validation.data.text;
+
+    const recipientIds: string[] = [];
+    if (groupInfo) {
+      recipientIds.push(...groupInfo.members.map(m => m.user_id));
+    } else if (otherMember) {
+      recipientIds.push(otherMember.user_id);
+    }
+
+    // Fire-and-forget push notifications for each recipient
+    for (const receiverId of recipientIds) {
+      supabase.from('notifications').insert({
+        sender_id: user.id,
+        receiver_id: receiverId,
+        type: 'dm',
+        message: `${senderName}: ${messagePreview}`,
+      }).select().single().then(({ data: notif }) => {
+        if (notif) {
+          triggerPushNotification({
+            id: notif.id,
+            receiver_id: receiverId,
+            sender_id: user.id,
+            type: 'dm',
+            message: `${senderName}: ${messagePreview}`,
+          });
+        }
+      });
+    }
+  }, [user, threadId, otherMember, groupInfo, currentUserProfile]);
 
   const getTimeAgo = (date: string) => {
     return formatDistanceToNow(new Date(date), { addSuffix: true })
