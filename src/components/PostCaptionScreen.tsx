@@ -16,7 +16,7 @@ type PostVisibility = 'close_friends' | 'all_friends' | 'mutual_friends';
 interface PostCaptionScreenProps {
   imageFile: File;
   imagePreview: string;
-  mediaType: 'image' | 'video';
+  mediaType?: 'image';
   onBack: () => void;
   onSuccess: () => void;
 }
@@ -27,7 +27,7 @@ const visibilityOptions = [
   { value: 'mutual_friends' as const, label: 'Mutual Friends', icon: Share2, description: 'Friends + their friends' },
 ];
 
-export function PostCaptionScreen({ imageFile, imagePreview, mediaType, onBack, onSuccess }: PostCaptionScreenProps) {
+export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }: PostCaptionScreenProps) {
   const { user } = useAuth();
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
@@ -140,7 +140,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType, onBack, 
   const uploadMedia = async (): Promise<string | null> => {
     if (!imageFile || !user) return null;
 
-    const fileExt = imageFile.name.split('.').pop() || (mediaType === 'video' ? 'mp4' : 'jpg');
+    const fileExt = imageFile.name.split('.').pop() || 'jpg';
     const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
@@ -177,7 +177,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType, onBack, 
         user_id: user.id,
         text: trimmedCaption,
         image_url: imageUrl,
-        media_type: mediaType,
+        media_type: 'image',
         venue_name: locationData?.venueName || location || null,
         venue_id: locationData?.venueId || null,
         expires_at: calculateExpiryTime(),
@@ -234,21 +234,11 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType, onBack, 
         {/* Hero Image - edge-to-edge with rounded corners */}
         <div className="px-3 pb-3">
           <div className="aspect-[4/5] w-full rounded-2xl overflow-hidden">
-            {mediaType === 'video' ? (
-              <video
-                src={imagePreview}
-                muted
-                playsInline
-                controls
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <img
-                src={imagePreview}
-                alt="Post preview"
-                className="w-full h-full object-cover"
-              />
-            )}
+            <img
+              src={imagePreview}
+              alt="Post preview"
+              className="w-full h-full object-cover"
+            />
           </div>
         </div>
 

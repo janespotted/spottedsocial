@@ -36,7 +36,7 @@ export const CommentInput = memo(function CommentInput({
   const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     setInputFocused(true);
     setTimeout(() => {
-      e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 300);
   }, [setInputFocused]);
 

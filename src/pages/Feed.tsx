@@ -22,6 +22,7 @@ import { useDemoMode } from '@/hooks/useDemoMode';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { toast } from 'sonner';
+import { warmUpCamera } from '@/lib/camera-service';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import {
   DropdownMenu,
@@ -43,6 +44,9 @@ export default function Feed() {
   const { city } = useUserCity();
   const { setInputFocused } = useInputFocus();
   useAutoVenueTracking();
+
+  // Pre-initialize Camera plugin so it opens instantly when tapped
+  useEffect(() => { warmUpCamera(); }, []);
 
   const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends } = useOfflineCache();
 
@@ -140,7 +144,7 @@ export default function Feed() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24" style={{ overscrollBehaviorY: 'none' }}>
+    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
       {!isOnline && (
         <div className="bg-yellow-500/20 text-yellow-500 text-center py-2 text-sm">
           You're offline. Showing cached data.
@@ -148,8 +152,8 @@ export default function Feed() {
       )}
 
       {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="flex items-start justify-between px-6 pt-6 pb-3">
+      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
+        <div className="flex items-start justify-between px-6 pt-3 pb-3">
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
@@ -183,7 +187,6 @@ export default function Feed() {
           </div>
         </div>
       </div>
-      <div style={{ height: 'calc(120px + env(safe-area-inset-top, 0px))' }} />
 
       {/* Posts Feed */}
       <PullToRefresh onRefresh={async () => { await fetchPosts(); }}>
@@ -211,16 +214,7 @@ export default function Feed() {
             >
               {post.image_url && (
                 <div className="w-full relative overflow-hidden group image-vignette">
-                  {(post as any).media_type === 'video' ? (
-                    <video
-                      src={post.image_url}
-                      controls
-                      playsInline
-                      muted
-                      className="w-full h-80 object-cover"
-                    />
-                  ) : (
-                    <img
+                  <img
                       src={post.image_url}
                       alt="Post"
                       loading="lazy"
@@ -229,7 +223,6 @@ export default function Feed() {
                         e.currentTarget.style.display = 'none';
                       }}
                     />
-                  )}
                 </div>
               )}
 

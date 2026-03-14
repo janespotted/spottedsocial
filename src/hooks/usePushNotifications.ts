@@ -139,10 +139,12 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
     try {
       if (native) {
-        // On native, check current permission status and stored token
+        // On native, check iOS permission status first — this is the source of truth
+        let iosPermission: string = 'default';
         try {
           const { PushNotifications } = await import('@capacitor/push-notifications');
           const permStatus = await PushNotifications.checkPermissions();
+          iosPermission = permStatus.receive;
           if (permStatus.receive === 'denied') {
             setPermission('denied');
             setIsSubscribed(false);
@@ -153,14 +155,31 @@ export function usePushNotifications(): UsePushNotificationsReturn {
           setPermission('default');
         }
 
-        const { data } = await supabase
-          .from('profiles')
-          .select('apns_device_token, push_enabled')
-          .eq('id', user.id)
-          .single();
+        // If iOS permission is granted, the user has opted in.
+        // The DB may not have push_enabled=true yet due to a race with
+        // App.tsx auto-registration, so treat granted permission as subscribed.
+        if (iosPermission === 'granted') {
+          setIsSubscribed(true);
 
-        const subscribed = !!(data?.apns_device_token && data?.push_enabled);
-        setIsSubscribed(subscribed);
+          // Ensure the DB reflects this — if push_enabled isn't true yet,
+          // the auto-registration in App.tsx will set it shortly.
+          const { data } = await supabase
+            .from('profiles')
+            .select('push_enabled')
+            .eq('id', user.id)
+            .single();
+
+          if (data && !data.push_enabled) {
+            // DB is stale — auto-registration hasn't saved yet, or
+            // something cleared it. Set it now.
+            await supabase
+              .from('profiles')
+              .update({ push_enabled: true })
+              .eq('id', user.id);
+          }
+        } else {
+          setIsSubscribed(false);
+        }
       } else {
       setPermission(Notification.permission);
         try {

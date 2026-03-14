@@ -331,6 +331,20 @@ html, body, #root {
   background-color: #0a0118;
 }
 
+/* Lock body so iOS can't scroll it when keyboard opens */
+html, body {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Mobile optimizations */
 @media (max-width: 768px) {
   html {

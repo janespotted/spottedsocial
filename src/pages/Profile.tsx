@@ -463,7 +463,7 @@ export default function Profile() {
       <div className="px-4 py-6 space-y-6">
         {/* User Identity */}
         <div>
-          <h2 className="text-xl font-bold text-white">@{profile?.username || 'username'}</h2>
+          <h2 className="text-xl font-bold text-white">@{profile?.username || user?.user_metadata?.username || user?.email?.split('@')[0] || 'username'}</h2>
           <button 
             onClick={() => setShowQuickStatus(true)}
             className={cn(
@@ -510,18 +510,28 @@ export default function Profile() {
 
         {/* Avatar + Stats */}
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/profile')} className="cursor-pointer">
-            <Avatar className="h-20 w-20 border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)]">
-              <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="bg-[#1a0f2e] text-white text-2xl">
-                {profile?.display_name?.[0] || 'U'}
-              </AvatarFallback>
-            </Avatar>
+          <button onClick={() => navigate('/edit-profile')} className="cursor-pointer">
+            <div className="relative h-20 w-20 rounded-full border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)] overflow-hidden bg-[#1a0f2e]">
+              {(profile?.avatar_url || allProfiles?.find((p: any) => p.id === user?.id)?.avatar_url || user?.user_metadata?.avatar_url) ? (
+                <img
+                  src={profile?.avatar_url || allProfiles?.find((p: any) => p.id === user?.id)?.avatar_url || user?.user_metadata?.avatar_url}
+                  alt={profile?.display_name || 'Profile'}
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-white text-2xl">
+                  {profile?.display_name?.[0] || user?.user_metadata?.display_name?.[0] || 'U'}
+                </div>
+              )}
+            </div>
           </button>
 
           <div className="flex-1">
             <h3 className="text-2xl font-bold text-white mb-2">
-              {profile?.display_name || 'User'}
+              {profile?.display_name || user?.user_metadata?.display_name || user?.user_metadata?.full_name || 'User'}
             </h3>
             <div className="flex items-center gap-6">
               <div className="text-center">

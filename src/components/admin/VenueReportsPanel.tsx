@@ -53,6 +53,7 @@ export function VenueReportsPanel() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'pending' | 'all'>('pending');
   const [activeTab, setActiveTab] = useState<'reports' | 'auto'>('reports');
+  const [isGeocoding, setIsGeocoding] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'reports') {
@@ -115,11 +116,19 @@ export function VenueReportsPanel() {
   const handleApprove = async (report: VenueReport) => {
     try {
       if (report.report_type === 'new_venue' && report.suggested_venue_name) {
-        // Create new venue
+        // Geocode to get actual business location before creating
+        const { geocodeVenue } = await import('@/lib/location-service');
+        const geocoded = await geocodeVenue(
+          report.suggested_venue_name,
+          report.reported_lat,
+          report.reported_lng
+        );
+
+        // Create new venue with geocoded or reported coordinates
         const { error: venueError } = await supabase.from('venues').insert([{
           name: report.suggested_venue_name,
-          lat: report.reported_lat,
-          lng: report.reported_lng,
+          lat: geocoded?.lat ?? report.reported_lat,
+          lng: geocoded?.lng ?? report.reported_lng,
           neighborhood: 'TBD', // Would need to detect
           type: report.suggested_venue_type || 'bar',
           city: 'nyc', // Would need to detect
@@ -234,13 +243,37 @@ export function VenueReportsPanel() {
     }
   };
 
+  const handleGeocodeAll = async () => {
+    setIsGeocoding(true);
+    try {
+      const { geocodeExistingVenues } = await import('@/lib/location-service');
+      const result = await geocodeExistingVenues();
+      toast.success(`Geocoding complete: ${result.updated} updated, ${result.skipped} skipped, ${result.failed} failed`);
+    } catch (err) {
+      toast.error('Geocoding failed: ' + String(err));
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
   return (
     <Card className="bg-white/5 border-white/10">
       <CardHeader className="pb-3">
-        <CardTitle className="text-white text-sm flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-[#a855f7]" />
-          Venue Reports
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-white text-sm flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-[#a855f7]" />
+            Venue Reports
+          </CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleGeocodeAll}
+            disabled={isGeocoding}
+            className="border-[#a855f7]/40 text-[#a855f7] text-xs"
+          >
+            {isGeocoding ? 'Geocoding...' : 'Fix All Venue Pins'}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'reports' | 'auto')}>

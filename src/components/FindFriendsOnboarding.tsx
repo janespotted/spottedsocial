@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogOverlay, DialogTitle } from '@/components/
 import { Link2, Copy, Share2, Search, UserPlus, QrCode, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { triggerPushNotification } from '@/lib/push-notifications';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import { VisuallyHidden } from '@/components/ui/visually-hidden';
@@ -214,6 +215,15 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
         .insert({ user_id: user?.id, friend_id: friendId, status: 'pending' });
 
       if (error) throw error;
+
+      // Trigger push notification for friend request
+      triggerPushNotification({
+        id: `friend-req-${user?.id}-${friendId}`,
+        receiver_id: friendId,
+        sender_id: user!.id,
+        type: 'friend_request',
+        message: 'You have a new friend request!',
+      });
 
       setSentRequests(prev => new Set(prev).add(friendId));
       setFriendsAddedCount(prev => prev + 1);

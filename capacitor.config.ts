@@ -10,8 +10,9 @@ const config: CapacitorConfig = {
   },
   plugins: {
     Keyboard: {
-      resize: 'none',
-      scroll: false,
+      resize: 'native',
+      scrollAssist: false,
+      scrollPadding: false,
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],

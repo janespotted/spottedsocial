@@ -651,21 +651,11 @@ export function VenueIdCard() {
                         {allCarouselItems.map((item, index) => (
                           <CarouselItem key={index}>
                             <div className="relative w-full h-56 overflow-hidden">
-                              {item.mediaType === 'video' ? (
-                                <video
-                                  src={item.url}
-                                  className="w-full h-full object-cover"
-                                  muted
-                                  playsInline
-                                  controls
-                                />
-                              ) : (
-                                <img
-                                  src={item.url}
-                                  alt={`${venue.name} photo ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                              )}
+                              <img
+                                src={item.url}
+                                alt={`${venue.name} photo ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
                             </div>
                           </CarouselItem>

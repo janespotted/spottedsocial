@@ -65,7 +65,6 @@ export default function Thread() {
   const [memberMap, setMemberMap] = useState<Map<string, ThreadMember>>(new Map());
   const [otherReadAt, setOtherReadAt] = useState<string | null>(null);
   const [bothShowReceipts, setBothShowReceipts] = useState(false);
-
   // Typing indicator
   const { typingUsers, setTyping } = useTypingIndicator(threadId, user?.id, memberMap);
 
@@ -374,8 +373,8 @@ export default function Thread() {
 
     // Trigger push notifications for all other thread members
     const senderName = currentUserProfile?.display_name || 'Someone';
-    const messagePreview = validation.data.text.length > 100 
-      ? validation.data.text.substring(0, 100) + '...' 
+    const messagePreview = validation.data.text.length > 100
+      ? validation.data.text.substring(0, 100) + '...'
       : validation.data.text;
 
     const recipientIds: string[] = [];
@@ -452,10 +451,10 @@ export default function Thread() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
-      <div className="max-w-[430px] mx-auto min-h-screen flex flex-col">
+    <div className="fixed inset-0 bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] overflow-hidden">
+      <div className="max-w-[430px] mx-auto h-full flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
+        <div className="shrink-0 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
           <div className="flex items-center justify-between px-4 py-3">
             <button 
               onClick={() => navigate('/messages')}

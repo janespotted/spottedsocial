@@ -514,25 +514,49 @@ async function sendApnsPush(
     };
 
     const isSandbox = Deno.env.get("APNS_SANDBOX") === "true";
-    const apnsHost = isSandbox ? "api.development.push.apple.com" : "api.push.apple.com";
+    const primaryHost = isSandbox ? "api.development.push.apple.com" : "api.push.apple.com";
+    const fallbackHost = isSandbox ? "api.push.apple.com" : "api.development.push.apple.com";
 
-    console.log(`Sending APNs push to device: ${deviceToken.substring(0, 8)}... (host: ${apnsHost}, sandbox: ${isSandbox}, bundle: ${bundleId})`);
+    const headers = {
+      Authorization: `bearer ${jwt}`,
+      "apns-topic": bundleId,
+      "apns-push-type": "alert",
+      "apns-priority": "10",
+      "Content-Type": "application/json",
+    };
+    const bodyStr = JSON.stringify(apnsPayload);
 
-    const response = await fetch(`https://${apnsHost}/3/device/${deviceToken}`, {
+    console.log(`Sending APNs push to device: ${deviceToken.substring(0, 8)}... (host: ${primaryHost}, sandbox: ${isSandbox}, bundle: ${bundleId})`);
+
+    const response = await fetch(`https://${primaryHost}/3/device/${deviceToken}`, {
       method: "POST",
-      headers: {
-        Authorization: `bearer ${jwt}`,
-        "apns-topic": bundleId,
-        "apns-push-type": "alert",
-        "apns-priority": "10",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(apnsPayload),
+      headers,
+      body: bodyStr,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("APNs push failed:", response.status, errorText);
+      console.error(`APNs push failed (${primaryHost}):`, response.status, errorText);
+
+      // If the token was issued for the other environment, retry on the fallback host
+      if (response.status === 403 && errorText.includes("BadEnvironmentKeyInToken")) {
+        console.log(`Retrying APNs push on fallback host: ${fallbackHost}`);
+        const retryResponse = await fetch(`https://${fallbackHost}/3/device/${deviceToken}`, {
+          method: "POST",
+          headers,
+          body: bodyStr,
+        });
+
+        if (!retryResponse.ok) {
+          const retryError = await retryResponse.text();
+          console.error(`APNs fallback push failed (${fallbackHost}):`, retryResponse.status, retryError);
+          return false;
+        }
+
+        await retryResponse.text();
+        console.log(`APNs push sent successfully via fallback host: ${fallbackHost}`);
+        return true;
+      }
 
       if (response.status === 410) {
         console.log("APNs device token is no longer active");

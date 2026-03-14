@@ -22,12 +22,12 @@
 	<string>2</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Spotted uses your photo library to add photos to Yaps and your profile.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Spotted needs camera access to set your profile photo.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Spotted needs your location to show you nearby venues and friends.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Spotted uses your photo library to add photos to Yaps and your profile.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -36,6 +36,8 @@
 	<array>
 		<string>armv7</string>
 	</array>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -49,8 +51,6 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>UIRequiresFullScreen</key>
-	<true/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>

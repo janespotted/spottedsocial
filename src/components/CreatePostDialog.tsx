@@ -13,7 +13,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const [step, setStep] = useState<FlowStep>('media');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -22,7 +21,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         setStep('media');
         setImageFile(null);
         setImagePreview(null);
-        setMediaType('image');
       }, 300);
     }
   }, [open]);
@@ -32,7 +30,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const handleMediaSelect = (file: File, preview: string) => {
     setImageFile(file);
     setImagePreview(preview);
-    setMediaType(file.type.startsWith('video/') ? 'video' : 'image');
     setStep('caption');
   };
 
@@ -40,7 +37,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
     setStep('media');
     setImageFile(null);
     setImagePreview(null);
-    setMediaType('image');
   };
 
   const handleSuccess = () => {
@@ -67,7 +63,6 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       <PostCaptionScreen
         imageFile={imageFile}
         imagePreview={imagePreview}
-        mediaType={mediaType}
         onBack={handleBack}
         onSuccess={handleSuccess}
       />

@@ -100,8 +100,6 @@ export default function Home() {
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [sharePost, setSharePost] = useState<Post | null>(null);
   const loadTriggerRef = useRef<HTMLDivElement>(null);
-  const videoObserverRef = useRef<IntersectionObserver | null>(null);
-  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   // Infinite scroll observer
   useEffect(() => {
@@ -114,33 +112,6 @@ export default function Home() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [loadMorePosts, feedMode]);
-
-  // Video autoplay observer
-  useEffect(() => {
-    videoObserverRef.current = new IntersectionObserver(
-      (entries) => entries.forEach(e => {
-        const video = e.target as HTMLVideoElement;
-        if (e.isIntersecting) {
-          video.play().catch(() => {});
-        } else {
-          video.pause();
-        }
-      }),
-      { threshold: 0.5 }
-    );
-    return () => videoObserverRef.current?.disconnect();
-  }, []);
-
-  const videoRefCallback = useCallback((postId: string) => (el: HTMLVideoElement | null) => {
-    if (el) {
-      videoRefs.current.set(postId, el);
-      videoObserverRef.current?.observe(el);
-    } else {
-      const prev = videoRefs.current.get(postId);
-      if (prev) videoObserverRef.current?.unobserve(prev);
-      videoRefs.current.delete(postId);
-    }
-  }, []);
 
   // Store fetch functions in refs to avoid dependency changes causing re-renders
   const fetchFriendsRef = useRef(fetchFriends);
@@ -518,27 +489,15 @@ export default function Home() {
 
               {post.image_url && (
                 <div className="w-full aspect-square relative overflow-hidden group image-vignette">
-                  {(post as any).media_type === 'video' ? (
-                    <video
-                      ref={videoRefCallback(post.id)}
+                  <img
                       src={post.image_url}
-                      controls
-                      playsInline
-                      muted
-                      loop
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <img 
-                      src={post.image_url} 
-                      alt="Post" 
+                      alt="Post"
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       onError={(e) => {
                         const parent = e.currentTarget.parentElement;
                         if (parent) parent.style.display = 'none';
                       }}
                     />
-                  )}
                 </div>
               )}
 

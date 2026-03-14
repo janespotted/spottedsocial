@@ -343,9 +343,9 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
   };
 
   const uploadMedia = async (file: File): Promise<{ url: string; type: string } | null> => {
+    const mediaType = "image";
     const ext = file.name.split(".").pop() || "jpg";
     const filePath = `${user!.id}/${Date.now()}.${ext}`;
-    const mediaType = file.type.startsWith("video/") ? "video" : "image";
     const { error } = await supabase.storage.from("yap-media").upload(filePath, file);
     if (error) {
       console.error("Upload error:", error);
@@ -741,7 +741,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
                   fileInputRef.current?.click();
                 }}
                 className="text-white/40 hover:text-[#d4ff00] transition-colors"
-                title="Add photo or video"
+                title="Add photo"
               >
                 <Image className="h-5 w-5" />
               </button>
@@ -808,7 +808,9 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
               <div className="flex gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">Anonymous</span>
+                    <span className={cn("font-bold", msg.user_id === user?.id ? "text-[#d4ff00]" : "text-white")}>
+                      {msg.user_id === user?.id ? "You" : "Anonymous"}
+                    </span>
                     <span className="text-white/40 text-sm">{getTimeAgo(msg.created_at)}</span>
                     <button
                       onClick={() => {
@@ -824,21 +826,12 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
 
                   {msg.image_url && (
                     <div className="mt-2">
-                      {msg.media_type === "video" ? (
-                        <video
-                          src={msg.image_url}
-                          controls
-                          className="w-full max-h-96 rounded-lg object-contain border border-[#a855f7]/20"
-                          preload="metadata"
-                        />
-                      ) : (
-                        <img
-                          src={msg.image_url}
-                          alt="Yap media"
-                          className="w-full max-h-96 rounded-lg object-contain border border-[#a855f7]/20"
-                          loading="lazy"
-                        />
-                      )}
+                      <img
+                        src={msg.image_url}
+                        alt="Yap media"
+                        className="w-full max-h-96 rounded-lg object-contain border border-[#a855f7]/20"
+                        loading="lazy"
+                      />
                     </div>
                   )}
 
@@ -858,8 +851,8 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
                         <div key={comment.id} className="flex gap-2">
                           <div className="flex-1 bg-white/[0.04] rounded-lg p-3">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-white text-sm">
-                                Anonymous
+                              <span className={cn("font-semibold text-sm", comment.user_id === user?.id ? "text-[#d4ff00]" : "text-white")}>
+                                {comment.user_id === user?.id ? "You" : "Anonymous"}
                               </span>
                               <span className="text-white/40 text-xs">{getTimeAgo(comment.created_at)}</span>
                             </div>

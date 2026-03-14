@@ -355,7 +355,67 @@ const BLOCKED_VENUE_NAMES = [
 ];
 
 /**
- * Create a new venue at given coordinates
+ * Geocode a venue name using Mapbox forward geocoding.
+ * Searches for POIs near the user's GPS and returns the actual
+ * business coordinates if a match is found within 1km.
+ */
+export const geocodeVenue = async (
+  name: string,
+  userLat: number,
+  userLng: number
+): Promise<{ lat: number; lng: number; placeId?: string } | null> => {
+  try {
+    const token = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN;
+    if (!token) return null;
+
+    const encoded = encodeURIComponent(name.trim());
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?proximity=${userLng},${userLat}&types=poi&limit=3&access_token=${token}`;
+
+    const response = await fetch(url);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const features: Array<{
+      center: [number, number]; // [lng, lat]
+      place_name: string;
+      id: string;
+    }> = data.features || [];
+
+    if (features.length === 0) return null;
+
+    // Find closest result within 1km of user
+    let best: typeof features[0] | null = null;
+    let bestDist = Infinity;
+
+    for (const feat of features) {
+      const [fLng, fLat] = feat.center;
+      const dist = calculateDistance(userLat, userLng, fLat, fLng);
+      if (dist < bestDist && dist <= 1000) {
+        bestDist = dist;
+        best = feat;
+      }
+    }
+
+    if (!best) {
+      console.log(`[geocodeVenue] No Mapbox result within 1km for "${name}"`);
+      return null;
+    }
+
+    const [lng, lat] = best.center;
+    console.log(
+      `[geocodeVenue] Resolved "${name}" → "${best.place_name}" at ${lat.toFixed(5)},${lng.toFixed(5)} (${Math.round(bestDist)}m from user)`
+    );
+    return { lat, lng, placeId: best.id };
+  } catch (error) {
+    console.error('[geocodeVenue] Error:', error);
+    return null;
+  }
+};
+
+/**
+ * Create a new venue at given coordinates.
+ * Automatically geocodes the venue name via Mapbox to get the actual
+ * business location. Falls back to user GPS if geocoding fails.
  */
 export const createNewVenue = async (
   name: string,
@@ -369,28 +429,85 @@ export const createNewVenue = async (
       console.warn(`[createNewVenue] Blocked venue name: "${name}"`);
       return null;
     }
+
+    // Try to get the actual business location via Mapbox geocoding
+    const geocoded = await geocodeVenue(name, lat, lng);
+    const venueLat = geocoded?.lat ?? lat;
+    const venueLng = geocoded?.lng ?? lng;
+
     const { data, error } = await supabase
       .from('venues')
       .insert({
         name,
-        lat,
-        lng,
+        lat: venueLat,
+        lng: venueLng,
         neighborhood,
         type,
-       is_leaderboard_promoted: false,
-       is_map_promoted: false,
+        is_leaderboard_promoted: false,
+        is_map_promoted: false,
         is_demo: false,
       })
       .select('id')
       .single();
 
     if (error) throw error;
-    
+
     return data?.id || null;
   } catch (error) {
     console.error('Error creating venue:', error);
     return null;
   }
+};
+
+/**
+ * Batch-correct existing venue coordinates using Mapbox geocoding.
+ * Returns the number of venues updated.
+ */
+export const geocodeExistingVenues = async (
+  city?: string
+): Promise<{ updated: number; failed: number; skipped: number }> => {
+  const query = supabase.from('venues').select('id, name, lat, lng, city');
+  if (city) query.eq('city', city);
+
+  const { data: venues, error } = await query;
+  if (error || !venues) return { updated: 0, failed: 0, skipped: 0 };
+
+  let updated = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const venue of venues) {
+    const geocoded = await geocodeVenue(venue.name, venue.lat, venue.lng);
+    if (!geocoded) {
+      skipped++;
+      continue;
+    }
+
+    // Only update if the geocoded location differs by more than 50m
+    const dist = calculateDistance(venue.lat, venue.lng, geocoded.lat, geocoded.lng);
+    if (dist < 50) {
+      skipped++;
+      continue;
+    }
+
+    const { error: updateError } = await supabase
+      .from('venues')
+      .update({ lat: geocoded.lat, lng: geocoded.lng })
+      .eq('id', venue.id);
+
+    if (updateError) {
+      failed++;
+      console.error(`[geocodeExistingVenues] Failed to update "${venue.name}":`, updateError);
+    } else {
+      updated++;
+      console.log(`[geocodeExistingVenues] Updated "${venue.name}" by ${Math.round(dist)}m`);
+    }
+
+    // Rate-limit Mapbox API calls (600 req/min limit)
+    await new Promise(r => setTimeout(r, 150));
+  }
+
+  return { updated, failed, skipped };
 };
 
 /**

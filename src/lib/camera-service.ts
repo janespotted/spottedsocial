@@ -6,6 +6,20 @@ export interface CapturedMedia {
   preview: string;
 }
 
+/**
+ * Pre-initialize the Camera plugin by checking permissions.
+ * This warms up the native bridge so the camera opens instantly when tapped.
+ * Call this early (e.g. when the feed mounts).
+ */
+export async function warmUpCamera(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await Camera.checkPermissions();
+  } catch {
+    // Ignore — just warming up the native bridge
+  }
+}
+
 // Mirror image horizontally (for front camera selfies)
 async function mirrorImage(base64: string, format: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -173,28 +187,6 @@ export async function pickFromGallery(): Promise<CapturedMedia | null> {
     return { file, preview: base64 };
   } catch (error) {
     console.error('Error picking from gallery:', error);
-    return null;
-  }
-}
-
-export async function captureVideo(): Promise<CapturedMedia | null> {
-  try {
-    return new Promise((resolve) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'video/*';
-      input.capture = 'environment';
-      input.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (!file) { resolve(null); return; }
-        const preview = URL.createObjectURL(file);
-        resolve({ file, preview });
-      };
-      input.oncancel = () => resolve(null);
-      input.click();
-    });
-  } catch (error) {
-    console.error('Error capturing video:', error);
     return null;
   }
 }

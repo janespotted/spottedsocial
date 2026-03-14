@@ -310,6 +310,7 @@ export default function Friends() {
   };
 
   const acceptRequest = async (requestId: string) => {
+    const request = requests.find(r => r.id === requestId);
     const { error } = await supabase
       .from('friendships')
       .update({ status: 'accepted' })
@@ -318,6 +319,18 @@ export default function Friends() {
     if (error) {
       toast.error('Failed to accept request');
       return;
+    }
+
+    // Trigger push notification for acceptance
+    if (request && user) {
+      const myName = currentUserProfile?.display_name || 'Someone';
+      triggerPushNotification({
+        id: `friend-accept-${requestId}`,
+        receiver_id: request.user_id,
+        sender_id: user.id,
+        type: 'friend_accepted',
+        message: `${myName} accepted your friend request!`,
+      });
     }
 
     haptic.success();
@@ -518,6 +531,16 @@ export default function Friends() {
         .insert({ user_id: user?.id, friend_id: friendId, status: 'pending' });
 
       if (error) throw error;
+
+      // Trigger push notification for friend request
+      const senderName = currentUserProfile?.display_name || 'Someone';
+      triggerPushNotification({
+        id: `friend-req-${user?.id}-${friendId}`,
+        receiver_id: friendId,
+        sender_id: user!.id,
+        type: 'friend_request',
+        message: `${senderName} sent you a friend request`,
+      });
 
       setFriendshipStatuses(prev => ({ ...prev, [friendId]: 'pending' }));
       haptic.success();
