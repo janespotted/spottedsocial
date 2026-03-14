@@ -101,15 +101,25 @@ function AutoTracker({ onReady }: { onReady: () => void }) {
 
             // Add listener BEFORE calling register to avoid missing the event
             PushNotifications.addListener('registration', async (token) => {
-              logger.info('push:token_received', { token: token.value.slice(0, 8) + '…' });
-              const { error } = await supabase
+              const tokenValue = token.value;
+              logger.info('push:token_received', {
+                tokenPrefix: tokenValue.slice(0, 8),
+                tokenLength: tokenValue.length,
+                userId: user.id.slice(0, 8),
+              });
+
+              // Always upsert the token to ensure it's fresh
+              const { error, data } = await supabase
                 .from('profiles')
-                .update({ apns_device_token: token.value, push_enabled: true })
-                .eq('id', user.id);
+                .update({ apns_device_token: tokenValue, push_enabled: true })
+                .eq('id', user.id)
+                .select('id')
+                .single();
+
               if (error) {
-                logger.error('push:save_token_failed', { error: error.message });
+                logger.error('push:save_token_failed', { error: error.message, code: error.code });
               } else {
-                logger.info('push:auto_registered');
+                logger.info('push:token_saved_confirmed', { profileId: data?.id?.slice(0, 8) });
               }
             });
 

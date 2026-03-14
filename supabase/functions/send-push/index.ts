@@ -480,6 +480,63 @@ async function createApnsJwt(keyId: string, teamId: string, authKeyRaw: string):
   return `${unsignedToken}.${signatureB64}`;
 }
 
+// Validate APNs device token format (should be hex string, 64 chars for modern tokens)
+function isValidApnsToken(token: string): boolean {
+  return /^[0-9a-fA-F]{64}$/.test(token);
+}
+
+async function sendApnsPushToHost(
+  deviceToken: string,
+  notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string },
+  apnsHost: string,
+  jwt: string,
+  bundleId: string,
+): Promise<{ ok: boolean; status: number; reason?: string }> {
+  const apnsPayload = {
+    aps: {
+      alert: {
+        title: notificationPayload.title,
+        body: notificationPayload.body,
+      },
+      sound: "default",
+      badge: 1,
+      "thread-id": notificationPayload.type || "default",
+    },
+    url: notificationPayload.url,
+    type: notificationPayload.type,
+  };
+
+  console.log(`APNs attempt → host: ${apnsHost}, token: ${deviceToken.substring(0, 8)}…, topic: ${bundleId}`);
+
+  const response = await fetch(`https://${apnsHost}/3/device/${deviceToken}`, {
+    method: "POST",
+    headers: {
+      Authorization: `bearer ${jwt}`,
+      "apns-topic": bundleId,
+      "apns-push-type": "alert",
+      "apns-priority": "10",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(apnsPayload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let reason = "unknown";
+    try {
+      reason = JSON.parse(errorText).reason || errorText;
+    } catch {
+      reason = errorText;
+    }
+    console.error(`APNs failed on ${apnsHost}: ${response.status} ${reason}`);
+    return { ok: false, status: response.status, reason };
+  }
+
+  await response.text();
+  console.log(`APNs push sent successfully via ${apnsHost}`);
+  return { ok: true, status: response.status };
+}
+
 async function sendApnsPush(
   deviceToken: string,
   notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string },
@@ -494,81 +551,42 @@ async function sendApnsPush(
     return false;
   }
 
+  // Validate token format
+  if (!isValidApnsToken(deviceToken)) {
+    console.error(`APNs token has invalid format (length=${deviceToken.length}, sample=${deviceToken.substring(0, 12)}…). Expected 64 hex chars.`);
+    return false;
+  }
+
   try {
-    console.log("APNs config:", { keyId, teamId, bundleId, tokenPrefix: deviceToken.substring(0, 8) });
+    console.log("APNs config:", { keyId, teamId, bundleId: bundleId.trim(), tokenPrefix: deviceToken.substring(0, 8) });
     const jwt = await createApnsJwt(keyId, teamId, authKey);
     console.log("APNs JWT created successfully, length:", jwt.length);
-
-    const apnsPayload = {
-      aps: {
-        alert: {
-          title: notificationPayload.title,
-          body: notificationPayload.body,
-        },
-        sound: "default",
-        badge: 1,
-        "thread-id": notificationPayload.type || "default",
-      },
-      url: notificationPayload.url,
-      type: notificationPayload.type,
-    };
 
     const isSandbox = Deno.env.get("APNS_SANDBOX") === "true";
     const primaryHost = isSandbox ? "api.development.push.apple.com" : "api.push.apple.com";
     const fallbackHost = isSandbox ? "api.push.apple.com" : "api.development.push.apple.com";
 
-    const headers = {
-      Authorization: `bearer ${jwt}`,
-      "apns-topic": bundleId,
-      "apns-push-type": "alert",
-      "apns-priority": "10",
-      "Content-Type": "application/json",
-    };
-    const bodyStr = JSON.stringify(apnsPayload);
+    // Try primary environment first
+    const result = await sendApnsPushToHost(deviceToken, notificationPayload, primaryHost, jwt, bundleId.trim());
 
-    console.log(`Sending APNs push to device: ${deviceToken.substring(0, 8)}... (host: ${primaryHost}, sandbox: ${isSandbox}, bundle: ${bundleId})`);
+    if (result.ok) return true;
 
-    const response = await fetch(`https://${primaryHost}/3/device/${deviceToken}`, {
-      method: "POST",
-      headers,
-      body: bodyStr,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`APNs push failed (${primaryHost}):`, response.status, errorText);
-
-      // If the token was issued for the other environment, retry on the fallback host
-      if (response.status === 403 && errorText.includes("BadEnvironmentKeyInToken")) {
-        console.log(`Retrying APNs push on fallback host: ${fallbackHost}`);
-        const retryResponse = await fetch(`https://${fallbackHost}/3/device/${deviceToken}`, {
-          method: "POST",
-          headers,
-          body: bodyStr,
-        });
-
-        if (!retryResponse.ok) {
-          const retryError = await retryResponse.text();
-          console.error(`APNs fallback push failed (${fallbackHost}):`, retryResponse.status, retryError);
-          return false;
-        }
-
-        await retryResponse.text();
-        console.log(`APNs push sent successfully via fallback host: ${fallbackHost}`);
+    // If BadEnvironmentKeyInToken, retry on the opposite host
+    if (result.reason === "BadEnvironmentKeyInToken") {
+      console.log(`BadEnvironmentKeyInToken on ${primaryHost}, retrying on fallback ${fallbackHost}…`);
+      const fallbackResult = await sendApnsPushToHost(deviceToken, notificationPayload, fallbackHost, jwt, bundleId.trim());
+      if (fallbackResult.ok) {
+        console.log(`APNs push succeeded on fallback host ${fallbackHost}. Token is registered for ${isSandbox ? "production" : "sandbox"} environment.`);
         return true;
       }
-
-      if (response.status === 410) {
-        console.log("APNs device token is no longer active");
-      }
-
-      return false;
+      console.error(`APNs push also failed on fallback: ${fallbackResult.status} ${fallbackResult.reason}`);
     }
 
-    // Consume body to prevent resource leak
-    await response.text();
-    console.log("APNs push sent successfully");
-    return true;
+    if (result.status === 410) {
+      console.log("APNs device token is no longer active");
+    }
+
+    return false;
   } catch (err) {
     console.error("APNs push error:", err);
     return false;
