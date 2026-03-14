@@ -435,7 +435,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
 
       const { error } = await supabase.from("yap_messages").insert({
         user_id: user!.id,
-        text: newYap.trim() || (mediaType === "video" ? "📹" : "📸"),
+        text: newYap.trim() || "📸",
         venue_name: venueName,
         is_anonymous: true,
         author_handle: handle,

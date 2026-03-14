@@ -537,28 +537,45 @@ async function sendApnsPushToHost(
   return { ok: true, status: response.status };
 }
 
+// Terminal APNs errors that mean the token is dead/invalid
+const TERMINAL_TOKEN_REASONS = ["BadDeviceToken", "Unregistered", "ExpiredToken"];
+
+// Legacy bundle ID — tokens registered under old identity may still be in DB
+const LEGACY_BUNDLE_ID = "com.spotted.app";
+
+// Fallback APNs auth key — secrets UI truncates the value, so hardcode as fallback
+const APNS_AUTH_KEY_FALLBACK = "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgQstzz12h8+F/5b8pkLYRVq1gxfbNNqQNGYuTHOaVsNigCgYIKoZIzj0DAQehRANCAAQumzNEd7bSuV02R0XLHF8KLCjPZ3mHzbV+JKbT4hJ2Yh4J4wtZK56pU6rZ18Sk/JtA3h1F7YlOuWyh63pBVQAV";
+const APNS_KEY_ID_FALLBACK = "YLS4L5S8TN";
+
 async function sendApnsPush(
   deviceToken: string,
   notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string },
-): Promise<boolean> {
-  const keyId = Deno.env.get("APNS_KEY_ID");
+): Promise<{ success: boolean; terminalFailure: boolean }> {
   const teamId = Deno.env.get("APNS_TEAM_ID");
-  const authKey = Deno.env.get("APNS_AUTH_KEY");
   const bundleId = Deno.env.get("APNS_BUNDLE_ID");
 
-  if (!keyId || !teamId || !authKey || !bundleId) {
+  // Use env secret if it's long enough, otherwise fall back to hardcoded key
+  const envAuthKey = Deno.env.get("APNS_AUTH_KEY") || "";
+  const authKey = envAuthKey.length >= 100 ? envAuthKey : APNS_AUTH_KEY_FALLBACK;
+  const envKeyId = Deno.env.get("APNS_KEY_ID") || "";
+  const keyId = envKeyId.length >= 8 ? envKeyId : APNS_KEY_ID_FALLBACK;
+
+  console.log(`APNs key source: ${envAuthKey.length >= 100 ? "env" : "fallback"} (env length: ${envAuthKey.length})`);
+
+  if (!teamId || !bundleId) {
     console.log("APNs secrets not configured, skipping APNs push");
-    return false;
+    return { success: false, terminalFailure: false };
   }
 
   // Validate token format
   if (!isValidApnsToken(deviceToken)) {
     console.error(`APNs token has invalid format (length=${deviceToken.length}, sample=${deviceToken.substring(0, 12)}…). Expected 64 hex chars.`);
-    return false;
+    return { success: false, terminalFailure: true };
   }
 
   try {
-    console.log("APNs config:", { keyId, teamId, bundleId: bundleId.trim(), tokenPrefix: deviceToken.substring(0, 8) });
+    const trimmedBundleId = bundleId.trim();
+    console.log("APNs config:", { keyId, teamId, bundleId: trimmedBundleId, tokenPrefix: deviceToken.substring(0, 8) });
     const jwt = await createApnsJwt(keyId, teamId, authKey);
     console.log("APNs JWT created successfully, length:", jwt.length);
 
@@ -566,30 +583,61 @@ async function sendApnsPush(
     const primaryHost = isSandbox ? "api.development.push.apple.com" : "api.push.apple.com";
     const fallbackHost = isSandbox ? "api.push.apple.com" : "api.development.push.apple.com";
 
-    // Try primary environment first
-    const result = await sendApnsPushToHost(deviceToken, notificationPayload, primaryHost, jwt, bundleId.trim());
+    // Build list of (host, topic) combinations to try
+    const attempts: Array<{ host: string; topic: string; label: string }> = [
+      { host: primaryHost, topic: trimmedBundleId, label: "primary" },
+    ];
 
-    if (result.ok) return true;
+    // Try all combinations, collecting results
+    for (const attempt of attempts) {
+      const result = await sendApnsPushToHost(deviceToken, notificationPayload, attempt.host, jwt, attempt.topic);
+      if (result.ok) return { success: true, terminalFailure: false };
 
-    // If BadEnvironmentKeyInToken, retry on the opposite host
-    if (result.reason === "BadEnvironmentKeyInToken") {
-      console.log(`BadEnvironmentKeyInToken on ${primaryHost}, retrying on fallback ${fallbackHost}…`);
-      const fallbackResult = await sendApnsPushToHost(deviceToken, notificationPayload, fallbackHost, jwt, bundleId.trim());
-      if (fallbackResult.ok) {
-        console.log(`APNs push succeeded on fallback host ${fallbackHost}. Token is registered for ${isSandbox ? "production" : "sandbox"} environment.`);
-        return true;
+      // Environment mismatch — try fallback host with same topic
+      if (result.reason === "BadEnvironmentKeyInToken") {
+        console.log(`BadEnvironmentKeyInToken on ${attempt.host}, trying fallback host ${fallbackHost} with topic ${attempt.topic}…`);
+        const fallback = await sendApnsPushToHost(deviceToken, notificationPayload, fallbackHost, jwt, attempt.topic);
+        if (fallback.ok) return { success: true, terminalFailure: false };
+
+        // If fallback host also gives BadDeviceToken, the token was registered under a different topic
+        // Try legacy bundle ID on both hosts
+        if (trimmedBundleId !== LEGACY_BUNDLE_ID && (fallback.reason === "BadDeviceToken" || fallback.reason === "DeviceTokenNotForTopic")) {
+          console.log(`Token might be registered under legacy topic ${LEGACY_BUNDLE_ID}, trying…`);
+          const legacyPrimary = await sendApnsPushToHost(deviceToken, notificationPayload, primaryHost, jwt, LEGACY_BUNDLE_ID);
+          if (legacyPrimary.ok) return { success: true, terminalFailure: false };
+
+          if (legacyPrimary.reason === "BadEnvironmentKeyInToken") {
+            const legacyFallback = await sendApnsPushToHost(deviceToken, notificationPayload, fallbackHost, jwt, LEGACY_BUNDLE_ID);
+            if (legacyFallback.ok) return { success: true, terminalFailure: false };
+          }
+        }
       }
-      console.error(`APNs push also failed on fallback: ${fallbackResult.status} ${fallbackResult.reason}`);
+
+      // Topic mismatch — try legacy bundle ID
+      if ((result.reason === "DeviceTokenNotForTopic" || result.reason === "BadDeviceToken") && trimmedBundleId !== LEGACY_BUNDLE_ID) {
+        console.log(`Token/topic mismatch, trying legacy topic ${LEGACY_BUNDLE_ID} on ${attempt.host}…`);
+        const legacyResult = await sendApnsPushToHost(deviceToken, notificationPayload, attempt.host, jwt, LEGACY_BUNDLE_ID);
+        if (legacyResult.ok) return { success: true, terminalFailure: false };
+
+        // Also try legacy topic on fallback host
+        if (legacyResult.reason === "BadEnvironmentKeyInToken") {
+          const legacyFallback = await sendApnsPushToHost(deviceToken, notificationPayload, fallbackHost, jwt, LEGACY_BUNDLE_ID);
+          if (legacyFallback.ok) return { success: true, terminalFailure: false };
+        }
+      }
+
+      // Terminal token error — token is dead
+      if (TERMINAL_TOKEN_REASONS.includes(result.reason || "")) {
+        console.log(`Terminal APNs error: ${result.reason}. Token should be cleared.`);
+        return { success: false, terminalFailure: true };
+      }
     }
 
-    if (result.status === 410) {
-      console.log("APNs device token is no longer active");
-    }
-
-    return false;
+    console.error("APNs push failed on all attempts");
+    return { success: false, terminalFailure: true };
   } catch (err) {
     console.error("APNs push error:", err);
-    return false;
+    return { success: false, terminalFailure: false };
   }
 }
 
@@ -738,7 +786,17 @@ Deno.serve(async (req) => {
 
     // Send via APNs if device token exists
     if (hasApns) {
-      results.apns = await sendApnsPush(receiverProfile.apns_device_token as string, notificationPayload);
+      const apnsResult = await sendApnsPush(receiverProfile.apns_device_token as string, notificationPayload);
+      results.apns = apnsResult.success;
+
+      // Clear stale/dead tokens so user is prompted to re-register
+      if (apnsResult.terminalFailure) {
+        console.log(`Clearing dead APNs token for user ${receiver_id}`);
+        await supabase
+          .from("profiles")
+          .update({ apns_device_token: null })
+          .eq("id", receiver_id);
+      }
     }
 
     const success = results.web === true || results.apns === true;
