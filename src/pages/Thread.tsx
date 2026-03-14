@@ -14,6 +14,7 @@ import { z } from 'zod';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { isFromTonight } from '@/lib/time-context';
 import { logger } from '@/lib/logger';
+import { triggerPushNotification } from '@/lib/push-notifications';
 import { MessageInput } from '@/components/MessageInput';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 

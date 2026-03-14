@@ -572,7 +572,7 @@ function getNotificationContent(
     case "invite_accepted":
       return { title: "🎉 Invite Accepted!", body: message, url: "/profile" };
     case "dm":
-      return { title: "💬 New Message", body: message, url: "/messages" };
+      return { title: _senderName ? `💬 ${_senderName}` : "💬 New Message", body: message, url: "/messages" };
     case "meetup_accepted":
       return { title: "🎉 Meet Up Accepted!", body: message, url: "/messages?tab=activity" };
     case "venue_invite_accepted":
