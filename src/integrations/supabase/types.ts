@@ -1287,6 +1287,27 @@ export type Database = {
           },
         ]
       }
+      push_logs: {
+        Row: {
+          created_at: string
+          detail: Json | null
+          id: string
+          stage: string | null
+        }
+        Insert: {
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          stage?: string | null
+        }
+        Update: {
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          stage?: string | null
+        }
+        Relationships: []
+      }
       rate_limit_actions: {
         Row: {
           action_type: string
