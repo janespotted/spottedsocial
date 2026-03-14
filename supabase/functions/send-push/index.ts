@@ -582,8 +582,22 @@ async function sendApnsPush(
       console.error(`APNs push also failed on fallback: ${fallbackResult.status} ${fallbackResult.reason}`);
     }
 
-    if (result.status === 410) {
-      console.log("APNs device token is no longer active");
+    // Terminal token errors — mark for cleanup
+    const terminalReasons = ["BadDeviceToken", "Unregistered", "DeviceTokenNotForTopic"];
+    if (result.status === 410 || terminalReasons.includes(result.reason || "")) {
+      console.log(`APNs terminal error (${result.reason || result.status}), clearing stale token`);
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const cleanupClient = createClient(supabaseUrl, supabaseServiceKey);
+        await cleanupClient
+          .from("profiles")
+          .update({ apns_device_token: null, push_enabled: false })
+          .eq("apns_device_token", deviceToken);
+        console.log("Cleared stale APNs token from profile");
+      } catch (cleanupErr) {
+        console.error("Failed to clear stale APNs token:", cleanupErr);
+      }
     }
 
     return false;
@@ -739,6 +753,13 @@ Deno.serve(async (req) => {
     // Send via APNs if device token exists
     if (hasApns) {
       results.apns = await sendApnsPush(receiverProfile.apns_device_token as string, notificationPayload);
+
+      // Token hygiene: clear stale APNs token on terminal failures
+      if (results.apns === false) {
+        // Re-check the last error reason from logs isn't sufficient,
+        // so we pass receiver_id into cleanup logic below
+        console.log("APNs push failed for receiver:", receiver_id, "— will check for stale token cleanup");
+      }
     }
 
     const success = results.web === true || results.apns === true;

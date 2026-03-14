@@ -1,19 +1,19 @@
 
 
-# Re-enter APNs Auth Key Secret
+## Problem
 
-The current `APNS_AUTH_KEY` is 200 characters after cleaning, but a valid P8 key should be exactly **164 characters** of base64 content. This is the root cause of all push notification failures.
+The push notification toggle doesn't appear at all because `isSupported` evaluates to `false` in the Lovable preview iframe. The preview runs in a sandboxed cross-origin iframe where Service Workers and PushManager are unavailable, so the code renders "Browser not supported" instead of the Switch.
 
-## What you need to do
+This same issue may happen on some mobile browsers. The toggle should always be visible and explain the situation on tap, rather than being hidden.
 
-1. Open your `.p8` file (downloaded from Apple Developer → Keys) in a text editor
-2. Copy **only** the base64 content between the header/footer lines — do NOT include `-----BEGIN PRIVATE KEY-----` or `-----END PRIVATE KEY-----`
-3. Remove all newlines so it's one continuous string (should be exactly 164 characters)
-4. I'll prompt you to paste it as the new `APNS_AUTH_KEY` value
+## Fix
 
-## After the key is fixed
+**`src/hooks/usePushNotifications.ts`** — Always report `isSupported = true` on web (since PWA push is broadly supported), and handle failures gracefully at subscribe time instead of hiding the UI.
 
-1. Redeploy the `send-push` edge function so it picks up the corrected secret
-2. Add token hygiene to `send-push` so stale tokens get cleared automatically on terminal APNs errors
-3. Open the app to trigger a fresh token registration, then test a notification
+**`src/pages/Settings.tsx`** — Always render the Switch (remove the `isSupported` gate). If subscribe fails because the browser doesn't actually support it, show a toast explaining why.
+
+| File | Change |
+|------|--------|
+| `src/hooks/usePushNotifications.ts` | Change `isSupported` to always be `true` on web (non-native), and catch unsupported errors in `subscribe()` |
+| `src/pages/Settings.tsx` | Always render the Switch toggle, remove `!isSupported` fallback text. Handle errors via toast on toggle |
 
