@@ -409,11 +409,11 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
 
       const { data: nightStatus } = await supabase
         .from("night_statuses")
-        .select("id, is_private_party, lat, lng, status")
+        .select("id, is_private_party, lat, lng, status, expires_at")
         .eq("user_id", user!.id)
-        .not('expires_at', 'is', null)
-        .gt('expires_at', new Date().toISOString())
-        .eq('status', 'out')
+        .eq("status", "out")
+        .not("expires_at", "is", null)
+        .gt("expires_at", new Date().toISOString())
         .maybeSingle();
 
       // Only tag as private party if this thread IS a private party thread (has partyId)

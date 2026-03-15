@@ -216,13 +216,22 @@ export function FindFriendsOnboarding({ onComplete, onSkip }: FindFriendsOnboard
 
       if (error) throw error;
 
-      // Trigger push notification for friend request
-      triggerPushNotification({
-        id: `friend-req-${user?.id}-${friendId}`,
-        receiver_id: friendId,
-        sender_id: user!.id,
-        type: 'friend_request',
-        message: 'You have a new friend request!',
+      // Create notification via RPC and trigger push
+      supabase.rpc('create_notification', {
+        p_receiver_id: friendId,
+        p_type: 'friend_request',
+        p_message: 'You have a new friend request!',
+      }).then(({ data }) => {
+        const notif = Array.isArray(data) ? data[0] : data;
+        if (notif?.id) {
+          triggerPushNotification({
+            id: notif.id,
+            receiver_id: friendId,
+            sender_id: user!.id,
+            type: 'friend_request',
+            message: 'You have a new friend request!',
+          });
+        }
       });
 
       setSentRequests(prev => new Set(prev).add(friendId));

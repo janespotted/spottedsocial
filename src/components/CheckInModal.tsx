@@ -673,6 +673,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         expires_at: status === 'home' ? null : calculateExpiryTime(),
         planning_neighborhood: status === 'planning' ? neighborhood : null,
         planning_visibility: status === 'planning' ? visibility : null,
+        // Always reset private party fields on non-private-party check-ins
+        is_private_party: false,
+        party_neighborhood: null,
+        party_address: null,
       };
 
       const { error } = await supabase
@@ -730,24 +734,31 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               .single();
 
             const displayName = profile?.display_name || 'A friend';
-            const message = `${displayName} just checked in at ${venue}`;
+            const message = `${displayName} just arrived at ${venue}`;
 
-            // Insert notifications for all friends and trigger push for each
-            const notifications = friendIds.map(friendId => ({
-              sender_id: user!.id,
-              receiver_id: friendId,
-              type: 'friend_checkin',
-              message,
-            }));
-
-            const { data: inserted } = await supabase
-              .from('notifications')
-              .insert(notifications)
-              .select('id, receiver_id, sender_id, type, message');
-
-            inserted?.forEach(notif => {
-              triggerPushNotification(notif);
-            });
+            // Create notifications via RPC (bypasses RLS) and trigger push for each
+            for (const friendId of friendIds) {
+              supabase.rpc('create_notification', {
+                p_receiver_id: friendId,
+                p_type: 'friend_checkin',
+                p_message: message,
+              }).then(({ data, error }) => {
+                if (error) {
+                  console.warn('Friend checkin notification failed:', error.message);
+                  return;
+                }
+                const notif = Array.isArray(data) ? data[0] : data;
+                if (notif && notif.id) {
+                  triggerPushNotification({
+                    id: notif.id,
+                    receiver_id: friendId,
+                    sender_id: user!.id,
+                    type: 'friend_checkin',
+                    message,
+                  });
+                }
+              }).catch(err => console.warn('Friend checkin push failed:', err));
+            }
           } catch (err) {
             console.warn('Friend checkin notifications failed:', err);
           }

@@ -6,6 +6,7 @@ import { withRetry } from '@/lib/retry';
 import { logger } from '@/lib/logger';
 import { validateCommentText } from '@/lib/validation-schemas';
 import { resolvePostImageUrls } from '@/lib/storage-utils';
+import { triggerPushNotification } from '@/lib/push-notifications';
 
 const POSTS_PER_PAGE = 20;
 
@@ -346,12 +347,36 @@ export function useFeed(options: UseFeedOptions) {
       return;
     }
 
+    // Notify post owner about the comment
+    const post = posts.find(p => p.id === postId);
+    if (post && post.user_id !== userId) {
+      const commentPreview = validation.data!.length > 50
+        ? validation.data!.substring(0, 50) + '...'
+        : validation.data!;
+      supabase.rpc('create_notification', {
+        p_receiver_id: post.user_id,
+        p_type: 'post_comment',
+        p_message: `Someone commented: "${commentPreview}"`,
+      }).then(({ data }) => {
+        const notif = Array.isArray(data) ? data[0] : data;
+        if (notif?.id) {
+          triggerPushNotification({
+            id: notif.id,
+            receiver_id: post.user_id,
+            sender_id: userId!,
+            type: 'post_comment',
+            message: `Someone commented: "${commentPreview}"`,
+          });
+        }
+      });
+    }
+
     if (!text) {
       setNewComment(prev => ({ ...prev, [postId]: '' }));
     }
     await fetchComments(postId);
     await fetchPosts();
-  }, [newComment, userId, fetchComments, fetchPosts]);
+  }, [newComment, userId, fetchComments, fetchPosts, posts]);
 
   const handleLikePost = useCallback(async (postId: string) => {
     if (!userId) return;
@@ -400,9 +425,30 @@ export function useFeed(options: UseFeedOptions) {
           return newSet;
         });
         setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: Math.max((p.likes_count || 0) - 1, 0) } : p));
+      } else {
+        // Notify post owner about the like
+        const post = posts.find(p => p.id === postId);
+        if (post && post.user_id !== userId) {
+          supabase.rpc('create_notification', {
+            p_receiver_id: post.user_id,
+            p_type: 'post_like',
+            p_message: 'Someone liked your post',
+          }).then(({ data }) => {
+            const notif = Array.isArray(data) ? data[0] : data;
+            if (notif?.id) {
+              triggerPushNotification({
+                id: notif.id,
+                receiver_id: post.user_id,
+                sender_id: userId!,
+                type: 'post_like',
+                message: 'Someone liked your post',
+              });
+            }
+          });
+        }
       }
     }
-  }, [userId, likedPosts]);
+  }, [userId, likedPosts, posts]);
 
   const handleDeletePost = useCallback(async (postId: string) => {
     if (!userId) return;

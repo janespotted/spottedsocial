@@ -390,7 +390,19 @@ export default function Thread() {
         p_receiver_id: receiverId,
         p_type: 'dm',
         p_message: `${senderName}: ${messagePreview}`,
-      }).then(({ data }) => {
+      }).then(({ data, error }) => {
+        if (error) {
+          console.error('[DM PUSH] create_notification RPC failed:', error.message);
+          // Try push anyway with a generated ID
+          triggerPushNotification({
+            id: `dm-${Date.now()}`,
+            receiver_id: receiverId,
+            sender_id: user.id,
+            type: 'dm',
+            message: `${senderName}: ${messagePreview}`,
+          });
+          return;
+        }
         const notif = Array.isArray(data) ? data[0] : data;
         if (notif && notif.id) {
           triggerPushNotification({
@@ -400,7 +412,19 @@ export default function Thread() {
             type: 'dm',
             message: `${senderName}: ${messagePreview}`,
           });
+        } else {
+          console.error('[DM PUSH] create_notification returned no data:', JSON.stringify(data));
+          // Try push anyway
+          triggerPushNotification({
+            id: `dm-${Date.now()}`,
+            receiver_id: receiverId,
+            sender_id: user.id,
+            type: 'dm',
+            message: `${senderName}: ${messagePreview}`,
+          });
         }
+      }).catch((err) => {
+        console.error('[DM PUSH] Unexpected error:', String(err));
       });
     }
   }, [user, threadId, otherMember, groupInfo, currentUserProfile]);

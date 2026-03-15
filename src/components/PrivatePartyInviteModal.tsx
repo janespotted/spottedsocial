@@ -78,7 +78,9 @@ export function PrivatePartyInviteModal({
       const { data: nightStatuses } = await supabase
         .from('night_statuses')
         .select('user_id, status, venue_name, planning_neighborhood')
-        .in('user_id', friendIds);
+        .in('user_id', friendIds)
+        .not('expires_at', 'is', null)
+        .gt('expires_at', new Date().toISOString());
 
       const statusMap = new Map(
         (nightStatuses || []).map(ns => [ns.user_id, ns])
