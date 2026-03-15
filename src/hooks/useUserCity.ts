@@ -34,6 +34,8 @@ export function useUserCity() {
       detectUserCity().then(detectedCity => {
         setCity(detectedCity);
         setIsLoading(false);
+      }).catch(() => {
+        setIsLoading(false);
       });
     } else {
       setIsLoading(false);
@@ -44,7 +46,7 @@ export function useUserCity() {
             console.log('Background GPS corrected city:', cached, '→', detectedCity);
             setCity(detectedCity);
           }
-        });
+        }).catch(() => {});
       }, 2000);
       return () => {
         clearTimeout(timer);

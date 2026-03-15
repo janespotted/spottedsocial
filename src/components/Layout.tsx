@@ -76,33 +76,55 @@ export function Layout({ children }: LayoutProps) {
 
         // Show in-app toast with actions
         if (user) {
-          toast(`Still at ${venueName}?`, {
-            description: 'Let your friends know you\'re still out',
-            duration: 60000,
-            action: {
-              label: 'Yes, still here',
-              onClick: async () => {
-                const now = new Date().toISOString();
-                await Promise.all([
-                  supabase.from('profiles').update({ last_location_at: now }).eq('id', user.id),
-                  supabase.from('checkins').update({ last_updated_at: now }).eq('user_id', user.id).is('ended_at', null),
-                ]);
-                localStorage.removeItem('still_here_deadline');
-                localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
-                localStorage.setItem('still_here_venue', venueName);
-              },
-            },
-            cancel: {
-              label: 'Heading home',
-              onClick: async () => {
-                if (user) {
-                  await performAutoCheckout(user.id, 'still_here_heading_home');
-                  localStorage.removeItem('still_here_deadline');
-                  localStorage.removeItem('still_here_venue');
-                }
-              },
-            },
-          });
+          toast.custom((id) => (
+            <div className="w-full bg-[#1a0f2e] border border-[#a855f7]/40 rounded-2xl p-4 shadow-xl">
+              <p className="text-white font-semibold text-sm mb-1">Still at {venueName}?</p>
+              <p className="text-white/50 text-xs mb-3">Let your friends know what you're up to</p>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={async () => {
+                    toast.dismiss(id);
+                    const now = new Date().toISOString();
+                    await Promise.all([
+                      supabase.from('profiles').update({ last_location_at: now }).eq('id', user.id),
+                      supabase.from('checkins').update({ last_updated_at: now }).eq('user_id', user.id).is('ended_at', null),
+                    ]);
+                    localStorage.removeItem('still_here_deadline');
+                    localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
+                    localStorage.setItem('still_here_venue', venueName);
+                  }}
+                  className="w-full h-10 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white text-sm font-medium rounded-xl transition-colors"
+                >
+                  Yes, still here
+                </button>
+                <button
+                  onClick={() => {
+                    toast.dismiss(id);
+                    localStorage.removeItem('still_here_deadline');
+                    localStorage.removeItem('still_here_venue');
+                    localStorage.removeItem('still_here_check');
+                    openCheckInFromReminder();
+                  }}
+                  className="w-full h-10 bg-[#2d1b4e] hover:bg-[#2d1b4e]/80 text-[#d4ff00] text-sm font-medium rounded-xl border border-[#d4ff00]/30 transition-colors"
+                >
+                  I'm at a new spot
+                </button>
+                <button
+                  onClick={async () => {
+                    toast.dismiss(id);
+                    if (user) {
+                      await performAutoCheckout(user.id, 'still_here_heading_home');
+                      localStorage.removeItem('still_here_deadline');
+                      localStorage.removeItem('still_here_venue');
+                    }
+                  }}
+                  className="w-full h-9 text-white/50 hover:text-white text-sm transition-colors"
+                >
+                  Heading home
+                </button>
+              </div>
+            </div>
+          ), { duration: 60000 });
         }
       }
 

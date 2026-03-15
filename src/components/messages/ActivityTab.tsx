@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target, Heart, TrendingUp, Megaphone } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useFriendIds } from '@/hooks/useFriendIds';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode'; // kept for bootstrapEnabled in fetchAll dependency
 import { useUserCity } from '@/hooks/useUserCity';
 import { getDemoUsersForCity, getPromotedVenuesForCity } from '@/lib/demo-data';
@@ -131,13 +132,14 @@ export function ActivityTab() {
   const { bootstrapEnabled } = useBootstrapMode();
   const { city } = useUserCity();
   const queryClient = useQueryClient();
+  const { data: friendIdData } = useFriendIds(user?.id);
 
   useEffect(() => {
     if (user) {
       fetchAll();
       fetchPlanningFriends();
     }
-  }, [user, demoEnabled, bootstrapEnabled, city]);
+  }, [user, demoEnabled, bootstrapEnabled, city, friendIdData]);
 
   // Realtime subscriptions for live updates
   useEffect(() => {
@@ -186,8 +188,8 @@ export function ActivityTab() {
 
   const fetchActivities = async () => {
     // Parallelize initial queries including real notifications
-    // Use cached friend IDs
-    const cachedFriendIds: string[] = queryClient.getQueryData(['friend-ids', user?.id]) || [];
+    // Use friend IDs from hook (passed via closure) with cache fallback
+    const cachedFriendIds: string[] = friendIdData || queryClient.getQueryData(['friend-ids', user?.id, demoEnabled]) || [];
 
     const [currentStatusResult, realInvitesResult] = await Promise.all([
       supabase.from('night_statuses').select('venue_name').eq('user_id', user?.id).eq('status', 'out').not('expires_at', 'is', null).gt('expires_at', new Date().toISOString()).maybeSingle(),
@@ -442,10 +444,9 @@ export function ActivityTab() {
           )
         `)
         .in('user_id', friendIds)
-        .is('ended_at', null)
         .gte('started_at', tonightCutoff.toISOString())
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (checkIns?.length) {
         // Filter out demo check-ins when demo mode is off
@@ -453,12 +454,12 @@ export function ActivityTab() {
           ? checkIns.filter(checkIn => !checkIn.is_demo)
           : checkIns;
         
-        // Filter out stale check-ins (last_updated_at > 2 hours ago)
-        const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+        // Filter out stale check-ins (started > 6 hours ago)
+        const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
         const filteredCheckIns = demoFiltered.filter(c => {
-          const lastUpdate = c.last_updated_at || c.started_at;
-          if (!lastUpdate) return false;
-          return Date.now() - new Date(lastUpdate).getTime() < TWO_HOURS_MS;
+          const checkTime = c.started_at || c.created_at;
+          if (!checkTime) return false;
+          return Date.now() - new Date(checkTime).getTime() < SIX_HOURS_MS;
         });
         
         // Deduplicate: keep only the most recent check-in per user
@@ -977,7 +978,7 @@ export function ActivityTab() {
                       <span className="font-semibold">{activity.display_name}</span>
                       <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
                     </div>
-                    <span className="text-[#d4ff00] block text-xs mt-0.5">@{activity.subtitle}</span>
+                    <span className="text-[#d4ff00] block text-xs mt-0.5">arrived at {activity.subtitle}</span>
                   </div>
                 )}
                 {activity.type === 'trending' && (
@@ -1268,11 +1269,11 @@ export function ActivityTab() {
               </div>
             )}
 
-            {/* Section 3: Friends Out Now */}
+            {/* Section 3: Friends Recently Out */}
             {friendsOut.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
-                  Friends Out Now
+                  Friends Recently Out
                 </h3>
                 <div className="space-y-3">
                   {friendsOut.map(renderActivityCard)}

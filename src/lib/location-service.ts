@@ -332,18 +332,118 @@ export const findNearbyVenues = async (
     });
 
     if (error) throw error;
-    
-    if (data && data.length > 0) {
-      return data.map((v: { venue_id: string; venue_name: string; distance_meters: number }) => ({
-        id: v.venue_id,
-        name: v.venue_name,
-        distance: v.distance_meters,
-      }));
+
+    const dbVenues: VenueMatch[] = (data || []).map((v: { venue_id: string; venue_name: string; distance_meters: number }) => ({
+      id: v.venue_id,
+      name: v.venue_name,
+      distance: v.distance_meters,
+    }));
+
+    // If DB has enough results, return them
+    if (dbVenues.length >= 3) return dbVenues;
+
+    // Fallback: search Mapbox for nearby POIs (bars, restaurants, nightlife)
+    const mapboxVenues = await searchMapboxNearbyPOIs(lat, lng, radiusMeters);
+
+    // Merge: DB venues first, then Mapbox results not already in DB (dedup by name)
+    const dbNames = new Set(dbVenues.map(v => v.name.toLowerCase()));
+    const merged = [...dbVenues];
+    for (const mv of mapboxVenues) {
+      if (!dbNames.has(mv.name.toLowerCase()) && merged.length < maxResults) {
+        merged.push(mv);
+        dbNames.add(mv.name.toLowerCase());
+      }
     }
 
-    return [];
+    return merged;
   } catch (error) {
     console.error('Error finding nearby venues:', error);
+    return [];
+  }
+};
+
+/**
+ * Search Mapbox for nearby POIs (bars, restaurants, nightlife).
+ * Creates venues in the DB so they're available for future searches.
+ */
+const searchMapboxNearbyPOIs = async (
+  lat: number,
+  lng: number,
+  radiusMeters: number
+): Promise<VenueMatch[]> => {
+  try {
+    const token = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN;
+    if (!token) return [];
+
+    // Search for food/drink/nightlife POIs near the user
+    const categories = 'restaurant,bar,nightclub,pub,cafe';
+    const url = `https://api.mapbox.com/search/searchbox/v1/category/${categories}?proximity=${lng},${lat}&limit=10&language=en&access_token=${token}`;
+
+    const response = await fetch(url);
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    const features = data.features || [];
+
+    const results: VenueMatch[] = [];
+
+    for (const feature of features) {
+      const coords = feature.geometry?.coordinates;
+      if (!coords || coords.length < 2) continue;
+
+      const [fLng, fLat] = coords;
+      const distance = calculateDistance(lat, lng, fLat, fLng);
+
+      // Only include venues within the search radius
+      if (distance > radiusMeters) continue;
+
+      const name = feature.properties?.name;
+      if (!name) continue;
+
+      // Try to insert into DB (upsert by name to avoid duplicates)
+      const neighborhood = feature.properties?.context?.neighborhood?.name
+        || feature.properties?.context?.locality?.name
+        || 'Unknown';
+
+      // Detect city from coordinates
+      const city = fLat > 38 ? 'nyc' : fLat > 30 ? 'la' : 'pb';
+
+      // Detect venue type from Mapbox category
+      const poiCategory = feature.properties?.poi_category || [];
+      const poiCategoryStr = Array.isArray(poiCategory) ? poiCategory.join(',').toLowerCase() : '';
+      const venueType = poiCategoryStr.includes('nightclub') || poiCategoryStr.includes('night_club')
+        ? 'nightclub'
+        : poiCategoryStr.includes('bar') || poiCategoryStr.includes('pub')
+        ? 'bar'
+        : 'restaurant';
+
+      // Try to insert into DB via RPC (bypasses RLS), fall back to direct insert
+      let venueId: string | null = null;
+      try {
+        const { data: rpcResult } = await supabase.rpc('create_venue_from_discovery', {
+          p_name: name,
+          p_lat: fLat,
+          p_lng: fLng,
+          p_neighborhood: neighborhood,
+          p_type: venueType,
+          p_city: city,
+          p_google_place_id: feature.properties?.mapbox_id || null,
+        });
+        venueId = rpcResult;
+      } catch {
+        // RPC doesn't exist yet or failed — venue won't be persisted but still shown
+      }
+
+      results.push({
+        id: venueId || `mapbox-${feature.properties?.mapbox_id || name}`,
+        name,
+        distance,
+      });
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Error searching Mapbox POIs:', error);
     return [];
   }
 };

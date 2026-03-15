@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logEvent } from '@/lib/event-logger';
+import { stopBackgroundLocation } from '@/lib/background-location';
 
 /**
  * Shared utility to auto-checkout a user:
@@ -37,6 +38,9 @@ export async function performAutoCheckout(userId: string, reason: string = 'stil
       })
       .eq('user_id', userId),
   ]);
+
+  // Stop background location tracking since user is no longer out
+  stopBackgroundLocation();
 
   logEvent('auto_checkout_stale' as any, { reason });
 }

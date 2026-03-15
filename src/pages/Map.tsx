@@ -16,7 +16,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home, Map as MapIcon, Music, Wine, Beer, Building } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home, Map as MapIcon, Music, Wine, Beer, Building, UtensilsCrossed } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -102,7 +102,7 @@ export default function Map() {
   const [friends, setFriends] = useState<FriendLocation[]>([]);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
-  const [venueFilter, setVenueFilter] = useState<'all' | 'nightclub' | 'cocktail_bar' | 'bar' | 'rooftop'>('all');
+  const [venueFilter, setVenueFilter] = useState<'all' | 'nightclub' | 'cocktail_bar' | 'bar' | 'rooftop' | 'restaurant'>('all');
   // Use Map object keyed by user_id to prevent duplicate markers
   const friendMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
   const venueMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
@@ -1968,6 +1968,7 @@ export default function Map() {
                   { key: 'nightclub', label: 'Clubs', icon: <Music className="h-4 w-4" /> },
                   { key: 'cocktail_bar', label: 'Cocktails', icon: <Wine className="h-4 w-4" /> },
                   { key: 'bar', label: 'Bars', icon: <Beer className="h-4 w-4" /> },
+                  { key: 'restaurant', label: 'Restaurants', icon: <UtensilsCrossed className="h-4 w-4" /> },
                   { key: 'rooftop', label: 'Rooftops', icon: <Building className="h-4 w-4" /> },
                 ].map((filter) => (
                   <button

@@ -226,13 +226,13 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
       return;
     }
 
-    // Check if last checkin was within 90 minutes
+    // Check if last checkin was within 4 hours
     const lastCheckinTime = new Date(lastCheckin.started_at || lastCheckin.created_at).getTime();
     const now = Date.now();
     const minutesSinceLastCheckin = (now - lastCheckinTime) / (1000 * 60);
-    
-    if (minutesSinceLastCheckin > 90) {
-      console.log('🔵 Last checkin was >90 minutes ago, skipping auto-tracking');
+
+    if (minutesSinceLastCheckin > 240) {
+      console.log('🔵 Last checkin was >4 hours ago, skipping auto-tracking');
       return;
     }
 
@@ -329,8 +329,13 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
 
     // All conditions met - auto-update venue
     console.log('✨ Auto-updating venue from', lastCheckin.venue_name, 'to', nearestVenue.name);
-    
+
     await createCheckin(userId, locationData, nearestVenue.id, nearestVenue.name);
+
+    // Reset "still here?" timer since we just moved to a new venue
+    localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
+    localStorage.setItem('still_here_venue', nearestVenue.name);
+    localStorage.removeItem('still_here_deadline');
     
     // Log location update
     logEvent('location_update', {

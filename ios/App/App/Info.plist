@@ -26,6 +26,14 @@
 	<string>Spotted needs camera access to set your profile photo.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Spotted needs your location to show you nearby venues and friends.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Spotted uses your location in the background to automatically update your venue when you move to a new spot.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Spotted uses your photo library to add photos to Yaps and your profile.</string>
 	<key>UILaunchStoryboardName</key>

@@ -103,6 +103,11 @@ export function useVenueArrivalNudge(onVenueShiftDetected?: (data: VenueShiftDat
         })
         .eq('id', userId);
 
+      // Reset "still here?" timer since we just moved to a new venue
+      localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
+      localStorage.setItem('still_here_venue', venue.name);
+      localStorage.removeItem('still_here_deadline');
+
       console.log('[VenueArrivalNudge] Silent venue update:', venue.name);
     } catch (error) {
       console.error('[VenueArrivalNudge] Silent update error:', error);

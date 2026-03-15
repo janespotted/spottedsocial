@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { autoTrackVenue } from '@/lib/auto-venue-tracker';
 import { supabase } from '@/integrations/supabase/client';
 import { performAutoCheckout } from '@/lib/auto-checkout';
+import { startBackgroundLocation, stopBackgroundLocation } from '@/lib/background-location';
 
 // Global tracking state to prevent duplicate calls across all hook instances
 let lastGlobalTrackTime = 0;
@@ -66,7 +67,13 @@ export const useAutoVenueTracking = () => {
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
         .maybeSingle();
-      if (cancelled || data?.status !== 'out') return;
+      if (cancelled || data?.status !== 'out') {
+        stopBackgroundLocation();
+        return;
+      }
+
+      // Start background location tracking for venue auto-updates
+      startBackgroundLocation(user.id);
 
       // Check if current checkin is stale (>2h with no activity)
       const { data: activeCheckin } = await supabase
