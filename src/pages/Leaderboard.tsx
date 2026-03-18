@@ -146,6 +146,7 @@ export default function Leaderboard() {
     setIsLoading(true);
     try {
       // Build query for night statuses with venue popularity_rank, filtered by city
+      // NOTE: profiles join is done separately to avoid silent null from embedded joins
       let query = supabase
         .from('night_statuses')
         .select(`
@@ -154,12 +155,7 @@ export default function Leaderboard() {
           user_id,
           updated_at,
           is_promoted,
-          profiles:user_id (
-            display_name,
-            username,
-            avatar_url,
-            is_demo
-          ),
+          is_demo,
           venues!inner(popularity_rank, is_leaderboard_promoted, city, opened_at, operating_hours)
         `)
         .eq('venues.city', city)
@@ -229,7 +225,20 @@ export default function Leaderboard() {
       const promotedVenues = promotedVenuesResult.data;
       const statuses = statusesResult.data;
       const topVenues = topVenuesResult?.data;
-      
+
+      // Fetch profiles separately (embedded joins silently return null)
+      const statusUserIds = [...new Set((statuses || []).map((s: any) => s.user_id))];
+      const leaderboardProfileMap = new Map<string, any>();
+      if (statusUserIds.length > 0) {
+        const { data: profileRows } = await supabase
+          .from('profiles')
+          .select('id, display_name, username, avatar_url, is_demo')
+          .in('id', statusUserIds);
+        for (const p of (profileRows || [])) {
+          leaderboardProfileMap.set(p.id, p);
+        }
+      }
+
     // Build a set of active promoted venue IDs (only order 1-2)
     const activePromotedIds = new Set(promotedVenues?.map(v => v.id) || []);
 
@@ -311,7 +320,8 @@ export default function Leaderboard() {
       const isNewlyOpened = openedAt 
         ? new Date(openedAt) > threeMonthsAgo 
         : false;
-      const isDemo = status.profiles?.is_demo || false;
+      const statusProfile = leaderboardProfileMap.get(status.user_id);
+      const isDemo = statusProfile?.is_demo || status.is_demo || false;
       const updatedAt = status.updated_at ? new Date(status.updated_at) : null;
       const isRecentCheckin = updatedAt && updatedAt > thirtyMinutesAgo;
       
@@ -351,8 +361,8 @@ export default function Leaderboard() {
       if ((demoEnabled || !bootstrapEnabled || !isDemo) && status.user_id !== user?.id) {
         venue.friends.push({
           user_id: status.user_id,
-          display_name: status.profiles?.display_name || status.profiles?.username || 'Anonymous',
-          avatar_url: status.profiles?.avatar_url || null,
+          display_name: statusProfile?.display_name || statusProfile?.username || 'Anonymous',
+          avatar_url: statusProfile?.avatar_url || null,
         });
       }
     });

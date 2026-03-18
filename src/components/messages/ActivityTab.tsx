@@ -439,13 +439,7 @@ export function ActivityTab() {
 
       const { data: checkIns } = await supabase
         .from('checkins')
-        .select(`
-          *,
-          profiles:user_id (
-            display_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .in('user_id', friendIds)
         .gte('started_at', tonightCutoff.toISOString())
         .order('created_at', { ascending: false })
@@ -475,13 +469,24 @@ export function ActivityTab() {
         }
         const uniqueCheckIns = Array.from(seenUsers.values());
 
-        // Use cached profiles as fallback for missing profile data
+        // Fetch profiles separately (embedded joins can silently return null)
+        const checkinUserIds = [...new Set(uniqueCheckIns.map(c => c.user_id))];
+        const { data: checkinProfileRows } = checkinUserIds.length > 0
+          ? await supabase.from('profiles').select('id, display_name, avatar_url').in('id', checkinUserIds)
+          : { data: [] };
+        const checkinProfileMap = new Map(
+          (checkinProfileRows || []).map((p: any) => [p.id, p])
+        );
+        // Fall back to cached profiles if direct fetch misses
         const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
-        const profileMap = new Map(allProfiles.map((p: any) => [p.id, p]));
-        
+        for (const p of allProfiles) {
+          if (!checkinProfileMap.has(p.id)) checkinProfileMap.set(p.id, p);
+        }
+
         const checkInActivities: Activity[] = uniqueCheckIns.map(checkIn => {
-          const profileName = checkIn.profiles?.display_name || profileMap.get(checkIn.user_id)?.display_name || 'Friend';
-          const profileAvatar = checkIn.profiles?.avatar_url || profileMap.get(checkIn.user_id)?.avatar_url || null;
+          const prof = checkinProfileMap.get(checkIn.user_id);
+          const profileName = prof?.display_name || 'Friend';
+          const profileAvatar = prof?.avatar_url || null;
           return {
             id: checkIn.id,
             type: 'check_in' as const,

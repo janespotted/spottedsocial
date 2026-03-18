@@ -364,21 +364,34 @@ export function FriendIdCard() {
       ...(receivedFriendships?.map(f => f.user_id) || [])
     ];
 
-    // Find active check-ins at this venue
+    // Find active check-ins at this venue (profiles fetched separately to avoid silent null joins)
     const { data: activeCheckIns } = await supabase
       .from('checkins')
-      .select('user_id, profiles:user_id(display_name, avatar_url)')
+      .select('user_id')
       .eq('venue_name', venue)
       .neq('user_id', selectedFriend.userId)
       .in('user_id', friendIds)
       .is('ended_at', null);
 
-    if (activeCheckIns) {
-      const friends = activeCheckIns.map(c => ({
-        user_id: c.user_id,
-        display_name: (c.profiles as any)?.display_name || 'Friend',
-        avatar_url: (c.profiles as any)?.avatar_url || null,
-      }));
+    if (activeCheckIns && activeCheckIns.length > 0) {
+      const checkinUserIds = activeCheckIns.map(c => c.user_id);
+      const { data: checkinProfiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', checkinUserIds);
+
+      const checkinProfileMap = new Map(
+        (checkinProfiles || []).map((p: any) => [p.id, p])
+      );
+
+      const friends = activeCheckIns.map(c => {
+        const prof = checkinProfileMap.get(c.user_id);
+        return {
+          user_id: c.user_id,
+          display_name: prof?.display_name || 'Friend',
+          avatar_url: prof?.avatar_url || null,
+        };
+      });
       setFriendsAtVenue(friends);
     }
   };

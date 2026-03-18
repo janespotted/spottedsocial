@@ -176,16 +176,25 @@ export default function Home() {
         return;
       }
 
-      // Step 2: Get night_statuses with profile join — no privacy gating needed
-      // The Home page only shows display_name/avatar (non-sensitive), not GPS coordinates
-      let statusQuery = supabase
-        .from('night_statuses')
-        .select('user_id, venue_name, status, planning_neighborhood, is_demo, profiles:user_id(display_name, avatar_url, is_demo)')
-        .in('user_id', queryIds)
-        .not('expires_at', 'is', null)
-        .gt('expires_at', new Date().toISOString());
+      // Step 2: Get night_statuses + profiles separately (embedded joins can silently
+      // return null when FK hints are ambiguous or RLS interferes with the sub-select)
+      const [statusResult, profileResult] = await Promise.all([
+        supabase
+          .from('night_statuses')
+          .select('user_id, venue_name, status, planning_neighborhood, is_demo')
+          .in('user_id', queryIds)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', new Date().toISOString()),
+        supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url, is_demo')
+          .in('id', queryIds),
+      ]);
 
-      const { data: statuses } = await statusQuery;
+      const statuses = statusResult.data;
+      const profileMap = new Map(
+        (profileResult.data || []).map((p: any) => [p.id, p])
+      );
 
       // Step 3: Build results
       const planningResults: typeof planningFriends = [];
@@ -193,11 +202,13 @@ export default function Home() {
 
       if (statuses) {
         for (const s of statuses as any[]) {
-          // Filter out demo users when demo mode is off
-          if (!demoEnabled && (s.is_demo || s.profiles?.is_demo)) continue;
+          const profile = profileMap.get(s.user_id);
 
-          const displayName = s.profiles?.display_name || 'Friend';
-          const avatarUrl = s.profiles?.avatar_url || null;
+          // Filter out demo users when demo mode is off
+          if (!demoEnabled && (s.is_demo || profile?.is_demo)) continue;
+
+          const displayName = profile?.display_name || 'Friend';
+          const avatarUrl = profile?.avatar_url || null;
 
           if (s.status === 'planning') {
             planningResults.push({
