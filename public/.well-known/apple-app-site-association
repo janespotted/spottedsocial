@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID.com.spotted.app",
+        "appID": "WAG8BQTW69.com.janereynolds.spotted",
         "paths": [
           "/invite/*",
           "/auth/*"
@@ -13,7 +13,7 @@
   },
   "webcredentials": {
     "apps": [
-      "TEAMID.com.spotted.app"
+      "WAG8BQTW69.com.janereynolds.spotted"
     ]
   }
 }

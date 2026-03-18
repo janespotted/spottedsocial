@@ -156,6 +156,7 @@ export default function Leaderboard() {
           is_promoted,
           profiles:user_id (
             display_name,
+            username,
             avatar_url,
             is_demo
           ),
@@ -346,10 +347,11 @@ export default function Leaderboard() {
       
       // In demo mode, show all avatars; in bootstrap mode, only show real user avatars
       // Demo data still contributes to venue rankings/energy
-      if (demoEnabled || !bootstrapEnabled || !isDemo) {
+      // Always exclude the current user from the "Also here tonight" list
+      if ((demoEnabled || !bootstrapEnabled || !isDemo) && status.user_id !== user?.id) {
         venue.friends.push({
           user_id: status.user_id,
-          display_name: status.profiles?.display_name || 'User',
+          display_name: status.profiles?.display_name || status.profiles?.username || 'Anonymous',
           avatar_url: status.profiles?.avatar_url || null,
         });
       }

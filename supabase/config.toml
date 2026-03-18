@@ -1,5 +1,8 @@
 project_id = "nkjdthjpqomfsqyzfwbj"
 
+[functions.daily-cleanup]
+verify_jwt = false
+
 [functions.delete-account]
 verify_jwt = true
 

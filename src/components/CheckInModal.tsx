@@ -18,6 +18,7 @@ import { logEvent } from '@/lib/event-logger';
 import { calculateExpiryTime } from '@/lib/time-utils';
 import { markManualCheckin } from '@/lib/auto-venue-tracker';
 import { triggerPushNotification } from '@/lib/push-notifications';
+import { sendCheckinNotifications } from '@/lib/checkin-notifications';
 import { getDemoMode } from '@/lib/demo-data';
 import { getCachedCity } from '@/lib/city-detection';
 import { useUserCity } from '@/hooks/useUserCity';
@@ -50,7 +51,7 @@ interface CheckInModalProps {
 
 export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const { user } = useAuth();
-  const { isReminderTriggered, showOutConfirmation, showPlanningConfirmation } = useCheckIn();
+  const { isReminderTriggered, venueArrivalPayload, showOutConfirmation, showPlanningConfirmation } = useCheckIn();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { city, refreshCity, isLoading: isDetectingCity } = useUserCity();
@@ -129,6 +130,19 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       loadLocationSharingLevel();
     }
   }, [user, open]);
+
+  // Venue arrival from planning push notification — skip status selection, go to privacy
+  useEffect(() => {
+    if (open && venueArrivalPayload) {
+      setSelectedStatus('out');
+      // Pre-populate venue so the venue confirm step is ready after privacy selection
+      setDetectedVenue(venueArrivalPayload.venueName);
+      setCustomVenue(venueArrivalPayload.venueName);
+      setSelectedVenueId(venueArrivalPayload.venueId);
+      // Skip directly to privacy selection (step 2 of the "I'm out" flow)
+      setShowShareModal(true);
+    }
+  }, [open, venueArrivalPayload]);
 
   // Clean up location interval on unmount
   useEffect(() => {
@@ -503,6 +517,38 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const handleShareLocation = async () => {
     setShowShareModal(false);
+
+    // Venue arrival flow: venue already known — skip GPS capture, go to venue confirm
+    if (venueArrivalPayload && selectedVenueId) {
+      // We still need locationData for handleVenueConfirm, so do a quick GPS capture
+      // but keep the pre-populated venue
+      try {
+        const loc = await getCurrentLocation();
+        setLocationData({
+          lat: loc.lat,
+          lng: loc.lng,
+          accuracy: loc.accuracy,
+          timestamp: new Date(loc.timestamp).toISOString(),
+          venueName: venueArrivalPayload.venueName,
+          venueId: venueArrivalPayload.venueId,
+          nearbyVenues: [],
+        });
+      } catch {
+        // If GPS fails, use a minimal locationData so venue confirm can proceed
+        setLocationData({
+          lat: 0,
+          lng: 0,
+          accuracy: 0,
+          timestamp: new Date().toISOString(),
+          venueName: venueArrivalPayload.venueName,
+          venueId: venueArrivalPayload.venueId,
+          nearbyVenues: [],
+        });
+      }
+      setShowVenueConfirm(true);
+      return;
+    }
+
     setIsDetectingLocation(true);
 
     if ('geolocation' in navigator) {
@@ -710,59 +756,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         // Mark manual checkin to prevent auto-tracker from overwriting
         markManualCheckin();
 
-        // Notify friends about check-in (best-effort, non-blocking)
-        (async () => {
-          try {
-            // Get accepted friends (both directions)
-            const { data: friendships } = await supabase
-              .from('friendships')
-              .select('user_id, friend_id')
-              .or(`user_id.eq.${user!.id},friend_id.eq.${user!.id}`)
-              .eq('status', 'accepted');
-
-            if (!friendships?.length) return;
-
-            const friendIds = friendships.map(f =>
-              f.user_id === user!.id ? f.friend_id : f.user_id
-            );
-
-            // Get current user's display name
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('display_name')
-              .eq('id', user!.id)
-              .single();
-
-            const displayName = profile?.display_name || 'A friend';
-            const message = `${displayName} just arrived at ${venue}`;
-
-            // Create notifications via RPC (bypasses RLS) and trigger push for each
-            for (const friendId of friendIds) {
-              supabase.rpc('create_notification', {
-                p_receiver_id: friendId,
-                p_type: 'friend_checkin',
-                p_message: message,
-              }).then(({ data, error }) => {
-                if (error) {
-                  console.warn('Friend checkin notification failed:', error.message);
-                  return;
-                }
-                const notif = Array.isArray(data) ? data[0] : data;
-                if (notif && notif.id) {
-                  triggerPushNotification({
-                    id: notif.id,
-                    receiver_id: friendId,
-                    sender_id: user!.id,
-                    type: 'friend_checkin',
-                    message,
-                  });
-                }
-              }).catch(err => console.warn('Friend checkin push failed:', err));
-            }
-          } catch (err) {
-            console.warn('Friend checkin notifications failed:', err);
-          }
-        })();
+        // Venue-aware notifications (best-effort, non-blocking)
+        // - Notifies friends already at this venue that you arrived
+        // - If 3+ friends at venue, notifies others (once per venue per night)
+        if (venueId) {
+          sendCheckinNotifications(user!.id, venueId, venue);
+        }
 
         // Log location update
         logEvent('location_update', {
@@ -781,12 +780,129 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           .eq('user_id', user?.id)
           .is('ended_at', null);
         
-        // For planning, also update profile to not show location
+        // For planning, also update profile to not show location and notify friends
+        console.log('[PLANNING NOTIF] triggered for status: planning, visibility:', visibility);
         if (status === 'planning') {
           await supabase
             .from('profiles')
             .update({ is_out: false })
             .eq('id', user?.id);
+
+          // Notify friends about planning status (best-effort, non-blocking)
+          (async () => {
+            try {
+              console.log('[PLANNING NOTIF] ===== NOTIFICATION FLOW STARTED =====');
+              console.log('[PLANNING NOTIF] user.id:', user?.id, 'timestamp:', new Date().toISOString());
+
+              // Dedup: skip if we sent a planning notification in the last 30 minutes
+              const dedupCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+              const { data: existingNotifs } = await supabase
+                .from('notifications')
+                .select('id, created_at')
+                .eq('sender_id', user!.id)
+                .eq('type', 'friend_planning')
+                .gte('created_at', dedupCutoff)
+                .limit(1);
+
+              console.log('[PLANNING NOTIF] Dedup check (last 30min):', existingNotifs?.length || 0, 'cutoff:', dedupCutoff);
+              if (existingNotifs && existingNotifs.length > 0) {
+                console.log('[PLANNING NOTIF] Skipping — sent within last 30 minutes, last sent:', existingNotifs[0].created_at);
+                return;
+              }
+
+              // Determine audience tier — default to all_friends if null
+              const effectiveVisibility = visibility || 'all_friends';
+              console.log('[PLANNING NOTIF] Visibility tier:', effectiveVisibility, '(raw:', visibility, ')');
+
+              // Build recipient list based on visibility tier
+              let recipientIds: string[] = [];
+
+              if (effectiveVisibility === 'close_friends') {
+                // Only close friends
+                const { data: closeFriends } = await supabase
+                  .from('close_friends')
+                  .select('close_friend_id')
+                  .eq('user_id', user!.id);
+
+                recipientIds = closeFriends?.map(cf => cf.close_friend_id) || [];
+              } else if (effectiveVisibility === 'all_friends') {
+                // Direct (accepted) friends only
+                const { data: friendships } = await supabase
+                  .from('friendships')
+                  .select('user_id, friend_id')
+                  .or(`user_id.eq.${user!.id},friend_id.eq.${user!.id}`)
+                  .eq('status', 'accepted');
+
+                if (friendships?.length) {
+                  recipientIds = friendships.map(f =>
+                    f.user_id === user!.id ? f.friend_id : f.user_id
+                  );
+                }
+              } else {
+                // mutual_friends — friends where both directions exist
+                const { data: friendships } = await supabase
+                  .from('friendships')
+                  .select('user_id, friend_id')
+                  .or(`user_id.eq.${user!.id},friend_id.eq.${user!.id}`)
+                  .eq('status', 'accepted');
+
+                if (friendships?.length) {
+                  const sentTo = new Set<string>();
+                  const receivedFrom = new Set<string>();
+                  for (const f of friendships) {
+                    if (f.user_id === user!.id) sentTo.add(f.friend_id);
+                    else receivedFrom.add(f.user_id);
+                  }
+                  recipientIds = [...sentTo].filter(id => receivedFrom.has(id));
+                }
+              }
+
+              console.log('[PLANNING NOTIF] Recipients found:', recipientIds.length, recipientIds);
+              if (recipientIds.length === 0) {
+                console.log('[PLANNING NOTIF] Skipping — no recipients');
+                return;
+              }
+
+              // Get first name
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('display_name')
+                .eq('id', user!.id)
+                .single();
+
+              const firstName = profile?.display_name?.split(' ')[0] || 'A friend';
+              const message = `${firstName} is thinking about going out 👀`;
+              console.log('[PLANNING NOTIF] Sending message:', message);
+
+              await Promise.allSettled(recipientIds.map(async (friendId) => {
+                console.log('[PLANNING NOTIF] Creating notification for:', friendId);
+                const { data, error } = await supabase.rpc('create_notification', {
+                  p_receiver_id: friendId,
+                  p_type: 'friend_planning',
+                  p_message: message,
+                });
+                if (error) {
+                  console.error('[PLANNING NOTIF] create_notification error for', friendId, ':', error);
+                  return;
+                }
+                const notif = Array.isArray(data) ? data[0] : data;
+                console.log('[PLANNING NOTIF] Notification created:', notif?.id, 'for', friendId);
+                if (notif?.id) {
+                  console.log('[PLANNING NOTIF] Triggering push for:', friendId);
+                  await triggerPushNotification({
+                    id: notif.id,
+                    receiver_id: friendId,
+                    sender_id: user!.id,
+                    type: 'friend_planning',
+                    message,
+                  });
+                }
+              }));
+            } catch (err) {
+              console.warn('[PLANNING NOTIF] Planning notification failed:', err);
+            }
+          })();
         }
       }
 
@@ -1163,22 +1279,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           </Select>
         </div>
 
-        <div className="flex gap-3">
-          <Button
-            onClick={() => handlePlanningConfirm(true)}
-            variant="outline"
-            className="flex-1 h-14 text-lg font-semibold rounded-full border-2 border-white/40 bg-transparent text-white hover:bg-white/10"
-          >
-            Skip
-          </Button>
-          <Button
-            onClick={() => handlePlanningConfirm(false)}
-            disabled={!planningNeighborhood}
-            className="flex-1 h-14 text-lg font-semibold rounded-full bg-[#a855f7] text-white border-2 border-[#a855f7] hover:bg-[#a855f7]/80 shadow-[0_0_20px_rgba(168,85,247,0.4)] disabled:opacity-50"
-          >
-            Share
-          </Button>
-        </div>
+        <Button
+          onClick={() => handlePlanningConfirm(!planningNeighborhood)}
+          className="w-full h-14 text-lg font-semibold rounded-full bg-[#a855f7] text-white border-2 border-[#a855f7] hover:bg-[#a855f7]/80 shadow-[0_0_20px_rgba(168,85,247,0.4)]"
+        >
+          Share
+        </Button>
 
         <p className="text-center text-sm text-white/60 italic">
           Friends will see you're planning tonight

@@ -42,6 +42,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
   const [threadVenueName, setThreadVenueName] = useState<string | null>(venueNameProp || null);
   const [threadPartyId, setThreadPartyId] = useState<string | null>(null);
   const [userVenueName, setUserVenueName] = useState<string | null>(null);
+  const [userStatus, setUserStatus] = useState<string | null>(null);
   const [userIsPrivateParty, setUserIsPrivateParty] = useState(false);
   const [userNightStatusId, setUserNightStatusId] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<YapQuote[]>([]);
@@ -75,13 +76,14 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
     const fetchUserVenue = async () => {
       const { data } = await supabase
         .from('night_statuses')
-        .select('id, venue_name, is_private_party, party_neighborhood')
+        .select('id, status, venue_name, is_private_party, party_neighborhood')
         .eq('user_id', user.id)
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
         .neq('status', 'home')
         .maybeSingle();
-      
+
+      setUserStatus(data?.status || null);
       if (data?.is_private_party) {
         const displayName = data.venue_name || `Private Party${data.party_neighborhood ? ` · ${data.party_neighborhood}` : ''}`;
         setUserVenueName(displayName);
@@ -110,6 +112,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
         (payload: any) => {
           const newRecord = payload.new;
           if (newRecord) {
+            setUserStatus(newRecord.status || null);
             if (newRecord.is_private_party) {
               const displayName = newRecord.venue_name || `Private Party${newRecord.party_neighborhood ? ` · ${newRecord.party_neighborhood}` : ''}`;
               setUserVenueName(displayName);
@@ -294,18 +297,6 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
     );
   }
 
-  // Detect consecutive same-venue groups
-  const isFirstInGroup = (index: number) => {
-    if (index === 0) return true;
-    return sortedQuotes[index].venue_name !== sortedQuotes[index - 1].venue_name;
-  };
-  const isInGroup = (index: number) => {
-    const vn = sortedQuotes[index].venue_name;
-    const prev = index > 0 && sortedQuotes[index - 1].venue_name === vn;
-    const next = index < sortedQuotes.length - 1 && sortedQuotes[index + 1].venue_name === vn;
-    return prev || next;
-  };
-
   return (
     <div className="space-y-4 pb-24">
       {/* Header */}
@@ -315,7 +306,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
       </div>
 
       {/* You're At compact bar */}
-      {userVenueName && (
+      {userStatus === 'out' && userVenueName && (
         <button
           onClick={() => openThread(userVenueName, userIsPrivateParty ? userNightStatusId : null)}
           className="w-full flex items-center justify-between bg-white/[0.06] backdrop-blur-sm rounded-2xl px-4 py-2.5 active:bg-white/[0.10] transition-colors animate-fade-in"
@@ -358,34 +349,12 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
       {sortedQuotes.length > 0 ? (
         <div className="space-y-3">
           {sortedQuotes.map((quote, index) => {
-            const firstInGroup = isFirstInGroup(index);
-            const grouped = isInGroup(index);
-            const showVenueHeader = grouped && firstInGroup;
-            const showVenueLine = !grouped;
             const venuePinnedCount = pinnedCounts.get(quote.venue_name) || 0;
             const isPartyYap = quote.is_private_party;
             const LocationIcon = isPartyYap ? Home : MapPin;
 
             return (
               <div key={quote.id} className="animate-fade-in" style={{ animationDelay: `${index * 40}ms` }}>
-                {/* Group venue header */}
-                {showVenueHeader && (
-                  <div className="mb-1.5 ml-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
-                      className="text-xs flex items-center gap-1 hover:text-white/70 transition-colors"
-                    >
-                      <LocationIcon className="h-3.5 w-3.5 text-[#d4ff00] inline" /> <span className="font-semibold text-white/70">{quote.venue_name}</span>
-                      {quote.venue_neighborhood && <span className="text-white/40">· {quote.venue_neighborhood}</span>}
-                    </button>
-                    {venuePinnedCount > 0 && firstInGroup && (
-                      <p className="text-white/40 text-[11px] mt-0.5 ml-4">
-                        <Pin className="h-3.5 w-3.5 text-[#d4ff00] inline mr-0.5" /> {venuePinnedCount} update{venuePinnedCount > 1 ? 's' : ''} from venue
-                      </p>
-                    )}
-                  </div>
-                )}
-
                 {/* Quote card */}
                 <button
                   onClick={() => openThread(quote.venue_name)}
@@ -396,31 +365,33 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
                     index === 0 && sortMode === 'hot' && 'p-6'
                   )}
                 >
-                  {/* Quote text — the hero */}
+                  {/* Venue name — primary anchor */}
+                  <div className="mb-2">
+                    <p
+                      className="hover:text-white/80 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
+                    >
+                      <LocationIcon className="h-3.5 w-3.5 text-[#d4ff00] inline mr-0.5" />
+                      <span className={cn(
+                        "font-bold text-white",
+                        index === 0 && sortMode === 'hot' ? 'text-[17px]' : 'text-[15px]'
+                      )}>{quote.venue_name}</span>
+                      {quote.venue_neighborhood && <span className="text-white/40 text-xs ml-1">· {quote.venue_neighborhood}</span>}
+                    </p>
+                    {venuePinnedCount > 0 && (
+                      <p className="text-white/40 text-[11px] mt-0.5 ml-5">
+                        <Pin className="h-3.5 w-3.5 text-[#d4ff00] inline mr-0.5" /> {venuePinnedCount} update{venuePinnedCount > 1 ? 's' : ''} from venue
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Yap text — secondary */}
                   <p className={cn(
-                    "text-white font-medium leading-relaxed mb-3",
-                    index === 0 && sortMode === 'hot' ? 'text-[17px]' : 'text-[15px]'
+                    "text-white/80 leading-relaxed mb-3",
+                    index === 0 && sortMode === 'hot' ? 'text-[15px]' : 'text-sm'
                   )}>
                     {quote.text}
                   </p>
-
-                  {/* Venue line (only if not in a group) */}
-                  {showVenueLine && (
-                    <div className="mb-2">
-                      <p
-                        className="text-xs hover:text-white/60 transition-colors"
-                        onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
-                      >
-                        <LocationIcon className="h-3.5 w-3.5 text-[#d4ff00] inline" /> <span className="font-semibold text-white">{quote.venue_name}</span>
-                        {quote.venue_neighborhood && <span className="text-white/40"> · {quote.venue_neighborhood}</span>}
-                      </p>
-                      {venuePinnedCount > 0 && (
-                        <p className="text-white/40 text-[11px] mt-0.5 ml-4">
-                          <Pin className="h-3.5 w-3.5 text-[#d4ff00] inline mr-0.5" /> {venuePinnedCount} update{venuePinnedCount > 1 ? 's' : ''} from venue
-                        </p>
-                      )}
-                    </div>
-                  )}
 
                   {/* Bottom row: score + timestamp */}
                   <div className="flex items-center justify-between">

@@ -44,6 +44,7 @@ interface FriendsPlanningProps {
   userPlanningNeighborhood?: string | null;
   userPlanningVisibility?: string | null;
   onChangeNeighborhood?: (neighborhood: string) => void;
+  onChangeVisibility?: (visibility: string) => void;
   onSwitchToOut?: () => void;
   city?: string;
 }
@@ -58,6 +59,10 @@ const getVisibilityLabel = (visibility: string | null | undefined): string => {
   };
   return labels[visibility] || visibility;
 };
+
+const VISIBILITY_CYCLE: ('close_friends' | 'all_friends' | 'mutual_friends')[] = [
+  'close_friends', 'all_friends', 'mutual_friends',
+];
 
 // Shorten neighborhood names for compact display
 const shortenNeighborhood = (neighborhood: string | null | undefined): string | null => {
@@ -91,6 +96,7 @@ export function FriendsPlanning({
   userPlanningNeighborhood,
   userPlanningVisibility,
   onChangeNeighborhood,
+  onChangeVisibility,
   onSwitchToOut,
   city = 'la'
 }: FriendsPlanningProps) {
@@ -101,14 +107,15 @@ export function FriendsPlanning({
   const neighborhoods = CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS['la'];
 
   const handleReachOut = (friend: PlanningFriend) => {
-    navigate('/messages', { 
-      state: { 
+    navigate('/messages', {
+      state: {
         preselectedUser: {
           id: friend.user_id,
           display_name: friend.display_name,
           avatar_url: friend.avatar_url
-        }
-      } 
+        },
+        source: 'planning'
+      }
     });
   };
 
@@ -241,74 +248,6 @@ export function FriendsPlanning({
       )}
       
       <div className="space-y-2">
-        {/* User's own planning row - shown first when user is planning */}
-        {isUserPlanning && userProfile && (
-          <>
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5">
-              {/* Animated avatar with pulsing ring */}
-              <div className="relative">
-                <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
-                <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
-                  <AvatarImage
-                    src={userProfile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.display_name}`}
-                  />
-                  <AvatarFallback className="bg-[#a855f7] text-white text-sm">
-                    {userProfile.display_name?.[0] || '?'}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-medium text-sm truncate">{userProfile.display_name}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-white/50 text-xs">Planning tonight —</span>
-                  {/* Interactive neighborhood dropdown */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 hover:bg-[#a855f7]/35 transition-colors">
-                        {shortenNeighborhood(userPlanningNeighborhood) || 'Select area'}
-                        <ChevronDown className="w-3 h-3" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent 
-                      className="max-h-60 overflow-y-auto bg-[#1a0f2e] border border-[#a855f7]/30 z-50"
-                      align="start"
-                    >
-                      {neighborhoods.map((neighborhood) => (
-                        <DropdownMenuItem
-                          key={neighborhood}
-                          onClick={() => onChangeNeighborhood?.(neighborhood)}
-                          className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
-                        >
-                          {neighborhood}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            </div>
-            
-            {/* "You're in planning mode — Edit" below user row */}
-            <div className="flex items-center justify-center gap-2 py-1.5 flex-wrap">
-              <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
-              <span className="text-white/50 text-xs">You're in planning mode</span>
-              {userPlanningVisibility && (
-                <>
-                  <span className="text-white/30 text-xs">·</span>
-                  <span className="text-white/60 text-xs">{getVisibilityLabel(userPlanningVisibility)}</span>
-                </>
-              )}
-              <span className="text-white/30 text-xs">—</span>
-              <button
-                onClick={() => setShowEditSheet(true)}
-                className="text-[#a855f7] text-xs font-medium hover:text-[#c084fc] transition-colors"
-              >
-                Edit
-              </button>
-            </div>
-          </>
-        )}
-
         {friends.slice(0, 3).map((friend) => (
           <div
             key={friend.user_id}
@@ -397,8 +336,96 @@ export function FriendsPlanning({
             </Button>
           </div>
         ))}
+
+        {/* User's own planning row - shown last */}
+        {isUserPlanning && userProfile && (
+          <>
+            <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/5">
+              {/* Animated avatar with pulsing ring */}
+              <div className="relative mt-0.5">
+                <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
+                <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
+                  <AvatarImage
+                    src={userProfile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.display_name}`}
+                  />
+                  <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+                    {userProfile.display_name?.[0] || '?'}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <p className="text-white font-medium text-sm truncate">{userProfile.display_name}</p>
+                {/* Visibility dropdown — own line */}
+                <div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 hover:bg-[#a855f7]/35 transition-colors">
+                        👁 {getVisibilityLabel(userPlanningVisibility) || '👫 all friends'}
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      className="max-h-60 overflow-y-auto bg-[#1a0f2e] border border-[#a855f7]/30 z-50"
+                      align="start"
+                    >
+                      {VISIBILITY_CYCLE.map((vis) => (
+                        <DropdownMenuItem
+                          key={vis}
+                          onClick={() => onChangeVisibility?.(vis)}
+                          className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
+                        >
+                          {getVisibilityLabel(vis)}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                {/* Planning tonight + neighborhood — own line */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-white/50 text-xs whitespace-nowrap">Planning tonight —</span>
+                  {/* Interactive neighborhood dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 hover:bg-[#a855f7]/35 transition-colors">
+                        {shortenNeighborhood(userPlanningNeighborhood) || 'Select area'}
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      className="max-h-60 overflow-y-auto bg-[#1a0f2e] border border-[#a855f7]/30 z-50"
+                      align="start"
+                    >
+                      {neighborhoods.map((neighborhood) => (
+                        <DropdownMenuItem
+                          key={neighborhood}
+                          onClick={() => onChangeNeighborhood?.(neighborhood)}
+                          className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
+                        >
+                          {neighborhood}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </div>
+
+            {/* "You're in planning mode — Edit" below user row */}
+            <div className="flex items-center justify-center gap-2 py-1.5 flex-wrap">
+              <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
+              <span className="text-white/50 text-xs">You're in planning mode</span>
+              <span className="text-white/30 text-xs">—</span>
+              <button
+                onClick={() => setShowEditSheet(true)}
+                className="text-[#a855f7] text-xs font-medium hover:text-[#c084fc] transition-colors"
+              >
+                Edit
+              </button>
+            </div>
+          </>
+        )}
       </div>
-      
+
       {/* Bottom CTA - Join Planning (only when NOT already planning) */}
       {showJoinOption && !isUserPlanning && (
         <div className="mt-5 pt-4 border-t border-white/10">

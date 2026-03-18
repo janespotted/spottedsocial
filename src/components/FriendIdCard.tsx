@@ -17,7 +17,18 @@ import { isFromTonight } from '@/lib/time-context';
 import { toast } from 'sonner';
 import { CreatePlanDialog } from '@/components/CreatePlanDialog';
 import { getOrCreateInviteCode, getInviteLink, triggerSmsInvite } from '@/lib/sms-invite';
+import { triggerPushNotification } from '@/lib/push-notifications';
 import { haptic } from '@/lib/haptics';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface FriendData {
   id: string;
@@ -72,6 +83,7 @@ export function FriendIdCard() {
     display_name: string;
     avatar_url: string | null;
   } | null>(null);
+  const [badgeConfirm, setBadgeConfirm] = useState<'add_close' | 'remove_close' | 'send_request' | null>(null);
 
   useEffect(() => {
     if (selectedFriend && user) {
@@ -216,14 +228,10 @@ export function FriendIdCard() {
           });
           setStatusSubtitle(neighborhood ? `@ Private Party · ${neighborhood}` : '@ Private Party');
         } else {
-          const venueName = nightStatus.venue_name || 'Out';
-          const minutesAgo = Math.floor((Date.now() - nightTime) / 60000);
-          const timeAgo = minutesAgo < 1 ? 'just now' : 
-                         minutesAgo < 60 ? `${minutesAgo} min ago` : 
-                         `${Math.floor(minutesAgo / 60)} hr ago`;
+          const venueName = nightStatus.venue_name || null;
           setUserStatus({
             isOut: true,
-            currentVenue: venueName,
+            currentVenue: venueName || 'Out',
             lastUpdatedAt: nightStatus.updated_at,
             lastEndedAt: null,
             lat: nightStatus.lat,
@@ -231,8 +239,8 @@ export function FriendIdCard() {
             canSeeLocation: true,
             isPrivateParty: false
           });
-          setStatusSubtitle(`@ ${venueName} • ${timeAgo}`);
-          if (venueName !== 'Out') fetchFriendsAtVenue(venueName);
+          setStatusSubtitle(venueName ? `@ ${venueName}` : 'Out now');
+          if (venueName) fetchFriendsAtVenue(venueName);
         }
         return;
       }
@@ -385,6 +393,84 @@ export function FriendIdCard() {
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
+  };
+
+  const handleBadgeConfirm = async () => {
+    if (!selectedFriend || !user) return;
+
+    try {
+      if (badgeConfirm === 'remove_close') {
+        await supabase
+          .from('close_friends')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('close_friend_id', selectedFriend.userId);
+        haptic.success();
+        toast.success('Removed from close friends');
+        // Update the card's relationship display
+        closeFriendCard();
+      } else if (badgeConfirm === 'add_close') {
+        await supabase
+          .from('close_friends')
+          .insert({ user_id: user.id, close_friend_id: selectedFriend.userId });
+        haptic.success();
+        toast.success('Added to close friends 💛');
+        closeFriendCard();
+      } else if (badgeConfirm === 'send_request') {
+        // Check if request already exists
+        const { data: existing } = await supabase
+          .from('friendships')
+          .select('status')
+          .or(`and(user_id.eq.${user.id},friend_id.eq.${selectedFriend.userId}),and(user_id.eq.${selectedFriend.userId},friend_id.eq.${user.id})`)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing?.status === 'accepted') {
+          toast.info('Already friends!');
+        } else if (existing?.status === 'pending') {
+          toast.info('Request already pending');
+        } else {
+          await supabase
+            .from('friendships')
+            .insert({ user_id: user.id, friend_id: selectedFriend.userId, status: 'pending' });
+
+          // Send notification
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('display_name')
+            .eq('id', user.id)
+            .single();
+          const senderName = profile?.display_name || 'Someone';
+          const message = `${senderName} sent you a friend request`;
+
+          supabase.rpc('create_notification', {
+            p_receiver_id: selectedFriend.userId,
+            p_type: 'friend_request',
+            p_message: message,
+          }).then(({ data }) => {
+            const notif = Array.isArray(data) ? data[0] : data;
+            if (notif?.id) {
+              triggerPushNotification({
+                id: notif.id,
+                receiver_id: selectedFriend!.userId,
+                sender_id: user!.id,
+                type: 'friend_request',
+                message,
+              });
+            }
+          });
+
+          haptic.success();
+          toast.success('Friend request sent!');
+        }
+        closeFriendCard();
+      }
+    } catch (error) {
+      console.error('Badge action failed:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setBadgeConfirm(null);
+    }
   };
 
   const handleOpenDM = () => {
@@ -649,19 +735,28 @@ export function FriendIdCard() {
                       </h2>
                     )}
                     {selectedFriend.relationshipType === 'close' && (
-                      <span className="text-xs bg-[#d4ff00]/20 text-[#d4ff00] px-2 py-0.5 rounded-full whitespace-nowrap">
+                      <button
+                        onClick={() => setBadgeConfirm('remove_close')}
+                        className="text-xs bg-[#d4ff00]/20 text-[#d4ff00] px-2 py-0.5 rounded-full whitespace-nowrap hover:bg-[#d4ff00]/30 transition-colors"
+                      >
                         Close Friend
-                      </span>
+                      </button>
                     )}
                     {selectedFriend.relationshipType === 'mutual' && (
-                      <span className="text-xs bg-[#6366f1]/20 text-[#6366f1] px-2 py-0.5 rounded-full whitespace-nowrap">
+                      <button
+                        onClick={() => setBadgeConfirm('send_request')}
+                        className="text-xs bg-[#6366f1]/20 text-[#6366f1] px-2 py-0.5 rounded-full whitespace-nowrap hover:bg-[#6366f1]/30 transition-colors"
+                      >
                         Mutual
-                      </span>
+                      </button>
                     )}
                     {selectedFriend.relationshipType === 'direct' && (
-                      <span className="text-xs bg-[#a855f7]/20 text-[#a855f7] px-2 py-0.5 rounded-full whitespace-nowrap">
+                      <button
+                        onClick={() => setBadgeConfirm('add_close')}
+                        className="text-xs bg-[#a855f7]/20 text-[#a855f7] px-2 py-0.5 rounded-full whitespace-nowrap hover:bg-[#a855f7]/30 transition-colors"
+                      >
                         Friend
-                      </span>
+                      </button>
                     )}
                   </div>
                   {demoEnabled ? (
@@ -827,6 +922,37 @@ export function FriendIdCard() {
       />
     )}
 
+
+    {/* Badge action confirm dialog */}
+    <AlertDialog open={badgeConfirm !== null} onOpenChange={(open) => { if (!open) setBadgeConfirm(null); }}>
+      <AlertDialogContent className="bg-[#1a0f2e] border border-[#a855f7]/40 z-[400]">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-white">
+            {badgeConfirm === 'remove_close' && 'Remove as Close Friend?'}
+            {badgeConfirm === 'add_close' && 'Add as Close Friend?'}
+            {badgeConfirm === 'send_request' && `Send Friend Request to ${selectedFriend?.displayName}?`}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-white/60">
+            {badgeConfirm === 'remove_close' && `${selectedFriend?.displayName} will remain a friend but won't see close-friends-only content.`}
+            {badgeConfirm === 'add_close' && `${selectedFriend?.displayName} will see your close-friends-only posts and plans.`}
+            {badgeConfirm === 'send_request' && `${selectedFriend?.displayName} will receive a friend request notification.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="bg-transparent border-white/20 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleBadgeConfirm}
+            className={badgeConfirm === 'remove_close'
+              ? 'bg-white/20 text-white hover:bg-white/30'
+              : 'bg-[#a855f7] text-white hover:bg-[#a855f7]/80'}
+          >
+            {badgeConfirm === 'remove_close' && 'Remove'}
+            {badgeConfirm === 'add_close' && 'Add'}
+            {badgeConfirm === 'send_request' && 'Send Request'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     {/* Create Plan Dialog - rendered outside of selectedFriend check so it stays open after card closes */}
     {user && (

@@ -43,9 +43,10 @@ interface PreselectedUser {
 interface MessagesTabProps {
   preselectedUser?: PreselectedUser | null;
   onClearPreselection?: () => void;
+  source?: string | null;
 }
 
-export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTabProps) {
+export function MessagesTab({ preselectedUser, onClearPreselection, source }: MessagesTabProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { openFriendCard } = useFriendIdCard();
@@ -306,8 +307,8 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
         </div>
 
         {/* New Chat Dialog */}
-        <NewChatDialog 
-          open={showNewChat} 
+        <NewChatDialog
+          open={showNewChat}
           onOpenChange={(open) => {
             setShowNewChat(open);
             if (!open && onClearPreselection) {
@@ -315,6 +316,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection }: MessagesTa
             }
           }}
           preselectedUser={preselectedUser}
+          source={source}
         />
 
         {/* Messages List */}

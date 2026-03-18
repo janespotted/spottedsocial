@@ -1,6 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { captureLocationWithVenue, calculateDistance, findNearestVenue, type LocationData } from './location-service';
 import { logEvent } from './event-logger';
+import { sendCheckinNotifications } from './checkin-notifications';
 
 interface LastCheckin {
   id: string;
@@ -192,6 +195,74 @@ const createCheckin = async (
 };
 
 /**
+ * Send a local notification after auto-confirming a venue change.
+ * Uses @capacitor/local-notifications on native (works backgrounded),
+ * falls back to Web Notifications API in the browser.
+ */
+const sendVenueChangeNotification = async (venueName: string): Promise<void> => {
+  const title = `You're now at ${venueName} 📍 — wrong spot?`;
+
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const { display } = await LocalNotifications.checkPermissions();
+      if (display !== 'granted') {
+        const { display: newPerm } = await LocalNotifications.requestPermissions();
+        if (newPerm !== 'granted') return;
+      }
+
+      // Set the correction flag before firing — the listener below handles taps,
+      // but if it hasn't been registered yet (cold start), the flag is already set.
+      localStorage.setItem('venue_correction_prompt', 'true');
+
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: Date.now() % 2147483647, // unique 32-bit int
+            title: 'Spotted',
+            body: title,
+            extra: { action: 'venue_correction' },
+          },
+        ],
+      });
+
+      // Listen for tap — clear + re-set the flag so Layout picks it up on resume
+      LocalNotifications.addListener('localNotificationActionPerformed', (notification) => {
+        if (notification.notification.extra?.action === 'venue_correction') {
+          localStorage.setItem('venue_correction_prompt', 'true');
+        }
+      });
+
+      return;
+    }
+  } catch (error) {
+    console.error('Capacitor local notification failed, falling back to Web:', error);
+  }
+
+  // Web Notifications fallback (browser / PWA)
+  try {
+    if (!('Notification' in window)) return;
+
+    const fireNotification = () => {
+      const notification = new Notification(title, { tag: 'venue-auto-checkin' });
+      notification.onclick = () => {
+        localStorage.setItem('venue_correction_prompt', 'true');
+        window.focus();
+        notification.close();
+      };
+    };
+
+    if (Notification.permission === 'granted') {
+      fireNotification();
+    } else if (Notification.permission !== 'denied') {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') fireNotification();
+    }
+  } catch (error) {
+    console.error('Error sending venue change notification:', error);
+  }
+};
+
+/**
  * Main function: Auto-track venue changes
  * Call this on app open and major interactions when user is "Out"
  */
@@ -327,16 +398,22 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
       return;
     }
 
-    // All conditions met - auto-update venue
-    console.log('✨ Auto-updating venue from', lastCheckin.venue_name, 'to', nearestVenue.name);
+    // All conditions met - auto-confirm venue check-in immediately
+    console.log('✨ Auto-confirming venue change from', lastCheckin.venue_name, 'to', nearestVenue.name);
 
     await createCheckin(userId, locationData, nearestVenue.id, nearestVenue.name);
+
+    // Venue-aware friend notifications (best-effort, non-blocking)
+    sendCheckinNotifications(userId, nearestVenue.id, nearestVenue.name);
+
+    // Fire push notification so user can correct if wrong
+    sendVenueChangeNotification(nearestVenue.name);
 
     // Reset "still here?" timer since we just moved to a new venue
     localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
     localStorage.setItem('still_here_venue', nearestVenue.name);
     localStorage.removeItem('still_here_deadline');
-    
+
     // Log location update
     logEvent('location_update', {
       venue_id: nearestVenue.id,

@@ -29,9 +29,10 @@ interface NewChatDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   preselectedUser?: PreselectedUser | null;
+  source?: string | null;
 }
 
-export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDialogProps) {
+export function NewChatDialog({ open, onOpenChange, preselectedUser, source }: NewChatDialogProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
@@ -150,7 +151,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser }: NewChatDi
       }
 
       onOpenChange(false);
-      navigate(`/messages/${threadId}`);
+      navigate(`/messages/${threadId}`, { state: source ? { source } : undefined });
     } catch (error) {
       console.error('Error in createThread:', error);
       setIsCreatingThread(false);

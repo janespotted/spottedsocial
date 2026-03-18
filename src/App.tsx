@@ -140,6 +140,45 @@ async function registerPushToken(user: { id: string }) {
   }
 }
 
+function DeepLinkListener() {
+  useEffect(() => {
+    if (!isNativePlatform()) return;
+
+    let cleanup: (() => void) | undefined;
+
+    (async () => {
+      try {
+        const { App: CapApp } = await import('@capacitor/app');
+        const listener = await CapApp.addListener('appUrlOpen', ({ url }) => {
+          logger.info('deeplink:received', { url });
+          try {
+            const parsed = new URL(url);
+            const path = parsed.pathname;
+            // Route invite links to the invite landing page
+            if (path.startsWith('/invite/')) {
+              window.location.hash = '';
+              window.history.replaceState(null, '', path + parsed.search);
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            } else if (path.startsWith('/auth')) {
+              window.history.replaceState(null, '', path + parsed.search);
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            }
+          } catch (err) {
+            logger.error('deeplink:parse_failed', { url, error: String(err) });
+          }
+        });
+        cleanup = () => listener.remove();
+      } catch (err) {
+        logger.error('deeplink:listener_failed', { error: String(err) });
+      }
+    })();
+
+    return () => cleanup?.();
+  }, []);
+
+  return null;
+}
+
 function AutoTracker({ onReady }: { onReady: () => void }) {
   const { user, loading } = useAuth();
 
@@ -216,6 +255,7 @@ function AppContent() {
     <>
       {showSplash && <SplashScreen />}
       <AutoTracker onReady={() => setShowSplash(false)} />
+      <DeepLinkListener />
       <GatedDemoActivator />
       <FriendIdCard />
       <VenueIdCard />

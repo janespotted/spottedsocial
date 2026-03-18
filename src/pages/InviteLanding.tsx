@@ -5,6 +5,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users } from 'lucide-react';
+import { isNativePlatform } from '@/lib/platform';
+
+const TESTFLIGHT_URL = 'https://testflight.apple.com/join/UjWqvyCX';
 
 interface InviterInfo {
   display_name: string;
@@ -77,7 +80,22 @@ export default function InviteLanding() {
     }
   };
 
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+
   const handleJoin = () => {
+    // If already in the native app, navigate directly
+    if (isNativePlatform()) {
+      navigate(`/auth?invite=${code}`);
+      return;
+    }
+
+    // On iOS web: redirect to TestFlight to install the app
+    if (isIOS) {
+      window.location.href = TESTFLIGHT_URL;
+      return;
+    }
+
+    // Non-iOS web: proceed with web auth flow
     navigate(`/auth?invite=${code}`);
   };
 
@@ -144,11 +162,15 @@ export default function InviteLanding() {
             onClick={handleJoin}
             className="w-full bg-[#a855f7] hover:bg-[#a855f7]/90 shadow-[0_0_15px_rgba(168,85,247,0.6)] hover:shadow-[0_0_25px_rgba(168,85,247,0.8)] transition-all text-white font-semibold text-lg py-6"
           >
-            Join {inviter?.display_name?.split(' ')[0]} on Spotted
+            {isIOS && !isNativePlatform()
+              ? 'Get Spotted on TestFlight'
+              : `Join ${inviter?.display_name?.split(' ')[0]} on Spotted`}
           </Button>
 
           <p className="text-white/40 text-sm mt-4">
-            You'll automatically become friends after signing up
+            {isIOS && !isNativePlatform()
+              ? 'Install the app, then tap this link again to connect'
+              : "You'll automatically become friends after signing up"}
           </p>
         </CardContent>
       </Card>

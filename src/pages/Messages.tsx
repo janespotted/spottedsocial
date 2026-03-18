@@ -27,8 +27,9 @@ export default function Messages() {
   const { unreadCount } = useNotifications();
   useAutoVenueTracking(); // Trigger auto-venue tracking on messages view
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<TabType>('messages');
+  const [activeTab, setActiveTab] = useState<TabType>('yap');
   const [preselectedUser, setPreselectedUser] = useState<PreselectedUser | null>(null);
+  const [dmSource, setDmSource] = useState<string | null>(null);
   const [yapVenueName, setYapVenueName] = useState<string | undefined>(undefined);
   const [yapIsPrivateParty, setYapIsPrivateParty] = useState(false);
   const [yapNavKey, setYapNavKey] = useState(0);
@@ -51,6 +52,7 @@ export default function Messages() {
       navigate(location.pathname, { replace: true, state: {} });
     } else if (state?.preselectedUser) {
       setPreselectedUser(state.preselectedUser);
+      setDmSource(state.source || null);
       setActiveTab('messages');
       navigate(location.pathname, { replace: true, state: {} });
     } else if (state?.activeTab) {
@@ -97,27 +99,13 @@ export default function Messages() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center justify-around px-6 pb-4">
-          <button
-            onClick={() => setActiveTab('messages')}
-            className={cn(
-              'relative pb-2 text-lg font-medium transition-colors',
-              activeTab === 'messages' 
-                ? 'text-white' 
-                : 'text-white/40'
-            )}
-          >
-            Messages
-            {activeTab === 'messages' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
-            )}
-          </button>
+        <div className="flex items-center px-6 pb-4">
           <button
             onClick={() => setActiveTab('yap')}
             className={cn(
-              'relative pb-2 text-lg font-medium transition-colors',
-              activeTab === 'yap' 
-                ? 'text-white' 
+              'relative flex-1 pb-2 text-lg font-medium text-center transition-colors',
+              activeTab === 'yap'
+                ? 'text-white'
                 : 'text-white/40'
             )}
           >
@@ -127,11 +115,25 @@ export default function Messages() {
             )}
           </button>
           <button
+            onClick={() => setActiveTab('messages')}
+            className={cn(
+              'relative flex-1 pb-2 text-lg font-medium text-center transition-colors',
+              activeTab === 'messages'
+                ? 'text-white'
+                : 'text-white/40'
+            )}
+          >
+            Messages
+            {activeTab === 'messages' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('activity')}
             className={cn(
-              'relative pb-2 text-lg font-medium transition-colors',
-              activeTab === 'activity' 
-                ? 'text-white' 
+              'relative flex-1 pb-2 text-lg font-medium text-center transition-colors',
+              activeTab === 'activity'
+                ? 'text-white'
                 : 'text-white/40'
             )}
           >
@@ -146,9 +148,10 @@ export default function Messages() {
       {/* Tab Content */}
       <div className="px-4 py-6">
         {activeTab === 'messages' && (
-          <MessagesTab 
+          <MessagesTab
             preselectedUser={preselectedUser}
-            onClearPreselection={() => setPreselectedUser(null)}
+            onClearPreselection={() => { setPreselectedUser(null); setDmSource(null); }}
+            source={dmSource}
           />
         )}
         {activeTab === 'yap' && <YapTab key={yapNavKey} venueName={yapVenueName} isPrivatePartyNav={yapIsPrivateParty} />}

@@ -16,9 +16,11 @@ import { useWeekendRally } from '@/hooks/useWeekendRally';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search, Loader2, Copy, Users, Target } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search, Loader2, Copy, Users, Target, MapPin } from 'lucide-react';
+import { useMeetUp } from '@/contexts/MeetUpContext';
+import { Button } from '@/components/ui/button';
 import { NotificationBadge } from '@/components/NotificationBadge';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { toast } from 'sonner';
 import { PullToRefresh } from '@/components/PullToRefresh';
@@ -47,9 +49,11 @@ export default function Home() {
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
+  const { sendMeetUpNotification } = useMeetUp();
   const demoEnabled = useDemoMode();
   const { bootstrapEnabled } = useBootstrapMode();
   const navigate = useNavigate();
+  const location = useLocation();
   const { unreadCount } = useNotifications();
   const { city } = useUserCity();
   const { showNudgeModal, nudgeType, closeNudgeModal } = useDailyNudge();
@@ -96,10 +100,20 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
+  const [friendsOut, setFriendsOut] = useState<{ user_id: string; display_name: string; avatar_url: string | null; venue_name: string }[]>([]);
   const [feedMode, setFeedMode] = useState<'newsfeed' | 'plans'>(() => isNightlifeHours() ? 'newsfeed' : 'plans');
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [sharePost, setSharePost] = useState<Post | null>(null);
   const loadTriggerRef = useRef<HTMLDivElement>(null);
+
+  // Handle navigation state (e.g., returning from DM to plans tab)
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.feedMode) {
+      setFeedMode(state.feedMode);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.key]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -137,107 +151,81 @@ export default function Home() {
     }
   };
 
-  // Fetch planning friends
+  // Fetch friends out + planning — uses night_statuses joined with profiles directly
+  // (not get_profiles_safe, which gates is_out behind can_see_location and can cause
+  //  asymmetric visibility when friendship direction doesn't match the privacy check)
   const fetchPlanningFriends = async () => {
     if (!user) return;
 
-    // Demo mode shortcut: directly query demo planning statuses (skip friendship lookup)
-    if (demoEnabled) {
-      const { data: demoStatuses } = await supabase
-        .from('night_statuses')
-        .select('user_id, planning_neighborhood')
-        .eq('status', 'planning')
-        .eq('is_demo', true)
-        .not('expires_at', 'is', null)
-        .gt('expires_at', new Date().toISOString());
+    try {
+      // Step 1: Get friend IDs (both directions)
+      const [sentResult, receivedResult] = await Promise.all([
+        supabase.from('friendships').select('friend_id').eq('user_id', user.id).eq('status', 'accepted'),
+        supabase.from('friendships').select('user_id').eq('friend_id', user.id).eq('status', 'accepted'),
+      ]);
 
-      if (!demoStatuses || demoStatuses.length === 0) {
+      const friendIds = [
+        ...(sentResult.data?.map(f => f.friend_id) || []),
+        ...(receivedResult.data?.map(f => f.user_id) || []),
+      ];
+
+      const queryIds = [...new Set(friendIds)];
+      if (queryIds.length === 0) {
         setPlanningFriends([]);
+        setFriendsOut([]);
         return;
       }
 
-      const demoUserIds = demoStatuses.map(s => s.user_id);
-      const neighborhoodMap = new Map(demoStatuses.map(s => [s.user_id, s.planning_neighborhood]));
+      // Step 2: Get night_statuses with profile join — no privacy gating needed
+      // The Home page only shows display_name/avatar (non-sensitive), not GPS coordinates
+      let statusQuery = supabase
+        .from('night_statuses')
+        .select('user_id, venue_name, status, planning_neighborhood, is_demo, profiles:user_id(display_name, avatar_url, is_demo)')
+        .in('user_id', queryIds)
+        .not('expires_at', 'is', null)
+        .gt('expires_at', new Date().toISOString());
 
-      const { data: demoProfiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url')
-        .in('id', demoUserIds);
+      const { data: statuses } = await statusQuery;
 
-      setPlanningFriends((demoProfiles || []).map((p: any) => ({
-        user_id: p.id,
-        display_name: p.display_name,
-        avatar_url: p.avatar_url,
-        planning_neighborhood: neighborhoodMap.get(p.id) || null,
-      })));
-      return;
+      // Step 3: Build results
+      const planningResults: typeof planningFriends = [];
+      const outResults: typeof friendsOut = [];
+
+      if (statuses) {
+        for (const s of statuses as any[]) {
+          // Filter out demo users when demo mode is off
+          if (!demoEnabled && (s.is_demo || s.profiles?.is_demo)) continue;
+
+          const displayName = s.profiles?.display_name || 'Friend';
+          const avatarUrl = s.profiles?.avatar_url || null;
+
+          if (s.status === 'planning') {
+            planningResults.push({
+              user_id: s.user_id,
+              display_name: displayName,
+              avatar_url: avatarUrl,
+              planning_neighborhood: s.planning_neighborhood || null,
+            });
+          } else if (s.status === 'out' && s.venue_name) {
+            outResults.push({
+              user_id: s.user_id,
+              display_name: displayName,
+              avatar_url: avatarUrl,
+              venue_name: s.venue_name,
+            });
+          }
+        }
+      }
+
+      // Deduplicate: if a user appears in planning, remove from out
+      const planningIds = new Set(planningResults.map(f => f.user_id));
+      const dedupedOut = outResults.filter(f => !planningIds.has(f.user_id));
+
+      setPlanningFriends(planningResults);
+      setFriendsOut(dedupedOut);
+    } catch (error) {
+      console.error('Error fetching planning/out friends:', error);
     }
-    
-    // Get friend IDs
-    const { data: sentFriendships } = await supabase
-      .from('friendships')
-      .select('friend_id')
-      .eq('user_id', user.id)
-      .eq('status', 'accepted');
-
-    const { data: receivedFriendships } = await supabase
-      .from('friendships')
-      .select('user_id')
-      .eq('friend_id', user.id)
-      .eq('status', 'accepted');
-
-    const friendIds = [
-      ...(sentFriendships?.map(f => f.friend_id) || []),
-      ...(receivedFriendships?.map(f => f.user_id) || [])
-    ];
-
-    if (friendIds.length === 0) {
-      setPlanningFriends([]);
-      return;
-    }
-
-    // Get friends with planning status (including neighborhood)
-    // In bootstrap mode, also filter out demo night_statuses
-    let statusQuery = supabase
-      .from('night_statuses')
-      .select('user_id, planning_neighborhood, is_demo')
-      .in('user_id', friendIds)
-      .eq('status', 'planning')
-      .not('expires_at', 'is', null)
-      .gt('expires_at', new Date().toISOString());
-    
-    // Filter out demo statuses when demo mode is off
-    if (!demoEnabled) {
-      statusQuery = statusQuery.eq('is_demo', false);
-    }
-    
-    const { data: planningStatuses } = await statusQuery;
-
-    if (!planningStatuses || planningStatuses.length === 0) {
-      setPlanningFriends([]);
-      return;
-    }
-
-    const planningUserIds = planningStatuses.map(s => s.user_id);
-    const neighborhoodMap = new Map(planningStatuses.map(s => [s.user_id, s.planning_neighborhood]));
-
-    // Get profiles for planning friends (include is_demo for filtering)
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, display_name, avatar_url, is_demo')
-      .in('id', planningUserIds);
-
-    // Filter out demo users when demo mode is OFF
-    const filteredProfiles = !demoEnabled
-      ? (profiles || []).filter((p: any) => !p.is_demo)
-      : (profiles || []);
-
-    setPlanningFriends(filteredProfiles.map((p: any) => ({
-      user_id: p.id,
-      display_name: p.display_name,
-      avatar_url: p.avatar_url,
-      planning_neighborhood: neighborhoodMap.get(p.id) || null,
-    })));
   };
 
   // Initial data fetch
@@ -386,32 +374,132 @@ export default function Home() {
         {isLoading ? (
           <FeedSkeleton />
         ) : posts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6">
-              <MessageCircle className="h-10 w-10 text-[#a855f7]/60" />
-            </div>
-            <h3 className="text-xl font-semibold text-white mb-6">
-              {(() => {
-                const hour = new Date().getHours();
-                if (hour < 12) return "Who's up?";
-                if (hour < 17) return "What's the move?";
-                if (hour < 21) return "Night's young";
-                return "Be the first";
-              })()}
-            </h3>
-            <button
-              onClick={() => setShowCreatePost(true)}
-              className="bg-[#d4ff00] hover:bg-[#d4ff00]/90 text-[#1a0f2e] rounded-full px-6 py-2.5 font-medium transition-colors"
-            >
-              Share what you're up to
-            </button>
-            {planningFriends.length > 0 && (
+          <div className="space-y-6">
+            {/* Share CTA — always visible */}
+            <div className="flex justify-center">
               <button
-                onClick={() => setFeedMode('plans')}
-                className="mt-4 text-white/40 text-sm hover:text-white/60 transition-colors"
+                onClick={() => setShowCreatePost(true)}
+                className="bg-[#d4ff00] hover:bg-[#d4ff00]/90 text-[#1a0f2e] rounded-full px-6 py-2.5 font-medium transition-colors"
               >
-                <Target className="h-4 w-4 text-[#a855f7] inline mr-1" /> {planningFriends.length} {planningFriends.length === 1 ? 'friend is' : 'friends are'} making plans
+                Share what you're up to
               </button>
+            </div>
+
+            {/* Out Tonight */}
+            {friendsOut.length > 0 && (
+              <div className="glass-card rounded-2xl overflow-hidden border border-[#a855f7]/20 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-[#d4ff00]" />
+                  <h3 className="text-white font-semibold text-sm">Out Tonight</h3>
+                  <span className="text-white/40 text-xs">({friendsOut.length})</span>
+                </div>
+                <div className="space-y-2">
+                  {friendsOut.map((friend) => (
+                    <div
+                      key={friend.user_id}
+                      className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                      onClick={() => openFriendCard({
+                        userId: friend.user_id,
+                        displayName: friend.display_name,
+                        avatarUrl: friend.avatar_url,
+                        venueName: friend.venue_name,
+                      })}
+                    >
+                      <div className="relative">
+                        <div className="absolute inset-0 rounded-full bg-[#22c55e]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
+                        <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#22c55e] relative z-10">
+                          <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                          <AvatarFallback className="bg-[#22c55e] text-white text-sm">
+                            {friend.display_name?.[0] || '?'}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
+                        <p className="text-[#d4ff00] text-xs truncate">📍 {friend.venue_name}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); sendMeetUpNotification(friend.user_id, friend.display_name, friend.avatar_url); }}
+                        className="h-8 px-3 bg-[#22c55e] hover:bg-[#22c55e]/80 text-white rounded-full text-xs shadow-[0_0_10px_rgba(34,197,94,0.4)] hover:shadow-[0_0_15px_rgba(34,197,94,0.6)] transition-all"
+                      >
+                        Meet Up
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Planning Tonight */}
+            {planningFriends.length > 0 && (
+              <div className="glass-card rounded-2xl overflow-hidden border border-[#a855f7]/20 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-[#a855f7]" />
+                  <h3 className="text-white font-semibold text-sm">Planning Tonight</h3>
+                  <span className="text-white/40 text-xs">({planningFriends.length})</span>
+                </div>
+                <div className="space-y-2">
+                  {planningFriends.map((friend) => (
+                    <div
+                      key={friend.user_id}
+                      className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                    >
+                      <div className="relative">
+                        <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
+                        <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
+                          <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                          <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+                            {friend.display_name?.[0] || '?'}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-white/50 text-xs">Planning tonight</span>
+                          {friend.planning_neighborhood && (
+                            <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium">
+                              {friend.planning_neighborhood}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => navigate('/messages', {
+                          state: {
+                            preselectedUser: { id: friend.user_id, display_name: friend.display_name, avatar_url: friend.avatar_url },
+                            source: 'planning'
+                          }
+                        })}
+                        className="h-8 px-3 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full text-xs shadow-[0_0_10px_rgba(168,85,247,0.4)] hover:shadow-[0_0_15px_rgba(168,85,247,0.6)] transition-all"
+                      >
+                        Make plans
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* True empty state — no friends out or planning */}
+            {friendsOut.length === 0 && planningFriends.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6">
+                  <MessageCircle className="h-10 w-10 text-[#a855f7]/60" />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  {(() => {
+                    const hour = new Date().getHours();
+                    if (hour < 12) return "Who's up?";
+                    if (hour < 17) return "What's the move?";
+                    if (hour < 21) return "Night's young";
+                    return "Be the first";
+                  })()}
+                </h3>
+                <p className="text-white/50 text-sm">Share what you're up to</p>
+              </div>
             )}
           </div>
         ) : (

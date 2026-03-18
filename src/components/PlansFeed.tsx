@@ -328,6 +328,32 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
     }
   };
 
+  const handleChangeVisibility = async (visibility: string) => {
+    if (!userId) return;
+
+    try {
+      const { error } = await supabase
+        .from('night_statuses')
+        .update({
+          planning_visibility: visibility,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      haptic.light();
+      setUserPlanningVisibility(visibility);
+    } catch (error) {
+      console.error('Error changing visibility:', error);
+      toast({
+        title: "Something went wrong",
+        description: "Couldn't update your audience. Try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSwitchToOut = () => {
     openCheckIn();
   };
@@ -461,7 +487,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
      fetchEvents();
   }, [userId, demoEnabled]);
 
-  // Realtime subscription for plans and plan_downs
+  // Realtime subscription for plans, plan_downs, and night_statuses
   useEffect(() => {
     const channel = supabase
       .channel('plans-realtime')
@@ -474,6 +500,11 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
         'postgres_changes',
         { event: '*', schema: 'public', table: 'plan_downs' },
         () => fetchPlans()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'night_statuses' },
+        () => fetchPlanningFriends()
       )
       .subscribe();
 
@@ -649,6 +680,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
           userPlanningNeighborhood={userPlanningNeighborhood}
           userPlanningVisibility={userPlanningVisibility}
           onChangeNeighborhood={handleChangeNeighborhood}
+          onChangeVisibility={handleChangeVisibility}
           onSwitchToOut={handleSwitchToOut}
           city={city || 'la'}
         />

@@ -114,7 +114,7 @@ export function useYapNotifications() {
                 triggerPushNotification({
                   id: notif.id,
                   receiver_id: user.id,
-                  sender_id: newYap.user_id,
+                  sender_id: user.id,
                   type: 'venue_yap',
                   message: yapMessage,
                 });

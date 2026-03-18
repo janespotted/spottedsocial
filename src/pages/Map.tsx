@@ -501,6 +501,9 @@ export default function Map() {
           
           setPlanningFriends(planningFriendsData);
 
+          // Collect planning user IDs to exclude from "out" list (prevents duplicate)
+          const planningUserIds = new Set(planningFriendsData.map(f => f.user_id));
+
           // Get relationship types (close friends, mutual friends) - BATCHED QUERY
           const { data: closeFriends } = await supabase
             .from('close_friends')
@@ -541,7 +544,8 @@ export default function Map() {
           }
 
           // RLS policies handle visibility filtering - no client-side filtering needed
-          friendLocations = (friendProfiles || []).map((friend: any) => {
+          // Exclude users who are in planning mode (prevents showing in both "out" and "planning")
+          friendLocations = (friendProfiles || []).filter((friend: any) => !planningUserIds.has(friend.id)).map((friend: any) => {
             const ppData = privatePartyMap[friend.id];
             const isPrivateParty = ppData?.is_private_party === true;
             
@@ -555,7 +559,7 @@ export default function Map() {
             
             const venueName = isPrivateParty
               ? `Private Party${ppData?.party_neighborhood ? ` (${ppData.party_neighborhood})` : ''}`
-              : venueMap[friend.id] || 'Out';
+              : venueMap[friend.id] || '';
 
             return {
               user_id: friend.id,
@@ -1831,10 +1835,7 @@ export default function Map() {
                           </Avatar>
                           <div className="flex-1 text-left">
                             <p className="text-white font-medium text-sm">{friend.profiles?.display_name}</p>
-                            <p className="text-[#d4ff00] text-xs">📍 {friend.venue_name}</p>
-                            {staleMins >= 5 && (
-                              <p className="text-white/40 text-xs">Last seen {formatLastSeen(staleMins)}</p>
-                            )}
+                            <p className="text-[#d4ff00] text-xs">{friend.venue_name ? `📍 At ${friend.venue_name}` : '📍 Out now'}</p>
                           </div>
                         </button>
                         );
@@ -1851,12 +1852,11 @@ export default function Map() {
                     <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">People</h3>
                     <div className="space-y-1">
                       {searchPeopleResults.map((friend) => {
-                        const staleMins = getStalenessMins(friend.last_location_at);
                         return (
                         <button
                           key={friend.user_id}
                           onClick={() => handleFriendSearchSelect(friend)}
-                          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors ${staleMins >= 60 ? 'opacity-50' : ''}`}
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
                         >
                           <Avatar className="w-9 h-9 border-2 border-[#a855f7]/40">
                             <AvatarImage src={friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`} />
@@ -1866,10 +1866,7 @@ export default function Map() {
                           </Avatar>
                           <div className="flex-1 text-left">
                             <p className="text-white font-medium text-sm">{friend.profiles?.display_name}</p>
-                            <p className="text-[#d4ff00] text-xs">📍 {friend.venue_name}</p>
-                            {staleMins >= 5 && (
-                              <p className="text-white/40 text-xs">Last seen {formatLastSeen(staleMins)}</p>
-                            )}
+                            <p className="text-[#d4ff00] text-xs">{friend.venue_name ? `📍 At ${friend.venue_name}` : '📍 Out now'}</p>
                           </div>
                         </button>
                         );
@@ -2038,13 +2035,8 @@ export default function Map() {
                       {friend.profiles?.display_name || 'Unknown'}
                     </p>
                     <p className="text-[#d4ff00] text-xs truncate">
-                      📍 At {friend.venue_name || 'Nearby'}
+                      {friend.venue_name ? `📍 At ${friend.venue_name}` : '📍 Out now'}
                     </p>
-                    {staleMins >= 5 && (
-                      <p className="text-white/40 text-xs">
-                        Last seen {formatLastSeen(staleMins)}
-                      </p>
-                    )}
                   </div>
 
                   {/* Distance */}
@@ -2055,19 +2047,22 @@ export default function Map() {
                 );
               })}
 
-              {/* Friends Planning Section */}
-              {planningFriends.length > 0 && (
+              {/* Friends Planning Section — exclude anyone already shown as "out" */}
+              {(() => {
+                const outUserIds = new Set(friends.map(f => f.user_id));
+                const filteredPlanningFriends = planningFriends.filter(f => !outUserIds.has(f.user_id));
+                return filteredPlanningFriends.length > 0 ? (
                 <>
                   {/* Divider with header */}
                   <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
                     <p className="text-white/70 text-xs font-medium flex items-center gap-1.5">
                       🔥 Friends Planning 🎯
-                      <span className="text-white/50">({planningFriends.length})</span>
+                      <span className="text-white/50">({filteredPlanningFriends.length})</span>
                     </p>
                   </div>
 
                   {/* Planning Friends List */}
-                  {planningFriends.map((friend) => (
+                  {filteredPlanningFriends.map((friend) => (
                     <button
                       key={friend.user_id}
                       onClick={() => {
@@ -2110,7 +2105,8 @@ export default function Map() {
                     </button>
                   ))}
                 </>
-              )}
+              ) : null;
+              })()}
             </div>
           )}
 
@@ -2130,7 +2126,11 @@ export default function Map() {
         <div className={`absolute left-6 bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 z-20 transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: bottomOffset }}>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#a855f7]/30 rounded-full"></div>
-            <span className="text-white/60 text-sm">No friends out</span>
+            <span className="text-white/60 text-sm">
+              {planningFriends.length > 0
+                ? `${planningFriends.length} friend${planningFriends.length === 1 ? '' : 's'} planning tonight`
+                : 'No friends out'}
+            </span>
           </div>
         </div>
       ) : null}
@@ -2191,7 +2191,7 @@ export default function Map() {
         >
           <div className="px-4 py-3 border-b border-[#a855f7]/20">
             <h3 className="text-white font-medium text-sm">
-              Friends at {selectedCluster.venueName}
+              {selectedCluster.venueName ? `Friends at ${selectedCluster.venueName}` : 'Friends out'}
             </h3>
           </div>
           <div className="max-h-64 overflow-y-auto">

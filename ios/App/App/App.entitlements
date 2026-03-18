@@ -4,5 +4,10 @@
 <dict>
 	<key>aps-environment</key>
 	<string>production</string>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:spottedsocial.lovable.app</string>
+		<string>webcredentials:spottedsocial.lovable.app</string>
+	</array>
 </dict>
 </plist>

@@ -231,8 +231,20 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
         const action = await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
           logger.info('push:native_action', { actionId: notification.actionId });
-          // Navigate based on notification data
-          const url = (notification.notification.data as any)?.url;
+          const data = notification.notification.data as any;
+          const notificationType = data?.type;
+
+          // Venue arrival while planning — skip "Are you out?" and go to privacy selection
+          if (notificationType === 'venue_arrival_planning') {
+            localStorage.setItem('venue_arrival_planning_open', 'true');
+            // Navigate to home so Layout picks up the flag
+            window.history.pushState(null, '', '/');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+            return;
+          }
+
+          // Default: navigate based on notification URL
+          const url = data?.url;
           if (url) {
             window.history.pushState(null, '', url);
             window.dispatchEvent(new PopStateEvent('popstate'));

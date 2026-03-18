@@ -25,7 +25,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { showCheckIn, closeCheckIn, openCheckInFromReminder } = useCheckIn();
+  const { showCheckIn, closeCheckIn, openCheckInFromReminder, openCheckInForVenueArrival } = useCheckIn();
   const { unreadCount } = useNotifications();
   const { showOnboarding, completeOnboarding, loading: onboardingLoading } = useOnboarding();
   const { user } = useAuth();
@@ -43,6 +43,43 @@ export function Layout({ children }: LayoutProps) {
   
   // Map page needs full width and flex layout
   const isMapPage = location.pathname === '/map';
+
+  // Check for venue correction prompt (set by auto-venue-tracker notification tap)
+  // Runs on mount and on app resume (visibilitychange) so it catches native notification taps
+  useEffect(() => {
+    const checkVenueFlags = () => {
+      if (localStorage.getItem('venue_correction_prompt') === 'true') {
+        localStorage.removeItem('venue_correction_prompt');
+        openCheckInFromReminder();
+        return;
+      }
+
+      // Venue arrival while planning — open check-in at privacy selection with pre-populated venue
+      if (localStorage.getItem('venue_arrival_planning_open') === 'true') {
+        localStorage.removeItem('venue_arrival_planning_open');
+        try {
+          const raw = localStorage.getItem('venue_arrival_planning_payload');
+          if (raw) {
+            const { venue_id, venue_name } = JSON.parse(raw);
+            localStorage.removeItem('venue_arrival_planning_payload');
+            if (venue_id && venue_name) {
+              openCheckInForVenueArrival(venue_id, venue_name);
+              return;
+            }
+          }
+        } catch {
+          // Malformed JSON — fall through to normal check-in
+        }
+        openCheckInFromReminder();
+      }
+    };
+    checkVenueFlags();
+    const onVisibilityChange = () => {
+      if (!document.hidden) checkVenueFlags();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [openCheckInFromReminder, openCheckInForVenueArrival]);
 
   // Check for pending check-in reminders + still-here nudge
   useEffect(() => {

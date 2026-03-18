@@ -28,6 +28,8 @@ export default function Settings() {
   const [isToggling, setIsToggling] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [notifyOnPlanning, setNotifyOnPlanning] = useState(true);
+  const [isTogglingPlanning, setIsTogglingPlanning] = useState(false);
 
   const cityLabels: Record<SupportedCity, string> = {
     nyc: 'New York City',
@@ -43,6 +45,17 @@ export default function Settings() {
   useEffect(() => {
     if (user) {
       fetchInviteCode();
+      // Load notify_friends_on_planning preference
+      supabase
+        .from('profiles')
+        .select('notify_friends_on_planning')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.notify_friends_on_planning !== undefined && data.notify_friends_on_planning !== null) {
+            setNotifyOnPlanning(data.notify_friends_on_planning);
+          }
+        });
     }
   }, [user]);
 
@@ -61,6 +74,24 @@ export default function Settings() {
   };
 
   const getInviteUrl = () => `${APP_BASE_URL}/invite/${inviteCode}`;
+
+  const handlePlanningNotifyToggle = async (enabled: boolean) => {
+    if (!user) return;
+    setIsTogglingPlanning(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ notify_friends_on_planning: enabled })
+        .eq('id', user.id);
+
+      if (!error) {
+        setNotifyOnPlanning(enabled);
+        toast.success(enabled ? 'Planning notifications enabled' : 'Planning notifications disabled');
+      }
+    } finally {
+      setIsTogglingPlanning(false);
+    }
+  };
 
   const handlePushToggle = async (enabled: boolean) => {
     setIsToggling(true);
@@ -226,6 +257,26 @@ export default function Settings() {
 
         {/* Read Receipts Section */}
         <ReadReceiptsToggle userId={user?.id} />
+
+        {/* Planning Notification Toggle */}
+        <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
+                <Eye className="h-5 w-5 text-[#a855f7]" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-white">Planning Notifications</h3>
+                <p className="text-white/60 text-sm">Notify friends when I'm planning to go out</p>
+              </div>
+            </div>
+            <Switch
+              checked={notifyOnPlanning}
+              onCheckedChange={handlePlanningNotifyToggle}
+              disabled={isTogglingPlanning}
+            />
+          </div>
+        </Card>
 
         {/* Activity Notifications Section */}
         <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">

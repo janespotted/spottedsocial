@@ -37,8 +37,12 @@ const VALID_NOTIFICATION_TYPES = [
   "private_party_invite",
   "venue_yap",
   "friend_checkin",
+  "friend_planning",
   "post_like",
   "post_comment",
+  "venue_arrival_planning",
+  "friend_arrived_venue",
+  "friends_at_venue",
 ] as const;
 
 // UUID v4 regex pattern
@@ -675,10 +679,18 @@ function getNotificationContent(
       return { title: "📍 Invite Accepted!", body: message, url: "/messages?tab=activity" };
     case "friend_checkin":
       return { title: "📍 Friend Checked In", body: message, url: "/" };
+    case "friend_planning":
+      return { title: "👀 Friend Making Plans", body: message, url: "/" };
     case "post_like":
       return { title: "❤️ Post Liked", body: message, url: "/feed" };
     case "post_comment":
       return { title: "💬 New Comment", body: message, url: "/feed" };
+    case "venue_arrival_planning":
+      return { title: "📍 You've arrived!", body: message, url: "/?checkin=true" };
+    case "friend_arrived_venue":
+      return { title: "👀 Friend Just Arrived!", body: message, url: "/" };
+    case "friends_at_venue":
+      return { title: "🔥 Friends Spotted!", body: message, url: "/" };
     default:
       return { title: "Spotted", body: message, url: "/" };
   }
@@ -721,6 +733,7 @@ Deno.serve(async (req) => {
     }
 
     const rawPayload = await req.json();
+    console.log('[SEND-PUSH] Invoked with payload:', JSON.stringify({ type: rawPayload.type, sender_id: rawPayload.sender_id, receiver_id: rawPayload.receiver_id, notification_id: rawPayload.notification_id }));
     const validation = validatePayload(rawPayload);
     if (!validation.valid) {
       return new Response(JSON.stringify({ error: `Bad Request: ${validation.error}` }), {

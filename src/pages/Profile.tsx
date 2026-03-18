@@ -75,6 +75,7 @@ export default function Profile() {
   const [currentVenue, setCurrentVenue] = useState<string | null>(null);
   const [planningNeighborhood, setPlanningNeighborhood] = useState<string | null>(null);
   const [venueNeighborhood, setVenueNeighborhood] = useState<string | null>(null);
+  const [planningVisibility, setPlanningVisibility] = useState<string | null>(null);
   const [isPrivateParty, setIsPrivateParty] = useState(false);
   const [partyNeighborhood, setPartyNeighborhood] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -152,7 +153,7 @@ export default function Profile() {
     if (!user?.id) return;
     const { data: nightStatus } = await supabase
       .from('night_statuses')
-      .select('status, venue_name, venue_id, planning_neighborhood, is_private_party, party_neighborhood')
+      .select('status, venue_name, venue_id, planning_neighborhood, planning_visibility, is_private_party, party_neighborhood')
       .eq('user_id', user.id)
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString())
@@ -162,6 +163,7 @@ export default function Profile() {
       setCurrentStatus(nightStatus.status as 'out' | 'planning' | 'home');
       setCurrentVenue(nightStatus.venue_name);
       setPlanningNeighborhood(nightStatus.planning_neighborhood);
+      setPlanningVisibility(nightStatus.planning_visibility || null);
       setIsPrivateParty(nightStatus.is_private_party || false);
       setPartyNeighborhood(nightStatus.party_neighborhood);
       setIsLocationSharing(nightStatus.status === 'out' && (!!nightStatus.venue_name || nightStatus.is_private_party));
@@ -169,6 +171,7 @@ export default function Profile() {
       setCurrentStatus(null);
       setCurrentVenue(null);
       setPlanningNeighborhood(null);
+      setPlanningVisibility(null);
       setIsPrivateParty(false);
       setPartyNeighborhood(null);
       setIsLocationSharing(false);
@@ -203,7 +206,7 @@ export default function Profile() {
         .single(),
       supabase
         .from('night_statuses')
-        .select('status, venue_name, venue_id, planning_neighborhood, is_private_party, party_neighborhood')
+        .select('status, venue_name, venue_id, planning_neighborhood, planning_visibility, is_private_party, party_neighborhood')
         .eq('user_id', user?.id)
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
@@ -282,6 +285,7 @@ export default function Profile() {
       setCurrentStatus(nightStatus.status as 'out' | 'planning' | 'home');
       setCurrentVenue(nightStatus.venue_name);
       setPlanningNeighborhood(nightStatus.planning_neighborhood);
+      setPlanningVisibility(nightStatus.planning_visibility || null);
       setIsPrivateParty(nightStatus.is_private_party || false);
       setPartyNeighborhood(nightStatus.party_neighborhood);
       setIsLocationSharing(nightStatus.status === 'out' && (!!nightStatus.venue_name || nightStatus.is_private_party));
@@ -289,6 +293,7 @@ export default function Profile() {
       setCurrentStatus(null);
       setCurrentVenue(null);
       setPlanningNeighborhood(null);
+      setPlanningVisibility(null);
       setVenueNeighborhood(null);
       setIsPrivateParty(false);
       setPartyNeighborhood(null);
@@ -370,6 +375,22 @@ export default function Profile() {
       toast.success(`Now sharing with ${getLevelDisplayName(value)}`);
     } catch (error: any) {
       toast.error('Failed to update location sharing');
+    }
+  };
+
+  const handlePlanningVisibilityChange = async (value: string) => {
+    try {
+      const { error } = await supabase
+        .from('night_statuses')
+        .update({ planning_visibility: value, updated_at: new Date().toISOString() })
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      setPlanningVisibility(value);
+      toast.success(`Planning visible to ${getLevelDisplayName(value)}`);
+    } catch (error: any) {
+      toast.error('Failed to update planning visibility');
     }
   };
 
@@ -611,15 +632,15 @@ export default function Profile() {
                     <>
                       <span className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0" />
                       <p className="text-[#d4ff00] font-medium text-sm">
-                        You're out · {isPrivateParty 
-                          ? `Private Party${partyNeighborhood ? ` (${partyNeighborhood})` : ''}` 
+                        You're out · {isPrivateParty
+                          ? `Private Party${partyNeighborhood ? ` (${partyNeighborhood})` : ''}`
                           : (currentVenue || 'Unknown venue')}
                       </p>
                     </>
                   ) : currentStatus === 'planning' ? (
                     <>
-                      <Target className="h-3.5 w-3.5 text-[#a855f7] shrink-0" />
-                      <p className="text-[#a855f7] font-medium text-sm">
+                      <span className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0" />
+                      <p className="text-[#d4ff00] font-medium text-sm">
                         You're planning{planningNeighborhood ? ` · ${planningNeighborhood}` : ''}
                       </p>
                     </>
@@ -635,8 +656,10 @@ export default function Profile() {
                 
                 {/* Helper Text */}
                 <p className="text-white/40 text-xs pl-5">
-                  {currentStatus === 'out' 
-                    ? 'Your live location is visible' 
+                  {currentStatus === 'out'
+                    ? 'Your live location is visible'
+                    : currentStatus === 'planning'
+                    ? 'Your location is paused'
                     : 'Your live location is paused'}
                 </p>
               </div>
@@ -652,11 +675,35 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Privacy Row - ONLY shown when user is "out" */}
+          {/* Privacy Row - shown when user is "out" or "planning" */}
           {currentStatus === 'out' && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
               <p className="text-white/60 text-sm">Who can see your location?</p>
               <Select value={locationSharingLevel} onValueChange={handleLocationSharingChange}>
+                <SelectTrigger className="w-auto min-w-[170px] border-[#a855f7]/30 bg-white/5 backdrop-blur-sm text-white rounded-full h-8 text-sm px-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-3.5 w-3.5 text-white/60" />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white z-50">
+                  <SelectItem value="close_friends" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
+                    Close Friends
+                  </SelectItem>
+                  <SelectItem value="mutual_friends" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
+                    Mutual Friends
+                  </SelectItem>
+                  <SelectItem value="all_friends" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
+                    All Friends
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {currentStatus === 'planning' && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+              <p className="text-white/60 text-sm">Who can see your planning?</p>
+              <Select value={planningVisibility || 'all_friends'} onValueChange={handlePlanningVisibilityChange}>
                 <SelectTrigger className="w-auto min-w-[170px] border-[#a855f7]/30 bg-white/5 backdrop-blur-sm text-white rounded-full h-8 text-sm px-3">
                   <div className="flex items-center gap-2">
                     <Users className="h-3.5 w-3.5 text-white/60" />

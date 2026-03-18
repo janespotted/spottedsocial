@@ -8,11 +8,18 @@ export interface DetectedVenue {
   distance?: number;
 }
 
+export interface VenueArrivalPayload {
+  venueId: string;
+  venueName: string;
+}
+
 interface CheckInContextType {
   showCheckIn: boolean;
   isReminderTriggered: boolean;
+  venueArrivalPayload: VenueArrivalPayload | null;
   openCheckIn: () => void;
   openCheckInFromReminder: () => void;
+  openCheckInForVenueArrival: (venueId: string, venueName: string) => void;
   closeCheckIn: () => void;
   // Venue arrival prompt state
   showVenueArrivalPrompt: boolean;
@@ -40,6 +47,7 @@ const CheckInContext = createContext<CheckInContextType | undefined>(undefined);
 export function CheckInProvider({ children }: { children: ReactNode }) {
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [isReminderTriggered, setIsReminderTriggered] = useState(false);
+  const [venueArrivalPayload, setVenueArrivalPayload] = useState<VenueArrivalPayload | null>(null);
   const [showVenueArrivalPrompt, setShowVenueArrivalPrompt] = useState(false);
   const [detectedVenue, setDetectedVenue] = useState<DetectedVenue | null>(null);
   const [nearbyVenues, setNearbyVenues] = useState<DetectedVenue[]>([]);
@@ -62,10 +70,17 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
     setIsReminderTriggered(true);
     setShowCheckIn(true);
   };
-  
+
+  const openCheckInForVenueArrival = (venueId: string, venueName: string) => {
+    setVenueArrivalPayload({ venueId, venueName });
+    setIsReminderTriggered(false);
+    setShowCheckIn(true);
+  };
+
   const closeCheckIn = () => {
     setShowCheckIn(false);
     setIsReminderTriggered(false);
+    setVenueArrivalPayload(null);
   };
 
   const showVenueArrival = () => setShowVenueArrivalPrompt(true);
@@ -104,11 +119,13 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <CheckInContext.Provider value={{ 
-      showCheckIn, 
-      isReminderTriggered, 
-      openCheckIn, 
-      openCheckInFromReminder, 
+    <CheckInContext.Provider value={{
+      showCheckIn,
+      isReminderTriggered,
+      venueArrivalPayload,
+      openCheckIn,
+      openCheckInFromReminder,
+      openCheckInForVenueArrival,
       closeCheckIn,
       showVenueArrivalPrompt,
       detectedVenue,
