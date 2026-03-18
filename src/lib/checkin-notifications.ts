@@ -108,10 +108,12 @@ export async function sendCheckinNotifications(
       // Insert throttle records
       const throttleRows = recipientIds.map(uid => ({
         user_id: uid,
+        friend_id: userId,
         venue_id: venueId,
+        notification_type: 'friends_at_venue',
         notified_date: today,
       }));
-      await supabase.from('venue_notif_throttle').insert(throttleRows);
+      await supabase.from('venue_notif_throttle').insert(throttleRows as any);
 
       // Send notifications
       for (const friendId of recipientIds) {
