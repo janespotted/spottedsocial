@@ -1197,6 +1197,7 @@ export type Database = {
           last_known_lng: number | null
           last_location_at: string | null
           location_sharing_level: string | null
+          notify_friends_on_planning: boolean | null
           push_enabled: boolean | null
           push_subscription: Json | null
           show_read_receipts: boolean
@@ -1219,6 +1220,7 @@ export type Database = {
           last_known_lng?: number | null
           last_location_at?: string | null
           location_sharing_level?: string | null
+          notify_friends_on_planning?: boolean | null
           push_enabled?: boolean | null
           push_subscription?: Json | null
           show_read_receipts?: boolean
@@ -1241,6 +1243,7 @@ export type Database = {
           last_known_lng?: number | null
           last_location_at?: string | null
           location_sharing_level?: string | null
+          notify_friends_on_planning?: boolean | null
           push_enabled?: boolean | null
           push_subscription?: Json | null
           show_read_receipts?: boolean
@@ -1305,6 +1308,36 @@ export type Database = {
           detail?: Json | null
           id?: string
           stage?: string | null
+        }
+        Relationships: []
+      }
+      push_throttle: {
+        Row: {
+          created_at: string
+          id: string
+          last_sent_at: string
+          notification_type: string
+          sent_count: number
+          sent_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_sent_at?: string
+          notification_type: string
+          sent_count?: number
+          sent_date?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_sent_at?: string
+          notification_type?: string
+          sent_count?: number
+          sent_date?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1812,6 +1845,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      venue_notif_throttle: {
+        Row: {
+          friend_id: string
+          id: string
+          notification_type: string
+          notified_date: string
+          user_id: string
+          venue_id: string
+        }
+        Insert: {
+          friend_id: string
+          id?: string
+          notification_type: string
+          notified_date?: string
+          user_id: string
+          venue_id: string
+        }
+        Update: {
+          friend_id?: string
+          id?: string
+          notification_type?: string
+          notified_date?: string
+          user_id?: string
+          venue_id?: string
+        }
+        Relationships: []
       }
       venue_owners: {
         Row: {
@@ -2387,6 +2447,7 @@ export type Database = {
       }
       cleanup_old_checkins: { Args: never; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: number }
+      cleanup_venue_notif_throttle: { Args: never; Returns: undefined }
       create_dm_thread: { Args: { friend_id: string }; Returns: string }
       create_group_thread: {
         Args: { group_name?: string; member_ids: string[] }
@@ -2429,6 +2490,18 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      create_venue_from_discovery: {
+        Args: {
+          p_city: string
+          p_google_place_id?: string
+          p_lat: number
+          p_lng: number
+          p_name: string
+          p_neighborhood: string
+          p_type: string
+        }
+        Returns: string
       }
       find_nearby_venues: {
         Args: {
@@ -2513,6 +2586,11 @@ export type Database = {
       }
       increment_yap_score: {
         Args: { p_delta: number; p_yap_id: string }
+        Returns: undefined
+      }
+      invoke_daily_cleanup: { Args: never; Returns: undefined }
+      invoke_daily_nudge: {
+        Args: { p_nudge_number: number }
         Returns: undefined
       }
       is_any_venue_owner: { Args: { check_user_id: string }; Returns: boolean }
