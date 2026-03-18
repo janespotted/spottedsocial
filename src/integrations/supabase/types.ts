@@ -2524,6 +2524,16 @@ export type Database = {
           venue_name: string
         }[]
       }
+      get_people_you_may_know: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          mutual_count: number
+          user_id: string
+          username: string
+        }[]
+      }
       get_profile_safe: {
         Args: { target_user_id: string }
         Returns: {
