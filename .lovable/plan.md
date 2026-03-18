@@ -1,18 +1,29 @@
 
 
-## Fix: Update APNS_AUTH_KEY with correct full-length key
+## Fix: Event Venues Dominating Leaderboard
 
-The uploaded `.p8` file confirms the key body is **164 characters**. The previously stored secret was only 96 characters (truncated during paste).
+### Root Cause
+The 79 event venues (type `other`) added during the venue inventory expansion all have `popularity_rank = 0`. The leaderboard sorts by `popularity_rank ASC`, so rank 0 beats rank 1 — pushing all real bars/clubs/nightclubs out of the top 20.
 
-### Steps
+- NYC: 39 venues at rank 0
+- LA: 34 venues at rank 0
 
-1. **Update the `APNS_AUTH_KEY` secret** with the exact 164-character base64 string extracted from the uploaded file (no PEM headers, no newlines)
-2. **Redeploy the `send-push` edge function** so it picks up the new secret value
-3. **Test** by triggering a push notification from the iOS device
+### Fix
+Run a single migration to push all `type = 'other'` venues to a high popularity rank (e.g., 900), so they appear below actual nightlife venues but remain discoverable:
 
-| Step | Action |
-|------|--------|
-| Update secret | Set `APNS_AUTH_KEY` to the full 164-char key from the .p8 file |
-| Redeploy | Deploy `send-push` edge function |
-| Verify | Trigger notification and check logs for successful APNs delivery |
+```sql
+UPDATE venues
+SET popularity_rank = 900
+WHERE type = 'other' AND popularity_rank = 0;
+```
+
+This immediately restores your real bars, clubs, and cocktail bars (rank 1+) to the top 20 leaderboard positions in both cities.
+
+### What This Affects
+- **Leaderboard**: Real venues return to top positions
+- **Bootstrap energy** (`refresh-leaderboard-energy`): The function queries top 20 by `popularity_rank ASC` per city — it will now pick actual nightlife spots again
+- **Map/discovery**: No change — event venues remain searchable and checkable
+
+### Alternative
+If you want event venues to never appear on the leaderboard at all, we could also add a `WHERE type != 'other'` filter to the leaderboard query. Let me know if you'd prefer that approach instead.
 
