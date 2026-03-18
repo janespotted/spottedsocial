@@ -72,7 +72,7 @@ export async function sendCheckinNotifications(
             message: arrivedMessage,
           });
         }
-      }).catch(err => console.warn('friend_arrived_venue push failed:', err));
+      });
     }
 
     // 5. "X friends are at [venue]" — if 3+ friends at venue, notify others
