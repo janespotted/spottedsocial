@@ -366,66 +366,27 @@ export default function Friends() {
   const fetchSuggestedFriends = useCallback(async () => {
     if (!user?.id) return;
     setLoadingSuggestions(true);
-    
+
     try {
-      const { data: myFriendships } = await supabase
-        .from('friendships')
-        .select('user_id, friend_id')
-        .eq('status', 'accepted')
-        .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
-      
-      const myFriendIds = new Set<string>();
-      myFriendships?.forEach(f => {
-        myFriendIds.add(f.user_id === user.id ? f.friend_id : f.user_id);
+      const { data, error } = await supabase.rpc('get_people_you_may_know', {
+        p_user_id: user.id,
+        p_limit: 10,
       });
-      
-      if (myFriendIds.size === 0) {
+
+      if (error) {
+        console.error('Error fetching suggestions:', error);
         setSuggestedFriends([]);
-        setLoadingSuggestions(false);
         return;
       }
-      
-      const friendIdArray = [...myFriendIds];
-      const { data: friendsOfFriends } = await supabase
-        .from('friendships')
-        .select('user_id, friend_id')
-        .eq('status', 'accepted')
-        .or(friendIdArray.map(id => `user_id.eq.${id},friend_id.eq.${id}`).join(','));
-      
-      const mutualCounts: Record<string, number> = {};
-      friendsOfFriends?.forEach(f => {
-        const otherId = myFriendIds.has(f.user_id) ? f.friend_id : f.user_id;
-        if (otherId !== user.id && !myFriendIds.has(otherId)) {
-          mutualCounts[otherId] = (mutualCounts[otherId] || 0) + 1;
-        }
-      });
-      
-      const topSuggestionIds = Object.entries(mutualCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([id]) => id);
-      
-      if (topSuggestionIds.length === 0) {
-        setSuggestedFriends([]);
-        setLoadingSuggestions(false);
-        return;
-      }
-      
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, username, avatar_url, is_demo')
-        .in('id', topSuggestionIds);
-      
-      const suggestions = (profiles || [])
-        .filter(p => demoEnabled || !p.is_demo)
-        .map(p => ({
-          id: p.id,
-          display_name: p.display_name,
-          username: p.username,
-          avatar_url: p.avatar_url,
-          mutual_count: mutualCounts[p.id] || 0
-        })).sort((a, b) => b.mutual_count - a.mutual_count);
-      
+
+      const suggestions: SuggestedFriend[] = (data || []).map((r: any) => ({
+        id: r.user_id,
+        display_name: r.display_name,
+        username: r.username,
+        avatar_url: r.avatar_url,
+        mutual_count: Number(r.mutual_count),
+      }));
+
       setSuggestedFriends(suggestions);
     } catch (error) {
       console.error('Error fetching suggestions:', error);
