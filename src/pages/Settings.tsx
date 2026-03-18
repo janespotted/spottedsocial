@@ -81,7 +81,7 @@ export default function Settings() {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ notify_friends_on_planning: enabled })
+        .update({ notify_friends_on_planning: enabled } as any)
         .eq('id', user.id);
 
       if (!error) {

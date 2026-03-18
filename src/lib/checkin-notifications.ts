@@ -136,7 +136,7 @@ export async function sendCheckinNotifications(
               message: hotVenueMessage,
             });
           }
-        }).catch(err => console.warn('friends_at_venue push failed:', err));
+        });
       }
     }
   } catch (err) {

@@ -420,7 +420,7 @@ const searchMapboxNearbyPOIs = async (
       // Try to insert into DB via RPC (bypasses RLS), fall back to direct insert
       let venueId: string | null = null;
       try {
-        const { data: rpcResult } = await supabase.rpc('create_venue_from_discovery', {
+        const { data: rpcResult } = await supabase.rpc('create_venue_from_discovery' as any, {
           p_name: name,
           p_lat: fLat,
           p_lng: fLng,
@@ -429,7 +429,7 @@ const searchMapboxNearbyPOIs = async (
           p_city: city,
           p_google_place_id: feature.properties?.mapbox_id || null,
         });
-        venueId = rpcResult;
+        venueId = rpcResult as string;
       } catch {
         // RPC doesn't exist yet or failed — venue won't be persisted but still shown
       }
