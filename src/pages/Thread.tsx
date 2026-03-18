@@ -424,8 +424,6 @@ export default function Thread() {
             message: `${senderName}: ${messagePreview}`,
           });
         }
-      }).catch((err) => {
-        console.error('[DM PUSH] Unexpected error:', String(err));
       });
     }
   }, [user, threadId, otherMember, groupInfo, currentUserProfile]);

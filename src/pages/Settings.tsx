@@ -48,12 +48,12 @@ export default function Settings() {
       // Load notify_friends_on_planning preference
       supabase
         .from('profiles')
-        .select('notify_friends_on_planning')
+        .select('*')
         .eq('id', user.id)
         .single()
         .then(({ data }) => {
-          if (data?.notify_friends_on_planning !== undefined && data.notify_friends_on_planning !== null) {
-            setNotifyOnPlanning(data.notify_friends_on_planning);
+          if (data && (data as any).notify_friends_on_planning !== undefined && (data as any).notify_friends_on_planning !== null) {
+            setNotifyOnPlanning((data as any).notify_friends_on_planning);
           }
         });
     }
@@ -81,7 +81,7 @@ export default function Settings() {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ notify_friends_on_planning: enabled })
+        .update({ notify_friends_on_planning: enabled } as any)
         .eq('id', user.id);
 
       if (!error) {

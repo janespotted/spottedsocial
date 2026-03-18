@@ -102,8 +102,8 @@ export async function startBackgroundLocation(userId: string): Promise<void> {
             } else {
               console.log('[BgLocation:PlanningNudge] New venue detected:', nearestVenue.name, '(', nearestVenue.id, ') — sending push');
               lastNudgedVenueId = nearestVenue.id;
-              lastNudgedVenueLat = nearestVenue.lat;
-              lastNudgedVenueLng = nearestVenue.lng;
+              lastNudgedVenueLat = location.latitude;
+              lastNudgedVenueLng = location.longitude;
 
               // Store venue data so the notification tap handler can read it
               localStorage.setItem('venue_arrival_planning_payload', JSON.stringify({

@@ -368,7 +368,7 @@ export default function Friends() {
     setLoadingSuggestions(true);
 
     try {
-      const { data, error } = await supabase.rpc('get_people_you_may_know', {
+      const { data, error } = await supabase.rpc('get_people_you_may_know' as any, {
         p_user_id: user.id,
         p_limit: 10,
       });

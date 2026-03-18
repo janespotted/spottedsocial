@@ -72,7 +72,7 @@ export async function sendCheckinNotifications(
             message: arrivedMessage,
           });
         }
-      }).catch(err => console.warn('friend_arrived_venue push failed:', err));
+      });
     }
 
     // 5. "X friends are at [venue]" — if 3+ friends at venue, notify others
@@ -84,15 +84,15 @@ export async function sendCheckinNotifications(
 
       // Check throttle: only send once per venue per night per recipient
       const today = new Date().toISOString().split('T')[0];
-      const { data: alreadyNotified } = await supabase
-        .from('venue_notif_throttle')
+      const { data: alreadyNotified } = await (supabase
+        .from('venue_notif_throttle') as any)
         .select('user_id')
         .eq('venue_id', venueId)
         .eq('notified_date', today)
         .in('user_id', friendsNotAtVenue);
 
       const alreadyNotifiedSet = new Set(
-        (alreadyNotified || []).map(r => r.user_id)
+        (alreadyNotified || []).map((r: any) => r.user_id)
       );
 
       const recipientIds = friendsNotAtVenue.filter(
@@ -108,10 +108,12 @@ export async function sendCheckinNotifications(
       // Insert throttle records
       const throttleRows = recipientIds.map(uid => ({
         user_id: uid,
+        friend_id: userId,
         venue_id: venueId,
+        notification_type: 'friends_at_venue',
         notified_date: today,
       }));
-      await supabase.from('venue_notif_throttle').insert(throttleRows);
+      await supabase.from('venue_notif_throttle').insert(throttleRows as any);
 
       // Send notifications
       for (const friendId of recipientIds) {
@@ -134,7 +136,7 @@ export async function sendCheckinNotifications(
               message: hotVenueMessage,
             });
           }
-        }).catch(err => console.warn('friends_at_venue push failed:', err));
+        });
       }
     }
   } catch (err) {
