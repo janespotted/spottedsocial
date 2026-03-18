@@ -84,15 +84,15 @@ export async function sendCheckinNotifications(
 
       // Check throttle: only send once per venue per night per recipient
       const today = new Date().toISOString().split('T')[0];
-      const { data: alreadyNotified } = await supabase
-        .from('venue_notif_throttle')
+      const { data: alreadyNotified } = await (supabase
+        .from('venue_notif_throttle') as any)
         .select('user_id')
         .eq('venue_id', venueId)
         .eq('notified_date', today)
         .in('user_id', friendsNotAtVenue);
 
       const alreadyNotifiedSet = new Set(
-        (alreadyNotified || []).map(r => r.user_id)
+        (alreadyNotified || []).map((r: any) => r.user_id)
       );
 
       const recipientIds = friendsNotAtVenue.filter(
