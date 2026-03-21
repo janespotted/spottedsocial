@@ -1,46 +1,23 @@
 
 
-## Full Audit: Add Missing Top NYC Venues
+## Plan: Fix Build Errors + Clean Up Dicebear Avatars
 
-After cross-referencing TimeOut's "Best Bars" and "Best Clubs" lists (March 2026) plus your specific mentions, here are the venues missing from your database:
+### 1. Fix Build Errors (code changes)
 
-### Missing Venues to Add (~20 venues)
+The `dm_threads` table has no `group_avatar_url` column. Two files reference it in their `.select()` queries, causing TypeScript errors.
 
-**Bars & Cocktail Bars:**
-| Venue | Neighborhood | Type |
-|---|---|---|
-| ACME | NoHo | nightclub |
-| People's | Greenwich Village | members_club |
-| Sip & Guzzle | West Village | cocktail_bar |
-| KABIN | Hudson Square | cocktail_bar |
-| Bar Blondeau | Williamsburg | rooftop |
-| Golden Ratio | Clinton Hill | cocktail_bar |
-| Sauced | Williamsburg | bar |
-| Nothing Really Matters | Midtown | speakeasy |
-| Grand Army | Boerum Hill | cocktail_bar |
-| Katana Kitten | West Village | cocktail_bar |
-| Sweet Afton | Astoria | bar |
-| Bar Kabawa | East Village | cocktail_bar |
-| Harlem Hops | Harlem | bar |
-| Seed Library | Midtown East | cocktail_bar |
+**Fix**: Remove `group_avatar_url` from the select strings in both files. The code already falls back with `(threadInfo as any)?.group_avatar_url`, so removing it from select and keeping the fallback (or defaulting to `null`) is safe.
 
-**Clubs & Music Venues:**
-| Venue | Neighborhood | Type |
-|---|---|---|
-| Animal | Greenpoint | club |
-| Desert 5 Spot | Williamsburg | bar |
-| C'mon Everybody | Bed-Stuy | club |
+**Files to edit:**
+- `src/components/messages/MessagesTab.tsx` line 108: change select from `'id, is_group, name, group_avatar_url'` to `'id, is_group, name'`
+- `src/pages/Thread.tsx` line 203: change select from `'is_group, name, group_avatar_url'` to `'is_group, name'`
 
-### Already in Database (no action needed)
-ACME-related: none (needs adding). Already present: Superbueno, Saint Tuesday, schmuck., Sunken Harbor Club, Dear Irving NYC, Bar Madonna, Sultan Room, Nowadays, The Delancey, and all the classics (Dead Rabbit, Attaboy, Death & Co, Bemelmans, etc.)
+### 2. Clean Up Dicebear Avatar URLs (data operation)
 
-### Implementation
-1. **Database insert**: Use Google Places API geocoding (via the existing `geocode-venues-csv.js` pattern) or manual coordinates from Google Maps to get accurate lat/lng for each venue
-2. **Popularity ranks**: Assign ranks 5-15 range so they appear in the leaderboard rotation but don't displace existing top spots
-3. **Single SQL insert** via the insert tool with all ~20 venues, each with accurate coordinates, neighborhood, type, and city = 'nyc'
+Run via the insert tool:
+```sql
+UPDATE profiles SET avatar_url = NULL WHERE avatar_url LIKE '%dicebear%';
+```
 
-### Notes
-- **ACME** (9 Great Jones St, NoHo) — nightclub/restaurant with DJ sets Thu-Sat
-- **People's** (Greenwich Village) — exclusive invite-only evening club, categorized as `members_club`
-- All venues will have `is_demo = false` and appropriate popularity ranks
+This nullifies any avatar URLs containing "dicebear" so real users get the default avatar treatment instead of broken placeholder images.
 
