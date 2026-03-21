@@ -105,7 +105,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
         // Get thread info (is_group, name)
         supabase
           .from('dm_threads')
-          .select('id, is_group, name')
+          .select('id, is_group, name, group_avatar_url')
           .in('id', threadIds),
         // Get ALL members for all threads at once
         supabase
