@@ -1,0 +1,1 @@
+ALTER TABLE public.dm_threads ADD COLUMN IF NOT EXISTS group_avatar_url TEXT;
