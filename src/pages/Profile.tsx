@@ -531,7 +531,7 @@ export default function Profile() {
 
         {/* Avatar + Stats */}
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/edit-profile')} className="cursor-pointer">
+          <button onClick={() => navigate('/profile/edit')} className="cursor-pointer">
             <div className="relative h-20 w-20 rounded-full border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)] overflow-hidden bg-[#1a0f2e]">
               {(profile?.avatar_url || allProfiles?.find((p: any) => p.id === user?.id)?.avatar_url || user?.user_metadata?.avatar_url) ? (
                 <img

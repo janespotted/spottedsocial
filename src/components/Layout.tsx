@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { BottomNav } from './BottomNav';
 import { CheckInModal } from './CheckInModal';
@@ -18,6 +18,8 @@ import { showBrowserNotification } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { performAutoCheckout } from '@/lib/auto-checkout';
+import { checkLocationPermission } from '@/lib/location-service';
+import { MapPin, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface LayoutProps {
@@ -43,6 +45,61 @@ export function Layout({ children }: LayoutProps) {
   
   // Map page needs full width and flex layout
   const isMapPage = location.pathname === '/map';
+
+  // Location permission reminder — once per session, show if not granted
+  const [locationReminderShown, setLocationReminderShown] = useState(false);
+  useEffect(() => {
+    if (!user || locationReminderShown || showOnboarding || onboardingLoading) return;
+
+    const sessionKey = 'location_reminder_shown_session';
+    if (sessionStorage.getItem(sessionKey)) return;
+
+    const timer = setTimeout(async () => {
+      const permission = await checkLocationPermission();
+      if (permission !== 'granted') {
+        sessionStorage.setItem(sessionKey, 'true');
+        setLocationReminderShown(true);
+        toast.custom((id) => (
+          <div className="w-full bg-[#1a0f2e] border border-[#a855f7]/40 rounded-2xl p-4 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#a855f7]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <MapPin className="h-5 w-5 text-[#a855f7]" />
+              </div>
+              <div className="flex-1">
+                <p className="text-white font-semibold text-sm">Enable Location Sharing</p>
+                <p className="text-white/50 text-xs mt-1">
+                  Select "Always Allow" for location so your friends can see where you are throughout the night. Spotted works best when your location stays on!
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => {
+                      toast.dismiss(id);
+                      navigator.geolocation.getCurrentPosition(
+                        () => toast.success('Location enabled!'),
+                        () => toast.error('Location access denied. Enable it in your browser or device settings.'),
+                        { enableHighAccuracy: true }
+                      );
+                    }}
+                    className="flex-1 h-9 bg-[#d4ff00] hover:bg-[#d4ff00]/90 text-[#0a0118] text-sm font-semibold rounded-xl transition-colors"
+                  >
+                    Enable Location
+                  </button>
+                  <button
+                    onClick={() => toast.dismiss(id)}
+                    className="h-9 px-3 text-white/40 hover:text-white/60 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ), { duration: 15000 });
+      }
+    }, 3000); // Delay 3s so it doesn't interrupt app load
+
+    return () => clearTimeout(timer);
+  }, [user, locationReminderShown, showOnboarding, onboardingLoading]);
 
   // Check for venue correction prompt (set by auto-venue-tracker notification tap)
   // Runs on mount and on app resume (visibilitychange) so it catches native notification taps
@@ -83,7 +140,7 @@ export function Layout({ children }: LayoutProps) {
 
   // Check for pending check-in reminders + still-here nudge
   useEffect(() => {
-    const checkReminder = () => {
+    const checkReminder = async () => {
       // Original check-in reminder
       const reminderTime = localStorage.getItem('checkin_reminder');
       if (reminderTime && Date.now() >= Number(reminderTime)) {
@@ -97,7 +154,24 @@ export function Layout({ children }: LayoutProps) {
 
       // "Still here?" nudge timer
       const stillHereTime = localStorage.getItem('still_here_check');
-      if (stillHereTime && Date.now() >= Number(stillHereTime)) {
+      if (stillHereTime && Date.now() >= Number(stillHereTime) && user) {
+        // Check if user still has an active (non-expired) night status
+        const { data: activeStatus } = await supabase
+          .from('night_statuses')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('status', 'out')
+          .gt('expires_at', new Date().toISOString())
+          .maybeSingle();
+
+        if (!activeStatus) {
+          // No active status — stale timer from a previous night, clean up
+          localStorage.removeItem('still_here_check');
+          localStorage.removeItem('still_here_venue');
+          localStorage.removeItem('still_here_deadline');
+          return;
+        }
+
         const venueName = localStorage.getItem('still_here_venue') || 'your spot';
         localStorage.removeItem('still_here_check');
 

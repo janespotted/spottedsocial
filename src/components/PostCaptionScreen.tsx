@@ -297,15 +297,29 @@ export function PostCaptionScreen({ imageFile, imagePreview, onBack, onSuccess }
               </button>
             </div>
           ) : (
-            <button 
-              onClick={() => setShowVenueInput(true)}
-              className="flex items-center gap-2 text-sm"
-            >
-              <MapPin className="h-4 w-4 text-white/40" />
-              <span className={location ? "text-white" : "text-white/40"}>
-                {location || "Add location"}
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowVenueInput(true)}
+                className="flex items-center gap-2 text-sm"
+              >
+                <MapPin className="h-4 w-4 text-white/40" />
+                <span className={location ? "text-white" : "text-white/40"}>
+                  {location || "Add location"}
+                </span>
+              </button>
+              {location !== 'In Uber 🚗' && (
+                <button
+                  onClick={() => {
+                    setLocation('In Uber 🚗');
+                    setLocationData(prev => prev ? { ...prev, venueName: 'In Uber 🚗', venueId: undefined } : null);
+                    setShowVenueInput(false);
+                  }}
+                  className="ml-auto flex items-center gap-1 text-xs text-white/40 hover:text-white/60 bg-white/5 hover:bg-white/10 rounded-full px-2.5 py-1 transition-colors"
+                >
+                  🚗 In Uber
+                </button>
+              )}
+            </div>
           )}
         </div>
 

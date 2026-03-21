@@ -135,7 +135,7 @@ export function ReviewCard({ review, currentUserVote, onVoteChange }: ReviewCard
                 <AvatarFallback className="bg-[#a855f7]/30 text-white text-xs">?</AvatarFallback>
               ) : (
                 <>
-                  <AvatarImage src={avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`} />
+                  <AvatarImage src={avatarUrl || undefined} />
                   <AvatarFallback className="bg-[#a855f7] text-white text-xs">
                     {displayName[0]}
                   </AvatarFallback>

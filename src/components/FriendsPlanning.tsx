@@ -142,7 +142,7 @@ export function FriendsPlanning({
                   <div className="absolute inset-0 rounded-full bg-[#a855f7]/40 animate-pulse" style={{ transform: 'scale(1.15)' }} />
                   <Avatar className="w-9 h-9 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
                     <AvatarImage
-                      src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
+                      src={friend.avatar_url || undefined}
                     />
                     <AvatarFallback className="bg-[#a855f7] text-white text-sm">
                       {friend.display_name?.[0] || '?'}
@@ -184,7 +184,7 @@ export function FriendsPlanning({
               {previewFriends.slice(0, 3).map((friend) => (
                 <Avatar key={friend.user_id} className="w-7 h-7 border-2 border-[#2d1b4e] ring-1 ring-[#a855f7]/30">
                   <AvatarImage
-                    src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
+                    src={friend.avatar_url || undefined}
                   />
                   <AvatarFallback className="bg-[#a855f7] text-white text-xs">
                     {friend.display_name?.[0] || '?'}
@@ -225,7 +225,7 @@ export function FriendsPlanning({
               {previewFriends.map((friend) => (
                 <Avatar key={friend.user_id} className="w-6 h-6 border-2 border-[#1a0f2e] ring-1 ring-[#a855f7]/40">
                   <AvatarImage
-                    src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
+                    src={friend.avatar_url || undefined}
                   />
                   <AvatarFallback className="bg-[#a855f7] text-white text-[10px]">
                     {friend.display_name?.[0] || '?'}
@@ -258,7 +258,7 @@ export function FriendsPlanning({
               <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
               <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
                 <AvatarImage
-                  src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
+                  src={friend.avatar_url || undefined}
                 />
                 <AvatarFallback className="bg-[#a855f7] text-white text-sm">
                   {friend.display_name?.[0] || '?'}
@@ -267,27 +267,25 @@ export function FriendsPlanning({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-white/50 text-xs">Thinking about going out</span>
-                {friend.planning_neighborhood && (
-                  <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium">
-                    {shortenNeighborhood(friend.planning_neighborhood)}
-                  </span>
-                )}
-              </div>
+              <span className="text-white/50 text-xs">Thinking about going out</span>
             </div>
+            {friend.planning_neighborhood && (
+              <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                {shortenNeighborhood(friend.planning_neighborhood)}
+              </span>
+            )}
             <Button
               size="sm"
               onClick={() => handleReachOut(friend)}
-              className="h-8 px-3 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full text-xs shadow-[0_0_10px_rgba(168,85,247,0.4)] hover:shadow-[0_0_15px_rgba(168,85,247,0.6)] transition-all"
+              className="h-8 px-3 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full text-xs shadow-[0_0_10px_rgba(168,85,247,0.4)] hover:shadow-[0_0_15px_rgba(168,85,247,0.6)] transition-all flex-shrink-0"
             >
               Make plans
             </Button>
           </div>
         ))}
-        
+
         {friends.length > 3 && (
-          <button 
+          <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="w-full flex items-center justify-center gap-1.5 text-[#a855f7] text-sm py-2 hover:text-[#c084fc] transition-colors group"
           >
@@ -299,7 +297,7 @@ export function FriendsPlanning({
             )}
           </button>
         )}
-        
+
         {isExpanded && friends.slice(3).map((friend) => (
           <div
             key={friend.user_id}
@@ -309,7 +307,7 @@ export function FriendsPlanning({
               <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
               <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
                 <AvatarImage
-                  src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`}
+                  src={friend.avatar_url || undefined}
                 />
                 <AvatarFallback className="bg-[#a855f7] text-white text-sm">
                   {friend.display_name?.[0] || '?'}
@@ -318,19 +316,17 @@ export function FriendsPlanning({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-white/50 text-xs">Thinking about going out</span>
-                {friend.planning_neighborhood && (
-                  <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium">
-                    {shortenNeighborhood(friend.planning_neighborhood)}
-                  </span>
-                )}
-              </div>
+              <span className="text-white/50 text-xs">Thinking about going out</span>
             </div>
+            {friend.planning_neighborhood && (
+              <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                {shortenNeighborhood(friend.planning_neighborhood)}
+              </span>
+            )}
             <Button
               size="sm"
               onClick={() => handleReachOut(friend)}
-              className="h-8 px-3 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full text-xs shadow-[0_0_10px_rgba(168,85,247,0.4)] hover:shadow-[0_0_15px_rgba(168,85,247,0.6)] transition-all"
+              className="h-8 px-3 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full text-xs shadow-[0_0_10px_rgba(168,85,247,0.4)] hover:shadow-[0_0_15px_rgba(168,85,247,0.6)] transition-all flex-shrink-0"
             >
               Make plans
             </Button>
@@ -346,7 +342,7 @@ export function FriendsPlanning({
                 <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
                 <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
                   <AvatarImage
-                    src={userProfile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.display_name}`}
+                    src={userProfile.avatar_url || undefined}
                   />
                   <AvatarFallback className="bg-[#a855f7] text-white text-sm">
                     {userProfile.display_name?.[0] || '?'}

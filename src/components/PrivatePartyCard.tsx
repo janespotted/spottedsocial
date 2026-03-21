@@ -117,7 +117,7 @@ export function PrivatePartyCard({
         {/* Host info */}
         <div className="flex items-center gap-3 p-3 bg-[#2d1b4e]/50 rounded-xl">
           <Avatar className="w-10 h-10 border-2 border-[#d4ff00]">
-            <AvatarImage src={hostAvatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${hostName}`} />
+            <AvatarImage src={hostAvatarUrl || undefined} />
             <AvatarFallback className="bg-[#a855f7] text-white">
               {hostName[0]}
             </AvatarFallback>
@@ -136,7 +136,7 @@ export function PrivatePartyCard({
               <div className="flex gap-2 flex-wrap">
                 {friendsAtParty.map(friend => (
                   <Avatar key={friend.userId} className="w-8 h-8 border border-[#a855f7]">
-                    <AvatarImage src={friend.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.displayName}`} />
+                    <AvatarImage src={friend.avatarUrl || undefined} />
                     <AvatarFallback className="bg-[#a855f7] text-white text-xs">
                       {friend.displayName[0]}
                     </AvatarFallback>

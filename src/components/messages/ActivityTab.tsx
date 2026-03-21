@@ -14,7 +14,7 @@ import { logEvent } from '@/lib/event-logger';
 import { triggerPushNotification } from '@/lib/push-notifications';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target, Heart, TrendingUp, Megaphone } from 'lucide-react';
+import { MapPin, Zap, UserPlus, MessageCircle, ChevronRight, Users, Target, Heart, TrendingUp, Megaphone, Check } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useFriendIds } from '@/hooks/useFriendIds';
@@ -196,7 +196,7 @@ export function ActivityTab() {
       supabase.from('notifications')
         .select(`id, type, message, created_at, sender_id, is_read`)
         .eq('receiver_id', user?.id)
-        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment', 'meetup_accepted', 'venue_invite_accepted', 'venue_yap', 'rally', 'plan_down', 'friend_planning'])
+        .in('type', ['meetup_request', 'venue_invite', 'post_like', 'post_comment', 'meetup_accepted', 'venue_invite_accepted', 'venue_yap', 'rally', 'plan_down', 'friend_planning', 'friend_request'])
         .order('created_at', { ascending: false })
         .limit(30),
     ]);
@@ -238,6 +238,7 @@ export function ActivityTab() {
         const isRally = invite.type === 'rally';
         const isPlanDown = invite.type === 'plan_down';
         const isFriendPlanning = invite.type === 'friend_planning';
+        const isFriendRequest = invite.type === 'friend_request';
 
         // Extract venue name from message like "X invited you to VenueName."
         const venueMatch = invite.message.match(/invited you to (.+?)\.?\s*(?:Want to go\?)?$/i);
@@ -254,7 +255,8 @@ export function ActivityTab() {
         if (isRally) activityType = 'rally';
         if (isPlanDown) activityType = 'plan_down';
         if (isFriendPlanning) activityType = 'friend_planning';
-        
+        if (isFriendRequest) activityType = 'friend_request';
+
         return {
           id: invite.id,
           type: activityType,
@@ -268,6 +270,7 @@ export function ActivityTab() {
             : isRally ? invite.message
             : isPlanDown ? invite.message
             : isFriendPlanning ? 'is planning to go out tonight'
+            : isFriendRequest ? 'sent you a friend request'
             : 'Meet Up',
           timestamp: invite.created_at || new Date().toISOString(),
           avatar_url: profile?.avatar_url,
@@ -469,19 +472,11 @@ export function ActivityTab() {
         }
         const uniqueCheckIns = Array.from(seenUsers.values());
 
-        // Fetch profiles separately (embedded joins can silently return null)
-        const checkinUserIds = [...new Set(uniqueCheckIns.map(c => c.user_id))];
-        const { data: checkinProfileRows } = checkinUserIds.length > 0
-          ? await supabase.from('profiles').select('id, display_name, avatar_url').in('id', checkinUserIds)
-          : { data: [] };
-        const checkinProfileMap = new Map(
-          (checkinProfileRows || []).map((p: any) => [p.id, p])
-        );
-        // Fall back to cached profiles if direct fetch misses
+        // Use cached profiles from get_profiles_safe (direct profiles table is blocked by RLS)
         const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
-        for (const p of allProfiles) {
-          if (!checkinProfileMap.has(p.id)) checkinProfileMap.set(p.id, p);
-        }
+        const checkinProfileMap = new Map(
+          allProfiles.map((p: any) => [p.id, p])
+        );
 
         const checkInActivities: Activity[] = uniqueCheckIns.map(checkIn => {
           const prof = checkinProfileMap.get(checkIn.user_id);
@@ -723,6 +718,75 @@ export function ActivityTab() {
     );
   };
 
+  const handleAcceptFriendRequest = async (activity: Activity) => {
+    if (!user || !activity.user_id) return;
+
+    try {
+      // Find the pending friendship where sender is user_id and receiver is current user
+      const { data: friendship, error: fetchError } = await supabase
+        .from('friendships')
+        .select('id')
+        .eq('user_id', activity.user_id)
+        .eq('friend_id', user.id)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (fetchError || !friendship) {
+        toast({ title: 'Could not find friend request', variant: 'destructive' });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('friendships')
+        .update({ status: 'accepted' })
+        .eq('id', friendship.id);
+
+      if (error) {
+        toast({ title: 'Failed to accept request', variant: 'destructive' });
+        return;
+      }
+
+      // Send acceptance notification + push
+      const { data: profiles } = await supabase.rpc('get_profile_safe', { target_user_id: user.id });
+      const myName = profiles?.[0]?.display_name || 'Someone';
+      const acceptMessage = `${myName} accepted your friend request!`;
+
+      const { data: notifData } = await supabase.rpc('create_notification', {
+        p_receiver_id: activity.user_id,
+        p_type: 'friend_accepted',
+        p_message: acceptMessage,
+      });
+
+      const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+      if (notif) {
+        triggerPushNotification({
+          id: notif.id,
+          receiver_id: activity.user_id,
+          sender_id: user.id,
+          type: 'friend_accepted',
+          message: acceptMessage,
+        });
+      }
+
+      // Delete the original notification
+      if (activity.notificationId) {
+        await supabase.from('notifications').delete().eq('id', activity.notificationId);
+      }
+
+      // Remove from activity list
+      setActivities(prev => prev.filter(a => a.id !== activity.id));
+
+      // Refresh friend lists
+      queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
+      queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+
+      toast({ title: 'Friend request accepted!' });
+    } catch (err) {
+      console.error('Accept friend request error:', err);
+      toast({ title: 'Something went wrong', variant: 'destructive' });
+    }
+  };
+
   const handleOpenChat = (activity: Activity) => {
     if (!activity.user_id || !activity.display_name) return;
     
@@ -919,6 +983,7 @@ export function ActivityTab() {
         const rallies = activities.filter(a => a.type === 'rally');
         const planDowns = activities.filter(a => a.type === 'plan_down');
         const friendsPlanning = activities.filter(a => a.type === 'friend_planning');
+        const friendRequests = activities.filter(a => a.type === 'friend_request');
 
         // Special muted style for city pulse
         const PULSE_CARD_STYLE = 'bg-[#1a0f2e]/40 border border-white/10';
@@ -1082,6 +1147,15 @@ export function ActivityTab() {
                     <span className="text-[#d4ff00] block text-xs mt-0.5">is planning to go out tonight</span>
                   </div>
                 )}
+                {activity.type === 'friend_request' && (
+                  <div className="text-white text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{activity.display_name}</span>
+                      <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
+                    </div>
+                    <span className="text-white/70 block text-xs mt-0.5">sent you a friend request</span>
+                  </div>
+                )}
               </div>
 
               {/* Actions - fixed on right */}
@@ -1202,12 +1276,23 @@ export function ActivityTab() {
                   </Button>
                 )}
 
+                {activity.type === 'friend_request' && (
+                  <Button
+                    onClick={() => handleAcceptFriendRequest(activity)}
+                    size="sm"
+                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                  >
+                    <Check className="h-3.5 w-3.5 mr-1" />
+                    Accept
+                  </Button>
+                )}
+
               </div>
             </div>
           </div>
         );
 
-        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0 || acceptedInvites.length > 0 || dmMessages.length > 0 || venueYaps.length > 0 || rallies.length > 0 || planDowns.length > 0 || friendsPlanning.length > 0;
+        const hasContent = invites.length > 0 || friendsOut.length > 0 || trending.length > 0 || postEngagement.length > 0 || cityPulse.length > 0 || acceptedInvites.length > 0 || dmMessages.length > 0 || venueYaps.length > 0 || rallies.length > 0 || planDowns.length > 0 || friendsPlanning.length > 0 || friendRequests.length > 0;
 
         return hasContent ? (
           <div className="space-y-5">
@@ -1227,6 +1312,18 @@ export function ActivityTab() {
           </div>
         )}
       </div>
+
+            {/* Section: Friend Requests */}
+            {friendRequests.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  👤 Friend Requests
+                </h3>
+                <div className="space-y-3">
+                  {friendRequests.map(renderActivityCard)}
+                </div>
+              </div>
+            )}
 
             {/* Section: Rallies */}
             {rallies.length > 0 && (

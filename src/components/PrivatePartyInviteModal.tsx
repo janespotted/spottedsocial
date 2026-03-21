@@ -201,7 +201,7 @@ export function PrivatePartyInviteModal({
         className="border-[#a855f7]"
       />
       <Avatar className="w-10 h-10">
-        <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+        <AvatarImage src={friend.avatar_url || undefined} />
         <AvatarFallback className="bg-[#a855f7] text-white">
           {friend.display_name[0]}
         </AvatarFallback>

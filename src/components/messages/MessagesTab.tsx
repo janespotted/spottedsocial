@@ -25,6 +25,7 @@ interface Thread {
   id: string;
   is_group: boolean;
   name: string | null;
+  group_avatar_url: string | null;
   members: ThreadMember[];
   venue_name: string | null;
   last_message: {
@@ -104,7 +105,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
         // Get thread info (is_group, name)
         supabase
           .from('dm_threads')
-          .select('id, is_group, name')
+          .select('id, is_group, name, group_avatar_url')
           .in('id', threadIds),
         // Get ALL members for all threads at once
         supabase
@@ -220,6 +221,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
           id: thread_id,
           is_group: threadInfo?.is_group || false,
           name: threadInfo?.name || null,
+          group_avatar_url: (threadInfo as any)?.group_avatar_url || null,
           members,
           venue_name: venueName,
           last_message: latestMessage ? {
@@ -350,9 +352,11 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
               >
                 <div className="flex items-center gap-3">
                   {thread.is_group ? (
-                    // Group avatar - grid of member avatars
+                    // Group avatar - custom photo or grid of member avatars
                     <div className="w-14 h-14 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] flex items-center justify-center overflow-hidden">
-                      {thread.members.length <= 4 ? (
+                      {thread.group_avatar_url ? (
+                        <img src={thread.group_avatar_url} alt="Group" className="w-full h-full object-cover" />
+                      ) : thread.members.length <= 4 ? (
                         <div className="grid grid-cols-2 gap-0.5 w-full h-full p-1">
                           {thread.members.slice(0, 4).map((member) => (
                             <Avatar key={member.user_id} className="w-full h-full rounded-sm">

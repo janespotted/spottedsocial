@@ -28,6 +28,16 @@ import { useToast } from '@/hooks/use-toast';
 import { CityBadge } from '@/components/CityBadge';
 import { logger } from '@/lib/logger';
 import { escapeHtml, escapeUrl } from '@/lib/html-escape';
+
+/** Returns an <img> tag if avatarUrl exists, otherwise a colored circle with the user's initial */
+function avatarHtml(avatarUrl: string | null | undefined, displayName: string, size: string, extraStyle = '') {
+  const safeUrl = avatarUrl ? escapeUrl(avatarUrl) : null;
+  if (safeUrl) {
+    return `<img src="${safeUrl}" style="width: ${size}; height: ${size}; border-radius: 50%; object-fit: cover; ${extraStyle}" alt="${escapeHtml(displayName)}" />`;
+  }
+  const initial = escapeHtml(displayName?.[0] || 'U');
+  return `<div style="width: ${size}; height: ${size}; border-radius: 50%; background: #a855f7; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: calc(${size} * 0.45); ${extraStyle}">${initial}</div>`;
+}
 import { isFromTonight } from '@/lib/time-context';
 import { QuickStatusSheet } from '@/components/QuickStatusSheet';
 import { UpdateSpotSheet } from '@/components/UpdateSpotSheet';
@@ -382,7 +392,7 @@ export default function Map() {
             last_location_at: new Date().toISOString(),
             profiles: {
               display_name: status.profiles?.display_name || 'Unknown',
-              avatar_url: status.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${status.profiles?.display_name}`,
+              avatar_url: status.profiles?.avatar_url || null,
             },
             // Cycle through relationship types for visual variety
             relationshipType: relationshipTypes[index % relationshipTypes.length],
@@ -885,17 +895,12 @@ export default function Map() {
       
       const colors = ringColors[friend.relationshipType || 'direct'];
       
-      const safeAvatarUrl = escapeUrl(friend.profiles?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(friend.profiles?.display_name || 'user')}`;
       const safeDisplayName = escapeHtml(friend.profiles?.display_name);
-      
+
       el.innerHTML = `
         <div style="position: relative; width: 100%; height: 100%;">
           <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${colors.border}; box-shadow: 0 0 8px ${colors.shadow};"></div>
-          <img 
-            src="${safeAvatarUrl}" 
-            style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; padding: 2px; border: 2px solid white;"
-            alt="${safeDisplayName}"
-          />
+          ${avatarHtml(friend.profiles?.avatar_url, friend.profiles?.display_name || 'user', '100%', 'padding: 2px; border: 2px solid white;')}
           ${colors.badge ? `
             <div style="position: absolute; bottom: -2px; right: -2px; width: 14px; height: 14px; background: #1a0f2e; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid ${colors.border}; font-size: 8px;">
               ${colors.badge}
@@ -1003,15 +1008,10 @@ export default function Map() {
             mutual: { border: '#6366f1', shadow: 'rgba(99, 102, 241, 0.35)' },
           };
           const colors = ringColors[topFriend.relationshipType || 'direct'];
-          const safeAvatarUrl = escapeUrl(topFriend.profiles?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(topFriend.profiles?.display_name || 'user')}`;
-          
           el.innerHTML = `
             <div style="position: relative; width: 100%; height: 100%;">
               <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${colors.border}; box-shadow: 0 0 8px ${colors.shadow};"></div>
-              <img 
-                src="${safeAvatarUrl}" 
-                style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; padding: 2px; border: 2px solid white;"
-              />
+              ${avatarHtml(topFriend.profiles?.avatar_url, topFriend.profiles?.display_name || 'user', '100%', 'padding: 2px; border: 2px solid white;')}
               <div style="position: absolute; bottom: -4px; right: -4px; min-width: 20px; height: 20px; background: #a855f7; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 0 5px; font-size: 11px; font-weight: 700; color: white; border: 2px solid #1a0f2e;">
                 ${cluster.length}
               </div>
@@ -1046,19 +1046,18 @@ export default function Map() {
           const displayFriends = sorted.slice(0, 3);
           const remainingCount = cluster.length - 3;
           
-          const safeAvatar0 = escapeUrl(displayFriends[0]?.profiles?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayFriends[0]?.profiles?.display_name || 'user0')}`;
-          const safeAvatar1 = escapeUrl(displayFriends[1]?.profiles?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayFriends[1]?.profiles?.display_name || 'user1')}`;
-          const safeAvatar2 = escapeUrl(displayFriends[2]?.profiles?.avatar_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayFriends[2]?.profiles?.display_name || 'user2')}`;
-          
           el.innerHTML = `
             <div style="position: relative; width: 100%; height: 100%;">
               <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(45, 27, 78, 0.95); border: 2px solid rgba(168, 85, 247, 0.5); box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);"></div>
-              <img src="${safeAvatar0}" 
-                   style="position: absolute; top: 4px; left: 50%; transform: translateX(-50%); width: 18px; height: 18px; border-radius: 50%; object-fit: cover; border: 1.5px solid white;" />
-              <img src="${safeAvatar1}" 
-                   style="position: absolute; bottom: 12px; left: 8px; width: 18px; height: 18px; border-radius: 50%; object-fit: cover; border: 1.5px solid white;" />
-              <img src="${safeAvatar2}" 
-                   style="position: absolute; bottom: 12px; right: 8px; width: 18px; height: 18px; border-radius: 50%; object-fit: cover; border: 1.5px solid white;" />
+              <div style="position: absolute; top: 4px; left: 50%; transform: translateX(-50%);">
+                ${avatarHtml(displayFriends[0]?.profiles?.avatar_url, displayFriends[0]?.profiles?.display_name || 'U', '18px', 'border: 1.5px solid white; font-size: 9px;')}
+              </div>
+              <div style="position: absolute; bottom: 12px; left: 8px;">
+                ${avatarHtml(displayFriends[1]?.profiles?.avatar_url, displayFriends[1]?.profiles?.display_name || 'U', '18px', 'border: 1.5px solid white; font-size: 9px;')}
+              </div>
+              <div style="position: absolute; bottom: 12px; right: 8px;">
+                ${avatarHtml(displayFriends[2]?.profiles?.avatar_url, displayFriends[2]?.profiles?.display_name || 'U', '18px', 'border: 1.5px solid white; font-size: 9px;')}
+              </div>
               <div style="position: absolute; bottom: -4px; right: -4px; min-width: 20px; height: 20px; background: #a855f7; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 0 5px; font-size: 10px; font-weight: 600; color: white; border: 2px solid #1a0f2e;">
                 +${remainingCount}
               </div>
@@ -1535,6 +1534,25 @@ export default function Map() {
           <span className="text-white/50 text-xs flex-1 text-left truncate">Search people, venues...</span>
         </button>
         <button
+          onClick={() => {
+            if (layerVisibility === 'friends') {
+              setLayerVisibility('both');
+              setRelationshipFilter('all');
+            } else {
+              setLayerVisibility('friends');
+              setRelationshipFilter('friends_only');
+            }
+          }}
+          className={`h-10 rounded-full backdrop-blur-md border flex items-center gap-1.5 px-3 transition-all flex-shrink-0 ${
+            layerVisibility === 'friends'
+              ? 'bg-[#a855f7]/30 border-[#a855f7]/50 text-[#d4ff00]'
+              : 'bg-black/50 border-white/15 text-white/70 hover:bg-black/60'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span className="text-xs font-medium">Friends</span>
+        </button>
+        <button
           onClick={() => setShowFilterSheet(true)}
           className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/15 flex items-center justify-center hover:bg-black/60 transition-colors flex-shrink-0"
         >
@@ -1828,7 +1846,7 @@ export default function Map() {
                           className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors ${staleMins >= 60 ? 'opacity-50' : ''}`}
                         >
                           <Avatar className="w-9 h-9 border-2 border-[#a855f7]/40">
-                            <AvatarImage src={friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`} />
+                            <AvatarImage src={friend.profiles?.avatar_url || undefined} />
                             <AvatarFallback className="bg-[#a855f7]/20 text-white text-xs">
                               {friend.profiles?.display_name?.[0] || '?'}
                             </AvatarFallback>
@@ -1859,7 +1877,7 @@ export default function Map() {
                           className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
                         >
                           <Avatar className="w-9 h-9 border-2 border-[#a855f7]/40">
-                            <AvatarImage src={friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`} />
+                            <AvatarImage src={friend.profiles?.avatar_url || undefined} />
                             <AvatarFallback className="bg-[#a855f7]/20 text-white text-xs">
                               {friend.profiles?.display_name?.[0] || '?'}
                             </AvatarFallback>
@@ -2009,10 +2027,7 @@ export default function Map() {
                   {/* Avatar */}
                   <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50 relative">
                     <AvatarImage
-                      src={
-                        friend.profiles?.avatar_url ||
-                        `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`
-                      }
+                      src={friend.profiles?.avatar_url || undefined}
                     />
                     <AvatarFallback className="bg-[#a855f7] text-white text-sm">
                       {friend.profiles?.display_name?.[0] || '?'}
@@ -2083,10 +2098,7 @@ export default function Map() {
                       {/* Avatar */}
                       <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
                         <AvatarImage
-                          src={
-                            friend.avatar_url ||
-                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`
-                          }
+                          src={friend.avatar_url || undefined}
                         />
                         <AvatarFallback className="bg-[#a855f7] text-white text-sm">
                           {friend.display_name?.[0] || '?'}
@@ -2215,7 +2227,7 @@ export default function Map() {
               >
                 <Avatar className="h-10 w-10 border-2 border-[#a855f7]/50">
                   <AvatarImage 
-                    src={friend.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.profiles?.display_name}`} 
+                    src={friend.profiles?.avatar_url || undefined} 
                     alt={friend.profiles?.display_name} 
                   />
                   <AvatarFallback className="bg-[#a855f7]/20 text-white">

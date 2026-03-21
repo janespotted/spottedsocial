@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Search, X, ChevronDown, Calendar, Clock, Users, Lock } from 'lucide-react';
+import { MapPin, Search, X, Plus, ChevronDown, Calendar, Clock, Users, Lock } from 'lucide-react';
 import {
   Drawer,
   DrawerContent,
@@ -10,9 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserCity } from '@/hooks/useUserCity';
+import { useDemoMode } from '@/hooks/useDemoMode';
 import { toast } from 'sonner';
 import { format, addDays } from 'date-fns';
 
@@ -38,6 +41,13 @@ interface Venue {
   neighborhood: string;
 }
 
+interface Friend {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  username: string;
+}
+
 export function EditPlanDialog({ open, onOpenChange, plan, onPlanUpdated }: EditPlanDialogProps) {
   const [description, setDescription] = useState(plan.description || '');
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(
@@ -53,10 +63,19 @@ export function EditPlanDialog({ open, onOpenChange, plan, onPlanUpdated }: Edit
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showMoreOptions, setShowMoreOptions] = useState(true);
   const { city } = useUserCity();
+  const demoEnabled = useDemoMode();
+
+  // Friend selection state
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<Friend[]>([]);
+  const [showFriendPicker, setShowFriendPicker] = useState(false);
+  const [friendSearch, setFriendSearch] = useState('');
 
   useEffect(() => {
     if (open && city) {
       fetchVenues();
+      fetchFriends();
+      fetchExistingParticipants();
     }
   }, [open, city]);
 
@@ -87,6 +106,80 @@ export function EditPlanDialog({ open, onOpenChange, plan, onPlanUpdated }: Edit
         }
       }
     }
+  };
+
+  const fetchFriends = async () => {
+    const { data: friends1 } = await supabase
+      .from('friendships')
+      .select('friend_id')
+      .eq('user_id', plan.user_id)
+      .eq('status', 'accepted');
+
+    const { data: friends2 } = await supabase
+      .from('friendships')
+      .select('user_id')
+      .eq('friend_id', plan.user_id)
+      .eq('status', 'accepted');
+
+    const friendIds = [
+      ...(friends1?.map(f => f.friend_id) || []),
+      ...(friends2?.map(f => f.user_id) || [])
+    ];
+
+    if (friendIds.length === 0) {
+      setFriends([]);
+      return;
+    }
+
+    let query = supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url, username')
+      .in('id', friendIds)
+      .order('display_name');
+
+    if (!demoEnabled) {
+      query = query.eq('is_demo', false);
+    }
+
+    const { data: profiles } = await query;
+    setFriends(profiles || []);
+  };
+
+  const fetchExistingParticipants = async () => {
+    const { data } = await supabase
+      .from('plan_participants')
+      .select('user_id')
+      .eq('plan_id', plan.id);
+
+    if (data && data.length > 0) {
+      const participantIds = data.map(p => p.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url, username')
+        .in('id', participantIds);
+
+      setSelectedFriends((profiles || []).map(p => ({
+        id: p.id,
+        display_name: p.display_name,
+        avatar_url: p.avatar_url,
+        username: p.username,
+      })));
+    } else {
+      setSelectedFriends([]);
+    }
+  };
+
+  const filteredFriends = friends.filter(f =>
+    f.display_name.toLowerCase().includes(friendSearch.toLowerCase()) ||
+    f.username.toLowerCase().includes(friendSearch.toLowerCase())
+  );
+
+  const toggleFriend = (friend: Friend) => {
+    setSelectedFriends(prev => {
+      const isSelected = prev.some(f => f.id === friend.id);
+      if (isSelected) return prev.filter(f => f.id !== friend.id);
+      return [...prev, friend];
+    });
   };
 
   const filteredVenues = venues.filter(v =>
@@ -124,6 +217,18 @@ export function EditPlanDialog({ open, onOpenChange, plan, onPlanUpdated }: Edit
         .eq('user_id', plan.user_id);
 
       if (error) throw error;
+
+      // Sync participants: delete old, insert new
+      await supabase
+        .from('plan_participants')
+        .delete()
+        .eq('plan_id', plan.id);
+
+      if (selectedFriends.length > 0) {
+        await supabase
+          .from('plan_participants')
+          .insert(selectedFriends.map(f => ({ plan_id: plan.id, user_id: f.id })));
+      }
 
       toast.success('Plan updated! ✨');
       onOpenChange(false);
@@ -238,6 +343,76 @@ export function EditPlanDialog({ open, onOpenChange, plan, onPlanUpdated }: Edit
                         className="bg-background/30 border-border/30 h-9 text-sm"
                       />
                     </div>
+                  </div>
+
+                  {/* Friends */}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {selectedFriends.map(friend => (
+                        <div
+                          key={friend.id}
+                          className="relative group"
+                          onClick={() => toggleFriend(friend)}
+                        >
+                          <Avatar className="h-8 w-8 border-2 border-primary cursor-pointer">
+                            <AvatarImage src={friend.avatar_url || undefined} />
+                            <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                              {friend.display_name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="absolute -top-1 -right-1 bg-destructive rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                            <X className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        </div>
+                      ))}
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowFriendPicker(!showFriendPicker)}
+                        className="text-muted-foreground hover:text-foreground gap-1 h-8 px-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {selectedFriends.length === 0 ? 'Add Friends' : ''}
+                      </Button>
+                    </div>
+
+                    {showFriendPicker && (
+                      <div className="mt-2 space-y-2">
+                        <Input
+                          placeholder="Search friends..."
+                          value={friendSearch}
+                          onChange={(e) => setFriendSearch(e.target.value)}
+                          className="bg-background/30 border-border/30 h-9 text-sm"
+                        />
+                        <ScrollArea className="h-[120px]">
+                          {filteredFriends.length === 0 ? (
+                            <p className="text-center text-muted-foreground py-4 text-sm">No friends found</p>
+                          ) : (
+                            filteredFriends.map(friend => {
+                              const isSelected = selectedFriends.some(f => f.id === friend.id);
+                              return (
+                                <div
+                                  key={friend.id}
+                                  className="flex items-center gap-2 py-1.5 hover:bg-primary/10 rounded-lg cursor-pointer px-1"
+                                  onClick={() => toggleFriend(friend)}
+                                >
+                                  <Checkbox checked={isSelected} className="border-primary h-4 w-4" />
+                                  <Avatar className="h-6 w-6">
+                                    <AvatarImage src={friend.avatar_url || undefined} />
+                                    <AvatarFallback className="bg-primary/20 text-primary text-[10px]">
+                                      {friend.display_name.charAt(0)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-sm text-foreground truncate">{friend.display_name}</span>
+                                </div>
+                              );
+                            })
+                          )}
+                        </ScrollArea>
+                      </div>
+                    )}
                   </div>
 
                   {/* Description */}

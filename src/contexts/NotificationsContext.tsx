@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { logEvent } from '@/lib/event-logger';
@@ -36,6 +36,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [latestNotification, setLatestNotification] = useState<Notification | null>(null);
   const { user } = useAuth();
+  const markedAllReadRef = useRef(false);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
@@ -63,7 +64,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
         // Create lookup map for O(1) access - filter to only senders we need
         const profileMap = new Map(
-          profiles?.filter(p => senderIds.includes(p.id)).map(p => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url }]) || []
+          profiles?.filter(p => senderIds.includes(p.id)).map(p => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url?.includes('dicebear.com') ? null : p.avatar_url }]) || []
         );
 
         // Attach profiles and filter to tonight only (5am boundary)
@@ -74,7 +75,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             sender_profile: profileMap.get(notification.sender_id) || undefined
           }));
 
-        setNotifications(notificationsWithProfiles);
+        // If markAllAsRead was called before fetch completed, ensure all are marked read
+        if (markedAllReadRef.current) {
+          setNotifications(notificationsWithProfiles.map(n => ({ ...n, is_read: true })));
+        } else {
+          setNotifications(notificationsWithProfiles);
+        }
       } else if (data) {
         setNotifications([]);
       }
@@ -106,7 +112,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
           const newNotification = {
             ...payload.new,
-            sender_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined
+            sender_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url?.includes('dicebear.com') ? null : profile.avatar_url } : undefined
           } as Notification;
 
           console.log('Setting latest notification:', newNotification);
@@ -120,6 +126,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             });
           }
 
+          // Reset the markedAllRead flag since a new notification arrived
+          markedAllReadRef.current = false;
           setNotifications(prev => [newNotification, ...prev]);
           setLatestNotification(newNotification);
         }
@@ -168,7 +176,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             message: preview,
             is_read: false,
             created_at: newMsg.created_at || new Date().toISOString(),
-            sender_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined,
+            sender_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url?.includes('dicebear.com') ? null : profile.avatar_url } : undefined,
             thread_id: newMsg.thread_id,
           };
 
@@ -202,8 +210,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     if (!user) return;
+
+    // Set ref so any in-flight fetch also marks notifications as read
+    markedAllReadRef.current = true;
+
+    // Update local state immediately (optimistic) so badge clears instantly
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
 
     const { error } = await supabase
       .from('notifications')
@@ -213,11 +227,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       console.error('Error marking all notifications as read:', error);
-      return;
     }
-
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-  };
+  }, [user]);
 
   const dismissLatest = () => {
     setLatestNotification(null);

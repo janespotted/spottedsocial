@@ -364,24 +364,22 @@ export function FriendIdCard() {
       ...(receivedFriendships?.map(f => f.user_id) || [])
     ];
 
-    // Find active check-ins at this venue (profiles fetched separately to avoid silent null joins)
-    const { data: activeCheckIns } = await supabase
-      .from('checkins')
-      .select('user_id')
-      .eq('venue_name', venue)
-      .neq('user_id', selectedFriend.userId)
-      .in('user_id', friendIds)
-      .is('ended_at', null);
+    // Find active check-ins at this venue
+    const [checkInsResult, profilesResult] = await Promise.all([
+      supabase
+        .from('checkins')
+        .select('user_id')
+        .eq('venue_name', venue)
+        .neq('user_id', selectedFriend.userId)
+        .in('user_id', friendIds)
+        .is('ended_at', null),
+      supabase.rpc('get_profiles_safe'),
+    ]);
 
+    const activeCheckIns = checkInsResult.data;
     if (activeCheckIns && activeCheckIns.length > 0) {
-      const checkinUserIds = activeCheckIns.map(c => c.user_id);
-      const { data: checkinProfiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url')
-        .in('id', checkinUserIds);
-
       const checkinProfileMap = new Map(
-        (checkinProfiles || []).map((p: any) => [p.id, p])
+        (profilesResult.data || []).map((p: any) => [p.id, p])
       );
 
       const friends = activeCheckIns.map(c => {

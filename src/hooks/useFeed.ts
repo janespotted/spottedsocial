@@ -8,6 +8,9 @@ import { validateCommentText } from '@/lib/validation-schemas';
 import { resolvePostImageUrls } from '@/lib/storage-utils';
 import { triggerPushNotification } from '@/lib/push-notifications';
 
+const sanitizeAvatarUrl = (url: string | null): string | null =>
+  url && url.includes('dicebear.com') ? null : url;
+
 const POSTS_PER_PAGE = 20;
 
 export interface Post {
@@ -162,14 +165,7 @@ export function useFeed(options: UseFeedOptions) {
 
       let query = supabase
         .from('posts')
-        .select(`
-          *,
-          profiles!posts_user_id_profiles_fkey (
-            display_name,
-            username,
-            avatar_url
-          )
-        `)
+        .select('*')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(POSTS_PER_PAGE);
@@ -184,8 +180,35 @@ export function useFeed(options: UseFeedOptions) {
         query = query.in('user_id', userIds).eq('is_demo', false);
       }
 
-      const { data } = await query;
-      const fetchedPosts = data || [];
+      const postsResult = await query;
+
+      const postUserIds = [...new Set((postsResult.data || []).map((p: any) => p.user_id))];
+
+      // Fetch profiles - try RPC first, fall back to direct query
+      let profileMap = new Map<string, any>();
+      const { data: rpcProfiles, error: rpcError } = await supabase.rpc('get_profiles_safe');
+      if (!rpcError && rpcProfiles) {
+        profileMap = new Map(rpcProfiles.map((p: any) => [p.id, p]));
+      } else {
+        console.warn('[useFeed] get_profiles_safe failed, using direct query:', rpcError);
+        if (postUserIds.length > 0) {
+          const { data: directProfiles } = await supabase
+            .from('profiles')
+            .select('id, display_name, username, avatar_url')
+            .in('id', postUserIds);
+          if (directProfiles) {
+            profileMap = new Map(directProfiles.map((p: any) => [p.id, p]));
+          }
+        }
+      }
+
+      const fetchedPosts = (postsResult.data || []).map((post: any) => {
+        const profile = profileMap.get(post.user_id);
+        return {
+          ...post,
+          profiles: profile ? { display_name: profile.display_name, username: profile.username, avatar_url: sanitizeAvatarUrl(profile.avatar_url) } : null,
+        };
+      });
       
       // Resolve signed URLs for post images
       const resolvedPosts = await resolvePostImageUrls(fetchedPosts);
@@ -280,21 +303,43 @@ export function useFeed(options: UseFeedOptions) {
   }, []);
 
   const fetchComments = useCallback(async (postId: string) => {
-    const { data } = await supabase
+    const commentsResult = await supabase
       .from('post_comments')
-      .select(`
-        *,
-        profiles!post_comments_user_id_profiles_fkey (
-          display_name,
-          username,
-          avatar_url
-        )
-      `)
+      .select('*')
       .eq('post_id', postId)
       .order('created_at', { ascending: true });
 
+    const data = commentsResult.data;
+
     if (data) {
-      setComments(prev => ({ ...prev, [postId]: data }));
+      const commentUserIds = [...new Set(data.map((c: any) => c.user_id))];
+
+      // Fetch profiles - try RPC first, fall back to direct query
+      let profileMap = new Map<string, any>();
+      const { data: rpcProfiles, error: rpcError } = await supabase.rpc('get_profiles_safe');
+      if (!rpcError && rpcProfiles) {
+        profileMap = new Map(rpcProfiles.map((p: any) => [p.id, p]));
+      } else {
+        console.warn('[useFeed] comments get_profiles_safe failed:', rpcError);
+        if (commentUserIds.length > 0) {
+          const { data: directProfiles } = await supabase
+            .from('profiles')
+            .select('id, display_name, username, avatar_url')
+            .in('id', commentUserIds);
+          if (directProfiles) {
+            profileMap = new Map(directProfiles.map((p: any) => [p.id, p]));
+          }
+        }
+      }
+
+      const enriched = data.map((c: any) => {
+        const profile = profileMap.get(c.user_id);
+        return {
+          ...c,
+          profiles: profile ? { display_name: profile.display_name, username: profile.username, avatar_url: sanitizeAvatarUrl(profile.avatar_url) } : null,
+        };
+      });
+      setComments(prev => ({ ...prev, [postId]: enriched }));
       
       if (userId && data.length > 0) {
         const commentIds = data.map(c => c.id);

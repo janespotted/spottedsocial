@@ -733,7 +733,7 @@ export function VenueIdCard() {
                             <button className="flex -space-x-2 cursor-pointer hover:opacity-90 transition-opacity">
                               {visibleFriends.map((friend) => (
                                 <Avatar key={friend.id} className="w-10 h-10 border-2 border-[#0a0118]">
-                                  <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                                  <AvatarImage src={friend.avatar_url || undefined} />
                                   <AvatarFallback className="bg-[#a855f7] text-white">
                                     {friend.display_name[0]}
                                   </AvatarFallback>
@@ -768,7 +768,7 @@ export function VenueIdCard() {
                                   className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
                                 >
                                   <Avatar className="h-8 w-8">
-                                    <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                                    <AvatarImage src={friend.avatar_url || undefined} />
                                     <AvatarFallback className="bg-[#a855f7] text-white text-xs">
                                       {friend.display_name[0]}
                                     </AvatarFallback>
@@ -801,7 +801,7 @@ export function VenueIdCard() {
                         <button className="flex -space-x-2 cursor-pointer hover:opacity-90 transition-opacity">
                           {friendsPlanning.slice(0, 4).map((friend) => (
                             <Avatar key={friend.id} className="w-10 h-10 border-2 border-[#0a0118]">
-                              <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                              <AvatarImage src={friend.avatar_url || undefined} />
                               <AvatarFallback className="bg-[#a855f7]/70 text-white">
                                 {friend.display_name[0]}
                               </AvatarFallback>
@@ -836,7 +836,7 @@ export function VenueIdCard() {
                               className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
                             >
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                                <AvatarImage src={friend.avatar_url || undefined} />
                                 <AvatarFallback className="bg-[#a855f7]/70 text-white text-xs">
                                   {friend.display_name[0]}
                                 </AvatarFallback>

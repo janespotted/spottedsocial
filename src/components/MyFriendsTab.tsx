@@ -8,10 +8,12 @@ import { useProfilesSafe } from '@/hooks/useProfilesCache';
 import { supabase } from '@/integrations/supabase/client';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, X, MapPin, Target, Megaphone, Check } from 'lucide-react';
+import { Search, X, MapPin, Target, Megaphone, Check, UserPlus, Clock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { haptic } from '@/lib/haptics';
 import { triggerPushNotification } from '@/lib/push-notifications';
 
 interface FriendWithStatus {
@@ -39,6 +41,11 @@ export function MyFriendsTab() {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [ralliedIds, setRalliedIds] = useState<Set<string>>(new Set());
+
+  // Non-friend search state
+  const [nonFriendResults, setNonFriendResults] = useState<Array<{ id: string; display_name: string; username: string; avatar_url: string | null }>>([]);
+  const [searchingNonFriends, setSearchingNonFriends] = useState(false);
+  const [friendshipStatuses, setFriendshipStatuses] = useState<Record<string, 'none' | 'pending' | 'accepted'>>({});
 
   // Get current user's display name for rally message
   const currentUserProfile = useMemo(() => {
@@ -76,6 +83,95 @@ export function MyFriendsTab() {
       toast.error('Could not send rally');
     }
   }, [user, ralliedIds, currentUserProfile]);
+
+  // Search non-friends when query is >= 2 chars
+  useEffect(() => {
+    if (search.trim().length < 2) {
+      setNonFriendResults([]);
+      return;
+    }
+    const timer = setTimeout(() => searchNonFriends(), 300);
+    return () => clearTimeout(timer);
+  }, [search, friendIds]);
+
+  const searchNonFriends = async () => {
+    if (!user || search.trim().length < 2) return;
+    setSearchingNonFriends(true);
+    try {
+      const { data } = await supabase.rpc('get_profiles_safe');
+      if (data) {
+        const friendSet = new Set(friendIds || []);
+        const filtered = data.filter((p: any) =>
+          p.id !== user.id &&
+          !friendSet.has(p.id) &&
+          (!demoEnabled ? !p.is_demo : true) &&
+          (p.username?.toLowerCase().includes(search.toLowerCase()) ||
+           p.display_name?.toLowerCase().includes(search.toLowerCase()))
+        ).slice(0, 10);
+
+        setNonFriendResults(filtered);
+
+        if (filtered.length > 0) {
+          const { data: friendships } = await supabase
+            .from('friendships')
+            .select('user_id, friend_id, status')
+            .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
+
+          const statuses: Record<string, 'none' | 'pending' | 'accepted'> = {};
+          filtered.forEach((p: any) => {
+            const f = friendships?.find(
+              (fs: any) => (fs.user_id === user.id && fs.friend_id === p.id) ||
+                           (fs.user_id === p.id && fs.friend_id === user.id)
+            );
+            statuses[p.id] = f ? (f.status as 'pending' | 'accepted') : 'none';
+          });
+          setFriendshipStatuses(statuses);
+        }
+      }
+    } catch (error) {
+      console.error('Non-friend search error:', error);
+    } finally {
+      setSearchingNonFriends(false);
+    }
+  };
+
+  const sendFriendRequest = async (friendId: string) => {
+    if (!user) return;
+    const status = friendshipStatuses[friendId];
+    if (status === 'accepted') { toast.info('Already friends!'); return; }
+    if (status === 'pending') { toast.info('Request already pending'); return; }
+
+    try {
+      const { error } = await supabase
+        .from('friendships')
+        .insert({ user_id: user.id, friend_id: friendId, status: 'pending' });
+      if (error) throw error;
+
+      const senderName = currentUserProfile?.display_name || 'Someone';
+      supabase.rpc('create_notification', {
+        p_receiver_id: friendId,
+        p_type: 'friend_request',
+        p_message: `${senderName} sent you a friend request`,
+      }).then(({ data }) => {
+        const notif = Array.isArray(data) ? data[0] : data;
+        if (notif?.id) {
+          triggerPushNotification({
+            id: notif.id,
+            receiver_id: friendId,
+            sender_id: user.id,
+            type: 'friend_request',
+            message: `${senderName} sent you a friend request`,
+          });
+        }
+      });
+
+      setFriendshipStatuses(prev => ({ ...prev, [friendId]: 'pending' }));
+      haptic.success();
+      toast.success('Friend request sent!');
+    } catch (error) {
+      toast.error('Failed to send request');
+    }
+  };
 
   const friendProfiles = useMemo(() => {
     if (!allProfiles || !friendIds) return [];
@@ -333,6 +429,73 @@ export function MyFriendsTab() {
             </>
           )}
         </div>
+      )}
+
+      {/* Non-friend search results */}
+      {search.trim().length >= 2 && (
+        <>
+          {searchingNonFriends && nonFriendResults.length === 0 && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 text-[#a855f7] animate-spin" />
+            </div>
+          )}
+
+          {nonFriendResults.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-white/60 text-xs font-semibold uppercase tracking-wider px-1">
+                Add Friends
+              </p>
+              <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl overflow-hidden">
+                {nonFriendResults.map((result) => {
+                  const status = friendshipStatuses[result.id];
+                  return (
+                    <div
+                      key={result.id}
+                      className="flex items-center gap-3 p-3 border-b border-[#a855f7]/10 last:border-b-0"
+                    >
+                      <Avatar className="h-11 w-11 border-2 border-[#a855f7]/40">
+                        <AvatarImage src={result.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
+                          {result.display_name?.[0] || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-white text-sm truncate">{result.display_name}</p>
+                        <p className="text-white/40 text-xs truncate">@{result.username}</p>
+                      </div>
+                      {status === 'pending' ? (
+                        <Button
+                          size="sm"
+                          disabled
+                          variant="outline"
+                          className="border-[#a855f7]/40 text-white/60 rounded-xl text-xs"
+                        >
+                          <Clock className="h-3.5 w-3.5 mr-1" />
+                          Pending
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => sendFriendRequest(result.id)}
+                          size="sm"
+                          className="bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl text-xs"
+                        >
+                          <UserPlus className="h-3.5 w-3.5 mr-1" />
+                          Add
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!searchingNonFriends && nonFriendResults.length === 0 && filteredFriends.length === 0 && (
+            <p className="text-white/50 text-sm text-center py-4">
+              No users found
+            </p>
+          )}
+        </>
       )}
     </div>
     </PullToRefresh>

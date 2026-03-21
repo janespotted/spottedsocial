@@ -24,7 +24,7 @@ interface PreselectedUser {
 export default function Messages() {
   const { openCheckIn } = useCheckIn();
   const navigate = useNavigate();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, markAllAsRead } = useNotifications();
   useAutoVenueTracking(); // Trigger auto-venue tracking on messages view
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<TabType>('yap');
@@ -34,6 +34,13 @@ export default function Messages() {
   const [yapIsPrivateParty, setYapIsPrivateParty] = useState(false);
   const [yapNavKey, setYapNavKey] = useState(0);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
+
+  // Mark all notifications as read when viewing the Activity tab
+  useEffect(() => {
+    if (activeTab === 'activity') {
+      markAllAsRead();
+    }
+  }, [activeTab, markAllAsRead]);
 
   useEffect(() => {
     const state = location.state as any;
@@ -82,7 +89,10 @@ export default function Messages() {
               <Search className="w-5 h-5" />
             </button>
             <button
-              onClick={() => setActiveTab('activity')}
+              onClick={() => {
+                setActiveTab('activity');
+                markAllAsRead();
+              }}
               className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
               aria-label="View activity"
             >

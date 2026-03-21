@@ -6,7 +6,7 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronLeft, Users, ChevronDown, UserPlus, ChevronRight } from 'lucide-react';
+import { ChevronLeft, Users, ChevronDown, UserPlus, ChevronRight, Camera, Pencil, Check, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -43,6 +43,7 @@ interface ThreadMember {
 interface GroupInfo {
   is_group: boolean;
   name: string | null;
+  group_avatar_url: string | null;
   members: ThreadMember[];
 }
 
@@ -59,6 +60,9 @@ export default function Thread() {
   const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showMembersPopover, setShowMembersPopover] = useState(false);
+  const [editingGroupName, setEditingGroupName] = useState(false);
+  const [groupNameInput, setGroupNameInput] = useState('');
+  const groupAvatarInputRef = useRef<HTMLInputElement>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -196,7 +200,7 @@ export default function Thread() {
     // Get thread info (is_group, name)
     const { data: threadData } = await supabase
       .from('dm_threads')
-      .select('is_group, name')
+      .select('is_group, name, group_avatar_url')
       .eq('id', threadId)
       .single();
 
@@ -251,6 +255,7 @@ export default function Thread() {
         setGroupInfo({
           is_group: true,
           name: threadData?.name || null,
+          group_avatar_url: (threadData as any)?.group_avatar_url || null,
           members: allMembers,
         });
         setOtherMember(null);
@@ -465,6 +470,64 @@ export default function Thread() {
     return grouped;
   };
 
+  const handleSaveGroupName = async () => {
+    if (!threadId) return;
+    const newName = groupNameInput.trim() || null;
+    const { error } = await supabase
+      .from('dm_threads')
+      .update({ name: newName })
+      .eq('id', threadId);
+    if (error) {
+      toast.error('Failed to update group name');
+      return;
+    }
+    setGroupInfo(prev => prev ? { ...prev, name: newName } : prev);
+    setEditingGroupName(false);
+    toast.success('Group name updated');
+  };
+
+  const handleGroupAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !threadId || !user) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `group-avatars/${threadId}/${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('post-images')
+        .upload(fileName, file);
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('post-images')
+        .getPublicUrl(fileName);
+
+      const publicUrl = urlData.publicUrl;
+      const { error: updateError } = await supabase
+        .from('dm_threads')
+        .update({ group_avatar_url: publicUrl } as any)
+        .eq('id', threadId);
+      if (updateError) throw updateError;
+
+      setGroupInfo(prev => prev ? { ...prev, group_avatar_url: publicUrl } : prev);
+      toast.success('Group photo updated');
+    } catch (err) {
+      console.error('Group avatar upload error:', err);
+      toast.error('Failed to update group photo');
+    }
+    // Reset file input
+    if (groupAvatarInputRef.current) groupAvatarInputRef.current.value = '';
+  };
+
   const getGroupDisplayName = (): string => {
     if (!groupInfo) return '';
     if (groupInfo.name) return groupInfo.name;
@@ -499,7 +562,9 @@ export default function Thread() {
                 <PopoverTrigger asChild>
                   <button className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity">
                     <div className="w-10 h-10 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] flex items-center justify-center overflow-hidden">
-                      {groupInfo.members.length <= 4 ? (
+                      {groupInfo.group_avatar_url ? (
+                        <img src={groupInfo.group_avatar_url} alt="Group" className="w-full h-full object-cover" />
+                      ) : groupInfo.members.length <= 4 ? (
                         <div className="grid grid-cols-2 gap-0.5 w-full h-full p-0.5">
                           {groupInfo.members.slice(0, 4).map((member) => (
                             <Avatar key={member.user_id} className="w-full h-full rounded-sm">
@@ -529,9 +594,81 @@ export default function Thread() {
                   sideOffset={8}
                   className="bg-[#1a0f2e] border-[#a855f7]/40 shadow-[0_0_25px_rgba(168,85,247,0.4)] p-0 w-64"
                 >
-                  {/* Header */}
-                  <div className="px-4 py-3 border-b border-[#a855f7]/20">
-                    <p className="text-white/70 text-sm font-medium">Group Members</p>
+                  {/* Group Photo & Name */}
+                  <div className="px-4 py-3 border-b border-[#a855f7]/20 space-y-3">
+                    {/* Group Avatar */}
+                    <div className="flex justify-center">
+                      <button
+                        onClick={() => groupAvatarInputRef.current?.click()}
+                        className="relative group"
+                      >
+                        <div className="w-16 h-16 rounded-full bg-[#2d1b4e] border-2 border-[#a855f7]/40 flex items-center justify-center overflow-hidden">
+                          {groupInfo.group_avatar_url ? (
+                            <img src={groupInfo.group_avatar_url} alt="Group" className="w-full h-full object-cover" />
+                          ) : groupInfo.members.length <= 4 ? (
+                            <div className="grid grid-cols-2 gap-0.5 w-full h-full p-1">
+                              {groupInfo.members.slice(0, 4).map((member) => (
+                                <Avatar key={member.user_id} className="w-full h-full rounded-sm">
+                                  <AvatarImage src={member.avatar_url || undefined} />
+                                  <AvatarFallback className="bg-[#2d1b4e] text-white text-[8px] rounded-sm">
+                                    {member.display_name[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                              ))}
+                            </div>
+                          ) : (
+                            <Users className="h-6 w-6 text-[#a855f7]" />
+                          )}
+                        </div>
+                        <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Camera className="w-5 h-5 text-white" />
+                        </div>
+                      </button>
+                      <input
+                        ref={groupAvatarInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleGroupAvatarChange}
+                      />
+                    </div>
+
+                    {/* Group Name */}
+                    {editingGroupName ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={groupNameInput}
+                          onChange={(e) => setGroupNameInput(e.target.value)}
+                          placeholder="Group name"
+                          className="flex-1 h-8 bg-white/5 border border-white/10 text-white text-sm rounded-lg px-2 placeholder:text-white/30 focus:outline-none focus:border-[#a855f7]/50"
+                          maxLength={50}
+                          autoFocus
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleSaveGroupName(); }}
+                        />
+                        <button onClick={handleSaveGroupName} className="text-[#d4ff00] hover:text-[#d4ff00]/80">
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setEditingGroupName(false)} className="text-white/40 hover:text-white/60">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setGroupNameInput(groupInfo.name || '');
+                          setEditingGroupName(true);
+                        }}
+                        className="w-full flex items-center justify-center gap-1.5 text-white/70 text-sm hover:text-white transition-colors"
+                      >
+                        <span className="truncate">{groupInfo.name || 'Add group name'}</span>
+                        <Pencil className="w-3 h-3 flex-shrink-0" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Members header */}
+                  <div className="px-4 py-2 border-b border-[#a855f7]/20">
+                    <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Members</p>
                   </div>
                   
                   {/* Members List */}

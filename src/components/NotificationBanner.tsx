@@ -2,13 +2,13 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, PartyPopper, MessageCircle, Send } from 'lucide-react';
+import { X, PartyPopper, MessageCircle, Send, UserPlus } from 'lucide-react';
 
 export function NotificationBanner() {
   const navigate = useNavigate();
   const { latestNotification, dismissLatest, markAsRead } = useNotifications();
 
-  const supportedTypes = ['meetup_request', 'venue_invite', 'meetup_accepted', 'venue_invite_accepted', 'venue_yap', 'dm_message'];
+  const supportedTypes = ['meetup_request', 'venue_invite', 'meetup_accepted', 'venue_invite_accepted', 'venue_yap', 'dm_message', 'friend_request', 'rally'];
 
   useEffect(() => {
     if (latestNotification && supportedTypes.includes(latestNotification.type)) {
@@ -69,6 +69,7 @@ export function NotificationBanner() {
   const isAcceptedType = latestNotification.type === 'meetup_accepted' || latestNotification.type === 'venue_invite_accepted';
   const isYapType = latestNotification.type === 'venue_yap';
   const isDmType = latestNotification.type === 'dm_message';
+  const isFriendRequest = latestNotification.type === 'friend_request';
 
   return (
     <div
@@ -102,6 +103,11 @@ export function NotificationBanner() {
             {isDmType && (
               <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-blue-400 flex items-center justify-center">
                 <MessageCircle className="h-3 w-3 text-white" />
+              </div>
+            )}
+            {isFriendRequest && (
+              <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-[#a855f7] flex items-center justify-center">
+                <UserPlus className="h-3 w-3 text-white" />
               </div>
             )}
           </div>

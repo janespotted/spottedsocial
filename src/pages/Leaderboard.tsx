@@ -226,17 +226,11 @@ export default function Leaderboard() {
       const statuses = statusesResult.data;
       const topVenues = topVenuesResult?.data;
 
-      // Fetch profiles separately (embedded joins silently return null)
-      const statusUserIds = [...new Set((statuses || []).map((s: any) => s.user_id))];
+      // Fetch profiles via RPC (direct profiles table is blocked by RLS for non-own profiles)
+      const { data: allProfileRows } = await supabase.rpc('get_profiles_safe');
       const leaderboardProfileMap = new Map<string, any>();
-      if (statusUserIds.length > 0) {
-        const { data: profileRows } = await supabase
-          .from('profiles')
-          .select('id, display_name, username, avatar_url, is_demo')
-          .in('id', statusUserIds);
-        for (const p of (profileRows || [])) {
-          leaderboardProfileMap.set(p.id, p);
-        }
+      for (const p of (allProfileRows || [])) {
+        leaderboardProfileMap.set(p.id, p);
       }
 
     // Build a set of active promoted venue IDs (only order 1-2)

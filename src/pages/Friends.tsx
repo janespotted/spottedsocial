@@ -65,6 +65,7 @@ export default function Friends() {
   
   // Friend requests state
   const [requests, setRequests] = useState<FriendRequest[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [requestsExpanded, setRequestsExpanded] = useState(false);
   
@@ -254,6 +255,36 @@ export default function Friends() {
       );
 
       setRequests(requestsWithMutuals.filter(r => r !== null) as FriendRequest[]);
+
+      // Fetch outgoing pending requests
+      const { data: outgoing } = await supabase
+        .from('friendships')
+        .select('id, friend_id')
+        .eq('user_id', user?.id)
+        .eq('status', 'pending');
+
+      if (outgoing && outgoing.length > 0) {
+        const outgoingWithProfiles = await Promise.all(
+          outgoing.map(async (req) => {
+            const { data: profiles } = await supabase
+              .rpc('get_profile_safe', { target_user_id: req.friend_id });
+            const profile = profiles?.[0];
+            if (!profile) return null;
+            if (!demoEnabled && profile.is_demo) return null;
+            return {
+              id: req.id,
+              user_id: req.friend_id,
+              display_name: profile.display_name,
+              username: profile.username,
+              avatar_url: profile.avatar_url,
+              mutual_friends: [],
+            };
+          })
+        );
+        setOutgoingRequests(outgoingWithProfiles.filter(r => r !== null) as FriendRequest[]);
+      } else {
+        setOutgoingRequests([]);
+      }
     } catch (error) {
       console.error('Error fetching requests:', error);
     } finally {
@@ -353,6 +384,22 @@ export default function Friends() {
 
     haptic.light();
     setRequests(requests.filter(r => r.id !== requestId));
+  };
+
+  const cancelOutgoingRequest = async (requestId: string) => {
+    const { error } = await supabase
+      .from('friendships')
+      .delete()
+      .eq('id', requestId);
+
+    if (error) {
+      toast.error('Failed to cancel request');
+      return;
+    }
+
+    haptic.light();
+    toast.success('Friend request cancelled');
+    setOutgoingRequests(outgoingRequests.filter(r => r.id !== requestId));
   };
 
   const getMutualText = (mutuals: any[]) => {
@@ -513,6 +560,21 @@ export default function Friends() {
       });
 
       setFriendshipStatuses(prev => ({ ...prev, [friendId]: 'pending' }));
+
+      // Add to outgoing requests list immediately
+      const friendProfile = searchResults.find(r => r.id === friendId)
+        || suggestedFriends.find(r => r.id === friendId);
+      if (friendProfile) {
+        setOutgoingRequests(prev => [...prev, {
+          id: `temp-${friendId}`,
+          user_id: friendId,
+          display_name: friendProfile.display_name,
+          username: friendProfile.username,
+          avatar_url: friendProfile.avatar_url,
+          mutual_friends: [],
+        }]);
+      }
+
       haptic.success();
       toast.success('Friend request sent!');
     } catch (error) {
@@ -800,6 +862,52 @@ export default function Friends() {
                         ))}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Outgoing pending requests */}
+                {!loadingRequests && outgoingRequests.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-white/60 text-xs font-semibold tracking-wider px-1 flex items-center gap-2">
+                      <Clock className="h-3.5 w-3.5" />
+                      PENDING REQUESTS ({outgoingRequests.length})
+                    </h3>
+                    <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl overflow-hidden">
+                      {outgoingRequests.map((request) => (
+                        <div
+                          key={request.id}
+                          className="flex items-center gap-3 p-3 border-b border-[#a855f7]/10 last:border-b-0"
+                        >
+                          <button
+                            onClick={() => openFriendCard({
+                              userId: request.user_id,
+                              displayName: request.display_name,
+                              avatarUrl: request.avatar_url,
+                            })}
+                          >
+                            <Avatar className="h-11 w-11 border-2 border-[#a855f7]/40">
+                              <AvatarImage src={request.avatar_url || undefined} />
+                              <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
+                                {request.display_name?.[0] || 'U'}
+                              </AvatarFallback>
+                            </Avatar>
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-white text-sm truncate">{request.display_name}</p>
+                            <p className="text-white/40 text-xs truncate">@{request.username}</p>
+                          </div>
+                          <Button
+                            onClick={() => cancelOutgoingRequest(request.id)}
+                            variant="outline"
+                            size="sm"
+                            className="border-white/20 text-white/60 hover:bg-white/10 rounded-xl text-xs"
+                          >
+                            <Clock className="h-3.5 w-3.5 mr-1" />
+                            Pending
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 

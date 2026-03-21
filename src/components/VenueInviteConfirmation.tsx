@@ -147,7 +147,7 @@ export function VenueInviteConfirmation() {
               className="absolute top-4 left-4 cursor-pointer hover:scale-110 transition-transform"
             >
               <Avatar className="w-12 h-12 border-2 border-[#2d1b4e] shadow-lg">
-                <AvatarImage src={invitedFriends[0].avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${invitedFriends[0].displayName}`} />
+                <AvatarImage src={invitedFriends[0].avatarUrl || undefined} />
                 <AvatarFallback className="bg-[#a855f7] text-white">
                   {invitedFriends[0].displayName[0]}
                 </AvatarFallback>

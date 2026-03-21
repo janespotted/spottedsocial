@@ -176,8 +176,8 @@ export default function Home() {
         return;
       }
 
-      // Step 2: Get night_statuses + profiles separately (embedded joins can silently
-      // return null when FK hints are ambiguous or RLS interferes with the sub-select)
+      // Step 2: Get night_statuses + profiles via RPC (direct profiles table is
+      // blocked by RLS for non-own profiles — must use get_profiles_safe)
       const [statusResult, profileResult] = await Promise.all([
         supabase
           .from('night_statuses')
@@ -185,10 +185,7 @@ export default function Home() {
           .in('user_id', queryIds)
           .not('expires_at', 'is', null)
           .gt('expires_at', new Date().toISOString()),
-        supabase
-          .from('profiles')
-          .select('id, display_name, avatar_url, is_demo')
-          .in('id', queryIds),
+        supabase.rpc('get_profiles_safe'),
       ]);
 
       const statuses = statusResult.data;
@@ -419,7 +416,7 @@ export default function Home() {
                       <div className="relative">
                         <div className="absolute inset-0 rounded-full bg-[#22c55e]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
                         <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#22c55e] relative z-10">
-                          <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                          <AvatarImage src={friend.avatar_url || undefined} />
                           <AvatarFallback className="bg-[#22c55e] text-white text-sm">
                             {friend.display_name?.[0] || '?'}
                           </AvatarFallback>
@@ -459,7 +456,7 @@ export default function Home() {
                       <div className="relative">
                         <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
                         <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
-                          <AvatarImage src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.display_name}`} />
+                          <AvatarImage src={friend.avatar_url || undefined} />
                           <AvatarFallback className="bg-[#a855f7] text-white text-sm">
                             {friend.display_name?.[0] || '?'}
                           </AvatarFallback>

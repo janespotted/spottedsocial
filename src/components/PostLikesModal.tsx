@@ -34,26 +34,28 @@ export function PostLikesModal({ postId, isOpen, onClose }: PostLikesModalProps)
 
   const fetchLikes = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('post_likes')
-      .select(`
-        user_id,
-        profiles:user_id (
-          display_name,
-          username,
-          avatar_url
-        )
-      `)
-      .eq('post_id', postId)
-      .order('created_at', { ascending: false });
+    const [likesResult, profileResult] = await Promise.all([
+      supabase
+        .from('post_likes')
+        .select('user_id')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: false }),
+      supabase.rpc('get_profiles_safe'),
+    ]);
 
-    if (data) {
-      const likesData = data.map((like: any) => ({
-        user_id: like.user_id,
-        display_name: like.profiles?.display_name || 'Unknown',
-        username: like.profiles?.username || 'unknown',
-        avatar_url: like.profiles?.avatar_url || null,
-      }));
+    if (likesResult.data) {
+      const profileMap = new Map(
+        (profileResult.data || []).map((p: any) => [p.id, p])
+      );
+      const likesData = likesResult.data.map((like: any) => {
+        const profile = profileMap.get(like.user_id);
+        return {
+          user_id: like.user_id,
+          display_name: profile?.display_name || 'Unknown',
+          username: profile?.username || 'unknown',
+          avatar_url: profile?.avatar_url || null,
+        };
+      });
       setUsers(likesData);
     }
     setLoading(false);
