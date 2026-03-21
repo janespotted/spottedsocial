@@ -200,7 +200,7 @@ export default function Thread() {
     // Get thread info (is_group, name)
     const { data: threadData } = await supabase
       .from('dm_threads')
-      .select('is_group, name')
+      .select('is_group, name, group_avatar_url')
       .eq('id', threadId)
       .single();
 
