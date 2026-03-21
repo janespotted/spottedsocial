@@ -145,7 +145,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
           setPlanningFriends((demoProfiles || []).map((p: any) => ({
             user_id: p.id,
             display_name: p.display_name,
-            avatar_url: p.avatar_url,
+            avatar_url: p.avatar_url?.includes('dicebear.com') ? null : p.avatar_url,
             planning_neighborhood: neighborhoodMap.get(p.id) || null,
           })));
         }

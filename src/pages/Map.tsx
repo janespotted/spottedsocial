@@ -392,7 +392,7 @@ export default function Map() {
             last_location_at: new Date().toISOString(),
             profiles: {
               display_name: status.profiles?.display_name || 'Unknown',
-              avatar_url: status.profiles?.avatar_url || null,
+              avatar_url: status.profiles?.avatar_url?.includes('dicebear.com') ? null : (status.profiles?.avatar_url || null),
             },
             // Cycle through relationship types for visual variety
             relationshipType: relationshipTypes[index % relationshipTypes.length],

@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
       // Users
       const ts=Date.now(), uids:string[]=[];
       const userList = DEMO_USERNAMES[city] || DEMO_USERNAMES['nyc'];
-      for(let i=0;i<24;i++){const u=userList[i];const id=crypto.randomUUID();uids.push(id);await sb.from('profiles').insert({id,display_name:u[0],username:u[1],avatar_url:`https://api.dicebear.com/7.x/avataaars/svg?seed=${u[0]}${i}`,is_demo:true});}
+      for(let i=0;i<24;i++){const u=userList[i];const id=crypto.randomUUID();uids.push(id);await sb.from('profiles').insert({id,display_name:u[0],username:u[1],avatar_url:null,is_demo:true});}
       
       // Friend all real users with demo
       const {data:real}=await sb.from('profiles').select('id').eq('is_demo',false);
