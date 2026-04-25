@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { Phone, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 
 interface InviterInfo {
@@ -350,7 +350,7 @@ export default function Auth() {
                 setOtpDigits(['', '', '', '', '', '']);
                 setError(null);
               }}
-              className={`absolute left-6 top-6 text-muted-foreground hover:text-foreground transition-colors ${step === 'setup' ? 'hidden' : ''}`}
+              className={`absolute left-6 top-12 text-muted-foreground hover:text-foreground transition-colors ${step === 'setup' ? 'hidden' : ''}`}
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
@@ -361,7 +361,7 @@ export default function Auth() {
             <img
               src={spottedLogo}
               alt="Spotted"
-              className="w-14 h-14 object-contain drop-shadow-[0_0_15px_rgba(212,255,0,0.5)]"
+              className="w-16 h-16 object-contain drop-shadow-[0_0_15px_rgba(212,255,0,0.5)]"
             />
           </div>
 
@@ -392,19 +392,16 @@ export default function Auth() {
         <CardContent className="space-y-6 px-6 pb-8">
           {step === 'phone' && (
             <form onSubmit={handleSendOtp} className="space-y-5">
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+1 (555) 000-0000"
-                  value={phone}
-                  onChange={(e) => setPhone(formatPhoneForDisplay(e.target.value))}
-                  required
-                  autoFocus
-                  className="pl-10 h-12 border-border/60 focus:border-primary focus:shadow-[0_0_15px_hsl(var(--primary)/0.3)] bg-card/50 text-foreground rounded-xl transition-all text-lg tracking-wide"
-                />
-              </div>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+1 (555) 000-0000"
+                value={phone}
+                onChange={(e) => setPhone(formatPhoneForDisplay(e.target.value))}
+                required
+                autoFocus
+                className="h-12 border-white/20 focus:border-primary focus:shadow-[0_0_15px_hsl(var(--primary)/0.3)] bg-card/50 text-foreground rounded-xl transition-all text-lg tracking-wide"
+              />
 
               {error && (
                 <p className="text-sm text-destructive">{error}</p>
@@ -412,7 +409,7 @@ export default function Auth() {
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-primary hover:bg-primary/90 shadow-[0_0_20px_hsl(var(--primary)/0.5)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.7)] transition-all text-primary-foreground font-semibold rounded-xl"
+                className="w-full h-12 bg-[#7c3aed] hover:bg-[#7c3aed]/90 shadow-[0_0_20px_rgba(124,58,237,0.5)] hover:shadow-[0_0_30px_rgba(124,58,237,0.7)] transition-all text-primary-foreground font-semibold rounded-xl"
                 disabled={loading}
               >
                 {loading ? 'Sending code...' : 'Continue'}
