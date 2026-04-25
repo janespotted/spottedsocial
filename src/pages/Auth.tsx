@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { Phone, ArrowLeft } from 'lucide-react';
@@ -322,7 +322,7 @@ export default function Auth() {
     if (step === 'phone') {
       return inviteCode
         ? 'Enter your phone number to connect with your friend!'
-        : 'Enter your phone number to sign in or create an account.';
+        : 'See where your friends are tonight.';
     }
     if (step === 'verify') {
       return `We sent a code to ${phone}`;
@@ -339,8 +339,8 @@ export default function Auth() {
         <div className="absolute -bottom-32 left-1/4 w-72 h-72 bg-primary/15 rounded-full blur-3xl animate-float-slow" />
       </div>
 
-      <Card className="relative z-10 w-full max-w-[430px] mx-auto glass-card rounded-3xl shadow-[0_0_60px_rgba(168,85,247,0.3)] animate-fade-in">
-        <CardHeader className="space-y-3 text-center pt-8 pb-4">
+      <Card className="relative z-10 w-full max-w-[430px] mx-auto border-0 bg-transparent shadow-none animate-fade-in">
+        <CardHeader className="space-y-5 text-center pt-8 pb-6">
           {/* Back button on verify/setup steps */}
           {step !== 'phone' && (
             <button
@@ -357,7 +357,7 @@ export default function Auth() {
           )}
 
           {/* Logo with glow effect */}
-          <div className="flex justify-center mb-2">
+          <div className="flex justify-center mb-4">
             <img
               src={spottedLogo}
               alt="Spotted"
@@ -365,9 +365,9 @@ export default function Auth() {
             />
           </div>
 
-          <CardTitle className="text-4xl font-light tracking-[0.25em] text-foreground">
+          <h1 className="text-4xl font-light tracking-[0.25em] text-foreground">
             Spotted
-          </CardTitle>
+          </h1>
 
           {/* Inviter Badge */}
           {inviter && step === 'phone' && (
@@ -384,29 +384,26 @@ export default function Auth() {
             </div>
           )}
 
-          <CardDescription className="text-base text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             {getDescription()}
-          </CardDescription>
+          </p>
         </CardHeader>
 
-        <CardContent className="space-y-5 px-6 pb-8">
+        <CardContent className="space-y-6 px-6 pb-8">
           {step === 'phone' && (
-            <form onSubmit={handleSendOtp} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="text-foreground text-sm font-medium">Phone Number</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+1 (555) 000-0000"
-                    value={phone}
-                    onChange={(e) => setPhone(formatPhoneForDisplay(e.target.value))}
-                    required
-                    autoFocus
-                    className="pl-10 h-11 border-border/60 focus:border-primary focus:shadow-[0_0_15px_hsl(var(--primary)/0.3)] bg-card/50 text-foreground rounded-xl transition-all text-lg tracking-wide"
-                  />
-                </div>
+            <form onSubmit={handleSendOtp} className="space-y-5">
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+1 (555) 000-0000"
+                  value={phone}
+                  onChange={(e) => setPhone(formatPhoneForDisplay(e.target.value))}
+                  required
+                  autoFocus
+                  className="pl-10 h-12 border-border/60 focus:border-primary focus:shadow-[0_0_15px_hsl(var(--primary)/0.3)] bg-card/50 text-foreground rounded-xl transition-all text-lg tracking-wide"
+                />
               </div>
 
               {error && (
@@ -418,7 +415,7 @@ export default function Auth() {
                 className="w-full h-12 bg-primary hover:bg-primary/90 shadow-[0_0_20px_hsl(var(--primary)/0.5)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.7)] transition-all text-primary-foreground font-semibold rounded-xl"
                 disabled={loading}
               >
-                {loading ? 'Sending code...' : 'Send Verification Code'}
+                {loading ? 'Sending code...' : 'Continue'}
               </Button>
 
               <p className="text-xs text-center text-muted-foreground">
@@ -550,47 +547,48 @@ export default function Auth() {
           </div>
         )}
 
-        {/* Hidden dev login */}
-        <div className="text-center pb-4">
-          <button
-            onClick={() => setShowDevLogin(!showDevLogin)}
-            className="text-muted-foreground/30 text-xs leading-none"
-          >
-            &middot;
-          </button>
-          {showDevLogin && (
-            <form onSubmit={handleDevLogin} className="mt-3 px-6 space-y-2">
-              <Input
-                type="email"
-                placeholder="Email"
-                value={devEmail}
-                onChange={(e) => setDevEmail(e.target.value)}
-                required
-                className="h-9 text-sm border-border/40 bg-card/30 text-foreground rounded-lg"
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={devPassword}
-                onChange={(e) => setDevPassword(e.target.value)}
-                required
-                className="h-9 text-sm border-border/40 bg-card/30 text-foreground rounded-lg"
-              />
-              {error && showDevLogin && (
-                <p className="text-xs text-destructive">{error}</p>
-              )}
-              <Button
-                type="submit"
-                size="sm"
-                className="w-full h-8 text-xs rounded-lg"
-                disabled={loading}
-              >
-                {loading ? 'Signing in...' : 'Dev Sign In'}
-              </Button>
-            </form>
-          )}
-        </div>
       </Card>
+
+      {/* Hidden dev login - fixed at bottom of screen */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
+        <button
+          onClick={() => setShowDevLogin(!showDevLogin)}
+          className="text-muted-foreground/20 text-xs leading-none p-2"
+        >
+          &middot;
+        </button>
+        {showDevLogin && (
+          <form onSubmit={handleDevLogin} className="w-[300px] space-y-2 px-4 pb-2">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={devEmail}
+              onChange={(e) => setDevEmail(e.target.value)}
+              required
+              className="h-9 text-sm border-border/40 bg-card/80 text-foreground rounded-lg backdrop-blur-sm"
+            />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={devPassword}
+              onChange={(e) => setDevPassword(e.target.value)}
+              required
+              className="h-9 text-sm border-border/40 bg-card/80 text-foreground rounded-lg backdrop-blur-sm"
+            />
+            {error && showDevLogin && (
+              <p className="text-xs text-destructive">{error}</p>
+            )}
+            <Button
+              type="submit"
+              size="sm"
+              className="w-full h-8 text-xs rounded-lg"
+              disabled={loading}
+            >
+              {loading ? 'Signing in...' : 'Dev Sign In'}
+            </Button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
