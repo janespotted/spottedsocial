@@ -37,6 +37,9 @@ export default function Auth() {
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showDevLogin, setShowDevLogin] = useState(false);
+  const [devEmail, setDevEmail] = useState('');
+  const [devPassword, setDevPassword] = useState('');
   const navigate = useNavigate();
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -294,6 +297,27 @@ export default function Auth() {
     }
   };
 
+  const handleDevLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: devEmail,
+        password: devPassword,
+      });
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      navigate('/');
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getDescription = () => {
     if (step === 'phone') {
       return inviteCode
@@ -525,6 +549,47 @@ export default function Auth() {
             </Link>
           </div>
         )}
+
+        {/* Hidden dev login */}
+        <div className="text-center pb-4">
+          <button
+            onClick={() => setShowDevLogin(!showDevLogin)}
+            className="text-muted-foreground/30 text-xs leading-none"
+          >
+            &middot;
+          </button>
+          {showDevLogin && (
+            <form onSubmit={handleDevLogin} className="mt-3 px-6 space-y-2">
+              <Input
+                type="email"
+                placeholder="Email"
+                value={devEmail}
+                onChange={(e) => setDevEmail(e.target.value)}
+                required
+                className="h-9 text-sm border-border/40 bg-card/30 text-foreground rounded-lg"
+              />
+              <Input
+                type="password"
+                placeholder="Password"
+                value={devPassword}
+                onChange={(e) => setDevPassword(e.target.value)}
+                required
+                className="h-9 text-sm border-border/40 bg-card/30 text-foreground rounded-lg"
+              />
+              {error && showDevLogin && (
+                <p className="text-xs text-destructive">{error}</p>
+              )}
+              <Button
+                type="submit"
+                size="sm"
+                className="w-full h-8 text-xs rounded-lg"
+                disabled={loading}
+              >
+                {loading ? 'Signing in...' : 'Dev Sign In'}
+              </Button>
+            </form>
+          )}
+        </div>
       </Card>
     </div>
   );
