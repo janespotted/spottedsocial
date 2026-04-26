@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { Keyboard } from '@capacitor/keyboard';
+import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +44,30 @@ export default function Auth() {
   const [devPassword, setDevPassword] = useState('');
   const navigate = useNavigate();
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Handle iOS keyboard push
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const showListener = Keyboard.addListener('keyboardDidShow', () => {
+      const active = document.activeElement as HTMLElement | null;
+      if (active && scrollRef.current) {
+        active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+
+    const hideListener = Keyboard.addListener('keyboardDidHide', () => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+
+    return () => {
+      showListener.then(h => h.remove());
+      hideListener.then(h => h.remove());
+    };
+  }, []);
 
   // Fetch inviter info if invite code exists
   useEffect(() => {
@@ -331,7 +357,8 @@ export default function Auth() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] overflow-hidden">
+    <div className="relative flex items-center justify-center p-4 bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118]" style={{ height: '100dvh', overflow: 'hidden' }}>
+      <div ref={scrollRef} className="w-full overflow-y-auto" style={{ maxHeight: '100dvh' }}>
       {/* Animated floating orbs for ambient depth */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-20 -left-20 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-float-slow" />
@@ -545,14 +572,15 @@ export default function Auth() {
         )}
 
       </Card>
+      </div>
 
       {/* Hidden dev login - fixed at bottom of screen */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
         <button
           onClick={() => setShowDevLogin(!showDevLogin)}
-          className="text-muted-foreground/20 text-xs leading-none p-2"
+          className="text-white/10 text-xs leading-none py-4 px-6"
         >
-          &middot;
+          &middot;&middot;&middot;
         </button>
         {showDevLogin && (
           <form onSubmit={handleDevLogin} className="w-[300px] space-y-2 px-4 pb-2">
