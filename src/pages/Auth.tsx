@@ -45,6 +45,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const devFormRef = useRef<HTMLFormElement>(null);
 
   // Handle iOS keyboard push
   useEffect(() => {
@@ -68,6 +69,15 @@ export default function Auth() {
       hideListener.then(h => h.remove());
     };
   }, []);
+
+  // Scroll dev login form into view when shown
+  useEffect(() => {
+    if (showDevLogin && devFormRef.current) {
+      setTimeout(() => {
+        devFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
+    }
+  }, [showDevLogin]);
 
   // Fetch inviter info if invite code exists
   useEffect(() => {
@@ -571,48 +581,51 @@ export default function Auth() {
           </div>
         )}
 
-      </Card>
-      </div>
-
-      {/* Hidden dev login - fixed at bottom of screen */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
-        <button
-          onClick={() => setShowDevLogin(!showDevLogin)}
-          className="text-white/10 text-xs leading-none py-4 px-6"
-        >
-          &middot;&middot;&middot;
-        </button>
-        {showDevLogin && (
-          <form onSubmit={handleDevLogin} className="w-[300px] space-y-2 px-4 pb-2">
-            <Input
-              type="email"
-              placeholder="Email"
-              value={devEmail}
-              onChange={(e) => setDevEmail(e.target.value)}
-              required
-              className="h-9 text-sm border-border/40 bg-card/80 text-foreground rounded-lg backdrop-blur-sm"
-            />
-            <Input
-              type="password"
-              placeholder="Password"
-              value={devPassword}
-              onChange={(e) => setDevPassword(e.target.value)}
-              required
-              className="h-9 text-sm border-border/40 bg-card/80 text-foreground rounded-lg backdrop-blur-sm"
-            />
-            {error && showDevLogin && (
-              <p className="text-xs text-destructive">{error}</p>
-            )}
-            <Button
-              type="submit"
-              size="sm"
-              className="w-full h-8 text-xs rounded-lg"
-              disabled={loading}
+        {/* Dev login */}
+        <div className="flex flex-col items-center pb-4">
+          {showDevLogin && (
+            <form
+              ref={devFormRef}
+              onSubmit={handleDevLogin}
+              className="w-full space-y-2 px-6 pb-2"
             >
-              {loading ? 'Signing in...' : 'Dev Sign In'}
-            </Button>
-          </form>
-        )}
+              <Input
+                type="email"
+                placeholder="Email"
+                value={devEmail}
+                onChange={(e) => setDevEmail(e.target.value)}
+                required
+                className="h-9 text-sm border-white/20 bg-white/5 text-foreground rounded-lg"
+              />
+              <Input
+                type="password"
+                placeholder="Password"
+                value={devPassword}
+                onChange={(e) => setDevPassword(e.target.value)}
+                required
+                className="h-9 text-sm border-white/20 bg-white/5 text-foreground rounded-lg"
+              />
+              {error && showDevLogin && (
+                <p className="text-xs text-destructive">{error}</p>
+              )}
+              <Button
+                type="submit"
+                size="sm"
+                className="w-full h-8 text-xs rounded-lg"
+                disabled={loading}
+              >
+                {loading ? 'Signing in...' : 'Dev Sign In'}
+              </Button>
+            </form>
+          )}
+          <button
+            onClick={() => setShowDevLogin(!showDevLogin)}
+            className="text-white/30 text-sm leading-none py-4 px-6 tracking-widest"
+          >
+            &middot;&middot;&middot;
+          </button>
+        </div>
+      </Card>
       </div>
     </div>
   );
