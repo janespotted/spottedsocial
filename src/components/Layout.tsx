@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { performAutoCheckout } from '@/lib/auto-checkout';
 import { checkLocationPermission } from '@/lib/location-service';
+import { useProfilesSafe } from '@/hooks/useProfilesCache';
 import { MapPin, X } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -34,6 +35,9 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   
+  // Keep profiles cache warm so all pages can read via getQueryData
+  useProfilesSafe();
+
   // Auto check-in prompt (runs after onboarding, during nightlife hours)
   useCheckInPrompt();
   

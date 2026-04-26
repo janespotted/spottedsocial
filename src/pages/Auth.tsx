@@ -581,45 +581,10 @@ export default function Auth() {
           </div>
         )}
 
-        {/* Dev login */}
-        <div className="flex flex-col items-center pb-4">
-          {showDevLogin && (
-            <form
-              ref={devFormRef}
-              onSubmit={handleDevLogin}
-              className="w-full space-y-2 px-6 pb-2"
-            >
-              <Input
-                type="email"
-                placeholder="Email"
-                value={devEmail}
-                onChange={(e) => setDevEmail(e.target.value)}
-                required
-                className="h-9 text-sm border-white/20 bg-white/5 text-foreground rounded-lg"
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={devPassword}
-                onChange={(e) => setDevPassword(e.target.value)}
-                required
-                className="h-9 text-sm border-white/20 bg-white/5 text-foreground rounded-lg"
-              />
-              {error && showDevLogin && (
-                <p className="text-xs text-destructive">{error}</p>
-              )}
-              <Button
-                type="submit"
-                size="sm"
-                className="w-full h-8 text-xs rounded-lg"
-                disabled={loading}
-              >
-                {loading ? 'Signing in...' : 'Dev Sign In'}
-              </Button>
-            </form>
-          )}
+        {/* Dev login trigger */}
+        <div className="flex justify-center pb-4">
           <button
-            onClick={() => setShowDevLogin(!showDevLogin)}
+            onClick={() => setShowDevLogin(true)}
             className="text-white/30 text-sm leading-none py-4 px-6 tracking-widest"
           >
             &middot;&middot;&middot;
@@ -627,6 +592,47 @@ export default function Auth() {
         </div>
       </Card>
       </div>
+
+      {/* Dev login overlay */}
+      {showDevLogin && (
+        <div className="fixed top-20 left-4 right-4 bg-black/90 rounded-2xl p-6 z-50">
+          <button
+            onClick={() => { setShowDevLogin(false); setError(null); }}
+            className="absolute top-4 right-4 text-white/60 hover:text-white text-lg leading-none"
+          >
+            &times;
+          </button>
+          <form ref={devFormRef} onSubmit={handleDevLogin} className="space-y-3">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={devEmail}
+              onChange={(e) => setDevEmail(e.target.value)}
+              required
+              className="h-10 text-sm border-white/20 bg-white/10 text-foreground rounded-lg"
+            />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={devPassword}
+              onChange={(e) => setDevPassword(e.target.value)}
+              required
+              className="h-10 text-sm border-white/20 bg-white/10 text-foreground rounded-lg"
+            />
+            {error && (
+              <p className="text-xs text-destructive">{error}</p>
+            )}
+            <Button
+              type="submit"
+              size="sm"
+              className="w-full h-9 text-sm rounded-lg"
+              disabled={loading}
+            >
+              {loading ? 'Signing in...' : 'Dev Sign In'}
+            </Button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

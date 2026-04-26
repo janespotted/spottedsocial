@@ -6,7 +6,7 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronLeft, Users, ChevronDown, UserPlus, ChevronRight, Camera, Pencil, Check, X } from 'lucide-react';
+import { ChevronLeft, Users, ChevronDown, UserPlus, ChevronRight, Camera, Pencil, Check, X, Heart } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -29,6 +29,15 @@ interface Message {
   sender_id: string;
   created_at: string;
   image_url?: string | null;
+  reactions?: { user_id: string; reaction: string }[];
+}
+
+interface SharedPostData {
+  id: string;
+  text: string;
+  image_url: string | null;
+  venue_name: string | null;
+  profiles: { display_name: string; avatar_url: string | null } | null;
 }
 
 interface ThreadMember {
@@ -66,6 +75,11 @@ export default function Thread() {
   const [currentUserProfile, setCurrentUserProfile] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  // Shared post cache and reactions
+  const [sharedPosts, setSharedPosts] = useState<Map<string, SharedPostData>>(new Map());
+  const [heartedMessages, setHeartedMessages] = useState<Set<string>>(new Set());
+  const lastTapRef = useRef<{ id: string; time: number } | null>(null);
+
   // Map sender_id to member info for group chats
   const [memberMap, setMemberMap] = useState<Map<string, ThreadMember>>(new Map());
   const [otherReadAt, setOtherReadAt] = useState<string | null>(null);
@@ -528,6 +542,86 @@ export default function Thread() {
     if (groupAvatarInputRef.current) groupAvatarInputRef.current.value = '';
   };
 
+  // Resolve shared post references in messages
+  const SHARED_POST_REGEX = /^\[shared_post:([a-f0-9-]+)\]$/;
+
+  useEffect(() => {
+    const postIds = messages
+      .map(m => m.text.match(SHARED_POST_REGEX)?.[1])
+      .filter((id): id is string => !!id && !sharedPosts.has(id));
+
+    if (postIds.length === 0) return;
+
+    const uniqueIds = [...new Set(postIds)];
+    (async () => {
+      const { data } = await supabase
+        .from('posts')
+        .select('id, text, image_url, venue_name, user_id')
+        .in('id', uniqueIds);
+
+      if (!data) return;
+
+      const { data: profiles } = await supabase.rpc('get_profiles_safe');
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+      setSharedPosts(prev => {
+        const next = new Map(prev);
+        for (const post of data) {
+          const profile = profileMap.get(post.user_id);
+          next.set(post.id, {
+            id: post.id,
+            text: post.text,
+            image_url: post.image_url,
+            venue_name: post.venue_name,
+            profiles: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : null,
+          });
+        }
+        return next;
+      });
+    })();
+  }, [messages]);
+
+  // Fetch existing reactions for visible messages
+  useEffect(() => {
+    if (messages.length === 0 || !user) return;
+    (async () => {
+      const { data } = await supabase
+        .from('dm_message_reactions')
+        .select('message_id, user_id')
+        .in('message_id', messages.map(m => m.id))
+        .eq('user_id', user.id);
+
+      if (data) {
+        setHeartedMessages(new Set(data.map(r => r.message_id)));
+      }
+    })();
+  }, [messages.length, user]);
+
+  const handleDoubleTap = useCallback(async (messageId: string) => {
+    if (!user) return;
+
+    const isHearted = heartedMessages.has(messageId);
+    if (isHearted) {
+      // Remove heart
+      setHeartedMessages(prev => { const next = new Set(prev); next.delete(messageId); return next; });
+      await supabase.from('dm_message_reactions').delete().eq('message_id', messageId).eq('user_id', user.id);
+    } else {
+      // Add heart
+      setHeartedMessages(prev => new Set(prev).add(messageId));
+      await supabase.from('dm_message_reactions').insert({ message_id: messageId, user_id: user.id, reaction: '❤️' });
+    }
+  }, [user, heartedMessages]);
+
+  const handleMessageTap = useCallback((messageId: string) => {
+    const now = Date.now();
+    if (lastTapRef.current && lastTapRef.current.id === messageId && now - lastTapRef.current.time < 300) {
+      handleDoubleTap(messageId);
+      lastTapRef.current = null;
+    } else {
+      lastTapRef.current = { id: messageId, time: now };
+    }
+  }, [handleDoubleTap]);
+
   const getGroupDisplayName = (): string => {
     if (!groupInfo) return '';
     if (groupInfo.name) return groupInfo.name;
@@ -839,24 +933,85 @@ export default function Thread() {
                       {groupInfo && !isCurrentUser && sender && (
                         <span className="text-white/50 text-xs mb-1 ml-1">{sender.display_name.split(' ')[0]}</span>
                       )}
-                      <div
-                        className={`rounded-2xl overflow-hidden ${
-                          isCurrentUser
-                            ? 'bg-[#4c2f6e] text-white rounded-br-sm'
-                            : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
-                        }`}
-                      >
-                        {message.image_url && (
-                          <img 
-                            src={message.image_url} 
-                            alt="Shared image" 
-                            className="w-full max-w-[250px] rounded-t-2xl"
-                          />
-                        )}
-                        {message.text && (
-                          <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
-                        )}
-                      </div>
+
+                      {/* Check if this is a shared post */}
+                      {(() => {
+                        const postMatch = message.text.match(SHARED_POST_REGEX);
+                        const sharedPost = postMatch ? sharedPosts.get(postMatch[1]) : null;
+
+                        if (postMatch && sharedPost) {
+                          return (
+                            <button
+                              onClick={() => navigate('/', { state: { feedMode: 'newsfeed', scrollToPost: sharedPost.id } })}
+                              onDoubleClick={() => handleDoubleTap(message.id)}
+                              className="text-left"
+                            >
+                              <div className={`rounded-2xl overflow-hidden border ${isCurrentUser ? 'border-[#a855f7]/30 bg-[#4c2f6e]/50' : 'border-white/20 bg-white/10'}`}>
+                                {sharedPost.image_url && (
+                                  <img src={sharedPost.image_url} alt="" className="w-full max-w-[250px] aspect-[4/3] object-cover" />
+                                )}
+                                <div className="px-3 py-2">
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    {sharedPost.profiles?.avatar_url && (
+                                      <img src={sharedPost.profiles.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                                    )}
+                                    <span className={`text-xs font-semibold ${isCurrentUser ? 'text-white' : 'text-[#1a0f2e]'}`}>
+                                      {sharedPost.profiles?.display_name || 'Someone'}
+                                    </span>
+                                  </div>
+                                  {sharedPost.text && (
+                                    <p className={`text-xs leading-relaxed line-clamp-2 ${isCurrentUser ? 'text-white/80' : 'text-[#1a0f2e]/70'}`}>
+                                      {sharedPost.text}
+                                    </p>
+                                  )}
+                                  {sharedPost.venue_name && (
+                                    <p className="text-[#d4ff00] text-[10px] mt-1">@ {sharedPost.venue_name}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        }
+
+                        if (postMatch && !sharedPost) {
+                          // Loading or expired post
+                          return (
+                            <div className={`rounded-2xl px-4 py-2.5 ${isCurrentUser ? 'bg-[#4c2f6e] text-white rounded-br-sm' : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'}`}>
+                              <p className="text-sm text-white/50 italic">Shared post</p>
+                            </div>
+                          );
+                        }
+
+                        // Regular message
+                        return (
+                          <div
+                            onClick={() => handleMessageTap(message.id)}
+                            className={`rounded-2xl overflow-hidden relative ${
+                              isCurrentUser
+                                ? 'bg-[#4c2f6e] text-white rounded-br-sm'
+                                : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'
+                            }`}
+                          >
+                            {message.image_url && (
+                              <img
+                                src={message.image_url}
+                                alt="Shared image"
+                                className="w-full max-w-[250px] rounded-t-2xl"
+                              />
+                            )}
+                            {message.text && (
+                              <p className="text-sm leading-relaxed px-4 py-2.5">{message.text}</p>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Heart reaction indicator */}
+                      {heartedMessages.has(message.id) && (
+                        <div className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} -mt-2 ${isCurrentUser ? 'mr-1' : 'ml-1'}`}>
+                          <span className="text-red-500 text-sm drop-shadow-sm">❤️</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   {showSeen && (

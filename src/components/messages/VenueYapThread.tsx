@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemoMode } from "@/hooks/useDemoMode";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageCircle, ChevronUp, ChevronDown, Send, Image, X, MoreHorizontal, ArrowLeft, MapPin, Flame, EyeOff } from "lucide-react";
+import { MessageCircle, ChevronUp, ChevronDown, Send, Image, Video, X, MoreHorizontal, ArrowLeft, MapPin, Flame, EyeOff } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import { validateYapText, validateYapCommentText } from "@/lib/validation-schema
 import { checkAndRecordRateLimit, getRateLimitMessage } from "@/lib/rate-limit";
 import { LoginPromptSheet } from "@/components/LoginPromptSheet";
 import { calculateExpiryTime } from "@/lib/time-utils";
+import { isNativePlatform } from "@/lib/platform";
+import { pickVideoNative, validateWebVideo } from "@/lib/video-picker-service";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -84,6 +86,8 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
 
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
   const [revealedBuriedIds, setRevealedBuriedIds] = useState<Set<string>>(new Set());
@@ -340,11 +344,49 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
       setMediaPreview(null);
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (videoInputRef.current) videoInputRef.current.value = "";
+  };
+
+  const handleVideoSelect = async () => {
+    if (!requireAuth()) return;
+    if (isNativePlatform()) {
+      setVideoLoading(true);
+      try {
+        const result = await pickVideoNative();
+        setMediaFile(result.file);
+        setMediaPreview(result.previewUrl);
+      } catch (err: any) {
+        if (!err.message?.includes("canceled") && !err.message?.includes("cancelled")) {
+          toast.error(err.message || "Failed to select video");
+        }
+      } finally {
+        setVideoLoading(false);
+      }
+    } else {
+      videoInputRef.current?.click();
+    }
+  };
+
+  const handleWebVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setVideoLoading(true);
+    try {
+      const result = await validateWebVideo(file);
+      setMediaFile(result.file);
+      setMediaPreview(result.previewUrl);
+    } catch (err: any) {
+      toast.error(err.message || "Invalid video file");
+    } finally {
+      setVideoLoading(false);
+    }
   };
 
   const uploadMedia = async (file: File): Promise<{ url: string; type: string } | null> => {
-    const mediaType = "image";
-    const ext = file.name.split(".").pop() || "jpg";
+    const mediaType = file.type.startsWith("video/") ? "video" : "image";
+    const defaultExt = mediaType === "video" ? "mp4" : "jpg";
+    const ext = file.name.split(".").pop() || defaultExt;
     const filePath = `${user!.id}/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("yap-media").upload(filePath, file);
     if (error) {
@@ -721,7 +763,11 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
           />
           {mediaPreview && (
             <div className="relative mt-2 inline-block">
-              <img src={mediaPreview} alt="Preview" className="max-h-40 rounded-lg border border-[#a855f7]/20" />
+              {mediaFile?.type.startsWith("video/") ? (
+                <video src={mediaPreview} controls playsInline muted className="max-h-40 rounded-lg border border-[#a855f7]/20" />
+              ) : (
+                <img src={mediaPreview} alt="Preview" className="max-h-40 rounded-lg border border-[#a855f7]/20" />
+              )}
               <button
                 onClick={clearMedia}
                 className="absolute -top-2 -right-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-full p-1"
@@ -739,6 +785,13 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
                 onChange={handleMediaSelect}
                 className="hidden"
               />
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                onChange={handleWebVideoSelect}
+                className="hidden"
+              />
               <button
                 onClick={() => {
                   if (!requireAuth()) return;
@@ -748,6 +801,14 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
                 title="Add photo"
               >
                 <Image className="h-5 w-5" />
+              </button>
+              <button
+                onClick={handleVideoSelect}
+                disabled={videoLoading}
+                className="text-white/40 hover:text-[#d4ff00] transition-colors disabled:opacity-50"
+                title="Add video (max 30s, 50MB)"
+              >
+                <Video className="h-5 w-5" />
               </button>
               <span className="text-white/40 text-sm">{newYap.length}/280</span>
             </div>
@@ -830,12 +891,22 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
 
                   {msg.image_url && (
                     <div className="mt-2">
-                      <img
-                        src={msg.image_url}
-                        alt="Yap media"
-                        className="w-full max-h-96 rounded-lg object-contain border border-[#a855f7]/20"
-                        loading="lazy"
-                      />
+                      {msg.media_type === "video" ? (
+                        <video
+                          src={msg.image_url}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          className="w-full max-h-96 rounded-lg object-contain border border-[#a855f7]/20"
+                        />
+                      ) : (
+                        <img
+                          src={msg.image_url}
+                          alt="Yap media"
+                          className="w-full max-h-96 rounded-lg object-contain border border-[#a855f7]/20"
+                          loading="lazy"
+                        />
+                      )}
                     </div>
                   )}
 

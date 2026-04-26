@@ -1,36 +1,12 @@
 import { z } from 'zod';
 
-export const loginSchema = z.object({
-  email: z
+export const phoneSchema = z.object({
+  phone: z
     .string()
     .trim()
-    .min(1, 'Email is required')
-    .email('Invalid email address')
-    .max(255, 'Email must be less than 255 characters'),
-  password: z
-    .string()
-    .min(6, 'Password must be at least 6 characters')
-    .max(100, 'Password must be less than 100 characters'),
+    .min(10, 'Phone number must include country code (e.g. +1234567890)')
+    .max(20, 'Phone number is too long')
+    .regex(/^\+\d{9,19}$/, 'Invalid phone number format. Include country code (e.g. +1234567890)'),
 });
 
-export const signupSchema = loginSchema.extend({
-  displayName: z
-    .string()
-    .trim()
-    .min(1, 'Display name is required')
-    .max(50, 'Display name must be less than 50 characters'),
-  username: z
-    .string()
-    .trim()
-    .min(3, 'Username must be at least 3 characters')
-    .max(30, 'Username must be less than 30 characters')
-    .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'),
-  agreedToTerms: z
-    .boolean()
-    .refine((val) => val === true, {
-      message: 'You must agree to the Terms of Service and Privacy Policy',
-    }),
-});
-
-export type LoginInput = z.infer<typeof loginSchema>;
-export type SignupInput = z.infer<typeof signupSchema>;
+export type PhoneInput = z.infer<typeof phoneSchema>;

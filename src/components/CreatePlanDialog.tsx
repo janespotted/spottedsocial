@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapPin, Search, Plus, X, ChevronDown, Calendar, Clock, Users, Lock, ArrowLeft } from 'lucide-react';
+import { MapPin, Search, Plus, X, ChevronDown, Calendar, Clock, Users, Lock, ArrowLeft, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,7 +8,9 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { useUserCity } from '@/hooks/useUserCity';
+import { useFriendIds } from '@/hooks/useFriendIds';
 import { useDemoMode } from '@/hooks/useDemoMode';
 
 import { toast } from 'sonner';
@@ -52,6 +54,8 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { city } = useUserCity();
   const demoEnabled = useDemoMode();
+  const queryClient = useQueryClient();
+  const { data: friendIdData } = useFriendIds(userId);
   
   const venueInputRef = useRef<HTMLInputElement>(null);
   const venueListRef = useRef<HTMLDivElement>(null);
@@ -96,40 +100,31 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
   };
 
   const fetchFriends = async () => {
-    const { data: friends1 } = await supabase
-      .from('friendships')
-      .select('friend_id')
-      .eq('user_id', userId)
-      .eq('status', 'accepted');
-
-    const { data: friends2 } = await supabase
-      .from('friendships')
-      .select('user_id')
-      .eq('friend_id', userId)
-      .eq('status', 'accepted');
-
-    const friendIds = [
-      ...(friends1?.map(f => f.friend_id) || []),
-      ...(friends2?.map(f => f.user_id) || [])
-    ];
+    const friendIds = friendIdData || [];
 
     if (friendIds.length === 0) {
       setFriends([]);
       return;
     }
 
-    let query = supabase
-      .from('profiles')
-      .select('id, display_name, avatar_url, username')
-      .in('id', friendIds)
-      .order('display_name');
+    // Use cached profiles from get_profiles_safe (bypasses RLS)
+    const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+    let friendProfiles = allProfiles
+      .filter((p: any) => friendIds.includes(p.id))
+      .map((p: any) => ({
+        id: p.id,
+        display_name: p.display_name,
+        avatar_url: p.avatar_url,
+        username: p.username,
+      }))
+      .sort((a: Friend, b: Friend) => a.display_name.localeCompare(b.display_name));
 
     if (!demoEnabled) {
-      query = query.eq('is_demo', false);
+      const demoIds = new Set(allProfiles.filter((p: any) => p.is_demo).map((p: any) => p.id));
+      friendProfiles = friendProfiles.filter(f => !demoIds.has(f.id));
     }
 
-    const { data: profiles } = await query;
-    setFriends(profiles || []);
+    setFriends(friendProfiles);
   };
 
   const filteredVenues = venues.filter(v =>
@@ -229,9 +224,9 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[500] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] animate-fade-in">
+    <div className="fixed inset-0 z-[500] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] animate-fade-in overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-4 pb-2">
+      <div className="flex items-center gap-3 px-4 pb-2 pt-[max(env(safe-area-inset-top),16px)]">
         <button
           onClick={() => {
             resetForm();
@@ -298,22 +293,8 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
 
         {/* Show more options and button only when venue is selected */}
         {selectedVenue && (
-          <>
-            {/* More Options - Collapsed by Default */}
-            <Collapsible open={showMoreOptions} onOpenChange={setShowMoreOptions} className="mt-3">
-              <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full py-2">
-                <ChevronDown className={`w-4 h-4 transition-transform ${showMoreOptions ? 'rotate-180' : ''}`} />
-                More Options
-                {(selectedFriends.length > 0 || description) && (
-                  <span className="text-xs text-primary ml-auto">
-                    {selectedFriends.length > 0 && `${selectedFriends.length} friends`}
-                    {selectedFriends.length > 0 && description && ' • '}
-                    {description && 'note added'}
-                  </span>
-                )}
-              </CollapsibleTrigger>
-              
-              <CollapsibleContent className="space-y-4 pt-3">
+          <div className="flex-1 overflow-y-auto mt-3 -mx-4 px-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="space-y-4">
                 {/* Date & Time - Inline */}
                 <div className="flex gap-2">
                   <div className="flex-1">
@@ -347,71 +328,76 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
 
                 {/* Friends */}
                 <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {selectedFriends.map(friend => (
-                      <div 
-                        key={friend.id} 
-                        className="relative group"
-                        onClick={() => toggleFriend(friend)}
-                      >
-                        <Avatar className="h-8 w-8 border-2 border-primary cursor-pointer">
-                          <AvatarImage src={friend.avatar_url || undefined} />
-                          <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                            {friend.display_name.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute -top-1 -right-1 bg-destructive rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                          <X className="w-2.5 h-2.5 text-white" />
-                        </div>
-                      </div>
-                    ))}
-                    
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowFriendPicker(!showFriendPicker)}
-                      className="text-muted-foreground hover:text-foreground gap-1 h-8 px-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      {selectedFriends.length === 0 ? 'Add Friends' : ''}
-                    </Button>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                    <Users className="w-3 h-3" />
+                    Going with
                   </div>
 
-                  {showFriendPicker && (
-                    <div className="mt-2 space-y-2">
-                      <Input
-                        placeholder="Search friends..."
-                        value={friendSearch}
-                        onChange={(e) => setFriendSearch(e.target.value)}
-                        className="bg-background/30 border-border/30 h-9 text-sm"
-                      />
-                      <ScrollArea className="h-[120px]">
-                        {filteredFriends.length === 0 ? (
-                          <p className="text-center text-muted-foreground py-4 text-sm">No friends found</p>
-                        ) : (
-                          filteredFriends.map(friend => {
-                            const isSelected = selectedFriends.some(f => f.id === friend.id);
-                            return (
-                              <div
-                                key={friend.id}
-                                className="flex items-center gap-2 py-1.5 hover:bg-primary/10 rounded-lg cursor-pointer px-1"
-                                onClick={() => toggleFriend(friend)}
-                              >
-                                <Checkbox checked={isSelected} className="border-primary h-4 w-4" />
-                                <Avatar className="h-6 w-6">
-                                  <AvatarImage src={friend.avatar_url || undefined} />
-                                  <AvatarFallback className="bg-primary/20 text-primary text-[10px]">
-                                    {friend.display_name.charAt(0)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-sm text-foreground truncate">{friend.display_name}</span>
-                              </div>
-                            );
-                          })
-                        )}
-                      </ScrollArea>
+                  {/* Selected friends chips */}
+                  {selectedFriends.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      {selectedFriends.map(friend => (
+                        <div
+                          key={friend.id}
+                          className="flex items-center gap-1.5 bg-primary/20 border border-primary/30 rounded-full pl-1 pr-2 py-0.5 cursor-pointer hover:bg-primary/30 transition-colors"
+                          onClick={() => toggleFriend(friend)}
+                        >
+                          <Avatar className="h-5 w-5">
+                            <AvatarImage src={friend.avatar_url || undefined} />
+                            <AvatarFallback className="bg-primary/30 text-primary text-[9px]">
+                              {friend.display_name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs text-foreground">{friend.display_name.split(' ')[0]}</span>
+                          <X className="w-3 h-3 text-muted-foreground" />
+                        </div>
+                      ))}
                     </div>
+                  )}
+
+                  {/* Search input */}
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Search friends to add..."
+                      value={friendSearch}
+                      onChange={(e) => setFriendSearch(e.target.value)}
+                      onFocus={() => setShowFriendPicker(true)}
+                      className="bg-background/30 border-border/30 h-9 text-sm pl-8"
+                    />
+                  </div>
+
+                  {/* Friends list - always visible when focused or has search */}
+                  {(showFriendPicker || friendSearch) && (
+                    <ScrollArea className="h-[140px] mt-2 rounded-lg border border-border/20 bg-background/20">
+                      {filteredFriends.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-4 text-sm">No friends found</p>
+                      ) : (
+                        filteredFriends.map(friend => {
+                          const isSelected = selectedFriends.some(f => f.id === friend.id);
+                          return (
+                            <div
+                              key={friend.id}
+                              className={`flex items-center gap-2.5 py-2 px-2.5 cursor-pointer transition-colors ${isSelected ? 'bg-primary/15' : 'hover:bg-primary/10'}`}
+                              onClick={() => toggleFriend(friend)}
+                            >
+                              <Checkbox checked={isSelected} className="border-primary h-4 w-4" />
+                              <Avatar className="h-7 w-7 border border-primary/30">
+                                <AvatarImage src={friend.avatar_url || undefined} />
+                                <AvatarFallback className="bg-primary/20 text-primary text-[10px]">
+                                  {friend.display_name.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm text-foreground truncate block">{friend.display_name}</span>
+                                <span className="text-xs text-muted-foreground truncate block">@{friend.username}</span>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
+                            </div>
+                          );
+                        })
+                      )}
+                    </ScrollArea>
                   )}
                 </div>
 
@@ -447,18 +433,19 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                     Close Friends
                   </Button>
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+            </div>
 
-            {/* Post Button - Always Visible when venue selected */}
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="w-full mt-4 bg-primary hover:bg-primary/90 h-12 text-base font-semibold"
-            >
-              {isSubmitting ? 'Posting...' : 'Post Plan'}
-            </Button>
-          </>
+            {/* Post Button */}
+            <div className="sticky bottom-0 pt-4 pb-[max(env(safe-area-inset-bottom),16px)] bg-gradient-to-t from-[#0a0118] via-[#0a0118] to-transparent">
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="w-full bg-[#d4ff00] hover:bg-[#d4ff00]/90 text-[#0a0118] h-12 text-base font-bold rounded-xl"
+              >
+                {isSubmitting ? 'Posting...' : 'Share Plan'}
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }, 0);
           
           const path = window.location.pathname;
-          if (path === '/auth' || path.startsWith('/~oauth') || path === '/') {
+          if (path === '/auth' || path === '/') {
             if (isNativePlatform()) {
               window.history.replaceState(null, '', '/');
               window.dispatchEvent(new PopStateEvent('popstate'));

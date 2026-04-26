@@ -35,7 +35,6 @@ import { useAuth } from "./contexts/AuthContext";
 import { autoTrackVenue } from "./lib/auto-venue-tracker";
 import { logger } from "./lib/logger";
 import Auth from "./pages/Auth";
-import ResetPassword from "./pages/ResetPassword";
 import InviteLanding from "./pages/InviteLanding";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -268,7 +267,6 @@ function AppContent() {
       <Routes>
         {/* Public routes */}
         <Route path="/auth" element={<Auth />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/invite/:code" element={<InviteLanding />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />

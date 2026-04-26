@@ -214,7 +214,16 @@ export default function Feed() {
             >
               {post.image_url && (
                 <div className="w-full relative overflow-hidden group image-vignette">
-                  <img
+                  {post.media_type === 'video' ? (
+                    <video
+                      src={post.image_url}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="w-full h-80 object-cover"
+                    />
+                  ) : (
+                    <img
                       src={post.image_url}
                       alt="Post"
                       loading="lazy"
@@ -223,6 +232,7 @@ export default function Feed() {
                         e.currentTarget.style.display = 'none';
                       }}
                     />
+                  )}
                 </div>
               )}
 

@@ -38,10 +38,12 @@ export const useAutoVenueTracking = () => {
     let cancelled = false;
 
     const heartbeat = async () => {
+      if (cancelled) return;
       try {
         const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
           navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
         );
+        if (cancelled) return;
         const now = new Date().toISOString();
         await Promise.all([
           supabase.from('profiles').update({

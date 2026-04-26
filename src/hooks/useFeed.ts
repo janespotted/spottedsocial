@@ -24,6 +24,7 @@ export interface Post {
   created_at: string;
   comments_count: number;
   likes_count: number;
+  visibility?: string;
   profiles: {
     display_name: string;
     username: string;
@@ -163,9 +164,10 @@ export function useFeed(options: UseFeedOptions) {
       const uniqueFriendIds = [...new Set(friendIds)];
       const userIds = [userId, ...uniqueFriendIds];
 
+      // Join with venues to get city for filtering — only show posts from current city
       let query = supabase
         .from('posts')
-        .select('*')
+        .select('*, venues!left(city)')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(POSTS_PER_PAGE);
@@ -182,7 +184,15 @@ export function useFeed(options: UseFeedOptions) {
 
       const postsResult = await query;
 
-      const postUserIds = [...new Set((postsResult.data || []).map((p: any) => p.user_id))];
+      // Filter out posts from other cities (keep posts without a venue, e.g. own posts)
+      const cityFilteredPosts = (postsResult.data || []).filter((post: any) => {
+        const venueCity = post.venues?.city;
+        // If the post has a venue with a known city, only show if it matches current city
+        if (venueCity && city && venueCity !== city) return false;
+        return true;
+      });
+
+      const postUserIds = [...new Set(cityFilteredPosts.map((p: any) => p.user_id))];
 
       // Fetch profiles - try RPC first, fall back to direct query
       let profileMap = new Map<string, any>();
@@ -202,7 +212,7 @@ export function useFeed(options: UseFeedOptions) {
         }
       }
 
-      const fetchedPosts = (postsResult.data || []).map((post: any) => {
+      const fetchedPosts = cityFilteredPosts.map((post: any) => {
         const profile = profileMap.get(post.user_id);
         return {
           ...post,

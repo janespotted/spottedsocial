@@ -437,15 +437,24 @@ export default function Map() {
           // Get friends' profiles with location data via safe RPC function
           // This function properly masks location data based on can_see_location permissions
           let { data: allProfiles, error: profilesError } = await supabase.rpc('get_profiles_safe');
-          
-          // Retry once on 403 (auth session may not be ready on cold load)
-          if (profilesError && String(profilesError.code) === '403') {
+
+          // Retry once on any error (auth session may not be ready on cold load)
+          if (profilesError) {
+            console.warn('Map profiles RPC failed, retrying:', profilesError.message);
             await new Promise(r => setTimeout(r, 1000));
             const retry = await supabase.rpc('get_profiles_safe');
             allProfiles = retry.data;
-            if (retry.error) {
-              console.error('Map profiles retry failed:', retry.error.message);
-            }
+            profilesError = retry.error;
+          }
+
+          // If RPC still fails, fall back to direct profiles query for friends
+          if (profilesError && friendIds.length > 0) {
+            console.warn('Map profiles RPC retry failed, falling back to direct query:', profilesError.message);
+            const { data: directProfiles } = await supabase
+              .from('profiles')
+              .select('id, display_name, username, avatar_url, is_out, last_known_lat, last_known_lng, last_location_at, is_demo')
+              .in('id', friendIds);
+            allProfiles = directProfiles;
           }
           
           // Filter to only friends who are out with valid location data
@@ -522,21 +531,28 @@ export default function Map() {
 
           const closeFriendIds = new Set(closeFriends?.map(cf => cf.close_friend_id) || []);
 
-          // Batch query: Get all friendships for all friends in one query
-          const { data: allFriendships } = await supabase
-            .from('friendships')
-            .select('user_id, friend_id')
-            .eq('status', 'accepted')
-            .in('user_id', friendIds);
+          // Batch query: Get all friendships for all friends in both directions
+          const [fwdResult, revResult] = await Promise.all([
+            supabase
+              .from('friendships')
+              .select('user_id, friend_id')
+              .eq('status', 'accepted')
+              .in('user_id', friendIds),
+            supabase
+              .from('friendships')
+              .select('user_id, friend_id')
+              .eq('status', 'accepted')
+              .in('friend_id', friendIds),
+          ]);
 
-          // Build a map of each friend's connections
+          // Build a map of each friend's connections (merge both directions)
           const friendConnections: Record<string, Set<string>> = {};
-          allFriendships?.forEach(f => {
-            if (!friendConnections[f.user_id]) {
-              friendConnections[f.user_id] = new Set();
-            }
-            friendConnections[f.user_id].add(f.friend_id);
-          });
+          const addConnection = (owner: string, conn: string) => {
+            if (!friendConnections[owner]) friendConnections[owner] = new Set();
+            friendConnections[owner].add(conn);
+          };
+          fwdResult.data?.forEach(f => addConnection(f.user_id, f.friend_id));
+          revResult.data?.forEach(f => addConnection(f.friend_id, f.user_id));
 
           // Determine relationship type for each friend in-memory (no N+1)
           const relationshipTypes: Record<string, 'close' | 'direct' | 'mutual'> = {};
@@ -560,11 +576,18 @@ export default function Map() {
             const isPrivateParty = ppData?.is_private_party === true;
             
             // For private party friends, jitter coordinates for privacy (~1km precision)
+            // Use deterministic hash so the pin doesn't drift on every re-render
             let lat = friend.last_known_lat;
             let lng = friend.last_known_lng;
             if (isPrivateParty && ppData?.lat && ppData?.lng) {
-              lat = Math.round(ppData.lat * 100) / 100 + (Math.random() - 0.5) * 0.002;
-              lng = Math.round(ppData.lng * 100) / 100 + (Math.random() - 0.5) * 0.002;
+              let hash = 0;
+              for (let i = 0; i < friend.id.length; i++) {
+                hash = ((hash << 5) - hash + friend.id.charCodeAt(i)) | 0;
+              }
+              const jitterLat = ((hash & 0xffff) / 0xffff - 0.5) * 0.002;
+              const jitterLng = (((hash >> 16) & 0xffff) / 0xffff - 0.5) * 0.002;
+              lat = Math.round(ppData.lat * 100) / 100 + jitterLat;
+              lng = Math.round(ppData.lng * 100) / 100 + jitterLng;
             }
             
             const venueName = isPrivateParty
@@ -710,6 +733,31 @@ export default function Map() {
       }
       // Clear the state so it doesn't re-trigger
       navigate(location.pathname, { replace: true, state: {} });
+    } else {
+      // Fly to user's current location on initial load
+      const flyToUserLocation = () => {
+        if ('geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const { latitude, longitude } = position.coords;
+              setUserLocation({ lat: latitude, lng: longitude });
+              map.current?.flyTo({
+                center: [longitude, latitude],
+                zoom: 14,
+                duration: 1500,
+                essential: true,
+              });
+            },
+            () => {}, // Silently fall back to city center
+            { timeout: 5000, enableHighAccuracy: true }
+          );
+        }
+      };
+      if (map.current.loaded()) {
+        flyToUserLocation();
+      } else {
+        map.current.once('load', flyToUserLocation);
+      }
     }
 
     const handleCenterMapOnVenue = (e: Event) => {

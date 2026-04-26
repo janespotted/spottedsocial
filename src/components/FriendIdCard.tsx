@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, ChevronRight, CalendarPlus, Share2 } from 'lucide-react';
+import { X, ChevronRight, CalendarPlus, Share2, Megaphone } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MessageCircle, MoreVertical, Flag, Ban, X as CloseIcon } from 'lucide-react';
@@ -69,6 +70,7 @@ export function FriendIdCard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const demoEnabled = useDemoMode();
+  const queryClient = useQueryClient();
   const [friendsAtVenue, setFriendsAtVenue] = useState<FriendsAtVenue[]>([]);
   const [distance, setDistance] = useState<number | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -78,6 +80,7 @@ export function FriendIdCard() {
   const [isDemoUser, setIsDemoUser] = useState(false);
   const [venueCoords, setVenueCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showCreatePlanDialog, setShowCreatePlanDialog] = useState(false);
+  const [rallySent, setRallySent] = useState(false);
   const [preselectedFriendForPlan, setPreselectedFriendForPlan] = useState<{
     id: string;
     display_name: string;
@@ -113,6 +116,7 @@ export function FriendIdCard() {
       setIsDemoUser(false);
       setVenueCoords(null);
       setShowCreatePlanDialog(false);
+      setRallySent(false);
     }
   }, [selectedFriend, demoEnabled]);
 
@@ -558,18 +562,61 @@ export function FriendIdCard() {
 
   const handleMakePlans = () => {
     if (!selectedFriend) return;
-    
-    // Store friend data before closing the card
-    setPreselectedFriendForPlan({
+
+    const friendData = {
       id: selectedFriend.userId,
       display_name: selectedFriend.displayName,
       avatar_url: selectedFriend.avatarUrl,
-    });
-    
-    // Close the friend card first, then open dialog
+    };
+
     closeFriendCard();
-    setShowCreatePlanDialog(true);
+    // Navigate to plans section with friend preselected
+    // Use timeout to avoid the useEffect race that clears the dialog
+    setTimeout(() => {
+      navigate('/', { state: { feedMode: 'plans', preselectedFriend: friendData } });
+    }, 100);
   };
+
+  const handleRally = async () => {
+    if (!user || !selectedFriend || rallySent) return;
+    try {
+      const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+      const myProfile = allProfiles.find((p: any) => p.id === user.id);
+      const senderName = myProfile?.display_name || 'Someone';
+      const message = `${senderName} wants you to rally. Come out tonight! 👋`;
+
+      const { data: notifData, error } = await supabase.rpc('create_notification', {
+        p_receiver_id: selectedFriend.userId,
+        p_type: 'rally',
+        p_message: message,
+      });
+      if (error) throw error;
+
+      const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+      if (notif) {
+        triggerPushNotification({
+          id: notif.id,
+          receiver_id: selectedFriend.userId,
+          sender_id: user.id,
+          type: 'rally',
+          message,
+        });
+      }
+
+      setRallySent(true);
+      haptic.success();
+      toast.success('Rally sent! 📣');
+    } catch (err) {
+      console.error('Rally failed:', err);
+      toast.error('Could not send rally');
+    }
+  };
+
+  // Check if it's Wed-Sun (rally nights)
+  const isRallyNight = (() => {
+    const day = new Date().getDay();
+    return day >= 3 || day === 0; // Wed=3, Thu=4, Fri=5, Sat=6, Sun=0
+  })();
 
   const handlePlanCreated = () => {
     setShowCreatePlanDialog(false);
@@ -886,13 +933,31 @@ export function FriendIdCard() {
                         Meet Up
                       </button>
                     ) : (
-                      <button
-                        onClick={handleMakePlans}
-                        className="flex-1 py-2 px-5 rounded-full border-2 border-[#a855f7] text-[#a855f7] text-sm font-semibold hover:bg-[#a855f7]/10 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <CalendarPlus className="h-4 w-4" />
-                        Make Plans
-                      </button>
+                      <>
+                        <button
+                          onClick={handleMakePlans}
+                          className="flex-1 py-2 px-5 rounded-full border-2 border-[#a855f7] text-[#a855f7] text-sm font-semibold hover:bg-[#a855f7]/10 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <CalendarPlus className="h-4 w-4" />
+                          Make Plans
+                        </button>
+                        {isRallyNight && (
+                          rallySent ? (
+                            <span className="py-2 px-4 rounded-full border-2 border-[#d4ff00]/30 text-[#d4ff00]/60 text-sm font-semibold flex items-center justify-center gap-1.5">
+                              <Megaphone className="h-4 w-4" />
+                              Rallied
+                            </span>
+                          ) : (
+                            <button
+                              onClick={handleRally}
+                              className="py-2 px-4 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors flex items-center justify-center gap-1.5"
+                            >
+                              <Megaphone className="h-4 w-4" />
+                              Rally
+                            </button>
+                          )
+                        )}
+                      </>
                     )}
                     <button
                       onClick={handleOpenDM}

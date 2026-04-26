@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { findClosestCity } from '@/lib/city-detection';
 
 export interface LocationData {
   lat: number;
@@ -405,8 +406,8 @@ const searchMapboxNearbyPOIs = async (
         || feature.properties?.context?.locality?.name
         || 'Unknown';
 
-      // Detect city from coordinates
-      const city = fLat > 38 ? 'nyc' : fLat > 30 ? 'la' : 'pb';
+      // Detect city from coordinates using proper distance calculation
+      const city = findClosestCity({ lat: fLat, lng: fLng });
 
       // Detect venue type from Mapbox category
       const poiCategory = feature.properties?.poi_category || [];

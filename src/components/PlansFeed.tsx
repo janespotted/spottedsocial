@@ -66,18 +66,27 @@ interface Plan {
    | { type: 'plan'; data: Plan }
    | { type: 'event'; data: EventWithFriends };
  
+interface PreselectedFriend {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 interface PlansFeedProps {
   userId: string;
   weekendFilter?: boolean;
   onClearWeekendFilter?: () => void;
+  preselectedFriend?: PreselectedFriend | null;
+  onPreselectedFriendConsumed?: () => void;
 }
 
-export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter }: PlansFeedProps) {
+export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter, preselectedFriend, onPreselectedFriendConsumed }: PlansFeedProps) {
   const [plans, setPlans] = useState<Plan[]>([]);
    const [events, setEvents] = useState<EventWithFriends[]>([]);
   const [userVotes, setUserVotes] = useState<Record<string, 'up' | 'down'>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [dialogPreselectedFriend, setDialogPreselectedFriend] = useState<PreselectedFriend | null>(null);
   const [showCreateEventDialog, setShowCreateEventDialog] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
@@ -89,6 +98,15 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
   const demoEnabled = useDemoMode();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Auto-open create plan dialog when preselectedFriend is provided
+  useEffect(() => {
+    if (preselectedFriend) {
+      setDialogPreselectedFriend(preselectedFriend);
+      setShowCreateDialog(true);
+      onPreselectedFriendConsumed?.();
+    }
+  }, [preselectedFriend]);
   const { openCheckIn } = useCheckIn();
   const { city } = useUserCity();
 
@@ -488,27 +506,39 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
   }, [userId, demoEnabled]);
 
   // Realtime subscription for plans, plan_downs, and night_statuses
+  // Debounced to avoid excessive refetches from global table changes
   useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    const debouncedFetchPlans = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchPlans(), 2000);
+    };
+    const debouncedFetchPlanning = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchPlanningFriends(), 2000);
+    };
+
     const channel = supabase
       .channel('plans-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'plans' },
-        () => fetchPlans()
+        debouncedFetchPlans
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'plan_downs' },
-        () => fetchPlans()
+        debouncedFetchPlans
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'night_statuses' },
-        () => fetchPlanningFriends()
+        debouncedFetchPlanning
       )
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [userId, demoEnabled]);
@@ -760,9 +790,13 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter 
 
       <CreatePlanDialog
         open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
+        onOpenChange={(open) => {
+          setShowCreateDialog(open);
+          if (!open) setDialogPreselectedFriend(null);
+        }}
         userId={userId}
         onPlanCreated={handlePlanCreated}
+        preselectedFriend={dialogPreselectedFriend}
       />
 
       {editingPlan && (

@@ -159,6 +159,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       clearInterval(locationIntervalRef.current);
     }
 
+    // Capture user ID at call time to avoid stale closure
+    const userId = user?.id;
+    if (!userId) return;
+
     // Update location every 60 seconds (reduced from 15s to lower DB load)
     locationIntervalRef.current = window.setInterval(() => {
       if ('geolocation' in navigator) {
@@ -166,15 +170,19 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           async (position) => {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
-            
-            await supabase
+
+            const { error } = await supabase
               .from('profiles')
-              .update({ 
+              .update({
                 last_known_lat: lat,
                 last_known_lng: lng,
                 last_location_at: new Date().toISOString()
               })
-              .eq('id', user?.id);
+              .eq('id', userId);
+
+            if (error) {
+              console.error('Location update failed:', error);
+            }
           },
           (error) => {
             console.error('Location update error:', error);
@@ -619,9 +627,9 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       localStorage.removeItem('checkin_reminder');
       // Save all location data to profile
       try {
-        await supabase
+        const { error: profileUpdateError } = await supabase
           .from('profiles')
-          .update({ 
+          .update({
             is_out: true,
             location_sharing_level: shareOption,
             last_known_lat: locationData.lat,
@@ -629,6 +637,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             last_location_at: locationData.timestamp
           })
           .eq('id', user?.id);
+
+        if (profileUpdateError) {
+          console.error('Failed to update profile location:', profileUpdateError);
+        }
 
         // Start tracking location updates
         startLocationTracking(locationData.lat, locationData.lng);
@@ -789,10 +801,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             .eq('id', user?.id);
 
           // Notify friends about planning status (best-effort, non-blocking)
+          // Capture userId at call time to avoid stale closure if modal unmounts
+          const planningUserId = user!.id;
           (async () => {
             try {
               console.log('[PLANNING NOTIF] ===== NOTIFICATION FLOW STARTED =====');
-              console.log('[PLANNING NOTIF] user.id:', user?.id, 'timestamp:', new Date().toISOString());
+              console.log('[PLANNING NOTIF] user.id:', planningUserId, 'timestamp:', new Date().toISOString());
 
               // Dedup: skip if we sent a planning notification in the last 30 minutes
               const dedupCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
@@ -800,7 +814,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               const { data: existingNotifs } = await supabase
                 .from('notifications')
                 .select('id, created_at')
-                .eq('sender_id', user!.id)
+                .eq('sender_id', planningUserId)
                 .eq('type', 'friend_planning')
                 .gte('created_at', dedupCutoff)
                 .limit(1);
@@ -823,7 +837,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                 const { data: closeFriends } = await supabase
                   .from('close_friends')
                   .select('close_friend_id')
-                  .eq('user_id', user!.id);
+                  .eq('user_id', planningUserId);
 
                 recipientIds = closeFriends?.map(cf => cf.close_friend_id) || [];
               } else if (effectiveVisibility === 'all_friends') {
@@ -831,12 +845,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                 const { data: friendships } = await supabase
                   .from('friendships')
                   .select('user_id, friend_id')
-                  .or(`user_id.eq.${user!.id},friend_id.eq.${user!.id}`)
+                  .or(`user_id.eq.${planningUserId},friend_id.eq.${planningUserId}`)
                   .eq('status', 'accepted');
 
                 if (friendships?.length) {
                   recipientIds = friendships.map(f =>
-                    f.user_id === user!.id ? f.friend_id : f.user_id
+                    f.user_id === planningUserId ? f.friend_id : f.user_id
                   );
                 }
               } else {
@@ -844,14 +858,14 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                 const { data: friendships } = await supabase
                   .from('friendships')
                   .select('user_id, friend_id')
-                  .or(`user_id.eq.${user!.id},friend_id.eq.${user!.id}`)
+                  .or(`user_id.eq.${planningUserId},friend_id.eq.${planningUserId}`)
                   .eq('status', 'accepted');
 
                 if (friendships?.length) {
                   const sentTo = new Set<string>();
                   const receivedFrom = new Set<string>();
                   for (const f of friendships) {
-                    if (f.user_id === user!.id) sentTo.add(f.friend_id);
+                    if (f.user_id === planningUserId) sentTo.add(f.friend_id);
                     else receivedFrom.add(f.user_id);
                   }
                   recipientIds = [...sentTo].filter(id => receivedFrom.has(id));
@@ -868,7 +882,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               const { data: profile } = await supabase
                 .from('profiles')
                 .select('display_name')
-                .eq('id', user!.id)
+                .eq('id', planningUserId)
                 .single();
 
               const firstName = profile?.display_name?.split(' ')[0] || 'A friend';
@@ -893,7 +907,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                   await triggerPushNotification({
                     id: notif.id,
                     receiver_id: friendId,
-                    sender_id: user!.id,
+                    sender_id: planningUserId,
                     type: 'friend_planning',
                     message,
                   });

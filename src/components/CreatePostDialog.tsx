@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PostMediaPicker } from '@/components/PostMediaPicker';
+import { PostMediaPicker, type MediaType } from '@/components/PostMediaPicker';
 import { PostCaptionScreen } from '@/components/PostCaptionScreen';
 
 interface CreatePostDialogProps {
@@ -11,32 +11,36 @@ type FlowStep = 'media' | 'caption';
 
 export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) {
   const [step, setStep] = useState<FlowStep>('media');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<MediaType>('image');
 
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
       setTimeout(() => {
         setStep('media');
-        setImageFile(null);
-        setImagePreview(null);
+        setMediaFile(null);
+        setMediaPreview(null);
+        setMediaType('image');
       }, 300);
     }
   }, [open]);
 
   if (!open) return null;
 
-  const handleMediaSelect = (file: File, preview: string) => {
-    setImageFile(file);
-    setImagePreview(preview);
+  const handleMediaSelect = (file: File, preview: string, type: MediaType) => {
+    setMediaFile(file);
+    setMediaPreview(preview);
+    setMediaType(type);
     setStep('caption');
   };
 
   const handleBack = () => {
     setStep('media');
-    setImageFile(null);
-    setImagePreview(null);
+    setMediaFile(null);
+    setMediaPreview(null);
+    setMediaType('image');
   };
 
   const handleSuccess = () => {
@@ -58,11 +62,12 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   }
 
   // Step 2: Caption Screen
-  if (step === 'caption' && imageFile && imagePreview) {
+  if (step === 'caption' && mediaFile && mediaPreview) {
     return (
       <PostCaptionScreen
-        imageFile={imageFile}
-        imagePreview={imagePreview}
+        imageFile={mediaFile}
+        imagePreview={mediaPreview}
+        mediaType={mediaType}
         onBack={handleBack}
         onSuccess={handleSuccess}
       />

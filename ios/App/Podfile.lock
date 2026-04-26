@@ -22,6 +22,8 @@ PODS:
     - Capacitor
   - CapacitorShare (8.0.1):
     - Capacitor
+  - CapawesomeCapacitorFilePicker (6.2.0):
+    - Capacitor
 
 DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
@@ -36,6 +38,7 @@ DEPENDENCIES:
   - "CapacitorLocalNotifications (from `../../node_modules/@capacitor/local-notifications`)"
   - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
   - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
+  - "CapawesomeCapacitorFilePicker (from `../../node_modules/@capawesome/capacitor-file-picker`)"
 
 EXTERNAL SOURCES:
   Capacitor:
@@ -62,6 +65,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/push-notifications"
   CapacitorShare:
     :path: "../../node_modules/@capacitor/share"
+  CapawesomeCapacitorFilePicker:
+    :path: "../../node_modules/@capawesome/capacitor-file-picker"
 
 SPEC CHECKSUMS:
   Capacitor: c95400d761e376be9da6be5a05f226c0e865cebf
@@ -76,7 +81,8 @@ SPEC CHECKSUMS:
   CapacitorLocalNotifications: 801867e687c42dd2b33c1e22e08f48e6738d2f72
   CapacitorPushNotifications: 99644101c6a82036e459929b6d897ee1cb27d97f
   CapacitorShare: 0c58305114538568059bfc07111f22dcb9cb2a82
+  CapawesomeCapacitorFilePicker: c40822f0a39f86855321943c7829d52bca7f01bd
 
-PODFILE CHECKSUM: b797e02fa36f53d8e3e1547ca21ef2e350338f4c
+PODFILE CHECKSUM: cea1091f85b5892c09117833dab0ad460a342e20
 
 COCOAPODS: 1.16.2

@@ -110,7 +110,7 @@ function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
 /**
  * Find closest city based on GPS coordinates
  */
-function findClosestCity(coords: { lat: number; lng: number }): SupportedCity {
+export function findClosestCity(coords: { lat: number; lng: number }): SupportedCity {
   let closest: SupportedCity = 'nyc';
   let minDistance = Infinity;
 

@@ -23,7 +23,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Spotted needs camera access to set your profile photo.</string>
+	<string>Spotted needs camera access to take photos and videos for posts.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Spotted needs your location to show you nearby venues and friends.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -36,8 +36,12 @@
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Spotted uses your photo library to add photos to Yaps and your profile.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Spotted needs microphone access to record video with audio for posts.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Spotted needs permission to save photos and videos to your photo library.</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>

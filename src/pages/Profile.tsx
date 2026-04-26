@@ -43,6 +43,7 @@ interface RecentSpot {
 interface UserPost {
   id: string;
   image_url: string | null;
+  media_type: string | null;
   text: string;
   created_at: string | null;
   likes_count: number | null;
@@ -820,21 +821,29 @@ export default function Profile() {
               <div className="grid grid-cols-3 gap-3">
                 {userPosts.map((post) => (
                   <div key={post.id} className="space-y-2">
-                    <div 
+                    <div
                       className="aspect-square rounded-xl overflow-hidden bg-[#2d1b4e] border border-[#a855f7]/20 relative"
                       style={{
-                        backgroundImage: post.image_url ? `url(${post.image_url})` : undefined,
+                        backgroundImage: post.image_url && post.media_type !== 'video' ? `url(${post.image_url})` : undefined,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                       }}
                     >
-                      {!post.image_url && (
+                      {post.image_url && post.media_type === 'video' ? (
+                        <video
+                          src={post.image_url}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : !post.image_url ? (
                         <div className="w-full h-full flex items-center justify-center p-2">
                           <p className="text-white/60 text-xs text-center line-clamp-3">
                             {post.text}
                           </p>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex items-center justify-center gap-3 text-white/40 text-xs">
                       <span className="flex items-center gap-0.5"><Heart className="h-3.5 w-3.5 text-red-400" /> {post.likes_count || 0}</span>

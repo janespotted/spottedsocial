@@ -104,6 +104,7 @@ export default function Home() {
   const [feedMode, setFeedMode] = useState<'newsfeed' | 'plans'>(() => isNightlifeHours() ? 'newsfeed' : 'plans');
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [sharePost, setSharePost] = useState<Post | null>(null);
+  const [planPreselectedFriend, setPlanPreselectedFriend] = useState<{ id: string; display_name: string; avatar_url: string | null } | null>(null);
   const loadTriggerRef = useRef<HTMLDivElement>(null);
 
   // Handle navigation state (e.g., returning from DM to plans tab)
@@ -111,6 +112,9 @@ export default function Home() {
     const state = location.state as any;
     if (state?.feedMode) {
       setFeedMode(state.feedMode);
+      if (state?.preselectedFriend) {
+        setPlanPreselectedFriend(state.preselectedFriend);
+      }
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.key]);
@@ -178,10 +182,11 @@ export default function Home() {
 
       // Step 2: Get night_statuses + profiles via RPC (direct profiles table is
       // blocked by RLS for non-own profiles — must use get_profiles_safe)
+      // Join with venues to get city so we can filter to current user's city
       const [statusResult, profileResult] = await Promise.all([
         supabase
           .from('night_statuses')
-          .select('user_id, venue_name, status, planning_neighborhood, is_demo')
+          .select('user_id, venue_name, status, planning_neighborhood, is_demo, venue_id, venues(city)')
           .in('user_id', queryIds)
           .not('expires_at', 'is', null)
           .gt('expires_at', new Date().toISOString()),
@@ -203,6 +208,10 @@ export default function Home() {
 
           // Filter out demo users when demo mode is off
           if (!demoEnabled && (s.is_demo || profile?.is_demo)) continue;
+
+          // Filter to current city — skip friends at venues in other cities
+          const venueCity = (s.venues as any)?.city;
+          if (venueCity && venueCity !== city) continue;
 
           const displayName = profile?.display_name || 'Friend';
           const avatarUrl = profile?.avatar_url || null;
@@ -368,10 +377,12 @@ export default function Home() {
       {/* Feed Content */}
       {feedMode === 'plans' ? (
         <div className="py-4">
-          <PlansFeed 
-            userId={user?.id || ''} 
+          <PlansFeed
+            userId={user?.id || ''}
             weekendFilter={isWeekendRally}
             onClearWeekendFilter={clearRally}
+            preselectedFriend={planPreselectedFriend}
+            onPreselectedFriendConsumed={() => setPlanPreselectedFriend(null)}
           />
         </div>
       ) : (
@@ -585,7 +596,16 @@ export default function Home() {
 
               {post.image_url && (
                 <div className="w-full aspect-square relative overflow-hidden group image-vignette">
-                  <img
+                  {post.media_type === 'video' ? (
+                    <video
+                      src={post.image_url}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img
                       src={post.image_url}
                       alt="Post"
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -594,6 +614,7 @@ export default function Home() {
                         if (parent) parent.style.display = 'none';
                       }}
                     />
+                  )}
                 </div>
               )}
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
@@ -35,6 +35,28 @@ interface PrivatePartyInviteModalProps {
   onInvitesSent: () => void;
 }
 
+// Load Google Places script once
+let googleScriptLoaded = false;
+function loadGooglePlacesScript(): Promise<void> {
+  if (googleScriptLoaded || (window as any).google?.maps?.places) {
+    googleScriptLoaded = true;
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const key = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+    if (!key) {
+      reject(new Error('No Google Places API key'));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
+    script.async = true;
+    script.onload = () => { googleScriptLoaded = true; resolve(); };
+    script.onerror = () => reject(new Error('Failed to load Google Places'));
+    document.head.appendChild(script);
+  });
+}
+
 export function PrivatePartyInviteModal({
   open,
   onClose,
@@ -53,6 +75,9 @@ export function PrivatePartyInviteModal({
   const [sending, setSending] = useState(false);
   const [planningOpen, setPlanningOpen] = useState(true);
   const [outOpen, setOutOpen] = useState(true);
+  const [addressSelected, setAddressSelected] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<any>(null);
 
   useEffect(() => {
     if (open && user) {
@@ -61,6 +86,62 @@ export function PrivatePartyInviteModal({
       setSelectedFriends(new Set());
     }
   }, [open, user]);
+
+  // Initialize Google Places Autocomplete
+  useEffect(() => {
+    if (!open) return;
+
+    let mounted = true;
+
+    loadGooglePlacesScript().then(() => {
+      if (!mounted || !inputRef.current || autocompleteRef.current) return;
+
+      const autocomplete = new (window as any).google.maps.places.Autocomplete(
+        inputRef.current,
+        {
+          types: ['address'],
+          componentRestrictions: { country: 'us' },
+        }
+      );
+
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place?.formatted_address) {
+          onAddressChange(place.formatted_address);
+          setAddressSelected(true);
+        } else if (place?.name) {
+          onAddressChange(place.name);
+          setAddressSelected(true);
+        }
+      });
+
+      autocompleteRef.current = autocomplete;
+    }).catch((err) => {
+      console.error('Google Places load error:', err);
+    });
+
+    return () => {
+      mounted = false;
+      // Clean up autocomplete on close
+      if (autocompleteRef.current) {
+        (window as any).google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
+      }
+    };
+  }, [open]);
+
+  // Reset addressSelected when address changes manually
+  const handleAddressInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onAddressChange(e.target.value);
+    setAddressSelected(false);
+  };
+
+  // Reset addressSelected when modal opens with empty address
+  useEffect(() => {
+    if (open) {
+      setAddressSelected(!!address.trim());
+    }
+  }, [open]);
 
   const fetchFriends = async () => {
     if (!user) return;
@@ -195,7 +276,7 @@ export function PrivatePartyInviteModal({
       onClick={() => handleToggleFriend(friend.id)}
       className="w-full flex items-center gap-3 p-3 bg-[#2d1b4e]/30 rounded-xl hover:bg-[#2d1b4e]/50 transition-colors"
     >
-      <Checkbox 
+      <Checkbox
         checked={selectedFriends.has(friend.id)}
         onCheckedChange={() => handleToggleFriend(friend.id)}
         className="border-[#a855f7]"
@@ -226,6 +307,8 @@ export function PrivatePartyInviteModal({
     </button>
   );
 
+  const canSend = selectedFriends.size > 0 && address.trim().length > 0 && addressSelected;
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="w-[90%] max-w-[400px] max-h-[85vh] bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden">
@@ -242,13 +325,14 @@ export function PrivatePartyInviteModal({
             </div>
           </div>
 
-          {/* Address Input */}
+          {/* Address Input with Autocomplete */}
           <div>
             <label className="text-white/60 text-sm mb-1.5 block">Party Address</label>
             <Input
+              ref={inputRef}
               value={address}
-              onChange={(e) => onAddressChange(e.target.value)}
-              placeholder="Enter the address..."
+              onChange={handleAddressInput}
+              placeholder="Start typing an address..."
               className="h-12 bg-[#2d1b4e]/30 border-white/20 rounded-xl text-white placeholder:text-white/40"
             />
           </div>
@@ -326,7 +410,7 @@ export function PrivatePartyInviteModal({
           {/* Send Button */}
           <Button
             onClick={handleSendInvites}
-            disabled={selectedFriends.size === 0 || !address.trim() || sending}
+            disabled={!canSend || sending}
             className="w-full h-12 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl"
           >
             {sending ? 'Sending...' : `Share Address ${selectedFriends.size > 0 ? `(${selectedFriends.size})` : ''}`}

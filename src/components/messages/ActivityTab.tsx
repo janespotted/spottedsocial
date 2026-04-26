@@ -37,6 +37,7 @@ interface Activity {
   action?: 'meet_up' | 'view' | 'accept_decline' | 'message';
   isAtVenue?: boolean;
   notificationId?: string;
+  isAlreadyFriend?: boolean;
 }
 
 // Session-based frequency limiting for city pulse (max 2 per session)
@@ -239,6 +240,7 @@ export function ActivityTab() {
         const isPlanDown = invite.type === 'plan_down';
         const isFriendPlanning = invite.type === 'friend_planning';
         const isFriendRequest = invite.type === 'friend_request';
+        const isFriendRequestAlreadyAccepted = isFriendRequest && friendIds.includes(invite.sender_id);
 
         // Extract venue name from message like "X invited you to VenueName."
         const venueMatch = invite.message.match(/invited you to (.+?)\.?\s*(?:Want to go\?)?$/i);
@@ -270,6 +272,7 @@ export function ActivityTab() {
             : isRally ? invite.message
             : isPlanDown ? invite.message
             : isFriendPlanning ? 'is planning to go out tonight'
+            : isFriendRequestAlreadyAccepted ? 'added as a friend!'
             : isFriendRequest ? 'sent you a friend request'
             : 'Meet Up',
           timestamp: invite.created_at || new Date().toISOString(),
@@ -278,6 +281,7 @@ export function ActivityTab() {
           display_name: profile?.display_name,
           isAtVenue: isVenueInvite && userCurrentVenue ? venueName.toLowerCase() === userCurrentVenue : false,
           notificationId: invite.id,
+          isAlreadyFriend: isFriendRequestAlreadyAccepted,
         };
       });
       activityList.push(...realActivities);
@@ -442,7 +446,7 @@ export function ActivityTab() {
 
       const { data: checkIns } = await supabase
         .from('checkins')
-        .select('*')
+        .select('*, venues!left(city)')
         .in('user_id', friendIds)
         .gte('started_at', tonightCutoff.toISOString())
         .order('created_at', { ascending: false })
@@ -453,10 +457,17 @@ export function ActivityTab() {
         const demoFiltered = !demoEnabled
           ? checkIns.filter(checkIn => !checkIn.is_demo)
           : checkIns;
+
+        // Filter to current city only — don't show check-ins from other cities
+        const cityFiltered = demoFiltered.filter(checkIn => {
+          const venueCity = (checkIn.venues as any)?.city;
+          if (venueCity && venueCity !== city) return false;
+          return true;
+        });
         
         // Filter out stale check-ins (started > 6 hours ago)
         const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-        const filteredCheckIns = demoFiltered.filter(c => {
+        const filteredCheckIns = cityFiltered.filter(c => {
           const checkTime = c.started_at || c.created_at;
           if (!checkTime) return false;
           return Date.now() - new Date(checkTime).getTime() < SIX_HOURS_MS;
@@ -514,9 +525,12 @@ export function ActivityTab() {
         .limit(20);
 
       if (recentDms?.length) {
+        // Filter to tonight only (consistent with notification filtering)
+        const tonightDms = recentDms.filter(dm => isFromTonight(dm.created_at));
+
         // Deduplicate: one DM per sender (most recent)
         const seenSenders = new Map<string, typeof recentDms[0]>();
-        for (const dm of recentDms) {
+        for (const dm of tonightDms) {
           if (!seenSenders.has(dm.sender_id)) {
             seenSenders.set(dm.sender_id, dm);
           }
@@ -732,7 +746,11 @@ export function ActivityTab() {
         .maybeSingle();
 
       if (fetchError || !friendship) {
-        toast({ title: 'Could not find friend request', variant: 'destructive' });
+        // Already accepted — update the activity to show as friend
+        setActivities(prev => prev.map(a =>
+          a.id === activity.id ? { ...a, isAlreadyFriend: true, subtitle: 'added as a friend!' } : a
+        ));
+        toast({ title: 'You\'re already friends!' });
         return;
       }
 
@@ -773,8 +791,10 @@ export function ActivityTab() {
         await supabase.from('notifications').delete().eq('id', activity.notificationId);
       }
 
-      // Remove from activity list
-      setActivities(prev => prev.filter(a => a.id !== activity.id));
+      // Update activity in-place to show "added as a friend!" with Chat button
+      setActivities(prev => prev.map(a =>
+        a.id === activity.id ? { ...a, isAlreadyFriend: true, subtitle: 'added as a friend!' } : a
+      ));
 
       // Refresh friend lists
       queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
@@ -1153,7 +1173,9 @@ export function ActivityTab() {
                       <span className="font-semibold">{activity.display_name}</span>
                       <span className="text-white/40 text-xs">{getTimeAgo(activity.timestamp)}</span>
                     </div>
-                    <span className="text-white/70 block text-xs mt-0.5">sent you a friend request</span>
+                    <span className={`block text-xs mt-0.5 ${activity.isAlreadyFriend ? 'text-[#d4ff00]' : 'text-white/70'}`}>
+                      {activity.isAlreadyFriend ? 'added as a friend!' : 'sent you a friend request'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1277,14 +1299,25 @@ export function ActivityTab() {
                 )}
 
                 {activity.type === 'friend_request' && (
-                  <Button
-                    onClick={() => handleAcceptFriendRequest(activity)}
-                    size="sm"
-                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
-                  >
-                    <Check className="h-3.5 w-3.5 mr-1" />
-                    Accept
-                  </Button>
+                  activity.isAlreadyFriend ? (
+                    <Button
+                      onClick={() => handleOpenChat(activity)}
+                      size="sm"
+                      className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-3 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)]"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 mr-1" />
+                      Chat
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => handleAcceptFriendRequest(activity)}
+                      size="sm"
+                      className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                    >
+                      <Check className="h-3.5 w-3.5 mr-1" />
+                      Accept
+                    </Button>
+                  )
                 )}
 
               </div>

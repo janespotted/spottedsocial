@@ -1,15 +1,21 @@
-import { useRef } from 'react';
-import { X, Camera, Image } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { X, Camera, Image, Video } from 'lucide-react';
 import { toast } from 'sonner';
+import { isNativePlatform } from '@/lib/platform';
+import { pickVideoNative, validateWebVideo } from '@/lib/video-picker-service';
+
+export type MediaType = 'image' | 'video';
 
 interface PostMediaPickerProps {
   onClose: () => void;
-  onMediaSelect: (file: File, preview: string) => void;
+  onMediaSelect: (file: File, preview: string, mediaType: MediaType) => void;
 }
 
 export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps) {
   const photoCaptureRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -20,10 +26,44 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
     }
     const reader = new FileReader();
     reader.onloadend = () => {
-      onMediaSelect(file, reader.result as string);
+      onMediaSelect(file, reader.result as string, 'image');
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  const handleVideoSelect = async () => {
+    if (isNativePlatform()) {
+      setVideoLoading(true);
+      try {
+        const result = await pickVideoNative();
+        onMediaSelect(result.file, result.previewUrl, 'video');
+      } catch (err: any) {
+        if (!err.message?.includes('canceled') && !err.message?.includes('cancelled')) {
+          toast.error(err.message || 'Failed to select video');
+        }
+      } finally {
+        setVideoLoading(false);
+      }
+    } else {
+      videoInputRef.current?.click();
+    }
+  };
+
+  const handleWebVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setVideoLoading(true);
+    try {
+      const result = await validateWebVideo(file);
+      onMediaSelect(result.file, result.previewUrl, 'video');
+    } catch (err: any) {
+      toast.error(err.message || 'Invalid video file');
+    } finally {
+      setVideoLoading(false);
+    }
   };
 
   return (
@@ -43,6 +83,14 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
         type="file"
         accept="image/*"
         onChange={handleFileSelect}
+        className="hidden"
+      />
+      {/* Video from gallery (web fallback) */}
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        onChange={handleWebVideoSelect}
         className="hidden"
       />
 
@@ -72,14 +120,31 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
             <span className="text-white font-medium">Take Photo</span>
           </button>
 
-          {/* Gallery */}
-          <button
-            onClick={() => galleryRef.current?.click()}
-            className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-          >
-            <Image className="h-5 w-5 text-white" />
-            <span className="text-white/80">Choose from Gallery</span>
-          </button>
+          {/* Gallery and Video buttons side by side */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => galleryRef.current?.click()}
+              className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            >
+              <Image className="h-5 w-5 text-white" />
+              <span className="text-white/80">Photo</span>
+            </button>
+
+            <button
+              onClick={handleVideoSelect}
+              disabled={videoLoading}
+              className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <Video className="h-5 w-5 text-white" />
+              <span className="text-white/80">
+                {videoLoading ? 'Loading...' : 'Video'}
+              </span>
+            </button>
+          </div>
+
+          <p className="text-white/30 text-xs text-center">
+            Videos: max 30 seconds, 50MB
+          </p>
         </div>
       </div>
     </div>
