@@ -51,6 +51,7 @@ import DemoSettings from "./pages/DemoSettings";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import CameraTest from "./pages/CameraTest";
 import Friends from "./pages/Friends";
 import BusinessLanding from "./pages/business/BusinessLanding";
 import BusinessAuth from "./pages/business/BusinessAuth";
@@ -107,7 +108,7 @@ async function registerPushToken(user: { id: string }) {
 
       const { error, data } = await supabase
         .from('profiles')
-        .update({ apns_device_token: tokenValue, push_enabled: true })
+        .update({ push_token: tokenValue, apns_device_token: tokenValue, push_enabled: true })
         .eq('id', user.id)
         .select('id')
         .single();
@@ -370,9 +371,7 @@ function AppContent() {
           path="/demo-settings"
           element={
             <ProtectedRoute>
-              <AdminRoute>
-                <DemoSettings />
-              </AdminRoute>
+              <DemoSettings />
             </ProtectedRoute>
           }
         />
@@ -447,6 +446,7 @@ function AppContent() {
            }
          />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="/camera-test" element={<ProtectedRoute><CameraTest /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
