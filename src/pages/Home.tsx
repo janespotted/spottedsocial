@@ -16,10 +16,13 @@ import { useWeekendRally } from '@/hooks/useWeekendRally';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search, Loader2, Copy, Users, Target, MapPin } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Loader2, Copy, Users, Target, MapPin, Search, Bell } from 'lucide-react';
+import { CityBadge } from '@/components/CityBadge';
+import { NotificationBadge } from '@/components/NotificationBadge';
+import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useMeetUp } from '@/contexts/MeetUpContext';
 import { Button } from '@/components/ui/button';
-import { NotificationBadge } from '@/components/NotificationBadge';
+import { PageHeader } from '@/components/PageHeader';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { toast } from 'sonner';
@@ -31,9 +34,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
-import spottedLogo from '@/assets/spotted-s-logo.png';
 import { PostLikesModal } from '@/components/PostLikesModal';
-import { CityBadge } from '@/components/CityBadge';
 import { FeedSkeleton } from '@/components/FeedSkeleton';
 import { FriendsPlanning } from '@/components/FriendsPlanning';
 import { PlansFeed } from '@/components/PlansFeed';
@@ -41,12 +42,16 @@ import { DailyNudgeModal } from '@/components/DailyNudgeModal';
 import { NoFriendsBanner } from '@/components/NoFriendsBanner';
 import { isNightlifeHours } from '@/lib/time-context';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
+import { MorningAfterBanner } from '@/components/MorningAfterBanner';
+import { FriendsOutPill } from '@/components/FriendsOutPill';
+import { MorningAfterModal } from '@/components/MorningAfterModal';
 import { CommentInput } from '@/components/CommentInput';
 import { ShareToDMModal } from '@/components/ShareToDMModal';
 
 export default function Home() {
   const { user } = useAuth();
   const { openCheckIn } = useCheckIn();
+  const { unreadCount } = useNotifications();
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
   const { sendMeetUpNotification } = useMeetUp();
@@ -54,7 +59,6 @@ export default function Home() {
   const { bootstrapEnabled } = useBootstrapMode();
   const navigate = useNavigate();
   const location = useLocation();
-  const { unreadCount } = useNotifications();
   const { city } = useUserCity();
   const { showNudgeModal, nudgeType, closeNudgeModal } = useDailyNudge();
   const { isWeekendRally, clearRally } = useWeekendRally();
@@ -96,6 +100,7 @@ export default function Home() {
   });
 
   const [showCreatePost, setShowCreatePost] = useState(false);
+  const [showMorningAfter, setShowMorningAfter] = useState(false);
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
@@ -107,7 +112,7 @@ export default function Home() {
   const [planPreselectedFriend, setPlanPreselectedFriend] = useState<{ id: string; display_name: string; avatar_url: string | null } | null>(null);
   const loadTriggerRef = useRef<HTMLDivElement>(null);
 
-  // Handle navigation state (e.g., returning from DM to plans tab)
+  // Handle navigation state (e.g., returning from DM to plans tab, or camera capture)
   useEffect(() => {
     const state = location.state as any;
     if (state?.feedMode) {
@@ -115,6 +120,10 @@ export default function Home() {
       if (state?.preselectedFriend) {
         setPlanPreselectedFriend(state.preselectedFriend);
       }
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    if (state?.cameraCapture) {
+      setShowCreatePost(true);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.key]);
@@ -294,8 +303,33 @@ export default function Home() {
     toast.success('Post deleted');
   };
 
+  // ── Collapsing header for Newsfeed ──
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const tickingRef = useRef(false);
+
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (!root) return;
+
+    const onScroll = () => {
+      if (!tickingRef.current) {
+        const scrollTop = root.scrollTop;
+        requestAnimationFrame(() => {
+          setScrollProgress(Math.min(1, Math.max(0, scrollTop / 80)));
+          tickingRef.current = false;
+        });
+        tickingRef.current = true;
+      }
+    };
+
+    root.addEventListener('scroll', onScroll, { passive: true });
+    // Set initial state
+    onScroll();
+    return () => root.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-24">
       {/* Offline Indicator */}
       {!isOnline && (
         <div className="bg-yellow-500/20 text-yellow-500 text-center py-2 text-sm">
@@ -303,72 +337,122 @@ export default function Home() {
         </div>
       )}
 
-      {/* Header */}
-     <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
-        <div className="flex items-start justify-between px-6 pt-3 pb-3">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-              <CityBadge />
-            </div>
-            <h2 className="text-3xl font-bold text-white">
-              {feedMode === 'plans' ? 'Make Plans' : 'Newsfeed'}
-            </h2>
-            <p className="text-white/60 text-sm mt-1">
-              {feedMode === 'plans' ? 'See what your friends are planning' : 'Everything disappears by 5am'}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowFriendSearch(true)}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
-              aria-label="Search friends"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
-              className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
-              aria-label="View activity"
-            >
-              <Bell className="w-5 h-5" />
-              <NotificationBadge count={unreadCount} />
-            </button>
-            <button 
-              onClick={openCheckIn}
-              className="hover:scale-110 transition-transform"
-            >
-              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
-            </button>
-          </div>
-        </div>
+      {/* Header — collapsing on Newsfeed, static on Plans */}
+      {feedMode === 'plans' ? (
+        <PageHeader
+          title="Plans"
+          subtitle="What friends are up to"
+          onSearchPress={() => setShowFriendSearch(true)}
+        />
+      ) : (
+        <div
+          className="sticky top-0 z-10 pt-[max(env(safe-area-inset-top),12px)]"
+          style={{
+            backgroundColor: scrollProgress > 0
+              ? `rgba(26, 15, 46, ${0.95 + scrollProgress * 0.05})`
+              : 'rgba(26, 15, 46, 0.95)',
+            backdropFilter: scrollProgress > 0 ? `blur(${scrollProgress * 12}px)` : 'none',
+            WebkitBackdropFilter: scrollProgress > 0 ? `blur(${scrollProgress * 12}px)` : 'none',
+            borderBottom: `1px solid rgba(255, 255, 255, ${scrollProgress * 0.08})`,
+          }}
+        >
+          <div className="flex items-start justify-between px-5 pt-3 pb-3">
+            <div>
+              {/* Wordmark row — anchored, no animation */}
+              <div className="flex items-center gap-3 mb-1">
+                <span
+                  className="text-[30px] tracking-[0.35em] text-white select-none"
+                  style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300 }}
+                >
+                  Spotted
+                </span>
+                <CityBadge />
+              </div>
 
-        {/* Feed Mode Toggle */}
-        <div className="flex items-center justify-around px-6 pb-4">
-          <button
-            onClick={() => setFeedMode('newsfeed')}
-            className={`relative pb-2 text-lg font-medium transition-colors ${
-              feedMode === 'newsfeed' ? 'text-white' : 'text-white/60'
-            }`}
-          >
-            Newsfeed
-            {feedMode === 'newsfeed' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
-            )}
-          </button>
-          <button
-            onClick={() => setFeedMode('plans')}
-            className={`relative pb-2 text-lg font-medium transition-colors ${
-              feedMode === 'plans' ? 'text-white' : 'text-white/60'
-            }`}
-          >
-            Plans
-            {feedMode === 'plans' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
-            )}
-          </button>
+              {/* Title — collapses */}
+              <h2
+                className="text-3xl font-bold text-white"
+                style={{
+                  transform: `scale(${1 - scrollProgress})`,
+                  transformOrigin: 'left top',
+                  opacity: 1 - scrollProgress,
+                  height: `${(1 - scrollProgress) * 36}px`,
+                  overflow: 'hidden',
+                  transition: 'none',
+                }}
+              >
+                Newsfeed
+              </h2>
+
+              {/* Tagline — fades fast */}
+              <p
+                className="text-white/50 text-sm mt-0.5 truncate"
+                style={{
+                  opacity: Math.max(0, 1 - scrollProgress * 3),
+                  height: `${Math.max(0, 1 - scrollProgress * 2) * 20}px`,
+                  overflow: 'hidden',
+                  transition: 'none',
+                }}
+              >
+                Everything disappears by 5am
+              </p>
+            </div>
+
+            {/* Right: Actions — anchored, no animation */}
+            <div className="flex items-center gap-4 pt-1">
+              <button
+                onClick={() => setShowFriendSearch(true)}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                aria-label="Search"
+              >
+                <Search className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
+                className="relative w-10 h-10 rounded-full bg-[#a855f7] text-white flex items-center justify-center hover:bg-[#a855f7]/90 transition-colors"
+                aria-label="Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                <NotificationBadge count={unreadCount} />
+              </button>
+              <button
+                onClick={openCheckIn}
+                className="hover:scale-110 transition-transform"
+              >
+                <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
+              </button>
+            </div>
+          </div>
         </div>
-        {/* Story row removed — Yap handles venue content now */}
+      )}
+
+      {/* Morning After Banner */}
+      <MorningAfterBanner onOpen={() => setShowMorningAfter(true)} />
+
+      {/* Feed Mode Toggle */}
+      <div className="flex items-center justify-around px-5 pb-4">
+        <button
+          onClick={() => setFeedMode('newsfeed')}
+          className={`relative pb-2 text-lg font-semibold transition-colors ${
+            feedMode === 'newsfeed' ? 'text-white' : 'text-white/40'
+          }`}
+        >
+          Newsfeed
+          {feedMode === 'newsfeed' && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+          )}
+        </button>
+        <button
+          onClick={() => setFeedMode('plans')}
+          className={`relative pb-2 text-lg font-semibold transition-colors ${
+            feedMode === 'plans' ? 'text-white' : 'text-white/40'
+          }`}
+        >
+          Plans
+          {feedMode === 'plans' && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+          )}
+        </button>
       </div>
 
       {/* No Friends Banner */}
@@ -387,7 +471,7 @@ export default function Home() {
         </div>
       ) : (
       <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchPlanningFriends(); }}>
-        <div className="px-4 py-6 space-y-6">
+        <div className="px-4 py-4 space-y-3">
         
         
         {isLoading ? (
@@ -406,7 +490,7 @@ export default function Home() {
 
             {/* Out Tonight */}
             {friendsOut.length > 0 && (
-              <div className="glass-card rounded-2xl overflow-hidden border border-[#a855f7]/20 p-4 space-y-3">
+              <div className="rounded-2xl overflow-hidden bg-[#1a0a2e]/80 border border-white/8 p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-[#d4ff00]" />
                   <h3 className="text-white font-semibold text-sm">Out Tonight</h3>
@@ -435,12 +519,12 @@ export default function Home() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
-                        <p className="text-[#d4ff00] text-xs truncate">📍 {friend.venue_name}</p>
+                        <p className="text-[#d4ff00] text-xs truncate">{friend.venue_name}</p>
                       </div>
                       <Button
                         size="sm"
                         onClick={(e) => { e.stopPropagation(); sendMeetUpNotification(friend.user_id, friend.display_name, friend.avatar_url); }}
-                        className="h-8 px-3 bg-[#22c55e] hover:bg-[#22c55e]/80 text-white rounded-full text-xs shadow-[0_0_10px_rgba(34,197,94,0.4)] hover:shadow-[0_0_15px_rgba(34,197,94,0.6)] transition-all"
+                        className="h-8 px-3 bg-[#22c55e] hover:bg-[#22c55e]/80 text-white rounded-full text-xs transition-colors"
                       >
                         Meet Up
                       </Button>
@@ -452,7 +536,7 @@ export default function Home() {
 
             {/* Planning Tonight */}
             {planningFriends.length > 0 && (
-              <div className="glass-card rounded-2xl overflow-hidden border border-[#a855f7]/20 p-4 space-y-3">
+              <div className="rounded-2xl overflow-hidden bg-[#1a0a2e]/80 border border-white/8 p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Target className="w-4 h-4 text-[#a855f7]" />
                   <h3 className="text-white font-semibold text-sm">Planning Tonight</h3>
@@ -466,7 +550,7 @@ export default function Home() {
                     >
                       <div className="relative">
                         <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
-                        <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
+                        <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-white/20 relative z-10">
                           <AvatarImage src={friend.avatar_url || undefined} />
                           <AvatarFallback className="bg-[#a855f7] text-white text-sm">
                             {friend.display_name?.[0] || '?'}
@@ -476,7 +560,7 @@ export default function Home() {
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-white/50 text-xs">Planning tonight</span>
+                          <span className="text-white/50 text-xs">TBD tonight</span>
                           {friend.planning_neighborhood && (
                             <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium">
                               {friend.planning_neighborhood}
@@ -492,7 +576,7 @@ export default function Home() {
                             source: 'planning'
                           }
                         })}
-                        className="h-8 px-3 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full text-xs shadow-[0_0_10px_rgba(168,85,247,0.4)] hover:shadow-[0_0_15px_rgba(168,85,247,0.6)] transition-all"
+                        className="h-8 px-3 border border-white/20 text-white bg-transparent rounded-full text-xs hover:bg-white/10 transition-colors"
                       >
                         Make plans
                       </Button>
@@ -514,7 +598,7 @@ export default function Home() {
                     if (hour < 12) return "Who's up?";
                     if (hour < 17) return "What's the move?";
                     if (hour < 21) return "Night's young";
-                    return "Be the first";
+                    return "Nothing here yet";
                   })()}
                 </h3>
                 <p className="text-white/50 text-sm">Share what you're up to</p>
@@ -525,7 +609,7 @@ export default function Home() {
           posts.map((post, index) => (
             <div
               key={post.id}
-              className="glass-card rounded-3xl overflow-hidden post-animate-in transition-all duration-300 hover:shadow-[0_0_50px_rgba(168,85,247,0.3)]"
+              className="rounded-3xl overflow-hidden bg-white/[0.03] border border-white/[0.06] post-animate-in transition-all duration-300 mb-3 p-3"
               style={{ animationDelay: `${index * 50}ms` }}
             >
               <div className="flex items-center justify-between p-4">
@@ -539,7 +623,7 @@ export default function Home() {
                     })}
                     className="hover:opacity-80 transition-opacity"
                   >
-                    <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
+                    <Avatar className="h-10 w-10 border-2 border-white/20 ">
                       <AvatarImage src={post.profiles?.avatar_url || undefined} />
                       <AvatarFallback className="bg-[#1a0f2e] text-white">
                         {post.profiles?.display_name?.[0]}
@@ -788,16 +872,21 @@ export default function Home() {
       {feedMode === 'newsfeed' && (
         <button
           onClick={() => setShowCreatePost(true)}
-          className="fixed bottom-28 right-6 z-20 w-14 h-14 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:scale-110 transition-transform"
+          className="fixed bottom-28 right-6 z-20 w-14 h-14 rounded-full bg-[#d4ff00] flex items-center justify-center hover:scale-105 transition-transform"
           aria-label="Create post"
         >
-          <Plus className="h-7 w-7 text-white" />
+          <Plus className="h-7 w-7 text-black" />
         </button>
       )}
 
-      <CreatePostDialog open={showCreatePost} onOpenChange={setShowCreatePost} />
+      {/* Friends Out Pill */}
+      <FriendsOutPill />
+
+      <CreatePostDialog open={showCreatePost} onOpenChange={(open) => { setShowCreatePost(open); if (!open) fetchPosts(); }} />
 
       <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
+
+      <MorningAfterModal open={showMorningAfter} onClose={() => setShowMorningAfter(false)} />
 
       {selectedPostForLikes && (
         <PostLikesModal
