@@ -51,7 +51,6 @@ import DemoSettings from "./pages/DemoSettings";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
-import CameraTest from "./pages/CameraTest";
 import Friends from "./pages/Friends";
 import BusinessLanding from "./pages/business/BusinessLanding";
 import BusinessAuth from "./pages/business/BusinessAuth";
@@ -446,7 +445,6 @@ function AppContent() {
            }
          />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="/camera-test" element={<ProtectedRoute><CameraTest /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

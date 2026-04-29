@@ -1,30 +1,33 @@
 # Spotted — Development Notes
 
-## Camera Plugin Setup
+## Camera Architecture
 
-We're using a local fork of `@capgo/camera-preview` for the custom camera experience.
+Camera is a **native UIKit fullscreen modal** (`SpottedCameraPlugin.swift` + `.m`).
 
-- **Fork location:** `../capacitor-camera-preview` (one directory up from this repo)
-- **Link method:** `file:` reference in `package.json`:
-  ```json
-  "@capgo/camera-preview": "file:../capacitor-camera-preview"
-  ```
-- **Podfile.lock** references the local path, not a remote version.
+- **Triggered from JS** via `openSpottedCamera()` in `src/lib/spotted-camera.ts`
+- **Returns** captured media to caller via promise: `{ type, file, previewUrl }`
+- **All UI is native UIKit** — buttons, gestures, animations are in Swift, not React
+- **Features:** tap-to-photo, hold-to-record (14s max), flip button + double-tap flip with fade, flash toggle (off/on), close/dismiss
+- **Gallery button** is intentionally removed (was a stub). Gallery access is via the web fallback in `PostMediaPicker`.
 
-### Workflow after modifying plugin Swift code:
+### Files
 
-1. `cd ../capacitor-camera-preview && npm run build`
-2. `cd ../spottedsocial && npm install --legacy-peer-deps`
-3. `npx cap sync ios`
-4. Rebuild in Xcode (Cmd+R)
+| File | Purpose |
+|------|---------|
+| `ios/App/App/SpottedCameraPlugin.swift` | Native camera VC + Capacitor plugin bridge |
+| `ios/App/App/SpottedCameraPlugin.m` | Obj-C plugin registration |
+| `src/lib/spotted-camera.ts` | JS wrapper — calls native plugin, converts file path to File+URL |
+| `src/components/PostMediaPicker.tsx` | Entry point — calls `openSpottedCamera()` on native, shows gallery fallback on web |
 
-### Test route
+### Do NOT reintroduce
 
-`/camera-test` — opens the camera preview for testing. Navigate to it from any screen.
+- `@capgo/camera-preview` — removed, was the old webview-overlay camera
+- `WebViewTransparencyPlugin` — removed, was only needed for webview-overlay approach
+- `CameraTest.tsx` / `/camera-test` route — removed, was the old camera page
 
 ## Header Patterns
 
-- **Newsfeed**: Has a collapsing header. The page title ("Newsfeed") and tagline ("Everything disappears by 5am") collapse on scroll. The "Spotted" wordmark, LA pill, search, notification bell, and S logo are anchored and do not animate.
-- **Other pages** (Plans, Map, Chat, Profile, Leaderboard): Do not have collapsing headers. Static headers only.
+- **Newsfeed & Plans**: Both have a collapsing header. The page title and tagline collapse on scroll. The "Spotted" wordmark, city pill, search, notification bell, and S logo are anchored and do not animate. The Newsfeed/Plans tab toggle is inside the sticky header.
+- **Other pages** (Map, Chat, Profile, Leaderboard): Do not have collapsing headers. Static headers only.
 - Implementation is inline in `src/pages/Home.tsx`, not a shared component. If a second page needs the same pattern, do not extract a component until that second page is built — duplicate the pattern first, abstract on the third use.
 - Padding and sizing of the expanded header have not been intentionally changed and should not be changed without an explicit task.

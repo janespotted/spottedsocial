@@ -22,7 +22,6 @@ import { NotificationBadge } from '@/components/NotificationBadge';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useMeetUp } from '@/contexts/MeetUpContext';
 import { Button } from '@/components/ui/button';
-import { PageHeader } from '@/components/PageHeader';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { toast } from 'sonner';
@@ -45,6 +44,7 @@ import { FriendSearchModal } from '@/components/FriendSearchModal';
 import { MorningAfterBanner } from '@/components/MorningAfterBanner';
 import { FriendsOutPill } from '@/components/FriendsOutPill';
 import { MorningAfterModal } from '@/components/MorningAfterModal';
+import { MORNING_AFTER_FLAG } from '@/lib/morning-after-notification';
 import { CommentInput } from '@/components/CommentInput';
 import { ShareToDMModal } from '@/components/ShareToDMModal';
 
@@ -112,6 +112,22 @@ export default function Home() {
   const [planPreselectedFriend, setPlanPreselectedFriend] = useState<{ id: string; display_name: string; avatar_url: string | null } | null>(null);
   const loadTriggerRef = useRef<HTMLDivElement>(null);
 
+  // Auto-open Morning After modal if user tapped the recap notification
+  useEffect(() => {
+    if (localStorage.getItem(MORNING_AFTER_FLAG) === 'true') {
+      localStorage.removeItem(MORNING_AFTER_FLAG);
+      setShowMorningAfter(true);
+    }
+    const onVisibility = () => {
+      if (!document.hidden && localStorage.getItem(MORNING_AFTER_FLAG) === 'true') {
+        localStorage.removeItem(MORNING_AFTER_FLAG);
+        setShowMorningAfter(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
   // Handle navigation state (e.g., returning from DM to plans tab, or camera capture)
   useEffect(() => {
     const state = location.state as any;
@@ -120,10 +136,6 @@ export default function Home() {
       if (state?.preselectedFriend) {
         setPlanPreselectedFriend(state.preselectedFriend);
       }
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-    if (state?.cameraCapture) {
-      setShowCreatePost(true);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.key]);
@@ -337,123 +349,121 @@ export default function Home() {
         </div>
       )}
 
-      {/* Header — collapsing on Newsfeed, static on Plans */}
-      {feedMode === 'plans' ? (
-        <PageHeader
-          title="Plans"
-          subtitle="What friends are up to"
-          onSearchPress={() => setShowFriendSearch(true)}
-        />
-      ) : (
-        <div
-          className="sticky top-0 z-10 pt-[max(env(safe-area-inset-top),12px)]"
-          style={{
-            backgroundColor: scrollProgress > 0
-              ? `rgba(26, 15, 46, ${0.95 + scrollProgress * 0.05})`
-              : 'rgba(26, 15, 46, 0.95)',
-            backdropFilter: scrollProgress > 0 ? `blur(${scrollProgress * 12}px)` : 'none',
-            WebkitBackdropFilter: scrollProgress > 0 ? `blur(${scrollProgress * 12}px)` : 'none',
-            borderBottom: `1px solid rgba(255, 255, 255, ${scrollProgress * 0.08})`,
-          }}
-        >
-          <div className="flex items-start justify-between px-5 pt-3 pb-3">
-            <div>
-              {/* Wordmark row — anchored, no animation */}
-              <div className="flex items-center gap-3 mb-1">
-                <span
-                  className="text-[30px] tracking-[0.35em] text-white select-none"
-                  style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300 }}
-                >
-                  Spotted
-                </span>
-                <CityBadge />
-              </div>
-
-              {/* Title — collapses */}
-              <h2
-                className="text-3xl font-bold text-white"
-                style={{
-                  transform: `scale(${1 - scrollProgress})`,
-                  transformOrigin: 'left top',
-                  opacity: 1 - scrollProgress,
-                  height: `${(1 - scrollProgress) * 36}px`,
-                  overflow: 'hidden',
-                  transition: 'none',
-                }}
+      {/* Header — collapsing on both Newsfeed and Plans */}
+      <div
+        className="sticky top-0 z-10 pt-[max(env(safe-area-inset-top),12px)]"
+        style={{
+          backgroundColor: scrollProgress > 0
+            ? `rgba(26, 15, 46, ${0.95 + scrollProgress * 0.05})`
+            : 'rgba(26, 15, 46, 0.95)',
+          backdropFilter: scrollProgress > 0 ? `blur(${scrollProgress * 12}px)` : 'none',
+          WebkitBackdropFilter: scrollProgress > 0 ? `blur(${scrollProgress * 12}px)` : 'none',
+          borderBottom: `1px solid rgba(255, 255, 255, ${scrollProgress * 0.08})`,
+        }}
+      >
+        <div className="flex items-start justify-between px-5 pt-3 pb-3">
+          <div>
+            {/* Wordmark row — anchored, no animation */}
+            <div className="flex items-center gap-3 mb-1">
+              <span
+                className="text-[30px] tracking-[0.35em] text-white select-none"
+                style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300 }}
               >
-                Newsfeed
-              </h2>
-
-              {/* Tagline — fades fast */}
-              <p
-                className="text-white/50 text-sm mt-0.5 truncate"
-                style={{
-                  opacity: Math.max(0, 1 - scrollProgress * 3),
-                  height: `${Math.max(0, 1 - scrollProgress * 2) * 20}px`,
-                  overflow: 'hidden',
-                  transition: 'none',
-                }}
-              >
-                Everything disappears by 5am
-              </p>
+                Spotted
+              </span>
+              <CityBadge />
             </div>
 
-            {/* Right: Actions — anchored, no animation */}
-            <div className="flex items-center gap-4 pt-1">
-              <button
-                onClick={() => setShowFriendSearch(true)}
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
-                aria-label="Search"
-              >
-                <Search className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
-                className="relative w-10 h-10 rounded-full bg-[#a855f7] text-white flex items-center justify-center hover:bg-[#a855f7]/90 transition-colors"
-                aria-label="Notifications"
-              >
-                <Bell className="w-5 h-5" />
-                <NotificationBadge count={unreadCount} />
-              </button>
-              <button
-                onClick={openCheckIn}
-                className="hover:scale-110 transition-transform"
-              >
-                <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
-              </button>
-            </div>
+            {/* Title — collapses */}
+            <h2
+              className="text-3xl font-bold text-white"
+              style={{
+                transform: `scale(${1 - scrollProgress})`,
+                transformOrigin: 'left top',
+                opacity: 1 - scrollProgress,
+                height: `${(1 - scrollProgress) * 36}px`,
+                overflow: 'hidden',
+                transition: 'none',
+              }}
+            >
+              {feedMode === 'plans' ? 'Plans' : 'Newsfeed'}
+            </h2>
+
+            {/* Tagline — fades fast */}
+            <p
+              className="text-white/50 text-sm mt-0.5 truncate"
+              style={{
+                opacity: Math.max(0, 1 - scrollProgress * 3),
+                height: `${Math.max(0, 1 - scrollProgress * 2) * 20}px`,
+                overflow: 'hidden',
+                transition: 'none',
+              }}
+            >
+              {feedMode === 'plans' ? 'What friends are up to' : 'Everything disappears by 5am'}
+            </p>
+          </div>
+
+          {/* Right: Actions — anchored, no animation */}
+          <div className="flex items-center gap-4 pt-1">
+            <button
+              onClick={() => setShowFriendSearch(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+              aria-label="Search"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
+              className="relative w-10 h-10 rounded-full bg-[#a855f7] text-white flex items-center justify-center hover:bg-[#a855f7]/90 transition-colors"
+              aria-label="Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              <NotificationBadge count={unreadCount} />
+            </button>
+            <button
+              onClick={openCheckIn}
+              className="hover:scale-110 transition-transform"
+            >
+              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
+            </button>
           </div>
         </div>
-      )}
+
+        {/* Feed Mode Toggle — inside sticky header */}
+        <div className="flex items-center justify-around px-5 pb-3">
+          <button
+            onClick={() => {
+              setFeedMode('newsfeed');
+              document.getElementById('root')?.scrollTo({ top: 0 });
+            }}
+            className={`relative pb-2 text-lg font-semibold transition-colors ${
+              feedMode === 'newsfeed' ? 'text-white' : 'text-white/40'
+            }`}
+          >
+            Newsfeed
+            {feedMode === 'newsfeed' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setFeedMode('plans');
+              document.getElementById('root')?.scrollTo({ top: 0 });
+            }}
+            className={`relative pb-2 text-lg font-semibold transition-colors ${
+              feedMode === 'plans' ? 'text-white' : 'text-white/40'
+            }`}
+          >
+            Plans
+            {feedMode === 'plans' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+            )}
+          </button>
+        </div>
+      </div>
 
       {/* Morning After Banner */}
       <MorningAfterBanner onOpen={() => setShowMorningAfter(true)} />
-
-      {/* Feed Mode Toggle */}
-      <div className="flex items-center justify-around px-5 pb-4">
-        <button
-          onClick={() => setFeedMode('newsfeed')}
-          className={`relative pb-2 text-lg font-semibold transition-colors ${
-            feedMode === 'newsfeed' ? 'text-white' : 'text-white/40'
-          }`}
-        >
-          Newsfeed
-          {feedMode === 'newsfeed' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
-          )}
-        </button>
-        <button
-          onClick={() => setFeedMode('plans')}
-          className={`relative pb-2 text-lg font-semibold transition-colors ${
-            feedMode === 'plans' ? 'text-white' : 'text-white/40'
-          }`}
-        >
-          Plans
-          {feedMode === 'plans' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
-          )}
-        </button>
-      </div>
 
       {/* No Friends Banner */}
       <NoFriendsBanner friendsCount={friends.length} />

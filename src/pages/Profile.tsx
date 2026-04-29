@@ -8,17 +8,16 @@ import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { PageHeader } from '@/components/PageHeader';
+import { FriendsOutPill } from '@/components/FriendsOutPill';
 import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode, Camera, Search, Heart, MessageCircle } from 'lucide-react';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
-import { NotificationBadge } from '@/components/NotificationBadge';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { CityBadge } from '@/components/CityBadge';
 import { ProfileSkeleton } from '@/components/ProfileSkeleton';
 import { QuickStatusSheet } from '@/components/QuickStatusSheet';
 import { useDemoMode } from '@/hooks/useDemoMode';
@@ -66,6 +65,7 @@ export default function Profile() {
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   const [friendsCount, setFriendsCount] = useState(0);
   const [placesCount, setPlacesCount] = useState(0);
+  const [weeklyCount, setWeeklyCount] = useState(0);
   const [isLocationSharing, setIsLocationSharing] = useState(false);
   const [locationSharingLevel, setLocationSharingLevel] = useState('all_friends');
   const [wishlistPlaces, setWishlistPlaces] = useState<WishlistPlace[]>([]);
@@ -84,37 +84,6 @@ export default function Profile() {
   const [showQuickStatus, setShowQuickStatus] = useState(false);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   
-  // Triple-tap secret access to demo settings (admin-only)
-  const tapCountRef = useRef(0);
-  const tapTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Pre-fetch admin status on mount
-  useEffect(() => {
-    if (!user) return;
-    supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' as any })
-      .then(({ data }) => setIsAdmin(data === true));
-  }, [user]);
-
-  const handleHeaderTripleTap = () => {
-    if (!isAdmin) return; // Non-admins: triple-tap does nothing
-
-    tapCountRef.current += 1;
-
-    if (tapTimerRef.current) {
-      clearTimeout(tapTimerRef.current);
-    }
-
-    if (tapCountRef.current === 3) {
-      navigate('/demo-settings');
-      tapCountRef.current = 0;
-      return;
-    }
-
-    tapTimerRef.current = setTimeout(() => {
-      tapCountRef.current = 0;
-    }, 500);
-  };
 
   useEffect(() => {
     if (user) {
@@ -202,7 +171,7 @@ export default function Profile() {
     ] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, display_name, username, avatar_url, bio, home_city, created_at, has_onboarded, is_demo, location_sharing_level, push_enabled')
+        .select('id, display_name, username, avatar_url, bio, created_at, is_demo, location_sharing_level')
         .eq('id', user?.id)
         .single(),
       supabase
@@ -224,7 +193,7 @@ export default function Profile() {
         .eq('status', 'accepted'),
       supabase
         .from('checkins')
-        .select('venue_name')
+        .select('venue_name, started_at')
         .eq('user_id', user?.id),
       supabase
         .from('checkins')
@@ -276,6 +245,11 @@ export default function Profile() {
     // Process places count
     const uniqueVenues = new Set(checkinsCountResult.data?.map(c => c.venue_name));
     setPlacesCount(uniqueVenues.size);
+
+    // Weekly check-in count
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const thisWeek = (checkinsCountResult.data || []).filter(c => c.started_at && c.started_at > oneWeekAgo);
+    setWeeklyCount(thisWeek.length);
 
     // Process wishlist
     setWishlistPlaces(wishlistResult.data || []);
@@ -442,98 +416,24 @@ export default function Profile() {
 
   return (
     <PullToRefresh onRefresh={fetchProfileData}>
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
-        <div className="flex items-center justify-between px-6 pt-3 pb-3">
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={handleHeaderTripleTap}
-              className="text-2xl font-light tracking-[0.3em] text-white select-none"
-            >
-              Spotted
-            </button>
-            <CityBadge />
-          </div>
-          <div className="flex gap-4">
-            <button
-              onClick={() => setShowFriendSearch(true)}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
-              aria-label="Search friends"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
-              className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
-              aria-label="View activity"
-            >
-              <Bell className="w-5 h-5" />
-              <NotificationBadge count={unreadCount} />
-            </button>
-            <button 
-              onClick={openCheckIn}
-              className="hover:scale-110 transition-transform"
-            >
-              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title=""
+        subtitle={`@${profile?.username || user?.email?.split('@')[0] || 'profile'}`}
+        onSearchPress={() => setShowFriendSearch(true)}
+        enableAdminGesture
+      />
+
+      {/* Friends Out Pill */}
+      <FriendsOutPill />
 
       {/* Content */}
-      <div className="px-4 py-6 space-y-6">
-        {/* User Identity */}
-        <div>
-          <h2 className="text-xl font-bold text-white">@{profile?.username || user?.user_metadata?.username || user?.email?.split('@')[0] || 'username'}</h2>
-          <button 
-            onClick={() => setShowQuickStatus(true)}
-            className={cn(
-              "flex items-center gap-1.5 cursor-pointer hover:bg-white/10 transition-all px-3 py-1.5 rounded-full border bg-white/5 mt-1",
-              currentStatus === 'out' ? "border-[#d4ff00]/40" : 
-              currentStatus === 'planning' ? "border-[#a855f7]/40" : 
-              "border-white/10"
-            )}
-          >
-            {currentStatus === 'out' ? (
-              isPrivateParty ? (
-                <>
-                  <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
-                  <span className="text-[#d4ff00] font-medium">
-                    Out · {currentVenue || 'Private Party'}{partyNeighborhood ? ` (${partyNeighborhood})` : ''}
-                  </span>
-                </>
-              ) : currentVenue ? (
-                <>
-                  <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
-                  <span className="text-[#d4ff00] font-medium">Out · {currentVenue}</span>
-                </>
-              ) : (
-                <>
-                  <MapPin className="h-4 w-4 text-[#d4ff00] fill-[#d4ff00]" />
-                  <span className="text-[#d4ff00] font-medium">Out</span>
-                </>
-              )
-            ) : currentStatus === 'planning' ? (
-              <>
-                <Target className="h-4 w-4 text-[#a855f7]" />
-                <span className="text-[#a855f7] font-medium">
-                  Planning{planningNeighborhood ? ` · ${planningNeighborhood}` : ''}
-                </span>
-              </>
-            ) : (
-              <>
-                <Home className="h-4 w-4 text-white/40" />
-                <span className="text-white/40 font-medium">Staying In</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Avatar + Stats */}
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/profile/edit')} className="cursor-pointer">
-            <div className="relative h-20 w-20 rounded-full border-2 border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.8)] overflow-hidden bg-[#1a0f2e]">
+      <div className="px-4 py-5 space-y-5">
+        {/* Avatar + Name + Username */}
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/profile/edit')} className="cursor-pointer flex-shrink-0">
+            <div className="relative h-14 w-14 rounded-full border border-[#d4ff00]/30 overflow-hidden bg-[#261B4A] flex items-center justify-center">
               {(profile?.avatar_url || allProfiles?.find((p: any) => p.id === user?.id)?.avatar_url || user?.user_metadata?.avatar_url) ? (
                 <img
                   src={profile?.avatar_url || allProfiles?.find((p: any) => p.id === user?.id)?.avatar_url || user?.user_metadata?.avatar_url}
@@ -544,187 +444,109 @@ export default function Profile() {
                   }}
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-white text-2xl">
+                <span className="text-[#d4ff00] text-xl font-medium">
                   {profile?.display_name?.[0] || user?.user_metadata?.display_name?.[0] || 'U'}
-                </div>
+                </span>
               )}
             </div>
           </button>
-
-          <div className="flex-1">
-            <h3 className="text-2xl font-bold text-white mb-2">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-medium text-white truncate">
               {profile?.display_name || user?.user_metadata?.display_name || user?.user_metadata?.full_name || 'User'}
-            </h3>
-            <div className="flex items-center gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">{friendsCount}</div>
-                <div className="text-white/60 text-sm">Friends</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">{placesCount}</div>
-                <div className="text-white/60 text-sm">Places</div>
-              </div>
-            </div>
+            </h2>
+            <p className="text-sm text-white/55 truncate">
+              @{profile?.username || user?.user_metadata?.username || user?.email?.split('@')[0] || 'username'}
+            </p>
           </div>
         </div>
 
-        {/* Quick Action Buttons - Prominent placement */}
-        <div className="flex gap-2">
-          <Button
-            onClick={() => navigate('/friends')}
-            className="flex-1 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full"
-          >
-            <Users className="h-4 w-4 mr-2" />
-            Friends
-          </Button>
-          {inviteCode && (
-            <Button
-              onClick={() => setShowQRModal(true)}
-              variant="outline"
-              className="border-[#a855f7]/40 text-white hover:bg-[#a855f7]/20 rounded-full"
-            >
-              <QrCode className="h-4 w-4" />
-            </Button>
-          )}
+        {/* Stats Row */}
+        <div className="flex items-center gap-3 text-sm text-white/65">
+          <span><span className="text-white font-medium">{placesCount}</span> spots</span>
+          <span className="text-white/25">·</span>
+          <span><span className="text-white font-medium">{friendsCount}</span> friends</span>
+          <span className="text-white/25">·</span>
+          <span><span className="text-white font-medium">{weeklyCount || 0}</span> this week</span>
         </div>
-        {/* Buttons */}
-        <div className="flex gap-3">
-          <Button
+
+        {/* Action Buttons — Edit / Share / Settings */}
+        <div className="flex gap-2">
+          <button
             onClick={() => navigate('/profile/edit')}
-            variant="outline"
-            className="flex-1 border-white text-white hover:bg-white/10 rounded-full"
+            className="flex-1 border border-white/20 text-white text-sm font-medium py-2.5 rounded-full hover:bg-white/5 transition-colors"
           >
-            Edit Profile
-          </Button>
-          <Button
+            Edit
+          </button>
+          <button
+            onClick={handleShareProfile}
+            className="flex-1 border border-white/20 text-white text-sm font-medium py-2.5 rounded-full hover:bg-white/5 transition-colors"
+          >
+            Share
+          </button>
+          <button
             onClick={() => navigate('/settings')}
-            variant="outline"
-            className="border-white/40 text-white hover:bg-white/10 rounded-full px-3"
+            className="w-10 border border-white/20 text-white rounded-full flex items-center justify-center hover:bg-white/5 transition-colors"
           >
             <Settings className="h-4 w-4" />
-          </Button>
-          <Button
-            onClick={handleShareProfile}
-            variant="outline"
-            className="flex-1 border-white text-white hover:bg-white/10 rounded-full"
-          >
-            <Share2 className="h-4 w-4 mr-2" />
-            Share Profile
-          </Button>
+          </button>
         </div>
 
-        {/* Location Sharing Card */}
-        <div className="bg-[#1D102D]/60 border border-[#a855f7]/20 rounded-2xl p-5">
-          {/* Header */}
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#a855f7] to-[#6b21a8] flex items-center justify-center">
-              <MapPin className="h-4 w-4 text-white" />
+        {/* Admin: Demo Mode + Camera Test */}
+        {user?.email === 'jane.reynolds752@gmail.com' && (
+          <div className="space-y-2">
+            <button
+              onClick={() => navigate('/demo-settings')}
+              className="w-full flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/8 hover:bg-white/[0.06] transition-colors"
+            >
+              <span className="text-white/50 text-sm">Demo Mode</span>
+              <span className="text-white/30 text-xs">Admin</span>
+            </button>
+          </div>
+        )}
+
+        {/* Tonight Status Card */}
+        <div className="bg-[#1F1740] border border-[#d4ff00]/25 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d4ff00]" />
+              <span className="text-[11px] text-white/60 uppercase tracking-wider">Tonight</span>
             </div>
-            <h3 className="font-medium text-white text-base">Location Sharing</h3>
+            <span className="text-[11px] text-white/45">
+              {currentStatus === 'out' ? 'Visible to all friends' : currentStatus === 'planning' ? 'TBD' : 'Not sharing'}
+            </span>
           </div>
 
-          {/* Status Section - Inner Card */}
-          <div className="bg-white/5 rounded-xl p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                {/* Status Line with Icon */}
-                <div className="flex items-center gap-2 mb-1">
-                  {currentStatus === 'out' ? (
-                    <>
-                      <span className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0" />
-                      <p className="text-[#d4ff00] font-medium text-sm">
-                        You're out · {isPrivateParty
-                          ? `Private Party${partyNeighborhood ? ` (${partyNeighborhood})` : ''}`
-                          : (currentVenue || 'Unknown venue')}
-                      </p>
-                    </>
-                  ) : currentStatus === 'planning' ? (
-                    <>
-                      <span className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0" />
-                      <p className="text-[#d4ff00] font-medium text-sm">
-                        You're planning{planningNeighborhood ? ` · ${planningNeighborhood}` : ''}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <Home className="h-3.5 w-3.5 text-white/40 shrink-0" />
-                      <p className="text-white/50 font-medium text-sm">
-                        You're staying in tonight
-                      </p>
-                    </>
-                  )}
-                </div>
-                
-                {/* Helper Text */}
-                <p className="text-white/40 text-xs pl-5">
-                  {currentStatus === 'out'
-                    ? 'Your live location is visible'
-                    : currentStatus === 'planning'
-                    ? 'Your location is paused'
-                    : 'Your live location is paused'}
-                </p>
-              </div>
-              
-              {/* Change Status Button */}
-              <button 
-                onClick={openCheckIn}
-                className="text-[#a855f7]/70 text-xs hover:text-[#a855f7] transition-colors whitespace-nowrap flex items-center gap-0.5 shrink-0"
-              >
-                Change status
-                <ChevronRight className="h-3 w-3" />
-              </button>
-            </div>
-          </div>
+          {currentStatus === 'out' ? (
+            <>
+              <p className="text-lg font-medium text-white mb-1">
+                Out at {isPrivateParty ? (currentVenue || 'Private Party') : (currentVenue || 'Unknown')}
+              </p>
+              <p className="text-xs text-white/55 mb-3.5">
+                {partyNeighborhood || planningNeighborhood || ''}{partyNeighborhood || planningNeighborhood ? ' · ' : ''}Live now
+              </p>
+            </>
+          ) : currentStatus === 'planning' ? (
+            <>
+              <p className="text-lg font-medium text-white mb-1">
+                TBD{planningNeighborhood ? ` · ${planningNeighborhood}` : ''}
+              </p>
+              <p className="text-xs text-white/55 mb-3.5">Looking for plans</p>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-medium text-white mb-1">Not out tonight</p>
+              <p className="text-xs text-white/55 mb-3.5">Tap to change your status</p>
+            </>
+          )}
 
-          {/* Privacy Row - shown when user is "out" or "planning" */}
-          {currentStatus === 'out' && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
-              <p className="text-white/60 text-sm">Who can see your location?</p>
-              <Select value={locationSharingLevel} onValueChange={handleLocationSharingChange}>
-                <SelectTrigger className="w-auto min-w-[170px] border-[#a855f7]/30 bg-white/5 backdrop-blur-sm text-white rounded-full h-8 text-sm px-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5 text-white/60" />
-                    <SelectValue />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white z-50">
-                  <SelectItem value="close_friends" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
-                    Close Friends
-                  </SelectItem>
-                  <SelectItem value="mutual_friends" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
-                    Mutual Friends
-                  </SelectItem>
-                  <SelectItem value="all_friends" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
-                    All Friends
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {currentStatus === 'planning' && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
-              <p className="text-white/60 text-sm">Who can see your planning?</p>
-              <Select value={planningVisibility || 'all_friends'} onValueChange={handlePlanningVisibilityChange}>
-                <SelectTrigger className="w-auto min-w-[170px] border-[#a855f7]/30 bg-white/5 backdrop-blur-sm text-white rounded-full h-8 text-sm px-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5 text-white/60" />
-                    <SelectValue />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white z-50">
-                  <SelectItem value="close_friends" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
-                    Close Friends
-                  </SelectItem>
-                  <SelectItem value="mutual_friends" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
-                    Mutual Friends
-                  </SelectItem>
-                  <SelectItem value="all_friends" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
-                    All Friends
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <button
+              onClick={openCheckIn}
+              className="flex-1 bg-[#d4ff00] text-[#15102E] font-medium text-sm py-2.5 rounded-full"
+            >
+              Change status
+            </button>
+          </div>
         </div>
 
         {/* Spots Section with Dropdown */}
@@ -736,13 +558,13 @@ export default function Profile() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white">
-                  <SelectItem value="recent" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
+                  <SelectItem value="recent" className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white">
                     Recent Spots
                   </SelectItem>
-                  <SelectItem value="wishlist" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
+                  <SelectItem value="wishlist" className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white">
                     Wishlist
                   </SelectItem>
-                  <SelectItem value="posts" className="text-white hover:bg-[#2d1b4e] focus:bg-[#2d1b4e] focus:text-white">
+                  <SelectItem value="posts" className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white">
                     Your Posts
                   </SelectItem>
                 </SelectContent>
@@ -758,7 +580,7 @@ export default function Profile() {
                 {recentSpots.map((spot, idx) => (
                   <div key={spot.venue_id} className="space-y-2">
                     <div 
-                      className="aspect-square rounded-xl overflow-hidden bg-[#2d1b4e] border border-[#a855f7]/20"
+                      className="aspect-square rounded-xl overflow-hidden bg-[#1a0a2e] border border-white/8"
                       style={{
                         backgroundImage: `url(${spot.venue_image_url || mockVenueImages[idx % mockVenueImages.length]})`,
                         backgroundSize: 'cover',
@@ -772,8 +594,8 @@ export default function Profile() {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-[#2d1b4e]/30 rounded-2xl border border-[#a855f7]/10">
-                <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-white/5 rounded-2xl border border-white/8">
+                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/8">
                   <MapPin className="h-8 w-8 text-[#a855f7]/60" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">
@@ -790,7 +612,7 @@ export default function Profile() {
                 {wishlistPlaces.map((place, idx) => (
                   <div key={place.id} className="space-y-2">
                     <div 
-                      className="aspect-square rounded-xl overflow-hidden bg-[#2d1b4e] border border-[#a855f7]/20"
+                      className="aspect-square rounded-xl overflow-hidden bg-[#1a0a2e] border border-white/8"
                       style={{
                         backgroundImage: `url(${place.venue_image_url || mockVenueImages[idx % mockVenueImages.length]})`,
                         backgroundSize: 'cover',
@@ -804,8 +626,8 @@ export default function Profile() {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-[#2d1b4e]/30 rounded-2xl border border-[#a855f7]/10">
-                <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-white/5 rounded-2xl border border-white/8">
+                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/8">
                   <Bookmark className="h-8 w-8 text-[#a855f7]/60" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">
@@ -822,7 +644,7 @@ export default function Profile() {
                 {userPosts.map((post) => (
                   <div key={post.id} className="space-y-2">
                     <div
-                      className="aspect-square rounded-xl overflow-hidden bg-[#2d1b4e] border border-[#a855f7]/20 relative"
+                      className="aspect-square rounded-xl overflow-hidden bg-[#1a0a2e] border border-white/8 relative"
                       style={{
                         backgroundImage: post.image_url && post.media_type !== 'video' ? `url(${post.image_url})` : undefined,
                         backgroundSize: 'cover',
@@ -853,8 +675,8 @@ export default function Profile() {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-[#2d1b4e]/30 rounded-2xl border border-[#a855f7]/10">
-                <div className="w-16 h-16 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-4 border border-[#a855f7]/20">
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-white/5 rounded-2xl border border-white/8">
+                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/8">
                   <Camera className="h-8 w-8 text-[#a855f7]/60" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">
