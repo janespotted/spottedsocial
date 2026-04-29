@@ -265,7 +265,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                     placeholder="Where are you going?"
                     value={venueSearch}
                     onChange={(e) => setVenueSearch(e.target.value)}
-                    className="pl-10 h-12 bg-white/5 border-white/8 text-white placeholder:text-white/25 rounded-2xl text-[15px] focus:border-white/20"
+                    className="pl-10 h-12 bg-white/5 border-white/8 text-white placeholder:text-white/25 rounded-2xl text-[15px] focus:border-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
                     autoFocus
                   />
                 </div>
@@ -309,7 +309,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                   type="time"
                   value={planTime}
                   onChange={(e) => setPlanTime(e.target.value)}
-                  className="w-full h-11 bg-white/5 border-white/8 text-white rounded-xl text-sm"
+                  className="w-full h-11 bg-white/5 border-white/8 text-white rounded-xl text-sm focus:border-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
             </div>
@@ -357,7 +357,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                   value={friendSearch}
                   onChange={(e) => { setFriendSearch(e.target.value); setShowFriendPicker(true); }}
                   onFocus={() => setShowFriendPicker(true)}
-                  className="pl-10 h-10 bg-white/5 border-white/8 text-white placeholder:text-white/25 rounded-xl text-sm focus:border-white/20"
+                  className="pl-10 h-10 bg-white/5 border-white/8 text-white placeholder:text-white/25 rounded-xl text-sm focus:border-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
 
