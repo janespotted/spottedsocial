@@ -265,7 +265,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                     placeholder="Where are you going?"
                     value={venueSearch}
                     onChange={(e) => setVenueSearch(e.target.value)}
-                    className="pl-10 h-12 bg-white/5 border-white/8 text-white placeholder:text-white/25 rounded-2xl text-[15px] focus:border-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="pl-10 h-12 bg-[#1a1230] border-white/8 text-white placeholder:text-white/25 rounded-2xl text-[15px] focus:border-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
                     autoFocus
                   />
                 </div>
@@ -296,7 +296,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                 <select
                   value={planDate}
                   onChange={(e) => setPlanDate(e.target.value)}
-                  className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/8 text-white text-sm appearance-none"
+                  className="w-full h-11 px-3 rounded-xl bg-[#1a1230] border border-white/8 text-white text-sm appearance-none"
                 >
                   {dateOptions.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -309,7 +309,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                   type="time"
                   value={planTime}
                   onChange={(e) => setPlanTime(e.target.value)}
-                  className="w-full h-11 bg-white/5 border-white/8 text-white rounded-xl text-sm focus:border-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="w-full h-11 bg-[#1a1230] border-white/8 text-white rounded-xl text-sm focus:border-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
             </div>
@@ -323,7 +323,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                 onChange={(e) => setDescription(e.target.value)}
                 maxLength={280}
                 rows={2}
-                className="w-full bg-white/5 border border-white/8 text-white placeholder:text-white/25 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-white/20"
+                className="w-full bg-[#1a1230] border border-white/8 text-white placeholder:text-white/25 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-white/20"
               />
             </div>
 
@@ -337,7 +337,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                     <button
                       key={friend.id}
                       onClick={() => toggleFriend(friend)}
-                      className="flex items-center gap-1.5 bg-white/5 border border-white/8 rounded-full pl-1 pr-2.5 py-1 hover:bg-white/10 transition-colors"
+                      className="flex items-center gap-1.5 bg-[#1a1230] border border-white/8 rounded-full pl-1 pr-2.5 py-1 hover:bg-white/10 transition-colors"
                     >
                       <Avatar className="h-5 w-5">
                         <AvatarImage src={friend.avatar_url || undefined} />
@@ -357,7 +357,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                   value={friendSearch}
                   onChange={(e) => { setFriendSearch(e.target.value); setShowFriendPicker(true); }}
                   onFocus={() => setShowFriendPicker(true)}
-                  className="pl-10 h-10 bg-white/5 border-white/8 text-white placeholder:text-white/25 rounded-xl text-sm focus:border-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="pl-10 h-10 bg-[#1a1230] border-white/8 text-white placeholder:text-white/25 rounded-xl text-sm focus:border-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
 
@@ -396,7 +396,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                   className={`flex-1 py-2 rounded-full text-xs font-medium transition-colors ${
                     visibility === 'friends'
                       ? 'bg-[#d4ff00] text-black'
-                      : 'bg-white/5 text-white/50 border border-white/8'
+                      : 'bg-[#1a1230] text-white/50 border border-white/8'
                   }`}
                 >
                   All Friends
@@ -406,7 +406,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                   className={`flex-1 py-2 rounded-full text-xs font-medium transition-colors ${
                     visibility === 'close_friends'
                       ? 'bg-[#d4ff00] text-black'
-                      : 'bg-white/5 text-white/50 border border-white/8'
+                      : 'bg-[#1a1230] text-white/50 border border-white/8'
                   }`}
                 >
                   Close Friends
