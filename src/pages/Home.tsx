@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useKeyboardAware } from '@/hooks/useKeyboardAware';
 import { useVisibilityRefresh } from '@/hooks/useVisibilityRefresh';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
@@ -111,6 +112,20 @@ export default function Home() {
   const [sharePost, setSharePost] = useState<Post | null>(null);
   const [planPreselectedFriend, setPlanPreselectedFriend] = useState<{ id: string; display_name: string; avatar_url: string | null } | null>(null);
   const loadTriggerRef = useRef<HTMLDivElement>(null);
+  const { isKeyboardOpen } = useKeyboardAware();
+  const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Scroll the active post into view when comments are expanded
+  useEffect(() => {
+    if (!expandedPostId) return;
+    // Small delay to let the comment input render and keyboard open
+    const timer = setTimeout(() => {
+      const el = postRefs.current.get(expandedPostId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [expandedPostId]);
 
   // Auto-open Morning After modal if user tapped the recap notification
   useEffect(() => {
@@ -470,7 +485,7 @@ export default function Home() {
 
       {/* Feed Content */}
       {feedMode === 'plans' ? (
-        <div className="py-4">
+        <div className="py-4 min-h-[calc(100vh+100px)]">
           <PlansFeed
             userId={user?.id || ''}
             weekendFilter={isWeekendRally}
@@ -619,10 +634,12 @@ export default function Home() {
           posts.map((post, index) => (
             <div
               key={post.id}
-              className="rounded-3xl overflow-hidden bg-white/[0.03] border border-white/[0.06] post-animate-in transition-all duration-300 mb-3 p-3"
+              ref={(el) => { if (el) postRefs.current.set(post.id, el); else postRefs.current.delete(post.id); }}
+              className="rounded-2xl overflow-hidden bg-white/[0.04] border border-white/[0.08] post-animate-in transition-all duration-300 mb-3 p-4"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <div className="flex items-center justify-between p-4">
+              {/* Header — avatar with gradient ring, name, venue, time, menu */}
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => openFriendCard({
@@ -631,14 +648,16 @@ export default function Home() {
                       avatarUrl: post.profiles?.avatar_url || null,
                       venueName: post.venue_name || undefined,
                     })}
-                    className="hover:opacity-80 transition-opacity"
+                    className="hover:opacity-80 transition-opacity flex-shrink-0"
                   >
-                    <Avatar className="h-10 w-10 border-2 border-white/20 ">
-                      <AvatarImage src={post.profiles?.avatar_url || undefined} />
-                      <AvatarFallback className="bg-[#1a0f2e] text-white">
-                        {post.profiles?.display_name?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="w-12 h-12 rounded-full p-[2px]" style={{ background: 'linear-gradient(135deg, #a855f7, #d4ff00)' }}>
+                      <Avatar className="w-full h-full border-2 border-[#1a0f2e]">
+                        <AvatarImage src={post.profiles?.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#1a0f2e] text-white text-sm">
+                          {post.profiles?.display_name?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
                   </button>
                   <div className="text-left min-w-0 flex-1">
                     <button
@@ -648,7 +667,7 @@ export default function Home() {
                         avatarUrl: post.profiles?.avatar_url || null,
                         venueName: post.venue_name || undefined,
                       })}
-                      className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
+                      className="font-semibold text-white hover:text-[#d4ff00] transition-colors text-[15px]"
                     >
                       {post.profiles?.display_name}
                     </button>
@@ -666,16 +685,16 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-white/60 text-sm">{getTimeAgo(post.created_at)}</span>
+                  <span className="text-white/40 text-sm">{getTimeAgo(post.created_at)}</span>
                   {post.user_id === user?.id && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button className="text-white/50 hover:text-white transition-colors p-1">
+                        <button className="text-white/40 hover:text-white transition-colors p-1">
                           <MoreHorizontal className="h-5 w-5" />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#4a3566]">
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => handlePostDelete(post.id)}
                           className="text-red-500 hover:text-red-400 focus:text-red-400 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer"
                         >
@@ -688,8 +707,9 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Image/video — rounded corners within card */}
               {post.image_url && (
-                <div className="w-full aspect-square relative overflow-hidden group image-vignette">
+                <div className="w-full aspect-[4/5] relative overflow-hidden rounded-xl mb-3 group">
                   {post.media_type === 'video' ? (
                     <video
                       src={post.image_url}
@@ -712,45 +732,50 @@ export default function Home() {
                 </div>
               )}
 
-              <div className={!post.image_url ? "pt-1 px-4 pb-4 space-y-3" : "p-4 space-y-3"}>
-                {/* Text-only posts - caption ABOVE engagement row */}
+              <div className="space-y-2.5">
+                {/* Text-only posts — caption above engagement */}
                 {!post.image_url && post.text && (
                   <div className="text-white text-[17px] leading-relaxed font-medium">
                     {post.text}
                   </div>
                 )}
 
-                <div className="flex items-center gap-4">
-                  <button 
+                {/* Engagement row — heart count | comment count ... send */}
+                <div className="flex items-center">
+                  <button
                     onClick={() => handleLikePost(post.id)}
-                    className={`flex items-center gap-2 transition-all active:scale-90 ${
-                      likedPosts.has(post.id) ? 'text-[#d4ff00]' : 'text-white hover:text-[#d4ff00]'
+                    className={`flex items-center gap-1.5 transition-all active:scale-90 ${
+                      likedPosts.has(post.id) ? 'text-[#d4ff00]' : 'text-white/70 hover:text-[#d4ff00]'
                     }`}
                   >
-                    <Heart 
-                      className={`h-6 w-6 transition-all ${
+                    <Heart
+                      className={`h-[22px] w-[22px] transition-all ${
                         animatingLike === post.id ? 'animate-scale-in' : ''
-                      } ${likedPosts.has(post.id) ? 'like-glow drop-shadow-[0_0_6px_rgba(212,255,0,0.6)]' : ''}`}
+                      }`}
                       fill={likedPosts.has(post.id) ? 'currentColor' : 'none'}
                     />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedPostForLikes(post.id); }}
+                      className="font-semibold text-sm text-white/80 hover:text-white transition-colors"
+                    >
+                      {post.likes_count || 0}
+                    </button>
                   </button>
-                  <button 
-                    onClick={() => setSelectedPostForLikes(post.id)}
-                    className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
-                  >
-                    {post.likes_count || 0} {post.likes_count === 1 ? 'like' : 'likes'}
-                  </button>
-                  <button 
+
+                  <div className="w-px h-4 bg-white/10 mx-3" />
+
+                  <button
                     onClick={() => handleToggleComments(post.id)}
-                    className="flex items-center gap-2 text-white hover:text-[#d4ff00] transition-colors"
+                    className="flex items-center gap-1.5 text-white/70 hover:text-[#d4ff00] transition-colors"
                   >
-                    <MessageCircle className="h-6 w-6" />
-                    <span className="font-semibold">{post.comments_count || 0}</span>
+                    <MessageCircle className="h-[22px] w-[22px]" />
+                    <span className="font-semibold text-sm text-white/80">{post.comments_count || 0}</span>
                   </button>
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="text-white hover:text-[#d4ff00] transition-colors ml-auto">
-                        <Send className="h-6 w-6" />
+                      <button className="text-white/50 hover:text-[#d4ff00] transition-colors ml-auto">
+                        <Send className="h-[22px] w-[22px]" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#4a3566]">
@@ -791,21 +816,23 @@ export default function Home() {
                   </DropdownMenu>
                 </div>
 
-                {/* Image posts with captions - Instagram style, BELOW engagement row */}
+                {/* Caption — below engagement, with thin separator */}
                 {post.image_url && post.text && (
-                  <div className="text-white/90 text-sm">
-                    <button
-                      onClick={() => openFriendCard({
-                        userId: post.user_id,
-                        displayName: post.profiles?.display_name || 'Friend',
-                        avatarUrl: post.profiles?.avatar_url || null,
-                        venueName: post.venue_name || undefined,
-                      })}
-                      className="font-semibold text-white hover:text-[#d4ff00] transition-colors"
-                    >
-                      {post.profiles?.display_name}
-                    </button>{' '}
-                    {post.text}
+                  <div className="pt-2 border-t border-white/[0.06]">
+                    <span className="text-white/90 text-sm">
+                      <button
+                        onClick={() => openFriendCard({
+                          userId: post.user_id,
+                          displayName: post.profiles?.display_name || 'Friend',
+                          avatarUrl: post.profiles?.avatar_url || null,
+                          venueName: post.venue_name || undefined,
+                        })}
+                        className="font-bold text-white hover:text-[#d4ff00] transition-colors mr-1.5"
+                      >
+                        {post.profiles?.display_name}
+                      </button>
+                      {post.text}
+                    </span>
                   </div>
                 )}
 
@@ -878,8 +905,8 @@ export default function Home() {
       )}
 
 
-      {/* Create Post FAB - only show in newsfeed mode */}
-      {feedMode === 'newsfeed' && (
+      {/* Create Post FAB - hide when keyboard is open */}
+      {feedMode === 'newsfeed' && !isKeyboardOpen && (
         <button
           onClick={() => setShowCreatePost(true)}
           className="fixed bottom-28 right-6 z-20 w-14 h-14 rounded-full bg-[#d4ff00] flex items-center justify-center hover:scale-105 transition-transform"
