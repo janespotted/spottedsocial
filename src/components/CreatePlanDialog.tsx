@@ -270,7 +270,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                   />
                 </div>
               </div>
-              <div className="mt-1">
+              <div className="mt-1 pb-40">
                 {filteredVenues.map(venue => (
                   <button
                     key={venue.id}
