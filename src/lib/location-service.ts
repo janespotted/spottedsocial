@@ -334,10 +334,10 @@ export const findNearbyVenues = async (
 
     if (error) throw error;
 
-    const dbVenues: VenueMatch[] = (data || []).map((v: { venue_id: string; venue_name: string; distance_meters: number }) => ({
-      id: v.venue_id,
-      name: v.venue_name,
-      distance: v.distance_meters,
+    const dbVenues: VenueMatch[] = (data || []).map((v: any) => ({
+      id: v.venue_id || v.id,
+      name: v.venue_name || v.name,
+      distance: v.distance_meters ?? v.distance,
     }));
 
     // If DB has enough results, return them

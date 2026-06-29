@@ -19,12 +19,12 @@ export function useOnboarding() {
     try {
       const { data } = await supabase
         .from('profiles')
-        .select('has_onboarded')
+        .select('onboarding_completed')
         .eq('id', user?.id)
         .single();
 
       // Show onboarding if user hasn't completed it
-      setShowOnboarding(data?.has_onboarded === false);
+      setShowOnboarding(data?.onboarding_completed === false);
     } catch (error) {
       console.error('Error checking onboarding status:', error);
     } finally {
@@ -36,7 +36,7 @@ export function useOnboarding() {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ has_onboarded: true })
+        .update({ onboarding_completed: true })
         .eq('id', user?.id);
 
       if (error) {

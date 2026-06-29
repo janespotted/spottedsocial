@@ -126,7 +126,7 @@ export function MeetUpProvider({ children }: { children: ReactNode }) {
 
       // Get sender's display name using safe RPC (own profile is always visible)
       const { data: senderProfiles, error: profileError } = await supabase
-        .rpc('get_profile_safe', { target_user_id: user.id });
+        .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', user.id);
 
       if (profileError) throw profileError;
       const senderProfile = senderProfiles?.[0];

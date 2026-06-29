@@ -102,10 +102,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         async (payload) => {
           console.log('New notification received (realtime):', payload);
           
-          // Fetch sender profile using safe RPC (bypasses RLS)
-          const { data: profileData } = await supabase.rpc('get_profile_safe', { 
-            target_user_id: payload.new.sender_id 
-          });
+          // Fetch sender profile
+          const { data: profileData } = await supabase
+            .from('profiles').select('id, display_name, username, avatar_url').eq('id', payload.new.sender_id);
           const profile = profileData?.[0];
 
           console.log('Sender profile fetched:', profile);
@@ -160,10 +159,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
           if (!membership) return;
 
-          // Fetch sender profile using safe RPC
-          const { data: profileData } = await supabase.rpc('get_profile_safe', { 
-            target_user_id: newMsg.sender_id 
-          });
+          // Fetch sender profile
+          const { data: profileData } = await supabase
+            .from('profiles').select('id, display_name, username, avatar_url').eq('id', newMsg.sender_id);
           const profile = profileData?.[0];
 
           const preview = newMsg.text.length > 50 ? newMsg.text.slice(0, 50) + '...' : newMsg.text;

@@ -1,3 +1,7 @@
+# Apple auth keys and scripts with secrets
+*.p8
+scripts/gen-apple-jwt.*
+
 # Logs
 logs
 *.log

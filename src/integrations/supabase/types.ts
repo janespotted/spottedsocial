@@ -562,6 +562,75 @@ export type Database = {
           },
         ]
       }
+      location_events: {
+        Row: {
+          id: string
+          created_at: string
+          evaluation_id: string
+          user_id: string | null
+          event_type: string
+          evaluated_venue_id: string | null
+          evaluated_venue_name: string | null
+          gps_lat: number | null
+          gps_lng: number | null
+          gps_accuracy_meters: number | null
+          distance_to_venue_meters: number | null
+          dwell_time_seconds: number | null
+          speed_mph: number | null
+          time_of_day: number | null
+          day_of_week: number | null
+          user_status_before: string | null
+          user_status_after: string | null
+          thresholds_met: Json | null
+          result: string | null
+          friends_at_venue_count: number | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          evaluation_id: string
+          user_id?: string | null
+          event_type: string
+          evaluated_venue_id?: string | null
+          evaluated_venue_name?: string | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          gps_accuracy_meters?: number | null
+          distance_to_venue_meters?: number | null
+          dwell_time_seconds?: number | null
+          speed_mph?: number | null
+          time_of_day?: number | null
+          day_of_week?: number | null
+          user_status_before?: string | null
+          user_status_after?: string | null
+          thresholds_met?: Json | null
+          result?: string | null
+          friends_at_venue_count?: number | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          evaluation_id?: string
+          user_id?: string | null
+          event_type?: string
+          evaluated_venue_id?: string | null
+          evaluated_venue_name?: string | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          gps_accuracy_meters?: number | null
+          distance_to_venue_meters?: number | null
+          dwell_time_seconds?: number | null
+          speed_mph?: number | null
+          time_of_day?: number | null
+          day_of_week?: number | null
+          user_status_before?: string | null
+          user_status_after?: string | null
+          thresholds_met?: Json | null
+          result?: string | null
+          friends_at_venue_count?: number | null
+        }
+        Relationships: []
+      }
       location_detection_logs: {
         Row: {
           confirmed_venue_id: string | null
@@ -2526,6 +2595,10 @@ export type Database = {
           venue_id: string
           venue_name: string
         }[]
+      }
+      get_mutual_friend_ids: {
+        Args: { p_user_id: string }
+        Returns: { user_id: string }[]
       }
       get_people_you_may_know: {
         Args: { p_limit?: number; p_user_id: string }

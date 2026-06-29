@@ -4,8 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useCheckIn } from '@/contexts/CheckInContext';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
+import { findNearbyVenues } from '@/lib/location-service';
 import { MapPin, MapPinOff, Search, Navigation, ChevronRight, Music, Wine, Beer, Building, Sofa } from 'lucide-react';
 
 interface NearbyVenue {
@@ -24,6 +26,7 @@ interface UpdateSpotSheetProps {
 
 export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotSheetProps) {
   const { user } = useAuth();
+  const { showOutConfirmation } = useCheckIn();
   const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<NearbyVenue[]>([]);
@@ -52,16 +55,12 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
       const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       setUserLocation(loc);
 
-      const { data } = await supabase.rpc('find_nearby_venues', {
-        user_lat: loc.lat,
-        user_lng: loc.lng,
-        radius_meters: 500,
-        max_results: 5,
-      });
+      // Use findNearbyVenues which includes Mapbox fallback for areas without DB venues
+      const venues = await findNearbyVenues(loc.lat, loc.lng, 800, 8);
 
-      if (data) {
-        // Enrich with venue metadata
-        const venueIds = data.map((v: any) => v.venue_id);
+      if (venues.length > 0) {
+        // Enrich with venue metadata (type, neighborhood) for DB venues
+        const venueIds = venues.map(v => v.id).filter(Boolean);
         const { data: venueDetails } = await supabase
           .from('venues')
           .select('id, neighborhood, type')
@@ -69,13 +68,16 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
 
         const detailsMap = new Map((venueDetails || []).map(v => [v.id, v]));
 
-        setNearbyVenues(data.map((v: any) => ({
-          id: v.venue_id,
-          name: v.venue_name,
-          distance: Math.round(v.distance_meters),
-          neighborhood: detailsMap.get(v.venue_id)?.neighborhood,
-          type: detailsMap.get(v.venue_id)?.type,
-        })));
+        setNearbyVenues(venues
+          .filter(v => v.name) // exclude venues with no name
+          .map(v => ({
+            id: v.id,
+            name: v.name,
+            distance: Math.round(v.distance),
+            neighborhood: detailsMap.get(v.id)?.neighborhood,
+            type: detailsMap.get(v.id)?.type,
+          }))
+        );
       }
     } catch {
       // GPS not available
@@ -159,16 +161,17 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
         })
         .eq('id', user.id);
 
-      toast(`📍 Now at ${venue.name}`);
       onOpenChange(false);
       onUpdated?.();
+      // Show "You're out at X" confirmation card
+      showOutConfirmation(venue.name, venue.id, 'all_friends');
     } catch (error) {
       console.error('Error switching venue:', error);
       toast.error('Something went wrong');
     } finally {
       setLoading(false);
     }
-  }, [user, userLocation, onOpenChange, onUpdated]);
+  }, [user, userLocation, onOpenChange, onUpdated, showOutConfirmation]);
 
   const handleCustomVenue = async () => {
     if (!customName.trim() || !user) return;
@@ -232,10 +235,9 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
         .update({ last_known_lat: lat, last_known_lng: lng, last_location_at: now })
         .eq('id', user.id);
 
-      const displayNeighborhood = detectedNeighborhood ? ` (${detectedNeighborhood})` : '';
-      toast(`📍 Now at ${customName.trim()}${displayNeighborhood}`);
       onOpenChange(false);
       onUpdated?.();
+      showOutConfirmation(customName.trim(), '', 'all_friends');
     } catch (error) {
       console.error('Error setting custom venue:', error);
       toast.error('Something went wrong');
@@ -326,14 +328,16 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
                   disabled={loading}
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors disabled:opacity-50"
                 >
-                  <span className="flex items-center">{venueTypeIcon(venue.type)}</span>
-                  <div className="flex-1 text-left">
-                    <p className="text-white font-medium text-sm">{venue.name}</p>
-                    <p className="text-white/40 text-xs">
-                      {venue.type && `${venue.type.replace(/_/g, ' ')} · `}
-                      {venue.neighborhood}
-                      {venue.distance > 0 && ` · ${venue.distance}m`}
-                    </p>
+                  <span className="flex-shrink-0 flex items-center">{venueTypeIcon(venue.type)}</span>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-white font-medium text-sm truncate">{venue.name || 'Unknown venue'}</p>
+                    {(venue.neighborhood || venue.distance > 0) && (
+                      <p className="text-white/40 text-xs truncate">
+                        {venue.type && `${venue.type.replace(/_/g, ' ')} · `}
+                        {venue.neighborhood}
+                        {venue.distance > 0 && ` · ${venue.distance}m`}
+                      </p>
+                    )}
                   </div>
                   <ChevronRight className="w-4 h-4 text-white/20" />
                 </button>

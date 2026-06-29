@@ -25,9 +25,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Spotted needs camera access to take photos and videos for posts.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Spotted needs your location to show you nearby venues and friends.</string>
+	<string>Spotted uses your location to show which friends are nearby and detect when you arrive at venues.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Spotted uses your location in the background to automatically update your venue when you move to a new spot.</string>
+	<string>Spotted uses background location to notify you when friends arrive at venues and auto-detect your check-ins, even when the app is closed. Your location is only shared with friends you choose.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

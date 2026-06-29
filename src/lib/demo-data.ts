@@ -4,93 +4,88 @@ import type { SupportedCity } from './city-detection';
 // Real NYC top-tier venues (scraped from top NYC bar/club rankings 2025)
 // These are "promoted" venues that appear in bootstrap mode (75% of leaderboard)
 export const NYC_PROMOTED_VENUES = [
-  // Top Manhattan Bars
-  { name: "Superbueno", lat: 40.7249, lng: -73.9865, neighborhood: "East Village", type: "bar" },
-  { name: "Sunken Harbor Club", lat: 40.6923, lng: -73.9872, neighborhood: "Downtown Brooklyn", type: "bar" },
-  { name: "Bar Snack", lat: 40.7258, lng: -73.9874, neighborhood: "East Village", type: "bar" },
-  { name: "Attaboy", lat: 40.7185, lng: -73.9885, neighborhood: "Lower East Side", type: "bar" },
-  { name: "schmuck.", lat: 40.7251, lng: -73.9863, neighborhood: "East Village", type: "bar" },
-  { name: "Saint Tuesday", lat: 40.7169, lng: -73.9982, neighborhood: "Tribeca", type: "bar" },
-  { name: "The Dead Rabbit", lat: 40.7040, lng: -74.0124, neighborhood: "Financial District", type: "bar" },
-  { name: "Sunn's", lat: 40.7161, lng: -73.9977, neighborhood: "Chinatown", type: "bar" },
-  { name: "The Mulberry", lat: 40.7221, lng: -73.9951, neighborhood: "Nolita", type: "bar" },
-  { name: "Amber Room", lat: 40.7198, lng: -73.9891, neighborhood: "East Village", type: "bar" },
-  { name: "Patent Pending", lat: 40.7234, lng: -73.9914, neighborhood: "Lower East Side", type: "bar" },
-  { name: "Double Chicken Please", lat: 40.7195, lng: -73.9921, neighborhood: "Lower East Side", type: "bar" },
-  { name: "Dante NYC", lat: 40.7310, lng: -74.0029, neighborhood: "West Village", type: "bar" },
-  
-  // Top Manhattan Clubs & Lounges
-  { name: "Ketchy Shuby", lat: 40.7231, lng: -73.9969, neighborhood: "SoHo", type: "club" },
-  { name: "Gospël", lat: 40.7241, lng: -73.9977, neighborhood: "SoHo", type: "club" },
-  { name: "Jean's", lat: 40.7251, lng: -73.9988, neighborhood: "Downtown", type: "club" },
+  // === 1-9: Big-energy clubs / dance floors ===
+  { name: "Marquee NYC", lat: 40.7478, lng: -74.0013, neighborhood: "Chelsea", type: "club" },
+  { name: "Nebula", lat: 40.7580, lng: -73.9855, neighborhood: "Midtown", type: "club" },
   { name: "The Box", lat: 40.7216, lng: -73.9935, neighborhood: "Lower East Side", type: "club" },
-  { name: "Paul's Casablanca", lat: 40.7235, lng: -73.9969, neighborhood: "SoHo", type: "club" },
-  { name: "Paul's Cocktail Lounge", lat: 40.7171, lng: -74.0089, neighborhood: "Tribeca", type: "lounge" },
-  { name: "The Nines", lat: 40.7268, lng: -73.9945, neighborhood: "NoHo", type: "lounge" },
-  { name: "Little Sister Lounge", lat: 40.7267, lng: -73.9857, neighborhood: "East Village", type: "club" },
-  { name: "Le Bain", lat: 40.7414, lng: -74.0078, neighborhood: "Chelsea", type: "club" },
-  { name: "Schimanski", lat: 40.7089, lng: -73.9332, neighborhood: "Williamsburg", type: "club" },
-  { name: "Public Hotel Rooftop", lat: 40.7252, lng: -73.9881, neighborhood: "Lower East Side", type: "lounge" },
-  
-  // Brooklyn Hotspots
-  { name: "Unveiled", lat: 40.7106, lng: -73.9638, neighborhood: "Williamsburg", type: "club" },
-  { name: "Studio Maison Nur", lat: 40.6844, lng: -73.9529, neighborhood: "Brooklyn", type: "lounge" },
-  { name: "House of Yes", lat: 40.7089, lng: -73.9332, neighborhood: "Bushwick", type: "club" },
-  { name: "Elsewhere", lat: 40.7067, lng: -73.9278, neighborhood: "Bushwick", type: "club" },
-  { name: "Nowadays", lat: 40.7067, lng: -73.9278, neighborhood: "Ridgewood", type: "club" },
-  { name: "Good Room", lat: 40.7089, lng: -73.9343, neighborhood: "Greenpoint", type: "club" },
-  { name: "TBA Brooklyn", lat: 40.7234, lng: -73.9567, neighborhood: "Williamsburg", type: "club" },
-  
-  // Midtown & Uptown
-  { name: "PHD Rooftop", lat: 40.7614, lng: -73.9776, neighborhood: "Midtown", type: "lounge" },
-  { name: "230 Fifth", lat: 40.7448, lng: -73.9873, neighborhood: "Flatiron", type: "rooftop" },
-  { name: "The Campbell", lat: 40.7527, lng: -73.9772, neighborhood: "Grand Central", type: "bar" },
+  { name: "Jean's", lat: 40.7251, lng: -73.9988, neighborhood: "SoHo", type: "club" },
+  { name: "Soho Grand Club Room", lat: 40.7243, lng: -74.0006, neighborhood: "SoHo", type: "club" },
+  { name: "Amber Room", lat: 40.7490, lng: -73.9780, neighborhood: "Midtown", type: "club" },
+  { name: "Loosie's", lat: 40.7198, lng: -73.9888, neighborhood: "Lower East Side", type: "club" },
+  { name: "Out of Ordinary (OOO)", lat: 40.7410, lng: -73.9890, neighborhood: "Flatiron", type: "club" },
+  { name: "Le Bain", lat: 40.7414, lng: -74.0078, neighborhood: "Meatpacking", type: "club" },
+
+  // === 10-19: Cocktail bars + Dimes Square (swapped with 20-29 for dynamic feel) ===
+  { name: "Seed Library", lat: 40.7450, lng: -73.9880, neighborhood: "NoMad", type: "bar" },
+  { name: "Superbueno", lat: 40.7249, lng: -73.9865, neighborhood: "East Village", type: "bar" },
+  { name: "Overstory", lat: 40.7065, lng: -74.0075, neighborhood: "Financial District", type: "bar" },
+  { name: "Bar Kabawa", lat: 40.7190, lng: -73.9890, neighborhood: "Lower East Side", type: "bar" },
+  { name: "Sunken Harbor Club", lat: 40.6923, lng: -73.9872, neighborhood: "Downtown Brooklyn", type: "bar" },
+  { name: "Oddball", lat: 40.7260, lng: -73.9850, neighborhood: "East Village", type: "bar" },
+  { name: "Dear Irving", lat: 40.7375, lng: -73.9860, neighborhood: "Gramercy", type: "bar" },
+  { name: "Time Again", lat: 40.7140, lng: -73.9920, neighborhood: "Dimes Square", type: "bar" },
+  { name: "Eel Bar", lat: 40.7138, lng: -73.9915, neighborhood: "Dimes Square", type: "bar" },
+
+  // === 20-29: Underground + world-class cocktail bars (swapped from 10-19) ===
+  { name: "Artspace at PUBLIC", lat: 40.7252, lng: -73.9881, neighborhood: "Lower East Side", type: "club" },
+  { name: "Basement", lat: 40.7111, lng: -73.9103, neighborhood: "Ridgewood", type: "club" },
+  { name: "Nowadays", lat: 40.7010, lng: -73.9130, neighborhood: "Ridgewood", type: "club" },
+  { name: "Good Room", lat: 40.7270, lng: -73.9510, neighborhood: "Greenpoint", type: "club" },
+  { name: "Bossa Nova Civic Club", lat: 40.7060, lng: -73.9210, neighborhood: "Bushwick", type: "club" },
+  { name: "Public Records", lat: 40.6783, lng: -73.9855, neighborhood: "Gowanus", type: "club" },
+  { name: "House of Yes", lat: 40.7055, lng: -73.9225, neighborhood: "Bushwick", type: "club" },
+  { name: "Double Chicken Please", lat: 40.7195, lng: -73.9921, neighborhood: "Lower East Side", type: "bar" },
+  { name: "Attaboy", lat: 40.7185, lng: -73.9885, neighborhood: "Lower East Side", type: "bar" },
+
+  // === 30: Dimes Square ===
+  { name: "Le Dive", lat: 40.7135, lng: -73.9918, neighborhood: "Dimes Square", type: "bar" },
+  { name: "Spring Bar", lat: 40.7130, lng: -73.9925, neighborhood: "Dimes Square", type: "bar" },
+  { name: "Schmuck", lat: 40.7251, lng: -73.9863, neighborhood: "East Village", type: "bar" },
 ];
 
 // Real LA top-tier venues (top LA nightlife spots 2025)
 // These are "promoted" venues that appear in bootstrap mode for LA users
 export const LA_PROMOTED_VENUES = [
-  // West Hollywood / Hollywood
-  { name: "Sound Nightclub", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "club" },
-  { name: "Academy LA", lat: 34.1020, lng: -118.3261, neighborhood: "Hollywood", type: "club" },
-  { name: "Avalon Hollywood", lat: 34.1020, lng: -118.3261, neighborhood: "Hollywood", type: "club" },
-  { name: "Exchange LA", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "club" },
+  // Top Bars (2026 rankings — 50 Best, TimeOut, Infatuation)
+  { name: "Vandell", lat: 34.1042, lng: -118.2870, neighborhood: "Los Feliz", type: "bar" },
+  { name: "Thunderbolt", lat: 34.0738, lng: -118.2862, neighborhood: "Historic Filipinotown", type: "bar" },
+  { name: "Mírate", lat: 34.1055, lng: -118.2890, neighborhood: "Los Feliz", type: "bar" },
+  { name: "Death & Co LA", lat: 34.0400, lng: -118.2340, neighborhood: "Arts District", type: "bar" },
+  { name: "The Varnish", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "bar" },
+  { name: "Bar 109", lat: 34.0900, lng: -118.2950, neighborhood: "East Hollywood", type: "bar" },
+  { name: "Dante Beverly Hills", lat: 34.0736, lng: -118.4004, neighborhood: "Beverly Hills", type: "bar" },
+  { name: "Accomplice", lat: 34.0040, lng: -118.4280, neighborhood: "Mar Vista", type: "bar" },
+  { name: "The Roger Room", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "bar" },
+  { name: "Seven Grand", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "bar" },
+  { name: "No Vacancy", lat: 34.1018, lng: -118.3266, neighborhood: "Hollywood", type: "bar" },
+  { name: "Harvard & Stone", lat: 34.0912, lng: -118.2945, neighborhood: "Hollywood", type: "bar" },
+  { name: "Dirty Laundry", lat: 34.1010, lng: -118.3280, neighborhood: "Hollywood", type: "bar" },
+
+  // Top Clubs (2026)
+  { name: "Sound Nightclub", lat: 34.0900, lng: -118.3290, neighborhood: "Hollywood", type: "club" },
+  { name: "Academy LA", lat: 34.0430, lng: -118.2350, neighborhood: "Downtown", type: "club" },
+  { name: "Avalon Hollywood", lat: 34.1018, lng: -118.3266, neighborhood: "Hollywood", type: "club" },
+  { name: "Exchange LA", lat: 34.0453, lng: -118.2510, neighborhood: "Downtown", type: "club" },
+  { name: "Resident DTLA", lat: 34.0410, lng: -118.2360, neighborhood: "Arts District", type: "club" },
+
+  // West Hollywood / Lounges
   { name: "The Abbey", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "bar" },
-  { name: "Sunset Room Hollywood", lat: 34.0907, lng: -118.3871, neighborhood: "West Hollywood", type: "club" },
-  { name: "The Highlight Room", lat: 34.0907, lng: -118.3871, neighborhood: "Hollywood", type: "lounge" },
-  { name: "Create Nightclub", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "club" },
-  
-  // Santa Monica / Venice / Westside (NEW - 8 venues)
+  { name: "Delilah", lat: 34.0890, lng: -118.3870, neighborhood: "West Hollywood", type: "lounge" },
+  { name: "Catch LA", lat: 34.0880, lng: -118.3860, neighborhood: "West Hollywood", type: "lounge" },
+  { name: "EP & LP", lat: 34.0882, lng: -118.3855, neighborhood: "West Hollywood", type: "lounge" },
+  { name: "The Highlight Room", lat: 34.1000, lng: -118.3260, neighborhood: "Hollywood", type: "lounge" },
+  { name: "Spire 73", lat: 34.0520, lng: -118.2560, neighborhood: "Downtown", type: "lounge" },
+  { name: "Perch", lat: 34.0490, lng: -118.2530, neighborhood: "Downtown", type: "lounge" },
+
+  // Santa Monica / Venice / Westside
   { name: "The Bungalow", lat: 34.0062, lng: -118.4715, neighborhood: "Santa Monica", type: "bar" },
-  { name: "The Galley", lat: 34.0082, lng: -118.4889, neighborhood: "Santa Monica", type: "bar" },
-  { name: "Finn McCool's", lat: 34.0057, lng: -118.4799, neighborhood: "Santa Monica", type: "bar" },
   { name: "The Basement Tavern", lat: 34.0134, lng: -118.4917, neighborhood: "Santa Monica", type: "bar" },
-  { name: "The Roosterfish", lat: 33.9920, lng: -118.4715, neighborhood: "Venice", type: "bar" },
   { name: "The Townhouse & Del Monte Speakeasy", lat: 33.9934, lng: -118.4701, neighborhood: "Venice", type: "bar" },
   { name: "High Rooftop Lounge", lat: 33.9913, lng: -118.4660, neighborhood: "Venice", type: "lounge" },
-  { name: "Simmzy's Manhattan Beach", lat: 33.8846, lng: -118.4094, neighborhood: "Manhattan Beach", type: "bar" },
-  
-  // Downtown LA
-  { name: "Resident DTLA", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "club" },
-  { name: "No Vacancy", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
-  { name: "EP & LP", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
-  { name: "Death & Co LA", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "bar" },
-  { name: "Warwick", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
-  
-  // Arts District / Silverlake
-  { name: "Good Times at Davey Wayne's", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
-  { name: "The Roger Room", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "bar" },
-  { name: "Harvard & Stone", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
-  { name: "Mom's Bar", lat: 34.0877, lng: -118.2706, neighborhood: "Silverlake", type: "bar" },
-  { name: "Villains Tavern", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "bar" },
-  { name: "The Well", lat: 34.0481, lng: -118.2394, neighborhood: "Downtown", type: "bar" },
-  
-  // High-end / Restaurants with nightlife
-  { name: "Catch LA", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
-  { name: "Delilah", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
-  { name: "Nightingale Plaza", lat: 34.0877, lng: -118.3840, neighborhood: "West Hollywood", type: "lounge" },
-  { name: "Seven Grand", lat: 34.0453, lng: -118.2499, neighborhood: "Downtown", type: "bar" },
-  { name: "Dirty Laundry", lat: 34.0481, lng: -118.2394, neighborhood: "Hollywood", type: "bar" },
+
+  // Silverlake / Los Feliz / East Side
+  { name: "Good Times at Davey Wayne's", lat: 34.1015, lng: -118.3275, neighborhood: "Hollywood", type: "bar" },
+  { name: "Mom's Bar", lat: 34.0870, lng: -118.2706, neighborhood: "Silverlake", type: "bar" },
 ];
 
 // Real Palm Beach / West Palm Beach top-tier venues - NIGHTLIFE FOCUSED ONLY
@@ -331,9 +326,8 @@ export async function clearDemoData() {
       throw new Error(result.error || 'Failed to clear demo data');
     }
     
-    // Reset seeded flag
-    const current = getDemoMode();
-    localStorage.setItem('demo_mode', JSON.stringify({ ...current, seeded: false }));
+    // Disable demo mode and reset seeded flag
+    localStorage.setItem('demo_mode', JSON.stringify({ enabled: false, seeded: false }));
     window.dispatchEvent(new Event('demoModeChanged'));
     
     return { success: true };
@@ -357,42 +351,54 @@ function getRandomItems<T>(array: T[], count: number): T[] {
   return shuffled.slice(0, count);
 }
 
-export async function seedDemoData(currentUserId: string) {
+export async function seedDemoData(currentUserId: string, city: string = 'nyc') {
   try {
-    console.log('🎬 Starting demo data seeding...');
-    
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('Not authenticated');
-    }
+    console.log(`Starting demo data seeding for ${city}...`);
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/seed-demo-data`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action: 'seed', userId: currentUserId }),
-      }
-    );
+    const { data, error } = await supabase.functions.invoke('seed-demo-data', {
+      body: { action: 'seed', city, userId: currentUserId },
+    });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error || 'Failed to seed demo data');
+    if (error) {
+      const status = (error as any)?.context?.status || 'unknown';
+      const detail = typeof data === 'object' ? data?.error : String(data);
+      console.error(`Seed failed (HTTP ${status}):`, detail || error.message);
+      return { success: false, error, status, detail: detail || error.message };
     }
 
     markDemoSeeded();
-    console.log('🎉 Demo data seeded successfully!');
-    
-    return { 
-      success: true, 
-      stats: result.stats,
+    console.log('Demo data seeded successfully!', data?.stats);
+
+    return {
+      success: true,
+      stats: data.stats,
     };
   } catch (error) {
-    console.error('❌ Error seeding demo data:', error);
-    return { success: false, error };
+    console.error('Error seeding demo data:', error);
+    return { success: false, error, status: 'exception', detail: String(error) };
+  }
+}
+
+export async function healthCheckDemoData(): Promise<{
+  success: boolean;
+  healthy?: boolean;
+  stats?: Record<string, number>;
+  isAdmin?: boolean;
+  error?: string;
+  status?: number | string;
+}> {
+  try {
+    const { data, error } = await supabase.functions.invoke('seed-demo-data', {
+      body: { action: 'health-check' },
+    });
+
+    if (error) {
+      const status = (error as any)?.context?.status || 'unknown';
+      return { success: false, error: data?.error || error.message, status };
+    }
+
+    return { success: true, healthy: data.healthy, stats: data.stats, isAdmin: data.isAdmin };
+  } catch (error) {
+    return { success: false, error: String(error), status: 'exception' };
   }
 }

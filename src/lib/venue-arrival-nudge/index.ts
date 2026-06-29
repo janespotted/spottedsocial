@@ -1,15 +1,17 @@
 // Types
-export type { 
-  NightStatus, 
-  DeliveryMethod, 
-  NudgeTriggerContext, 
-  ToastTriggerContext, 
-  DetectedVenue, 
-  NudgeDecision, 
+export type {
+  NightStatus,
+  DeliveryMethod,
+  NudgeTriggerContext,
+  ToastTriggerContext,
+  DetectedVenue,
+  NudgeDecision,
   DwellTracker,
   VenueArrivalContext,
   VenueDeparture,
   LocationSnapshot,
+  ThresholdsMet,
+  TriggerResult,
 } from './types';
 
 // Trigger layer - unified engine

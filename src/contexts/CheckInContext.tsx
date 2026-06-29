@@ -20,6 +20,8 @@ interface CheckInContextType {
   openCheckIn: () => void;
   openCheckInFromReminder: () => void;
   openCheckInForVenueArrival: (venueId: string, venueName: string) => void;
+  openCheckInNewSpot: () => void;
+  skipToVenueDetection: boolean;
   closeCheckIn: () => void;
   // Venue arrival prompt state
   showVenueArrivalPrompt: boolean;
@@ -47,6 +49,7 @@ const CheckInContext = createContext<CheckInContextType | undefined>(undefined);
 export function CheckInProvider({ children }: { children: ReactNode }) {
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [isReminderTriggered, setIsReminderTriggered] = useState(false);
+  const [skipToVenueDetection, setSkipToVenueDetection] = useState(false);
   const [venueArrivalPayload, setVenueArrivalPayload] = useState<VenueArrivalPayload | null>(null);
   const [showVenueArrivalPrompt, setShowVenueArrivalPrompt] = useState(false);
   const [detectedVenue, setDetectedVenue] = useState<DetectedVenue | null>(null);
@@ -71,6 +74,12 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
     setShowCheckIn(true);
   };
 
+  const openCheckInNewSpot = () => {
+    setSkipToVenueDetection(true);
+    setIsReminderTriggered(false);
+    setShowCheckIn(true);
+  };
+
   const openCheckInForVenueArrival = (venueId: string, venueName: string) => {
     setVenueArrivalPayload({ venueId, venueName });
     setIsReminderTriggered(false);
@@ -80,6 +89,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
   const closeCheckIn = () => {
     setShowCheckIn(false);
     setIsReminderTriggered(false);
+    setSkipToVenueDetection(false);
     setVenueArrivalPayload(null);
   };
 
@@ -126,6 +136,8 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       openCheckIn,
       openCheckInFromReminder,
       openCheckInForVenueArrival,
+      openCheckInNewSpot,
+      skipToVenueDetection,
       closeCheckIn,
       showVenueArrivalPrompt,
       detectedVenue,

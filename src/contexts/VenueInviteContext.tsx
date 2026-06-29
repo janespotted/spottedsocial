@@ -48,13 +48,20 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
 
       // Get current user's profile for first name using safe RPC (own profile is always visible)
       const { data: profiles } = await supabase
-        .rpc('get_profile_safe', { target_user_id: user.id });
+        .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', user.id);
       const profile = profiles?.[0];
 
       const senderFirstName = profile?.display_name?.split(' ')[0] || 'Someone';
 
-      // Send notification to each filtered friend (real users only)
-      const notifications = filteredFriends.map(friend => ({
+      // Filter out demo users before sending notifications (not in auth.users)
+      const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+      const demoIds = new Set((allProfiles || []).filter((p: any) => p.is_demo).map((p: any) => p.id));
+      const realFriends = filteredFriends.filter(f => !demoIds.has(f.id));
+      if (realFriends.length === 0) {
+        setShowConfirmation(true);
+        return;
+      }
+      const notifications = realFriends.map(friend => ({
         sender_id: user.id,
         receiver_id: friend.id,
         type: 'venue_invite',

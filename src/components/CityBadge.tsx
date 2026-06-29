@@ -14,8 +14,8 @@ export function CityBadge() {
   };
 
   return (
-    <div className="inline-flex items-center px-2.5 py-0.5 rounded-xl bg-[#d4ff00]/20 border border-[#d4ff00]/40">
-      <span className="text-[#d4ff00] text-xs font-semibold uppercase tracking-wider">
+    <div className="inline-flex items-center px-2 py-0.5 rounded-lg bg-[#d4ff00]/10 border border-[#d4ff00]/20">
+      <span className="text-[#d4ff00] text-xs font-medium uppercase tracking-wide">
         {getCityDisplayName()}
       </span>
     </div>

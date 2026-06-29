@@ -4,6 +4,8 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { captureLocationWithVenue, calculateDistance, findNearestVenue, type LocationData } from './location-service';
 import { logEvent } from './event-logger';
 import { sendCheckinNotifications } from './checkin-notifications';
+import { logLocationEvent, createEvaluationId, markAutoCheckin } from './location-event-logger';
+import type { ThresholdsMet, TriggerResult } from './venue-arrival-nudge';
 
 interface LastCheckin {
   id: string;
@@ -267,6 +269,39 @@ const sendVenueChangeNotification = async (venueName: string): Promise<void> => 
  * Call this on app open and major interactions when user is "Out"
  */
 export const autoTrackVenue = async (userId: string): Promise<void> => {
+  const evalId = createEvaluationId();
+
+  // Helper to log a trigger_evaluated event and return (fire-and-forget)
+  const logAutoTrackEval = (
+    result: TriggerResult,
+    thresholds: ThresholdsMet,
+    extra?: {
+      venueId?: string | null;
+      venueName?: string | null;
+      lat?: number;
+      lng?: number;
+      accuracy?: number;
+      distance?: number;
+      speed?: number | null;
+    },
+  ) => {
+    logLocationEvent({
+      evaluation_id: evalId,
+      user_id: userId,
+      event_type: 'trigger_evaluated',
+      evaluated_venue_id: extra?.venueId ?? null,
+      evaluated_venue_name: extra?.venueName ?? null,
+      gps_lat: extra?.lat ?? null,
+      gps_lng: extra?.lng ?? null,
+      gps_accuracy_meters: extra?.accuracy ?? null,
+      distance_to_venue_meters: extra?.distance ?? null,
+      speed_mph: extra?.speed ?? null,
+      user_status_before: 'out',
+      thresholds_met: thresholds,
+      result,
+    });
+  };
+
   try {
     // Debounce: skip if called within 30 seconds
     const currentTime = Date.now();
@@ -309,7 +344,7 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
 
     // Capture fresh GPS coordinates
     const locationData = await captureLocationWithVenue();
-    
+
     // Calculate distance from last checkin
     const distanceMeters = calculateDistance(
       lastCheckin.lat,
@@ -323,14 +358,22 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
     // If <200m, no update needed
     if (distanceMeters < 200) {
       console.log('🔵 Still at same venue (<200m), updating GPS and check-in timestamp');
-      
+
+      logAutoTrackEval('suppressed_distance', {
+        accuracy_ok: true, distance_ok: false, dwell_ok: true, speed_ok: true,
+      }, {
+        venueId: lastCheckin.venue_id, venueName: lastCheckin.venue_name,
+        lat: locationData.lat, lng: locationData.lng,
+        accuracy: locationData.accuracy, distance: distanceMeters,
+      });
+
       // Update the active check-in's last_updated_at
       await supabase
         .from('checkins')
         .update({ last_updated_at: locationData.timestamp })
         .eq('user_id', userId)
         .is('ended_at', null);
-      
+
       // Update profile with fresh GPS but keep same venue
       await supabase
         .from('profiles')
@@ -344,6 +387,7 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
     }
 
     // Calculate speed if we have previous GPS data
+    let currentSpeed: number | null = null;
     if (trackingState.lastGPS) {
       const speed = calculateSpeed(
         trackingState.lastGPS.lat,
@@ -353,11 +397,20 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
         locationData.lng,
         locationData.timestamp
       );
+      currentSpeed = speed;
 
       console.log('🚗 Detected speed:', speed.toFixed(1), 'mph');
 
       if (speed > 12) {
         console.log('🔵 Speed >12 mph (car/transit), skipping auto-update');
+
+        logAutoTrackEval('suppressed_speed', {
+          accuracy_ok: true, distance_ok: true, dwell_ok: true, speed_ok: false,
+        }, {
+          lat: locationData.lat, lng: locationData.lng,
+          accuracy: locationData.accuracy, distance: distanceMeters, speed,
+        });
+
         trackingState.lastGPS = {
           lat: locationData.lat,
           lng: locationData.lng,
@@ -371,6 +424,14 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
     const inZone = await isInNightlifeZone(locationData.lat, locationData.lng);
     if (!inZone) {
       console.log('🔵 Not in nightlife zone, skipping auto-update');
+
+      logAutoTrackEval('suppressed_distance', {
+        accuracy_ok: true, distance_ok: false, dwell_ok: true, speed_ok: currentSpeed == null || currentSpeed <= 12,
+      }, {
+        lat: locationData.lat, lng: locationData.lng,
+        accuracy: locationData.accuracy, distance: distanceMeters, speed: currentSpeed,
+      });
+
       trackingState.lastGPS = {
         lat: locationData.lat,
         lng: locationData.lng,
@@ -381,9 +442,17 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
 
     // Find nearest venue at new location
     const nearestVenue = await findNearestVenue(locationData.lat, locationData.lng, 200);
-    
+
     if (!nearestVenue) {
       console.log('🔵 No venue found at new location, skipping auto-update');
+
+      logAutoTrackEval('suppressed_distance', {
+        accuracy_ok: true, distance_ok: false, dwell_ok: true, speed_ok: currentSpeed == null || currentSpeed <= 12,
+      }, {
+        lat: locationData.lat, lng: locationData.lng,
+        accuracy: locationData.accuracy, distance: distanceMeters, speed: currentSpeed,
+      });
+
       trackingState.lastGPS = {
         lat: locationData.lat,
         lng: locationData.lng,
@@ -395,13 +464,31 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
     // Check if it's actually a different venue
     if (nearestVenue.id === lastCheckin.venue_id) {
       console.log('🔵 Same venue detected, no update needed');
+
+      logAutoTrackEval('suppressed_cooldown', {
+        accuracy_ok: true, distance_ok: true, dwell_ok: true, speed_ok: currentSpeed == null || currentSpeed <= 12,
+      }, {
+        venueId: nearestVenue.id, venueName: nearestVenue.name,
+        lat: locationData.lat, lng: locationData.lng,
+        accuracy: locationData.accuracy, distance: nearestVenue.distance, speed: currentSpeed,
+      });
+
       return;
     }
 
     // All conditions met - auto-confirm venue check-in immediately
     console.log('✨ Auto-confirming venue change from', lastCheckin.venue_name, 'to', nearestVenue.name);
 
+    logAutoTrackEval('fired', {
+      accuracy_ok: true, distance_ok: true, dwell_ok: true, speed_ok: currentSpeed == null || currentSpeed <= 12,
+    }, {
+      venueId: nearestVenue.id, venueName: nearestVenue.name,
+      lat: locationData.lat, lng: locationData.lng,
+      accuracy: locationData.accuracy, distance: nearestVenue.distance, speed: currentSpeed,
+    });
+
     await createCheckin(userId, locationData, nearestVenue.id, nearestVenue.name);
+    markAutoCheckin(evalId, nearestVenue.id);
 
     // Venue-aware friend notifications (best-effort, non-blocking)
     sendCheckinNotifications(userId, nearestVenue.id, nearestVenue.name);

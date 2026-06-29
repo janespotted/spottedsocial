@@ -2,36 +2,50 @@ import React, { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { Send } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useInputFocus } from '@/contexts/InputFocusContext';
-import { useKeyboardAware } from '@/hooks/useKeyboardAware';
 
 interface CommentInputProps {
   postId: string;
   userAvatarUrl?: string;
   userInitial?: string;
   onSubmit: (postId: string, text: string) => void;
+  onDismiss?: () => void;
 }
 
 export const CommentInput = memo(function CommentInput({
   postId,
   userAvatarUrl,
   userInitial,
-  onSubmit
+  onSubmit,
+  onDismiss,
 }: CommentInputProps) {
   const [text, setText] = useState('');
   const { setInputFocused } = useInputFocus();
-  const { keyboardHeight } = useKeyboardAware();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus the input when mounted
+  // Auto-focus the input when mounted or postId changes
   useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }, []);
+    const timer = setTimeout(() => inputRef.current?.focus(), 100);
+    return () => clearTimeout(timer);
+  }, [postId]);
+
+  // Dismiss when input loses focus (keyboard closed)
+  const handleBlur = useCallback(() => {
+    setInputFocused(false);
+    // Small delay so submit can complete before dismiss
+    if (onDismiss) {
+      setTimeout(onDismiss, 150);
+    }
+  }, [setInputFocused, onDismiss]);
+
+  // Clear text when postId changes (switching between posts)
+  useEffect(() => {
+    setText('');
+  }, [postId]);
 
   const handleSubmit = useCallback(() => {
     if (text.trim()) {
       onSubmit(postId, text);
       setText('');
-      // Keep focus for rapid commenting
       inputRef.current?.focus();
     }
   }, [postId, text, onSubmit]);
@@ -44,11 +58,11 @@ export const CommentInput = memo(function CommentInput({
   }, [handleSubmit]);
 
   return (
-    <div className="fixed left-0 right-0 z-[100] bg-[#110a24] border-t border-white/8 px-4 py-2"
+    <div
+      className="fixed left-0 right-0 z-[100] bg-[#110a24] border-t border-white/8 px-4 py-2"
       style={{
-        bottom: keyboardHeight,
-        paddingBottom: keyboardHeight > 0 ? 8 : 'max(env(safe-area-inset-bottom, 8px), 8px)',
-        transition: 'bottom 250ms ease-out',
+        bottom: 0,
+        paddingBottom: 'max(env(safe-area-inset-bottom, 8px), 8px)',
       }}
     >
       <div className="flex items-center gap-2 max-w-[430px] mx-auto">
@@ -65,7 +79,7 @@ export const CommentInput = memo(function CommentInput({
           onChange={(e) => setText(e.target.value)}
           onKeyPress={handleKeyPress}
           onFocus={() => setInputFocused(true)}
-          onBlur={() => setInputFocused(false)}
+          onBlur={handleBlur}
           placeholder="Add a comment..."
           maxLength={500}
           className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2.5 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-white/20"

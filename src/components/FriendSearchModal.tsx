@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
+import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
+import { useUserCity } from '@/hooks/useUserCity';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, X, ArrowLeft, Home } from 'lucide-react';
+import { Search, X, ArrowLeft, Home, MapPin } from 'lucide-react';
 
 interface Friend {
   id: string;
@@ -20,6 +22,12 @@ interface Friend {
   has_story: boolean;
 }
 
+interface Venue {
+  id: string;
+  name: string;
+  neighborhood: string;
+}
+
 interface FriendSearchModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,10 +38,13 @@ const STATUS_ORDER: Record<string, number> = { out: 0, planning: 1, home: 2 };
 export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps) {
   const { user } = useAuth();
   const { openFriendCard } = useFriendIdCard();
+  const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
+  const { city } = useUserCity();
   const { data: cachedFriendIds } = useFriendIds(user?.id);
   const { data: allProfiles } = useProfilesSafe();
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -47,45 +58,50 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
   }, [allProfiles, cachedFriendIds, demoEnabled]);
 
   useEffect(() => {
-    if (open && user && friendProfiles.length > 0) {
-      fetchStatuses();
-    } else if (open && friendProfiles.length === 0 && allProfiles) {
-      setFriends([]);
-      setIsLoading(false);
+    if (open && user) {
+      fetchData();
     }
     if (!open) setSearch('');
-  }, [open, user, friendProfiles]);
+  }, [open, user, friendProfiles, city]);
 
   useEffect(() => {
     if (open) {
-      // Small delay to let the overlay render before focusing
       setTimeout(() => searchInputRef.current?.focus(), 100);
     }
   }, [open]);
 
-  const fetchStatuses = async () => {
-    if (!user || friendProfiles.length === 0) { setFriends([]); setIsLoading(false); return; }
+  const fetchData = async () => {
+    if (!user) return;
     setIsLoading(true);
 
     try {
+      // Fetch friends + statuses
       const friendIds = friendProfiles.map(p => p.id);
       const now = new Date().toISOString();
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      const [checkinsRes, nightRes, storiesRes] = await Promise.all([
-        supabase.from('checkins').select('user_id, venue_name, started_at').in('user_id', friendIds).is('ended_at', null).gt('started_at', twentyFourHoursAgo).order('started_at', { ascending: false }),
-        supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name, updated_at, is_private_party, party_neighborhood').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
-        supabase.from('stories').select('user_id').in('user_id', friendIds).gt('expires_at', now),
+      const [checkinsRes, nightRes, storiesRes, venuesRes] = await Promise.all([
+        friendIds.length > 0
+          ? supabase.from('checkins').select('user_id, venue_name, started_at').in('user_id', friendIds).is('ended_at', null).gt('started_at', twentyFourHoursAgo).order('started_at', { ascending: false })
+          : Promise.resolve({ data: [] }),
+        friendIds.length > 0
+          ? supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name, updated_at, is_private_party, party_neighborhood').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now)
+          : Promise.resolve({ data: [] }),
+        friendIds.length > 0
+          ? supabase.from('stories').select('user_id').in('user_id', friendIds).gt('expires_at', now)
+          : Promise.resolve({ data: [] }),
+        supabase.from('venues').select('id, name, neighborhood').eq('city', city).order('popularity_rank'),
       ]);
 
+      // Process friends
       const checkinMap = new Map<string, { venue_name: string; started_at: string | null }>();
-      checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, { venue_name: c.venue_name, started_at: c.started_at }); });
+      (checkinsRes.data || []).forEach((c: any) => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, { venue_name: c.venue_name, started_at: c.started_at }); });
 
-      const nightMap = new Map<string, { status: string; planning_neighborhood: string | null; venue_name: string | null; updated_at: string | null; is_private_party: boolean | null; party_neighborhood: string | null }>();
-      nightRes.data?.forEach(n => { if (!nightMap.has(n.user_id)) nightMap.set(n.user_id, n); });
+      const nightMap = new Map<string, any>();
+      (nightRes.data || []).forEach((n: any) => { if (!nightMap.has(n.user_id)) nightMap.set(n.user_id, n); });
 
       const storySet = new Set<string>();
-      storiesRes.data?.forEach(s => storySet.add(s.user_id));
+      (storiesRes.data || []).forEach((s: any) => storySet.add(s.user_id));
 
       const friendsData: Friend[] = friendProfiles.map(profile => {
         let status: 'out' | 'planning' | 'home' = 'home';
@@ -134,8 +150,9 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
       });
 
       setFriends(friendsData);
+      setVenues(venuesRes.data || []);
     } catch (error) {
-      console.error('Error fetching friends:', error);
+      console.error('Error fetching search data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -151,15 +168,32 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
     });
   };
 
+  const handleSelectVenue = (venue: Venue) => {
+    onOpenChange(false);
+    openVenueCard(venue.id);
+  };
+
+  const q = search.toLowerCase();
+
   const filteredFriends = useMemo(() =>
     friends.filter(f =>
-      f.display_name.toLowerCase().includes(search.toLowerCase()) ||
-      f.username.toLowerCase().includes(search.toLowerCase())
-    ), [friends, search]);
+      f.display_name.toLowerCase().includes(q) ||
+      f.username.toLowerCase().includes(q)
+    ), [friends, q]);
+
+  const filteredVenues = useMemo(() =>
+    search.length > 0
+      ? venues.filter(v =>
+          v.name.toLowerCase().includes(q) ||
+          v.neighborhood.toLowerCase().includes(q)
+        )
+      : [], [venues, q, search]);
 
   const outFriends = filteredFriends.filter(f => f.status === 'out');
   const planningFriends = filteredFriends.filter(f => f.status === 'planning');
   const homeFriends = filteredFriends.filter(f => f.status === 'home');
+
+  const hasResults = filteredFriends.length > 0 || filteredVenues.length > 0;
 
   const renderFriendRow = (friend: Friend) => (
     <button
@@ -180,11 +214,11 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
         </p>
         {friend.status === 'out' ? (
           <p className="text-[#d4ff00] text-xs truncate">
-            📍 At {friend.venue_name || 'Nearby'}
+            At {friend.venue_name || 'Nearby'}
           </p>
         ) : friend.status === 'planning' ? (
           <p className="text-[#a855f7] text-xs truncate">
-            🎯 Planning{friend.planning_neighborhood ? ` (${friend.planning_neighborhood})` : ' tonight'}
+            TBD{friend.planning_neighborhood ? ` · ${friend.planning_neighborhood}` : ''}
           </p>
         ) : (
           <p className="text-white/40 text-xs">Home</p>
@@ -196,7 +230,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-[#0a0118] z-[500] flex flex-col animate-fade-in" style={{ touchAction: 'auto' }}>
+    <div className="fixed inset-0 bg-[#110a24] z-[500] flex flex-col animate-fade-in" style={{ touchAction: 'auto' }}>
       {/* Search Header */}
       <div className="flex items-center gap-3 px-4 py-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
         <button
@@ -210,7 +244,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Search friends..."
+            placeholder="Search friends or places..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="bg-transparent text-white text-sm flex-1 outline-none placeholder:text-white/40"
@@ -237,19 +271,43 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
               </div>
             ))}
           </div>
-        ) : filteredFriends.length === 0 ? (
+        ) : !hasResults ? (
           <div className="text-center py-12">
             <p className="text-white/40 text-sm">
-              {search ? 'No friends found' : 'Your friend list is empty'}
+              {search ? 'No results found' : 'Your friend list is empty'}
             </p>
           </div>
         ) : (
           <>
+            {/* Venues — only shown when searching */}
+            {filteredVenues.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Places</h3>
+                <div className="space-y-1">
+                  {filteredVenues.slice(0, 8).map(venue => (
+                    <button
+                      key={venue.id}
+                      onClick={() => handleSelectVenue(venue)}
+                      className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-4 h-4 text-[#d4ff00]" />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <p className="text-white font-medium text-sm truncate">{venue.name}</p>
+                        <p className="text-white/40 text-xs truncate">{venue.neighborhood}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Friends Out Now */}
             {outFriends.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">
-                  👥 Friends Out Now
+                  Friends Out Now
                   <span className="text-white/50 ml-1">({outFriends.length})</span>
                 </h3>
                 <div className="space-y-1">
@@ -262,7 +320,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
             {planningFriends.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">
-                  🔥 Friends Planning 🎯
+                  TBD tonight
                   <span className="text-white/50 ml-1">({planningFriends.length})</span>
                 </h3>
                 <div className="space-y-1">
@@ -275,7 +333,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
             {homeFriends.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <Home className="h-3.5 w-3.5 text-white/50" /> Staying In
+                  <Home className="h-3.5 w-3.5 text-white/50" /> Staying in
                   <span className="text-white/50">({homeFriends.length})</span>
                 </h3>
                 <div className="space-y-1">

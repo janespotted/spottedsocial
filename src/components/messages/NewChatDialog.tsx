@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
+import { useQueryClient } from '@tanstack/react-query';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Search, Users } from 'lucide-react';
+import { toast } from 'sonner';
 import { NewGroupChatDialog } from './NewGroupChatDialog';
 
 interface Friend {
@@ -36,6 +38,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser, source }: N
   const navigate = useNavigate();
   const { user } = useAuth();
   const demoEnabled = useDemoMode();
+  const queryClient = useQueryClient();
   const { data: allProfiles } = useProfilesSafe();
   const { data: friendIds } = useFriendIds(user?.id);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -132,28 +135,82 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser, source }: N
 
   const createThread = async (friendId: string) => {
     try {
-      // Wait for auth session to be fully ready
-      const isAuthenticated = await waitForAuthSession();
-      if (!isAuthenticated) {
-        console.error('Auth session not ready after retries');
-        setIsCreatingThread(false);
-        isCreatingRef.current = false;
+      // Ensure auth session is ready
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('No auth session for createThread');
+        toast.error('Please sign in again to start a chat.');
         return;
       }
 
-      // Use SECURITY DEFINER function to create/find thread
-      const { data: threadId, error } = await supabase
-        .rpc('create_dm_thread', { friend_id: friendId });
-
-      if (error) {
-        console.error('Thread creation error:', error);
-        throw error;
+      // Block DMs to demo users when demo mode is off (they don't have auth.users rows)
+      if (!demoEnabled) {
+        const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+        const targetProfile = allProfiles.find((p: any) => p.id === friendId);
+        if (targetProfile?.is_demo) {
+          toast('Demo users can\'t receive messages');
+          onOpenChange(false);
+          return;
+        }
       }
 
+      // Find or create DM thread
+      let threadId: string | null = null;
+
+      if (demoEnabled) {
+        // For demo users, look for existing seeded thread first
+        const { data: existingMembers } = await supabase
+          .from('dm_thread_members')
+          .select('thread_id')
+          .eq('user_id', friendId);
+
+        if (existingMembers?.length) {
+          // Find a thread where BOTH the current user and the friend are members
+          const { data: myMemberships } = await supabase
+            .from('dm_thread_members')
+            .select('thread_id')
+            .eq('user_id', user!.id);
+
+          const myThreadIds = new Set(myMemberships?.map(m => m.thread_id) || []);
+          const sharedThread = existingMembers.find(m => myThreadIds.has(m.thread_id));
+          threadId = sharedThread?.thread_id || null;
+        }
+      }
+
+      if (!threadId) {
+        const { data, error } = await supabase
+          .rpc('create_dm_thread', { friend_id: friendId });
+
+        if (error) {
+          console.error('Thread creation error:', error);
+          throw error;
+        }
+
+        if (!data) {
+          throw new Error('Thread creation returned empty result');
+        }
+        threadId = data;
+      }
+
+      // Find the friend's profile to pass via nav state for instant header render
+      // Check both fetched friends list and preselectedUser
+      const friend = friends.find(f => f.id === friendId);
+      const friendProfile = friend
+        ? { user_id: friend.id, display_name: friend.display_name, username: friend.username, avatar_url: friend.avatar_url, venue_name: friend.venue_name }
+        : preselectedUser
+          ? { user_id: preselectedUser.id, display_name: preselectedUser.display_name, username: '', avatar_url: preselectedUser.avatar_url, venue_name: null }
+          : undefined;
+
       onOpenChange(false);
-      navigate(`/messages/${threadId}`, { state: source ? { source } : undefined });
+      navigate(`/messages/${threadId}`, {
+        state: {
+          ...(source ? { source } : {}),
+          friendProfile,
+        },
+      });
     } catch (error) {
       console.error('Error in createThread:', error);
+      toast.error('Failed to open chat. Try again.');
       setIsCreatingThread(false);
       isCreatingRef.current = false;
     }
@@ -174,16 +231,16 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser, source }: N
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white">
-          {(isCreatingThread || preselectedUser) ? (
+          {isCreatingThread ? (
             <div className="py-12 text-center">
               <div className="animate-pulse text-white/60">
-                Opening chat with {preselectedUser?.display_name}...
+                Opening chat{preselectedUser ? ` with ${preselectedUser.display_name}` : ''}...
               </div>
             </div>
           ) : (
             <>
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold">New Message</DialogTitle>
+                <DialogTitle className="text-2xl font-bold">New DM</DialogTitle>
               </DialogHeader>
 
               {/* Create Group Button */}
@@ -214,7 +271,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser, source }: N
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search friends..."
-                  className="bg-[#0a0118] border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full pl-12"
+                  className="bg-[#110a24] border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full pl-12"
                 />
               </div>
 

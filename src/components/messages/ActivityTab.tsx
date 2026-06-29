@@ -115,7 +115,7 @@ const generateDemoActivities = (city: SupportedCity, userCurrentVenue: string | 
 };
 
 // Unified card style - consistent purple aesthetic
-const CARD_STYLE = 'bg-[#2d1b4e]/60 border border-[#a855f7]/20';
+const CARD_STYLE = 'bg-[#2d1b4e]/60 border border-white/8';
 // Unified avatar ring color - always purple
 const AVATAR_RING_COLOR = 'border-[#a855f7]';
 
@@ -212,21 +212,30 @@ export function ActivityTab() {
     const tonightInvites = realInvitesResult.data?.filter(n => isFromTonight(n.created_at)) || [];
     if (tonightInvites.length) {
       const senderIds = [...new Set(tonightInvites.map(n => n.sender_id))];
-      // Use cached profiles
-      const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
-      let senderProfiles = allProfiles.filter((p: any) => senderIds.includes(p.id));
-      
+      // Use cached profiles, with direct fallback for cache misses
+      let allCachedProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+      let senderProfiles = allCachedProfiles.filter((p: any) => senderIds.includes(p.id));
+
+      // Fallback for senders not in cache
+      const missingSenderIds = senderIds.filter(id => !senderProfiles.some((p: any) => p.id === id));
+      if (missingSenderIds.length > 0) {
+        const { data: fallback } = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url, is_demo')
+          .in('id', missingSenderIds);
+        if (fallback) senderProfiles = [...senderProfiles, ...fallback];
+      }
+
       // Filter out demo users when demo mode is off
       if (!demoEnabled) {
         senderProfiles = senderProfiles.filter((p: any) => !p.is_demo);
       }
-      
+
       const profileMap = new Map(senderProfiles?.map((p: any) => [p.id, p]) || []);
       
-      // Filter invites to only those from non-demo users when demo mode is off
-      const filteredInvites = !demoEnabled
-        ? tonightInvites.filter(invite => profileMap.has(invite.sender_id))
-        : tonightInvites;
+      // Always filter out notifications from unknown senders (deleted demo users, etc.)
+      // When demo mode is off, also exclude demo users; when on, include them
+      const filteredInvites = tonightInvites.filter(invite => profileMap.has(invite.sender_id));
       
       const realActivities: Activity[] = filteredInvites.map(invite => {
         const profile = profileMap.get(invite.sender_id);
@@ -626,7 +635,7 @@ export function ActivityTab() {
     if (!user || !activity.user_id || !activity.display_name) return;
 
     // Get current user's display name using safe RPC (own profile is always visible)
-    const { data: profiles } = await supabase.rpc('get_profile_safe', { target_user_id: user.id });
+    const { data: profiles } = await supabase.from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', user.id);
     const profile = profiles?.[0];
 
     const myName = profile?.display_name?.split(' ')[0] || 'Someone';
@@ -680,7 +689,7 @@ export function ActivityTab() {
     if (!user || !activity.user_id || !activity.display_name) return;
 
     // Get current user's display name using safe RPC (own profile is always visible)
-    const { data: profiles } = await supabase.rpc('get_profile_safe', { target_user_id: user.id });
+    const { data: profiles } = await supabase.from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', user.id);
     const profile = profiles?.[0];
 
     const myName = profile?.display_name?.split(' ')[0] || 'Someone';
@@ -765,7 +774,7 @@ export function ActivityTab() {
       }
 
       // Send acceptance notification + push
-      const { data: profiles } = await supabase.rpc('get_profile_safe', { target_user_id: user.id });
+      const { data: profiles } = await supabase.from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', user.id);
       const myName = profiles?.[0]?.display_name || 'Someone';
       const acceptMessage = `${myName} accepted your friend request!`;
 
@@ -907,10 +916,10 @@ export function ActivityTab() {
       {/* Friend Requests - Always at top */}
       <div
         onClick={() => navigate('/friends', { state: { tab: 'requests' } })}
-        className="bg-gradient-to-r from-[#2d1b4e]/80 to-[#3d1b5e]/60 border border-[#a855f7]/30 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-[#2d1b4e]/80 transition-all hover:border-[#a855f7]/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
+        className="bg-[#1a0a2e]/80 border border-white/8 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-white/8 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] flex items-center justify-center shadow-[0_0_12px_rgba(168,85,247,0.4)]">
+          <div className="w-12 h-12 rounded-full bg-white/5 border border-white/15 flex items-center justify-center">
             <UserPlus className="h-6 w-6 text-[#d4ff00]" />
           </div>
           <div>
@@ -1186,7 +1195,7 @@ export function ActivityTab() {
                   <Button
                     onClick={() => handleAcceptMeetUp(activity)}
                     size="sm"
-                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                    className="h-8 border border-white/20 text-white bg-transparent rounded-2xl px-4 text-xs font-medium hover:bg-white/10 transition-colors"
                   >
                     I'm down!
                   </Button>
@@ -1197,7 +1206,7 @@ export function ActivityTab() {
                     <Button
                       onClick={() => handleOpenChat(activity)}
                       size="sm"
-                      className="h-8 bg-[#d4ff00] hover:bg-[#d4ff00]/80 text-[#1a0f2e] rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(212,255,0,0.5)] hover:shadow-[0_0_16px_rgba(212,255,0,0.7)] transition-all"
+                      className="h-8 bg-[#d4ff00] hover:bg-[#d4ff00]/80 text-black rounded-2xl px-4 text-xs font-medium transition-colors"
                     >
                       Say hi!
                     </Button>
@@ -1205,7 +1214,7 @@ export function ActivityTab() {
                     <Button
                       onClick={() => handleAcceptVenueInvite(activity)}
                       size="sm"
-                      className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                      className="h-8 border border-white/20 text-white bg-transparent rounded-2xl px-4 text-xs font-medium hover:bg-white/10 transition-colors"
                     >
                       I'm down!
                     </Button>
@@ -1216,7 +1225,7 @@ export function ActivityTab() {
                   <Button
                     onClick={() => handleMeetUp(activity)}
                     size="sm"
-                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                    className="h-8 border border-white/20 text-white bg-transparent rounded-2xl px-4 text-xs font-medium hover:bg-white/10 transition-colors"
                   >
                     Meet Up
                   </Button>
@@ -1226,7 +1235,7 @@ export function ActivityTab() {
                   <Button
                     onClick={() => handleViewVenue(activity.venue_id, activity.title.replace(' is trending', ''))}
                     size="sm"
-                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                    className="h-8 border border-white/20 text-white bg-transparent rounded-2xl px-4 text-xs font-medium hover:bg-white/10 transition-colors"
                   >
                     View
                   </Button>
@@ -1236,7 +1245,7 @@ export function ActivityTab() {
                   <Button
                     onClick={() => handleOpenChat(activity)}
                     size="sm"
-                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                    className="h-8 border border-white/20 text-white bg-transparent rounded-2xl px-4 text-xs font-medium hover:bg-white/10 transition-colors"
                   >
                     <MessageCircle className="h-3.5 w-3.5 mr-1" />
                     Chat
@@ -1247,7 +1256,7 @@ export function ActivityTab() {
                   <Button
                     onClick={() => handleOpenChat(activity)}
                     size="sm"
-                    className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                    className="h-8 border border-white/20 text-white bg-transparent rounded-2xl px-4 text-xs font-medium hover:bg-white/10 transition-colors"
                   >
                     View
                   </Button>
@@ -1312,7 +1321,7 @@ export function ActivityTab() {
                     <Button
                       onClick={() => handleAcceptFriendRequest(activity)}
                       size="sm"
-                      className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full px-4 text-xs font-medium shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] transition-all"
+                      className="h-8 border border-white/20 text-white bg-transparent rounded-2xl px-4 text-xs font-medium hover:bg-white/10 transition-colors"
                     >
                       <Check className="h-3.5 w-3.5 mr-1" />
                       Accept
@@ -1339,7 +1348,7 @@ export function ActivityTab() {
             {invites.map(renderActivityCard)}
           </div>
         ) : (
-          <div className="bg-gradient-to-r from-[#2d1b4e]/40 to-[#3d1b5e]/30 border border-[#a855f7]/20 rounded-2xl p-4 text-center">
+          <div className="bg-gradient-to-r from-[#2d1b4e]/40 to-[#3d1b5e]/30 border border-white/8 rounded-2xl p-4 text-center">
             <p className="text-white/50 text-sm">No invites yet</p>
             <p className="text-white/30 text-xs mt-1">When friends invite you out, you'll see them here</p>
           </div>
@@ -1350,7 +1359,7 @@ export function ActivityTab() {
             {friendRequests.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
-                  👤 Friend Requests
+                  Friend Requests
                 </h3>
                 <div className="space-y-3">
                   {friendRequests.map(renderActivityCard)}
@@ -1362,7 +1371,7 @@ export function ActivityTab() {
             {rallies.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
-                  📣 Rallies
+                  Rallies
                 </h3>
                 <div className="space-y-3">
                   {rallies.map(renderActivityCard)}
@@ -1386,7 +1395,7 @@ export function ActivityTab() {
             {planDowns.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
-                  🎉 Down for Your Plans
+                  Down for Your Plans
                 </h3>
                 <div className="space-y-3">
                   {planDowns.map(renderActivityCard)}
@@ -1398,7 +1407,7 @@ export function ActivityTab() {
             {venueYaps.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-xs text-white/50 uppercase tracking-wider font-medium">
-                  💬 Yaps at Your Spot
+                  Yaps at Your Spot
                 </h3>
                 <div className="space-y-3">
                   {venueYaps.map(renderActivityCard)}
@@ -1475,7 +1484,7 @@ export function ActivityTab() {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-white/8">
               <MapPin className="h-10 w-10 text-[#a855f7]/60" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">

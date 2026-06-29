@@ -20,7 +20,7 @@ export const isNativePlatform = (): boolean => {
  * In a native Capacitor shell window.location.origin is "capacitor://localhost"
  * which is useless for shareable links, so we hard-code the hosted URL.
  */
-export const APP_BASE_URL = 'https://spottedsocial.lovable.app';
+export const APP_BASE_URL = 'https://spotted.social';
 
 /**
  * Returns the correct origin for OAuth redirect_uri and email redirect URLs.

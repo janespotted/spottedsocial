@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ProfileSkeleton } from '@/components/ProfileSkeleton';
 import { QuickStatusSheet } from '@/components/QuickStatusSheet';
+import { UpdateSpotSheet } from '@/components/UpdateSpotSheet';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
@@ -83,6 +84,7 @@ export default function Profile() {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [showQuickStatus, setShowQuickStatus] = useState(false);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
+  const [showUpdateSpot, setShowUpdateSpot] = useState(false);
   
 
   useEffect(() => {
@@ -540,6 +542,14 @@ export default function Profile() {
           )}
 
           <div className="flex gap-2">
+            {currentStatus === 'out' && (
+              <button
+                onClick={() => setShowUpdateSpot(true)}
+                className="flex-1 bg-white/10 text-white font-medium text-sm py-2.5 rounded-full border border-white/15"
+              >
+                Change venue
+              </button>
+            )}
             <button
               onClick={openCheckIn}
               className="flex-1 bg-[#d4ff00] text-[#15102E] font-medium text-sm py-2.5 rounded-full"
@@ -723,6 +733,15 @@ export default function Profile() {
       />
 
       <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
+
+      <UpdateSpotSheet
+        open={showUpdateSpot}
+        onOpenChange={(open) => {
+          setShowUpdateSpot(open);
+          if (!open) fetchProfileData();
+        }}
+        onUpdated={fetchProfileData}
+      />
     </div>
     </PullToRefresh>
   );

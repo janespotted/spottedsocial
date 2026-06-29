@@ -18,25 +18,31 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
   useEffect(() => {
     if (!isNativePlatform()) return;
 
+    console.log('[PostMediaPicker] Opening native camera...');
     // Open native camera modal
     openSpottedCamera()
       .then((result) => {
         onMediaSelect(result.file, result.previewUrl, result.type === 'video' ? 'video' : 'image');
       })
       .catch((err) => {
-        const msg = err?.message || '';
+        const msg = err?.message || String(err);
+        console.log('[PostMediaPicker] Camera error:', msg);
+
         if (msg.includes('permission denied') || msg.includes('Permission denied')) {
           toast.error('Camera access required. Enable in Settings.', {
             action: {
               label: 'Open Settings',
               onClick: () => {
-                // Capacitor App plugin can open settings
                 import('@capacitor/app').then(({ App }) => App.openUrl({ url: 'app-settings:' })).catch(() => {});
               },
             },
           });
+        } else if (!msg.includes('cancelled') && !msg.includes('canceled')) {
+          // Unexpected error — show feedback
+          toast.error('Camera failed to open. Try again.');
+          console.error('[PostMediaPicker] Unexpected camera error:', err);
         }
-        // User cancel or other error — silently return
+        // User cancel or error — close
         onClose();
       });
   }, []);
@@ -70,7 +76,12 @@ export function PostMediaPicker({ onClose, onMediaSelect }: PostMediaPickerProps
     }
   };
 
-  // Web fallback (native path returns early above)
+  // On native, show nothing — the native camera modal is fullscreen
+  if (isNativePlatform()) {
+    return <div className="fixed inset-0 z-[100] bg-[#110a24]" />;
+  }
+
+  // Web fallback
   return (
     <div className="fixed inset-0 z-[100] bg-[#110a24] flex flex-col items-center justify-center pt-[env(safe-area-inset-top,0px)]">
       <input

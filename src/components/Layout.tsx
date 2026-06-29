@@ -12,15 +12,16 @@ import { useCheckInPrompt } from '@/hooks/useCheckInPrompt';
 import { useVenueArrivalNudge } from '@/hooks/useVenueArrivalNudge';
 import { useYapNotifications } from '@/hooks/useYapNotifications';
 import { useAuth } from '@/contexts/AuthContext';
-import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { showBrowserNotification } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { performAutoCheckout } from '@/lib/auto-checkout';
-import { checkLocationPermission } from '@/lib/location-service';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
-import { MapPin, X } from 'lucide-react';
+import { useLocationPermission } from '@/hooks/useLocationPermission';
+import { AlwaysOnGate } from './AlwaysOnGate';
+import { LocationDegradedBanner } from './LocationDegradedBanner';
+import { PlanInviteModal } from './PlanInviteModal';
 import { toast } from 'sonner';
 
 interface LayoutProps {
@@ -28,13 +29,161 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { showCheckIn, closeCheckIn, openCheckInFromReminder, openCheckInForVenueArrival } = useCheckIn();
+  const { showCheckIn, closeCheckIn, openCheckInFromReminder, openCheckInForVenueArrival, openCheckInNewSpot } = useCheckIn();
   const { unreadCount } = useNotifications();
   const { showOnboarding, completeOnboarding, loading: onboardingLoading } = useOnboarding();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
+  const isMapPage = location.pathname === '/map';
+  const { showGate, dismissGate, isDegraded, permissionState } = useLocationPermission();
+
+  // Plan invite modal state
+  const [planInvite, setPlanInvite] = useState<{
+    planId: string;
+    inviterName: string;
+    inviterAvatarUrl: string | null;
+    venueName: string;
+    planDate: string;
+    planTime: string;
+  } | null>(null);
+
+  // Check for pending plan invites on mount and app resume
+  useEffect(() => {
+    if (!user) return;
+
+    const checkPlanInvites = async () => {
+      const { data: invites } = await supabase
+        .from('notifications')
+        .select('id, message, sender_id, created_at')
+        .eq('receiver_id', user.id)
+        .eq('type', 'plan_invite')
+        .eq('is_read', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!invites?.length) return;
+      const invite = invites[0];
+
+      // Get sender profile
+      const allProfiles: any[] = (await supabase.rpc('get_profiles_safe')).data || [];
+      const sender = allProfiles.find((p: any) => p.id === invite.sender_id);
+      if (!sender) return;
+
+      // Find the plan this invite is for
+      const { data: participations } = await supabase
+        .from('plan_participants')
+        .select('plan_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (!participations?.length) return;
+
+      const planIds = participations.map(p => p.plan_id);
+      const { data: plans } = await supabase
+        .from('plans')
+        .select('id, venue_name, plan_date, plan_time, user_id')
+        .in('id', planIds)
+        .eq('user_id', invite.sender_id)
+        .gte('expires_at', new Date().toISOString())
+        .limit(1);
+
+      if (!plans?.length) return;
+      const plan = plans[0];
+
+      setPlanInvite({
+        planId: plan.id,
+        inviterName: sender.display_name,
+        inviterAvatarUrl: sender.avatar_url,
+        venueName: plan.venue_name,
+        planDate: plan.plan_date,
+        planTime: plan.plan_time,
+      });
+
+      // Mark notification as read
+      await supabase.from('notifications').update({ is_read: true }).eq('id', invite.id);
+    };
+
+    // Small delay so it doesn't block initial render
+    const timer = setTimeout(checkPlanInvites, 2000);
+
+    const onVisibility = () => {
+      if (!document.hidden) setTimeout(checkPlanInvites, 500);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [user]);
+
+  // Scroll to top on tab change
+  useEffect(() => {
+    const main = document.getElementById('main-scroll');
+    if (main) main.scrollTop = 0;
+  }, [location.pathname]);
+
+  // DEBUG: runtime layout measurements on leaderboard
+  useEffect(() => {
+    if (location.pathname !== '/leaderboard') return;
+    const timer = setTimeout(() => {
+      const main = document.getElementById('main-scroll');
+      const layoutDiv = main?.parentElement;
+      const nav = document.querySelector('nav.fixed');
+      if (main) {
+        const cs = getComputedStyle(main);
+        const rect = main.getBoundingClientRect();
+        console.log('[DEBUG layout] main#main-scroll', {
+          computedHeight: cs.height,
+          computedPaddingBottom: cs.paddingBottom,
+          boundingRect: { top: rect.top, bottom: rect.bottom, height: rect.height },
+          scrollHeight: main.scrollHeight,
+          clientHeight: main.clientHeight,
+          overflowY: cs.overflowY,
+        });
+      }
+      if (layoutDiv) {
+        const cs = getComputedStyle(layoutDiv);
+        const rect = layoutDiv.getBoundingClientRect();
+        console.log('[DEBUG layout] Layout outer div', {
+          computedHeight: cs.height,
+          computedPaddingBottom: cs.paddingBottom,
+          boundingRect: { top: rect.top, bottom: rect.bottom, height: rect.height },
+          overflowY: cs.overflowY,
+          className: layoutDiv.className,
+        });
+      }
+      if (nav) {
+        const rect = nav.getBoundingClientRect();
+        console.log('[DEBUG layout] BottomNav', {
+          boundingRect: { top: rect.top, bottom: rect.bottom, height: rect.height },
+        });
+      }
+      // Check if leaderboard items are inside main
+      const items = document.querySelectorAll('[data-leaderboard-item]');
+      if (items.length === 0) {
+        const allDivs = main?.querySelectorAll('div');
+        console.log('[DEBUG layout] No [data-leaderboard-item] found. main has', allDivs?.length, 'child divs');
+        // Check if main contains the visible leaderboard content
+        const h2 = main?.querySelector('h1, h2, [class*="Leaderboard"]');
+        console.log('[DEBUG layout] Leaderboard heading inside main?', !!h2, h2?.textContent?.slice(0, 30));
+      } else {
+        const firstItem = items[0];
+        console.log('[DEBUG layout] First leaderboard item inside main?', main?.contains(firstItem));
+      }
+      console.log('[DEBUG layout] isMapPage=', location.pathname === '/map', 'pathname=', location.pathname);
+      console.log('[DEBUG layout] pb class applied?', !!(location.pathname !== '/map'), '→ pb-[calc(4rem+env(safe-area-inset-bottom,0px))]');
+      // Check window dimensions
+      console.log('[DEBUG layout] window', { innerHeight: window.innerHeight, innerWidth: window.innerWidth, dvh: CSS.supports('height', '100dvh') });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
+  // Input scroll handled by Capacitor's resize: 'native' — no manual scrollIntoView needed
+
   // Keep profiles cache warm so all pages can read via getQueryData
   useProfilesSafe();
 
@@ -47,63 +196,7 @@ export function Layout({ children }: LayoutProps) {
   // Yap notifications at user's current venue
   useYapNotifications();
   
-  // Map page needs full width and flex layout
-  const isMapPage = location.pathname === '/map';
-
-  // Location permission reminder — once per session, show if not granted
-  const [locationReminderShown, setLocationReminderShown] = useState(false);
-  useEffect(() => {
-    if (!user || locationReminderShown || showOnboarding || onboardingLoading) return;
-
-    const sessionKey = 'location_reminder_shown_session';
-    if (sessionStorage.getItem(sessionKey)) return;
-
-    const timer = setTimeout(async () => {
-      const permission = await checkLocationPermission();
-      if (permission !== 'granted') {
-        sessionStorage.setItem(sessionKey, 'true');
-        setLocationReminderShown(true);
-        toast.custom((id) => (
-          <div className="w-full bg-[#1a0f2e] border border-[#a855f7]/40 rounded-2xl p-4 shadow-xl">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#a855f7]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <MapPin className="h-5 w-5 text-[#a855f7]" />
-              </div>
-              <div className="flex-1">
-                <p className="text-white font-semibold text-sm">Enable Location Sharing</p>
-                <p className="text-white/50 text-xs mt-1">
-                  Select "Always Allow" for location so your friends can see where you are throughout the night. Spotted works best when your location stays on!
-                </p>
-                <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={() => {
-                      toast.dismiss(id);
-                      navigator.geolocation.getCurrentPosition(
-                        () => toast.success('Location enabled!'),
-                        () => toast.error('Location access denied. Enable it in your browser or device settings.'),
-                        { enableHighAccuracy: true }
-                      );
-                    }}
-                    className="flex-1 h-9 bg-[#d4ff00] hover:bg-[#d4ff00]/90 text-[#0a0118] text-sm font-semibold rounded-xl transition-colors"
-                  >
-                    Enable Location
-                  </button>
-                  <button
-                    onClick={() => toast.dismiss(id)}
-                    className="h-9 px-3 text-white/40 hover:text-white/60 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ), { duration: 15000 });
-      }
-    }, 3000); // Delay 3s so it doesn't interrupt app load
-
-    return () => clearTimeout(timer);
-  }, [user, locationReminderShown, showOnboarding, onboardingLoading]);
+  // Location permission is now handled by useLocationPermission hook + AlwaysOnGate
 
   // Check for venue correction prompt (set by auto-venue-tracker notification tap)
   // Runs on mount and on app resume (visibilitychange) so it catches native notification taps
@@ -189,8 +282,9 @@ export function Layout({ children }: LayoutProps) {
           'Tap to confirm or head home'
         );
 
-        // Show in-app toast with actions
+        // Show in-app toast with actions (use fixed ID to prevent duplicates)
         if (user) {
+          toast.dismiss('still-here-nudge');
           toast.custom((id) => (
             <div className="w-full bg-[#1a0f2e] border border-[#a855f7]/40 rounded-2xl p-4 shadow-xl">
               <p className="text-white font-semibold text-sm mb-1">Still at {venueName}?</p>
@@ -218,7 +312,7 @@ export function Layout({ children }: LayoutProps) {
                     localStorage.removeItem('still_here_deadline');
                     localStorage.removeItem('still_here_venue');
                     localStorage.removeItem('still_here_check');
-                    openCheckInFromReminder();
+                    openCheckInNewSpot();
                   }}
                   className="w-full h-10 bg-[#2d1b4e] hover:bg-[#2d1b4e]/80 text-[#d4ff00] text-sm font-medium rounded-xl border border-[#d4ff00]/30 transition-colors"
                 >
@@ -239,7 +333,7 @@ export function Layout({ children }: LayoutProps) {
                 </button>
               </div>
             </div>
-          ), { duration: 60000 });
+          ), { duration: 60000, id: 'still-here-nudge' });
         }
       }
 
@@ -264,20 +358,34 @@ export function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className={cn(
-  "min-h-[100dvh] bg-background flex flex-col",
-  !isMapPage && "pb-[calc(4rem+env(safe-area-inset-bottom,0px))]"
-)}>
+    <div className="h-[100dvh] bg-background flex flex-col overflow-hidden">
       <OfflineBanner />
-      <main className={cn(
-        "flex-1 flex flex-col",
-        isMapPage ? "w-full" : "max-w-[430px] mx-auto w-full"
-      )}>
+      {isDegraded && <LocationDegradedBanner />}
+      {showGate && !showOnboarding && (
+        <AlwaysOnGate
+          permissionState={permissionState === 'denied' ? 'denied' : 'while_using'}
+          onDismiss={dismissGate}
+        />
+      )}
+      <main
+        id="main-scroll"
+        key={location.pathname}
+        className={cn(
+          "flex-1 flex flex-col page-enter overflow-y-auto overflow-x-hidden overscroll-contain",
+          isMapPage ? "w-full" : "max-w-[430px] mx-auto w-full"
+        )}
+        style={isMapPage ? undefined : { paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
+      >
         {children}
       </main>
       <BottomNav />
       <CheckInModal open={showCheckIn} onOpenChange={closeCheckIn} />
       <CheckInConfirmation />
+      <PlanInviteModal
+        open={!!planInvite}
+        invite={planInvite}
+        onClose={() => setPlanInvite(null)}
+      />
     </div>
   );
 }

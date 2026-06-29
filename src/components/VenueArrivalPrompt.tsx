@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { dismissVenuePrompt } from '@/lib/venue-arrival-nudge';
 import { haptic } from '@/lib/haptics';
 import { logVenueConfirmation, logVenueDismissal } from '@/lib/location-detection-logger';
+import { logLocationEvent, getCurrentEvaluationId } from '@/lib/location-event-logger';
 import { VenueCorrectionSheet } from '@/components/VenueCorrectionSheet';
 import { AddVenueSheet } from '@/components/AddVenueSheet';
 import { VisuallyHidden } from '@/components/ui/visually-hidden';
@@ -100,6 +101,23 @@ export function VenueArrivalPrompt() {
         const wasCorrect = detectedVenue.id === selectedVenue.id;
         logVenueConfirmation(detectedVenue.id, selectedVenue.id, wasCorrect);
       }
+
+      // Log prompt_confirmed event
+      const evalId = getCurrentEvaluationId();
+      if (evalId) {
+        logLocationEvent({
+          evaluation_id: evalId,
+          user_id: user.id,
+          event_type: 'prompt_confirmed',
+          evaluated_venue_id: selectedVenue.id,
+          evaluated_venue_name: selectedVenue.name,
+          gps_lat: selectedVenue.lat,
+          gps_lng: selectedVenue.lng,
+          user_status_before: null, // was planning or null before
+          user_status_after: 'out',
+          result: 'fired',
+        });
+      }
       
       // Show confirmation with buzz prompt - get privacy level from profile
       const { data: profile } = await supabase
@@ -121,6 +139,21 @@ export function VenueArrivalPrompt() {
     if (detectedVenue) {
       dismissVenuePrompt(detectedVenue.id);
       logVenueDismissal(detectedVenue.id, 'user_dismissed');
+
+      // Log prompt_dismissed event
+      const evalId = getCurrentEvaluationId();
+      if (evalId) {
+        logLocationEvent({
+          evaluation_id: evalId,
+          user_id: user?.id,
+          event_type: 'prompt_dismissed',
+          evaluated_venue_id: detectedVenue.id,
+          evaluated_venue_name: detectedVenue.name,
+          gps_lat: detectedVenue.lat,
+          gps_lng: detectedVenue.lng,
+          result: 'suppressed_cooldown',
+        });
+      }
     }
     haptic.light();
     hideVenueArrival();
@@ -214,7 +247,7 @@ export function VenueArrivalPrompt() {
             disabled={isConfirming}
             className="w-full h-14 text-lg font-semibold rounded-2xl bg-gradient-to-r from-[#c4ee00] to-[#d4ff00] text-black hover:opacity-90 transition-all shadow-[0_0_20px_rgba(212,255,0,0.3)] mb-3"
           >
-            {isConfirming ? 'Updating...' : "Yes, I'm here! 🎉"}
+            {isConfirming ? 'Updating...' : "Yes, I'm here"}
           </Button>
 
           {/* I'm somewhere else button */}

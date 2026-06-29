@@ -68,6 +68,7 @@ async function subscribeNative(userId: string): Promise<boolean> {
         const { error } = await supabase
           .from('profiles')
           .update({
+            push_token: token.value,
             apns_device_token: token.value,
             push_enabled: true,
           })
@@ -101,6 +102,7 @@ async function unsubscribeNative(userId: string): Promise<boolean> {
     const { error } = await supabase
       .from('profiles')
       .update({
+        push_token: null,
         apns_device_token: null,
         push_enabled: false,
       })
@@ -161,8 +163,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         if (iosPermission === 'granted') {
           setIsSubscribed(true);
 
-          // Ensure the DB reflects this — if push_enabled isn't true yet,
-          // the auto-registration in App.tsx will set it shortly.
+          // Ensure push_enabled is set in DB
           const { data } = await supabase
             .from('profiles')
             .select('push_enabled')
@@ -170,8 +171,6 @@ export function usePushNotifications(): UsePushNotificationsReturn {
             .single();
 
           if (data && !data.push_enabled) {
-            // DB is stale — auto-registration hasn't saved yet, or
-            // something cleared it. Set it now.
             await supabase
               .from('profiles')
               .update({ push_enabled: true })
@@ -303,7 +302,8 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
       const { error } = await supabase
         .from('profiles')
-        .update({ 
+        .update({
+          push_token: JSON.stringify(subscriptionJson),
           push_subscription: subscriptionJson,
           push_enabled: true,
         })
@@ -350,7 +350,8 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
       const { error } = await supabase
         .from('profiles')
-        .update({ 
+        .update({
+          push_token: null,
           push_subscription: null,
           push_enabled: false,
         })

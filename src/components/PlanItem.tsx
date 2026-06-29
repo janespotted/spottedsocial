@@ -214,21 +214,24 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
           const firstName = myProfile?.display_name?.split(' ')[0] || 'Someone';
           const message = `${firstName} is down for your plan at ${plan.venue_name}! 🎉`;
           
-          const { data: notifData } = await supabase.rpc('create_notification', {
-            p_receiver_id: plan.user_id,
-            p_type: 'plan_down',
-            p_message: message,
-          });
-          
-          const notif = Array.isArray(notifData) ? notifData[0] : notifData;
-          if (notif) {
-            triggerPushNotification({
-              id: notif.id,
-              receiver_id: plan.user_id,
-              sender_id: currentUserId,
-              type: 'plan_down',
-              message,
+          // Skip notification for demo users (not in auth.users)
+          if (!plan.user?.is_demo) {
+            const { data: notifData } = await supabase.rpc('create_notification', {
+              p_receiver_id: plan.user_id,
+              p_type: 'plan_down',
+              p_message: message,
             });
+
+            const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+            if (notif) {
+              triggerPushNotification({
+                id: notif.id,
+                receiver_id: plan.user_id,
+                sender_id: currentUserId,
+                type: 'plan_down',
+                message,
+              });
+            }
           }
         }
         
@@ -504,7 +507,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
       {/* Empty state - subtle text when no participants AND no downs */}
       {participants.length === 0 && downs.length === 0 && (
         <p className="text-xs text-muted-foreground/50 mb-3">
-          Nobody's joined yet — be the first 👀
+          Nobody's joined yet
         </p>
       )}
 
@@ -520,7 +523,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
                 : 'bg-primary/20 text-primary hover:bg-primary/30'
             }`}
           >
-            <span>🎉</span>
+            <span className="text-sm font-medium">Down</span>
             {isDown && currentUserDown?.user && (
               <Avatar className="h-5 w-5 border border-black/20">
                 <AvatarImage src={currentUserDown.user.avatar_url || ''} />
@@ -609,7 +612,7 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
           {isLoadingComments ? (
             <p className="text-muted-foreground text-sm text-center">Loading comments...</p>
           ) : comments.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-2">No comments yet. Be the first!</p>
+            <p className="text-muted-foreground text-sm text-center py-2">No comments yet</p>
           ) : (
             <div className="space-y-3 max-h-48 overflow-y-auto">
               {comments.map((comment) => (

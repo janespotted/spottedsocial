@@ -82,8 +82,10 @@ class SpottedCameraViewController: UIViewController {
     private var videoOutput = AVCaptureMovieFileOutput()
     private var currentCamera: AVCaptureDevice.Position = .back
     private var isRecording = false
+    private var isSwitchingMidRecord = false
     private var recordingTimer: Timer?
     private var recordingStartTime: Date?
+    private var videoSegmentPaths: [String] = []
 
     // UI Elements
     private let shutterButton = UIView()
@@ -94,6 +96,16 @@ class SpottedCameraViewController: UIViewController {
     private let flashButton = UIButton(type: .system)
     private let timerLabel = UILabel()
     private var flashMode: AVCaptureDevice.FlashMode = .off
+
+    // Preview state
+    private var capturedFilePath: String?
+    private var capturedType: CaptureResult?
+    private let previewOverlay = UIView()
+    private let previewImageView = UIImageView()
+    private let previewVideoPlayer = AVPlayerLayer()
+    private var previewPlayer: AVPlayer?
+    private let retakeButton = UIButton(type: .system)
+    private let continueButton = UIButton(type: .system)
 
     override var prefersStatusBarHidden: Bool { true }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
@@ -121,6 +133,7 @@ class SpottedCameraViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         previewLayer?.frame = view.bounds
+        previewVideoPlayer.frame = previewOverlay.bounds
     }
 
     // MARK: - Camera Setup
@@ -162,9 +175,20 @@ class SpottedCameraViewController: UIViewController {
     }
 
     private func switchCamera() {
+        if isRecording {
+            // Mid-recording switch: stop current segment, switch, restart
+            isSwitchingMidRecord = true
+            videoOutput.stopRecording()
+            // The delegate callback will handle the rest via isSwitchingMidRecord flag
+            return
+        }
+
+        performCameraSwitch()
+    }
+
+    private func performCameraSwitch() {
         captureSession.beginConfiguration()
 
-        // Remove current video input
         for input in captureSession.inputs {
             if let deviceInput = input as? AVCaptureDeviceInput, deviceInput.device.hasMediaType(.video) {
                 captureSession.removeInput(deviceInput)
@@ -276,6 +300,59 @@ class SpottedCameraViewController: UIViewController {
             timerLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             timerLabel.bottomAnchor.constraint(equalTo: shutterButton.topAnchor, constant: -16),
         ])
+
+        // Preview overlay (hidden by default)
+        previewOverlay.backgroundColor = .black
+        previewOverlay.isHidden = true
+        previewOverlay.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(previewOverlay)
+
+        previewImageView.contentMode = .scaleAspectFill
+        previewImageView.clipsToBounds = true
+        previewImageView.translatesAutoresizingMaskIntoConstraints = false
+        previewOverlay.addSubview(previewImageView)
+
+        previewVideoPlayer.videoGravity = .resizeAspectFill
+        previewOverlay.layer.addSublayer(previewVideoPlayer)
+
+        // Retake button (bottom-left)
+        retakeButton.setImage(UIImage(systemName: "xmark")?.withConfiguration(UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)), for: .normal)
+        retakeButton.tintColor = .white
+        retakeButton.setTitle(" Retake", for: .normal)
+        retakeButton.setTitleColor(.white, for: .normal)
+        retakeButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        retakeButton.translatesAutoresizingMaskIntoConstraints = false
+        retakeButton.addTarget(self, action: #selector(handleRetake), for: .touchUpInside)
+        previewOverlay.addSubview(retakeButton)
+
+        // Continue button (bottom-right, green arrow)
+        continueButton.backgroundColor = UIColor(red: 212/255, green: 255/255, blue: 0, alpha: 1) // #d4ff00
+        continueButton.layer.cornerRadius = 28
+        continueButton.setImage(UIImage(systemName: "arrow.right")?.withConfiguration(UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)), for: .normal)
+        continueButton.tintColor = UIColor(red: 10/255, green: 1/255, blue: 24/255, alpha: 1) // #0a0118
+        continueButton.translatesAutoresizingMaskIntoConstraints = false
+        continueButton.addTarget(self, action: #selector(handleContinue), for: .touchUpInside)
+        previewOverlay.addSubview(continueButton)
+
+        NSLayoutConstraint.activate([
+            previewOverlay.topAnchor.constraint(equalTo: view.topAnchor),
+            previewOverlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            previewOverlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            previewOverlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            previewImageView.topAnchor.constraint(equalTo: previewOverlay.topAnchor),
+            previewImageView.bottomAnchor.constraint(equalTo: previewOverlay.bottomAnchor),
+            previewImageView.leadingAnchor.constraint(equalTo: previewOverlay.leadingAnchor),
+            previewImageView.trailingAnchor.constraint(equalTo: previewOverlay.trailingAnchor),
+
+            retakeButton.leadingAnchor.constraint(equalTo: previewOverlay.leadingAnchor, constant: 24),
+            retakeButton.bottomAnchor.constraint(equalTo: previewOverlay.safeAreaLayoutGuide.bottomAnchor, constant: -30),
+
+            continueButton.trailingAnchor.constraint(equalTo: previewOverlay.trailingAnchor, constant: -24),
+            continueButton.bottomAnchor.constraint(equalTo: previewOverlay.safeAreaLayoutGuide.bottomAnchor, constant: -24),
+            continueButton.widthAnchor.constraint(equalToConstant: 56),
+            continueButton.heightAnchor.constraint(equalToConstant: 56),
+        ])
     }
 
     // MARK: - Gestures
@@ -295,7 +372,9 @@ class SpottedCameraViewController: UIViewController {
     }
 
     @objc private func handleDoubleTapFlip() {
+        // Block camera flip while recording — AVCaptureMovieFileOutput can't survive session reconfiguration
         guard !isRecording else { return }
+
         UIView.animate(withDuration: 0.15, animations: {
             self.previewLayer.opacity = 0
         }) { _ in
@@ -306,20 +385,51 @@ class SpottedCameraViewController: UIViewController {
         }
     }
 
-    @objc private func handleTap() {
-        // Take photo
-        let settings = AVCapturePhotoSettings()
-        if flashMode == .on, let device = (captureSession.inputs.first as? AVCaptureDeviceInput)?.device, device.hasFlash {
-            settings.flashMode = .on
-        }
-        photoOutput.capturePhoto(with: settings, delegate: self)
+    private var savedBrightness: CGFloat = 0.5
 
-        // Flash animation
-        let flash = UIView(frame: view.bounds)
-        flash.backgroundColor = .white
-        flash.alpha = 0.8
-        view.addSubview(flash)
-        UIView.animate(withDuration: 0.15) { flash.alpha = 0 } completion: { _ in flash.removeFromSuperview() }
+    @objc private func handleTap() {
+        let settings = AVCapturePhotoSettings()
+
+        if flashMode == .on && currentCamera == .front {
+            // Snapchat-style screen flash: max brightness + white overlay to illuminate face
+            savedBrightness = UIScreen.main.brightness
+            UIScreen.main.brightness = 1.0
+
+            let screenFlash = UIView(frame: view.bounds)
+            screenFlash.backgroundColor = .white
+            screenFlash.alpha = 1.0
+            screenFlash.tag = 999
+            view.addSubview(screenFlash)
+
+            // Small delay so the screen brightness illuminates the face before capture
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.photoOutput.capturePhoto(with: settings, delegate: self!)
+            }
+        } else {
+            // Back camera: use hardware flash
+            if flashMode == .on, let device = (captureSession.inputs.first as? AVCaptureDeviceInput)?.device, device.hasFlash {
+                settings.flashMode = .on
+            }
+            photoOutput.capturePhoto(with: settings, delegate: self)
+
+            // Capture animation
+            let flash = UIView(frame: view.bounds)
+            flash.backgroundColor = .white
+            flash.alpha = 0.8
+            view.addSubview(flash)
+            UIView.animate(withDuration: 0.15) { flash.alpha = 0 } completion: { _ in flash.removeFromSuperview() }
+        }
+    }
+
+    private func cleanupScreenFlash() {
+        if let screenFlash = view.viewWithTag(999) {
+            UIView.animate(withDuration: 0.2, animations: {
+                screenFlash.alpha = 0
+            }) { _ in
+                screenFlash.removeFromSuperview()
+            }
+        }
+        UIScreen.main.brightness = savedBrightness
     }
 
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -335,9 +445,42 @@ class SpottedCameraViewController: UIViewController {
 
     // MARK: - Recording
 
+    private func startRecordingSegment() {
+        // Start a new recording segment (used after mid-record camera switch)
+        if let connection = videoOutput.connection(with: .video) {
+            connection.isVideoMirrored = (currentCamera == .front)
+        }
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("spotted_video_\(Int(Date().timeIntervalSince1970))_\(videoSegmentPaths.count).mp4")
+        videoOutput.startRecording(to: outputURL, recordingDelegate: self)
+        isRecording = true
+    }
+
     private func startRecording() {
         guard !isRecording else { return }
         isRecording = true
+        videoSegmentPaths = []
+
+        // Enable torch/screen flash for video
+        if flashMode == .on {
+            if currentCamera == .back {
+                // Back camera: use hardware torch
+                if let device = (captureSession.inputs.compactMap { $0 as? AVCaptureDeviceInput }.first(where: { $0.device.hasMediaType(.video) }))?.device,
+                   device.hasTorch {
+                    try? device.lockForConfiguration()
+                    device.torchMode = .on
+                    device.unlockForConfiguration()
+                }
+            } else {
+                // Front camera: screen flash (keep screen bright + white overlay while recording)
+                savedBrightness = UIScreen.main.brightness
+                UIScreen.main.brightness = 1.0
+                let screenFlash = UIView(frame: view.bounds)
+                screenFlash.backgroundColor = UIColor.white.withAlphaComponent(0.85)
+                screenFlash.tag = 999
+                screenFlash.isUserInteractionEnabled = false
+                view.insertSubview(screenFlash, belowSubview: shutterButton)
+            }
+        }
 
         // Animate shutter to recording state
         UIView.animate(withDuration: 0.2) {
@@ -369,6 +512,11 @@ class SpottedCameraViewController: UIViewController {
             self.timerLabel.text = String(format: "%d:%02d", seconds, tenths)
         }
 
+        // Mirror video for front camera so selfie videos match the preview
+        if let connection = videoOutput.connection(with: .video) {
+            connection.isVideoMirrored = (currentCamera == .front)
+        }
+
         // Start recording to file
         let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("spotted_video_\(Int(Date().timeIntervalSince1970)).mp4")
         videoOutput.startRecording(to: outputURL, recordingDelegate: self)
@@ -380,6 +528,20 @@ class SpottedCameraViewController: UIViewController {
 
         recordingTimer?.invalidate()
         recordingTimer = nil
+
+        // Turn off torch/screen flash
+        if flashMode == .on {
+            if currentCamera == .back {
+                if let device = (captureSession.inputs.compactMap { $0 as? AVCaptureDeviceInput }.first(where: { $0.device.hasMediaType(.video) }))?.device,
+                   device.hasTorch {
+                    try? device.lockForConfiguration()
+                    device.torchMode = .off
+                    device.unlockForConfiguration()
+                }
+            } else {
+                cleanupScreenFlash()
+            }
+        }
 
         // Animate shutter back
         UIView.animate(withDuration: 0.2) {
@@ -395,6 +557,64 @@ class SpottedCameraViewController: UIViewController {
         videoOutput.stopRecording()
     }
 
+    // MARK: - Preview
+
+    private func showPreview(result: CaptureResult) {
+        capturedType = result
+        captureSession.stopRunning()
+
+        switch result {
+        case .photo(let path):
+            if let image = UIImage(contentsOfFile: path) {
+                previewImageView.image = image
+                previewImageView.isHidden = false
+            }
+        case .video(let path):
+            let url = URL(fileURLWithPath: path)
+            previewPlayer = AVPlayer(url: url)
+            previewVideoPlayer.player = previewPlayer
+            previewVideoPlayer.frame = view.bounds
+            previewImageView.isHidden = true
+            previewPlayer?.play()
+            // Loop video
+            NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: previewPlayer?.currentItem,
+                queue: .main
+            ) { [weak self] _ in
+                self?.previewPlayer?.seek(to: .zero)
+                self?.previewPlayer?.play()
+            }
+        }
+
+        previewOverlay.isHidden = false
+        previewOverlay.alpha = 0
+        UIView.animate(withDuration: 0.2) {
+            self.previewOverlay.alpha = 1
+        }
+    }
+
+    @objc private func handleRetake() {
+        // Hide preview, restart camera
+        previewOverlay.isHidden = true
+        previewImageView.image = nil
+        previewPlayer?.pause()
+        previewPlayer = nil
+        previewVideoPlayer.player = nil
+        capturedType = nil
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.captureSession.startRunning()
+        }
+    }
+
+    @objc private func handleContinue() {
+        guard let result = capturedType else { return }
+        dismiss(animated: true) { [weak self] in
+            self?.onCapture?(result)
+        }
+    }
+
     // MARK: - Actions
 
     @objc private func handleClose() {
@@ -405,6 +625,7 @@ class SpottedCameraViewController: UIViewController {
 
     @objc private func handleFlip() {
         guard !isRecording else { return }
+
         UIView.animate(withDuration: 0.15, animations: {
             self.previewLayer.opacity = 0
         }) { _ in
@@ -434,6 +655,9 @@ class SpottedCameraViewController: UIViewController {
 
 extension SpottedCameraViewController: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        // Clean up screen flash (front camera)
+        cleanupScreenFlash()
+
         guard error == nil, let data = photo.fileDataRepresentation() else {
             print("[SpottedCamera] Photo capture error: \(error?.localizedDescription ?? "unknown")")
             return
@@ -443,10 +667,20 @@ extension SpottedCameraViewController: AVCapturePhotoCaptureDelegate {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
 
         do {
-            try data.write(to: url)
-            dismiss(animated: true) { [weak self] in
-                self?.onCapture?(.photo(url.path))
+            var finalData = data
+
+            // Front camera: mirror the image so selfies match the preview
+            if currentCamera == .front, let image = UIImage(data: data) {
+                if let cgImage = image.cgImage {
+                    let mirrored = UIImage(cgImage: cgImage, scale: image.scale, orientation: .leftMirrored)
+                    if let jpegData = mirrored.jpegData(compressionQuality: 0.9) {
+                        finalData = jpegData
+                    }
+                }
             }
+
+            try finalData.write(to: url)
+            showPreview(result: .photo(url.path))
         } catch {
             print("[SpottedCamera] Error saving photo: \(error)")
         }
@@ -458,18 +692,98 @@ extension SpottedCameraViewController: AVCapturePhotoCaptureDelegate {
 extension SpottedCameraViewController: AVCaptureFileOutputRecordingDelegate {
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
         if let error = error {
-            // Check if it was just max duration reached (not a real error)
             let nsError = error as NSError
+            // Max duration or mid-switch stop — not real errors
             if nsError.domain == AVFoundationErrorDomain && nsError.code == -11810 {
-                // Max duration reached — this is expected, not an error
+                // Max duration reached
+            } else if isSwitchingMidRecord {
+                // Expected stop for camera switch
             } else {
                 print("[SpottedCamera] Video recording error: \(error.localizedDescription)")
                 return
             }
         }
 
-        dismiss(animated: true) { [weak self] in
-            self?.onCapture?(.video(outputFileURL.path))
+        if isSwitchingMidRecord {
+            // Save this segment and switch cameras
+            videoSegmentPaths.append(outputFileURL.path)
+            isSwitchingMidRecord = false
+
+            // Perform the camera switch
+            performCameraSwitch()
+
+            // Brief delay to let the session stabilize, then restart recording
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.startRecordingSegment()
+            }
+            return
+        }
+
+        // Normal finish — check if we have multiple segments to merge
+        if videoSegmentPaths.isEmpty {
+            showPreview(result: .video(outputFileURL.path))
+        } else {
+            videoSegmentPaths.append(outputFileURL.path)
+            mergeVideoSegments { [weak self] mergedPath in
+                guard let mergedPath = mergedPath else {
+                    // Merge failed — use last segment
+                    self?.showPreview(result: .video(outputFileURL.path))
+                    return
+                }
+                self?.showPreview(result: .video(mergedPath))
+            }
+        }
+    }
+
+    private func mergeVideoSegments(completion: @escaping (String?) -> Void) {
+        let composition = AVMutableComposition()
+
+        guard let videoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
+              let audioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            completion(nil)
+            return
+        }
+
+        var currentTime = CMTime.zero
+
+        for path in videoSegmentPaths {
+            let asset = AVURLAsset(url: URL(fileURLWithPath: path))
+            let duration = asset.duration
+
+            if let assetVideoTrack = asset.tracks(withMediaType: .video).first {
+                try? videoTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: assetVideoTrack, at: currentTime)
+            }
+            if let assetAudioTrack = asset.tracks(withMediaType: .audio).first {
+                try? audioTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: assetAudioTrack, at: currentTime)
+            }
+
+            currentTime = CMTimeAdd(currentTime, duration)
+        }
+
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("spotted_merged_\(Int(Date().timeIntervalSince1970)).mp4")
+
+        guard let exporter = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+            completion(nil)
+            return
+        }
+
+        exporter.outputURL = outputURL
+        exporter.outputFileType = .mp4
+
+        exporter.exportAsynchronously {
+            DispatchQueue.main.async {
+                if exporter.status == .completed {
+                    // Clean up segments
+                    for path in self.videoSegmentPaths {
+                        try? FileManager.default.removeItem(atPath: path)
+                    }
+                    self.videoSegmentPaths = []
+                    completion(outputURL.path)
+                } else {
+                    print("[SpottedCamera] Merge failed: \(exporter.error?.localizedDescription ?? "unknown")")
+                    completion(nil)
+                }
+            }
         }
     }
 }

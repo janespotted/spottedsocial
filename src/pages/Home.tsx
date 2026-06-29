@@ -17,7 +17,7 @@ import { useWeekendRally } from '@/hooks/useWeekendRally';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Loader2, Copy, Users, Target, MapPin, Search, Bell } from 'lucide-react';
+import { Heart, MessageCircle, MessageSquare, Send, Plus, MoreHorizontal, Trash2, Loader2, Target, MapPin, Search, Bell, Volume2, VolumeX } from 'lucide-react';
 import { CityBadge } from '@/components/CityBadge';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import spottedLogo from '@/assets/spotted-s-logo.png';
@@ -46,7 +46,7 @@ import { MorningAfterBanner } from '@/components/MorningAfterBanner';
 import { FriendsOutPill } from '@/components/FriendsOutPill';
 import { MorningAfterModal } from '@/components/MorningAfterModal';
 import { MORNING_AFTER_FLAG } from '@/lib/morning-after-notification';
-import { CommentInput } from '@/components/CommentInput';
+import { CommentsSheet } from '@/components/CommentsSheet';
 import { ShareToDMModal } from '@/components/ShareToDMModal';
 
 export default function Home() {
@@ -73,6 +73,7 @@ export default function Home() {
     likedPosts,
     likedComments,
     expandedPostId,
+    setExpandedPostId,
     comments,
     newComment,
     setNewComment,
@@ -88,6 +89,7 @@ export default function Home() {
     handleLikeComment,
     handleDeletePost,
     loadMorePosts,
+    fetchComments,
     handleIncrementalNewPost,
     handleIncrementalDelete,
   } = useFeed({
@@ -111,21 +113,35 @@ export default function Home() {
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [sharePost, setSharePost] = useState<Post | null>(null);
   const [planPreselectedFriend, setPlanPreselectedFriend] = useState<{ id: string; display_name: string; avatar_url: string | null } | null>(null);
+  const clearPreselectedFriend = useCallback(() => setPlanPreselectedFriend(null), []);
   const loadTriggerRef = useRef<HTMLDivElement>(null);
   const { isKeyboardOpen } = useKeyboardAware();
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [feedAudioEnabled, setFeedAudioEnabled] = useState(false);
 
-  // Scroll the active post into view when comments are expanded
+  // Sync mute state across all feed videos when toggled
   useEffect(() => {
-    if (!expandedPostId) return;
-    // Small delay to let the comment input render and keyboard open
-    const timer = setTimeout(() => {
-      const el = postRefs.current.get(expandedPostId);
-      if (!el) return;
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [expandedPostId]);
+    document.querySelectorAll<HTMLVideoElement>('video.feed-video').forEach(v => {
+      v.muted = !feedAudioEnabled;
+    });
+  }, [feedAudioEnabled]);
+
+  // Shared IntersectionObserver for autoplay videos
+  const videoObserver = useMemo(() => {
+    return new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          const video = entry.target as HTMLVideoElement;
+          if (entry.intersectionRatio >= 0.5) {
+            video.play().catch(() => {});
+          } else {
+            video.pause();
+          }
+        });
+      },
+      { threshold: [0, 0.5, 1.0] }
+    );
+  }, []);
 
   // Auto-open Morning After modal if user tapped the recap notification
   useEffect(() => {
@@ -330,27 +346,31 @@ export default function Home() {
     toast.success('Post deleted');
   };
 
-  // ── Collapsing header for Newsfeed ──
+  // ── Collapsing header ──
   const [scrollProgress, setScrollProgress] = useState(0);
+  const scrollRef = useRef(0);
   const tickingRef = useRef(false);
 
   useEffect(() => {
-    const root = document.getElementById('root');
+    const root = document.getElementById('main-scroll');
     if (!root) return;
 
     const onScroll = () => {
       if (!tickingRef.current) {
-        const scrollTop = root.scrollTop;
+        tickingRef.current = true;
         requestAnimationFrame(() => {
-          setScrollProgress(Math.min(1, Math.max(0, scrollTop / 80)));
+          const p = Math.min(1, Math.max(0, root.scrollTop / 80));
+          // Only update state if value actually changed (avoids unnecessary re-renders)
+          if (p !== scrollRef.current) {
+            scrollRef.current = p;
+            setScrollProgress(p);
+          }
           tickingRef.current = false;
         });
-        tickingRef.current = true;
       }
     };
 
     root.addEventListener('scroll', onScroll, { passive: true });
-    // Set initial state
     onScroll();
     return () => root.removeEventListener('scroll', onScroll);
   }, []);
@@ -368,17 +388,15 @@ export default function Home() {
       <div
         className="sticky top-0 z-10 pt-[max(env(safe-area-inset-top),12px)]"
         style={{
-          backgroundColor: scrollProgress > 0
-            ? `rgba(26, 15, 46, ${0.95 + scrollProgress * 0.05})`
-            : 'rgba(26, 15, 46, 0.95)',
-          backdropFilter: scrollProgress > 0 ? `blur(${scrollProgress * 12}px)` : 'none',
-          WebkitBackdropFilter: scrollProgress > 0 ? `blur(${scrollProgress * 12}px)` : 'none',
+          backgroundColor: `rgba(26, 15, 46, ${0.95 + scrollProgress * 0.05})`,
+          backdropFilter: `blur(${scrollProgress * 12}px)`,
+          WebkitBackdropFilter: `blur(${scrollProgress * 12}px)`,
           borderBottom: `1px solid rgba(255, 255, 255, ${scrollProgress * 0.08})`,
         }}
       >
         <div className="flex items-start justify-between px-5 pt-3 pb-3">
           <div>
-            {/* Wordmark row — anchored, no animation */}
+            {/* Wordmark row — anchored */}
             <div className="flex items-center gap-3 mb-1">
               <span
                 className="text-[30px] tracking-[0.35em] text-white select-none"
@@ -398,7 +416,6 @@ export default function Home() {
                 opacity: 1 - scrollProgress,
                 height: `${(1 - scrollProgress) * 36}px`,
                 overflow: 'hidden',
-                transition: 'none',
               }}
             >
               {feedMode === 'plans' ? 'Plans' : 'Newsfeed'}
@@ -411,7 +428,6 @@ export default function Home() {
                 opacity: Math.max(0, 1 - scrollProgress * 3),
                 height: `${Math.max(0, 1 - scrollProgress * 2) * 20}px`,
                 overflow: 'hidden',
-                transition: 'none',
               }}
             >
               {feedMode === 'plans' ? 'What friends are up to' : 'Everything disappears by 5am'}
@@ -449,7 +465,7 @@ export default function Home() {
           <button
             onClick={() => {
               setFeedMode('newsfeed');
-              document.getElementById('root')?.scrollTo({ top: 0 });
+              document.getElementById('main-scroll')?.scrollTo({ top: 0 });
             }}
             className={`relative pb-2 text-lg font-semibold transition-colors ${
               feedMode === 'newsfeed' ? 'text-white' : 'text-white/40'
@@ -463,7 +479,7 @@ export default function Home() {
           <button
             onClick={() => {
               setFeedMode('plans');
-              document.getElementById('root')?.scrollTo({ top: 0 });
+              document.getElementById('main-scroll')?.scrollTo({ top: 0 });
             }}
             className={`relative pb-2 text-lg font-semibold transition-colors ${
               feedMode === 'plans' ? 'text-white' : 'text-white/40'
@@ -485,13 +501,13 @@ export default function Home() {
 
       {/* Feed Content */}
       {feedMode === 'plans' ? (
-        <div className="py-4 min-h-[calc(100vh+100px)]">
+        <div className="py-4">
           <PlansFeed
             userId={user?.id || ''}
             weekendFilter={isWeekendRally}
             onClearWeekendFilter={clearRally}
             preselectedFriend={planPreselectedFriend}
-            onPreselectedFriendConsumed={() => setPlanPreselectedFriend(null)}
+            onPreselectedFriendConsumed={clearPreselectedFriend}
           />
         </div>
       ) : (
@@ -593,18 +609,17 @@ export default function Home() {
                           )}
                         </div>
                       </div>
-                      <Button
-                        size="sm"
+                      <button
                         onClick={() => navigate('/messages', {
                           state: {
                             preselectedUser: { id: friend.user_id, display_name: friend.display_name, avatar_url: friend.avatar_url },
                             source: 'planning'
                           }
                         })}
-                        className="h-8 px-3 border border-white/20 text-white bg-transparent rounded-full text-xs hover:bg-white/10 transition-colors"
+                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
                       >
-                        Make plans
-                      </Button>
+                        <MessageSquare className="w-5 h-5 text-white" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -711,13 +726,34 @@ export default function Home() {
               {post.image_url && (
                 <div className="w-full aspect-[4/5] relative overflow-hidden rounded-xl mb-3 group">
                   {post.media_type === 'video' ? (
-                    <video
-                      src={post.image_url}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      className="w-full h-full object-cover"
-                    />
+                    <div
+                      className="relative w-full h-full"
+                      onClick={() => setFeedAudioEnabled(prev => !prev)}
+                    >
+                      <video
+                        ref={(el) => {
+                          if (el) {
+                            videoObserver.observe(el);
+                            el.muted = !feedAudioEnabled;
+                          }
+                          // Cleanup handled by IntersectionObserver disconnect on unmount
+                        }}
+                        src={post.image_url}
+                        muted
+                        playsInline
+                        loop
+                        preload="metadata"
+                        className="feed-video w-full h-full object-cover"
+                      />
+                      {/* Mute/unmute indicator */}
+                      <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center pointer-events-none">
+                        {feedAudioEnabled ? (
+                          <Volume2 className="w-4 h-4 text-white" />
+                        ) : (
+                          <VolumeX className="w-4 h-4 text-white/70" />
+                        )}
+                      </div>
+                    </div>
                   ) : (
                     <img
                       src={post.image_url}
@@ -765,55 +801,19 @@ export default function Home() {
                   <div className="w-px h-4 bg-white/10 mx-3" />
 
                   <button
-                    onClick={() => handleToggleComments(post.id)}
+                    onClick={() => { setExpandedPostId(post.id); }}
                     className="flex items-center gap-1.5 text-white/70 hover:text-[#d4ff00] transition-colors"
                   >
                     <MessageCircle className="h-[22px] w-[22px]" />
                     <span className="font-semibold text-sm text-white/80">{post.comments_count || 0}</span>
                   </button>
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="text-white/50 hover:text-[#d4ff00] transition-colors ml-auto">
-                        <Send className="h-[22px] w-[22px]" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#4a3566]">
-                      <DropdownMenuItem
-                        onClick={() => setSharePost(post)}
-                        className="text-white hover:bg-[#2d1b4e] cursor-pointer"
-                      >
-                        <Users className="h-4 w-4 mr-2" />
-                        Send to Friend
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={async () => {
-                          const shareData = {
-                            title: `${post.profiles?.display_name} on Spotted`,
-                            text: `${post.text}${post.venue_name ? ` @ ${post.venue_name}` : ''}`,
-                            url: APP_BASE_URL,
-                          };
-                          if (navigator.share) {
-                            try {
-                              await navigator.share(shareData);
-                            } catch (err) {
-                              if ((err as Error).name !== 'AbortError') {
-                                await copyToClipboard(`${shareData.text} - ${shareData.url}`);
-                                toast.success('Link copied to clipboard!');
-                              }
-                            }
-                          } else {
-                            await copyToClipboard(`${shareData.text} - ${shareData.url}`);
-                            toast.success('Link copied to clipboard!');
-                          }
-                        }}
-                        className="text-white hover:bg-[#2d1b4e] cursor-pointer"
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy Link
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <button
+                    onClick={() => setSharePost(post)}
+                    className="text-white/50 hover:text-[#d4ff00] transition-colors ml-auto"
+                  >
+                    <Send className="h-[22px] w-[22px]" />
+                  </button>
                 </div>
 
                 {/* Caption — below engagement, with thin separator */}
@@ -836,52 +836,6 @@ export default function Home() {
                   </div>
                 )}
 
-                {expandedPostId === post.id && (
-                  <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
-                    {comments[post.id]?.map((comment) => (
-                      <div key={comment.id} className="flex gap-3">
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          <AvatarImage src={comment.profiles?.avatar_url || undefined} />
-                          <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                            {comment.profiles?.display_name?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="bg-[#1a0f2e]/60 rounded-lg px-3 py-2">
-                            <p className="font-semibold text-white text-sm">
-                              {comment.profiles?.display_name}
-                            </p>
-                            <p className="text-white/80 text-sm break-words">{comment.text}</p>
-                          </div>
-                          <div className="flex items-center gap-3 mt-1 ml-1">
-                            <span className="text-white/40 text-xs">{getTimeAgo(comment.created_at)}</span>
-                            <button 
-                              onClick={() => handleLikeComment(comment.id, post.id)}
-                              className={`flex items-center gap-1 transition-colors ${
-                                likedComments.has(comment.id) ? 'text-[#d4ff00]' : 'text-white/50 hover:text-[#d4ff00]'
-                              }`}
-                            >
-                              <Heart 
-                                className="h-3.5 w-3.5"
-                                fill={likedComments.has(comment.id) ? 'currentColor' : 'none'}
-                              />
-                              {(comment.likes_count || 0) > 0 && (
-                                <span className="text-xs">{comment.likes_count}</span>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    <CommentInput
-                      postId={post.id}
-                      userAvatarUrl={user?.user_metadata?.avatar_url}
-                      userInitial={user?.email?.[0].toUpperCase()}
-                      onSubmit={handlePostComment}
-                    />
-                  </div>
-                )}
               </div>
             </div>
           ))
@@ -905,11 +859,26 @@ export default function Home() {
       )}
 
 
-      {/* Create Post FAB - hide when keyboard is open */}
-      {feedMode === 'newsfeed' && !isKeyboardOpen && (
+      {/* Comments bottom sheet */}
+      <CommentsSheet
+        open={!!expandedPostId}
+        onOpenChange={(open) => { if (!open) setExpandedPostId(null); }}
+        postId={expandedPostId}
+        comments={comments}
+        likedComments={likedComments}
+        onPostComment={handlePostComment}
+        onLikeComment={handleLikeComment}
+        onFetchComments={fetchComments}
+        getTimeAgo={getTimeAgo}
+        userAvatarUrl={user?.user_metadata?.avatar_url}
+        userInitial={user?.email?.[0].toUpperCase()}
+      />
+
+      {/* Create Post FAB - hide when keyboard is open or commenting */}
+      {feedMode === 'newsfeed' && !isKeyboardOpen && !expandedPostId && !showCreatePost && (
         <button
           onClick={() => setShowCreatePost(true)}
-          className="fixed bottom-28 right-6 z-20 w-14 h-14 rounded-full bg-[#d4ff00] flex items-center justify-center hover:scale-105 transition-transform"
+          className="fixed bottom-28 right-6 z-[60] w-14 h-14 rounded-full bg-[#d4ff00] flex items-center justify-center hover:scale-105 transition-transform shadow-[0_0_20px_rgba(212,255,0,0.3)]"
           aria-label="Create post"
         >
           <Plus className="h-7 w-7 text-black" />

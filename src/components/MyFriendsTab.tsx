@@ -359,34 +359,12 @@ export function MyFriendsTab() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="px-4 py-4 space-y-3">
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search friends..."
-          className="bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl pl-10 h-10 text-sm"
-        />
-        {search && (
-          <button onClick={() => setSearch('')} className="absolute right-3.5 top-1/2 -translate-y-1/2">
-            <X className="h-3.5 w-3.5 text-white/30 hover:text-white/50" />
-          </button>
-        )}
-      </div>
-
+    <div className="space-y-1">
       {/* List */}
       {isLoading ? (
-        Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3 p-3">
-            <Skeleton className="h-11 w-11 rounded-full bg-white/5" />
-            <div className="flex-1 space-y-1.5">
-              <Skeleton className="h-3.5 w-24 bg-white/5" />
-              <Skeleton className="h-3 w-16 bg-white/5" />
-            </div>
-          </div>
-        ))
+        <div className="flex justify-center py-8">
+          <div className="w-5 h-5 border-2 border-white/10 border-t-[#d4ff00] rounded-full animate-spin" />
+        </div>
       ) : filteredFriends.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Search className="h-6 w-6 text-white/20 mb-3" />
@@ -400,7 +378,7 @@ export function MyFriendsTab() {
             <>
               <div className="px-3 py-2 bg-[#1a0f2e]/50">
                 <p className="text-white/70 text-xs font-semibold uppercase tracking-wider">
-                  👥 Out Now <span className="text-white/50">({outFriends.length})</span>
+                  Out Now <span className="text-white/50">({outFriends.length})</span>
                 </p>
               </div>
               {outFriends.map(renderRow)}
@@ -411,7 +389,7 @@ export function MyFriendsTab() {
             <>
               <div className="px-3 py-2 bg-[#1a0f2e]/50 border-t border-[#a855f7]/10">
                 <p className="text-white/70 text-xs font-semibold uppercase tracking-wider">
-                  🎯 Planning <span className="text-white/50">({planningFriends.length})</span>
+                  TBD <span className="text-white/50">({planningFriends.length})</span>
                 </p>
               </div>
               {planningFriends.map(renderRow)}

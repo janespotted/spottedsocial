@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Home, Share2 } from 'lucide-react';
+import { Home, Share2, Users, ChevronRight, X } from 'lucide-react';
 import { getOrCreateInviteCode, getInviteLink, triggerSmsInvite } from '@/lib/sms-invite';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -143,27 +143,27 @@ export function InviteFriendsModal() {
     <button
       key={friend.id}
       onClick={() => handleToggleFriend(friend.id)}
-      className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+      className="w-full flex items-center gap-3 p-3 hover:bg-white/5 transition-colors rounded-xl"
     >
       <Checkbox
         checked={selectedFriends.has(friend.id)}
         onCheckedChange={() => handleToggleFriend(friend.id)}
-        className="border-[#a855f7]"
+        className="border-white/20 data-[state=checked]:bg-[#d4ff00] data-[state=checked]:border-[#d4ff00] data-[state=checked]:text-black"
       />
-      <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
+      <Avatar className="w-9 h-9 flex-shrink-0 border-2 border-white/15">
         <AvatarImage src={friend.avatar_url || undefined} />
-        <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+        <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
           {friend.display_name[0]}
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0 text-left">
-        <p className="text-white font-semibold text-sm truncate">{friend.display_name}</p>
+        <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
         {friend.status === 'out' ? (
-          <p className="text-[#d4ff00] text-xs truncate">📍 At {friend.venue_name || 'Nearby'}</p>
+          <p className="text-[#d4ff00] text-xs truncate">At {friend.venue_name || 'Nearby'}</p>
         ) : friend.status === 'planning' ? (
-          <p className="text-[#a855f7] text-xs truncate">🎯 Planning{friend.planning_neighborhood ? ` (${friend.planning_neighborhood})` : ' tonight'}</p>
+          <p className="text-[#a855f7] text-xs truncate">TBD{friend.planning_neighborhood ? ` · ${friend.planning_neighborhood}` : ''}</p>
         ) : (
-          <p className="text-white/40 text-xs">Home</p>
+          <p className="text-white/30 text-xs">Home</p>
         )}
       </div>
     </button>
@@ -173,13 +173,21 @@ export function InviteFriendsModal() {
     <Dialog open={showInviteModal} onOpenChange={(open) => {
       if (!open) { closeInviteModal(); setSelectedFriends(new Set()); }
     }}>
-      <DialogContent className="w-[90%] max-w-[400px] max-h-[80vh] bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden flex flex-col">
+      <DialogContent className="w-[90%] max-w-[400px] max-h-[80vh] bg-[#1a1030] border border-white/10 rounded-3xl p-0 overflow-hidden flex flex-col shadow-[0_0_40px_rgba(168,85,247,0.1)] [&>button]:hidden">
         <VisuallyHidden><DialogTitle>Invite Friends</DialogTitle></VisuallyHidden>
         <div className="flex flex-col flex-1 min-h-0">
           {/* Header */}
-          <div className="p-5 pb-2">
-            <h2 className="text-xl font-bold text-white">Invite Friends</h2>
-            <p className="text-sm text-white/60">to {venueName}</p>
+          <div className="p-5 pb-3 flex items-start justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-white">Invite Friends</h2>
+              <p className="text-sm text-white/50">to <span className="text-[#d4ff00]">{venueName}</span></p>
+            </div>
+            <button
+              onClick={() => { closeInviteModal(); setSelectedFriends(new Set()); }}
+              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/15 transition-colors flex-shrink-0"
+            >
+              <X className="h-4 w-4 text-white/70" />
+            </button>
           </div>
 
           {/* Scrollable content */}
@@ -187,15 +195,20 @@ export function InviteFriendsModal() {
             {loading ? (
               <div className="text-center text-white/50 py-8">Loading friends...</div>
             ) : friends.length === 0 ? (
-              <div className="text-center text-white/50 py-8">No friends found</div>
+              <div className="flex items-center gap-3 py-6">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0">
+                  <Users className="h-5 w-5 text-white/30" />
+                </div>
+                <span className="text-white/40 text-sm">No friends found</span>
+              </div>
             ) : (
-              <div className="bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg overflow-hidden">
+              <div className="rounded-xl overflow-hidden">
                 {outFriends.length > 0 && (
                   <>
-                    <div className="px-3 py-2">
-                      <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider">
-                        👥 Friends Out Now
-                        <span className="text-white/50 ml-1">({outFriends.length})</span>
+                    <div className="px-1 py-2">
+                      <h3 className="text-white/50 text-xs font-semibold uppercase tracking-wider">
+                        Friends Out Now
+                        <span className="text-white/30 ml-1">({outFriends.length})</span>
                       </h3>
                     </div>
                     {outFriends.map(renderFriendRow)}
@@ -203,10 +216,10 @@ export function InviteFriendsModal() {
                 )}
                 {planningFriends.length > 0 && (
                   <>
-                    <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
-                      <p className="text-white/70 text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider">
-                        🔥 Friends Planning 🎯
-                        <span className="text-white/50 normal-case tracking-normal">({planningFriends.length})</span>
+                    <div className="px-1 py-2 mt-1">
+                      <p className="text-white/50 text-xs font-semibold uppercase tracking-wider">
+                        TBD tonight
+                        <span className="text-white/30 ml-1">({planningFriends.length})</span>
                       </p>
                     </div>
                     {planningFriends.map(renderFriendRow)}
@@ -214,10 +227,10 @@ export function InviteFriendsModal() {
                 )}
                 {homeFriends.length > 0 && (
                   <>
-                    <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
-                      <p className="text-white/70 text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider">
-                        <Home className="h-3.5 w-3.5 text-white/50 inline mr-0.5" /> Staying In
-                        <span className="text-white/50 normal-case tracking-normal">({homeFriends.length})</span>
+                    <div className="px-1 py-2 mt-1">
+                      <p className="text-white/50 text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider">
+                        <Home className="h-3.5 w-3.5 text-white/30" /> Staying in
+                        <span className="text-white/30 ml-1">({homeFriends.length})</span>
                       </p>
                     </div>
                     {homeFriends.map(renderFriendRow)}
@@ -226,21 +239,24 @@ export function InviteFriendsModal() {
               </div>
             )}
 
+            {/* Divider */}
+            <div className="h-px bg-white/10 my-4" />
+
             {/* Invite from Contacts */}
-            <div className="border-t border-white/10 pt-4 mt-4 mb-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-1">
                 <Share2 className="h-4 w-4 text-[#d4ff00]" />
                 <span className="font-semibold text-white text-sm">Invite from Contacts</span>
               </div>
-              <p className="text-white/50 text-xs mb-3">
+              <p className="text-white/40 text-xs mb-3">
                 Invite friends who aren't on Spotted yet via text message
               </p>
-              <Button
+              <button
                 onClick={async () => {
                   if (!user) return;
                   haptic.light();
                   try {
-                    const { data: profile } = await supabase.rpc('get_profile_safe', { target_user_id: user.id });
+                    const { data: profile } = await supabase.from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', user.id);
                     const senderName = profile?.[0]?.display_name?.split(' ')[0] || 'Your friend';
                     const code = await getOrCreateInviteCode(user.id);
                     const link = getInviteLink(code, venueId || undefined);
@@ -250,21 +266,21 @@ export function InviteFriendsModal() {
                     toast.error('Could not open share sheet');
                   }
                 }}
-                variant="outline"
-                className="w-full border-[#d4ff00]/40 text-[#d4ff00] hover:bg-[#d4ff00]/10"
+                className="w-full flex items-center gap-3 h-11 px-4 rounded-xl border border-[#d4ff00]/40 text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/5 transition-colors"
               >
-                <Share2 className="h-4 w-4 mr-2" />
-                Send Text Invite
-              </Button>
+                <Share2 className="h-4 w-4" />
+                <span className="flex-1 text-left">Send Text Invite</span>
+                <ChevronRight className="h-4 w-4 text-[#d4ff00]/60" />
+              </button>
             </div>
           </ScrollArea>
 
           {/* Fixed bottom button */}
-          <div className="p-5 pt-3 border-t border-white/10">
+          <div className="p-5 pt-3">
             <Button
               onClick={handleSendInvites}
               disabled={selectedFriends.size === 0}
-              className="w-full bg-[#a855f7] hover:bg-[#a855f7]/90 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-12 bg-[#a855f7] hover:bg-[#a855f7]/90 text-white font-semibold text-base rounded-xl disabled:opacity-40"
             >
               Send Invites {selectedFriends.size > 0 && `(${selectedFriends.size})`}
             </Button>

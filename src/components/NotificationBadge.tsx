@@ -15,11 +15,11 @@ export function NotificationBadge({ count, max = 9, className }: NotificationBad
   return (
     <span
       className={cn(
-        "absolute -top-1.5 -right-1.5 h-5 flex items-center justify-center",
-        "bg-purple-600 text-white text-[10px] font-bold",
-        "ring-2 ring-background shadow-lg",
+        "absolute -top-1 -right-1 h-4 flex items-center justify-center",
+        "bg-red-500 text-white text-[9px] font-bold",
+        "ring-1.5 ring-background",
         "animate-in zoom-in-50 duration-200",
-        isOverflow ? "min-w-6 px-1.5 rounded-full" : "w-5 rounded-full",
+        isOverflow ? "min-w-5 px-1 rounded-full" : "w-4 rounded-full",
         className
       )}
     >

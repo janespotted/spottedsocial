@@ -11,14 +11,12 @@ import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
-import spottedLogo from '@/assets/spotted-s-logo.png';
+import { PageHeader } from '@/components/PageHeader';
 import { ChevronUp, ChevronDown, Bell, BarChart3, ChevronRight, Search } from 'lucide-react';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
-import { NotificationBadge } from '@/components/NotificationBadge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
-import { CityBadge } from '@/components/CityBadge';
 import { LeaderboardSkeleton } from '@/components/LeaderboardSkeleton';
 import { isVenueOpen, VenueHours } from '@/lib/venue-hours';
 import { isNightlifeHours } from '@/lib/time-context';
@@ -478,73 +476,40 @@ export default function Leaderboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-32">
+    <div className="min-h-screen bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-40">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
-        <div className="flex items-start justify-between px-6 pt-3 pb-3">
-          <div>
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-                <CityBadge />
-              </div>
-              <h2 className="text-3xl font-bold text-white">Leaderboard</h2>
-              <p className="text-white/60 text-sm mb-4">Top places to go out now</p>
-              
-              {/* Neighborhood Filter Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 px-3 py-1.5 min-w-[72px] whitespace-nowrap rounded-[14px] bg-[#1D102D]/40 border border-[#a855f7]/30 text-white font-medium text-sm transition-all hover:bg-[#1D102D]/60">
-                    <span>{selectedNeighborhood || `All ${getCityLabel(city)}`}</span>
-                    <ChevronDown className="w-4 h-4 text-[#a855f7]" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-[#1a0f2e] border border-[#a855f7]/40 max-h-64 overflow-y-auto">
-                  <DropdownMenuItem
-                    onClick={() => setSelectedNeighborhood(null)}
-                    className="text-white hover:bg-[#a855f7]/20 focus:bg-[#a855f7]/20 cursor-pointer"
-                  >
-                    All {getCityLabel(city)}
-                  </DropdownMenuItem>
-                  {(CITY_NEIGHBORHOODS[city] || []).map((neighborhood) => (
-                    <DropdownMenuItem
-                      key={neighborhood}
-                      onClick={() => setSelectedNeighborhood(neighborhood)}
-                      className="text-white hover:bg-[#a855f7]/20 focus:bg-[#a855f7]/20 cursor-pointer"
-                    >
-                      {neighborhood}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowFriendSearch(true)}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
-              aria-label="Search friends"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
-              className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
-              aria-label="View activity"
-            >
-              <Bell className="w-5 h-5" />
-              <NotificationBadge count={unreadCount} />
-            </button>
-            <button 
-              onClick={openCheckIn} 
-              className="hover:scale-110 transition-transform"
-            >
-              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Leaderboard"
+        subtitle="Top spots tonight"
+        onSearchPress={() => setShowFriendSearch(true)}
+        rightActions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 px-3 py-1.5 whitespace-nowrap rounded-2xl bg-white/5 border border-white/15 text-white font-medium text-sm transition-colors hover:bg-white/10">
+                <span>{selectedNeighborhood || `All ${getCityLabel(city)}`}</span>
+                <ChevronDown className="w-4 h-4 text-white/60" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-[#1a0f2e] border border-white/15 max-h-64 overflow-y-auto">
+              <DropdownMenuItem
+                onClick={() => setSelectedNeighborhood(null)}
+                className="text-white hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+              >
+                All {getCityLabel(city)}
+              </DropdownMenuItem>
+              {(CITY_NEIGHBORHOODS[city] || []).map((neighborhood) => (
+                <DropdownMenuItem
+                  key={neighborhood}
+                  onClick={() => setSelectedNeighborhood(neighborhood)}
+                  className="text-white hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                >
+                  {neighborhood}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      />
 
       {/* Leaderboard List */}
       <PullToRefresh onRefresh={fetchLeaderboard}>
@@ -559,7 +524,7 @@ export default function Leaderboard() {
             {venues.filter(v => v.isPromoted).map((venue) => (
               <div
                 key={venue.venue_name}
-                className="relative overflow-hidden rounded-2xl p-4 bg-[#2d1b4e]/60 border border-[#a855f7]/30"
+                className="relative overflow-hidden rounded-2xl p-4 bg-[#1a0a2e]/80 border border-white/8"
               >
                 <div className="flex items-center gap-4">
                   {/* Promoted Badge */}
@@ -593,7 +558,7 @@ export default function Leaderboard() {
                           <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
                             <div className="flex -space-x-2">
                               {venue.friends.slice(0, 2).map((friend, idx) => (
-                            <Avatar key={idx} className="h-6 w-6 border border-[#a855f7] shadow-[0_0_4px_rgba(168,85,247,0.25)]">
+                            <Avatar key={idx} className="h-6 w-6 border border-white/20">
                                   <AvatarImage src={friend.avatar_url || undefined} />
                                   <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
                                     {friend.display_name[0]}
@@ -651,7 +616,7 @@ export default function Leaderboard() {
             
             {/* Separator */}
             <div className="py-2">
-              <div className="border-t border-[#a855f7]/20"></div>
+              <div className="border-t border-white/8"></div>
             </div>
           </>
         )}
@@ -660,7 +625,7 @@ export default function Leaderboard() {
         {venues.filter(v => !v.isPromoted).map((venue) => (
           <div
             key={venue.venue_name}
-            className="relative overflow-hidden rounded-2xl p-4 bg-[#2d1b4e]/80 border border-[#a855f7]/20 shadow-[0_0_12px_rgba(168,85,247,0.15)]"
+            className="relative overflow-hidden rounded-2xl p-4 bg-[#1a0a2e]/80 border border-white/8"
           >
             <div className="flex items-center gap-4">
               {/* Rank Number */}
@@ -703,7 +668,7 @@ export default function Leaderboard() {
                       <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
                         <div className="flex -space-x-2">
                           {venue.friends.slice(0, 2).map((friend, idx) => (
-                            <Avatar key={idx} className="h-6 w-6 border border-[#a855f7] shadow-[0_0_4px_rgba(168,85,247,0.25)]">
+                            <Avatar key={idx} className="h-6 w-6 border border-white/20">
                               <AvatarImage src={friend.avatar_url || undefined} />
                               <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
                                 {friend.display_name[0]}
@@ -761,7 +726,7 @@ export default function Leaderboard() {
 
         {venues.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
+            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 border border-white/8">
               <BarChart3 className="h-10 w-10 text-[#a855f7]/60" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">
@@ -785,8 +750,8 @@ export default function Leaderboard() {
 
       {/* Biggest Mover Card */}
       {biggestMover && (
-        <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-20 w-full max-w-[430px] px-4">
-          <div className="bg-[#2d1b4e] border border-[#a855f7] rounded-2xl p-3 shadow-[0_0_12px_rgba(168,85,247,0.3)]">
+        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px)+8px)] left-1/2 -translate-x-1/2 z-20 w-full max-w-[430px] px-4">
+          <div className="bg-[#1a0a2e] border border-white/8 rounded-2xl p-3 shadow-lg">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-[#a855f7] text-sm font-medium mb-0.5">Biggest Mover</p>
@@ -811,7 +776,7 @@ export default function Leaderboard() {
                       <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
                         <div className="flex -space-x-2">
                           {biggestMover.friends.map((friend, idx) => (
-                            <Avatar key={idx} className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_6px_rgba(168,85,247,0.3)]">
+                            <Avatar key={idx} className="h-8 w-8 border-2 border-white/20">
                               <AvatarImage src={friend.avatar_url || undefined} />
                               <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
                                 {friend.display_name[0]}
@@ -857,7 +822,7 @@ export default function Leaderboard() {
                     </PopoverContent>
                   </Popover>
                 ) : (
-                  <span className="text-white/40 text-xs">Be the first 👀</span>
+                  <span className="text-white/40 text-xs">Nothing here yet</span>
                 )}
               </div>
             </div>

@@ -1,4 +1,4 @@
-project_id = "nkjdthjpqomfsqyzfwbj"
+project_id = "rwavbyvdytdegntdryll"
 
 [functions.daily-cleanup]
 verify_jwt = false

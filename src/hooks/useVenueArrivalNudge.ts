@@ -18,6 +18,7 @@ import {
   suppressVenueTonight,
 } from '@/lib/venue-arrival-nudge';
 import type { VenueArrivalContext, NightStatus } from '@/lib/venue-arrival-nudge';
+import { logLocationEvent, setCurrentEvaluationId, markAutoCheckin } from '@/lib/location-event-logger';
 import { toast } from 'sonner';
 
 // Re-export for consumers that need to dismiss venues
@@ -211,7 +212,27 @@ export function useVenueArrivalNudge(onVenueShiftDetected?: (data: VenueShiftDat
 
       // Single unified trigger check
       const decision = canTriggerVenueArrival(context);
-      
+
+      // Log every trigger evaluation (fired or suppressed)
+      const evalId = decision.evaluationId || 'unknown';
+      setCurrentEvaluationId(evalId);
+      logLocationEvent({
+        evaluation_id: evalId,
+        user_id: user.id,
+        event_type: 'trigger_evaluated',
+        evaluated_venue_id: nearestVenue.id,
+        evaluated_venue_name: nearestVenue.name,
+        gps_lat: location.lat,
+        gps_lng: location.lng,
+        gps_accuracy_meters: location.accuracy,
+        distance_to_venue_meters: nearestVenue.distance,
+        dwell_time_seconds: decision.dwellTimeSeconds ?? null,
+        speed_mph: null, // Speed not available in nudge pipeline
+        user_status_before: context.status,
+        thresholds_met: decision.thresholdsMet ?? null,
+        result: decision.result ?? null,
+      });
+
       if (!decision.shouldNudge) {
         console.log('[VenueArrivalNudge] Blocked:', decision.reason);
         return;
@@ -226,7 +247,7 @@ export function useVenueArrivalNudge(onVenueShiftDetected?: (data: VenueShiftDat
       if (decision.deliveryMethod === 'toast') {
         // For "out" users near a new venue — expose via callback for banner UI
         markToastShown(nearestVenue.id);
-        
+
         if (onVenueShiftRef.current) {
           // Let the UI show a banner instead of auto-updating
           onVenueShiftRef.current({
@@ -238,11 +259,26 @@ export function useVenueArrivalNudge(onVenueShiftDetected?: (data: VenueShiftDat
         } else {
           // Fallback: auto-update silently (original behavior)
           await silentVenueUpdate(user.id, nearestVenue, location.lat, location.lng);
+          markAutoCheckin(evalId, nearestVenue.id);
           toast(`📍 Now at ${nearestVenue.name}`, {
             duration: 3000,
             position: 'bottom-center',
           });
         }
+
+        logLocationEvent({
+          evaluation_id: evalId,
+          user_id: user.id,
+          event_type: 'silent_toast_shown',
+          evaluated_venue_id: nearestVenue.id,
+          evaluated_venue_name: nearestVenue.name,
+          gps_lat: location.lat,
+          gps_lng: location.lng,
+          gps_accuracy_meters: location.accuracy,
+          distance_to_venue_meters: nearestVenue.distance,
+          user_status_before: context.status,
+          result: 'fired',
+        });
       } else {
         // Modal flow for planning/no-status users
         if (isVenueDismissed(nearestVenue.id)) {
@@ -256,6 +292,20 @@ export function useVenueArrivalNudge(onVenueShiftDetected?: (data: VenueShiftDat
           lat: location.lat,
           lng: location.lng,
           distance: nearestVenue.distance,
+        });
+
+        logLocationEvent({
+          evaluation_id: evalId,
+          user_id: user.id,
+          event_type: 'prompt_shown',
+          evaluated_venue_id: nearestVenue.id,
+          evaluated_venue_name: nearestVenue.name,
+          gps_lat: location.lat,
+          gps_lng: location.lng,
+          gps_accuracy_meters: location.accuracy,
+          distance_to_venue_meters: nearestVenue.distance,
+          user_status_before: context.status,
+          result: 'fired',
         });
       }
     } catch (error) {

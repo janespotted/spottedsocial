@@ -17,6 +17,9 @@
 		764F7BB4E7154941804D1A49 /* SpottedCameraPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = F75E6C67580E676CDE525F04 /* SpottedCameraPlugin.m */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		F18FC3A46676391FA1CE48D1 /* SpottedCameraPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BF752D4EF6597BEED8EC370 /* SpottedCameraPlugin.swift */; };
+		B1A2C3D4E5F6A7B8C9D0E1F2 /* LocationPermissionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* LocationPermissionPlugin.swift */; };
+		C2B3D4E5F6A7B8C9D0E1F2A3 /* LocationPermissionPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = D3C4E5F6A7B8C9D0E1F2A3B4 /* LocationPermissionPlugin.m */; };
+		E4D5F6A7B8C9D0E1F2A3B4C5 /* SpottedBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E6A7B8C9D0E1F2A3B4C5D6 /* SpottedBridgeViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +36,9 @@
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		F75E6C67580E676CDE525F04 /* SpottedCameraPlugin.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SpottedCameraPlugin.m; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* LocationPermissionPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationPermissionPlugin.swift; sourceTree = "<group>"; };
+		D3C4E5F6A7B8C9D0E1F2A3B4 /* LocationPermissionPlugin.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = LocationPermissionPlugin.m; sourceTree = "<group>"; };
+		F5E6A7B8C9D0E1F2A3B4C5D6 /* SpottedBridgeViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpottedBridgeViewController.swift; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -87,6 +93,9 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 				5BF752D4EF6597BEED8EC370 /* SpottedCameraPlugin.swift */,
 				F75E6C67580E676CDE525F04 /* SpottedCameraPlugin.m */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* LocationPermissionPlugin.swift */,
+				D3C4E5F6A7B8C9D0E1F2A3B4 /* LocationPermissionPlugin.m */,
+				F5E6A7B8C9D0E1F2A3B4C5D6 /* SpottedBridgeViewController.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -216,6 +225,9 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				F18FC3A46676391FA1CE48D1 /* SpottedCameraPlugin.swift in Sources */,
 				764F7BB4E7154941804D1A49 /* SpottedCameraPlugin.m in Sources */,
+				B1A2C3D4E5F6A7B8C9D0E1F2 /* LocationPermissionPlugin.swift in Sources */,
+				C2B3D4E5F6A7B8C9D0E1F2A3 /* LocationPermissionPlugin.m in Sources */,
+				E4D5F6A7B8C9D0E1F2A3B4C5 /* SpottedBridgeViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

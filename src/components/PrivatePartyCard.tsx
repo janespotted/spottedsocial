@@ -167,7 +167,7 @@ export function PrivatePartyCard({
             disabled={isRequesting}
             className="flex-1 h-12 rounded-2xl bg-gradient-to-b from-[#f0ff80] to-[#d4ff00] text-[#0a0118] font-semibold hover:from-[#f5ffb3] hover:to-[#e5ff4d]"
           >
-            {isRequesting ? 'Sending...' : '💬 Ask for address'}
+            {isRequesting ? 'Sending...' : 'Ask for address'}
           </Button>
         </div>
       </div>

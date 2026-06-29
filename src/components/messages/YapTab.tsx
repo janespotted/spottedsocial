@@ -415,10 +415,10 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
             <Mic className="h-10 w-10 text-[#a855f7]/60" />
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">
-            No Yap yet tonight
+            Nothing happening yet
           </h3>
           <p className="text-white/50 text-sm max-w-xs">
-            Be the first to post when you're out! 🎤
+            Post when you're out tonight
           </p>
         </div>
       )}

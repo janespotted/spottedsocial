@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp, MapPin, RefreshCw, Navigation } from 'lucide-react';
+import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp, MapPin, RefreshCw, Navigation, Activity } from 'lucide-react';
 import { toast } from 'sonner';
-import { getDemoMode, setDemoMode, clearDemoData } from '@/lib/demo-data';
+import { getDemoMode, setDemoMode, clearDemoData, seedDemoData, healthCheckDemoData } from '@/lib/demo-data';
 import { getBootstrapMode, setBootstrapMode } from '@/lib/bootstrap-config';
 import { useUserCity } from '@/hooks/useUserCity';
 import { cacheCity, clearCachedCity, detectUserCity, type SupportedCity } from '@/lib/city-detection';
@@ -17,6 +18,7 @@ import { cacheCity, clearCachedCity, detectUserCity, type SupportedCity } from '
 export default function DemoSettings() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { city } = useUserCity();
   const cityLabel = city === 'la' ? 'LA' : 'NYC';
   const [demoEnabled, setDemoEnabled] = useState(false);
@@ -25,6 +27,7 @@ export default function DemoSettings() {
   const [loading, setLoading] = useState(false);
   const [venues, setVenues] = useState<Array<{ id: string; name: string; lat: number; lng: number }>>([]);
   const [selectedVenueId, setSelectedVenueId] = useState<string>('');
+  const [healthResult, setHealthResult] = useState<{ healthy?: boolean; stats?: Record<string, number>; isAdmin?: boolean; error?: string } | null>(null);
 
   useEffect(() => {
     const checkActualDemoData = async () => {
@@ -77,7 +80,10 @@ export default function DemoSettings() {
   const handleToggleDemo = async (enabled: boolean) => {
     setDemoMode(enabled);
     setDemoEnabled(enabled);
-    
+
+    // Refetch friend IDs so demo friends are included/excluded immediately
+    queryClient.refetchQueries({ queryKey: ['friend-ids'] });
+
     if (enabled && !seeded) {
       toast.info('Demo mode enabled. Tap "Seed Demo Data" to populate.');
     } else if (!enabled) {
@@ -98,41 +104,70 @@ export default function DemoSettings() {
 
   const handleSeedData = async (targetCity?: SupportedCity) => {
     if (!user) return;
-    
+
     const seedCity = targetCity || city;
-    const seedCityLabel = seedCity === 'la' ? 'LA' : 'NYC';
-    
+    const seedCityLabel = seedCity === 'la' ? 'LA' : seedCity === 'pb' ? 'PB' : 'NYC';
+
     setLoading(true);
     try {
       toast.info(`Seeding ${seedCityLabel} demo data... This may take a moment.`);
-      
-      // Call edge function with city parameter and userId for targeted notifications
-      const { data, error } = await supabase.functions.invoke('seed-demo-data', {
-        body: { action: 'seed', city: seedCity, userId: user.id }
-      });
-      
-      if (error) throw error;
-      
-      if (data.success && data.stats) {
-        setSeeded(true);
-        
-        // Update city to match the seeded data so venue dropdown refreshes
-        if (targetCity) {
-          cacheCity(targetCity);
-        }
-        
-        toast.success(
-          `${seedCityLabel} demo environment created!\n` +
-          `${data.stats.users} users • ${data.stats.posts} posts • ` +
-          `${data.stats.yaps} yaps • ${data.stats.venues} venues`,
-          { duration: 5000 }
-        );
-        setTimeout(() => navigate('/feed'), 1500);
-      } else {
-        toast.error('Failed to seed demo data');
+
+      const result = await seedDemoData(user.id, seedCity);
+
+      if (!result.success) {
+        toast.error(`Seed failed (${result.status})`, {
+          description: result.detail || 'Unknown error',
+        });
+        return;
       }
-    } catch (error) {
-      toast.error('Error seeding demo data');
+
+      // Seeding succeeded — now it's safe to mark as seeded and enable demo
+      setSeeded(true);
+      setDemoMode(true);
+      setDemoEnabled(true);
+
+      // Force clear + refetch ALL caches so components pick up new demo UUIDs
+      queryClient.removeQueries({ queryKey: ['profiles-safe'] });
+      queryClient.removeQueries({ queryKey: ['friend-ids'] });
+      const { data: freshProfiles } = await supabase.rpc('get_profiles_safe');
+      if (freshProfiles) queryClient.setQueryData(['profiles-safe'], freshProfiles);
+
+      // Update city to match the seeded data so venue dropdown refreshes
+      if (targetCity) {
+        cacheCity(targetCity);
+      }
+
+      const s = result.stats;
+      toast.success(
+        `${seedCityLabel} demo environment created!\n` +
+        `${s?.users ?? '?'} users • ${s?.posts ?? '?'} posts • ` +
+        `${s?.yaps ?? '?'} yaps • ${s?.venues ?? '?'} venues`,
+        { duration: 5000 }
+      );
+      setTimeout(() => navigate('/feed'), 1500);
+    } catch (error: any) {
+      toast.error('Error seeding demo data', { description: error?.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleHealthCheck = async () => {
+    setLoading(true);
+    setHealthResult(null);
+    try {
+      const result = await healthCheckDemoData();
+      if (!result.success) {
+        toast.error(`Health check failed (${result.status})`, {
+          description: result.error,
+        });
+        setHealthResult({ error: result.error });
+      } else {
+        setHealthResult({ healthy: result.healthy, stats: result.stats, isAdmin: result.isAdmin });
+        toast.success(result.healthy ? 'Demo data is healthy' : 'Demo data is missing or incomplete');
+      }
+    } catch (error: any) {
+      toast.error('Health check error', { description: error?.message });
     } finally {
       setLoading(false);
     }
@@ -144,6 +179,9 @@ export default function DemoSettings() {
       const result = await clearDemoData();
       if (result.success) {
         setSeeded(false);
+        // Force refetch caches to remove stale demo data
+        await queryClient.refetchQueries({ queryKey: ['profiles-safe'] });
+        await queryClient.refetchQueries({ queryKey: ['friend-ids'] });
         toast.success('Demo data cleared!');
         setTimeout(() => navigate('/'), 1000);
       } else {
@@ -359,22 +397,32 @@ export default function DemoSettings() {
                 
                 {!seeded ? (
                   <div className="space-y-2">
-                    <Button
-                      onClick={() => handleSeedData('nyc')}
-                      disabled={loading}
-                      className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
-                    >
-                      <Users className="h-4 w-4 mr-2" />
-                      {loading ? 'Seeding...' : 'Seed NYC Data'}
-                    </Button>
-                    <Button
-                      onClick={() => handleSeedData('la')}
-                      disabled={loading}
-                      className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
-                    >
-                      <Users className="h-4 w-4 mr-2" />
-                      {loading ? 'Seeding...' : 'Seed LA Data'}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleSeedData('nyc')}
+                        disabled={loading}
+                        className="flex-1 bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        {loading ? '...' : 'NYC'}
+                      </Button>
+                      <Button
+                        onClick={() => handleSeedData('la')}
+                        disabled={loading}
+                        className="flex-1 bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        {loading ? '...' : 'LA'}
+                      </Button>
+                      <Button
+                        onClick={() => handleSeedData('pb')}
+                        disabled={loading}
+                        className="flex-1 bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        {loading ? '...' : 'PB'}
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -394,6 +442,14 @@ export default function DemoSettings() {
                         className="flex-1 border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10"
                       >
                         LA
+                      </Button>
+                      <Button
+                        onClick={() => handleSeedData('pb')}
+                        disabled={loading}
+                        variant="outline"
+                        className="flex-1 border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10"
+                      >
+                        PB
                       </Button>
                     </div>
                     <Button
@@ -513,6 +569,58 @@ export default function DemoSettings() {
           </CardContent>
         </Card>
 
+        {/* Demo Health Check */}
+        <Card className="bg-[#2d1b4e]/60 border-2 border-[#a855f7]/40">
+          <CardHeader>
+            <CardTitle className="text-[#d4ff00] flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Demo Health Check
+            </CardTitle>
+            <CardDescription className="text-white/60">
+              Verify seed function connectivity and count is_demo rows in DB
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              onClick={handleHealthCheck}
+              disabled={loading}
+              variant="outline"
+              className="w-full border-[#a855f7]/40 text-white/70 hover:bg-[#a855f7]/10"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              {loading ? 'Checking...' : 'Run Health Check'}
+            </Button>
+
+            {healthResult?.error && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-300 text-sm">
+                {healthResult.error}
+              </div>
+            )}
+
+            {healthResult?.stats && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${healthResult.healthy ? 'bg-green-400' : 'bg-red-400'}`} />
+                  <span className="text-sm text-white/80">
+                    {healthResult.healthy ? 'Healthy — demo data present' : 'Unhealthy — demo data missing'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(healthResult.stats).map(([key, val]) => (
+                    <div key={key} className="bg-[#1a0f2e]/60 p-2 rounded-lg border border-[#a855f7]/20 flex justify-between">
+                      <span className="text-white/50 text-xs">{key}</span>
+                      <span className="text-[#d4ff00] text-xs font-mono">{val}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-white/40">
+                  Role: {healthResult.isAdmin ? 'admin' : 'non-admin (seed OK, clear requires admin)'}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Info Card */}
         <Card className="bg-[#2d1b4e]/60 border-2 border-[#a855f7]/40">
           <CardHeader>
@@ -521,35 +629,32 @@ export default function DemoSettings() {
           <CardContent className="text-white/70 space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
-                <div className="text-[#d4ff00] text-2xl font-bold">20</div>
-                <div className="text-white/60 text-xs">Fake Users</div>
+                <div className="text-[#d4ff00] text-2xl font-bold">29</div>
+                <div className="text-white/60 text-xs">Demo Users (24 + 5 TBD)</div>
               </div>
               <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
-                <div className="text-[#d4ff00] text-2xl font-bold">20</div>
-                <div className="text-white/60 text-xs">Promoted Venues</div>
+                <div className="text-[#d4ff00] text-2xl font-bold">5-8</div>
+                <div className="text-white/60 text-xs">Demo Venues</div>
               </div>
               <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
-                <div className="text-[#d4ff00] text-2xl font-bold">60</div>
+                <div className="text-[#d4ff00] text-2xl font-bold">18</div>
                 <div className="text-white/60 text-xs">Newsfeed Posts</div>
               </div>
               <div className="bg-[#1a0f2e]/60 p-3 rounded-lg border border-[#a855f7]/20">
-                <div className="text-[#d4ff00] text-2xl font-bold">15+</div>
+                <div className="text-[#d4ff00] text-2xl font-bold">22+</div>
                 <div className="text-white/60 text-xs">Yaps</div>
               </div>
             </div>
-            
+
             <div className="pt-2 space-y-2">
               <p>
-                All demo data is marked with <code className="text-[#d4ff00]">isDemo = true</code> so you can:
+                All demo data is marked with <code className="text-[#d4ff00]">is_demo = true</code> and expires in 30 days.
               </p>
               <ul className="list-disc list-inside space-y-1 ml-2 text-white/60">
-                <li>Filter it out when needed</li>
-                <li>Clear it anytime without affecting real data</li>
-                <li>Use it for testing and presentations</li>
+                <li>16 users "out" at venues, 8 users "planning"</li>
+                <li>7 plans, 3 events, 4 DM threads</li>
+                <li>Clear requires admin role</li>
               </ul>
-              <p className="text-white/50 text-xs pt-2">
-                Posts and yaps have realistic timestamps within the last 4 hours. Demo users are interconnected as friends to make the map and leaderboard look active.
-              </p>
             </div>
           </CardContent>
         </Card>

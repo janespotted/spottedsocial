@@ -171,7 +171,7 @@ export function DailyNudgeModal({ open, onClose, nudgeType }: DailyNudgeModalPro
                   variant="outline"
                   className="w-full h-14 text-lg font-semibold border-[#a855f7]/50 text-white hover:bg-[#a855f7]/20 rounded-2xl"
                 >
-                  Maybe 🤔
+                  TBD
                 </Button>
                 <Button
                   onClick={() => handleResponse('staying_in')}

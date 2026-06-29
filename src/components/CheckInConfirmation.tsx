@@ -137,10 +137,10 @@ export function CheckInConfirmation() {
             ) : (
               <>
                 <h2 className="text-2xl font-bold text-white mb-3">
-                  You're planning to go out{checkInNeighborhood ? ` in ${checkInNeighborhood}` : ''}!
+                  You're still deciding{checkInNeighborhood ? ` — ${checkInNeighborhood}` : ''}
                 </h2>
                 <p className="text-white/90 text-base">
-                  Your <span className="font-semibold">{privacyLabel}</span> can now see you're planning to go out.
+                  Your friends can see you're still deciding where to go tonight
                 </p>
               </>
             )}

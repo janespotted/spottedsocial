@@ -144,7 +144,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
         .update({ is_out: false })
         .eq('id', user.id);
 
-      toast.success('Planning on it! 🎯');
+      toast.success('You\'re TBD for tonight 🤔');
       onOpenChange(false);
     } catch (error) {
       console.error('Error updating status:', error);
@@ -267,7 +267,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
               <span className="text-white/40 text-xs uppercase tracking-wider">Currently: </span>
               <span className="text-white/60 text-xs">
                  {currentStatus === 'out' ? `🟢 Out${currentVenue ? ` · ${currentVenue}` : ''}` :
-                 currentStatus === 'planning' ? 'Planning on it' :
+                 currentStatus === 'planning' ? 'TBD' :
                  'Staying in'}
               </span>
             </div>
@@ -295,7 +295,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
             className="w-full h-14 text-lg font-semibold border-[#a855f7]/50 text-white hover:bg-[#a855f7]/20 rounded-2xl"
           >
             <Target className="w-5 h-5 mr-2" />
-            Planning on it
+            TBD
           </Button>
 
           <Button
@@ -305,7 +305,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
             className="w-full h-12 text-base text-white/60 hover:text-white hover:bg-white/5 rounded-2xl"
           >
             <Home className="w-4 h-4 mr-2" />
-            No — staying in
+            Staying in
           </Button>
 
           {/* Stop Sharing option — only visible when actively sharing */}

@@ -6,12 +6,18 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   ios: {
     contentInset: 'never',
-    backgroundColor: '#0a0118',
+    backgroundColor: '#110a24',
+    allowsLinkPreview: false,
+    preferredContentMode: 'mobile',
+    scrollEnabled: true,
+  },
+  server: {
+    iosScheme: 'capacitor',
   },
   plugins: {
     Keyboard: {
-      resize: 'none',
-      resizeOnFullScreen: true,
+      resize: 'native',
+      style: 'dark',
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],

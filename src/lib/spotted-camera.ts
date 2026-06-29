@@ -36,8 +36,10 @@ export async function openSpottedCamera(): Promise<CaptureResult> {
   const mimeType = result.type === 'video' ? 'video/mp4' : 'image/jpeg';
   const filename = `spotted_${result.type}_${Date.now()}.${extension}`;
 
+  // Create File with explicit MIME type, then use it for the preview URL
+  // (the raw blob from Capacitor may lack a content-type, breaking video playback)
   const file = new File([blob], filename, { type: mimeType });
-  const previewUrl = URL.createObjectURL(blob);
+  const previewUrl = URL.createObjectURL(file);
 
   return {
     type: result.type,

@@ -14,11 +14,30 @@ export interface VenueArrivalContext {
   timestamp: number; // For stale detection
 }
 
+export interface ThresholdsMet {
+  accuracy_ok: boolean;
+  distance_ok: boolean;
+  dwell_ok: boolean;
+  speed_ok: boolean;
+}
+
+export type TriggerResult =
+  | 'fired'
+  | 'suppressed_accuracy'
+  | 'suppressed_distance'
+  | 'suppressed_dwell'
+  | 'suppressed_speed'
+  | 'suppressed_cooldown';
+
 export interface NudgeDecision {
   shouldNudge: boolean;
   reason: string;
   deliveryMethod?: DeliveryMethod;
   venue?: DetectedVenue;
+  evaluationId?: string;
+  thresholdsMet?: ThresholdsMet;
+  result?: TriggerResult;
+  dwellTimeSeconds?: number;
 }
 
 export interface DwellTracker {

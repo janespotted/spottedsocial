@@ -1,5 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap");
 @tailwind base;
 @tailwind components;
@@ -202,36 +202,38 @@ All colors MUST be HSL.
 
   /* Glassmorphism card effect */
   .glass-card {
-    background: linear-gradient(
-      135deg,
-      hsl(265 50% 8% / 0.9) 0%,
-      hsl(265 50% 12% / 0.7) 100%
-    );
+    background: rgba(26, 10, 46, 0.8);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    box-shadow: 
-      0 0 30px hsl(270 100% 65% / 0.08),
-      inset 0 1px 0 hsl(270 100% 80% / 0.06);
-  }
-
-  .glass-card:hover {
-    box-shadow: 
-      0 0 40px hsl(270 100% 65% / 0.15),
-      inset 0 1px 0 hsl(270 100% 80% / 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   /* Story ring animation */
   @keyframes story-ring-pulse {
     0%, 100% {
-      box-shadow: 0 0 10px hsl(72 100% 50% / 0.4);
+      box-shadow: 0 0 6px hsl(72 100% 50% / 0.2);
     }
     50% {
-      box-shadow: 0 0 20px hsl(72 100% 50% / 0.6);
+      box-shadow: 0 0 12px hsl(72 100% 50% / 0.3);
     }
   }
 
   .story-ring-active {
     animation: story-ring-pulse 2s ease-in-out infinite;
+  }
+
+  /* Page fade in animation — fast, barely perceptible */
+  @keyframes page-enter {
+    from {
+      opacity: 0.6;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .page-enter {
+    animation: page-enter 0.1s ease-out;
   }
 
   /* Post fade in animation */
@@ -256,10 +258,10 @@ All colors MUST be HSL.
       filter: drop-shadow(0 0 0 transparent);
     }
     50% {
-      filter: drop-shadow(0 0 8px hsl(72 100% 50% / 0.8));
+      filter: drop-shadow(0 0 4px hsl(72 100% 50% / 0.4));
     }
     100% {
-      filter: drop-shadow(0 0 4px hsl(72 100% 50% / 0.4));
+      filter: drop-shadow(0 0 2px hsl(72 100% 50% / 0.2));
     }
   }
 
@@ -328,22 +330,18 @@ All colors MUST be HSL.
 }
 
 html, body, #root {
-  background-color: #0a0118;
+  background-color: #110a24;
 }
 
-/* Lock body so iOS can't scroll it when keyboard opens */
 html, body {
-  position: fixed;
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
 #root {
-  height: 100dvh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  position: fixed;
+  height: 100%;
+  overflow: hidden;
   width: 100%;
 }
 
@@ -386,38 +384,119 @@ html, body {
   display: none !important;
 }
 
-/* Mobile optimizations */
-@media (max-width: 768px) {
-  html {
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
-    background-color: #0a0118;
-  }
+/* Scroll focused input into view when keyboard opens */
+input:focus, textarea:focus {
+  scroll-margin-bottom: 120px;
+}
 
-  /* Smoother scrolling on iOS */
-  body {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: none;
-  }
+/* Hide native video controls on feed videos */
+video.feed-video::-webkit-media-controls,
+video.feed-video::-webkit-media-controls-panel,
+video.feed-video::-webkit-media-controls-play-button,
+video.feed-video::-webkit-media-controls-start-playback-button,
+video.feed-video::-webkit-media-controls-fullscreen-button,
+video.feed-video::-webkit-media-controls-overlay-play-button,
+video.feed-video::-webkit-media-controls-current-time-display,
+video.feed-video::-webkit-media-controls-time-remaining-display,
+video.feed-video::-webkit-media-controls-timeline,
+video.feed-video::-webkit-media-controls-volume-slider,
+video.feed-video::-webkit-media-controls-mute-button,
+video.feed-video::-webkit-media-controls-toggle-closed-captions-button,
+video.feed-video::-webkit-media-controls-enclosure {
+  display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+}
 
-  /* Prevent pull-to-refresh on iOS */
-  body {
-    overscroll-behavior-y: contain;
-  }
+/* ── Performance & native-feel optimizations ── */
 
-  /* Touch optimization */
-  button, a {
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-  }
+/* GPU layer promotion for frequently animated elements */
+.post-animate-in,
+[class*="transition-"],
+[class*="animate-"] {
+  will-change: auto;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
 
-  /* Input touch optimization - prevent jitter and iOS zoom */
-  input, textarea, select {
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-    -webkit-user-select: text;
-    user-select: text;
-    font-size: 16px; /* Prevents iOS auto-zoom on focus */
+/* Smooth momentum scrolling everywhere */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Faster touch response — remove 300ms tap delay */
+html {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Reduce paint complexity on scroll containers */
+#root {
+  contain: layout style;
+}
+
+/* Input focus optimization — reduce layout shift on keyboard open */
+input, textarea, select {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-user-select: text;
+  user-select: text;
+  font-size: 16px; /* Prevents iOS auto-zoom on focus */
+  /* Reduce reflow during focus by reserving space */
+  -webkit-appearance: none;
+}
+
+/* Instant tap feedback for interactive elements */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  /* Prevent delay from hover state detection */
+  -webkit-user-drag: none;
+}
+
+/* Image rendering optimization */
+img, video {
+  content-visibility: auto;
+}
+
+/* Reduce compositing layers for off-screen elements */
+.post-animate-in {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
+}
+
+/* Prevent pull-to-refresh and overscroll */
+body {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Optimize backdrop-filter performance */
+[style*="backdrop-filter"] {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High refresh rate support (120Hz ProMotion) */
+@supports (animation-timeline: scroll()) {
+  #root {
+    scroll-behavior: smooth;
   }
 }
 

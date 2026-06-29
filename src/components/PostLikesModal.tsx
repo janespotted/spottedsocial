@@ -81,7 +81,7 @@ export function PostLikesModal({ postId, isOpen, onClose }: PostLikesModalProps)
                 >
                   <Avatar className="h-10 w-10 border-2 border-[#a855f7]">
                     <AvatarImage src={user.avatar_url || undefined} />
-                    <AvatarFallback className="bg-[#0a0118] text-white">
+                    <AvatarFallback className="bg-[#110a24] text-white">
                       {user.display_name[0]}
                     </AvatarFallback>
                   </Avatar>

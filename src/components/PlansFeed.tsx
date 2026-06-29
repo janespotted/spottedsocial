@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Calendar, Plus, Sparkles } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,7 +80,7 @@ interface PlansFeedProps {
   onPreselectedFriendConsumed?: () => void;
 }
 
-export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter, preselectedFriend, onPreselectedFriendConsumed }: PlansFeedProps) {
+export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter, preselectedFriend, onPreselectedFriendConsumed }: PlansFeedProps) {
   const [plans, setPlans] = useState<Plan[]>([]);
    const [events, setEvents] = useState<EventWithFriends[]>([]);
   const [userVotes, setUserVotes] = useState<Record<string, 'up' | 'down'>>({});
@@ -123,7 +123,9 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
           .gte('expires_at', new Date().toISOString())
           .maybeSingle(),
         supabase
-          .rpc('get_profile_safe', { target_user_id: userId })
+          .from('profiles')
+          .select('display_name, avatar_url')
+          .eq('id', userId)
           .maybeSingle()
       ]);
       
@@ -141,35 +143,6 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
       }
 
       // Demo mode shortcut: directly query demo planning statuses
-      if (demoEnabled) {
-        const { data: demoStatuses } = await supabase
-          .from('night_statuses')
-          .select('user_id, planning_neighborhood')
-          .eq('status', 'planning')
-          .eq('is_demo', true)
-          .not('expires_at', 'is', null)
-          .gt('expires_at', new Date().toISOString());
-
-        if (!demoStatuses || demoStatuses.length === 0) {
-          setPlanningFriends([]);
-        } else {
-          const demoUserIds = demoStatuses.map(s => s.user_id);
-          const neighborhoodMap = new Map(demoStatuses.map(s => [s.user_id, s.planning_neighborhood]));
-          const { data: demoProfiles } = await supabase
-            .from('profiles')
-            .select('id, display_name, avatar_url')
-            .in('id', demoUserIds);
-
-          setPlanningFriends((demoProfiles || []).map((p: any) => ({
-            user_id: p.id,
-            display_name: p.display_name,
-            avatar_url: p.avatar_url?.includes('dicebear.com') ? null : p.avatar_url,
-            planning_neighborhood: neighborhoodMap.get(p.id) || null,
-          })));
-        }
-        return;
-      }
-
       // Get user's friends
       const { data: friendships } = await supabase
         .from('friendships')
@@ -185,13 +158,16 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
       const friendIds = friendships.map(f => f.user_id === userId ? f.friend_id : f.user_id);
 
       // Get friends who are planning
-      const { data: planningStatuses } = await supabase
+      let planningQuery = supabase
         .from('night_statuses')
         .select('user_id, planning_neighborhood')
         .in('user_id', friendIds)
         .eq('status', 'planning')
-        .eq('is_demo', false)
         .gte('expires_at', new Date().toISOString());
+      if (!demoEnabled) {
+        planningQuery = planningQuery.eq('is_demo', false);
+      }
+      const { data: planningStatuses } = await planningQuery;
 
       if (!planningStatuses || planningStatuses.length === 0) {
         setPlanningFriends([]);
@@ -199,10 +175,19 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
       }
 
       const planningUserIds = planningStatuses.map(s => s.user_id);
-      
-      // Get profiles for planning friends using cache
+
+      // Get profiles for planning friends using cache, with direct fallback
       const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
-      const profiles = allProfiles.filter((p: any) => planningUserIds.includes(p.id));
+      let profiles = allProfiles.filter((p: any) => planningUserIds.includes(p.id));
+      // Fallback for profiles not in cache (e.g. freshly seeded demo users)
+      const missingIds = planningUserIds.filter(id => !profiles.some((p: any) => p.id === id));
+      if (missingIds.length > 0) {
+        const { data: fallback } = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', missingIds);
+        if (fallback) profiles = [...profiles, ...fallback];
+      }
 
       if (profiles.length > 0) {
         const friendsWithNeighborhood = profiles.map(p => ({
@@ -238,14 +223,17 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
  
        // Fetch upcoming events (today and future)
        const today = new Date().toISOString().split('T')[0];
-        const { data: eventsData } = await supabase
+        let eventsQuery = supabase
           .from('events')
           .select('*')
           .gte('event_date', today)
           .gt('expires_at', new Date().toISOString())
-          .eq('is_demo', false)
           .eq('city', city)
           .order('event_date', { ascending: true });
+        if (!demoEnabled) {
+          eventsQuery = eventsQuery.eq('is_demo', false);
+        }
+        const { data: eventsData } = await eventsQuery;
  
        if (!eventsData || eventsData.length === 0) {
          setEvents([]);
@@ -468,10 +456,19 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
         return;
       }
 
-      // Fetch user profiles for plans using cache
+      // Fetch user profiles for plans using cache, with direct fallback for missing profiles
       const userIds = [...new Set(plansData.map(p => p.user_id))];
       const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
-      const profiles = allProfiles.filter((p: any) => userIds.includes(p.id));
+      let profiles = allProfiles.filter((p: any) => userIds.includes(p.id));
+
+      const missingIds = userIds.filter(id => !profiles.some((p: any) => p.id === id));
+      if (missingIds.length > 0) {
+        const { data: fallback } = await supabase
+          .from('profiles')
+          .select('id, display_name, username, avatar_url, is_demo')
+          .in('id', missingIds);
+        if (fallback) profiles = [...profiles, ...fallback];
+      }
 
       // Fetch user's votes
       const { data: votesData } = await supabase
@@ -506,16 +503,16 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
   }, [userId, demoEnabled]);
 
   // Realtime subscription for plans, plan_downs, and night_statuses
-  // Debounced to avoid excessive refetches from global table changes
   useEffect(() => {
-    let debounceTimer: ReturnType<typeof setTimeout>;
+    let plansTimer: ReturnType<typeof setTimeout>;
+    let planningTimer: ReturnType<typeof setTimeout>;
     const debouncedFetchPlans = () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => fetchPlans(), 2000);
+      clearTimeout(plansTimer);
+      plansTimer = setTimeout(() => fetchPlans(), 1500);
     };
     const debouncedFetchPlanning = () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => fetchPlanningFriends(), 2000);
+      clearTimeout(planningTimer);
+      planningTimer = setTimeout(() => fetchPlanningFriends(), 500);
     };
 
     const channel = supabase
@@ -538,7 +535,8 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
       .subscribe();
 
     return () => {
-      clearTimeout(debounceTimer);
+      clearTimeout(plansTimer);
+      clearTimeout(planningTimer);
       supabase.removeChannel(channel);
     };
   }, [userId, demoEnabled]);
@@ -642,7 +640,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
   }
 
   return (
-    <div className="space-y-7 px-4 pb-24">
+    <div className="space-y-7 px-4 pb-28">
       {/* Weekend Rally Header - shown when activated via push notification */}
       {weekendFilter && (
         <div className="bg-gradient-to-br from-[#a855f7]/20 to-[#7c3aed]/10 rounded-2xl p-4">
@@ -719,35 +717,19 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
       {/* Subtle separator */}
       {!weekendFilter && <div className="h-px bg-white/10" />}
 
-      {/* Drop a Plan Section */}
-      <div className="space-y-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">📝</span>
-            <h3 className="text-white font-semibold text-base">
-              {weekendFilter ? 'Make Weekend Plans' : 'Share Plans'}
-            </h3>
-          </div>
-          <p className="text-white/50 text-xs mt-1 ml-7">Post a specific plan or event your friends can join</p>
+      {/* Share a Plan */}
+      <button
+        onClick={() => setShowCreateDialog(true)}
+        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-[#1a0a2e]/80 border border-white/8 hover:bg-[#1a0a2e] transition-colors"
+      >
+        <div className="w-11 h-11 rounded-full bg-[#d4ff00]/10 flex items-center justify-center flex-shrink-0">
+          <Plus className="w-5 h-5 text-[#d4ff00]" />
         </div>
-        
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowCreateDialog(true)}
-            className="flex-1 flex items-center justify-center gap-2 bg-white/[0.06] backdrop-blur-sm hover:bg-white/[0.10] text-white/80 hover:text-white py-3.5 rounded-xl transition-all duration-200 shadow-sm"
-          >
-            <Plus className="w-4 h-4" strokeWidth={1.5} />
-            <span className="text-sm font-medium tracking-tight">Share a plan</span>
-          </button>
-          <button
-            onClick={() => setShowCreateEventDialog(true)}
-            className="flex-1 flex items-center justify-center gap-2 bg-white/[0.06] backdrop-blur-sm hover:bg-white/[0.10] text-white/80 hover:text-white py-3.5 rounded-xl transition-all duration-200 shadow-sm"
-          >
-            <Calendar className="w-4 h-4" strokeWidth={1.5} />
-            <span className="text-sm font-medium tracking-tight">Add event</span>
-          </button>
+        <div className="flex-1 text-left">
+          <p className="text-white font-medium text-[15px]">Share a plan</p>
+          <p className="text-white/35 text-xs mt-0.5">Post what you're doing — see who's down</p>
         </div>
-      </div>
+      </button>
 
        {feedItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -759,7 +741,7 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
           </h3>
           <p className="text-muted-foreground text-sm max-w-[280px] leading-relaxed">
             {weekendFilter 
-              ? 'Be the first to share what you\'re up to this weekend!'
+              ? 'Nothing here yet — share what you\'re up to this weekend!'
               : 'Share a plan and see who\'s down to join.'
             }
           </p>
@@ -818,4 +800,4 @@ export function PlansFeed({ userId, weekendFilter = false, onClearWeekendFilter,
       />
     </div>
   );
-}
+});

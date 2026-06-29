@@ -87,6 +87,13 @@ export default function Friends() {
 
   const handleRally = useCallback(async (friendId: string) => {
     if (!user || ralliedIds.has(friendId)) return;
+    // Skip DB notification for demo users
+    const targetProfile = allProfiles.find((p: any) => p.id === friendId);
+    if (targetProfile?.is_demo) {
+      setRalliedIds(prev => new Set(prev).add(friendId));
+      toast.success('Rally sent! 📣');
+      return;
+    }
     const senderName = currentUserProfile?.display_name || 'Someone';
     try {
       const message = `${senderName} wants you to rally. Come out tonight! 👋`;
@@ -236,7 +243,7 @@ export default function Friends() {
       const requestsWithMutuals = await Promise.all(
         friendRequests.map(async (req) => {
           const { data: profiles } = await supabase
-            .rpc('get_profile_safe', { target_user_id: req.user_id });
+            .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', req.user_id);
           const profile = profiles?.[0];
 
           if (!profile) return null;
@@ -267,7 +274,7 @@ export default function Friends() {
         const outgoingWithProfiles = await Promise.all(
           outgoing.map(async (req) => {
             const { data: profiles } = await supabase
-              .rpc('get_profile_safe', { target_user_id: req.friend_id });
+              .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', req.friend_id);
             const profile = profiles?.[0];
             if (!profile) return null;
             if (!demoEnabled && profile.is_demo) return null;
@@ -606,445 +613,219 @@ export default function Friends() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118]">
+    <div className="min-h-screen bg-gradient-to-b from-[#1a0f2e] to-[#110a24]">
       <div className="max-w-[430px] mx-auto pb-24">
         {/* Header */}
-        <header className="sticky top-0 z-50 bg-[#2d1b4e]/80 backdrop-blur-lg border-b border-white/10 pt-[env(safe-area-inset-top)]">
-          <div className="flex items-center justify-between px-4 py-3">
+        <header className="sticky top-0 z-50 bg-[#110a24] pt-[env(safe-area-inset-top)]">
+          <div className="flex items-center justify-between px-4 h-12">
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate('/profile')}
-                className="p-2 -ml-2 text-white/80 hover:text-white"
-              >
+              <button onClick={() => navigate(-1)} className="p-1 -ml-1 text-white/70 hover:text-white">
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <h1 className="text-lg font-semibold text-white">Friends</h1>
             </div>
-            <button 
-              onClick={openCheckIn}
-              className="hover:scale-110 transition-transform"
-            >
-              <img src={spottedLogo} alt="Go live" className="h-10 w-10 object-contain" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setShowQRModal(true)} className="text-white/50 hover:text-white transition-colors">
+                <QrCode className="h-5 w-5" />
+              </button>
+              <button onClick={openCheckIn} className="hover:scale-105 transition-transform">
+                <img src={spottedLogo} alt="Go live" className="h-8 w-8 object-contain" />
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => {
-          const tab = v as 'friends' | 'invite';
-          setActiveTab(tab);
-          if (tab === 'friends') {
-            queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-            queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
-          }
-        }} className="w-full">
-          <div className="px-4 pt-4">
-            <TabsList className="w-full bg-[#1a0f2e]/80 border border-[#a855f7]/30 p-1 rounded-2xl flex justify-center">
-              <TabsTrigger 
-                value="friends" 
-                className="flex-1 rounded-xl data-[state=active]:bg-[#d4ff00] data-[state=active]:text-[#0a0118] data-[state=active]:font-bold text-white/60"
-              >
-                Friends
-                {pendingCount > 0 && (
-                  <Badge className="ml-2 bg-[#a855f7] text-white text-xs px-1.5 py-0">
-                    {pendingCount}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="invite" 
-                className="flex-1 rounded-xl data-[state=active]:bg-[#d4ff00] data-[state=active]:text-[#0a0118] data-[state=active]:font-bold text-white/60"
-              >
-                Invite
-              </TabsTrigger>
-            </TabsList>
+        <div className="px-4 pt-3 pb-4 space-y-6">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/25" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or username"
+              className="bg-white/5 border-white/8 text-white placeholder:text-white/25 rounded-2xl pl-10 h-11 text-sm focus:border-white/20"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                <X className="h-4 w-4 text-white/30 hover:text-white/50" />
+              </button>
+            )}
           </div>
 
-          {/* Friends Tab */}
-          <TabsContent value="friends" className="px-4 py-4 space-y-3">
-            {/* Search bar + Close Friends link */}
-            <div className="space-y-2">
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by name or username..."
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl pl-10 h-10 text-sm"
-                />
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                    <X className="h-3.5 w-3.5 text-white/30 hover:text-white/50" />
-                  </button>
-                )}
-              </div>
-              <div className="flex justify-end">
-                <button
-                  onClick={() => navigate('/profile/close-friends')}
-                  className="flex items-center gap-1 text-[#a855f7] text-xs hover:text-[#a855f7]/80 transition-colors"
-                >
-                  <Heart className="h-3 w-3" />
-                  Manage Close Friends
-                </button>
-              </div>
-            </div>
-
-            {/* Search results (when searching) */}
-            {isSearching && (
-              <div className="space-y-3">
-                {searching && (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-5 w-5 text-[#a855f7] animate-spin" />
-                  </div>
-                )}
-
-                {!searching && searchResults.length > 0 && (
-                  <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl overflow-hidden">
-                    {searchResults.map((result) => {
-                      const buttonState = getButtonState(result.id);
-                      const ButtonIcon = buttonState.icon;
-                      
-                      return (
-                        <div
-                          key={result.id}
-                          className="flex items-center gap-3 p-3 border-b border-[#a855f7]/10 last:border-b-0"
-                        >
-                          <Avatar className="h-11 w-11 border-2 border-[#a855f7]/40">
+          {/* Search Results */}
+          {isSearching && (
+            <div>
+              {searching ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-white/10 border-t-[#d4ff00] rounded-full animate-spin" />
+                </div>
+              ) : searchResults.length > 0 ? (
+                <div className="space-y-1">
+                  {searchResults.map((result) => {
+                    const status = friendshipStatuses[result.id];
+                    return (
+                      <div key={result.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
+                        <button onClick={() => openFriendCard({ userId: result.id, displayName: result.display_name, avatarUrl: result.avatar_url })}>
+                          <Avatar className="h-12 w-12">
                             <AvatarImage src={result.avatar_url || undefined} />
-                            <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
-                              {result.display_name?.[0] || 'U'}
-                            </AvatarFallback>
+                            <AvatarFallback className="bg-[#1a0a2e] text-white">{result.display_name?.[0] || '?'}</AvatarFallback>
+                          </Avatar>
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium text-[15px] truncate">{result.display_name}</p>
+                          <p className="text-white/40 text-xs truncate">@{result.username}</p>
+                        </div>
+                        {status === 'accepted' ? (
+                          ralliedIds.has(result.id) ? (
+                            <span className="text-[#d4ff00]/50 text-xs font-medium">Sent</span>
+                          ) : (
+                            <button onClick={() => handleRally(result.id)} className="h-8 px-4 text-xs font-medium border border-white/15 text-white rounded-full hover:bg-white/5 transition-colors">
+                              Rally
+                            </button>
+                          )
+                        ) : status === 'pending' ? (
+                          <span className="text-white/40 text-xs font-medium">Pending</span>
+                        ) : (
+                          <button onClick={() => sendFriendRequest(result.id)} className="h-8 px-4 text-xs font-semibold bg-[#d4ff00] text-black rounded-full hover:bg-[#d4ff00]/90 transition-colors">
+                            Add
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-white/40 text-sm mb-3">No one found</p>
+                  <button onClick={handleTextFriend} className="text-sm font-medium text-[#d4ff00] hover:text-[#d4ff00]/80 transition-colors">
+                    Invite via text instead
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Default Content (not searching) */}
+          {!isSearching && (
+            <>
+              {/* Friend Requests */}
+              {pendingCount > 0 && (
+                <section>
+                  <h2 className="text-xs text-white/40 uppercase tracking-[0.15em] font-semibold mb-3">
+                    Requests · {pendingCount}
+                  </h2>
+                  <div className="space-y-1">
+                    {requests.map((request) => (
+                      <div key={request.id} className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03]">
+                        <button onClick={() => openFriendCard({ userId: request.user_id, displayName: request.display_name, avatarUrl: request.avatar_url })}>
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage src={request.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#1a0a2e] text-white">{request.display_name[0]}</AvatarFallback>
+                          </Avatar>
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium text-[15px] truncate">{request.display_name}</p>
+                          {request.mutual_friends.length > 0 && (
+                            <p className="text-white/35 text-xs truncate">{getMutualText(request.mutual_friends)}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => acceptRequest(request.id)} className="h-8 px-4 text-xs font-semibold bg-[#d4ff00] text-black rounded-full hover:bg-[#d4ff00]/90 transition-colors">
+                            Accept
+                          </button>
+                          <button onClick={() => declineRequest(request.id)} className="h-8 w-8 flex items-center justify-center text-white/30 hover:text-white/60 transition-colors">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Suggested */}
+              {suggestedFriends.length > 0 && (
+                <section>
+                  <h2 className="text-xs text-white/40 uppercase tracking-[0.15em] font-semibold mb-3">Suggested</h2>
+                  <div className="space-y-1">
+                    {suggestedFriends.map((friend) => {
+                      const status = friendshipStatuses[friend.id];
+                      return (
+                        <div key={friend.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage src={friend.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#1a0a2e] text-white">{friend.display_name?.[0] || '?'}</AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-white text-sm truncate">{result.display_name}</p>
-                            <p className="text-white/40 text-xs truncate">@{result.username}</p>
+                            <p className="text-white font-medium text-[15px] truncate">{friend.display_name}</p>
+                            <p className="text-white/35 text-xs">
+                              {friend.mutual_count} mutual{friend.mutual_count !== 1 ? 's' : ''}
+                            </p>
                           </div>
-                          {friendshipStatuses[result.id] === 'accepted' ? (
-                            ralliedIds.has(result.id) ? (
-                              <span className="flex items-center gap-1 text-[#d4ff00]/60 text-xs font-medium px-2">
-                                <Check className="h-3.5 w-3.5" />
-                                Rallied
-                              </span>
-                            ) : (
-                              <Button
-                                onClick={() => handleRally(result.id)}
-                                size="sm"
-                                className="bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl text-xs"
-                              >
-                                <Megaphone className="h-3.5 w-3.5 mr-1" />
-                                Rally
-                              </Button>
-                            )
+                          {status === 'pending' ? (
+                            <span className="text-white/40 text-xs font-medium">Pending</span>
+                          ) : status === 'accepted' ? (
+                            <span className="text-white/30 text-xs">Friends</span>
                           ) : (
-                            <Button
-                              onClick={() => sendFriendRequest(result.id)}
-                              size="sm"
-                              disabled={buttonState.disabled}
-                              variant={buttonState.variant}
-                              className={buttonState.disabled 
-                                ? "border-[#a855f7]/40 text-white/60 rounded-xl text-xs"
-                                : "bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl text-xs"
-                              }
-                            >
-                              <ButtonIcon className="h-3.5 w-3.5 mr-1" />
-                              {buttonState.label}
-                            </Button>
+                            <button onClick={() => sendFriendRequest(friend.id)} className="h-8 px-4 text-xs font-semibold bg-[#d4ff00] text-black rounded-full hover:bg-[#d4ff00]/90 transition-colors">
+                              Add
+                            </button>
                           )}
                         </div>
                       );
                     })}
                   </div>
-                )}
+                </section>
+              )}
 
-                {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
-                  <p className="text-white/50 text-sm text-center py-4">
-                    No users found. Invite them with your link!
+              {/* My Friends */}
+              <MyFriendsTab />
+
+              {/* Invite Section */}
+              <section>
+                <h2 className="text-xs text-white/40 uppercase tracking-[0.15em] font-semibold mb-3">Invite friends</h2>
+                <div className="space-y-2">
+                  <button
+                    onClick={handleTextFriend}
+                    className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-[#d4ff00]/10 flex items-center justify-center">
+                      <MessageCircle className="h-5 w-5 text-[#d4ff00]" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-white text-sm font-medium">Text a friend</p>
+                      <p className="text-white/30 text-xs">Send your invite link via iMessage</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-white/20" />
+                  </button>
+
+                  <button
+                    onClick={handleCopyLink}
+                    className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                      {justCopied ? <Check className="h-5 w-5 text-[#22c55e]" /> : <Copy className="h-5 w-5 text-white/50" />}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-white text-sm font-medium">{justCopied ? 'Link copied' : 'Copy invite link'}</p>
+                      <p className="text-white/30 text-xs">Share anywhere</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-white/20" />
+                  </button>
+                </div>
+
+                {usesCount > 0 && (
+                  <p className="text-white/25 text-xs text-center mt-3">
+                    {usesCount} friend{usesCount !== 1 ? 's' : ''} joined via your link
                   </p>
                 )}
-              </div>
-            )}
-
-            {/* Non-search content */}
-            {!isSearching && (
-              <>
-                {/* Pending requests banner */}
-                {!loadingRequests && pendingCount > 0 && (
-                  <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl overflow-hidden">
-                    <button
-                      onClick={() => setRequestsExpanded(!requestsExpanded)}
-                      className="w-full flex items-center justify-between p-3.5 hover:bg-[#a855f7]/10 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
-                          <UserPlus className="h-4 w-4 text-[#a855f7]" />
-                        </div>
-                        <span className="text-white text-sm font-medium">
-                          You have {pendingCount} friend request{pendingCount !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      {requestsExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-white/40" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-white/40" />
-                      )}
-                    </button>
-
-                    {requestsExpanded && (
-                      <div className="border-t border-[#a855f7]/10">
-                        {requests.map((request) => (
-                          <div
-                            key={request.id}
-                            className="flex items-center gap-3 p-3.5 border-b border-[#a855f7]/10 last:border-b-0"
-                          >
-                            <button
-                              onClick={() => openFriendCard({
-                                userId: request.user_id,
-                                displayName: request.display_name,
-                                avatarUrl: request.avatar_url,
-                              })}
-                              className="transition-transform hover:scale-110"
-                            >
-                              <Avatar className="h-11 w-11 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
-                                <AvatarImage src={request.avatar_url || undefined} />
-                                <AvatarFallback className="bg-[#1a0f2e] text-white text-sm">
-                                  {request.display_name[0]}
-                                </AvatarFallback>
-                              </Avatar>
-                            </button>
-
-                            <div className="flex-1 min-w-0">
-                              <button
-                                onClick={() => openFriendCard({
-                                  userId: request.user_id,
-                                  displayName: request.display_name,
-                                  avatarUrl: request.avatar_url,
-                                })}
-                                className="text-left hover:opacity-80 transition-opacity"
-                              >
-                                <h3 className="font-semibold text-white text-sm">{request.display_name}</h3>
-                              </button>
-                              {request.mutual_friends.length > 0 && (
-                                <div className="flex items-center gap-1 mt-0.5">
-                                  <div className="flex -space-x-2">
-                                    {request.mutual_friends.slice(0, 2).map((friend, idx) => (
-                                      <Avatar key={idx} className="h-4 w-4 border border-[#1a0f2e]">
-                                        <AvatarImage src={friend.avatar_url || undefined} />
-                                        <AvatarFallback className="bg-[#2d1b4e] text-white text-[8px]">
-                                          {friend.display_name[0]}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                    ))}
-                                  </div>
-                                  <p className="text-white/50 text-xs ml-0.5">
-                                    {getMutualText(request.mutual_friends)}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                              <Button
-                                onClick={() => acceptRequest(request.id)}
-                                variant="outline"
-                                size="sm"
-                                className="border-[#a855f7] text-white hover:bg-[#a855f7]/20 rounded-full px-3 text-xs"
-                              >
-                                Confirm
-                              </Button>
-                              <button
-                                onClick={() => declineRequest(request.id)}
-                                className="text-white/60 hover:text-white transition-colors"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Outgoing pending requests */}
-                {!loadingRequests && outgoingRequests.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-white/60 text-xs font-semibold tracking-wider px-1 flex items-center gap-2">
-                      <Clock className="h-3.5 w-3.5" />
-                      PENDING REQUESTS ({outgoingRequests.length})
-                    </h3>
-                    <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl overflow-hidden">
-                      {outgoingRequests.map((request) => (
-                        <div
-                          key={request.id}
-                          className="flex items-center gap-3 p-3 border-b border-[#a855f7]/10 last:border-b-0"
-                        >
-                          <button
-                            onClick={() => openFriendCard({
-                              userId: request.user_id,
-                              displayName: request.display_name,
-                              avatarUrl: request.avatar_url,
-                            })}
-                          >
-                            <Avatar className="h-11 w-11 border-2 border-[#a855f7]/40">
-                              <AvatarImage src={request.avatar_url || undefined} />
-                              <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
-                                {request.display_name?.[0] || 'U'}
-                              </AvatarFallback>
-                            </Avatar>
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-white text-sm truncate">{request.display_name}</p>
-                            <p className="text-white/40 text-xs truncate">@{request.username}</p>
-                          </div>
-                          <Button
-                            onClick={() => cancelOutgoingRequest(request.id)}
-                            variant="outline"
-                            size="sm"
-                            className="border-white/20 text-white/60 hover:bg-white/10 rounded-xl text-xs"
-                          >
-                            <Clock className="h-3.5 w-3.5 mr-1" />
-                            Pending
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Friend list (MyFriendsTab content) */}
-                <MyFriendsTab />
-
-                {/* People You May Know */}
-                {(loadingSuggestions || suggestedFriends.length > 0) && (
-                  <div className="space-y-3 pt-2">
-                    <h3 className="font-semibold text-white text-sm px-1">People You May Know</h3>
-                    
-                    {loadingSuggestions ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="h-5 w-5 text-[#a855f7] animate-spin" />
-                      </div>
-                    ) : (
-                      <div className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl overflow-hidden">
-                        {suggestedFriends.map((friend, index) => {
-                          const buttonState = getButtonState(friend.id);
-                          const ButtonIcon = buttonState.icon;
-                          
-                          return (
-                            <div
-                              key={friend.id}
-                              className={`flex items-center gap-3 p-3 ${
-                                index !== suggestedFriends.length - 1 ? 'border-b border-[#a855f7]/10' : ''
-                              }`}
-                            >
-                              <Avatar className="h-11 w-11 border-2 border-[#a855f7]/40">
-                                <AvatarImage src={friend.avatar_url || undefined} />
-                                <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
-                                  {friend.display_name?.[0] || 'U'}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-white text-sm truncate">{friend.display_name}</p>
-                                <p className="text-white/40 text-xs flex items-center gap-1">
-                                  <Users className="h-3 w-3" />
-                                  {friend.mutual_count} mutual friend{friend.mutual_count !== 1 ? 's' : ''}
-                                </p>
-                              </div>
-                              <Button
-                                onClick={() => sendFriendRequest(friend.id)}
-                                size="sm"
-                                disabled={buttonState.disabled}
-                                variant={buttonState.variant}
-                                className={buttonState.disabled 
-                                  ? "border-[#a855f7]/40 text-white/60 rounded-xl text-xs"
-                                  : "bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white rounded-xl text-xs"
-                                }
-                              >
-                                <ButtonIcon className="h-3.5 w-3.5 mr-1" />
-                                {buttonState.label}
-                              </Button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </TabsContent>
-
-          {/* Invite Tab */}
-          <TabsContent value="invite" className="px-4 py-4 space-y-5">
-            {/* Invite Friends Section */}
-            <div className="bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl p-5 space-y-4">
-              <div className="flex items-center gap-4 mb-2">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center">
-                  <Link2 className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-white text-lg">Invite Friends</h3>
-                  <p className="text-white/50 text-sm">Share your link to grow your squad</p>
-                </div>
-              </div>
-
-              {loading ? (
-                <div className="h-24 bg-[#0a0118]/50 rounded-2xl animate-pulse" />
-              ) : (
-                <div className="space-y-3">
-                  <Button
-                    onClick={handleTextFriend}
-                    className="w-full bg-gradient-to-r from-[#a855f7] to-[#7c3aed] hover:from-[#9333ea] hover:to-[#6b21a8] text-white font-semibold py-6 rounded-2xl"
-                  >
-                    <MessageCircle className="h-5 w-5 mr-2" />
-                    Text a Friend
-                  </Button>
-                  <Button
-                    onClick={handleCopyLink}
-                    variant="outline"
-                    className="w-full border-[#a855f7]/40 text-white hover:bg-[#a855f7]/20 py-6 rounded-2xl"
-                  >
-                    {justCopied ? (
-                      <Check className="h-5 w-5 mr-2 text-green-400" />
-                    ) : (
-                      <Copy className="h-5 w-5 mr-2" />
-                    )}
-                    {justCopied ? 'Copied!' : 'Copy Invite Link'}
-                  </Button>
-
-                  {usesCount > 0 && (
-                    <div className="flex items-center justify-center gap-2 text-[#a855f7] text-sm pt-2">
-                      <Users className="h-4 w-4" />
-                      <span>{usesCount} friend{usesCount !== 1 ? 's' : ''} joined via your link</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Show My QR Code Button */}
-            <button
-              onClick={() => setShowQRModal(true)}
-              className="w-full bg-[#1a0f2e]/80 backdrop-blur-xl border border-[#a855f7]/30 rounded-3xl p-5 flex items-center gap-4 hover:bg-[#a855f7]/10 transition-all duration-300"
-            >
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center">
-                <QrCode className="h-6 w-6 text-white" />
-              </div>
-              <div className="text-left flex-1">
-                <h3 className="font-semibold text-white">Show My QR Code</h3>
-                <p className="text-white/50 text-sm">For adding friends in person</p>
-              </div>
-              <ChevronRight className="h-5 w-5 text-white/40" />
-            </button>
-          </TabsContent>
-        </Tabs>
+              </section>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* QR Code Modal */}
-      <QRCodeModal
-        open={showQRModal}
-        onOpenChange={setShowQRModal}
-        inviteUrl={getInviteUrl()}
-      />
+      <QRCodeModal open={showQRModal} onOpenChange={setShowQRModal} inviteUrl={getInviteUrl()} />
     </div>
     </PullToRefresh>
   );

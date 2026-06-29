@@ -11,16 +11,15 @@ import { useOfflineCache } from '@/hooks/useOfflineCache';
 import { useUserCity } from '@/hooks/useUserCity';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2, Bell, Search } from 'lucide-react';
+import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2 } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
-import { NotificationBadge } from '@/components/NotificationBadge';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
-import spottedLogo from '@/assets/spotted-s-logo.png';
 import { toast } from 'sonner';
 import { warmUpCamera } from '@/lib/camera-service';
 import { PullToRefresh } from '@/components/PullToRefresh';
@@ -30,7 +29,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CityBadge } from '@/components/CityBadge';
 import { FeedSkeleton } from '@/components/FeedSkeleton';
 
 export default function Feed() {
@@ -144,7 +142,7 @@ export default function Feed() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#110a24] pb-24">
       {!isOnline && (
         <div className="bg-yellow-500/20 text-yellow-500 text-center py-2 text-sm">
           You're offline. Showing cached data.
@@ -152,51 +150,21 @@ export default function Feed() {
       )}
 
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
-        <div className="flex items-start justify-between px-6 pt-3 pb-3">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-              <CityBadge />
-            </div>
-            <h2 className="text-3xl font-bold text-white">Newsfeed</h2>
-            <p className="text-white/50 text-sm mt-1">Everything disappears by 5am</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowFriendSearch(true)}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
-              aria-label="Search friends"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
-              className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
-              aria-label="View activity"
-            >
-              <Bell className="w-5 h-5" />
-              <NotificationBadge count={unreadCount} />
-            </button>
-            <button 
-              onClick={openCheckIn} 
-              className="hover:scale-110 transition-transform"
-            >
-              <img src={spottedLogo} alt="Go live" className="h-14 w-14 object-contain" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Newsfeed"
+        subtitle="Everything disappears by 5am"
+        onSearchPress={() => setShowFriendSearch(true)}
+      />
 
       {/* Posts Feed */}
       <PullToRefresh onRefresh={async () => { await fetchPosts(); }}>
-        <div className="px-4 py-6 space-y-6">
+        <div className="px-4 py-4 space-y-3">
         {isLoading ? (
           <FeedSkeleton />
         ) : posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-            <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
-              <MessageCircle className="h-10 w-10 text-[#a855f7]/60" />
+            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 border border-white/8">
+              <MessageCircle className="h-10 w-10 text-white/30" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">
               Your friends are quiet tonight
@@ -209,7 +177,7 @@ export default function Feed() {
           posts.map((post, index) => (
             <div
               key={post.id}
-              className="glass-card rounded-3xl overflow-hidden post-animate-in transition-all duration-300 hover:shadow-[0_0_50px_rgba(168,85,247,0.3)]"
+              className="rounded-3xl overflow-hidden bg-white/[0.03] border border-white/[0.06] post-animate-in transition-all duration-300 mb-3 p-3"
               style={{ animationDelay: `${index * 50}ms` }}
             >
               {post.image_url && (
@@ -424,7 +392,7 @@ export default function Feed() {
                           if (e.key === 'Enter') handlePostComment(post.id);
                         }}
                         placeholder="Add a comment..."
-                        className="flex-1 bg-white/5 rounded-full px-4 py-2 text-sm text-white placeholder:text-white/30 border border-white/10 focus:border-[#a855f7]/50 outline-none"
+                        className="flex-1 bg-white/5 rounded-full px-4 py-2 text-sm text-white placeholder:text-white/30 border border-white/10 focus:border-white/30 outline-none"
                       />
                       <button
                         onClick={() => handlePostComment(post.id)}
@@ -446,7 +414,7 @@ export default function Feed() {
             <button
               onClick={loadMorePosts}
               disabled={isLoadingMore}
-              className="px-6 py-2 rounded-full bg-[#a855f7]/20 text-[#a855f7] text-sm font-medium hover:bg-[#a855f7]/30 transition-colors disabled:opacity-50"
+              className="px-6 py-2 rounded-full border border-white/20 text-white text-sm font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
             >
               {isLoadingMore ? 'Loading...' : 'Load more'}
             </button>
@@ -458,13 +426,13 @@ export default function Feed() {
       {/* Create Post FAB */}
       <button
         onClick={() => setShowCreatePost(true)}
-        className="fixed bottom-28 right-6 z-20 w-14 h-14 rounded-full bg-gradient-to-br from-[#a855f7] to-[#7c3aed] flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:scale-110 transition-transform"
+        className="fixed bottom-28 right-6 z-20 w-14 h-14 rounded-full bg-[#d4ff00] flex items-center justify-center hover:scale-105 transition-transform"
         aria-label="Create post"
       >
-        <Plus className="h-7 w-7 text-white" />
+        <Plus className="h-7 w-7 text-black" />
       </button>
 
-      <CreatePostDialog open={showCreatePost} onOpenChange={setShowCreatePost} />
+      <CreatePostDialog open={showCreatePost} onOpenChange={(open) => { setShowCreatePost(open); if (!open) fetchPosts(); }} />
 
       {selectedPostForLikes && (
         <PostLikesModal

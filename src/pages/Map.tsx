@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CityBadge } from '@/components/CityBadge';
 import { logger } from '@/lib/logger';
 import { escapeHtml, escapeUrl } from '@/lib/html-escape';
+import { useFriendsOutStatus } from '@/hooks/useFriendsOutStatus';
 
 /** Returns an <img> tag if avatarUrl exists, otherwise a colored circle with the user's initial */
 function avatarHtml(avatarUrl: string | null | undefined, displayName: string, size: string, extraStyle = '') {
@@ -91,6 +92,7 @@ export default function Map() {
   const { openVenueCard } = useVenueIdCard();
   const demoEnabled = useDemoMode();
   const { bootstrapEnabled } = useBootstrapMode();
+  const { data: friendsOutData } = useFriendsOutStatus();
   const { city } = useUserCity();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -220,6 +222,17 @@ export default function Map() {
         { event: '*', schema: 'public', table: 'night_statuses' },
         (payload) => {
           console.log('Night status updated:', payload);
+          // Instantly update the user's own status pill without waiting for full refetch
+          const row = payload.new as any;
+          if (row && row.user_id === user.id) {
+            setCurrentUserStatus(row.status || null);
+            setCurrentUserVenue(row.venue_name || null);
+            if (row.status === 'out' && row.lat && row.lng) {
+              setUserLocation({ lat: row.lat, lng: row.lng });
+            } else {
+              setUserLocation(null);
+            }
+          }
           debouncedFetchFriendsLocations();
         }
       )
@@ -256,16 +269,27 @@ export default function Map() {
 
   const fetchFriendsLocations = async () => {
     if (!user) return;
-    
+
     setIsLoadingFriends(true);
 
     try {
-      // Get current user's profile to check their location
+      // Get current user's profile for avatar
       const { data: myProfile } = await supabase
         .from('profiles')
-        .select('is_out, last_known_lat, last_known_lng, location_sharing_level, avatar_url, display_name')
+        .select('avatar_url, display_name, location_sharing_level')
         .eq('id', user.id)
         .single();
+
+      // DEBUG (1): Log current user's full profile when demo mode is on
+      if (demoEnabledRef.current) {
+        const { data: fullProfile } = await supabase
+          .from('profiles')
+          .select('id, display_name, last_known_lat, last_known_lng, is_out, home_city, location_sharing_level')
+          .eq('id', user.id)
+          .single();
+        console.log('[DEBUG map] (1) current user profile:', fullProfile);
+        console.log('[DEBUG map] (1) cityRef.current:', cityRef.current);
+      }
 
       // Store user profile for avatar marker
       if (myProfile) {
@@ -275,12 +299,18 @@ export default function Map() {
         });
       }
 
-      // Update user's location state
-      if (myProfile?.is_out && myProfile.last_known_lat && myProfile.last_known_lng) {
-        console.log('Setting user location:', { lat: myProfile.last_known_lat, lng: myProfile.last_known_lng, is_out: myProfile.is_out });
-        setUserLocation({ lat: myProfile.last_known_lat, lng: myProfile.last_known_lng });
+      // Check night_statuses to determine if user is out
+      const { data: userNightStatus } = await supabase
+        .from('night_statuses')
+        .select('status, lat, lng')
+        .eq('user_id', user.id)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+
+      // Update user's location state — show pin if user is "out" and has coordinates
+      if (userNightStatus?.status === 'out' && userNightStatus.lat && userNightStatus.lng) {
+        setUserLocation({ lat: userNightStatus.lat, lng: userNightStatus.lng });
       } else {
-        console.log('User location not set - is_out:', myProfile?.is_out, 'has coords:', !!myProfile?.last_known_lat);
         setUserLocation(null);
       }
 
@@ -313,7 +343,7 @@ export default function Map() {
             user_lng: pos.coords.longitude,
             radius_meters: 200,
           });
-          if (nearbyVenues && nearbyVenues.length > 0 && !smartPromptDismissedRef.current.has(nearbyVenues[0].venue_id)) {
+          if (nearbyVenues && nearbyVenues.length > 0 && nearbyVenues[0].venue_name && !smartPromptDismissedRef.current.has(nearbyVenues[0].venue_id)) {
             setSmartPromptVenue({
               id: nearbyVenues[0].venue_id,
               name: nearbyVenues[0].venue_name,
@@ -332,81 +362,118 @@ export default function Map() {
 
       // When demo mode is ON, fetch demo users from database
       if (demoEnabledRef.current) {
-        // Fetch demo users who are "out" from night_statuses joined with profiles
-        const [{ data: demoStatuses }, { data: planningDemoStatuses }, { data: cityVenues }] = await Promise.all([
+        // Fetch demo statuses + ALL statuses (to include real friends too) and demo profiles
+        const [{ data: demoOutStatuses }, { data: demoPlanningStatuses }, { data: demoProfiles }] = await Promise.all([
           supabase
             .from('night_statuses')
-            .select(`
-              user_id,
-              lat,
-              lng,
-              venue_name,
-              profiles!inner(display_name, avatar_url, is_demo)
-            `)
+            .select('user_id, lat, lng, venue_name, is_demo')
             .eq('status', 'out')
-            .eq('profiles.is_demo', true)
             .not('expires_at', 'is', null)
             .gt('expires_at', new Date().toISOString()),
-          // Also fetch planning demo users
           supabase
             .from('night_statuses')
-            .select(`
-              user_id,
-              planning_neighborhood,
-              profiles!inner(display_name, avatar_url, is_demo)
-            `)
+            .select('user_id, planning_neighborhood, is_demo')
             .eq('status', 'planning')
-            .eq('profiles.is_demo', true)
             .not('expires_at', 'is', null)
             .gt('expires_at', new Date().toISOString()),
-          // Fetch venues for current city to filter demo users
           supabase
-            .from('venues')
-            .select('name')
-            .eq('city', cityRef.current)
+            .from('profiles')
+            .select('id, display_name, avatar_url, is_demo')
+            .or('is_demo.eq.true'),
         ]);
 
-        const cityVenueNames = new Set(cityVenues?.map(v => v.name.toLowerCase()) || []);
+        // DEBUG (4): Log night_statuses query responses
+        console.log('[DEBUG map] (4) night_statuses "out" response:', {
+          count: demoOutStatuses?.length ?? 0,
+          first3: (demoOutStatuses || []).slice(0, 3).map((s: any) => ({
+            user_id: s.user_id?.slice(0, 8),
+            venue_name: s.venue_name,
+            is_demo: s.is_demo,
+            lat: s.lat,
+            lng: s.lng,
+          })),
+        });
+        console.log('[DEBUG map] (4) night_statuses "planning" response:', {
+          count: demoPlanningStatuses?.length ?? 0,
+          first3: (demoPlanningStatuses || []).slice(0, 3),
+        });
+        console.log('[DEBUG map] (4) demo profiles response:', {
+          count: demoProfiles?.length ?? 0,
+          first3: (demoProfiles || []).slice(0, 3).map((p: any) => ({
+            id: p.id?.slice(0, 8),
+            display_name: p.display_name,
+            is_demo: p.is_demo,
+          })),
+        });
 
-        // Filter demo users by city (matching venue name to city's venues)
-        const filteredDemoStatuses = (demoStatuses || []).filter((status: any) => 
-          status.venue_name && cityVenueNames.has(status.venue_name.toLowerCase())
-        );
+        // Build profile map: start with fresh demo profiles, then add all profiles from RPC
+        // Fetch fresh (not cached) to ensure newly seeded profiles are included
+        const { data: freshAllProfiles } = await supabase.rpc('get_profiles_safe');
+        const profileMap = new Map<string, any>();
+        // Add all profiles first, then overlay demo profiles (fresh query takes priority)
+        for (const p of freshAllProfiles || []) profileMap.set(p.id, p);
+        for (const p of demoProfiles || []) profileMap.set(p.id, p);
 
-        // Deduplicate by display_name (keep first occurrence)
+        // Get real friend IDs so we can include both demo AND real friends
+        const [{ data: sentF }, { data: recvF }] = await Promise.all([
+          supabase.from('friendships').select('friend_id').eq('user_id', user.id).eq('status', 'accepted'),
+          supabase.from('friendships').select('user_id').eq('friend_id', user.id).eq('status', 'accepted'),
+        ]);
+        const realFriendIds = new Set([
+          ...(sentF?.map(f => f.friend_id) || []),
+          ...(recvF?.map(f => f.user_id) || []),
+        ]);
+
+        // Include demo users with valid coordinates + real friends who are out
+        const filteredOutStatuses = (demoOutStatuses || []).filter((status: any) => {
+          if (status.is_demo) {
+            return status.lat && status.lng;
+          }
+          return realFriendIds.has(status.user_id) && status.lat && status.lng;
+        });
+
+        // Deduplicate by display_name
         const seenNames = new Set<string>();
         const relationshipTypes: ('close' | 'direct' | 'mutual')[] = ['close', 'direct', 'mutual'];
-        
-        friendLocations = filteredDemoStatuses
+
+        friendLocations = filteredOutStatuses
           .filter((status: any) => {
-            const name = status.profiles?.display_name;
+            const profile = profileMap.get(status.user_id);
+            const name = profile?.display_name;
             if (!name || seenNames.has(name)) return false;
             seenNames.add(name);
             return true;
           })
-          .map((status: any, index: number) => ({
-            user_id: status.user_id,
-            lat: status.lat,
-            lng: status.lng,
-            venue_name: status.venue_name || 'Out',
-            last_location_at: new Date().toISOString(),
-            profiles: {
-              display_name: status.profiles?.display_name || 'Unknown',
-              avatar_url: status.profiles?.avatar_url?.includes('dicebear.com') ? null : (status.profiles?.avatar_url || null),
-            },
-            // Cycle through relationship types for visual variety
-            relationshipType: relationshipTypes[index % relationshipTypes.length],
-          }));
+          .map((status: any, index: number) => {
+            const profile = profileMap.get(status.user_id);
+            return {
+              user_id: status.user_id,
+              lat: status.lat,
+              lng: status.lng,
+              venue_name: status.venue_name || 'Out',
+              last_location_at: new Date().toISOString(),
+              profiles: {
+                display_name: profile?.display_name || 'Unknown',
+                avatar_url: profile?.avatar_url?.includes('dicebear.com') ? null : (profile?.avatar_url || null),
+              },
+              relationshipType: relationshipTypes[index % relationshipTypes.length],
+            };
+          });
 
         friendIds = friendLocations.map(f => f.user_id);
 
-        // Set planning friends from demo data
-        const planningFriendsData = (planningDemoStatuses || []).map((status: any) => ({
-          user_id: status.user_id,
-          display_name: status.profiles?.display_name || 'Friend',
-          avatar_url: status.profiles?.avatar_url || null,
-          planning_neighborhood: status.planning_neighborhood || null,
-        }));
+        // Planning friends: both demo and real
+        const planningFriendsData = (demoPlanningStatuses || [])
+          .filter((s: any) => s.is_demo || realFriendIds.has(s.user_id))
+          .map((status: any) => {
+            const profile = profileMap.get(status.user_id);
+            return {
+              user_id: status.user_id,
+              display_name: profile?.display_name || 'Friend',
+              avatar_url: profile?.avatar_url || null,
+              planning_neighborhood: status.planning_neighborhood || null,
+            };
+          });
         setPlanningFriends(planningFriendsData);
       } else {
         // Normal mode: show real friends only - use cached friend IDs if available
@@ -474,6 +541,36 @@ export default function Map() {
           // Only filter out demo users when demo mode is OFF (bootstrap mode)
           if (!demoEnabled) {
             friendProfiles = friendProfiles.filter((p: any) => p.is_demo === false);
+          }
+
+          // Expand map to include friends-of-friends with mutual_friends location sharing
+          const { data: mutualData } = await supabase.rpc('get_mutual_friend_ids', { p_user_id: user.id });
+          const mutualFriendIds = (mutualData || []).map((r: any) => r.user_id as string);
+
+          if (mutualFriendIds.length > 0) {
+            const { data: mutualStatuses } = await supabase
+              .from('night_statuses')
+              .select('user_id, venue_name, lat, lng')
+              .in('user_id', mutualFriendIds)
+              .eq('status', 'out')
+              .not('expires_at', 'is', null)
+              .gt('expires_at', new Date().toISOString());
+
+            const { data: mutualProfiles } = await supabase
+              .from('profiles')
+              .select('id, display_name, avatar_url, location_sharing_level, is_out, last_known_lat, last_known_lng, last_location_at')
+              .in('id', mutualFriendIds)
+              .eq('is_out', true);
+
+            const mutualProfileMap = new Map((mutualProfiles || []).map((p: any) => [p.id, p]));
+
+            for (const ms of mutualStatuses || []) {
+              const profile = mutualProfileMap.get(ms.user_id);
+              if (profile && profile.location_sharing_level === 'mutual_friends' && ms.lat && ms.lng) {
+                friendProfiles.push(profile);
+                if (!friendIds.includes(ms.user_id)) friendIds.push(ms.user_id);
+              }
+            }
           }
 
           // Get friends' night statuses to determine status type (including planning_neighborhood)
@@ -558,36 +655,36 @@ export default function Map() {
           const relationshipTypes: Record<string, 'close' | 'direct' | 'mutual'> = {};
           const friendIdSet = new Set(friendIds);
           
+          const mutualFriendIdSet = new Set(mutualFriendIds);
           for (const friendId of friendIds) {
             if (closeFriendIds.has(friendId)) {
               relationshipTypes[friendId] = 'close';
+            } else if (mutualFriendIdSet.has(friendId)) {
+              // This is a friend-of-friend, not a direct friend
+              relationshipTypes[friendId] = 'mutual';
             } else {
-              // Check if mutual friend: does this friend have connections to other friends?
-              const connections = friendConnections[friendId] || new Set();
-              const hasCommonFriend = [...connections].some(connId => friendIdSet.has(connId) && connId !== friendId);
-              relationshipTypes[friendId] = hasCommonFriend ? 'mutual' : 'direct';
+              relationshipTypes[friendId] = 'direct';
             }
           }
 
-          // RLS policies handle visibility filtering - no client-side filtering needed
-          // Exclude users who are in planning mode (prevents showing in both "out" and "planning")
+          // Exclude planning users from "out" markers
+          // Private parties: show exact location for close/direct friends, hide map pin for mutuals
           friendLocations = (friendProfiles || []).filter((friend: any) => !planningUserIds.has(friend.id)).map((friend: any) => {
             const ppData = privatePartyMap[friend.id];
             const isPrivateParty = ppData?.is_private_party === true;
-            
-            // For private party friends, jitter coordinates for privacy (~1km precision)
-            // Use deterministic hash so the pin doesn't drift on every re-render
+            const relationship = relationshipTypes[friend.id] || 'direct';
+
+            // Mutual friends at private parties: no map pin (they see text only in friends list)
+            if (isPrivateParty && relationship === 'mutual') {
+              return null;
+            }
+
+            // For private parties, use GPS from night_statuses (exact location for close/direct friends)
             let lat = friend.last_known_lat;
             let lng = friend.last_known_lng;
             if (isPrivateParty && ppData?.lat && ppData?.lng) {
-              let hash = 0;
-              for (let i = 0; i < friend.id.length; i++) {
-                hash = ((hash << 5) - hash + friend.id.charCodeAt(i)) | 0;
-              }
-              const jitterLat = ((hash & 0xffff) / 0xffff - 0.5) * 0.002;
-              const jitterLng = (((hash >> 16) & 0xffff) / 0xffff - 0.5) * 0.002;
-              lat = Math.round(ppData.lat * 100) / 100 + jitterLat;
-              lng = Math.round(ppData.lng * 100) / 100 + jitterLng;
+              lat = ppData.lat;
+              lng = ppData.lng;
             }
             
             const venueName = isPrivateParty
@@ -612,9 +709,9 @@ export default function Map() {
         }
       }
 
-      setFriends(friendLocations);
+      setFriends(friendLocations.filter(Boolean) as FriendLocation[]);
       setIsLoadingFriends(false);
-      
+
       logger.mapLoad(friendLocations.length, 0); // Log successful friends fetch
 
       // Fetch venues and calculate heat scores
@@ -628,11 +725,29 @@ export default function Map() {
   // Simplified heat score calculation using popularity_rank instead of expensive queries
   const fetchVenuesWithHeatScores = async (friendIds: string[]) => {
     try {
+      // DEBUG (2): Log venue query parameters
+      console.log('[DEBUG map] (2) venue query: venues.select(*).eq(city,', cityRef.current, ')');
+
       // Fetch venues filtered by city (server-side filtering)
-      const { data: venuesData } = await supabase
+      const { data: venuesData, error: venuesError } = await supabase
         .from('venues')
         .select('*')
         .eq('city', cityRef.current);
+
+      // DEBUG (3): Log venue query response
+      console.log('[DEBUG map] (3) venue query response:', {
+        count: venuesData?.length ?? 0,
+        error: venuesError?.message ?? null,
+        first3: (venuesData || []).slice(0, 3).map((v: any) => ({
+          id: v.id?.slice(0, 8),
+          name: v.name,
+          lat: v.lat,
+          lng: v.lng,
+          city: v.city,
+          is_demo: v.is_demo,
+          neighborhood: v.neighborhood,
+        })),
+      });
 
       if (!venuesData) return;
 
@@ -797,9 +912,9 @@ export default function Map() {
     });
   }, [city]);
 
-  // Add user's marker
+  // Add user's marker — only when both location AND profile are loaded
   useEffect(() => {
-    if (!map.current || !userLocation) {
+    if (!map.current || !userLocation || !userProfile) {
       userMarkerRef.current?.remove();
       userMarkerRef.current = null;
       return;
@@ -815,22 +930,14 @@ export default function Map() {
     el.style.height = '60px';
     el.style.cursor = 'pointer';
     el.style.zIndex = '15';
-    
-    const avatarUrl = escapeUrl(userProfile?.avatar_url) || '/placeholder.svg';
-    const initials = escapeHtml(userProfile?.display_name?.charAt(0).toUpperCase()) || 'M';
-    
+
+    const displayName = userProfile?.display_name || 'Me';
+
     el.innerHTML = `
       <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-        <!-- Yellow pulsing glow to distinguish from friends -->
-        <div style="position: absolute; inset: -4px; border-radius: 50%; background: radial-gradient(circle, rgba(212, 255, 0, 0.3) 0%, transparent 70%); animation: pulse 2s infinite;"></div>
-        <!-- Avatar with yellow border (vs purple for friends) -->
-        <div style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; border: 3px solid #d4ff00; box-shadow: 0 0 12px rgba(212, 255, 0, 0.5); background: #1a0f2e;">
-          <img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" 
-               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-          <div style="display: none; width: 100%; height: 100%; background: #d4ff00; align-items: center; justify-content: center; font-weight: bold; color: #0a0118; font-size: 18px;">
-            ${initials}
-          </div>
-        </div>
+        <div style="position: absolute; inset: -4px; border-radius: 50%; background: radial-gradient(circle, rgba(212, 255, 0, 0.15) 0%, transparent 70%); animation: pulse 2s infinite;"></div>
+        <div style="position: absolute; inset: 0; border-radius: 50%; border: 3px solid #d4ff00;"></div>
+        ${avatarHtml(userProfile?.avatar_url, displayName, '50px', 'border: 2px solid #1a0f2e;')}
       </div>
     `;
 
@@ -1050,17 +1157,17 @@ export default function Map() {
           el.style.cursor = 'pointer';
           el.style.zIndex = clusterZIndex;
           
-          const ringColors: Record<string, { border: string; shadow: string }> = {
-            close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.35)' },
-            direct: { border: '#a855f7', shadow: 'rgba(168, 85, 247, 0.35)' },
-            mutual: { border: '#6366f1', shadow: 'rgba(99, 102, 241, 0.35)' },
+          const ringColors: Record<string, string> = {
+            close: '#d4ff00',
+            direct: '#9333ea',
+            mutual: '#6366f1',
           };
-          const colors = ringColors[topFriend.relationshipType || 'direct'];
+          const borderColor = ringColors[topFriend.relationshipType || 'direct'];
           el.innerHTML = `
             <div style="position: relative; width: 100%; height: 100%;">
-              <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${colors.border}; box-shadow: 0 0 8px ${colors.shadow};"></div>
+              <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${borderColor};"></div>
               ${avatarHtml(topFriend.profiles?.avatar_url, topFriend.profiles?.display_name || 'user', '100%', 'padding: 2px; border: 2px solid white;')}
-              <div style="position: absolute; bottom: -4px; right: -4px; min-width: 20px; height: 20px; background: #a855f7; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 0 5px; font-size: 11px; font-weight: 700; color: white; border: 2px solid #1a0f2e;">
+              <div style="position: absolute; bottom: -4px; right: -4px; min-width: 18px; height: 18px; background: #9333ea; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 4px; font-size: 10px; font-weight: 700; color: white; border: 2px solid #0a0118;">
                 ${cluster.length}
               </div>
             </div>
@@ -1086,8 +1193,8 @@ export default function Map() {
           // Cluster bubble for 4+ friends (reduced to 56px)
           const el = document.createElement('div');
           el.className = 'cluster-marker';
-          el.style.width = '56px';
-          el.style.height = '56px';
+          el.style.width = '48px';
+          el.style.height = '48px';
           el.style.cursor = 'pointer';
           el.style.zIndex = clusterZIndex;
           
@@ -1096,7 +1203,7 @@ export default function Map() {
           
           el.innerHTML = `
             <div style="position: relative; width: 100%; height: 100%;">
-              <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(45, 27, 78, 0.95); border: 2px solid rgba(168, 85, 247, 0.5); box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);"></div>
+              <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(26, 10, 46, 0.95); border: 2px solid rgba(147, 51, 234, 0.5);"></div>
               <div style="position: absolute; top: 4px; left: 50%; transform: translateX(-50%);">
                 ${avatarHtml(displayFriends[0]?.profiles?.avatar_url, displayFriends[0]?.profiles?.display_name || 'U', '18px', 'border: 1.5px solid white; font-size: 9px;')}
               </div>
@@ -1106,7 +1213,7 @@ export default function Map() {
               <div style="position: absolute; bottom: 12px; right: 8px;">
                 ${avatarHtml(displayFriends[2]?.profiles?.avatar_url, displayFriends[2]?.profiles?.display_name || 'U', '18px', 'border: 1.5px solid white; font-size: 9px;')}
               </div>
-              <div style="position: absolute; bottom: -4px; right: -4px; min-width: 20px; height: 20px; background: #a855f7; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 0 5px; font-size: 10px; font-weight: 600; color: white; border: 2px solid #1a0f2e;">
+              <div style="position: absolute; bottom: -4px; right: -4px; min-width: 18px; height: 18px; background: #9333ea; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 4px; font-size: 10px; font-weight: 600; color: white; border: 2px solid #0a0118;">
                 +${remainingCount}
               </div>
             </div>
@@ -1617,14 +1724,14 @@ export default function Map() {
           <div className="bg-gradient-to-r from-[#d4ff00]/20 to-[#a855f7]/20 backdrop-blur border border-[#d4ff00]/40 rounded-xl px-4 py-3 flex items-center gap-3">
             <div className="flex-1">
               <p className="text-white text-sm font-medium">
-                Looks like you're at <span className="text-[#d4ff00]">{smartPromptVenue.name}</span>
+                Looks like you're at <span className="text-[#d4ff00]">{smartPromptVenue.name || 'a venue nearby'}</span>
               </p>
               <p className="text-white/50 text-xs">Go live?</p>
             </div>
             <button
               onClick={() => {
                 setShowSmartPrompt(false);
-                setShowQuickStatus(true);
+                openCheckIn();
               }}
               className="px-3 py-1.5 bg-[#d4ff00] text-[#0a0118] text-xs font-semibold rounded-full hover:bg-[#d4ff00]/90 transition-colors"
             >
@@ -1692,7 +1799,7 @@ export default function Map() {
               }}
             />
           )}
-          {showPlanningReady && currentUserStatus === 'planning' && (
+          {showPlanningReady && currentUserStatus === 'planning' && !(showSmartPrompt && smartPromptVenue) && (
             <PlanningReadyBanner
               onGoOut={() => {
                 setShowPlanningReady(false);
@@ -1716,7 +1823,7 @@ export default function Map() {
           })() }}
         >
           <button
-            onClick={() => currentUserStatus === 'out' ? setShowUpdateSpot(true) : setShowQuickStatus(true)}
+            onClick={() => currentUserStatus === 'out' ? setShowUpdateSpot(true) : openCheckIn()}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full backdrop-blur-md border transition-all hover:scale-105 bg-black/40 border-white/10 ${
               currentUserStatus === 'out'
                 ? 'text-[#d4ff00]'
@@ -1733,7 +1840,7 @@ export default function Map() {
             ) : currentUserStatus === 'planning' ? (
               <>
                 <Target className="w-3 h-3" />
-                <span className="text-[11px] font-medium">Planning</span>
+                <span className="text-[11px] font-medium">TBD</span>
               </>
             ) : (
               <>
@@ -1800,7 +1907,7 @@ export default function Map() {
 
       {/* Full-Screen Search Overlay */}
       {showSearchOverlay && (
-        <div className="fixed inset-0 bg-[#0a0118] z-[500] flex flex-col animate-fade-in pointer-events-auto" style={{ touchAction: 'auto' }}>
+        <div className="fixed inset-0 bg-[#110a24] z-[500] flex flex-col animate-fade-in pointer-events-auto" style={{ touchAction: 'auto' }}>
           {/* Search Header */}
           <div className="flex items-center gap-3 px-4 py-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
             <button 
@@ -1861,7 +1968,7 @@ export default function Map() {
                 {/* Trending Tonight */}
                 {searchFilterVenues && trendingVenues.length > 0 && (
                   <div className="mb-6">
-                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">🔥 Trending Tonight</h3>
+                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Trending Tonight</h3>
                     <div className="space-y-1">
                       {trendingVenues.map((venue) => (
                         <button
@@ -1883,7 +1990,7 @@ export default function Map() {
                 {/* Friends Out Now */}
                 {searchFilterPeople && friends.length > 0 && (
                   <div>
-                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">👥 Friends Out Now</h3>
+                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Friends Out Now</h3>
                     <div className="space-y-1">
                       {friends.map((friend) => {
                         const staleMins = getStalenessMins(friend.last_location_at);
@@ -1901,7 +2008,7 @@ export default function Map() {
                           </Avatar>
                           <div className="flex-1 text-left">
                             <p className="text-white font-medium text-sm">{friend.profiles?.display_name}</p>
-                            <p className="text-[#d4ff00] text-xs">{friend.venue_name ? `📍 At ${friend.venue_name}` : '📍 Out now'}</p>
+                            <p className="text-[#d4ff00] text-xs">{friend.venue_name ? `At ${friend.venue_name}` : 'Out now'}</p>
                           </div>
                         </button>
                         );
@@ -1932,7 +2039,7 @@ export default function Map() {
                           </Avatar>
                           <div className="flex-1 text-left">
                             <p className="text-white font-medium text-sm">{friend.profiles?.display_name}</p>
-                            <p className="text-[#d4ff00] text-xs">{friend.venue_name ? `📍 At ${friend.venue_name}` : '📍 Out now'}</p>
+                            <p className="text-[#d4ff00] text-xs">{friend.venue_name ? `At ${friend.venue_name}` : 'Out now'}</p>
                           </div>
                         </button>
                         );
@@ -2057,11 +2164,11 @@ export default function Map() {
       </Drawer>
 
       {/* Friends Out Pill + List - Bottom Left - Hidden in venues-only mode */}
-      {layerVisibility !== 'venues' && friends.length > 0 ? (
+      {layerVisibility !== 'venues' && (friendsOutData?.outFriends?.length ?? 0) > 0 ? (
         <div ref={friendsListRef} className={`absolute left-6 z-[200] max-w-sm transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: bottomOffset }}>
           {/* Expanded Friends List - Opens Upward */}
           {showFriendsList && (
-            <div className="mb-2 bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/30 rounded-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] max-h-96 overflow-y-auto relative z-[200]">
+            <div className="mb-2 bg-[#1a0a2e]/95 backdrop-blur border border-white/10 rounded-2xl max-h-96 overflow-y-auto relative z-[200]">
               {/* Friends Out Section */}
               {friendsWithDistances.map((friend) => {
                 const staleMins = getStalenessMins(friend.last_location_at);
@@ -2098,7 +2205,7 @@ export default function Map() {
                       {friend.profiles?.display_name || 'Unknown'}
                     </p>
                     <p className="text-[#d4ff00] text-xs truncate">
-                      {friend.venue_name ? `📍 At ${friend.venue_name}` : '📍 Out now'}
+                      {friend.venue_name ? `At ${friend.venue_name}` : 'Out now'}
                     </p>
                   </div>
 
@@ -2110,16 +2217,17 @@ export default function Map() {
                 );
               })}
 
-              {/* Friends Planning Section — exclude anyone already shown as "out" */}
+              {/* Friends Planning Section — use shared hook data, exclude anyone already shown as "out" */}
               {(() => {
                 const outUserIds = new Set(friends.map(f => f.user_id));
-                const filteredPlanningFriends = planningFriends.filter(f => !outUserIds.has(f.user_id));
+                const hookPlanning = friendsOutData?.planningFriends || [];
+                const filteredPlanningFriends = hookPlanning.filter(f => !outUserIds.has(f.user_id));
                 return filteredPlanningFriends.length > 0 ? (
                 <>
                   {/* Divider with header */}
                   <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
                     <p className="text-white/70 text-xs font-medium flex items-center gap-1.5">
-                      🔥 Friends Planning 🎯
+                      TBD tonight
                       <span className="text-white/50">({filteredPlanningFriends.length})</span>
                     </p>
                   </div>
@@ -2159,7 +2267,7 @@ export default function Map() {
                           {friend.display_name || 'Unknown'}
                         </p>
                         <p className="text-[#a855f7] text-xs truncate">
-                          🎯 Planning{friend.planning_neighborhood ? ` (${friend.planning_neighborhood})` : ' tonight'}
+                          TBD{friend.planning_neighborhood ? ` · ${friend.planning_neighborhood}` : ''}
                         </p>
                       </div>
                     </button>
@@ -2176,8 +2284,8 @@ export default function Map() {
             className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 hover:bg-[#2d1b4e] transition-colors w-full"
           >
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-[#a855f7] rounded-full shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>
-              <span className="text-white/80 text-sm">{friends.length} friends out</span>
+              <div className="w-3 h-3 bg-purple-600 rounded-full"></div>
+              <span className="text-white/80 text-sm">{friendsOutData?.outFriends?.length ?? 0} friends out</span>
               <ChevronDown className={`w-4 h-4 text-white/60 transition-transform duration-200 ${showFriendsList ? 'rotate-180' : ''}`} />
             </div>
           </button>
@@ -2187,8 +2295,8 @@ export default function Map() {
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#a855f7]/30 rounded-full"></div>
             <span className="text-white/60 text-sm">
-              {planningFriends.length > 0
-                ? `${planningFriends.length} friend${planningFriends.length === 1 ? '' : 's'} planning tonight`
+              {(friendsOutData?.planningFriends?.length ?? 0) > 0
+                ? `${friendsOutData!.planningFriends.length} friend${friendsOutData!.planningFriends.length === 1 ? '' : 's'} TBD`
                 : 'No friends out'}
             </span>
           </div>
@@ -2199,7 +2307,7 @@ export default function Map() {
       {/* My Location Button */}
       <button
         onClick={centerOnMyLocation}
-        className={`absolute right-6 w-12 h-12 rounded-full bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/50 flex items-center justify-center z-20 hover:bg-[#2d1b4e] transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.4)] ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        className={`absolute right-6 w-12 h-12 rounded-full bg-[#1a0a2e]/90 backdrop-blur border border-white/15 flex items-center justify-center z-20 hover:bg-[#1a0a2e] transition-all duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
         style={{ bottom: bottomOffset }}
         aria-label="Center on my location"
       >
@@ -2208,21 +2316,21 @@ export default function Map() {
 
       {/* Legend - Hidden in venues-only mode */}
       {layerVisibility !== 'venues' && (
-        <div className={`absolute right-6 bg-[#2d1b4e]/95 backdrop-blur-sm border border-[#a855f7]/20 rounded-md p-2 z-20 shadow-[0_0_8px_rgba(168,85,247,0.2)] transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: legendBottomOffset }}>
+        <div className={`absolute right-6 bg-[#1a0a2e]/95 backdrop-blur-sm border border-white/10 rounded-xl p-2 z-20 transition-opacity duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ bottom: legendBottomOffset }}>
         <p className="text-white/70 text-[10px] font-medium mb-1.5">Relationship</p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full border-[1.5px] border-[#d4ff00] flex items-center justify-center text-[6px] bg-[#1a0f2e] shadow-[0_0_4px_rgba(212,255,0,0.3)]">
+            <div className="w-3 h-3 rounded-full border-[1.5px] border-[#d4ff00] flex items-center justify-center text-[6px] bg-[#1a0f2e]">
               💛
             </div>
             <span className="text-white/60 text-[10px]">Close</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full border-[1.5px] border-[#a855f7] bg-[#1a0f2e] shadow-[0_0_4px_rgba(168,85,247,0.3)]"></div>
+            <div className="w-3 h-3 rounded-full border-[1.5px] border-purple-600 bg-[#1a0f2e]"></div>
             <span className="text-white/60 text-[10px]">Friend</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full border-[1.5px] border-[#6366f1] flex items-center justify-center text-[6px] bg-[#1a0f2e] shadow-[0_0_4px_rgba(99,102,241,0.3)]">
+            <div className="w-3 h-3 rounded-full border-[1.5px] border-[#6366f1] flex items-center justify-center text-[6px] bg-[#1a0f2e]">
               🔗
             </div>
             <span className="text-white/60 text-[10px]">Mutual</span>
@@ -2234,7 +2342,7 @@ export default function Map() {
       {/* Cluster Friends Popover */}
       {selectedCluster && (
         <div 
-          className="absolute z-[300] bg-[#2d1b4e]/95 backdrop-blur border border-[#a855f7]/40 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.4)] overflow-hidden animate-fade-in"
+          className="absolute z-[300] bg-[#1a0a2e]/95 backdrop-blur border border-white/10 rounded-2xl overflow-hidden animate-fade-in"
           style={{
             left: Math.min(
               Math.max(selectedCluster.screenX - 120, 10),

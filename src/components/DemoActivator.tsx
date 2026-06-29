@@ -79,22 +79,28 @@ async function activateDemo(city: SupportedCity, userId: string) {
   try {
     logger.debug('demo:activating', { city, userId });
 
-    // Enable demo mode
-    setDemoMode(true);
-    
-    // Set city
+    // Set city before seeding (needed for venue lookups)
     cacheCity(city);
 
-    // Seed data via edge function
-    const { error } = await supabase.functions.invoke('seed-demo-data', {
+    // Seed data via edge function — do NOT enable demo mode until this succeeds
+    const { data, error } = await supabase.functions.invoke('seed-demo-data', {
       body: { action: 'seed', city, userId }
     });
 
     if (error) {
-      logger.error('demo:seed-error', { error: error.message });
-      toast.error('Failed to load demo data');
+      // Extract structured details from the error
+      const context = (error as any)?.context;
+      const status = context?.status || 'unknown';
+      const errorBody = typeof data === 'object' ? data : { raw: data };
+      logger.error('demo:seed-error', { status, error: error.message, ...errorBody });
+      toast.error(`Demo seed failed (${status})`, {
+        description: errorBody?.error || error.message,
+      });
       return;
     }
+
+    // Seeding succeeded — now enable demo mode
+    setDemoMode(true);
 
     // Try real GPS first for venue detection
     let venueName: string | null = null;
@@ -146,16 +152,32 @@ async function simulateCheckinForDemo(
   venue: { name: string; lat: number; lng: number }
 ): Promise<string | null> {
   try {
-    // Find venue ID from database
-    const { data: venueData } = await supabase
-      .from('venues')
-      .select('id')
-      .eq('name', venue.name)
-      .single();
+    // Find venue ID from database — use maybeSingle to avoid throwing on 0 or 2+ rows
+    let resolvedVenue: { id: string; name: string } | null = null;
 
-    if (!venueData) {
-      logger.warn('demo:venue-not-found', { venueName: venue.name });
-      return null;
+    const { data: venueData, error: venueError } = await supabase
+      .from('venues')
+      .select('id, name')
+      .eq('name', venue.name)
+      .maybeSingle();
+
+    if (venueError || !venueData) {
+      logger.warn('demo:venue-not-found', { venueName: venue.name, error: venueError?.message });
+      // Fallback: try to find any venue in the city's demo set
+      const { data: fallbackVenue } = await supabase
+        .from('venues')
+        .select('id, name')
+        .eq('is_demo', true)
+        .limit(1)
+        .maybeSingle();
+      if (!fallbackVenue) {
+        logger.warn('demo:no-fallback-venue');
+        return null;
+      }
+      logger.debug('demo:using-fallback-venue', { fallback: fallbackVenue.name });
+      resolvedVenue = fallbackVenue;
+    } else {
+      resolvedVenue = venueData;
     }
 
     const expiresAt = calculateExpiryTime();
@@ -165,8 +187,8 @@ async function simulateCheckinForDemo(
     await supabase.from('night_statuses').upsert({
       user_id: userId,
       status: 'out',
-      venue_id: venueData.id,
-      venue_name: venue.name,
+      venue_id: resolvedVenue.id,
+      venue_name: resolvedVenue.name,
       lat: venue.lat,
       lng: venue.lng,
       expires_at: expiresAt,
@@ -178,8 +200,8 @@ async function simulateCheckinForDemo(
     // Create checkin record
     await supabase.from('checkins').insert({
       user_id: userId,
-      venue_id: venueData.id,
-      venue_name: venue.name,
+      venue_id: resolvedVenue.id,
+      venue_name: resolvedVenue.name,
       lat: venue.lat,
       lng: venue.lng,
       started_at: now,
@@ -194,8 +216,8 @@ async function simulateCheckinForDemo(
       last_active_at: now,
     }).eq('id', userId);
 
-    logger.debug('demo:checkin-simulated', { userId, venue: venue.name });
-    return venue.name;
+    logger.debug('demo:checkin-simulated', { userId, venue: resolvedVenue.name });
+    return resolvedVenue.name;
   } catch (e) {
     logger.error('demo:checkin-failed', { error: String(e) });
     return null;

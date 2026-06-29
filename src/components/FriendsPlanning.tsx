@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, ChevronDown, ChevronUp, Plus, Check, X, Pencil } from 'lucide-react';
+import { MessageSquare, ChevronDown, ChevronUp, Plus, Users, MapPin, MoreHorizontal } from 'lucide-react';
 import { useState, CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -101,6 +102,7 @@ export function FriendsPlanning({
   city = 'la'
 }: FriendsPlanningProps) {
   const navigate = useNavigate();
+  const { openFriendCard } = useFriendIdCard();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showEditSheet, setShowEditSheet] = useState(false);
 
@@ -152,7 +154,7 @@ export function FriendsPlanning({
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-white/60 text-xs">Planning</span>
+                    <span className="text-white/60 text-xs">TBD</span>
                     {friend.planning_neighborhood && (
                       <span className="text-xs bg-[#a855f7]/20 text-[#a855f7] px-1.5 py-0.5 rounded-full">
                         {shortenNeighborhood(friend.planning_neighborhood)}
@@ -208,229 +210,181 @@ export function FriendsPlanning({
     );
   }
 
+  // Helper to render a friend row
+  const handleOpenFriendCard = (friend: PlanningFriend) => {
+    if (friend.user_id === 'self') return;
+    openFriendCard({
+      userId: friend.user_id,
+      displayName: friend.display_name,
+      avatarUrl: friend.avatar_url,
+    });
+  };
+
+  const renderFriendRow = (friend: PlanningFriend, isUser = false) => (
+    <div key={friend.user_id}>
+      <div className="flex items-center gap-3 py-3">
+        <button onClick={() => !isUser && handleOpenFriendCard(friend)} className={!isUser ? 'hover:opacity-80 transition-opacity' : ''}>
+          <Avatar className="w-12 h-12 flex-shrink-0 border-2 border-[#a855f7]">
+            <AvatarImage src={friend.avatar_url || undefined} />
+            <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
+              {friend.display_name?.[0] || '?'}
+            </AvatarFallback>
+          </Avatar>
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => !isUser && handleOpenFriendCard(friend)}
+              className={`text-white font-semibold text-[15px] truncate ${!isUser ? 'hover:text-[#d4ff00] transition-colors cursor-pointer' : ''}`}
+            >
+              {friend.display_name}
+            </button>
+            {isUser && <span className="text-[#d4ff00] text-xs font-medium">You</span>}
+          </div>
+          {isUser ? (
+            <div className="flex items-center gap-2 mt-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="inline-flex items-center gap-1 text-xs border border-[#a855f7]/30 text-[#a855f7] px-2.5 py-1 rounded-full hover:bg-[#a855f7]/10 transition-colors">
+                    <Users className="w-3 h-3" />
+                    {getVisibilityLabel(userPlanningVisibility) || 'All friends'}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="max-h-60 overflow-y-auto bg-[#1a0f2e] border border-[#a855f7]/30 z-50" align="start">
+                  {VISIBILITY_CYCLE.map((vis) => (
+                    <DropdownMenuItem key={vis} onClick={() => onChangeVisibility?.(vis)} className="text-white hover:bg-[#a855f7]/20 cursor-pointer">
+                      {getVisibilityLabel(vis)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="inline-flex items-center gap-1 text-xs border border-[#a855f7]/30 text-[#a855f7] px-2.5 py-1 rounded-full hover:bg-[#a855f7]/10 transition-colors">
+                    <MapPin className="w-3 h-3" />
+                    {shortenNeighborhood(userPlanningNeighborhood) || 'Select area'}
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="max-h-60 overflow-y-auto bg-[#1a0f2e] border border-[#a855f7]/30 z-50" align="start">
+                  {neighborhoods.map((n) => (
+                    <DropdownMenuItem key={n} onClick={() => onChangeNeighborhood?.(n)} className="text-white hover:bg-[#a855f7]/20 cursor-pointer">
+                      {n}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 mt-0.5 text-white/40 text-xs">
+              <Users className="w-3 h-3" />
+              <span>{getVisibilityLabel(friend.planning_neighborhood ? 'close_friends' : 'all_friends')}</span>
+              {friend.planning_neighborhood && (
+                <>
+                  <span className="text-white/20">|</span>
+                  <MapPin className="w-3 h-3" />
+                  <span>{friend.planning_neighborhood}</span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        {!isUser && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors flex-shrink-0">
+                <MoreHorizontal className="w-4 h-4 text-white/40" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-[#1a0f2e] border border-[#a855f7]/30 z-50">
+              <DropdownMenuItem onClick={() => handleReachOut(friend)} className="text-white hover:bg-[#a855f7]/20 cursor-pointer">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Message
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {isUser && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors flex-shrink-0">
+                <MoreHorizontal className="w-4 h-4 text-white/40" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-[#1a0f2e] border border-[#a855f7]/30 z-50">
+              <DropdownMenuItem onClick={() => onSwitchToOut?.()} className="text-white hover:bg-[#a855f7]/20 cursor-pointer">
+                I'm out now
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onLeavePlanning?.()} className="text-red-400 hover:bg-red-500/20 cursor-pointer">
+                Cancel plans
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+      <div className="h-px bg-white/5" />
+    </div>
+  );
+
   // Card variant for Home page
   return (
-    <div className={`bg-[#1a0f2e]/80 backdrop-blur border border-[#a855f7]/20 rounded-2xl p-4 shadow-[0_0_20px_rgba(168,85,247,0.15)] ${className}`}>
-      {/* Header with stacked avatars */}
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">👀</span>
-          <h3 className="text-white font-semibold text-sm">Planning on Going Out</h3>
-        </div>
-        
-        {/* Stacked avatar preview */}
-        {friends.length > 0 && (
-          <div className="flex items-center gap-2">
-            <div className="flex -space-x-2">
-              {previewFriends.map((friend) => (
-                <Avatar key={friend.user_id} className="w-6 h-6 border-2 border-[#1a0f2e] ring-1 ring-[#a855f7]/40">
-                  <AvatarImage
-                    src={friend.avatar_url || undefined}
-                  />
-                  <AvatarFallback className="bg-[#a855f7] text-white text-[10px]">
-                    {friend.display_name?.[0] || '?'}
-                  </AvatarFallback>
-                </Avatar>
-              ))}
-            </div>
-            {remainingCount > 0 && (
-              <span className="text-white/40 text-xs">+{remainingCount}</span>
-            )}
-          </div>
-        )}
+    <div className={`bg-[#1a1030] border border-[#a855f7]/20 rounded-2xl p-5 ${className}`}>
+      {/* Header */}
+      <div className="mb-3">
+        <h3 className="text-white font-bold text-base">TBD tonight</h3>
+        <p className="text-white/40 text-sm">Let friends know when and where.</p>
       </div>
-      
-      {/* Empty state when no friends */}
-      {friends.length === 0 && !isUserPlanning && (
-        <p className="text-white/40 text-xs text-center py-2">
-          No one yet. Be first.
-        </p>
+
+      {/* User's own row first (when planning) */}
+      {isUserPlanning && userProfile && renderFriendRow(
+        { user_id: 'self', display_name: userProfile.display_name, avatar_url: userProfile.avatar_url, planning_neighborhood: userPlanningNeighborhood },
+        true
       )}
-      
-      <div className="space-y-2">
-        {friends.slice(0, 3).map((friend) => (
-          <div
-            key={friend.user_id}
-            className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-          >
-            {/* Animated avatar with pulsing ring */}
-            <div className="relative">
-              <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
-              <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
-                <AvatarImage
-                  src={friend.avatar_url || undefined}
-                />
-                <AvatarFallback className="bg-[#a855f7] text-white text-sm">
-                  {friend.display_name?.[0] || '?'}
-                </AvatarFallback>
-              </Avatar>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
-              <span className="text-white/50 text-xs">Thinking about going out</span>
-            </div>
-            {friend.planning_neighborhood && (
-              <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
-                {shortenNeighborhood(friend.planning_neighborhood)}
-              </span>
-            )}
-            <Button
-              size="sm"
-              onClick={() => handleReachOut(friend)}
-              className="h-8 px-3 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full text-xs shadow-[0_0_10px_rgba(168,85,247,0.4)] hover:shadow-[0_0_15px_rgba(168,85,247,0.6)] transition-all flex-shrink-0"
-            >
-              Make plans
-            </Button>
-          </div>
-        ))}
 
-        {friends.length > 3 && (
+      {/* Friend rows */}
+      {friends.slice(0, isExpanded ? undefined : 3).map((friend) => renderFriendRow(friend))}
+
+      {/* Empty state */}
+      {friends.length === 0 && !isUserPlanning && (
+        <p className="text-white/30 text-sm text-center py-4">No one yet. Be first.</p>
+      )}
+
+      {/* Show more */}
+      {friends.length > 3 && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full flex items-center justify-center gap-1.5 text-[#a855f7] text-sm py-2 hover:text-[#c084fc] transition-colors"
+        >
+          <span>{isExpanded ? 'Show less' : `+${friends.length - 3} more`}</span>
+          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+      )}
+
+      {/* Bottom status bar (when planning) */}
+      {isUserPlanning && (
+        <div className="flex items-center justify-between pt-3 mt-2 border-t border-white/5">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
+            <span className="text-white/40 text-sm">You're TBD for tonight</span>
+          </div>
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="w-full flex items-center justify-center gap-1.5 text-[#a855f7] text-sm py-2 hover:text-[#c084fc] transition-colors group"
+            onClick={() => onSwitchToOut?.()}
+            className="text-[#a855f7] text-sm font-medium hover:text-[#c084fc] transition-colors"
           >
-            <span>{isExpanded ? 'Show less' : `+${friends.length - 3} more`}</span>
-            {isExpanded ? (
-              <ChevronUp className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-            ) : (
-              <ChevronDown className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" />
-            )}
+            Edit
           </button>
-        )}
+        </div>
+      )}
 
-        {isExpanded && friends.slice(3).map((friend) => (
-          <div
-            key={friend.user_id}
-            className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-          >
-            <div className="relative">
-              <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
-              <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
-                <AvatarImage
-                  src={friend.avatar_url || undefined}
-                />
-                <AvatarFallback className="bg-[#a855f7] text-white text-sm">
-                  {friend.display_name?.[0] || '?'}
-                </AvatarFallback>
-              </Avatar>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
-              <span className="text-white/50 text-xs">Thinking about going out</span>
-            </div>
-            {friend.planning_neighborhood && (
-              <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
-                {shortenNeighborhood(friend.planning_neighborhood)}
-              </span>
-            )}
-            <Button
-              size="sm"
-              onClick={() => handleReachOut(friend)}
-              className="h-8 px-3 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white rounded-full text-xs shadow-[0_0_10px_rgba(168,85,247,0.4)] hover:shadow-[0_0_15px_rgba(168,85,247,0.6)] transition-all flex-shrink-0"
-            >
-              Make plans
-            </Button>
-          </div>
-        ))}
-
-        {/* User's own planning row - shown last */}
-        {isUserPlanning && userProfile && (
-          <>
-            <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/5">
-              {/* Animated avatar with pulsing ring */}
-              <div className="relative mt-0.5">
-                <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />
-                <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7] relative z-10">
-                  <AvatarImage
-                    src={userProfile.avatar_url || undefined}
-                  />
-                  <AvatarFallback className="bg-[#a855f7] text-white text-sm">
-                    {userProfile.display_name?.[0] || '?'}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-              <div className="flex-1 min-w-0 space-y-1.5">
-                <p className="text-white font-medium text-sm truncate">{userProfile.display_name}</p>
-                {/* Visibility dropdown — own line */}
-                <div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 hover:bg-[#a855f7]/35 transition-colors">
-                        👁 {getVisibilityLabel(userPlanningVisibility) || '👫 all friends'}
-                        <ChevronDown className="w-3 h-3" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      className="max-h-60 overflow-y-auto bg-[#1a0f2e] border border-[#a855f7]/30 z-50"
-                      align="start"
-                    >
-                      {VISIBILITY_CYCLE.map((vis) => (
-                        <DropdownMenuItem
-                          key={vis}
-                          onClick={() => onChangeVisibility?.(vis)}
-                          className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
-                        >
-                          {getVisibilityLabel(vis)}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                {/* Planning tonight + neighborhood — own line */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-white/50 text-xs whitespace-nowrap">Planning tonight —</span>
-                  {/* Interactive neighborhood dropdown */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 hover:bg-[#a855f7]/35 transition-colors">
-                        {shortenNeighborhood(userPlanningNeighborhood) || 'Select area'}
-                        <ChevronDown className="w-3 h-3" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      className="max-h-60 overflow-y-auto bg-[#1a0f2e] border border-[#a855f7]/30 z-50"
-                      align="start"
-                    >
-                      {neighborhoods.map((neighborhood) => (
-                        <DropdownMenuItem
-                          key={neighborhood}
-                          onClick={() => onChangeNeighborhood?.(neighborhood)}
-                          className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
-                        >
-                          {neighborhood}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            </div>
-
-            {/* "You're in planning mode — Edit" below user row */}
-            <div className="flex items-center justify-center gap-2 py-1.5 flex-wrap">
-              <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
-              <span className="text-white/50 text-xs">You're in planning mode</span>
-              <span className="text-white/30 text-xs">—</span>
-              <button
-                onClick={() => setShowEditSheet(true)}
-                className="text-[#a855f7] text-xs font-medium hover:text-[#c084fc] transition-colors"
-              >
-                Edit
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Bottom CTA - Join Planning (only when NOT already planning) */}
+      {/* Join CTA (when not planning) */}
       {showJoinOption && !isUserPlanning && (
-        <div className="mt-5 pt-4 border-t border-white/10">
+        <div className="mt-4 pt-3 border-t border-white/5">
           <button
             onClick={onJoinPlanning}
-            className="w-full h-[38px] bg-[#a855f7]/15 hover:bg-[#a855f7]/25 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 border border-[#a855f7]/50 shadow-[0_2px_6px_rgba(0,0,0,0.25)] transition-all px-3"
+            className="w-full h-10 bg-[#a855f7]/15 hover:bg-[#a855f7]/25 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 border border-[#a855f7]/40 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            {isUserOut ? 'Back to Planning Mode' : "I'm in"}
+            {isUserOut ? 'Switch to TBD' : "I'm in"}
           </button>
         </div>
       )}
@@ -442,22 +396,12 @@ export function FriendsPlanning({
             <SheetTitle className="text-white text-center">Switch Status</SheetTitle>
           </SheetHeader>
           <div className="space-y-3 pb-6">
-            <button
-              onClick={() => {
-                setShowEditSheet(false);
-                onSwitchToOut?.();
-              }}
-              className="w-full h-12 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all"
-            >
-              I'm out 🎉
+            <button onClick={() => { setShowEditSheet(false); onSwitchToOut?.(); }}
+              className="w-full h-12 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 transition-all">
+              I'm out
             </button>
-            <button
-              onClick={() => {
-                setShowEditSheet(false);
-                onLeavePlanning?.();
-              }}
-              className="w-full h-12 bg-white/5 hover:bg-white/10 text-white/80 text-sm font-medium rounded-xl flex items-center justify-center border border-white/10 transition-all"
-            >
+            <button onClick={() => { setShowEditSheet(false); onLeavePlanning?.(); }}
+              className="w-full h-12 bg-white/5 hover:bg-white/10 text-white/80 text-sm font-medium rounded-xl flex items-center justify-center border border-white/10 transition-all">
               No longer going out
             </button>
           </div>

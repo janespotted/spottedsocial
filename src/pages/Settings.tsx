@@ -339,7 +339,7 @@ export default function Settings() {
               if (!user) return;
               const { error } = await supabase
                 .from('profiles')
-                .update({ has_onboarded: false })
+                .update({ onboarding_completed: false })
                 .eq('id', user.id);
               if (error) {
                 toast.error('Failed to reset onboarding');

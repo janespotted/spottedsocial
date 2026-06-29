@@ -9,7 +9,7 @@ const navItems = [
   { to: '/', icon: Home, label: 'Home' },
   { to: '/leaderboard', icon: BarChart3, label: 'Leaderboard' },
   { to: '/map', icon: MapPin, label: 'Map', isCenter: true },
-  { to: '/messages', icon: MessageSquare, label: 'Messages' },
+  { to: '/messages', icon: MessageSquare, label: 'Chat' },
   { to: '/profile', icon: null, label: 'S', isSpecial: true },
 ];
 
@@ -46,7 +46,7 @@ export const BottomNav = memo(function BottomNav() {
   return (
     <nav 
       className={cn(
-        "fixed bottom-0 left-0 right-0 bg-gradient-to-t from-[#2d1b4e] to-[#1a0f2e] border-t border-[#a855f7]/20 backdrop-blur-lg z-50 transition-transform duration-200 ease-out",
+        "fixed bottom-0 left-0 right-0 bg-background border-t border-white/8 z-50 transition-transform duration-200 ease-out will-change-transform",
         isInputFocused && "translate-y-full"
       )}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
@@ -72,7 +72,7 @@ export const BottomNav = memo(function BottomNav() {
                   alt="Profile"
                   className={cn(
                     'h-10 w-10 object-contain transition-all',
-                    isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]'
+                    isActive && 'drop-shadow-[0_0_4px_rgba(212,255,0,0.4)]'
                   )}
                 />
               ) : Icon ? (
@@ -80,7 +80,7 @@ export const BottomNav = memo(function BottomNav() {
                   <Icon 
                     className={cn(
                       'h-6 w-6 transition-all',
-                      isActive && 'drop-shadow-[0_0_8px_rgba(212,255,0,0.8)]',
+                      isActive && 'drop-shadow-[0_0_4px_rgba(212,255,0,0.4)]',
                       isCenter && 'h-7 w-7'
                     )} 
                   />

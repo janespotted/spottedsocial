@@ -6,7 +6,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ChevronLeft, LogOut, Camera, Loader2, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,8 +15,6 @@ export default function EditProfile() {
   const { user, signOut } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
-  const [homeCity, setHomeCity] = useState('');
-  const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -37,15 +34,13 @@ export default function EditProfile() {
   const fetchProfile = async () => {
     const { data } = await supabase
       .from('profiles')
-      .select('id, display_name, username, avatar_url, bio, home_city, created_at, has_onboarded, is_demo, location_sharing_level')
+      .select('id, display_name, username, avatar_url')
       .eq('id', user?.id)
       .single();
 
     if (data) {
       setDisplayName(data.display_name || '');
       setUsername(data.username || '');
-      setHomeCity(data.home_city || '');
-      setBio(data.bio || '');
       setAvatarUrl(data.avatar_url || '');
     }
   };
@@ -74,9 +69,12 @@ export default function EditProfile() {
       const filePath = `${user.id}/avatar.${ext}`;
 
       // Upload to storage
+      let contentType = file.type || 'image/jpeg';
+      if (contentType === 'image/jpg') contentType = 'image/jpeg';
+
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, file, { upsert: true, contentType });
 
       if (uploadError) throw uploadError;
 
@@ -114,8 +112,6 @@ export default function EditProfile() {
         .update({
           display_name: displayName,
           username,
-          home_city: homeCity,
-          bio,
         })
         .eq('id', user?.id);
 
@@ -248,28 +244,6 @@ export default function EditProfile() {
               onChange={(e) => setUsername(e.target.value)}
               className="bg-[#2d1b4e]/60 border-[#a855f7]/20 text-white"
               placeholder="@username"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="homeCity" className="text-white">Home City</Label>
-            <Input
-              id="homeCity"
-              value={homeCity}
-              onChange={(e) => setHomeCity(e.target.value)}
-              className="bg-[#2d1b4e]/60 border-[#a855f7]/20 text-white"
-              placeholder="Where are you from?"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="bio" className="text-white">Bio</Label>
-            <Textarea
-              id="bio"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              className="bg-[#2d1b4e]/60 border-[#a855f7]/20 text-white min-h-[100px]"
-              placeholder="Tell us about yourself..."
             />
           </div>
 

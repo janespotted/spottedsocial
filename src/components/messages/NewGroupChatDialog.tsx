@@ -246,7 +246,7 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search friends..."
-                  className="bg-[#0a0118] border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full pl-12"
+                  className="bg-[#110a24] border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-full pl-12"
                 />
               </div>
             </div>
@@ -362,7 +362,7 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
                   onChange={(e) => setGroupName(e.target.value)}
                   placeholder={generateDefaultName()}
                   maxLength={50}
-                  className="bg-[#0a0118] border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-xl text-center text-lg"
+                  className="bg-[#110a24] border-[#a855f7]/20 text-white placeholder:text-white/40 rounded-xl text-center text-lg"
                 />
                 <p className="text-xs text-white/40 text-center">
                   {50 - groupName.length} characters remaining

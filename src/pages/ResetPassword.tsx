@@ -82,7 +82,7 @@ export default function ResetPassword() {
   if (emailSent) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
-        <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#0a0118] rounded-3xl">
+        <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#110a24] rounded-3xl">
           <CardHeader className="space-y-2 text-center pt-8">
             <div className="flex justify-center mb-4">
               <div className="h-16 w-16 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
@@ -111,7 +111,7 @@ export default function ResetPassword() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
-      <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#0a0118] rounded-3xl">
+      <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#110a24] rounded-3xl">
         <CardHeader className="space-y-2 text-center pt-8">
           <button
             onClick={() => navigate('/auth')}

@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronLeft, Users, ChevronDown, UserPlus, ChevronRight, Camera, Pencil, Check, X, Heart } from 'lucide-react';
@@ -17,6 +18,7 @@ import { logger } from '@/lib/logger';
 import { triggerPushNotification } from '@/lib/push-notifications';
 import { MessageInput } from '@/components/MessageInput';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
+import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 
 // Validation schema for DM messages
 const messageSchema = z.object({
@@ -61,11 +63,16 @@ export default function Thread() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { openCheckIn } = useCheckIn();
   const { openFriendCard } = useFriendIdCard();
   const { openVenueCard } = useVenueIdCard();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [otherMember, setOtherMember] = useState<ThreadMember | null>(null);
+  // Seed from navigation state for instant header render
+  const navFriend = (location.state as any)?.friendProfile as ThreadMember | undefined;
+  const [otherMember, setOtherMember] = useState<ThreadMember | null>(
+    navFriend ? { ...navFriend, venue_id: null } : null
+  );
   const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showMembersPopover, setShowMembersPopover] = useState(false);
@@ -206,9 +213,16 @@ export default function Thread() {
     }
   };
 
+  const prevMessageCount = useRef(0);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (messages.length === 0) return;
+    // Only scroll when message count actually changes (not on re-renders)
+    if (messages.length !== prevMessageCount.current) {
+      const behavior = prevMessageCount.current === 0 ? 'instant' : 'smooth';
+      messagesEndRef.current?.scrollIntoView({ behavior: behavior as ScrollBehavior });
+      prevMessageCount.current = messages.length;
+    }
+  }, [messages.length]);
 
   const fetchThreadData = async () => {
     // Get thread info (is_group, name)
@@ -230,11 +244,38 @@ export default function Thread() {
     if (members && members.length > 0) {
       const memberIds = members.map(m => m.user_id);
 
-      // Use get_profiles_safe RPC to bypass RLS restrictions
-      const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
+      // Use cached profiles if available, fetch statuses in parallel
+      const cachedProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+      const [allProfiles, { data: statusesData }] = await Promise.all([
+        cachedProfiles.length > 0
+          ? Promise.resolve(cachedProfiles)
+          : supabase.rpc('get_profiles_safe').then(r => r.data || []),
+        supabase
+          .from('night_statuses')
+          .select('user_id, venue_name, venue_id')
+          .in('user_id', memberIds)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', new Date().toISOString()),
+      ]);
+
       const profileMap = new Map(
         (allProfiles || []).map((p: any) => [p.id, p])
       );
+      const statusMap = new Map(
+        (statusesData || []).map((s: any) => [s.user_id, s])
+      );
+
+      // Check for any members missing from the RPC result
+      const missingIds = memberIds.filter(id => !profileMap.has(id));
+      if (missingIds.length > 0) {
+        const { data: fallbackProfiles } = await supabase
+          .from('profiles')
+          .select('id, display_name, username, avatar_url')
+          .in('id', missingIds);
+        for (const p of fallbackProfiles || []) {
+          profileMap.set(p.id, p);
+        }
+      }
 
       // Build member map for message sender lookup
       const newMemberMap = new Map<string, ThreadMember>();
@@ -242,13 +283,7 @@ export default function Thread() {
 
       for (const memberId of memberIds) {
         const profile = profileMap.get(memberId);
-
-        // Get their venue
-        const { data: status } = await supabase
-          .from('night_statuses')
-          .select('venue_name, venue_id')
-          .eq('user_id', memberId)
-          .maybeSingle();
+        const status = statusMap.get(memberId);
 
         const memberData: ThreadMember = {
           user_id: memberId,
@@ -313,23 +348,29 @@ export default function Thread() {
       .order('created_at', { ascending: true });
 
     if (data) {
-      // Filter to only show messages from the current night window (5am boundary)
       const tonightMessages = data.filter(msg => isFromTonight(msg.created_at));
-      
-      // Generate signed URLs for messages with images
-      const messagesWithSignedUrls = await Promise.all(
-        tonightMessages.map(async (msg) => {
-          if (msg.image_url && !msg.image_url.startsWith('http')) {
-            // It's a file path, generate signed URL
-            const { data: signedData } = await supabase.storage
-              .from('dm-images')
-              .createSignedUrl(msg.image_url, 3600); // 1 hour expiry
-            return { ...msg, image_url: signedData?.signedUrl || null };
-          }
-          return msg;
-        })
-      );
-      setMessages(messagesWithSignedUrls);
+
+      // Show messages immediately (images will load lazily)
+      setMessages(tonightMessages);
+
+      // Then resolve signed URLs for images in background
+      const imageMsgs = tonightMessages.filter(m => m.image_url && !m.image_url.startsWith('http'));
+      if (imageMsgs.length > 0) {
+        const paths = imageMsgs.map(m => m.image_url!);
+        const { data: signedUrls } = await supabase.storage
+          .from('dm-images')
+          .createSignedUrls(paths, 3600);
+
+        if (signedUrls) {
+          const urlMap = new Map(signedUrls.map(s => [s.path, s.signedUrl]));
+          setMessages(prev => prev.map(msg => {
+            if (msg.image_url && urlMap.has(msg.image_url)) {
+              return { ...msg, image_url: urlMap.get(msg.image_url)! };
+            }
+            return msg;
+          }));
+        }
+      }
     }
   };
 
@@ -353,7 +394,11 @@ export default function Thread() {
               .createSignedUrl(newMsg.image_url, 3600);
             newMsg.image_url = signedData?.signedUrl || null;
           }
-          setMessages((prev) => [...prev, newMsg]);
+          setMessages((prev) => {
+            // Skip if this message already exists (optimistic update or duplicate)
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
           // Mark as read when receiving new messages from others
           if (newMsg.sender_id !== user?.id) {
             markAsRead();
@@ -377,16 +422,33 @@ export default function Thread() {
       return;
     }
 
-    const { error } = await supabase.from('dm_messages').insert({
+    // Optimistic update — show message immediately
+    const optimisticMsg: Message = {
+      id: `optimistic-${Date.now()}`,
+      sender_id: user.id,
+      text: validation.data.text,
+      image_url: null,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    const { data: inserted, error } = await supabase.from('dm_messages').insert({
       thread_id: threadId,
       sender_id: user.id,
       text: validation.data.text,
-    });
+    }).select().single();
 
     if (error) {
       logger.apiError('dm:send', error);
       toast.error('Failed to send message');
+      // Remove optimistic message on failure
+      setMessages((prev) => prev.filter(m => m.id !== optimisticMsg.id));
       return;
+    }
+
+    // Replace optimistic message with real one (prevents duplicate from realtime)
+    if (inserted) {
+      setMessages((prev) => prev.map(m => m.id === optimisticMsg.id ? { ...inserted } : m));
     }
 
     logger.dm(threadId!, otherMember?.user_id || 'unknown');
@@ -622,6 +684,20 @@ export default function Thread() {
     }
   }, [handleDoubleTap]);
 
+  const handleBack = useCallback(() => {
+    const state = location.state as any;
+    if (state?.source === 'planning') {
+      navigate('/', { state: { feedMode: 'plans' } });
+    } else {
+      navigate('/messages');
+    }
+  }, [location.state, navigate]);
+
+  const swipeHandlers = useSwipeGesture({
+    onSwipeRight: handleBack,
+    threshold: 60,
+  });
+
   const getGroupDisplayName = (): string => {
     if (!groupInfo) return '';
     if (groupInfo.name) return groupInfo.name;
@@ -631,20 +707,13 @@ export default function Thread() {
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] overflow-hidden">
+    <div className="fixed inset-0 bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] overflow-hidden" {...swipeHandlers}>
       <div className="max-w-[430px] mx-auto h-full flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="shrink-0 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
+        <div className="shrink-0 bg-[#1a0f2e]/95 backdrop-blur border-b border-white/8 pt-[max(env(safe-area-inset-top),12px)]">
           <div className="flex items-center justify-between px-4 py-3">
             <button
-              onClick={() => {
-                const state = location.state as any;
-                if (state?.source === 'planning') {
-                  navigate('/', { state: { feedMode: 'plans' } });
-                } else {
-                  navigate('/messages');
-                }
-              }}
+              onClick={handleBack}
               className="text-white/60 hover:text-white transition-colors"
             >
               <ChevronLeft className="h-6 w-6" />
@@ -655,7 +724,7 @@ export default function Thread() {
               <Popover open={showMembersPopover} onOpenChange={setShowMembersPopover}>
                 <PopoverTrigger asChild>
                   <button className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity">
-                    <div className="w-10 h-10 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] flex items-center justify-center overflow-hidden">
+                    <div className="w-10 h-10 rounded-full bg-[#1a0f2e] border-2 border-white/20  flex items-center justify-center overflow-hidden">
                       {groupInfo.group_avatar_url ? (
                         <img src={groupInfo.group_avatar_url} alt="Group" className="w-full h-full object-cover" />
                       ) : groupInfo.members.length <= 4 ? (
@@ -663,7 +732,7 @@ export default function Thread() {
                           {groupInfo.members.slice(0, 4).map((member) => (
                             <Avatar key={member.user_id} className="w-full h-full rounded-sm">
                               <AvatarImage src={member.avatar_url || undefined} />
-                              <AvatarFallback className="bg-[#2d1b4e] text-white text-[8px] rounded-sm">
+                              <AvatarFallback className="bg-[#1a0a2e] text-white text-[8px] rounded-sm">
                                 {member.display_name[0]}
                               </AvatarFallback>
                             </Avatar>
@@ -686,17 +755,17 @@ export default function Thread() {
                 <PopoverContent 
                   align="start" 
                   sideOffset={8}
-                  className="bg-[#1a0f2e] border-[#a855f7]/40 shadow-[0_0_25px_rgba(168,85,247,0.4)] p-0 w-64"
+                  className="bg-[#1a0f2e] border-white/15  p-0 w-64"
                 >
                   {/* Group Photo & Name */}
-                  <div className="px-4 py-3 border-b border-[#a855f7]/20 space-y-3">
+                  <div className="px-4 py-3 border-b border-white/8 space-y-3">
                     {/* Group Avatar */}
                     <div className="flex justify-center">
                       <button
                         onClick={() => groupAvatarInputRef.current?.click()}
                         className="relative group"
                       >
-                        <div className="w-16 h-16 rounded-full bg-[#2d1b4e] border-2 border-[#a855f7]/40 flex items-center justify-center overflow-hidden">
+                        <div className="w-16 h-16 rounded-full bg-[#1a0a2e] border-2 border-white/15 flex items-center justify-center overflow-hidden">
                           {groupInfo.group_avatar_url ? (
                             <img src={groupInfo.group_avatar_url} alt="Group" className="w-full h-full object-cover" />
                           ) : groupInfo.members.length <= 4 ? (
@@ -704,7 +773,7 @@ export default function Thread() {
                               {groupInfo.members.slice(0, 4).map((member) => (
                                 <Avatar key={member.user_id} className="w-full h-full rounded-sm">
                                   <AvatarImage src={member.avatar_url || undefined} />
-                                  <AvatarFallback className="bg-[#2d1b4e] text-white text-[8px] rounded-sm">
+                                  <AvatarFallback className="bg-[#1a0a2e] text-white text-[8px] rounded-sm">
                                     {member.display_name[0]}
                                   </AvatarFallback>
                                 </Avatar>
@@ -761,7 +830,7 @@ export default function Thread() {
                   </div>
 
                   {/* Members header */}
-                  <div className="px-4 py-2 border-b border-[#a855f7]/20">
+                  <div className="px-4 py-2 border-b border-white/8">
                     <p className="text-white/70 text-xs font-medium uppercase tracking-wider">Members</p>
                   </div>
                   
@@ -769,9 +838,9 @@ export default function Thread() {
                   <div className="max-h-60 overflow-y-auto">
                     {/* Current user (you) */}
                     <div className="flex items-center gap-3 px-4 py-2.5">
-                      <Avatar className="h-8 w-8 border border-[#a855f7]/40">
+                      <Avatar className="h-8 w-8 border border-white/15">
                         <AvatarImage src={currentUserProfile?.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
+                        <AvatarFallback className="bg-[#1a0a2e] text-white text-sm">
                           {currentUserProfile?.display_name?.[0] || 'Y'}
                         </AvatarFallback>
                       </Avatar>
@@ -793,9 +862,9 @@ export default function Thread() {
                         }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#a855f7]/15 transition-colors"
                       >
-                        <Avatar className="h-8 w-8 border border-[#a855f7]/40">
+                        <Avatar className="h-8 w-8 border border-white/15">
                           <AvatarImage src={member.avatar_url || undefined} />
-                          <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
+                          <AvatarFallback className="bg-[#1a0a2e] text-white text-sm">
                             {member.display_name[0]}
                           </AvatarFallback>
                         </Avatar>
@@ -811,7 +880,7 @@ export default function Thread() {
                   </div>
                   
                   {/* Add People Button */}
-                  <div className="border-t border-[#a855f7]/20 p-2">
+                  <div className="border-t border-white/8 p-2">
                     <button
                       onClick={() => {
                         setShowMembersPopover(false);
@@ -838,7 +907,7 @@ export default function Thread() {
                 })}
                 className="flex items-center gap-3 flex-1 mx-4 hover:opacity-80 transition-opacity"
               >
-                <Avatar className="h-10 w-10 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
+                <Avatar className="h-10 w-10 border-2 border-white/20  cursor-pointer">
                   <AvatarImage src={otherMember?.avatar_url || undefined} />
                   <AvatarFallback className="bg-[#1a0f2e] text-white">
                     {otherMember?.display_name?.[0]}
@@ -846,20 +915,19 @@ export default function Thread() {
                 </Avatar>
                 <div className="flex-1 min-w-0 text-left">
                   <h2 className="font-semibold text-white truncate">{otherMember?.display_name}</h2>
-                  <div className="flex items-center gap-2">
-                    <p className="text-white/60 text-sm truncate">@{otherMember?.username}</p>
-                    {otherMember?.venue_name && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleVenueClick(otherMember.venue_name!, otherMember.venue_id);
-                        }}
-                        className="text-[#d4ff00] text-xs font-medium hover:text-[#d4ff00]/80 transition-colors truncate max-w-[140px]"
-                      >
-                        @{otherMember.venue_name}
-                      </button>
-                    )}
-                  </div>
+                  {otherMember?.venue_name ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleVenueClick(otherMember.venue_name!, otherMember.venue_id);
+                      }}
+                      className="text-[#d4ff00] text-sm font-medium hover:text-[#d4ff00]/80 transition-colors truncate block max-w-full"
+                    >
+                      @ {otherMember.venue_name}
+                    </button>
+                  ) : otherMember?.username ? (
+                    <p className="text-white/60 text-sm truncate">@{otherMember.username}</p>
+                  ) : null}
                 </div>
               </button>
             )}
@@ -919,7 +987,7 @@ export default function Thread() {
                         })}
                         className="hover:opacity-80 transition-opacity"
                       >
-                        <Avatar className="h-8 w-8 border-2 border-[#a855f7] shadow-[0_0_10px_rgba(168,85,247,0.4)]">
+                        <Avatar className="h-8 w-8 border-2 border-white/20 shadow-[0_0_10px_rgba(168,85,247,0.4)]">
                           <AvatarImage src={sender?.avatar_url || otherMember?.avatar_url || undefined} />
                           <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
                             {sender?.display_name?.[0] || otherMember?.display_name?.[0]}

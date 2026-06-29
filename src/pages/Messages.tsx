@@ -4,13 +4,10 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { cn } from '@/lib/utils';
-import spottedLogo from '@/assets/spotted-s-logo.png';
 import { MessagesTab } from '@/components/messages/MessagesTab';
 import { YapTab } from '@/components/messages/YapTab';
 import { ActivityTab } from '@/components/messages/ActivityTab';
-import { CityBadge } from '@/components/CityBadge';
-import { Bell, Search } from 'lucide-react';
-import { NotificationBadge } from '@/components/NotificationBadge';
+import { PageHeader } from '@/components/PageHeader';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
 
 type TabType = 'messages' | 'yap' | 'activity';
@@ -69,90 +66,46 @@ export default function Messages() {
   }, [location.key]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
+    <div className="bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-24">
       {/* Header */}
-        <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
-        <div className="flex items-start justify-between px-6 pt-3 pb-3">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-light tracking-[0.3em] text-white">Spotted</h1>
-              <CityBadge />
-            </div>
-            <p className="text-white/60 text-sm">Everything disappears by 5am</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowFriendSearch(true)}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
-              aria-label="Search friends"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('activity');
-                markAllAsRead();
-              }}
-              className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
-              aria-label="View activity"
-            >
-              <Bell className="w-5 h-5" />
-              <NotificationBadge count={unreadCount} />
-            </button>
-            <button 
-              onClick={openCheckIn}
-              className="hover:scale-110 transition-transform"
-            >
-              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
-            </button>
-          </div>
-        </div>
+      <PageHeader
+        title=""
+        subtitle="Everything disappears by 5am"
+        onSearchPress={() => setShowFriendSearch(true)}
+      />
 
-        {/* Tabs */}
-        <div className="flex items-center px-6 pb-4">
-          <button
-            onClick={() => setActiveTab('yap')}
-            className={cn(
-              'relative flex-1 pb-2 text-lg font-medium text-center transition-colors',
-              activeTab === 'yap'
-                ? 'text-white'
-                : 'text-white/40'
-            )}
-          >
-            Yap
-            {activeTab === 'yap' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('messages')}
-            className={cn(
-              'relative flex-1 pb-2 text-lg font-medium text-center transition-colors',
-              activeTab === 'messages'
-                ? 'text-white'
-                : 'text-white/40'
-            )}
-          >
-            Messages
-            {activeTab === 'messages' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('activity')}
-            className={cn(
-              'relative flex-1 pb-2 text-lg font-medium text-center transition-colors',
-              activeTab === 'activity'
-                ? 'text-white'
-                : 'text-white/40'
-            )}
-          >
-            Activity
-            {activeTab === 'activity' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
-            )}
-          </button>
-        </div>
+      {/* Tabs */}
+      <div className="flex items-center px-5 pb-4">
+        <button
+          onClick={() => setActiveTab('yap')}
+          className={cn(
+            'relative flex-1 pb-2 text-lg font-semibold text-center transition-colors',
+            activeTab === 'yap' ? 'text-white' : 'text-white/40'
+          )}
+        >
+          Yap
+          {activeTab === 'yap' && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-[#d4ff00]" />}
+        </button>
+        <button
+          onClick={() => setActiveTab('messages')}
+          className={cn(
+            'relative flex-1 pb-2 text-lg font-semibold text-center transition-colors',
+            activeTab === 'messages' ? 'text-white' : 'text-white/40'
+          )}
+        >
+          DMs
+          {activeTab === 'messages' && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-[#d4ff00]" />}
+        </button>
+        <button
+          onClick={() => setActiveTab('activity')}
+          className={cn(
+            'relative flex-1 pb-2 text-lg font-semibold text-center transition-colors',
+            activeTab === 'activity' ? 'text-white' : 'text-white/40'
+          )}
+        >
+          Activity
+          {activeTab === 'activity' && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-[#d4ff00]" />}
+        </button>
       </div>
 
       {/* Tab Content */}

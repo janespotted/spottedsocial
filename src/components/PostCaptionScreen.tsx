@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, MapPin, Loader2, Users, Heart, Share2, ChevronDown, Check, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ArrowLeft, MapPin, Loader2, Users, Heart, Share2, ChevronRight, Check, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { calculateExpiryTime } from '@/lib/time-utils';
-import { captureLocationWithVenue, createNewVenue, type LocationData } from '@/lib/location-service';
+import { captureLocationWithVenue, type LocationData } from '@/lib/location-service';
 import { validatePostText } from '@/lib/validation-schemas';
 
 type PostVisibility = 'close_friends' | 'all_friends' | 'mutual_friends';
@@ -37,6 +37,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [showVenueInput, setShowVenueInput] = useState(false);
   const [customVenueName, setCustomVenueName] = useState('');
+  const [venueSuggestions, setVenueSuggestions] = useState<{ id: string; name: string; neighborhood: string }[]>([]);
   const [visibility, setVisibility] = useState<PostVisibility>('all_friends');
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
 
@@ -49,7 +50,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
 
   const fetchActiveCheckInOrCaptureLocation = async () => {
     if (!user) return;
-    
+
     setCapturingLocation(true);
     try {
       const { data: activeStatus } = await supabase
@@ -107,34 +108,43 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
     }
   };
 
-  const handleCreateVenue = async () => {
+  const handleCreateVenue = () => {
     if (!customVenueName.trim() || !locationData) return;
 
-    setLoading(true);
-    try {
-      const venueId = await createNewVenue(
-        customVenueName.trim(),
-        locationData.lat,
-        locationData.lng,
-        'Unknown',
-        'bar'
-      );
+    // Just use the name — no venue record created (requires admin approval)
+    setLocationData({
+      ...locationData,
+      venueId: undefined,
+      venueName: customVenueName.trim(),
+    });
+    setLocation(customVenueName.trim());
+    setShowVenueInput(false);
+    setCustomVenueName('');
+  };
 
-      if (venueId) {
-        setLocationData({
-          ...locationData,
-          venueId,
-          venueName: customVenueName.trim(),
-        });
-        setLocation(customVenueName.trim());
-        setShowVenueInput(false);
-        toast.success('Venue added!');
-      }
-    } catch (error) {
-      console.error('Error creating venue:', error);
-    } finally {
-      setLoading(false);
+  // Venue autocomplete search
+  useEffect(() => {
+    if (!customVenueName.trim() || customVenueName.trim().length < 2) {
+      setVenueSuggestions([]);
+      return;
     }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('venues')
+        .select('id, name, neighborhood')
+        .ilike('name', `%${customVenueName.trim()}%`)
+        .limit(5);
+      setVenueSuggestions(data || []);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [customVenueName]);
+
+  const selectVenueSuggestion = (venue: { id: string; name: string }) => {
+    setCustomVenueName(venue.name);
+    setLocation(venue.name);
+    setLocationData(prev => prev ? { ...prev, venueId: venue.id, venueName: venue.name } : null);
+    setShowVenueInput(false);
+    setVenueSuggestions([]);
   };
 
   const uploadMedia = async (): Promise<string | null> => {
@@ -144,13 +154,19 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
     const fileExt = imageFile.name.split('.').pop() || defaultExt;
     const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
+    let contentType = imageFile.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
+    if (contentType === 'image/jpg') contentType = 'image/jpeg';
+
     const { error: uploadError } = await supabase.storage
       .from('post-images')
-      .upload(fileName, imageFile);
+      .upload(fileName, imageFile, {
+        contentType,
+        upsert: true,
+      });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError);
-      toast.error('Failed to upload media');
+      console.error('Upload error:', uploadError.message, uploadError);
+      toast.error(`Upload failed: ${uploadError.message}`);
       return null;
     }
 
@@ -202,157 +218,152 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
     return option?.label || 'All Friends';
   };
 
-  const getVisibilityIcon = () => {
-    const option = visibilityOptions.find(o => o.value === visibility);
-    return option?.icon || Users;
-  };
-
-  const VisibilityIcon = getVisibilityIcon();
-
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-b from-[#2d1b4e] via-[#1a0f2e] to-[#0a0118] flex flex-col pt-[env(safe-area-inset-top,0px)]">
-      {/* Header - tighter padding */}
-      <div className="flex items-center justify-between px-3 py-3">
+    <div className="fixed inset-0 z-[500] bg-[#110a24] flex flex-col pt-[env(safe-area-inset-top,0px)]">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 h-12">
         <button
           onClick={onBack}
-          className="p-2 -ml-1 rounded-full hover:bg-white/10 transition-colors"
+          className="p-1 -ml-1"
         >
-          <ArrowLeft className="h-5 w-5 text-white" />
+          <ArrowLeft className="h-6 w-6 text-white" />
         </button>
-        <span className="text-white font-semibold">New Post</span>
-        <Button
+        <span className="text-white font-semibold text-base">New Post</span>
+        <button
           onClick={handleShare}
           disabled={loading}
-          size="sm"
-          className="bg-white text-[#1a0f2e] hover:bg-white/90 font-semibold px-5 rounded-full disabled:opacity-40"
+          className="text-[#d4ff00] font-semibold text-sm disabled:opacity-40"
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Share'}
-        </Button>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#d4ff00]" /> : 'Share'}
+        </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Hero Image - edge-to-edge with rounded corners */}
-        <div className="px-3 pb-3">
-          <div className="aspect-[4/5] w-full rounded-2xl overflow-hidden">
-            {mediaType === 'video' ? (
-              <video
-                src={imagePreview}
-                controls
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <img
-                src={imagePreview}
-                alt="Post preview"
-                className="w-full h-full object-cover"
-              />
-            )}
-          </div>
+      {/* Media Preview — fills available space */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {mediaType === 'video' ? (
+          <video
+            src={imagePreview}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-full object-cover"
+            onLoadedData={(e) => {
+              (e.target as HTMLVideoElement).play().catch(() => {});
+            }}
+          />
+        ) : (
+          <img
+            src={imagePreview}
+            alt="Post preview"
+            className="w-full h-full object-cover"
+          />
+        )}
+      </div>
+
+      {/* Metadata — pinned at bottom */}
+      <div className="shrink-0 pb-[env(safe-area-inset-bottom,0px)]">
+        {/* Caption */}
+        <div className="flex items-start gap-3 px-4 py-3">
+          <Avatar className="h-8 w-8 flex-shrink-0 mt-0.5">
+            <AvatarImage src={profile?.avatar_url || undefined} />
+            <AvatarFallback className="bg-[#1a0a2e] text-white text-xs">
+              {profile?.display_name?.[0] || 'U'}
+            </AvatarFallback>
+          </Avatar>
+          <textarea
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder="Write a caption..."
+            className="flex-1 bg-transparent text-white placeholder:text-white/40 resize-none text-sm leading-relaxed focus:outline-none min-h-[44px]"
+            maxLength={500}
+            rows={2}
+          />
         </div>
 
-        {/* Caption - lightweight, borderless */}
-        <div className="px-3 py-2">
-          <div className="flex items-start gap-3">
-            <Avatar className="h-8 w-8 flex-shrink-0">
-              <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="bg-[#a855f7] text-white text-sm">
-                {profile?.display_name?.[0] || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <textarea
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                placeholder="Write a caption..."
-                className="w-full bg-transparent text-white placeholder:text-white/30 resize-none text-base leading-relaxed focus:outline-none min-h-[60px]"
-                maxLength={500}
-                rows={2}
-              />
-              <p className="text-xs text-white/30 text-right">{caption.length}/500</p>
-            </div>
-          </div>
-        </div>
+        <div className="mx-4 border-t border-white/8" />
 
-        {/* Location - subtle pill style */}
-        <div className="px-3 py-2">
-          {capturingLocation ? (
-            <div className="flex items-center gap-2 text-white/40 text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Detecting location...</span>
-            </div>
-          ) : showVenueInput ? (
+        {/* Location Row */}
+        {capturingLocation ? (
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Loader2 className="h-4 w-4 text-white/40 animate-spin" />
+            <span className="text-white/40 text-sm">Detecting location...</span>
+          </div>
+        ) : showVenueInput ? (
+          <div className="px-4 py-2.5">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-white/40 flex-shrink-0" />
               <Input
                 value={customVenueName}
                 onChange={(e) => setCustomVenueName(e.target.value)}
-                placeholder="Add location"
-                className="flex-1 h-8 bg-white/5 border-white/10 text-white text-sm placeholder:text-white/30 rounded-full px-3"
+                placeholder="Search venues..."
+                autoFocus
+                className="flex-1 h-9 bg-white/5 border-white/10 text-white text-sm placeholder:text-white/30 rounded-lg px-3 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/20"
               />
               <Button
                 onClick={handleCreateVenue}
                 disabled={!customVenueName.trim() || loading}
                 size="sm"
-                className="h-8 bg-[#a855f7] hover:bg-[#a855f7]/90 rounded-full px-3"
+                className="h-9 bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90 rounded-lg px-3 text-xs font-semibold"
               >
                 Add
               </Button>
               <button
-                onClick={() => setShowVenueInput(false)}
+                onClick={() => { setShowVenueInput(false); setVenueSuggestions([]); }}
                 className="p-1 text-white/40 hover:text-white/60"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowVenueInput(true)}
-                className="flex items-center gap-2 text-sm"
-              >
-                <MapPin className="h-4 w-4 text-white/40" />
-                <span className={location ? "text-white" : "text-white/40"}>
-                  {location || "Add location"}
-                </span>
-              </button>
-              {location !== 'In Uber 🚗' && (
-                <button
-                  onClick={() => {
-                    setLocation('In Uber 🚗');
-                    setLocationData(prev => prev ? { ...prev, venueName: 'In Uber 🚗', venueId: undefined } : null);
-                    setShowVenueInput(false);
-                  }}
-                  className="ml-auto flex items-center gap-1 text-xs text-white/40 hover:text-white/60 bg-white/5 hover:bg-white/10 rounded-full px-2.5 py-1 transition-colors"
-                >
-                  🚗 In Uber
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+            {/* Venue suggestions */}
+            {venueSuggestions.length > 0 && (
+              <div className="mt-1.5 ml-6 rounded-lg border border-white/10 bg-[#1a0f2e] overflow-hidden">
+                {venueSuggestions.map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => selectVenueSuggestion(v)}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0"
+                  >
+                    <MapPin className="h-3.5 w-3.5 text-[#d4ff00] flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-white text-sm truncate">{v.name}</p>
+                      <p className="text-white/40 text-xs truncate">{v.neighborhood}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowVenueInput(true)}
+            className="w-full flex items-center gap-3 px-4 py-3"
+          >
+            <MapPin className="h-4 w-4 text-white/60" />
+            <span className={`flex-1 text-left text-sm ${location ? 'text-white' : 'text-white/60'}`}>
+              {location || 'Add location'}
+            </span>
+            <ChevronRight className="h-4 w-4 text-white/30" />
+          </button>
+        )}
 
-        {/* Audience - single row, opens sheet */}
-        <button 
+        <div className="mx-4 border-t border-white/8" />
+
+        {/* Audience Row */}
+        <button
           onClick={() => setShowAudienceSheet(true)}
-          className="w-full flex items-center justify-between px-3 py-3 mt-1"
+          className="w-full flex items-center gap-3 px-4 py-3"
         >
-          <div className="flex items-center gap-2">
-            <VisibilityIcon className="h-4 w-4 text-white/40" />
-            <span className="text-sm text-white/60">Audience</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-white">
-            <span className="text-sm">{getVisibilityLabel()}</span>
-            <ChevronDown className="h-4 w-4 text-white/40" />
-          </div>
+          <Users className="h-4 w-4 text-white/60" />
+          <span className="flex-1 text-left text-sm text-white/60">Audience</span>
+          <span className="text-white text-sm font-medium">{getVisibilityLabel()}</span>
+          <ChevronRight className="h-4 w-4 text-white/30" />
         </button>
       </div>
 
       {/* Audience Selection Sheet */}
       <Sheet open={showAudienceSheet} onOpenChange={setShowAudienceSheet}>
-        <SheetContent side="bottom" className="bg-[#1a0f2e] border-white/10 rounded-t-2xl px-0 pb-8">
+        <SheetContent side="bottom" className="bg-[#1a0a2e] border-white/10 rounded-t-2xl px-0 pb-8">
           <SheetHeader className="px-4 pb-2">
             <SheetTitle className="text-white text-center">Who can see this?</SheetTitle>
           </SheetHeader>
@@ -367,10 +378,10 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
                 className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
               >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  visibility === option.value ? 'bg-[#a855f7]/20' : 'bg-white/5'
+                  visibility === option.value ? 'bg-[#d4ff00]/10' : 'bg-white/5'
                 }`}>
                   <option.icon className={`h-5 w-5 ${
-                    visibility === option.value ? 'text-[#a855f7]' : 'text-white/60'
+                    visibility === option.value ? 'text-[#d4ff00]' : 'text-white/60'
                   }`} />
                 </div>
                 <div className="flex-1 text-left">
@@ -378,7 +389,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
                   <p className="text-xs text-white/40">{option.description}</p>
                 </div>
                 {visibility === option.value && (
-                  <Check className="h-5 w-5 text-[#a855f7]" />
+                  <Check className="h-5 w-5 text-[#d4ff00]" />
                 )}
               </button>
             ))}

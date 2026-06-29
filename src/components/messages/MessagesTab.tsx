@@ -154,11 +154,21 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
       ]);
 
       const allProfiles = profilesResult || [];
-      const profiles = allProfiles.filter((p: any) => otherUserIds.includes(p.id));
+      let profiles = allProfiles.filter((p: any) => otherUserIds.includes(p.id));
       const statuses = statusesResult.data || [];
 
+      // Fallback for profiles not in cache (e.g. freshly seeded demo users)
+      const missingIds = otherUserIds.filter(id => !profiles.some((p: any) => p.id === id));
+      if (missingIds.length > 0) {
+        const { data: fallback } = await supabase
+          .from('profiles')
+          .select('id, display_name, username, avatar_url, is_demo')
+          .in('id', missingIds);
+        if (fallback) profiles = [...profiles, ...fallback];
+      }
+
       // Filter out demo users when demo mode is off
-      const filteredProfiles = !demoEnabled 
+      const filteredProfiles = !demoEnabled
         ? profiles.filter((p: any) => !p.is_demo)
         : profiles;
 
@@ -293,18 +303,18 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
             placeholder="Search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#0a0118] border border-[#a855f7]/20 rounded-full pl-12 pr-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-[#a855f7]/50"
+            className="w-full bg-[#110a24] border border-white/8 rounded-full pl-12 pr-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30"
           />
         </div>
 
-        {/* Messages Header */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">Messages</h2>
-          <button 
+        {/* New DM button */}
+        <div className="flex justify-end">
+          <button
             onClick={() => setShowNewChat(true)}
-            className="text-white hover:text-[#d4ff00] transition-colors"
+            className="flex items-center gap-1.5 text-sm text-white/60 hover:text-[#d4ff00] transition-colors"
           >
-            <Plus className="h-6 w-6" />
+            <Plus className="h-4 w-4" />
+            New DM
           </button>
         </div>
 
@@ -327,20 +337,20 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
             <MessagesSkeleton />
           ) : filteredThreads.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-              <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6 border border-[#a855f7]/20">
-                <MessageSquare className="h-10 w-10 text-[#a855f7]/60" />
+              <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 border border-white/8">
+                <MessageSquare className="h-10 w-10 text-white/30" />
               </div>
               <h3 className="text-xl font-semibold text-white mb-2">
-                Your inbox is ready
+                No DMs yet
               </h3>
               <p className="text-white/50 text-sm max-w-xs mb-6">
                 Start a conversation with friends
               </p>
               <button
                 onClick={() => setShowNewChat(true)}
-                className="bg-[#a855f7] hover:bg-[#a855f7]/90 text-white rounded-full px-6 py-2.5 font-medium transition-colors"
+                className="bg-[#d4ff00] hover:bg-[#d4ff00]/90 text-black rounded-full px-6 py-2.5 font-medium transition-colors"
               >
-                Start a Chat
+                Start a DM
               </button>
             </div>
           ) : (
@@ -348,12 +358,12 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
               <div
                 key={thread.id}
                 onClick={() => navigate(`/messages/${thread.id}`)}
-                className="bg-[#2d1b4e]/60 border border-[#a855f7]/20 rounded-2xl p-4 hover:bg-[#2d1b4e]/80 transition-colors cursor-pointer"
+                className="bg-[#1a0a2e]/80 border border-white/8 rounded-2xl p-4 hover:bg-[#2d1b4e]/80 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   {thread.is_group ? (
                     // Group avatar - custom photo or grid of member avatars
-                    <div className="w-14 h-14 rounded-full bg-[#1a0f2e] border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] flex items-center justify-center overflow-hidden">
+                    <div className="w-14 h-14 rounded-full bg-[#1a0f2e] border-2 border-white/20 flex items-center justify-center overflow-hidden">
                       {thread.group_avatar_url ? (
                         <img src={thread.group_avatar_url} alt="Group" className="w-full h-full object-cover" />
                       ) : thread.members.length <= 4 ? (
@@ -387,7 +397,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
                       }}
                       className="hover:opacity-80 transition-opacity"
                     >
-                      <Avatar className="h-14 w-14 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)] cursor-pointer">
+                      <Avatar className="h-14 w-14 border-2 border-white/20 cursor-pointer">
                         <AvatarImage src={thread.members[0]?.avatar_url || undefined} />
                         <AvatarFallback className="bg-[#1a0f2e] text-white">
                           {thread.members[0]?.display_name?.[0]}

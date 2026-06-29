@@ -5,10 +5,10 @@ import { useMeetUp } from '@/contexts/MeetUpContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, ChevronRight, CalendarPlus, Share2, Megaphone } from 'lucide-react';
+import { X, ChevronRight, CalendarPlus, Share2, Megaphone, UserPlus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MessageCircle, MoreVertical, Flag, Ban, X as CloseIcon } from 'lucide-react';
+import { MessageSquare, MoreVertical, Flag, Ban, X as CloseIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAuth } from '@/contexts/AuthContext';
@@ -78,6 +78,7 @@ export function FriendIdCard() {
   const [statusSubtitle, setStatusSubtitle] = useState<string>('');
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isDemoUser, setIsDemoUser] = useState(false);
+  const [friendUsername, setFriendUsername] = useState('');
   const [venueCoords, setVenueCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showCreatePlanDialog, setShowCreatePlanDialog] = useState(false);
   const [rallySent, setRallySent] = useState(false);
@@ -135,8 +136,9 @@ export function FriendIdCard() {
   const checkIfDemoUser = async () => {
     if (!selectedFriend) return;
     // Use safe RPC to check if user is demo (respects location privacy)
-    const { data } = await supabase.rpc('get_profile_safe', { target_user_id: selectedFriend.userId });
+    const { data } = await supabase.from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', selectedFriend.userId);
     setIsDemoUser(data?.[0]?.is_demo || false);
+    setFriendUsername(data?.[0]?.username || '');
   };
 
   // Calculate distance when we have both locations
@@ -210,8 +212,8 @@ export function FriendIdCard() {
           isPrivateParty: false
         });
         const neighborhoodText = nightStatus.planning_neighborhood 
-          ? `🎯 Planning tonight — thinking: ${nightStatus.planning_neighborhood}`
-          : '🎯 Planning their night';
+          ? `TBD tonight — thinking: ${nightStatus.planning_neighborhood}`
+          : 'TBD tonight';
         setStatusSubtitle(neighborhoodText);
         return;
       }
@@ -338,7 +340,7 @@ export function FriendIdCard() {
     if (!user) return;
     
     const { data: profileRows } = await supabase
-      .rpc('get_profile_safe', { target_user_id: user.id });
+      .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', user.id);
     const data = profileRows?.[0] ?? null;
 
     if (data && data.last_known_lat && data.last_known_lng) {
@@ -449,31 +451,35 @@ export function FriendIdCard() {
             .from('friendships')
             .insert({ user_id: user.id, friend_id: selectedFriend.userId, status: 'pending' });
 
-          // Send notification
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('display_name')
-            .eq('id', user.id)
-            .single();
-          const senderName = profile?.display_name || 'Someone';
-          const message = `${senderName} sent you a friend request`;
+          // Send notification (skip for demo users — not in auth.users)
+          const cachedProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+          const targetIsDemo = cachedProfiles.find((p: any) => p.id === selectedFriend.userId)?.is_demo;
+          if (!targetIsDemo) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('display_name')
+              .eq('id', user.id)
+              .single();
+            const senderName = profile?.display_name || 'Someone';
+            const message = `${senderName} sent you a friend request`;
 
-          supabase.rpc('create_notification', {
-            p_receiver_id: selectedFriend.userId,
-            p_type: 'friend_request',
-            p_message: message,
-          }).then(({ data }) => {
-            const notif = Array.isArray(data) ? data[0] : data;
-            if (notif?.id) {
-              triggerPushNotification({
-                id: notif.id,
-                receiver_id: selectedFriend!.userId,
-                sender_id: user!.id,
-                type: 'friend_request',
-                message,
-              });
-            }
-          });
+            supabase.rpc('create_notification', {
+              p_receiver_id: selectedFriend.userId,
+              p_type: 'friend_request',
+              p_message: message,
+            }).then(({ data }) => {
+              const notif = Array.isArray(data) ? data[0] : data;
+              if (notif?.id) {
+                triggerPushNotification({
+                  id: notif.id,
+                  receiver_id: selectedFriend!.userId,
+                  sender_id: user!.id,
+                  type: 'friend_request',
+                  message,
+                });
+              }
+            });
+          }
 
           haptic.success();
           toast.success('Friend request sent!');
@@ -511,7 +517,7 @@ export function FriendIdCard() {
       haptic.light();
       try {
         const { data: profile } = await supabase
-          .rpc('get_profile_safe', { target_user_id: user.id });
+          .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', user.id);
         const senderName = profile?.[0]?.display_name?.split(' ')[0] || 'Your friend';
         const code = await getOrCreateInviteCode(user.id);
         const venueName = userStatus?.currentVenue || selectedFriend.venueName || undefined;
@@ -543,7 +549,7 @@ export function FriendIdCard() {
     haptic.light();
     try {
       const { data: profile } = await supabase
-        .rpc('get_profile_safe', { target_user_id: user.id });
+        .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', user.id);
       const senderName = profile?.[0]?.display_name?.split(' ')[0] || 'Your friend';
       const code = await getOrCreateInviteCode(user.id);
       const venueName = userStatus?.currentVenue || selectedFriend.venueName || undefined;
@@ -582,8 +588,17 @@ export function FriendIdCard() {
     try {
       const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
       const myProfile = allProfiles.find((p: any) => p.id === user.id);
+      const targetProfile = allProfiles.find((p: any) => p.id === selectedFriend.userId);
       const senderName = myProfile?.display_name || 'Someone';
       const message = `${senderName} wants you to rally. Come out tonight! 👋`;
+
+      // Demo users aren't in auth.users — skip DB insert, just show confirmation
+      if (targetProfile?.is_demo) {
+        setRallySent(true);
+        haptic.success();
+        toast.success('Rally sent! 📣');
+        return;
+      }
 
       const { data: notifData, error } = await supabase.rpc('create_notification', {
         p_receiver_id: selectedFriend.userId,
@@ -691,6 +706,8 @@ export function FriendIdCard() {
     }
   };
 
+  const isOutStatus = userStatus?.isOut || (demoEnabled && !!selectedFriend?.venueName);
+
   const swipeHandlers = useSwipeGesture({
     onSwipeDown: closeFriendCard,
     threshold: 50
@@ -708,33 +725,24 @@ export function FriendIdCard() {
       {/* Mobile frame constrained container */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full z-[300] flex items-center justify-center px-4 pointer-events-none">
               {/* Card */}
-              <div 
-                className="relative w-full max-w-[390px] bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-card-lift"
+              <div
+                className="relative w-full max-w-[390px] bg-[#1a1030] border border-[#a855f7]/30 rounded-3xl p-0 overflow-hidden pointer-events-auto animate-card-lift shadow-[0_0_40px_rgba(168,85,247,0.15)]"
                 {...swipeHandlers}
               >
-                {/* Close button */}
-                <button 
-                  onClick={closeFriendCard}
-                  className="absolute right-4 top-4 z-20 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                >
-                  <CloseIcon className="h-4 w-4 text-white" />
-                  <span className="sr-only">Close</span>
-                </button>
-                
-                {/* Three-dot menu positioned below the X close button */}
+                {/* Three-dot menu — top right */}
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="absolute right-4 top-10 z-20 rounded-sm hover:bg-white/10 transition-colors">
-                    <MoreVertical className="h-4 w-4 text-white/60" />
+                  <DropdownMenuTrigger className="absolute right-4 top-4 z-20 w-7 h-7 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+                    <MoreVertical className="h-4 w-4 text-white/50" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={() => setShowReportDialog(true)}
                       className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
                     >
                       <Flag className="h-4 w-4 mr-2" />
                       Report User
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={handleBlockUser}
                       className="text-red-400 hover:bg-red-500/20 cursor-pointer"
                     >
@@ -744,121 +752,72 @@ export function FriendIdCard() {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-              <div className="p-5 pt-8 relative">
-                <div className="flex items-start gap-4 mb-4">
-                {/* Large Avatar - relationship-colored border */}
-                <div className="relative flex-shrink-0">
-                    <Avatar className={`h-20 w-20 border-[3px] ${
-                      selectedFriend.relationshipType === 'close' ? 'border-[#d4ff00]' :
-                      selectedFriend.relationshipType === 'mutual' ? 'border-[#6366f1]' :
-                      'border-[#a855f7]'
+              <div className="p-5">
+                {/* Avatar + Info row */}
+                <div className="flex items-center gap-4 mb-4">
+                  {/* Avatar with gradient ring */}
+                  <div className="relative flex-shrink-0">
+                    <div className={`rounded-full p-[3px] ${
+                      selectedFriend.relationshipType === 'close'
+                        ? 'bg-gradient-to-br from-[#a855f7] to-[#d4ff00]'
+                        : selectedFriend.relationshipType === 'mutual'
+                        ? 'bg-gradient-to-br from-[#a855f7] to-[#6366f1]'
+                        : 'bg-gradient-to-br from-[#a855f7] to-[#a855f7]/60'
                     }`}>
-                      <AvatarImage src={selectedFriend.avatarUrl || undefined} />
-                      <AvatarFallback className="bg-[#2d1b4e] text-white text-2xl">
-                        {selectedFriend.displayName[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                  
-                  {/* Relationship badge */}
-                  {selectedFriend.relationshipType === 'close' && (
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#1a0f2e] border-2 border-[#d4ff00] rounded-full flex items-center justify-center text-xs shadow-[0_0_8px_rgba(212,255,0,0.6)]">
-                      💛
+                      <Avatar className="h-16 w-16 border-2 border-[#1a1030]">
+                        <AvatarImage src={selectedFriend.avatarUrl || undefined} />
+                        <AvatarFallback className="bg-[#1a1030] text-white text-xl">
+                          {selectedFriend.displayName[0]}
+                        </AvatarFallback>
+                      </Avatar>
                     </div>
-                  )}
-                  {selectedFriend.relationshipType === 'mutual' && (
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#1a0f2e] border-2 border-[#6366f1] rounded-full flex items-center justify-center text-xs shadow-[0_0_8px_rgba(99,102,241,0.6)]">
-                      🔗
-                    </div>
-                  )}
-                  {selectedFriend.relationshipType === 'direct' && (
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#1a0f2e] border-2 border-[#a855f7] rounded-full flex items-center justify-center text-xs shadow-[0_0_8px_rgba(168,85,247,0.6)]">
-                      👤
-                    </div>
-                  )}
-                </div>
+                  </div>
 
-                {/* User Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 pr-8">
-                    {userStatus?.lat && userStatus?.lng ? (
+                  {/* Name + venue/status */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      {userStatus?.lat && userStatus?.lng ? (
+                        <button
+                          onClick={handleNameClick}
+                          className="text-xl font-bold text-white leading-tight hover:underline cursor-pointer text-left truncate"
+                        >
+                          {selectedFriend.displayName}
+                        </button>
+                      ) : (
+                        <h2 className="text-xl font-bold text-white leading-tight truncate">
+                          {selectedFriend.displayName}
+                        </h2>
+                      )}
+                    </div>
+                    {demoEnabled && selectedFriend.venueName ? (
                       <button
-                        onClick={handleNameClick}
-                        className="text-xl font-bold text-white leading-tight hover:underline cursor-pointer text-left"
+                        onClick={() => handleVenueClick(selectedFriend.venueName!)}
+                        className="text-[#d4ff00] text-sm font-medium leading-tight hover:underline text-left truncate block"
                       >
-                        {selectedFriend.displayName}
+                        @{selectedFriend.venueName}
                       </button>
-                    ) : (
-                      <h2 className="text-xl font-bold text-white leading-tight">
-                        {selectedFriend.displayName}
-                      </h2>
-                    )}
-                    {selectedFriend.relationshipType === 'close' && (
+                    ) : userStatus?.isOut && userStatus.currentVenue ? (
                       <button
-                        onClick={() => setBadgeConfirm('remove_close')}
-                        className="text-xs bg-[#d4ff00]/20 text-[#d4ff00] px-2 py-0.5 rounded-full whitespace-nowrap hover:bg-[#d4ff00]/30 transition-colors"
+                        onClick={() => userStatus.isPrivateParty ? handlePrivatePartyClick() : handleVenueClick(userStatus.currentVenue!)}
+                        className="text-[#d4ff00] text-sm font-medium leading-tight hover:underline text-left truncate block"
                       >
-                        Close Friend
+                        {statusSubtitle}
                       </button>
-                    )}
-                    {selectedFriend.relationshipType === 'mutual' && (
-                      <button
-                        onClick={() => setBadgeConfirm('send_request')}
-                        className="text-xs bg-[#6366f1]/20 text-[#6366f1] px-2 py-0.5 rounded-full whitespace-nowrap hover:bg-[#6366f1]/30 transition-colors"
-                      >
-                        Mutual
-                      </button>
-                    )}
-                    {selectedFriend.relationshipType === 'direct' && (
-                      <button
-                        onClick={() => setBadgeConfirm('add_close')}
-                        className="text-xs bg-[#a855f7]/20 text-[#a855f7] px-2 py-0.5 rounded-full whitespace-nowrap hover:bg-[#a855f7]/30 transition-colors"
-                      >
-                        Friend
-                      </button>
+                    ) : friendUsername ? (
+                      <p className="text-white/40 text-sm leading-tight truncate">@{friendUsername}</p>
+                    ) : statusSubtitle ? (
+                      <p className="text-white/40 text-sm leading-tight truncate">{statusSubtitle}</p>
+                    ) : null}
+                    {distance !== null && isOutStatus && (
+                      <p className="text-white/30 text-xs leading-tight mt-0.5">
+                        {distance.toFixed(1)} mi away
+                      </p>
                     )}
                   </div>
-                  {demoEnabled ? (
-                    <>
-                      {selectedFriend.venueName && (
-                        <button
-                          onClick={() => handleVenueClick(selectedFriend.venueName!)}
-                          className="text-[#d4ff00] text-base font-medium leading-tight mb-1 hover:underline text-left"
-                        >
-                          @ {selectedFriend.venueName}
-                        </button>
-                      )}
-                      {distance !== null && (
-                        <p className="text-white/50 text-sm leading-tight">
-                          {distance.toFixed(1)} mi away
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {userStatus?.isOut && userStatus.currentVenue ? (
-                        <button
-                          onClick={() => userStatus.isPrivateParty ? handlePrivatePartyClick() : handleVenueClick(userStatus.currentVenue!)}
-                          className="text-[#d4ff00] text-base font-medium leading-tight mb-1 hover:underline text-left"
-                        >
-                          {statusSubtitle}
-                        </button>
-                      ) : statusSubtitle && (
-                        <p className="text-white/70 text-base font-medium leading-tight mb-1">
-                          {statusSubtitle}
-                        </p>
-                      )}
-                      {distance !== null && userStatus?.isOut && (
-                        <p className="text-white/50 text-sm leading-tight">
-                          {distance.toFixed(1)} mi away
-                        </p>
-                      )}
-                    </>
-                  )}
                 </div>
-              </div>
 
-              {/* Bottom Row: Friends + Buttons */}
-              <div className="flex items-center gap-3">
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3">
               {/* Friends at Venue - Tappable with Popover */}
                 {friendsAtVenue.length > 0 && (
                   <Popover>
@@ -925,32 +884,33 @@ export function FriendIdCard() {
                 {(!isDemoUser || demoEnabled) && (
                   <div className="flex items-center gap-2 flex-1">
                     {/* Show "Meet Up" if friend is out, "Make Plans" otherwise */}
-                    {(demoEnabled && selectedFriend?.venueName) || (userStatus?.isOut) ? (
+                    {isOutStatus ? (
                       <button
                         onClick={handleMeetUp}
-                        className="flex-1 py-2 px-5 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors"
+                        className="flex-1 h-11 rounded-full bg-[#d4ff00] text-black text-sm font-semibold hover:bg-[#d4ff00]/90 transition-colors flex items-center justify-center gap-2 shadow-[0_0_16px_rgba(212,255,0,0.25)]"
                       >
+                        <UserPlus className="h-4 w-4" />
                         Meet Up
                       </button>
                     ) : (
                       <>
                         <button
                           onClick={handleMakePlans}
-                          className="flex-1 py-2 px-5 rounded-full border-2 border-[#a855f7] text-[#a855f7] text-sm font-semibold hover:bg-[#a855f7]/10 transition-colors flex items-center justify-center gap-2"
+                          className="flex-1 h-11 rounded-full border border-[#a855f7]/40 text-[#a855f7] text-sm font-semibold hover:bg-[#a855f7]/10 transition-colors flex items-center justify-center gap-2"
                         >
                           <CalendarPlus className="h-4 w-4" />
                           Make Plans
                         </button>
                         {isRallyNight && (
                           rallySent ? (
-                            <span className="py-2 px-4 rounded-full border-2 border-[#d4ff00]/30 text-[#d4ff00]/60 text-sm font-semibold flex items-center justify-center gap-1.5">
+                            <span className="h-11 px-4 rounded-full border border-[#d4ff00]/20 text-[#d4ff00]/50 text-sm font-semibold flex items-center justify-center gap-1.5">
                               <Megaphone className="h-4 w-4" />
                               Rallied
                             </span>
                           ) : (
                             <button
                               onClick={handleRally}
-                              className="py-2 px-4 rounded-full border-2 border-[#d4ff00] text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors flex items-center justify-center gap-1.5"
+                              className="h-11 px-4 rounded-full border border-[#d4ff00]/40 text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors flex items-center justify-center gap-1.5"
                             >
                               <Megaphone className="h-4 w-4" />
                               Rally
@@ -961,9 +921,9 @@ export function FriendIdCard() {
                     )}
                     <button
                       onClick={handleOpenDM}
-                      className="p-2 rounded-full bg-transparent border-2 border-white/20 text-white hover:bg-white/10 transition-colors"
+                      className="w-11 h-11 rounded-full flex items-center justify-center border border-white/15 text-white/50 hover:bg-white/5 transition-colors flex-shrink-0"
                     >
-                     <MessageCircle className="h-5 w-5" />
+                      <MessageSquare className="h-5 w-5" />
                     </button>
                   </div>
                 )}

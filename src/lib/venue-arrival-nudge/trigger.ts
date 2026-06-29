@@ -1,9 +1,11 @@
-import type { 
-  VenueArrivalContext, 
-  NudgeDecision, 
-  DwellTracker, 
+import type {
+  VenueArrivalContext,
+  NudgeDecision,
+  DwellTracker,
   VenueDeparture,
-  LocationSnapshot 
+  LocationSnapshot,
+  ThresholdsMet,
+  TriggerResult,
 } from './types';
 
 // ============= CONSTANTS =============
@@ -170,131 +172,171 @@ function isToastCooldownActive(): boolean {
   return Date.now() - lastToastTime < TOAST_COOLDOWN_MS;
 }
 
+// ============= UUID GENERATION =============
+
+function generateEvaluationId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // ============= MAIN UNIFIED TRIGGER ENGINE =============
 
 export function canTriggerVenueArrival(context: VenueArrivalContext): NudgeDecision {
+  const evaluationId = generateEvaluationId();
+
+  // Pre-compute thresholds (read-only snapshot, no side effects)
+  const dwellElapsed = dwellTracker?.venueId === context.detectedVenueId
+    ? (Date.now() - dwellTracker.firstSeenAt) / 1000
+    : 0;
+  const thresholdsMet: ThresholdsMet = {
+    accuracy_ok: context.gpsAccuracy <= GPS_ACCURACY_THRESHOLD,
+    distance_ok: context.distance <= VENUE_TRIGGER_RADIUS_M,
+    dwell_ok: dwellTracker?.venueId === context.detectedVenueId
+      ? (Date.now() - dwellTracker.firstSeenAt) >= DWELL_TIME_MS
+      : false,
+    speed_ok: true, // Speed not evaluated in trigger engine
+  };
+  const dwellTimeSeconds = Math.round(dwellElapsed);
+
+  // Helper to build decision with metadata
+  const decide = (
+    base: { shouldNudge: boolean; reason: string; deliveryMethod?: 'modal' | 'toast' | 'push' },
+    result: TriggerResult,
+  ): NudgeDecision => ({ ...base, evaluationId, thresholdsMet, result, dwellTimeSeconds });
+
   // === UNIVERSAL HARD GATES ===
-  
+
   // 1. GPS accuracy hard gate (≤50m)
   if (context.gpsAccuracy > GPS_ACCURACY_THRESHOLD) {
-    return { 
-      shouldNudge: false, 
-      reason: `GPS accuracy too low: ${Math.round(context.gpsAccuracy)}m (need ≤${GPS_ACCURACY_THRESHOLD}m)` 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: `GPS accuracy too low: ${Math.round(context.gpsAccuracy)}m (need ≤${GPS_ACCURACY_THRESHOLD}m)`
+    }, 'suppressed_accuracy');
   }
-  
+
   // 2. Distance hard gate - reject if >500m entirely
   if (context.distance > MAX_DETECTION_DISTANCE_M) {
-    return { 
-      shouldNudge: false, 
-      reason: `Distance too far: ${Math.round(context.distance)}m (limit: ${MAX_DETECTION_DISTANCE_M}m)` 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: `Distance too far: ${Math.round(context.distance)}m (limit: ${MAX_DETECTION_DISTANCE_M}m)`
+    }, 'suppressed_distance');
   }
-  
+
   // 3. Must be within trigger radius
   if (context.distance > VENUE_TRIGGER_RADIUS_M) {
-    return { 
-      shouldNudge: false, 
-      reason: `Outside trigger radius: ${Math.round(context.distance)}m (need ≤${VENUE_TRIGGER_RADIUS_M}m)` 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: `Outside trigger radius: ${Math.round(context.distance)}m (need ≤${VENUE_TRIGGER_RADIUS_M}m)`
+    }, 'suppressed_distance');
   }
-  
+
   // 4. Stale location rejection
   if (isLocationStale(context.lat, context.lng, context.timestamp)) {
-    return { 
-      shouldNudge: false, 
-      reason: 'Stale/cached location detected' 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: 'Stale/cached location detected'
+    }, 'suppressed_cooldown');
   }
-  
+
   // 5. Dwell time check (45 seconds)
   if (!updateDwellTime(context.detectedVenueId)) {
-    const elapsed = dwellTracker 
+    const elapsed = dwellTracker
       ? Math.round((Date.now() - dwellTracker.firstSeenAt) / 1000)
       : 0;
-    return { 
-      shouldNudge: false, 
-      reason: `Dwell time not met: ${elapsed}s / 45s required` 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: `Dwell time not met: ${elapsed}s / 45s required`
+    }, 'suppressed_dwell');
   }
-  
+
   // Update location snapshot after passing gates
   updateLocationSnapshot(context.lat, context.lng, context.timestamp);
-  
+
   // === STATUS-SPECIFIC LOGIC ===
-  
+
   if (context.status === 'out') {
-    return canTriggerToastFlow(context);
+    return canTriggerToastFlow(context, decide);
   } else if (context.status === 'planning' || context.status === null) {
-    return canTriggerModalFlow(context);
+    return canTriggerModalFlow(context, decide);
   } else {
     // home, heading_out, off → no nudge
-    return { 
-      shouldNudge: false, 
-      reason: `Status '${context.status}' blocks nudge` 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: `Status '${context.status}' blocks nudge`
+    }, 'suppressed_cooldown');
   }
 }
 
 // ============= TOAST FLOW (Already "out" users) =============
 
-function canTriggerToastFlow(context: VenueArrivalContext): NudgeDecision {
+type DecideHelper = (
+  base: { shouldNudge: boolean; reason: string; deliveryMethod?: 'modal' | 'toast' | 'push' },
+  result: TriggerResult,
+) => NudgeDecision;
+
+function canTriggerToastFlow(context: VenueArrivalContext, decide: DecideHelper): NudgeDecision {
   // Must be different from current venue
   if (context.currentVenueId && context.currentVenueId === context.detectedVenueId) {
-    return { 
-      shouldNudge: false, 
-      reason: 'Same venue as current' 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: 'Same venue as current'
+    }, 'suppressed_cooldown');
   }
-  
+
   // Global toast cooldown
   if (isToastCooldownActive()) {
     const remaining = Math.round((TOAST_COOLDOWN_MS - (Date.now() - lastToastTime)) / 60000);
-    return { 
-      shouldNudge: false, 
-      reason: `Toast cooldown active: ${remaining} min remaining` 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: `Toast cooldown active: ${remaining} min remaining`
+    }, 'suppressed_cooldown');
   }
-  
+
   // Re-entry check (20min + 300m away required)
   if (!canReenterVenue(context.detectedVenueId)) {
-    return { 
-      shouldNudge: false, 
-      reason: 'Re-entry cooldown active (need 20min away + 300m distance)' 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: 'Re-entry cooldown active (need 20min away + 300m distance)'
+    }, 'suppressed_cooldown');
   }
-  
+
   // User suppressed this venue tonight ("Not here" action)
   if (isVenueSuppressed(context.detectedVenueId)) {
-    return { 
-      shouldNudge: false, 
-      reason: 'Venue suppressed by user for tonight' 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: 'Venue suppressed by user for tonight'
+    }, 'suppressed_cooldown');
   }
-  
-  return { 
-    shouldNudge: true, 
+
+  return decide({
+    shouldNudge: true,
     reason: 'OK',
     deliveryMethod: 'toast'
-  };
+  }, 'fired');
 }
 
 // ============= MODAL FLOW (Planning/no-status users) =============
 
-function canTriggerModalFlow(context: VenueArrivalContext): NudgeDecision {
+function canTriggerModalFlow(context: VenueArrivalContext, decide: DecideHelper): NudgeDecision {
   // Venue-specific dismiss cooldown
   if (isVenueDismissed(context.detectedVenueId)) {
-    return { 
-      shouldNudge: false, 
-      reason: 'Venue dismissed recently' 
-    };
+    return decide({
+      shouldNudge: false,
+      reason: 'Venue dismissed recently'
+    }, 'suppressed_cooldown');
   }
-  
-  return { 
-    shouldNudge: true, 
+
+  return decide({
+    shouldNudge: true,
     reason: 'OK',
     deliveryMethod: 'modal'
-  };
+  }, 'fired');
 }
 
 // ============= LEGACY EXPORTS (for backwards compatibility during migration) =============

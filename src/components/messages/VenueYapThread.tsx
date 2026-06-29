@@ -1025,7 +1025,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
               <MessageCircle className="h-8 w-8 text-[#d4ff00]/60" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">No yaps yet</h3>
-            <p className="text-white/50 text-sm max-w-xs">Be the first to yap about {venueName}.</p>
+            <p className="text-white/50 text-sm max-w-xs">Nothing happening yet at {venueName}.</p>
           </div>
         )}
       </div>

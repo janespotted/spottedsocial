@@ -19,6 +19,9 @@ import { calculateExpiryTime } from '@/lib/time-utils';
 import { markManualCheckin } from '@/lib/auto-venue-tracker';
 import { triggerPushNotification } from '@/lib/push-notifications';
 import { sendCheckinNotifications } from '@/lib/checkin-notifications';
+import { scheduleMorningAfterNotification } from '@/lib/morning-after-notification';
+import { notifyFriendArrived, checkVenueBuzzing, checkGroupForming } from '@/lib/fomo-notifications';
+import { checkForManualCorrection } from '@/lib/location-event-logger';
 import { getDemoMode } from '@/lib/demo-data';
 import { getCachedCity } from '@/lib/city-detection';
 import { useUserCity } from '@/hooks/useUserCity';
@@ -51,7 +54,7 @@ interface CheckInModalProps {
 
 export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const { user } = useAuth();
-  const { isReminderTriggered, venueArrivalPayload, showOutConfirmation, showPlanningConfirmation } = useCheckIn();
+  const { isReminderTriggered, venueArrivalPayload, skipToVenueDetection, showOutConfirmation, showPlanningConfirmation } = useCheckIn();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { city, refreshCity, isLoading: isDetectingCity } = useUserCity();
@@ -63,6 +66,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       (document.activeElement as HTMLElement)?.blur();
     }
   }, [open]);
+
+  // "I'm at a new spot" — skip status selection, go straight to venue detection
+  useEffect(() => {
+    if (open && skipToVenueDetection) {
+      handleStatusUpdate('out');
+    }
+  }, [open, skipToVenueDetection]);
   const [selectedStatus, setSelectedStatus] = useState<'out' | 'heading_out' | 'home' | 'planning' | 'private_party'>('home');
   
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -96,9 +106,23 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [isDetectingNeighborhood, setIsDetectingNeighborhood] = useState(false);
   const [showNeighborhoodManualSelect, setShowNeighborhoodManualSelect] = useState(false);
 
-  // Check for pending reminder when modal opens
+  // Reset state when modal opens so stale venue data from prior check-ins doesn't persist
   useEffect(() => {
     if (open) {
+      // Only reset venue state if NOT a venue-arrival flow (which pre-populates venue)
+      if (!venueArrivalPayload) {
+        setDetectedVenue('');
+        setCustomVenue('');
+        setSelectedVenueId(null);
+        setLocationData(null);
+        setIsEditingVenue(false);
+      }
+      setShowVenueConfirm(false);
+      setShowShareModal(false);
+      setShowPlanningNeighborhood(false);
+      setShowPlanningPrivacy(false);
+      setIsDetectingLocation(false);
+
       const reminderTime = localStorage.getItem('checkin_reminder');
       if (reminderTime) {
         setHasPendingReminder(true);
@@ -108,7 +132,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         setPendingReminderTime(null);
       }
     }
-  }, [open]);
+  }, [open, venueArrivalPayload]);
 
   // Load current location sharing level from profile
   useEffect(() => {
@@ -139,8 +163,9 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       setDetectedVenue(venueArrivalPayload.venueName);
       setCustomVenue(venueArrivalPayload.venueName);
       setSelectedVenueId(venueArrivalPayload.venueId);
-      // Skip directly to privacy selection (step 2 of the "I'm out" flow)
-      setShowShareModal(true);
+      setSelectedStatus('out');
+      // Go straight to venue confirm with privacy inline
+      setShowVenueConfirm(true);
     }
   }, [open, venueArrivalPayload]);
 
@@ -331,7 +356,38 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     setSelectedStatus(status);
 
     if (status === 'out') {
-      setShowShareModal(true);
+      // Start GPS detection immediately — privacy selection is inline on venue confirm
+      setIsDetectingLocation(true);
+      if (venueArrivalPayload?.venueId) {
+        // Venue arrival — venue already known
+        try {
+          const loc = await getCurrentLocation();
+          setLocationData({
+            lat: loc.lat, lng: loc.lng, accuracy: loc.accuracy,
+            timestamp: new Date(loc.timestamp).toISOString(),
+            venueName: venueArrivalPayload.venueName,
+            venueId: venueArrivalPayload.venueId,
+            nearbyVenues: [],
+          });
+        } catch {
+          setLocationData({
+            lat: 0, lng: 0, accuracy: 0, timestamp: new Date().toISOString(),
+            venueName: venueArrivalPayload.venueName,
+            venueId: venueArrivalPayload.venueId,
+            nearbyVenues: [],
+          });
+        }
+        setIsDetectingLocation(false);
+        setShowVenueConfirm(true);
+      } else if ('geolocation' in navigator) {
+        captureAndDeriveVenue().catch((error) => {
+          setIsDetectingLocation(false);
+          if (error?.code === 1) {
+            setLocationErrorType('permission_denied');
+            setShowLocationPrompt(true);
+          }
+        });
+      }
     } else if (status === 'heading_out') {
       await captureAndDeriveVenue();
     } else if (status === 'planning') {
@@ -379,8 +435,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     
     await updatePrivatePartyStatus();
     setShowPrivatePartyNeighborhood(false);
-    // Ask if they want to invite friends
-    setShowPrivatePartyInvite(true);
+    // Skip address sharing — location is shared via GPS to close/direct friends
+    onOpenChange(false);
   };
 
   const updatePrivatePartyStatus = async () => {
@@ -469,6 +525,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     onOpenChange(false);
     // Show planning confirmation card
     showPlanningConfirmation(neighborhood, planningVisibility);
+    // Check if friends are also planning the same area
+    if (user?.id && neighborhood) {
+      checkGroupForming(user.id, neighborhood);
+    }
   };
 
   const handleSetReminder = async (minutes: number) => {
@@ -591,24 +651,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     let finalVenueName = customVenue.trim() || locationData.venueName;
     let isCustomVenue = false;
 
-    // If user entered custom venue and no venue ID, create new venue
+    // Custom venue name — check in with name only, no venue record created
+    // Venue creation requires admin approval to prevent spam
     if (!finalVenueId && customVenue.trim()) {
       isCustomVenue = true;
-      const newVenueId = await createNewVenue(
-        customVenue.trim(),
-        locationData.lat,
-        locationData.lng,
-        'Unknown',
-        'bar'
-      );
-      
-      if (newVenueId) {
-        finalVenueId = newVenueId;
-        toast({
-          title: 'Venue created',
-          description: `${customVenue.trim()} has been added!`,
-        });
-      }
+      // No venue_id — just use the name
+      finalVenueId = null;
     }
 
     if (!finalVenueName) {
@@ -768,12 +816,27 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         // Mark manual checkin to prevent auto-tracker from overwriting
         markManualCheckin();
 
+        // Check if this manual check-in corrects a recent auto check-in
+        if (venueId && user?.id) {
+          checkForManualCorrection(user.id, venueId, venue, lat, lng);
+        }
+
         // Venue-aware notifications (best-effort, non-blocking)
         // - Notifies friends already at this venue that you arrived
         // - If 3+ friends at venue, notifies others (once per venue per night)
         if (venueId) {
           sendCheckinNotifications(user!.id, venueId, venue);
         }
+
+        // FOMO notifications (best-effort, non-blocking)
+        if (venueId) {
+          const name = user?.user_metadata?.display_name || user?.user_metadata?.full_name || 'A friend';
+          notifyFriendArrived(user!.id, name, venueId, venue);
+          checkVenueBuzzing(venueId, venue);
+        }
+
+        // Schedule morning-after recap notification for 10am tomorrow
+        scheduleMorningAfterNotification();
 
         // Log location update
         logEvent('location_update', {
@@ -886,7 +949,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
                 .single();
 
               const firstName = profile?.display_name?.split(' ')[0] || 'A friend';
-              const message = `${firstName} is thinking about going out 👀`;
+              const message = `${firstName} is deciding where to go tonight`;
               console.log('[PLANNING NOTIF] Sending message:', message);
 
               await Promise.allSettled(recipientIds.map(async (friendId) => {
@@ -968,10 +1031,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               handleStatusUpdate('out');
             }}
             size="lg"
-            className="w-full h-14 text-lg font-semibold rounded-2xl bg-gradient-to-b from-[#e8ff66] to-[#d4ff00] text-[#0a0118] hover:from-[#f0ff80] hover:to-[#e5ff4d] shadow-[0_0_20px_rgba(212,255,0,0.2),inset_0_1px_0_rgba(255,255,255,0.35)] hover:shadow-[0_0_28px_rgba(212,255,0,0.35),inset_0_1px_0_rgba(255,255,255,0.4)] transition-all duration-200 disabled:opacity-50"
+            className="w-full h-14 text-lg font-semibold rounded-2xl bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90 transition-colors duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
-            {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes 🎉'}
+            {isDetectingLocation && selectedStatus === 'out' ? 'Detecting location...' : 'Yes'}
           </Button>
           
           {/* Planning - Secondary button with subtle glow */}
@@ -980,10 +1043,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
               handleStatusUpdate('planning');
             }}
             size="lg"
-            className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#a855f7]/90 to-[#7c3aed] text-white border border-[#a855f7]/25 hover:border-[#a855f7]/40 hover:from-[#b668f8]/90 hover:to-[#9333ea] shadow-[0_0_16px_rgba(168,85,247,0.15),inset_0_1px_0_rgba(255,255,255,0.1)] hover:shadow-[0_0_24px_rgba(168,85,247,0.25),inset_0_1px_0_rgba(255,255,255,0.15)] transition-all duration-200 disabled:opacity-50"
+            className="w-full h-14 text-lg font-medium rounded-2xl border border-white/20 text-white bg-transparent hover:bg-white/10 transition-colors duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
-            Planning on it 🎯
+            TBD
           </Button>
 
           {/* No - Tertiary glass button with refined effect */}
@@ -996,7 +1059,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             className="w-full h-14 text-lg font-medium rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 text-white/60 hover:bg-white/[0.08] hover:text-white/85 hover:border-white/20 transition-all duration-200 disabled:opacity-50"
             disabled={isDetectingLocation}
           >
-            No — staying in 🛋️
+            Staying in
           </Button>
         </div>
 
@@ -1055,7 +1118,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             )}
           </div>
           <div className="flex-1">
-            <span className="text-lg text-white block">Close Friends 💛</span>
+            <span className="text-lg text-white block">Close Friends</span>
             <span className="text-sm text-white/50">Only your closest friends</span>
           </div>
         </button>
@@ -1089,7 +1152,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             )}
           </div>
           <div className="flex-1">
-            <span className="text-lg text-white block">Mutual Friends 🔗</span>
+            <span className="text-lg text-white block">Mutual Friends</span>
             <span className="text-sm text-white/50">Friends + their friends</span>
           </div>
         </button>
@@ -1097,7 +1160,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
       <Button
         onClick={handleShareLocation}
-        className="w-full h-14 text-lg font-semibold rounded-full bg-[#5b21b6] text-[#d4ff00] border-2 border-[#d4ff00] hover:bg-[#6d28d9] shadow-[0_0_20px_rgba(212,255,0,0.4)]"
+        className="w-full h-14 text-lg font-semibold rounded-2xl bg-[#d4ff00] text-black font-semibold hover:bg-[#d4ff00]/90"
       >
         Share Location
       </Button>
@@ -1236,12 +1299,36 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           </div>
         )}
 
+        {/* Inline Privacy Selector */}
+        <div className="space-y-2">
+          <p className="text-xs text-white/40 uppercase tracking-wider">Visible to</p>
+          <div className="flex gap-2">
+            {([
+              { value: 'close_friends' as const, label: 'Close' },
+              { value: 'all_friends' as const, label: 'All Friends' },
+              { value: 'mutual_friends' as const, label: 'Mutual' },
+            ]).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setShareOption(opt.value)}
+                className={`flex-1 py-2 rounded-full text-xs font-medium transition-colors ${
+                  shareOption === opt.value
+                    ? 'bg-[#d4ff00] text-black'
+                    : 'bg-white/5 text-white/50 border border-white/10'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <Button
           onClick={handleVenueConfirm}
           disabled={!customVenue.trim()}
-          className="w-full h-14 text-lg font-semibold rounded-full bg-[#5b21b6] text-[#d4ff00] border-2 border-[#d4ff00] hover:bg-[#6d28d9] shadow-[0_0_20px_rgba(212,255,0,0.4)] disabled:opacity-50"
+          className="w-full h-14 text-lg font-semibold rounded-2xl bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90 disabled:opacity-50"
         >
-          {detectedVenue ? 'Confirm' : 'Enter Venue Manually'}
+          Go Live
         </Button>
 
         {/* Always show Private Party option */}
@@ -1252,7 +1339,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         </div>
         <Button
           onClick={handlePrivatePartyFromVenueConfirm}
-          className="w-full h-14 text-lg font-medium rounded-2xl bg-gradient-to-b from-[#6366f1] to-[#4f46e5] text-white border border-[#6366f1]/40 hover:from-[#818cf8] hover:to-[#6366f1] hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-200"
+          className="w-full h-14 text-lg font-medium rounded-2xl border border-white/20 text-white bg-transparent hover:bg-white/10 transition-colors duration-200"
         >
           <Home className="w-5 h-5 mr-2" />
           I'm at a Private Party
@@ -1276,10 +1363,10 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
         <div className="space-y-4">
           <Select value={planningNeighborhood ?? undefined} onValueChange={setPlanningNeighborhood}>
-            <SelectTrigger className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#a855f7]/50 text-white focus:ring-[#a855f7] focus:border-[#a855f7]">
+            <SelectTrigger className="h-14 text-lg bg-[#1a0f2e] border-2 border-white/20 text-white focus:ring-white/30 focus:border-white/30">
               <SelectValue placeholder="Select neighborhood..." />
             </SelectTrigger>
-            <SelectContent className="bg-[#1a0f2e] border-2 border-[#a855f7]/30 max-h-60 z-[600]">
+            <SelectContent className="bg-[#1a0f2e] border-2 border-white/15 max-h-60 z-[600]">
               {neighborhoods.map((neighborhood) => (
                 <SelectItem 
                   key={neighborhood} 
@@ -1295,7 +1382,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
         <Button
           onClick={() => handlePlanningConfirm(!planningNeighborhood)}
-          className="w-full h-14 text-lg font-semibold rounded-full bg-[#a855f7] text-white border-2 border-[#a855f7] hover:bg-[#a855f7]/80 shadow-[0_0_20px_rgba(168,85,247,0.4)]"
+          className="w-full h-14 text-lg font-semibold rounded-2xl bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90"
         >
           Share
         </Button>
@@ -1329,7 +1416,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             )}
           </div>
           <div className="flex-1">
-            <span className="text-lg text-white block">Close Friends 💛</span>
+            <span className="text-lg text-white block">Close Friends</span>
             <span className="text-sm text-white/50">Only your closest friends</span>
           </div>
         </button>
@@ -1363,7 +1450,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             )}
           </div>
           <div className="flex-1">
-            <span className="text-lg text-white block">Mutual Friends 🔗</span>
+            <span className="text-lg text-white block">Mutual Friends</span>
             <span className="text-sm text-white/50">Friends + their friends</span>
           </div>
         </button>
@@ -1411,7 +1498,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             )}
           </div>
           <div className="flex-1">
-            <span className="text-lg text-white block">Close Friends 💛</span>
+            <span className="text-lg text-white block">Close Friends</span>
             <span className="text-sm text-white/50">Only your closest friends</span>
           </div>
         </button>
@@ -1445,7 +1532,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             )}
           </div>
           <div className="flex-1">
-            <span className="text-lg text-white block">Mutual Friends 🔗</span>
+            <span className="text-lg text-white block">Mutual Friends</span>
             <span className="text-sm text-white/50">Friends + their friends</span>
           </div>
         </button>
@@ -1482,7 +1569,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           <div className="flex items-center justify-center py-8">
             <div className="flex items-center gap-3 text-white/70">
               <MapPin className="h-5 w-5 animate-pulse text-[#6366f1]" />
-              <span>📍 Detecting your neighborhood...</span>
+              <span>Detecting your neighborhood...</span>
             </div>
           </div>
         </div>
@@ -1508,7 +1595,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           <div className="h-px bg-white/20" />
 
           <div className="text-center py-4">
-            <p className="text-white/60 text-sm mb-2">📍 Detected:</p>
+            <p className="text-white/60 text-sm mb-2">Detected:</p>
             <p className="text-2xl font-semibold text-white">{privatePartyNeighborhood}</p>
           </div>
 

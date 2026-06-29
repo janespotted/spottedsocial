@@ -164,10 +164,14 @@ export function useFeed(options: UseFeedOptions) {
       const uniqueFriendIds = [...new Set(friendIds)];
       const userIds = [userId, ...uniqueFriendIds];
 
-      // Join with venues to get city for filtering — only show posts from current city
+      // Fetch friends-of-friends for mutual_friends visibility expansion
+      const { data: mutualData } = await supabase.rpc('get_mutual_friend_ids', { p_user_id: userId });
+      const mutualFriendIds = (mutualData || []).map((r: any) => r.user_id as string);
+
+      // Fetch posts (city filtering done client-side if venue_id exists)
       let query = supabase
         .from('posts')
-        .select('*, venues!left(city)')
+        .select('*')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(POSTS_PER_PAGE);
@@ -179,18 +183,29 @@ export function useFeed(options: UseFeedOptions) {
       if (demoEnabled) {
         query = query.or(`user_id.in.(${userIds.join(',')}),is_demo.eq.true`);
       } else {
-        query = query.in('user_id', userIds).eq('is_demo', false);
+        // Include: own posts + friends' posts + mutual friends' posts with mutual_friends visibility
+        const allVisibleIds = [...userIds];
+        if (mutualFriendIds.length > 0) {
+          // Fetch posts from direct friends (any visibility) + mutual friends (only mutual_friends visibility)
+          query = query.or(
+            `and(user_id.in.(${userIds.join(',')}),is_demo.eq.false),and(user_id.in.(${mutualFriendIds.join(',')}),visibility.eq.mutual_friends,is_demo.eq.false)`
+          );
+        } else {
+          query = query.in('user_id', userIds).eq('is_demo', false);
+        }
       }
 
       const postsResult = await query;
 
-      // Filter out posts from other cities (keep posts without a venue, e.g. own posts)
-      const cityFilteredPosts = (postsResult.data || []).filter((post: any) => {
-        const venueCity = post.venues?.city;
-        // If the post has a venue with a known city, only show if it matches current city
-        if (venueCity && city && venueCity !== city) return false;
-        return true;
-      });
+      if (postsResult.error) {
+        console.error('[useFeed] posts query error:', postsResult.error.message, postsResult.error);
+        // Show error to user for debugging
+        const { toast } = await import('sonner');
+        toast.error(`Feed error: ${postsResult.error.message}`);
+        return;
+      }
+
+      const cityFilteredPosts = postsResult.data || [];
 
       const postUserIds = [...new Set(cityFilteredPosts.map((p: any) => p.user_id))];
 
@@ -250,8 +265,10 @@ export function useFeed(options: UseFeedOptions) {
           setLikedPosts(new Set(likes?.map(l => l.post_id) || []));
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.apiError('fetchPosts', error);
+      const { toast } = await import('sonner');
+      toast.error(`Feed catch: ${error?.message || error}`);
       if (!cursor) {
         const cached = getCachedPosts?.();
         if (cached) setPosts(cached);
@@ -474,6 +491,7 @@ export function useFeed(options: UseFeedOptions) {
 
       if (error) {
         console.error('Error liking post:', error);
+        // Revert optimistic update
         setLikedPosts(prev => {
           const newSet = new Set(prev);
           newSet.delete(postId);
@@ -484,10 +502,27 @@ export function useFeed(options: UseFeedOptions) {
         // Notify post owner about the like
         const post = posts.find(p => p.id === postId);
         if (post && post.user_id !== userId) {
+          // Get liker's name for a better notification
+          const { data: likerProfile } = await supabase
+            .from('profiles')
+            .select('display_name')
+            .eq('id', userId)
+            .single();
+          const likerName = likerProfile?.display_name?.split(' ')[0] || 'Someone';
+          const message = `${likerName} liked your post${post.venue_name ? ` at ${post.venue_name}` : ''}`;
+
+          // Skip notification for demo users
+          const { data: ownerProfile } = await supabase
+            .from('profiles')
+            .select('is_demo')
+            .eq('id', post.user_id)
+            .single();
+          if (ownerProfile?.is_demo) return;
+
           supabase.rpc('create_notification', {
             p_receiver_id: post.user_id,
             p_type: 'post_like',
-            p_message: 'Someone liked your post',
+            p_message: message,
           }).then(({ data }) => {
             const notif = Array.isArray(data) ? data[0] : data;
             if (notif?.id) {
@@ -496,7 +531,7 @@ export function useFeed(options: UseFeedOptions) {
                 receiver_id: post.user_id,
                 sender_id: userId!,
                 type: 'post_like',
-                message: 'Someone liked your post',
+                message,
               });
             }
           });
@@ -583,6 +618,7 @@ export function useFeed(options: UseFeedOptions) {
     likedPosts,
     likedComments,
     expandedPostId,
+    setExpandedPostId,
     comments,
     newComment,
     setNewComment,

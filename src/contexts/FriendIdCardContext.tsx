@@ -31,6 +31,10 @@ export function FriendIdCardProvider({ children }: { children: ReactNode }) {
       return;
     }
     setSelectedFriend(friend);
+    // Track profile view for FOMO notification
+    import('@/lib/fomo-notifications').then(({ notifyProfileViewed }) => {
+      notifyProfileViewed(friend.userId);
+    }).catch(() => {});
   };
 
   const closeFriendCard = () => {

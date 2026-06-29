@@ -113,7 +113,7 @@ export default function InviteLanding() {
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
-        <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#0a0118] rounded-3xl">
+        <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#110a24] rounded-3xl">
           <CardContent className="pt-8 pb-8 text-center">
             <div className="w-20 h-20 rounded-full bg-[#2d1b4e] flex items-center justify-center mx-auto mb-6 border border-[#a855f7]/40">
               <Users className="h-10 w-10 text-[#a855f7]/60" />
@@ -134,7 +134,7 @@ export default function InviteLanding() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
-      <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#0a0118] rounded-3xl">
+      <Card className="w-full max-w-[430px] mx-auto border-2 border-[#a855f7]/40 shadow-[0_0_30px_rgba(168,85,247,0.4)] bg-[#110a24] rounded-3xl">
         <CardContent className="pt-8 pb-8 text-center">
           {/* Spotted Logo */}
           <h1 className="text-4xl font-light tracking-[0.3em] text-white mb-8">

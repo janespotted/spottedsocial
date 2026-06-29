@@ -607,120 +607,116 @@ export function VenueIdCard() {
       {/* Mobile frame constrained container */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-full z-[300] flex items-center justify-center px-4 pointer-events-none">
               {/* Card */}
-              <div 
-                className="relative w-full max-w-[390px] max-h-[85vh] flex flex-col bg-gradient-to-b from-[#2d1b4e]/95 via-[#1a0f2e]/95 to-[#0a0118]/95 backdrop-blur-xl border-2 border-[#a855f7] rounded-3xl p-0 overflow-hidden pointer-events-auto animate-card-lift"
+              <div
+                className="relative w-full max-w-[390px] max-h-[85vh] flex flex-col bg-[#0d0a18] border border-white/10 rounded-3xl p-0 overflow-hidden pointer-events-auto animate-card-lift"
                 {...swipeHandlers}
               >
-                {/* Close button */}
-                <button 
-                  onClick={closeVenueCard}
-                  className="absolute right-4 top-4 z-20 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                >
-                  <CloseIcon className="h-4 w-4 text-white" />
-                  <span className="sr-only">Close</span>
-                </button>
-
-                {/* Three-dot menu positioned below the X close button */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="absolute right-4 top-14 z-20 p-1 rounded-full hover:bg-white/10 transition-colors">
-                    <MoreVertical className="h-5 w-5 text-white/60" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
-                    <DropdownMenuItem 
-                      onClick={() => setShowReportDialog(true)}
-                      className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
-                    >
-                      <Flag className="h-4 w-4 mr-2" />
-                      Report Venue
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
                 <div className="flex-1 min-h-0 overflow-y-auto">
-                  <div className="p-5">
-              {/* Photo Carousel - Google photos + Yap media */}
+              {/* Photo section with overlaid close button */}
               {(() => {
                 const allCarouselItems: { type: 'google' | 'yap'; url: string; mediaType: string }[] = [
                   ...googlePhotos.map(url => ({ type: 'google' as const, url, mediaType: 'image' })),
                   ...yapMedia.map(m => ({ type: 'yap' as const, url: m.url, mediaType: m.media_type })),
                 ];
-                
-                return allCarouselItems.length > 0 ? (
-                  <div className="relative mb-4 -mx-5 -mt-5">
-                    <Carousel className="w-full">
-                      <CarouselContent>
-                        {allCarouselItems.map((item, index) => (
-                          <CarouselItem key={index}>
-                            <div className="relative w-full h-56 overflow-hidden">
-                              <img
-                                src={item.url}
-                                alt={`${venue.name} photo ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                            </div>
-                          </CarouselItem>
-                        ))}
-                      </CarouselContent>
-                      {allCarouselItems.length > 1 && (
-                        <>
-                          <CarouselPrevious className="left-2 bg-white/90 hover:bg-white border-none" />
-                          <CarouselNext className="right-2 bg-white/90 hover:bg-white border-none" />
-                        </>
-                      )}
-                    </Carousel>
-                  </div>
-                ) : (
-                  <div className="relative mb-4 -mx-5 -mt-5">
-                    <div className="w-full h-56 bg-gradient-to-br from-[#a855f7]/40 to-[#d4ff00]/40" />
+
+                return (
+                  <div className="relative">
+                    {allCarouselItems.length > 0 ? (
+                      <Carousel className="w-full">
+                        <CarouselContent>
+                          {allCarouselItems.map((item, index) => (
+                            <CarouselItem key={index}>
+                              <div className="relative w-full h-56 overflow-hidden rounded-t-3xl">
+                                <img
+                                  src={item.url}
+                                  alt={`${venue.name} photo ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                              </div>
+                            </CarouselItem>
+                          ))}
+                        </CarouselContent>
+                        {allCarouselItems.length > 1 && (
+                          <>
+                            <CarouselPrevious className="left-2 bg-white/90 hover:bg-white border-none" />
+                            <CarouselNext className="right-2 bg-white/90 hover:bg-white border-none" />
+                          </>
+                        )}
+                      </Carousel>
+                    ) : (
+                      <div className="w-full h-56 bg-gradient-to-br from-[#a855f7]/30 via-[#1a0f2e] to-[#d4ff00]/20 rounded-t-3xl" />
+                    )}
+
+                    {/* Close button overlaid on photo */}
+                    <button
+                      onClick={closeVenueCard}
+                      className="absolute right-3 top-3 z-20 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors"
+                    >
+                      <CloseIcon className="h-4 w-4 text-white" />
+                    </button>
+
+                    {/* Three-dot menu */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="absolute right-3 top-14 z-20 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors">
+                        <MoreVertical className="h-4 w-4 text-white/80" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
+                        <DropdownMenuItem
+                          onClick={() => setShowReportDialog(true)}
+                          className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
+                        >
+                          <Flag className="h-4 w-4 mr-2" />
+                          Report Venue
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 );
               })()}
 
-              {/* Venue Info */}
-              <div className="mb-4">
-                <div className="flex items-start justify-between mb-1">
-                   {/* Featured Tonight pill for promoted venues */}
-                   {venue.is_map_promoted && (
-                     <span className="inline-flex items-center gap-1 px-2 py-0.5 mb-2 rounded-full text-[10px] font-medium bg-[#d4ff00]/10 text-[#d4ff00] border border-[#d4ff00]/20">
-                       Featured Tonight
-                     </span>
-                   )}
-                 </div>
-                 <div className="flex items-start justify-between mb-1">
-                  <h2 className="text-2xl font-bold text-white flex-1">
-                    {venue.name}
-                  </h2>
-                </div>
+                  <div className="p-5 pt-4">
 
-                {/* Venue Type Badge */}
-                {venue.type && (
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border mb-2 ${getVenueTypeDisplay(venue.type).color}`}>
-                    {getVenueTypeDisplay(venue.type).icon} {getVenueTypeDisplay(venue.type).label}
+              {/* Venue Info */}
+              <div className="mb-3">
+                {venue.is_map_promoted && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 mb-2 rounded-full text-[10px] font-medium bg-[#d4ff00]/10 text-[#d4ff00] border border-[#d4ff00]/20">
+                    Featured Tonight
                   </span>
                 )}
+                <h2 className="text-2xl font-bold text-white mb-1.5">
+                  {venue.name}
+                </h2>
 
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm text-white/60 italic">
-                    {venue.neighborhood} • {distance} mi
-                  </p>
-                  {/* Operating Hours Badge */}
-                  {venueHours && !loadingHours && (
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      venueHours.isOpen 
-                        ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                        : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    }`}>
-                      {venueHours.isOpen ? '○ Open' : '● Closed'}
+                {venue.type && (
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border bg-white/5 text-white/70 border-white/15">
+                      {getVenueTypeDisplay(venue.type).icon} {getVenueTypeDisplay(venue.type).label}
                     </span>
-                  )}
-                  {/* Energy Level Bars - Based on total check-ins, only show when venue is open */}
-                  {venueHours?.isOpen && (
-                    <div className="flex-shrink-0">
-                      {renderEnergyBars(calculateEnergyLevel(totalCheckIns))}
-                    </div>
-                  )}
-                </div>
+                    {venueHours && !loadingHours && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        venueHours.isOpen
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                      }`}>
+                        {venueHours.isOpen ? 'Open' : 'Closed'}
+                      </span>
+                    )}
+                    {venueHours?.isOpen && (
+                      <div className="flex-shrink-0">
+                        {renderEnergyBars(calculateEnergyLevel(totalCheckIns))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-sm text-white/50 italic">
+                  {venue.neighborhood} • {distance} mi
+                </p>
               </div>
+
+              {/* Divider */}
+              <div className="h-px bg-white/10 mb-3" />
 
               {/* Friends at Venue - Clean layout */}
               <div className="mb-4">
@@ -785,7 +781,9 @@ export function VenueIdCard() {
                         </span>
                       </>
                     ) : (
-                      <span className="text-sm text-white/60">Be the first to bring your crew 🎉</span>
+                      <span className="text-sm text-white/50 flex items-center gap-1.5">
+                        <span className="text-base">✨</span> Nothing here yet
+                      </span>
                     )}
                   </div>
                 </div>
@@ -795,7 +793,6 @@ export function VenueIdCard() {
               {friendsPlanning.length > 0 && (
                 <div className="mb-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-base">🎯</span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <button className="flex -space-x-2 cursor-pointer hover:opacity-90 transition-opacity">
@@ -858,18 +855,18 @@ export function VenueIdCard() {
               {/* Primary CTA - Invite Friends */}
               <Button
                 onClick={() => openInviteModal(venue.id, venue.name)}
-                className="w-full mb-3 bg-gradient-to-r from-[#c4ee00] to-[#d4ff00] text-black font-semibold shadow-[0_2px_8px_rgba(212,255,0,0.25)] hover:shadow-[0_4px_16px_rgba(212,255,0,0.4)] transition-all duration-300"
+                className="w-full mb-3 h-11 bg-[#d4ff00] text-black font-semibold hover:bg-[#d4ff00]/90 transition-colors rounded-xl"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Invite Friends Here
               </Button>
 
-              {/* Secondary CTAs - Full Width Row */}
+              {/* Secondary CTAs */}
               <div className="flex gap-3 mb-4">
                 <Button
                   onClick={handleMapPinClick}
                   variant="outline"
-                  className="flex-1 bg-[#a855f7]/10 hover:bg-[#a855f7]/20 text-white border border-[#a855f7]/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all duration-300"
+                  className="flex-1 h-11 bg-white/5 hover:bg-white/10 text-white border border-white/15 rounded-xl transition-colors"
                 >
                   <MapPin className="w-4 h-4 mr-2" />
                   Directions
@@ -877,7 +874,7 @@ export function VenueIdCard() {
                 <Button
                   onClick={handleShareVenue}
                   variant="outline"
-                  className="flex-1 bg-[#a855f7]/10 hover:bg-[#a855f7]/20 text-white border border-[#a855f7]/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all duration-300"
+                  className="flex-1 h-11 bg-white/5 hover:bg-white/10 text-white border border-white/15 rounded-xl transition-colors"
                 >
                   <Share2 className="w-4 h-4 mr-2" />
                   Share
@@ -966,7 +963,7 @@ export function VenueIdCard() {
                   {/* Google rating sub-section */}
                   {googleRating && (
                     <div className="text-center text-xs text-white/40 pb-2">
-                      {googleRating.toFixed(1)} ⭐ on Google ({googleRatingsCount.toLocaleString()})
+                      {googleRating.toFixed(1)} on Google ({googleRatingsCount.toLocaleString()})
                     </div>
                   )}
                 </CollapsibleContent>

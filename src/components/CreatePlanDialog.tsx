@@ -9,9 +9,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import { useUserCity } from '@/hooks/useUserCity';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { triggerPushNotification } from '@/lib/push-notifications';
 
 import { toast } from 'sonner';
 import { format, addDays } from 'date-fns';
@@ -52,6 +54,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
   const [venueSearch, setVenueSearch] = useState('');
   const [venues, setVenues] = useState<Venue[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
   const { city } = useUserCity();
   const demoEnabled = useDemoMode();
   const queryClient = useQueryClient();
@@ -187,6 +190,38 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
         if (participantsError) {
           console.error('Error adding participants:', participantsError);
         }
+
+        // Notify each invited friend
+        const senderName = user?.user_metadata?.display_name || user?.user_metadata?.full_name || 'Someone';
+        const senderAvatar = user?.user_metadata?.avatar_url || null;
+        for (const friend of selectedFriends) {
+          // Skip demo users (not in auth.users, FK would fail)
+          const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+          const friendProfile = allProfiles.find((p: any) => p.id === friend.id);
+          if (friendProfile?.is_demo) continue;
+
+          const message = `${senderName} invited you to their plans at ${selectedVenue.name}`;
+          supabase.rpc('create_notification', {
+            p_receiver_id: friend.id,
+            p_type: 'plan_invite',
+            p_message: message,
+          }).then(({ data, error: notifErr }) => {
+            if (notifErr) {
+              console.error('Plan invite notification error:', notifErr);
+              return;
+            }
+            const notif = Array.isArray(data) ? data[0] : data;
+            if (notif?.id) {
+              triggerPushNotification({
+                id: notif.id,
+                receiver_id: friend.id,
+                sender_id: userId,
+                type: 'plan_invite',
+                message,
+              });
+            }
+          });
+        }
       }
 
       toast.success('Plan posted! 🎉');
@@ -220,6 +255,16 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
       label: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : format(date, 'EEE, MMM d')
     };
   });
+
+  const timeOptions = Array.from({ length: 24 }, (_, i) => {
+    const hour24 = (i + 16) % 24; // Start at 4 PM, wrap around
+    const hour12 = hour24 % 12 || 12;
+    const ampm = hour24 < 12 ? 'AM' : 'PM';
+    return [
+      { value: `${String(hour24).padStart(2, '0')}:00`, label: `${hour12}:00 ${ampm}` },
+      { value: `${String(hour24).padStart(2, '0')}:30`, label: `${hour12}:30 ${ampm}` },
+    ];
+  }).flat();
 
   if (!open) return null;
 
@@ -305,12 +350,15 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white/40 text-xs mb-1.5">Time</p>
-                <Input
-                  type="time"
+                <select
                   value={planTime}
                   onChange={(e) => setPlanTime(e.target.value)}
-                  className="w-full h-11 bg-[#1a1230] border-white/8 text-white rounded-xl text-sm focus:border-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
-                />
+                  className="w-full h-11 px-3 rounded-xl bg-[#1a1230] border border-white/8 text-white text-sm appearance-none"
+                >
+                  {timeOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
