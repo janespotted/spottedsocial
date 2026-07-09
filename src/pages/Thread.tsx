@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
@@ -212,6 +212,19 @@ export default function Thread() {
       setCurrentUserProfile(data);
     }
   };
+
+  // With Keyboard.resize: 'native' the webview shrinks when the keyboard
+  // opens, which cuts off the newest messages at the bottom of the list.
+  // Re-pin to the bottom once the keyboard has finished appearing.
+  useEffect(() => {
+    const onKeyboardShow = () => {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      });
+    };
+    window.addEventListener('keyboardDidShow', onKeyboardShow);
+    return () => window.removeEventListener('keyboardDidShow', onKeyboardShow);
+  }, []);
 
   const prevMessageCount = useRef(0);
   useEffect(() => {
@@ -515,7 +528,10 @@ export default function Thread() {
       .replace(' ago', '');
   };
 
-  const groupMessages = () => {
+  // Memoized: recomputes only when messages change, instead of on every
+  // render (typing indicator updates, reactions, etc. were re-running this
+  // repeatedly while the user typed).
+  const messageGroups = useMemo(() => {
     const grouped: { timestamp: string; messages: Message[] }[] = [];
     let currentGroup: Message[] = [];
     let lastTimestamp = '';
@@ -544,7 +560,17 @@ export default function Thread() {
     }
 
     return grouped;
-  };
+  }, [messages]);
+
+  // Last message sent by the current user (drives the "Seen" indicator) —
+  // computed once per messages change instead of scanning all groups inside
+  // the render loop for every message.
+  const lastSentByMeId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender_id === user?.id) return messages[i].id;
+    }
+    return null;
+  }, [messages, user?.id]);
 
   const handleSaveGroupName = async () => {
     if (!threadId) return;
@@ -943,7 +969,7 @@ export default function Thread() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-        {groupMessages().map((group, groupIdx) => (
+        {messageGroups.map((group, groupIdx) => (
           <div key={groupIdx} className="space-y-3">
             {/* Timestamp */}
             <div className="flex justify-center">
@@ -955,19 +981,8 @@ export default function Thread() {
               const isCurrentUser = message.sender_id === user?.id;
               const sender = !isCurrentUser ? memberMap.get(message.sender_id) : null;
 
-              // Determine if this is the last message sent by current user in the entire thread
-              const isLastSentByMe = isCurrentUser && (() => {
-                // Find the very last message sent by current user across all groups
-                for (let g = groupMessages().length - 1; g >= 0; g--) {
-                  const grp = groupMessages()[g];
-                  for (let m = grp.messages.length - 1; m >= 0; m--) {
-                    if (grp.messages[m].sender_id === user?.id) {
-                      return grp.messages[m].id === message.id;
-                    }
-                  }
-                }
-                return false;
-              })();
+              // Last message sent by the current user (precomputed above)
+              const isLastSentByMe = isCurrentUser && message.id === lastSentByMeId;
 
               const showSeen = isLastSentByMe && !groupInfo && bothShowReceipts && otherReadAt && 
                 new Date(otherReadAt) >= new Date(message.created_at);

@@ -64,7 +64,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
         // Create lookup map for O(1) access - filter to only senders we need
         const profileMap = new Map(
-          profiles?.filter(p => senderIds.includes(p.id)).map(p => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url?.includes('dicebear.com') ? null : p.avatar_url }]) || []
+          profiles?.filter(p => senderIds.includes(p.id)).map(p => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url }]) || []
         );
 
         // Attach profiles and filter to tonight only (5am boundary)
@@ -111,7 +111,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
           const newNotification = {
             ...payload.new,
-            sender_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url?.includes('dicebear.com') ? null : profile.avatar_url } : undefined
+            sender_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined
           } as Notification;
 
           console.log('Setting latest notification:', newNotification);
@@ -174,7 +174,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             message: preview,
             is_read: false,
             created_at: newMsg.created_at || new Date().toISOString(),
-            sender_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url?.includes('dicebear.com') ? null : profile.avatar_url } : undefined,
+            sender_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined,
             thread_id: newMsg.thread_id,
           };
 

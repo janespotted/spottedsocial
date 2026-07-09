@@ -24,6 +24,7 @@ interface Plan {
   venue_name: string;
   plan_date: string;
   plan_time: string;
+  plan_type: string | null;
   description: string;
   visibility: string;
   score: number;

@@ -129,7 +129,7 @@ export default function Feed() {
         fetchPostsRef.current(),
       ]).finally(() => setIsLoading(false));
     }
-  }, [user, demoEnabled, city]);
+  }, [user?.id, demoEnabled, city]);
 
   useRealtimeSubscriptions({
     onNewPost: handleIncrementalNewPost,

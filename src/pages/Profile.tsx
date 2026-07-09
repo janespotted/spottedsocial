@@ -9,8 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
-import { FriendsOutPill } from '@/components/FriendsOutPill';
-import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode, Camera, Search, Heart, MessageCircle } from 'lucide-react';
+import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode, Camera, Search, Heart, MessageCircle, Contact } from 'lucide-react';
+import { ContactsSync } from '@/components/ContactsSync';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { QRCodeModal } from '@/components/QRCodeModal';
@@ -84,6 +84,7 @@ export default function Profile() {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [showQuickStatus, setShowQuickStatus] = useState(false);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
+  const [showContactsSync, setShowContactsSync] = useState(false);
   const [showUpdateSpot, setShowUpdateSpot] = useState(false);
   
 
@@ -427,9 +428,6 @@ export default function Profile() {
         enableAdminGesture
       />
 
-      {/* Friends Out Pill */}
-      <FriendsOutPill />
-
       {/* Content */}
       <div className="px-4 py-5 space-y-5">
         {/* Avatar + Name + Username */}
@@ -492,6 +490,21 @@ export default function Profile() {
             <Settings className="h-4 w-4" />
           </button>
         </div>
+
+        {/* Find from Contacts */}
+        <button
+          onClick={() => setShowContactsSync(true)}
+          className="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-[#a855f7]/10 to-[#d4ff00]/5 border border-[#a855f7]/20 hover:border-[#a855f7]/40 transition-colors"
+        >
+          <div className="w-9 h-9 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
+            <Contact className="h-4.5 w-4.5 text-[#a855f7]" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-white text-sm font-medium">Find Friends from Contacts</p>
+            <p className="text-white/30 text-xs">See who's already on Spotted</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-white/20" />
+        </button>
 
         {/* Admin: Demo Mode + Camera Test */}
         {user?.email === 'jane.reynolds752@gmail.com' && (
@@ -733,6 +746,7 @@ export default function Profile() {
       />
 
       <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
+      <ContactsSync open={showContactsSync} onClose={() => setShowContactsSync(false)} />
 
       <UpdateSpotSheet
         open={showUpdateSpot}

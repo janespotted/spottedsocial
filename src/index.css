@@ -414,10 +414,8 @@ video.feed-video::-webkit-media-controls-enclosure {
 
 /* ── Performance & native-feel optimizations ── */
 
-/* GPU layer promotion for frequently animated elements */
-.post-animate-in,
-[class*="transition-"],
-[class*="animate-"] {
+/* GPU layer promotion for post animations */
+.post-animate-in {
   will-change: auto;
   -webkit-transform: translateZ(0);
   transform: translateZ(0);

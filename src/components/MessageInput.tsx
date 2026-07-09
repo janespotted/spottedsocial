@@ -8,6 +8,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { isNativePlatform } from '@/lib/platform';
+import { openSpottedCamera } from '@/lib/spotted-camera';
 
 interface MessageInputProps {
   onSendMessage: (text: string) => void;
@@ -74,8 +76,16 @@ export const MessageInput = memo(function MessageInput({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="bg-[#1a0f2e] border-[#a855f7]/40">
-            <DropdownMenuItem 
-              onClick={() => cameraInputRef.current?.click()}
+            <DropdownMenuItem
+              onClick={() => {
+                if (isNativePlatform()) {
+                  openSpottedCamera()
+                    .then((result) => onImageUpload(result.file))
+                    .catch(() => {});
+                } else {
+                  cameraInputRef.current?.click();
+                }
+              }}
               className="text-white hover:bg-[#2d1b4e] cursor-pointer"
             >
               <Camera className="mr-2 h-4 w-4" />

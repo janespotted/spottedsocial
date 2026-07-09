@@ -9,7 +9,11 @@ PODS:
     - Capacitor
   - CapacitorClipboard (8.0.1):
     - Capacitor
+  - CapacitorCommunityAppleSignIn (7.1.0):
+    - Capacitor
   - CapacitorCommunityBackgroundGeolocation (1.2.26):
+    - Capacitor
+  - CapacitorCommunityContacts (7.2.0):
     - Capacitor
   - CapacitorCordova (6.2.1)
   - CapacitorGeolocation (8.2.0):
@@ -35,7 +39,9 @@ DEPENDENCIES:
   - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
   - "CapacitorClipboard (from `../../node_modules/@capacitor/clipboard`)"
+  - "CapacitorCommunityAppleSignIn (from `../../node_modules/@capacitor-community/apple-sign-in`)"
   - "CapacitorCommunityBackgroundGeolocation (from `../../node_modules/@capacitor-community/background-geolocation`)"
+  - "CapacitorCommunityContacts (from `../../node_modules/@capacitor-community/contacts`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorGeolocation (from `../../node_modules/@capacitor/geolocation`)"
   - "CapacitorHaptics (from `../../node_modules/@capacitor/haptics`)"
@@ -60,8 +66,12 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/camera"
   CapacitorClipboard:
     :path: "../../node_modules/@capacitor/clipboard"
+  CapacitorCommunityAppleSignIn:
+    :path: "../../node_modules/@capacitor-community/apple-sign-in"
   CapacitorCommunityBackgroundGeolocation:
     :path: "../../node_modules/@capacitor-community/background-geolocation"
+  CapacitorCommunityContacts:
+    :path: "../../node_modules/@capacitor-community/contacts"
   CapacitorCordova:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorGeolocation:
@@ -85,7 +95,9 @@ SPEC CHECKSUMS:
   CapacitorBrowser: e72e572d5dbdbb854fda5950586a2451e981f2d6
   CapacitorCamera: 592acb7ab9fb748e2d8571eb03af30ec4e1ace12
   CapacitorClipboard: c75fdaa6e622111119f35e7914ecfc67b05efecb
+  CapacitorCommunityAppleSignIn: 271cb2860576fd2961508bbfa7a82117d93eadca
   CapacitorCommunityBackgroundGeolocation: 750523ec6dd1cc94cf4e2bf7787605106753f73c
+  CapacitorCommunityContacts: 12008d6650ba80d7bb948a70fe31fec6813d49dc
   CapacitorCordova: 8d93e14982f440181be7304aa9559ca631d77fff
   CapacitorGeolocation: b36f6287bfc9f2eefa04dc900496f2c8ae666136
   CapacitorHaptics: 2079d9fa04c5a71e18663b4722323c304c58245c
@@ -96,6 +108,6 @@ SPEC CHECKSUMS:
   CapawesomeCapacitorFilePicker: c40822f0a39f86855321943c7829d52bca7f01bd
   IONGeolocationLib: 6a7b6f76063fb1b01cfb14fae7d0f526e3c9b271
 
-PODFILE CHECKSUM: 8de04306bff3180b4723f4c6c1ea8bb6ad55d241
+PODFILE CHECKSUM: 1eadae2ca6d65de2c451b0f93d19758366279b0e
 
 COCOAPODS: 1.16.2

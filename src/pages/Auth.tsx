@@ -67,7 +67,7 @@ export default function Auth() {
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(true);
 
   // Dev login
   const [showDevLogin, setShowDevLogin] = useState(false);

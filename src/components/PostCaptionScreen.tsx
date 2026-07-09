@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, MapPin, Loader2, Users, Heart, Share2, ChevronRight, Check, X } from 'lucide-react';
+import { MapPin, Loader2, Users, Heart, Share2, ChevronRight, Check, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -219,55 +219,51 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
   };
 
   return (
-    <div className="fixed inset-0 z-[500] bg-[#110a24] flex flex-col pt-[env(safe-area-inset-top,0px)]">
+    <div className="fixed inset-0 z-[500] bg-[#110a24] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 h-12">
-        <button
-          onClick={onBack}
-          className="p-1 -ml-1"
-        >
-          <ArrowLeft className="h-6 w-6 text-white" />
+      <div className="flex items-center justify-between px-4 h-11 shrink-0">
+        <button onClick={onBack} className="p-1 -ml-1">
+          <X className="h-5 w-5 text-white/70" />
         </button>
         <span className="text-white font-semibold text-base">New Post</span>
-        <button
-          onClick={handleShare}
-          disabled={loading}
-          className="text-[#d4ff00] font-semibold text-sm disabled:opacity-40"
-        >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#d4ff00]" /> : 'Share'}
-        </button>
+        <div className="w-6" />
       </div>
 
-      {/* Media Preview — fills available space */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {mediaType === 'video' ? (
-          <video
-            src={imagePreview}
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full h-full object-cover"
-            onLoadedData={(e) => {
-              (e.target as HTMLVideoElement).play().catch(() => {});
-            }}
-          />
-        ) : (
-          <img
-            src={imagePreview}
-            alt="Post preview"
-            className="w-full h-full object-cover"
-          />
-        )}
+      {/* Photo — flexible height, caps at 45vh */}
+      <div className="shrink min-h-0 px-4 pb-2">
+        <div className="relative mx-auto rounded-2xl overflow-hidden bg-black/40 h-full" style={{ maxHeight: '45vh' }}>
+          {mediaType === 'video' ? (
+            <video
+              src={imagePreview}
+              autoPlay loop muted playsInline
+              className="w-full h-full object-contain rounded-2xl"
+              style={{ maxHeight: '45vh' }}
+              onLoadedData={(e) => { (e.target as HTMLVideoElement).play().catch(() => {}); }}
+            />
+          ) : (
+            <img
+              src={imagePreview}
+              alt="Post preview"
+              className="w-full h-full object-contain rounded-2xl"
+              style={{ maxHeight: '45vh' }}
+            />
+          )}
+          <button
+            onClick={onBack}
+            className="absolute bottom-2 left-2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white/80 text-xs font-medium"
+          >
+            Retake
+          </button>
+        </div>
       </div>
 
-      {/* Metadata — pinned at bottom */}
-      <div className="shrink-0 pb-[env(safe-area-inset-bottom,0px)]">
-        {/* Caption */}
-        <div className="flex items-start gap-3 px-4 py-3">
-          <Avatar className="h-8 w-8 flex-shrink-0 mt-0.5">
+      {/* Metadata — fixed height rows, no scroll */}
+      <div className="shrink-0 px-5">
+        {/* Caption — compact */}
+        <div className="flex items-center gap-2.5 py-2">
+          <Avatar className="h-7 w-7 flex-shrink-0">
             <AvatarImage src={profile?.avatar_url || undefined} />
-            <AvatarFallback className="bg-[#1a0a2e] text-white text-xs">
+            <AvatarFallback className="bg-[#1a0a2e] text-white text-[10px]">
               {profile?.display_name?.[0] || 'U'}
             </AvatarFallback>
           </Avatar>
@@ -275,22 +271,24 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             placeholder="Write a caption..."
-            className="flex-1 bg-transparent text-white placeholder:text-white/40 resize-none text-sm leading-relaxed focus:outline-none min-h-[44px]"
+            className="flex-1 bg-transparent text-white placeholder:text-white/40 resize-none text-sm leading-snug focus:outline-none py-1"
             maxLength={500}
-            rows={2}
+            rows={1}
+            onFocus={(e) => { (e.target as HTMLTextAreaElement).rows = 3; }}
+            onBlur={(e) => { (e.target as HTMLTextAreaElement).rows = 1; }}
           />
         </div>
 
-        <div className="mx-4 border-t border-white/8" />
+        <div className="border-t border-white/[0.06]" />
 
-        {/* Location Row */}
+        {/* Location row */}
         {capturingLocation ? (
-          <div className="flex items-center gap-3 px-4 py-3">
+          <div className="flex items-center gap-3 py-2.5">
             <Loader2 className="h-4 w-4 text-white/40 animate-spin" />
             <span className="text-white/40 text-sm">Detecting location...</span>
           </div>
         ) : showVenueInput ? (
-          <div className="px-4 py-2.5">
+          <div className="py-2">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-white/40 flex-shrink-0" />
               <Input
@@ -298,31 +296,30 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
                 onChange={(e) => setCustomVenueName(e.target.value)}
                 placeholder="Search venues..."
                 autoFocus
-                className="flex-1 h-9 bg-white/5 border-white/10 text-white text-sm placeholder:text-white/30 rounded-lg px-3 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/20"
+                className="flex-1 h-8 bg-white/5 border-white/10 text-white text-sm placeholder:text-white/30 rounded-lg px-2.5 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/20"
               />
               <Button
                 onClick={handleCreateVenue}
                 disabled={!customVenueName.trim() || loading}
                 size="sm"
-                className="h-9 bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90 rounded-lg px-3 text-xs font-semibold"
+                className="h-8 bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90 rounded-lg px-2.5 text-xs font-semibold"
               >
                 Add
               </Button>
               <button
                 onClick={() => { setShowVenueInput(false); setVenueSuggestions([]); }}
-                className="p-1 text-white/40 hover:text-white/60"
+                className="p-0.5 text-white/40"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {/* Venue suggestions */}
             {venueSuggestions.length > 0 && (
-              <div className="mt-1.5 ml-6 rounded-lg border border-white/10 bg-[#1a0f2e] overflow-hidden">
+              <div className="mt-1 ml-6 rounded-lg border border-white/10 bg-[#1a0f2e] overflow-hidden max-h-32 overflow-y-auto">
                 {venueSuggestions.map((v) => (
                   <button
                     key={v.id}
                     onClick={() => selectVenueSuggestion(v)}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 border-b border-white/5 last:border-b-0"
                   >
                     <MapPin className="h-3.5 w-3.5 text-[#d4ff00] flex-shrink-0" />
                     <div className="min-w-0">
@@ -335,29 +332,35 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
             )}
           </div>
         ) : (
-          <button
-            onClick={() => setShowVenueInput(true)}
-            className="w-full flex items-center gap-3 px-4 py-3"
-          >
+          <button onClick={() => setShowVenueInput(true)} className="w-full flex items-center gap-3 py-2.5">
             <MapPin className="h-4 w-4 text-white/60" />
-            <span className={`flex-1 text-left text-sm ${location ? 'text-white' : 'text-white/60'}`}>
+            <span className={`flex-1 text-left text-sm ${location ? 'text-white' : 'text-white/40'}`}>
               {location || 'Add location'}
             </span>
-            <ChevronRight className="h-4 w-4 text-white/30" />
+            <ChevronRight className="h-4 w-4 text-white/20" />
           </button>
         )}
 
-        <div className="mx-4 border-t border-white/8" />
+        <div className="border-t border-white/[0.06]" />
 
-        {/* Audience Row */}
-        <button
-          onClick={() => setShowAudienceSheet(true)}
-          className="w-full flex items-center gap-3 px-4 py-3"
-        >
+        {/* Audience row */}
+        <button onClick={() => setShowAudienceSheet(true)} className="w-full flex items-center gap-3 py-2.5">
           <Users className="h-4 w-4 text-white/60" />
-          <span className="flex-1 text-left text-sm text-white/60">Audience</span>
+          <span className="flex-1 text-left text-sm text-white/40">Audience</span>
           <span className="text-white text-sm font-medium">{getVisibilityLabel()}</span>
-          <ChevronRight className="h-4 w-4 text-white/30" />
+          <ChevronRight className="h-4 w-4 text-white/20" />
+        </button>
+      </div>
+
+      {/* Post button — pinned at bottom, always visible */}
+      <div className="shrink-0 px-5 pt-2 mt-auto" style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>
+        <button
+          type="button"
+          onClick={handleShare}
+          disabled={loading || !imageFile}
+          className="w-full h-12 bg-[#d4ff00] text-black font-semibold text-base rounded-xl disabled:opacity-40 active:bg-[#d4ff00]/80 flex items-center justify-center"
+        >
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Post'}
         </button>
       </div>
 

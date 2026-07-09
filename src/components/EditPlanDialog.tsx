@@ -31,6 +31,7 @@ interface EditPlanDialogProps {
     venue_name: string;
     plan_date: string;
     plan_time: string;
+    plan_type: string | null;
     description: string;
     visibility: string;
   };
@@ -57,6 +58,7 @@ export function EditPlanDialog({ open, onOpenChange, plan, onPlanUpdated }: Edit
   );
   const [planDate, setPlanDate] = useState(plan.plan_date);
   const [planTime, setPlanTime] = useState(plan.plan_time);
+  const [planType, setPlanType] = useState<string | null>(plan.plan_type);
   const [visibility, setVisibility] = useState<'friends' | 'close_friends'>(
     plan.visibility as 'friends' | 'close_friends'
   );
@@ -89,6 +91,7 @@ export function EditPlanDialog({ open, onOpenChange, plan, onPlanUpdated }: Edit
       setSelectedVenue(plan.venue_id ? { id: plan.venue_id, name: plan.venue_name, neighborhood: '' } : null);
       setPlanDate(plan.plan_date);
       setPlanTime(plan.plan_time);
+      setPlanType(plan.plan_type);
       setVisibility(plan.visibility as 'friends' | 'close_friends');
     }
   }, [open, plan]);
@@ -203,6 +206,7 @@ export function EditPlanDialog({ open, onOpenChange, plan, onPlanUpdated }: Edit
           venue_name: selectedVenue.name,
           plan_date: planDate,
           plan_time: planTime,
+          plan_type: planType,
           description: description.trim() || null,
           visibility,
           expires_at: expiresAt.toISOString()
@@ -409,6 +413,26 @@ export function EditPlanDialog({ open, onOpenChange, plan, onPlanUpdated }: Edit
                         )}
                       </ScrollArea>
                     )}
+                  </div>
+
+                  {/* Plan Type */}
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                      Type
+                    </div>
+                    <select
+                      value={planType || ''}
+                      onChange={(e) => setPlanType(e.target.value || null)}
+                      className="w-full h-9 px-2 rounded-md bg-background/30 border border-border/30 text-foreground text-sm"
+                    >
+                      <option value="">Just a plan</option>
+                      <option value="event">Event</option>
+                      <option value="party">Party</option>
+                      <option value="dinner">Dinner</option>
+                      <option value="pregame">Pregame</option>
+                      <option value="afterparty">Afterparty</option>
+                      <option value="kickback">Kickback</option>
+                    </select>
                   </div>
 
                   {/* Description */}

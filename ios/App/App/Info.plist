@@ -24,6 +24,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Spotted needs camera access to take photos and videos for posts.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Spotted checks your contacts to help you find friends who are already on the app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Spotted uses your location to show which friends are nearby and detect when you arrive at venues.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

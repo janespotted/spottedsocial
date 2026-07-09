@@ -125,7 +125,7 @@ export function VenueInviteConfirmation() {
     }
   };
 
-  if (!showConfirmation) return null;
+  if (!showConfirmation || invitedFriends.length === 0) return null;
 
   const friendsText = invitedFriends.length === 1
     ? invitedFriends[0].displayName

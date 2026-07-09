@@ -68,6 +68,7 @@ interface PlanItemProps {
     venue_name: string;
     plan_date: string;
     plan_time: string;
+    plan_type: string | null;
     description: string;
     visibility: string;
     score: number;
@@ -396,8 +397,28 @@ export function PlanItem({ plan, currentUserId, userVote, onVoteChange, onEdit, 
   // Get current user's profile for avatar in down pill
   const currentUserDown = downs.find(d => d.user_id === currentUserId);
 
+  const planTypeLabels: Record<string, { label: string; emoji: string }> = {
+    event: { label: 'EVENT', emoji: '🎉' },
+    party: { label: 'PARTY', emoji: '🥳' },
+    dinner: { label: 'DINNER', emoji: '🍽️' },
+    pregame: { label: 'PREGAME', emoji: '🍻' },
+    afterparty: { label: 'AFTERPARTY', emoji: '🌙' },
+    kickback: { label: 'KICKBACK', emoji: '😎' },
+  };
+
+  const planTypeInfo = plan.plan_type ? planTypeLabels[plan.plan_type] : null;
+
   return (
     <div className="bg-white/[0.06] backdrop-blur-sm rounded-2xl p-4 transition-all duration-300">
+      {/* Plan Type Badge */}
+      {planTypeInfo && (
+        <div className="mb-2">
+          <span className="inline-flex items-center gap-1 bg-[#d4ff00]/15 text-[#d4ff00] text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-lg">
+            {planTypeInfo.emoji} {planTypeInfo.label}
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-3">

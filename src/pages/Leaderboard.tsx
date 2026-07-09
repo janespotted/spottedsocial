@@ -8,11 +8,12 @@ import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useUserCity } from '@/hooks/useUserCity';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
+import { useFriendIds } from '@/hooks/useFriendIds';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { PageHeader } from '@/components/PageHeader';
-import { ChevronUp, ChevronDown, Bell, BarChart3, ChevronRight, Search } from 'lucide-react';
+import { ChevronUp, ChevronDown, BarChart3, ChevronRight } from 'lucide-react';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +26,7 @@ import { CITY_NEIGHBORHOODS, getCityLabel } from '@/lib/city-neighborhoods';
 interface VenueStats {
   venue_name: string;
   venue_id: string | null;
+  neighborhood: string | null;
   count: number;
   rank: number;
   movement: 'up' | 'down' | 'same';
@@ -60,7 +62,8 @@ export default function Leaderboard() {
   const { city } = useUserCity();
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
-  useAutoVenueTracking(); // Trigger auto-venue tracking on leaderboard view
+  useAutoVenueTracking();
+  const { data: cachedFriendIds } = useFriendIds(user?.id);
   const [venues, setVenues] = useState<VenueStats[]>([]);
   const [biggestMover, setBiggestMover] = useState<BiggestMover | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,7 +115,7 @@ export default function Leaderboard() {
     if (user) {
       fetchLeaderboard();
     }
-  }, [user, demoEnabled, bootstrapEnabled, city, selectedNeighborhood]);
+  }, [user, demoEnabled, bootstrapEnabled, city, selectedNeighborhood, cachedFriendIds]);
 
   // Auto-refresh on tab/app return
   useVisibilityRefresh(() => {
@@ -154,7 +157,7 @@ export default function Leaderboard() {
           updated_at,
           is_promoted,
           is_demo,
-          venues!inner(popularity_rank, is_leaderboard_promoted, city, opened_at, operating_hours)
+          venues!inner(popularity_rank, is_leaderboard_promoted, city, opened_at, operating_hours, neighborhood)
         `)
         .eq('venues.city', city)
         .not('venue_name', 'is', null)
@@ -168,15 +171,10 @@ export default function Leaderboard() {
         query = query.eq('venues.neighborhood', selectedNeighborhood);
       }
 
-      // Hybrid mode: show real data + ALL demo data to populate leaderboard
-      if (bootstrapEnabled && !demoEnabled) {
-        // Show everything (both real and demo) to ensure leaderboard is populated
-        // No filter needed - promoted venues handled separately
-      } else if (!demoEnabled) {
-        // Pure real mode (only real data when bootstrap is off)
+      // Only show demo data when demo mode is explicitly ON
+      if (!demoEnabled) {
         query = query.eq('is_demo', false);
       }
-      // If demoEnabled is true, show everything (no filter)
 
       // Parallelize: fetch promoted venues AND night statuses at the same time
       // Fetch promoted venues ordered by leaderboard_promo_order (active spots are order 1-2)
@@ -261,6 +259,7 @@ export default function Leaderboard() {
         venueMap.set(venue.name, {
           venue_name: venue.name,
           venue_id: venue.id,
+          neighborhood: (venue as any).neighborhood || null,
           count: 0,
           rank,
           movement: 'same',
@@ -286,6 +285,7 @@ export default function Leaderboard() {
       venueMap.set(venue.name, {
         venue_name: venue.name,
         venue_id: venue.id,
+        neighborhood: venue.neighborhood || null,
         count: 0,
         rank: 0,
         movement: 'same',
@@ -321,6 +321,7 @@ export default function Leaderboard() {
         venueMap.set(venueName, {
           venue_name: venueName,
           venue_id: venueId,
+          neighborhood: status.venues?.neighborhood || null,
           count: 0,
           rank: 0,
           movement: 'same',
@@ -347,10 +348,9 @@ export default function Leaderboard() {
         venue.operatingHours = operatingHours;
       }
       
-      // In demo mode, show all avatars; in bootstrap mode, only show real user avatars
-      // Demo data still contributes to venue rankings/energy
-      // Always exclude the current user from the "Also here tonight" list
-      if ((demoEnabled || !bootstrapEnabled || !isDemo) && status.user_id !== user?.id) {
+      // Only show avatars for the current user's friends (close, direct, mutual)
+      const friendIdSet = cachedFriendIds || [];
+      if (status.user_id !== user?.id && friendIdSet.includes(status.user_id)) {
         venue.friends.push({
           user_id: status.user_id,
           display_name: statusProfile?.display_name || statusProfile?.username || 'Anonymous',
@@ -458,25 +458,148 @@ export default function Leaderboard() {
     }
   };
 
-  const renderEnergyBars = (level: number) => {
-    const barHeights = ['h-2', 'h-3', 'h-4']; // Progressive: 8px, 12px, 16px
-    
+  // Max count across all ranked venues — used for relative activity bars
+  const maxCount = venues.filter(v => !v.isPromoted).reduce((max, v) => Math.max(max, v.count), 1);
+
+  // Shared friend popover for a venue
+  const renderFriendPopover = (venue: { venue_name: string; friends: VenueStats['friends'] }) => {
+    if (venue.friends.length === 0) return null;
     return (
-      <div className="flex gap-0.5 items-end">
-        {[1, 2, 3].map((bar, index) => (
-          <div
-            key={bar}
-            className={`w-1.5 rounded-sm transition-all ${barHeights[index]} ${
-              bar <= level ? 'bg-white' : 'bg-white/20'
-            }`}
-          />
-        ))}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
+            <div className="flex -space-x-2">
+              {venue.friends.slice(0, 3).map((friend, idx) => (
+                <Avatar key={idx} className="h-7 w-7 border-2 border-[#1e1338]">
+                  <AvatarImage src={friend.avatar_url || undefined} />
+                  <AvatarFallback className="bg-[#a855f7] text-white text-[10px]">
+                    {friend.display_name[0]}
+                  </AvatarFallback>
+                </Avatar>
+              ))}
+            </div>
+            {venue.friends.length > 3 && (
+              <span className="ml-1.5 text-xs text-white/60 font-medium">
+                +{venue.friends.length - 3}
+              </span>
+            )}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl" align="end">
+          <p className="text-white/60 text-xs px-2 mb-2">Friends at {venue.venue_name}</p>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {venue.friends.map((friend, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openFriendCard({
+                    userId: friend.user_id,
+                    displayName: friend.display_name,
+                    avatarUrl: friend.avatar_url,
+                    venueName: venue.venue_name,
+                  });
+                }}
+                className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={friend.avatar_url || undefined} />
+                  <AvatarFallback className="bg-[#a855f7] text-white text-xs">
+                    {friend.display_name[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-white text-sm flex-1 text-left">{friend.display_name}</span>
+                <ChevronRight className="h-4 w-4 text-white/40" />
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
+  // Venue card — adapts styling based on rank tier
+  const renderVenueCard = (venue: VenueStats) => {
+    const isTop1 = venue.rank === 1;
+    const isTop3 = venue.rank >= 1 && venue.rank <= 3;
+    const activityPct = maxCount > 0 ? Math.max(8, (venue.count / maxCount) * 100) : 8;
+
+    // Sub-line: neighborhood + count
+    const subParts: string[] = [];
+    if (venue.neighborhood) subParts.push(venue.neighborhood);
+    if (venue.count > 0) subParts.push(`${venue.count} here now`);
+    const subLine = subParts.join(' \u00b7 ');
+
+    return (
+      <div
+        key={venue.venue_name}
+        className={`relative overflow-hidden rounded-2xl transition-all ${
+          isTop1
+            ? 'bg-[#221540] p-5 shadow-[0_4px_20px_rgba(168,85,247,0.15)] border border-[#d4ff00]/20'
+            : isTop3
+            ? 'bg-[#1e1338] p-4 shadow-[0_4px_12px_rgba(0,0,0,0.4)] border border-white/[0.08]'
+            : 'bg-[#1a1030] p-4 shadow-[0_4px_12px_rgba(0,0,0,0.4)] border border-white/[0.06]'
+        }`}
+      >
+        {/* Subtle top glow for #1 */}
+        {isTop1 && (
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d4ff00]/40 to-transparent" />
+        )}
+
+        <div className="flex items-center gap-3">
+          {/* Rank Number */}
+          <div className="flex-shrink-0 w-10 text-center">
+            <div className={`font-bold tabular-nums ${
+              isTop1
+                ? 'text-4xl text-[#d4ff00] drop-shadow-[0_0_8px_rgba(212,255,0,0.3)]'
+                : isTop3
+                ? 'text-3xl text-[#d4ff00]'
+                : 'text-2xl text-white/50'
+            }`}>
+              {venue.rank}
+            </div>
+          </div>
+
+          {/* Venue Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleVenueClick(venue.venue_name, venue.venue_id)}
+                className={`font-semibold text-white truncate hover:text-[#d4ff00] transition-colors text-left ${
+                  isTop1 ? 'text-lg' : 'text-base'
+                }`}
+              >
+                {venue.venue_name}
+              </button>
+              {venue.isNewlyOpened && (
+                <span className="px-2 py-0.5 bg-[#d4ff00]/15 rounded-full text-[10px] text-[#d4ff00] font-semibold flex-shrink-0">
+                  NEW
+                </span>
+              )}
+              {/* Trend arrow */}
+              {venue.movement === 'up' && (
+                <ChevronUp className="w-5 h-5 text-[#d4ff00] flex-shrink-0" />
+              )}
+              {venue.movement === 'down' && (
+                <ChevronDown className="w-5 h-5 text-[#ef4444] flex-shrink-0" />
+              )}
+            </div>
+            {subLine && (
+              <p className="text-white/40 text-xs mt-0.5 truncate">{subLine}</p>
+            )}
+          </div>
+
+          {/* Friend Avatars */}
+          <div className="flex-shrink-0">
+            {renderFriendPopover(venue)}
+          </div>
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-40">
+    <div className="bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-40">
       {/* Header */}
       <PageHeader
         title="Leaderboard"
@@ -524,209 +647,48 @@ export default function Leaderboard() {
             {venues.filter(v => v.isPromoted).map((venue) => (
               <div
                 key={venue.venue_name}
-                className="relative overflow-hidden rounded-2xl p-4 bg-[#1a0a2e]/80 border border-white/8"
+                className="relative overflow-hidden rounded-2xl p-4 bg-[#1e1338] shadow-[0_4px_12px_rgba(0,0,0,0.4)] border border-white/[0.06]"
               >
-                <div className="flex items-center gap-4">
-                  {/* Promoted Badge */}
+                <div className="flex items-center gap-3">
                   <div className="flex-shrink-0">
-                    <div className="px-3 py-1 bg-[#a855f7]/20 rounded-full text-xs text-[#a855f7] font-medium">
+                    <div className="px-2.5 py-1 bg-[#a855f7]/15 rounded-full text-[10px] text-[#a855f7] font-semibold uppercase tracking-wide">
                       Promoted
                     </div>
                   </div>
-
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleVenueClick(venue.venue_name, venue.venue_id)}
-                        className="text-lg font-semibold text-white truncate hover:text-[#d4ff00] transition-colors"
-                      >
-                        {venue.venue_name}
-                      </button>
-                      {venue.isNewlyOpened && (
-                        <span className="px-2 py-0.5 bg-[#d4ff00]/20 rounded-full text-xs text-[#d4ff00] font-medium">
-                          NEW
-                        </span>
-                      )}
-                    </div>
+                    <button
+                      onClick={() => handleVenueClick(venue.venue_name, venue.venue_id)}
+                      className="text-base font-semibold text-white truncate hover:text-[#d4ff00] transition-colors block text-left"
+                    >
+                      {venue.venue_name}
+                    </button>
+                    {(venue.neighborhood || venue.count > 0) && (
+                      <p className="text-white/40 text-xs mt-0.5 truncate">
+                        {[venue.neighborhood, venue.count > 0 ? `${venue.count} here now` : null].filter(Boolean).join(' \u00b7 ')}
+                      </p>
+                    )}
                   </div>
-
-                  {/* Friend Avatars with Popover */}
-                  <div className="flex-shrink-0 flex items-center">
-                    {venue.friends.length > 0 ? (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
-                            <div className="flex -space-x-2">
-                              {venue.friends.slice(0, 2).map((friend, idx) => (
-                            <Avatar key={idx} className="h-6 w-6 border border-white/20">
-                                  <AvatarImage src={friend.avatar_url || undefined} />
-                                  <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
-                                    {friend.display_name[0]}
-                                  </AvatarFallback>
-                                </Avatar>
-                              ))}
-                            </div>
-                            {venue.friends.length > 2 && (
-                              <span className="ml-1 text-xs text-white/70 font-medium">
-                                +{venue.friends.length - 2}
-                              </span>
-                            )}
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl" align="end">
-                          <p className="text-white/60 text-xs px-2 mb-2">Also here tonight</p>
-                          <div className="max-h-48 overflow-y-auto space-y-1">
-                            {venue.friends.map((friend, idx) => (
-                              <button
-                                key={idx}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openFriendCard({
-                                    userId: friend.user_id,
-                                    displayName: friend.display_name,
-                                    avatarUrl: friend.avatar_url,
-                                    venueName: venue.venue_name,
-                                  });
-                                }}
-                                className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
-                              >
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={friend.avatar_url || undefined} />
-                                  <AvatarFallback className="bg-[#a855f7] text-white text-xs">
-                                    {friend.display_name[0]}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-white text-sm flex-1 text-left">{friend.display_name}</span>
-                                <ChevronRight className="h-4 w-4 text-white/40" />
-                              </button>
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    ) : null}
-                  </div>
-
-                  {/* Energy Bars */}
+                  {venue.isNewlyOpened && (
+                    <span className="px-2 py-0.5 bg-[#d4ff00]/15 rounded-full text-[10px] text-[#d4ff00] font-semibold flex-shrink-0">
+                      NEW
+                    </span>
+                  )}
                   <div className="flex-shrink-0">
-                    {renderEnergyBars(venue.energyLevel)}
+                    {renderFriendPopover(venue)}
                   </div>
                 </div>
               </div>
             ))}
-            
-            {/* Separator */}
-            <div className="py-2">
-              <div className="border-t border-white/8"></div>
-            </div>
+            <div className="py-1" />
           </>
         )}
 
         {/* Ranked Section */}
-        {venues.filter(v => !v.isPromoted).map((venue) => (
-          <div
-            key={venue.venue_name}
-            className="relative overflow-hidden rounded-2xl p-4 bg-[#1a0a2e]/80 border border-white/8"
-          >
-            <div className="flex items-center gap-4">
-              {/* Rank Number */}
-              <div className="flex-shrink-0">
-                <div className="text-3xl font-bold text-[#d4ff00] w-8 text-center">
-                  {venue.rank}
-                </div>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleVenueClick(venue.venue_name, venue.venue_id)}
-                    className="text-lg font-semibold text-white truncate hover:text-[#d4ff00] transition-colors"
-                  >
-                    {venue.venue_name}
-                  </button>
-                  {venue.isNewlyOpened && (
-                    <span className="px-2 py-0.5 bg-[#d4ff00]/20 rounded-full text-xs text-[#d4ff00] font-medium">
-                      NEW
-                    </span>
-                  )}
-                  {venue.movement !== 'same' && (
-                    <div>
-                      {venue.movement === 'up' ? (
-                        <ChevronUp className="w-4 h-4 text-[#d4ff00]" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-[#a855f7]" />
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Friend Avatars with Popover */}
-              <div className="flex-shrink-0 flex items-center">
-                {venue.friends.length > 0 ? (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
-                        <div className="flex -space-x-2">
-                          {venue.friends.slice(0, 2).map((friend, idx) => (
-                            <Avatar key={idx} className="h-6 w-6 border border-white/20">
-                              <AvatarImage src={friend.avatar_url || undefined} />
-                              <AvatarFallback className="bg-[#1a0f2e] text-white text-[10px]">
-                                {friend.display_name[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                          ))}
-                        </div>
-                        {venue.friends.length > 2 && (
-                          <span className="ml-1 text-xs text-white/70 font-medium">
-                            +{venue.friends.length - 2}
-                          </span>
-                        )}
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl" align="end">
-                      <p className="text-white/60 text-xs px-2 mb-2">Also here tonight</p>
-                      <div className="max-h-48 overflow-y-auto space-y-1">
-                        {venue.friends.map((friend, idx) => (
-                          <button
-                            key={idx}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openFriendCard({
-                                userId: friend.user_id,
-                                displayName: friend.display_name,
-                                avatarUrl: friend.avatar_url,
-                                venueName: venue.venue_name,
-                              });
-                            }}
-                            className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
-                          >
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={friend.avatar_url || undefined} />
-                              <AvatarFallback className="bg-[#a855f7] text-white text-xs">
-                                {friend.display_name[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-white text-sm flex-1 text-left">{friend.display_name}</span>
-                            <ChevronRight className="h-4 w-4 text-white/40" />
-                          </button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                ) : null}
-              </div>
-
-              {/* Energy Bars */}
-              <div className="flex-shrink-0">
-                {renderEnergyBars(venue.energyLevel)}
-              </div>
-            </div>
-          </div>
-        ))}
+        {venues.filter(v => !v.isPromoted).map((venue) => renderVenueCard(venue))}
 
         {venues.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 border border-white/8">
+            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
               <BarChart3 className="h-10 w-10 text-[#a855f7]/60" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">
@@ -748,83 +710,25 @@ export default function Leaderboard() {
         </div>
       </PullToRefresh>
 
-      {/* Biggest Mover Card */}
+      {/* Biggest Mover Card — fixed at bottom */}
       {biggestMover && (
-        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px)+8px)] left-1/2 -translate-x-1/2 z-20 w-full max-w-[430px] px-4">
-          <div className="bg-[#1a0a2e] border border-white/8 rounded-2xl p-3 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-[#a855f7] text-sm font-medium mb-0.5">Biggest Mover</p>
+        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-20 w-full max-w-[430px] px-4">
+          <div className="bg-[#1e1338] border border-white/[0.06] rounded-2xl p-3.5 shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[#a855f7] text-xs font-semibold uppercase tracking-wide mb-0.5">Biggest Mover</p>
                 <button
                   onClick={() => handleVenueClick(biggestMover.venue_name, biggestMover.venue_id)}
-                  className="text-lg font-bold text-white hover:text-white/80 transition-colors max-w-[180px] truncate block text-left"
+                  className="text-base font-bold text-white hover:text-[#d4ff00] transition-colors truncate block text-left max-w-full"
                 >
                   {biggestMover.venue_name}
                 </button>
               </div>
-
-              {/* Energy Bars */}
-              <div className="mx-3">
-                {renderEnergyBars(3)}
-              </div>
-
-              {/* Friend Avatars with Popover */}
-              <div className="flex items-center">
-                {biggestMover.friends.length > 0 ? (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button className="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
-                        <div className="flex -space-x-2">
-                          {biggestMover.friends.map((friend, idx) => (
-                            <Avatar key={idx} className="h-8 w-8 border-2 border-white/20">
-                              <AvatarImage src={friend.avatar_url || undefined} />
-                              <AvatarFallback className="bg-[#1a0f2e] text-white text-xs">
-                                {friend.display_name[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                          ))}
-                        </div>
-                        {biggestMover.friends.length > 3 && (
-                          <span className="ml-3 text-sm text-white font-medium">
-                            +{biggestMover.friends.length - 3}
-                          </span>
-                        )}
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl" align="end">
-                      <p className="text-white/60 text-xs px-2 mb-2">Also here tonight</p>
-                      <div className="max-h-48 overflow-y-auto space-y-1">
-                        {biggestMover.friends.map((friend, idx) => (
-                          <button
-                            key={idx}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openFriendCard({
-                                userId: friend.user_id,
-                                displayName: friend.display_name,
-                                avatarUrl: friend.avatar_url,
-                                venueName: biggestMover.venue_name,
-                              });
-                            }}
-                            className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
-                          >
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={friend.avatar_url || undefined} />
-                              <AvatarFallback className="bg-[#a855f7] text-white text-xs">
-                                {friend.display_name[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-white text-sm flex-1 text-left">{friend.display_name}</span>
-                            <ChevronRight className="h-4 w-4 text-white/40" />
-                          </button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                ) : (
-                  <span className="text-white/40 text-xs">Nothing here yet</span>
-                )}
-              </div>
+              {biggestMover.friends.length > 0 && (
+                <div className="flex-shrink-0">
+                  {renderFriendPopover(biggestMover)}
+                </div>
+              )}
             </div>
           </div>
         </div>

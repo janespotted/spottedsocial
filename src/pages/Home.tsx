@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useKeyboardAware } from '@/hooks/useKeyboardAware';
 import { useVisibilityRefresh } from '@/hooks/useVisibilityRefresh';
+import { CreatePostFab } from '@/components/CreatePostFab';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
@@ -8,6 +8,7 @@ import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
+import { haptic } from '@/lib/haptics';
 import { useFeed, Post } from '@/hooks/useFeed';
 import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 import { useOfflineCache } from '@/hooks/useOfflineCache';
@@ -17,7 +18,7 @@ import { useWeekendRally } from '@/hooks/useWeekendRally';
 import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, MessageSquare, Send, Plus, MoreHorizontal, Trash2, Loader2, Target, MapPin, Search, Bell, Volume2, VolumeX } from 'lucide-react';
+import { Heart, MessageCircle, MessageSquare, Send, MoreHorizontal, Trash2, Loader2, Target, MapPin, Search, Bell, Volume2, VolumeX } from 'lucide-react';
 import { CityBadge } from '@/components/CityBadge';
 import { NotificationBadge } from '@/components/NotificationBadge';
 import spottedLogo from '@/assets/spotted-s-logo.png';
@@ -64,6 +65,29 @@ export default function Home() {
   const { showNudgeModal, nudgeType, closeNudgeModal } = useDailyNudge();
   const { isWeekendRally, clearRally } = useWeekendRally();
   useAutoVenueTracking();
+
+  // Admin triple-tap on "Spotted" wordmark
+  const adminTapCount = useRef(0);
+  const adminTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    supabase.rpc('has_role', { user_id: user.id, role: 'admin' } as any)
+      .then(({ data }) => setIsAdmin(data === true));
+  }, [user]);
+  const handleWordmarkTap = () => {
+    adminTapCount.current += 1;
+    if (adminTapTimer.current) clearTimeout(adminTapTimer.current);
+    if (adminTapCount.current >= 3) {
+      adminTapCount.current = 0;
+      if (isAdmin) {
+        haptic.light();
+        navigate('/demo-settings');
+      }
+      return;
+    }
+    adminTapTimer.current = setTimeout(() => { adminTapCount.current = 0; }, 500);
+  };
 
   const { isOnline, cachePosts, getCachedPosts, cacheFriends, getCachedFriends } = useOfflineCache();
 
@@ -115,7 +139,6 @@ export default function Home() {
   const [planPreselectedFriend, setPlanPreselectedFriend] = useState<{ id: string; display_name: string; avatar_url: string | null } | null>(null);
   const clearPreselectedFriend = useCallback(() => setPlanPreselectedFriend(null), []);
   const loadTriggerRef = useRef<HTMLDivElement>(null);
-  const { isKeyboardOpen } = useKeyboardAware();
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [feedAudioEnabled, setFeedAudioEnabled] = useState(false);
 
@@ -238,11 +261,13 @@ export default function Home() {
       const [statusResult, profileResult] = await Promise.all([
         supabase
           .from('night_statuses')
-          .select('user_id, venue_name, status, planning_neighborhood, is_demo, venue_id, venues(city)')
+          .select('user_id, venue_name, status, planning_neighborhood, is_demo, venue_id')
           .in('user_id', queryIds)
           .not('expires_at', 'is', null)
           .gt('expires_at', new Date().toISOString()),
-        supabase.rpc('get_profiles_safe'),
+        supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url, is_demo'),
       ]);
 
       const statuses = statusResult.data;
@@ -261,9 +286,7 @@ export default function Home() {
           // Filter out demo users when demo mode is off
           if (!demoEnabled && (s.is_demo || profile?.is_demo)) continue;
 
-          // Filter to current city — skip friends at venues in other cities
-          const venueCity = (s.venues as any)?.city;
-          if (venueCity && venueCity !== city) continue;
+          // City filtering skipped — show all friends regardless of venue city
 
           const displayName = profile?.display_name || 'Friend';
           const avatarUrl = profile?.avatar_url || null;
@@ -310,7 +333,7 @@ export default function Home() {
         setHasFetchedOnce(true);
       });
     }
-  }, [user, demoEnabled, city]);
+  }, [user?.id, demoEnabled, city]);
 
   // Auto-refresh when returning to the app / switching tabs
   useVisibilityRefresh(() => {
@@ -376,7 +399,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-24">
+    <div className="bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-24">
       {/* Offline Indicator */}
       {!isOnline && (
         <div className="bg-yellow-500/20 text-yellow-500 text-center py-2 text-sm">
@@ -399,8 +422,9 @@ export default function Home() {
             {/* Wordmark row — anchored */}
             <div className="flex items-center gap-3 mb-1">
               <span
-                className="text-[30px] tracking-[0.35em] text-white select-none"
+                className="text-[30px] tracking-[0.35em] text-white select-none cursor-pointer"
                 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300 }}
+                onClick={handleWordmarkTap}
               >
                 Spotted
               </span>
@@ -871,19 +895,16 @@ export default function Home() {
         onFetchComments={fetchComments}
         getTimeAgo={getTimeAgo}
         userAvatarUrl={user?.user_metadata?.avatar_url}
-        userInitial={user?.email?.[0].toUpperCase()}
+        userInitial={user?.email?.[0]?.toUpperCase()}
       />
 
-      {/* Create Post FAB - hide when keyboard is open or commenting */}
-      {feedMode === 'newsfeed' && !isKeyboardOpen && !expandedPostId && !showCreatePost && (
-        <button
-          onClick={() => setShowCreatePost(true)}
-          className="fixed bottom-28 right-6 z-[60] w-14 h-14 rounded-full bg-[#d4ff00] flex items-center justify-center hover:scale-105 transition-transform shadow-[0_0_20px_rgba(212,255,0,0.3)]"
-          aria-label="Create post"
-        >
-          <Plus className="h-7 w-7 text-black" />
-        </button>
-      )}
+      {/* Create Post FAB — hides itself when the keyboard is open. Keyboard
+          state lives inside the FAB so opening/closing the keyboard doesn't
+          re-render the entire feed. */}
+      <CreatePostFab
+        visible={feedMode === 'newsfeed' && !expandedPostId && !showCreatePost}
+        onClick={() => setShowCreatePost(true)}
+      />
 
       {/* Friends Out Pill */}
       <FriendsOutPill />

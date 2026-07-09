@@ -1,9 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-// Treat auto-generated placeholder avatars as no avatar
-const sanitizeAvatarUrl = (url: string | null): string | null =>
-  url && url.includes('dicebear.com') ? null : url;
+const sanitizeAvatarUrl = (url: string | null): string | null => url;
 
 export function useProfilesSafe() {
   return useQuery({

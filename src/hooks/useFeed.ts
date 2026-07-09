@@ -8,8 +8,7 @@ import { validateCommentText } from '@/lib/validation-schemas';
 import { resolvePostImageUrls } from '@/lib/storage-utils';
 import { triggerPushNotification } from '@/lib/push-notifications';
 
-const sanitizeAvatarUrl = (url: string | null): string | null =>
-  url && url.includes('dicebear.com') ? null : url;
+const sanitizeAvatarUrl = (url: string | null): string | null => url;
 
 const POSTS_PER_PAGE = 20;
 
@@ -416,31 +415,9 @@ export function useFeed(options: UseFeedOptions) {
 
     if (error) {
       console.error('Error posting comment:', error);
+      const { toast } = await import('sonner');
+      toast.error('Failed to post comment');
       return;
-    }
-
-    // Notify post owner about the comment
-    const post = posts.find(p => p.id === postId);
-    if (post && post.user_id !== userId) {
-      const commentPreview = validation.data!.length > 50
-        ? validation.data!.substring(0, 50) + '...'
-        : validation.data!;
-      supabase.rpc('create_notification', {
-        p_receiver_id: post.user_id,
-        p_type: 'post_comment',
-        p_message: `Someone commented: "${commentPreview}"`,
-      }).then(({ data }) => {
-        const notif = Array.isArray(data) ? data[0] : data;
-        if (notif?.id) {
-          triggerPushNotification({
-            id: notif.id,
-            receiver_id: post.user_id,
-            sender_id: userId!,
-            type: 'post_comment',
-            message: `Someone commented: "${commentPreview}"`,
-          });
-        }
-      });
     }
 
     if (!text) {
@@ -448,7 +425,7 @@ export function useFeed(options: UseFeedOptions) {
     }
     await fetchComments(postId);
     await fetchPosts();
-  }, [newComment, userId, fetchComments, fetchPosts, posts]);
+  }, [newComment, userId, fetchComments, fetchPosts]);
 
   const handleLikePost = useCallback(async (postId: string) => {
     if (!userId) return;

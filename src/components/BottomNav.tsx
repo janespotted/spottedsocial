@@ -44,10 +44,15 @@ export const BottomNav = memo(function BottomNav() {
   }, [setInputFocused]);
 
   return (
-    <nav 
+    <nav
       className={cn(
-        "fixed bottom-0 left-0 right-0 bg-background border-t border-white/8 z-50 transition-transform duration-200 ease-out will-change-transform",
-        isInputFocused && "translate-y-full"
+        // Fixed overlay: hiding the nav no longer reflows the page layout.
+        // It slides out in sync with the keyboard instead of unmounting,
+        // which was causing a visible content jump right before the
+        // keyboard appeared.
+        'fixed bottom-0 left-0 right-0 bg-background border-t border-white/8 z-50',
+        'transition-transform duration-200 ease-out',
+        isInputFocused && 'translate-y-full pointer-events-none'
       )}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >

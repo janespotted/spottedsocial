@@ -47,8 +47,12 @@ export function useTypingIndicator(threadId: string | undefined, userId: string 
           table: 'dm_typing_indicators',
           filter: `thread_id=eq.${threadId}`,
         },
-        () => {
-          // Refetch current typing users
+        (payload) => {
+          // Ignore our own typing upserts/deletes — otherwise every ~2s of
+          // typing triggered a refetch + state update that re-rendered the
+          // whole thread while the user was mid-keystroke.
+          const row = (payload.new ?? payload.old) as { user_id?: string } | null;
+          if (row?.user_id === userId) return;
           fetchTypingUsers();
         }
       )
@@ -83,9 +87,13 @@ export function useTypingIndicator(threadId: string | undefined, userId: string 
         user_id: row.user_id,
         display_name: memberMap.get(row.user_id)?.display_name || 'Someone',
       }));
-      setTypingUsers(users);
+      // Skip the state update when nothing changed (empty -> empty was
+      // creating a new array every fetch and re-rendering the thread).
+      setTypingUsers(prev =>
+        prev.length === 0 && users.length === 0 ? prev : users
+      );
     } else {
-      setTypingUsers([]);
+      setTypingUsers(prev => (prev.length === 0 ? prev : []));
     }
   };
 

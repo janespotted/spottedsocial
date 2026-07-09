@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Copy, Users, Search, UserPlus, QrCode, Check, Loader2, Clock, ChevronRight, ChevronDown, MessageCircle, Link2, X, Heart, Megaphone } from 'lucide-react';
+import { ArrowLeft, Copy, Users, Search, UserPlus, QrCode, Check, Loader2, Clock, ChevronRight, ChevronDown, MessageCircle, Link2, X, Heart, Megaphone, Contact } from 'lucide-react';
+import { ContactsSync } from '@/components/ContactsSync';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
 import { triggerPushNotification } from '@/lib/push-notifications';
@@ -126,6 +127,7 @@ export default function Friends() {
   
   // QR modal state
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showContactsSync, setShowContactsSync] = useState(false); // kept for button handler
   
   // Copy animation state
   const [justCopied, setJustCopied] = useState(false);
@@ -781,6 +783,24 @@ export default function Friends() {
               {/* My Friends */}
               <MyFriendsTab />
 
+              {/* Find from Contacts */}
+              <section>
+                <h2 className="text-xs text-white/40 uppercase tracking-[0.15em] font-semibold mb-3">Find friends</h2>
+                <button
+                  onClick={() => setShowContactsSync(true)}
+                  className="w-full flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-[#a855f7]/10 to-[#d4ff00]/5 border border-[#a855f7]/20 hover:border-[#a855f7]/40 transition-colors mb-4"
+                >
+                  <div className="w-10 h-10 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
+                    <Contact className="h-5 w-5 text-[#a855f7]" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-white text-sm font-medium">Find from Contacts</p>
+                    <p className="text-white/30 text-xs">See who's already on Spotted</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-white/20" />
+                </button>
+              </section>
+
               {/* Invite Section */}
               <section>
                 <h2 className="text-xs text-white/40 uppercase tracking-[0.15em] font-semibold mb-3">Invite friends</h2>
@@ -826,6 +846,7 @@ export default function Friends() {
       </div>
 
       <QRCodeModal open={showQRModal} onOpenChange={setShowQRModal} inviteUrl={getInviteUrl()} />
+      <ContactsSync open={showContactsSync} onClose={() => setShowContactsSync(false)} />
     </div>
     </PullToRefresh>
   );

@@ -14,6 +14,7 @@ import { checkAndRecordRateLimit, getRateLimitMessage } from "@/lib/rate-limit";
 import { LoginPromptSheet } from "@/components/LoginPromptSheet";
 import { calculateExpiryTime } from "@/lib/time-utils";
 import { isNativePlatform } from "@/lib/platform";
+import { openSpottedCamera } from "@/lib/spotted-camera";
 import { pickVideoNative, validateWebVideo } from "@/lib/video-picker-service";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -795,7 +796,16 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
               <button
                 onClick={() => {
                   if (!requireAuth()) return;
-                  fileInputRef.current?.click();
+                  if (isNativePlatform()) {
+                    openSpottedCamera()
+                      .then((result) => {
+                        setMediaFile(result.file);
+                        setMediaPreview(result.previewUrl);
+                      })
+                      .catch(() => {});
+                  } else {
+                    fileInputRef.current?.click();
+                  }
                 }}
                 className="text-white/40 hover:text-[#d4ff00] transition-colors"
                 title="Add photo"

@@ -59,20 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_IN' && session?.user) {
           logEvent('user_login', { method: 'auth_state_change' });
-          
+
           setTimeout(() => {
             processPendingInvite(session.user.id);
           }, 0);
-          
-          const path = window.location.pathname;
-          if (path === '/auth' || path === '/') {
-            if (isNativePlatform()) {
-              window.history.replaceState(null, '', '/');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            } else {
-              window.location.href = '/';
-            }
-          }
         }
       }
     );

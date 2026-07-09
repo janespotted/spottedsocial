@@ -372,9 +372,12 @@ export function Layout({ children }: LayoutProps) {
         key={location.pathname}
         className={cn(
           "flex-1 flex flex-col page-enter overflow-y-auto overflow-x-hidden overscroll-contain",
+          // Reserve the height of the (now fixed-position) BottomNav so page
+          // geometry is identical to when the nav was in the flex flow. The
+          // nav overlays this strip; hiding it no longer reflows content.
+          "pb-[calc(4rem+env(safe-area-inset-bottom,0px))]",
           isMapPage ? "w-full" : "max-w-[430px] mx-auto w-full"
         )}
-        style={isMapPage ? undefined : { paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
       >
         {children}
       </main>

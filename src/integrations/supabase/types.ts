@@ -984,6 +984,7 @@ export type Database = {
           is_demo: boolean | null
           plan_date: string
           plan_time: string
+          plan_type: string | null
           score: number | null
           user_id: string
           venue_id: string | null
@@ -999,6 +1000,7 @@ export type Database = {
           is_demo?: boolean | null
           plan_date: string
           plan_time: string
+          plan_type?: string | null
           score?: number | null
           user_id: string
           venue_id?: string | null
@@ -1014,6 +1016,7 @@ export type Database = {
           is_demo?: boolean | null
           plan_date?: string
           plan_time?: string
+          plan_type?: string | null
           score?: number | null
           user_id?: string
           venue_id?: string | null

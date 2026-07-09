@@ -175,6 +175,9 @@ class SpottedCameraViewController: UIViewController {
     }
 
     private func switchCamera() {
+        // Block if already switching (prevents rapid double-tap race)
+        guard !isSwitchingMidRecord else { return }
+
         if isRecording {
             // Mid-recording switch: stop current segment, switch, restart
             isSwitchingMidRecord = true
@@ -358,23 +361,22 @@ class SpottedCameraViewController: UIViewController {
     // MARK: - Gestures
 
     private func setupGestures() {
+        // Double-tap anywhere on screen to flip camera (Snapchat-style) — must be added first
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTapFlip))
+        doubleTap.numberOfTapsRequired = 2
+        view.addGestureRecognizer(doubleTap)
+
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        // Single-tap waits for double-tap to fail so they don't conflict
+        tap.require(toFail: doubleTap)
         shutterButton.addGestureRecognizer(tap)
 
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
         longPress.minimumPressDuration = 0.3
         shutterButton.addGestureRecognizer(longPress)
-
-        // Double-tap anywhere on preview to flip camera (Snapchat-style)
-        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTapFlip))
-        doubleTap.numberOfTapsRequired = 2
-        view.addGestureRecognizer(doubleTap)
     }
 
     @objc private func handleDoubleTapFlip() {
-        // Block camera flip while recording — AVCaptureMovieFileOutput can't survive session reconfiguration
-        guard !isRecording else { return }
-
         UIView.animate(withDuration: 0.15, animations: {
             self.previewLayer.opacity = 0
         }) { _ in
@@ -523,7 +525,7 @@ class SpottedCameraViewController: UIViewController {
     }
 
     private func stopRecording() {
-        guard isRecording else { return }
+        guard isRecording, !isSwitchingMidRecord else { return }
         isRecording = false
 
         recordingTimer?.invalidate()
@@ -624,8 +626,6 @@ class SpottedCameraViewController: UIViewController {
     }
 
     @objc private func handleFlip() {
-        guard !isRecording else { return }
-
         UIView.animate(withDuration: 0.15, animations: {
             self.previewLayer.opacity = 0
         }) { _ in
@@ -744,7 +744,21 @@ extension SpottedCameraViewController: AVCaptureFileOutputRecordingDelegate {
             return
         }
 
+        // Determine output size from the first segment
+        let firstAsset = AVURLAsset(url: URL(fileURLWithPath: videoSegmentPaths[0]))
+        guard let firstVideoTrack = firstAsset.tracks(withMediaType: .video).first else {
+            completion(nil)
+            return
+        }
+        let naturalSize = firstVideoTrack.naturalSize
+        let firstTransform = firstVideoTrack.preferredTransform
+        // Apply the transform to get the rendered size (handles rotation)
+        let renderedSize = naturalSize.applying(firstTransform)
+        let renderSize = CGSize(width: abs(renderedSize.width), height: abs(renderedSize.height))
+
         var currentTime = CMTime.zero
+        var instructions: [AVMutableVideoCompositionLayerInstruction] = []
+        var timeRanges: [(CMTime, CMTime)] = [] // (start, duration) for each segment
 
         for path in videoSegmentPaths {
             let asset = AVURLAsset(url: URL(fileURLWithPath: path))
@@ -752,6 +766,7 @@ extension SpottedCameraViewController: AVCaptureFileOutputRecordingDelegate {
 
             if let assetVideoTrack = asset.tracks(withMediaType: .video).first {
                 try? videoTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: assetVideoTrack, at: currentTime)
+                timeRanges.append((currentTime, duration))
             }
             if let assetAudioTrack = asset.tracks(withMediaType: .audio).first {
                 try? audioTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: assetAudioTrack, at: currentTime)
@@ -759,6 +774,50 @@ extension SpottedCameraViewController: AVCaptureFileOutputRecordingDelegate {
 
             currentTime = CMTimeAdd(currentTime, duration)
         }
+
+        // Build per-segment video composition instructions to normalize orientation
+        var compositionInstructions: [AVMutableVideoCompositionInstruction] = []
+
+        for (index, path) in videoSegmentPaths.enumerated() {
+            guard index < timeRanges.count else { continue }
+            let (segStart, segDuration) = timeRanges[index]
+            let asset = AVURLAsset(url: URL(fileURLWithPath: path))
+
+            guard let assetVideoTrack = asset.tracks(withMediaType: .video).first else { continue }
+
+            let instruction = AVMutableVideoCompositionInstruction()
+            instruction.timeRange = CMTimeRange(start: segStart, duration: segDuration)
+
+            let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
+
+            // Compute transform to fit this segment's orientation into the render size
+            let segNatural = assetVideoTrack.naturalSize
+            let segTransform = assetVideoTrack.preferredTransform
+            let segRendered = CGSize(width: abs(segNatural.applying(segTransform).width),
+                                     height: abs(segNatural.applying(segTransform).height))
+
+            // Scale to fit the render size if segment has different dimensions
+            let scaleX = renderSize.width / segRendered.width
+            let scaleY = renderSize.height / segRendered.height
+            let scale = min(scaleX, scaleY)
+
+            // Center after scaling
+            let offsetX = (renderSize.width - segRendered.width * scale) / 2
+            let offsetY = (renderSize.height - segRendered.height * scale) / 2
+
+            let finalTransform = segTransform
+                .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+                .concatenating(CGAffineTransform(translationX: offsetX, y: offsetY))
+
+            layerInstruction.setTransform(finalTransform, at: segStart)
+            instruction.layerInstructions = [layerInstruction]
+            compositionInstructions.append(instruction)
+        }
+
+        let videoComposition = AVMutableVideoComposition()
+        videoComposition.renderSize = renderSize
+        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        videoComposition.instructions = compositionInstructions
 
         let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("spotted_merged_\(Int(Date().timeIntervalSince1970)).mp4")
 
@@ -769,11 +828,11 @@ extension SpottedCameraViewController: AVCaptureFileOutputRecordingDelegate {
 
         exporter.outputURL = outputURL
         exporter.outputFileType = .mp4
+        exporter.videoComposition = videoComposition
 
         exporter.exportAsynchronously {
             DispatchQueue.main.async {
                 if exporter.status == .completed {
-                    // Clean up segments
                     for path in self.videoSegmentPaths {
                         try? FileManager.default.removeItem(atPath: path)
                     }

@@ -50,7 +50,10 @@ export function ShareToDMModal({ post, open, onOpenChange }: ShareToDMModalProps
       let eligibleIds = new Set<string>(friendIds);
 
       // If not the current user's post, filter to mutual friends
-      if (post.user_id !== user?.id) {
+      // Skip for demo posts — RLS blocks reading demo users' friendships,
+      // and demo mode is a sandbox where this filter isn't meaningful
+      const isDemoPost = allProfiles.find((p: any) => p.id === post.user_id)?.is_demo;
+      if (post.user_id !== user?.id && !isDemoPost) {
         const [s, r] = await Promise.all([
           supabase.from('friendships').select('friend_id').eq('user_id', post.user_id).eq('status', 'accepted'),
           supabase.from('friendships').select('user_id').eq('friend_id', post.user_id).eq('status', 'accepted'),

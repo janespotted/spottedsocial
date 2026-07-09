@@ -50,6 +50,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [planDate, setPlanDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [planTime, setPlanTime] = useState('21:00');
+  const [planType, setPlanType] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<'friends' | 'close_friends'>('friends');
   const [venueSearch, setVenueSearch] = useState('');
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -170,6 +171,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
         venue_name: selectedVenue.name,
         plan_date: planDate,
         plan_time: planTime,
+        plan_type: planType,
         description: description.trim() || null,
         visibility,
         expires_at: expiresAt.toISOString()
@@ -240,6 +242,7 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
     setSelectedVenue(null);
     setPlanDate(format(new Date(), 'yyyy-MM-dd'));
     setPlanTime('21:00');
+    setPlanType(null);
     setVisibility('friends');
     setVenueSearch('');
     setSelectedFriends([]);
@@ -360,6 +363,24 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                   ))}
                 </select>
               </div>
+            </div>
+
+            {/* Plan Type */}
+            <div>
+              <p className="text-white/40 text-xs mb-1.5">Type</p>
+              <select
+                value={planType || ''}
+                onChange={(e) => setPlanType(e.target.value || null)}
+                className="w-full h-11 px-3 rounded-xl bg-[#1a1230] border border-white/8 text-white text-sm appearance-none"
+              >
+                <option value="">Just a plan</option>
+                <option value="event">Event</option>
+                <option value="party">Party</option>
+                <option value="dinner">Dinner</option>
+                <option value="pregame">Pregame</option>
+                <option value="afterparty">Afterparty</option>
+                <option value="kickback">Kickback</option>
+              </select>
             </div>
 
             {/* Note */}

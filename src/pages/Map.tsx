@@ -30,14 +30,101 @@ import { logger } from '@/lib/logger';
 import { escapeHtml, escapeUrl } from '@/lib/html-escape';
 import { useFriendsOutStatus } from '@/hooks/useFriendsOutStatus';
 
-/** Returns an <img> tag if avatarUrl exists, otherwise a colored circle with the user's initial */
+// ── Shared marker sizing — single source of truth for all map markers ──
+const MARKER = {
+  // People
+  friendSolo:       44,   // individual friend avatar diameter (px)
+  friendGroupMember: 36,  // avatar inside a group marker (px)
+  friendGroup2_3:   72,   // container for 2-3 friends
+  friendGroup4Plus: 80,   // container for 4+ friends
+  userSelf:         52,   // current user's own marker
+  ringWidth:        3,    // relationship ring thickness (px)
+
+  // Venues — deliberately smaller / muted so friends dominate
+  venueClusterRadii: [12, 16, 20] as const,  // small / medium / large cluster circle radius
+  venueClusterOpacity: 0.6,                  // fill opacity (was 0.85)
+  venueClusterStroke: 1.5,                   // stroke width
+  venueClusterStrokeColor: 'rgba(255,255,255,0.5)',
+  venuePinSize:     28,   // individual unclustered pin canvas size
+  venuePromoted:    42,   // promoted venue marker outer size
+  venuePromotedInner: 30, // promoted venue inner circle
+
+  // Z-order — friends always above venues
+  zFriendClose:   '20',
+  zFriendDirect:  '18',
+  zFriendMutual:  '16',
+  zUser:          '25',
+  zVenuePromoted: '10',   // below all friend markers
+} as const;
+
+const PEOPLE_BG = '#0e7490'; // cyan-700 — avatar fill, distinct from venue purple
+
+// Single source of truth for relationship ring colors — must match the legend
+const RELATIONSHIP_COLORS = {
+  close:  '#d4ff00',  // yellow-lime
+  direct: '#9333ea',  // purple-600 (legend: "Friend")
+  mutual: '#6366f1',  // indigo (legend: "Mutual")
+} as const;
+
+const RING_COLORS: Record<string, { border: string; shadow: string }> = {
+  close:  { border: RELATIONSHIP_COLORS.close,  shadow: 'rgba(212, 255, 0, 0.4)' },
+  direct: { border: RELATIONSHIP_COLORS.direct, shadow: 'rgba(147, 51, 234, 0.4)' },
+  mutual: { border: RELATIONSHIP_COLORS.mutual, shadow: 'rgba(99, 102, 241, 0.4)' },
+};
+
+/** Avatar circle with onerror fallback to initials */
 function avatarHtml(avatarUrl: string | null | undefined, displayName: string, size: string, extraStyle = '') {
-  const safeUrl = avatarUrl ? escapeUrl(avatarUrl) : null;
-  if (safeUrl) {
-    return `<img src="${safeUrl}" style="width: ${size}; height: ${size}; border-radius: 50%; object-fit: cover; ${extraStyle}" alt="${escapeHtml(displayName)}" />`;
-  }
   const initial = escapeHtml(displayName?.[0] || 'U');
-  return `<div style="width: ${size}; height: ${size}; border-radius: 50%; background: #a855f7; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: calc(${size} * 0.45); ${extraStyle}">${initial}</div>`;
+  const fallbackBg = PEOPLE_BG;
+  const initialsDiv = `<div style="width:${size};height:${size};border-radius:50%;background:${fallbackBg};display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:calc(${size}*0.45);${extraStyle}">${initial}</div>`;
+  const safeUrl = avatarUrl ? escapeUrl(avatarUrl) : null;
+  if (!safeUrl) return initialsDiv;
+  // Render img with onerror that swaps to initials
+  const escapedInitials = initialsDiv.replace(/"/g, '&quot;');
+  return `<img src="${safeUrl}" style="width:${size};height:${size};border-radius:50%;object-fit:cover;${extraStyle}" alt="${escapeHtml(displayName)}" onerror="this.outerHTML='${escapedInitials}'" />`;
+}
+
+/** Single person avatar circle with relationship-colored ring */
+function personCircleHtml(avatarUrl: string | null | undefined, displayName: string, size: string, relType: string = 'direct') {
+  const ring = RING_COLORS[relType] || RING_COLORS.direct;
+  return `<div style="width:${size};height:${size};border-radius:50%;border:${MARKER.ringWidth}px solid ${ring.border};box-shadow:0 0 8px ${ring.shadow};padding:1px;box-sizing:border-box;flex-shrink:0;">
+    ${avatarHtml(avatarUrl, displayName, '100%', '')}
+  </div>`;
+}
+
+/** Group marker: up to 3 member circles inside a larger container, +N badge only when >3 */
+function groupMarkerHtml(members: { avatarUrl: string | null | undefined; displayName: string; relType: string }[], totalCount: number) {
+  const shown = members.slice(0, 3);
+  const extra = totalCount - shown.length;
+  const containerSize = totalCount <= 3 ? MARKER.friendGroup2_3 : MARKER.friendGroup4Plus;
+  const memberSize = MARKER.friendGroupMember;
+
+  // Position members in a triangle/line layout — offsets scaled to container
+  let membersHtml = '';
+  if (shown.length === 1) {
+    membersHtml = `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);">${personCircleHtml(shown[0].avatarUrl, shown[0].displayName, memberSize + 'px', shown[0].relType)}</div>`;
+  } else if (shown.length === 2) {
+    membersHtml = `
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-75%,-50%);">${personCircleHtml(shown[0].avatarUrl, shown[0].displayName, memberSize + 'px', shown[0].relType)}</div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-5%,-50%);">${personCircleHtml(shown[1].avatarUrl, shown[1].displayName, memberSize + 'px', shown[1].relType)}</div>`;
+  } else {
+    membersHtml = `
+      <div style="position:absolute;top:2px;left:50%;transform:translateX(-50%);">${personCircleHtml(shown[0].avatarUrl, shown[0].displayName, memberSize + 'px', shown[0].relType)}</div>
+      <div style="position:absolute;bottom:2px;left:4px;">${personCircleHtml(shown[1].avatarUrl, shown[1].displayName, memberSize + 'px', shown[1].relType)}</div>
+      <div style="position:absolute;bottom:2px;right:4px;">${personCircleHtml(shown[2].avatarUrl, shown[2].displayName, memberSize + 'px', shown[2].relType)}</div>`;
+  }
+
+  // Badge only when there are hidden members (>3)
+  const badge = extra > 0
+    ? `<div style="position:absolute;bottom:-5px;right:-5px;min-width:20px;height:20px;background:#1a0f2e;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 5px;font-size:11px;font-weight:700;color:white;border:1.5px solid rgba(255,255,255,0.3);">+${extra}</div>`
+    : '';
+
+  // Container: stroke-only, no fill — just a grouping hint
+  return `<div style="position:relative;width:${containerSize}px;height:${containerSize}px;">
+    <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,0.12);"></div>
+    ${membersHtml}
+    ${badge}
+  </div>`;
 }
 import { isFromTonight } from '@/lib/time-context';
 import { QuickStatusSheet } from '@/components/QuickStatusSheet';
@@ -150,7 +237,7 @@ export default function Map() {
   // Smart venue prompt for planning users
   const [smartPromptVenue, setSmartPromptVenue] = useState<{ id: string; name: string; lat: number; lng: number } | null>(null);
   const [showSmartPrompt, setShowSmartPrompt] = useState(false);
-  const smartPromptDismissedRef = useRef<Set<string>>(new Set());
+  const smartPromptDismissedRef = useRef<Set<string>>(new globalThis.Set());
   
   // Venue move banner state
   const [venueShiftData, setVenueShiftData] = useState<VenueShiftData | null>(null);
@@ -280,16 +367,6 @@ export default function Map() {
         .eq('id', user.id)
         .single();
 
-      // DEBUG (1): Log current user's full profile when demo mode is on
-      if (demoEnabledRef.current) {
-        const { data: fullProfile } = await supabase
-          .from('profiles')
-          .select('id, display_name, last_known_lat, last_known_lng, is_out, home_city, location_sharing_level')
-          .eq('id', user.id)
-          .single();
-        console.log('[DEBUG map] (1) current user profile:', fullProfile);
-        console.log('[DEBUG map] (1) cityRef.current:', cityRef.current);
-      }
 
       // Store user profile for avatar marker
       if (myProfile) {
@@ -362,118 +439,70 @@ export default function Map() {
 
       // When demo mode is ON, fetch demo users from database
       if (demoEnabledRef.current) {
-        // Fetch demo statuses + ALL statuses (to include real friends too) and demo profiles
-        const [{ data: demoOutStatuses }, { data: demoPlanningStatuses }, { data: demoProfiles }] = await Promise.all([
-          supabase
-            .from('night_statuses')
-            .select('user_id, lat, lng, venue_name, is_demo')
-            .eq('status', 'out')
-            .not('expires_at', 'is', null)
-            .gt('expires_at', new Date().toISOString()),
-          supabase
-            .from('night_statuses')
-            .select('user_id, planning_neighborhood, is_demo')
-            .eq('status', 'planning')
-            .not('expires_at', 'is', null)
-            .gt('expires_at', new Date().toISOString()),
-          supabase
-            .from('profiles')
-            .select('id, display_name, avatar_url, is_demo')
-            .or('is_demo.eq.true'),
-        ]);
-
-        // DEBUG (4): Log night_statuses query responses
-        console.log('[DEBUG map] (4) night_statuses "out" response:', {
-          count: demoOutStatuses?.length ?? 0,
-          first3: (demoOutStatuses || []).slice(0, 3).map((s: any) => ({
-            user_id: s.user_id?.slice(0, 8),
-            venue_name: s.venue_name,
-            is_demo: s.is_demo,
-            lat: s.lat,
-            lng: s.lng,
-          })),
-        });
-        console.log('[DEBUG map] (4) night_statuses "planning" response:', {
-          count: demoPlanningStatuses?.length ?? 0,
-          first3: (demoPlanningStatuses || []).slice(0, 3),
-        });
-        console.log('[DEBUG map] (4) demo profiles response:', {
-          count: demoProfiles?.length ?? 0,
-          first3: (demoProfiles || []).slice(0, 3).map((p: any) => ({
-            id: p.id?.slice(0, 8),
-            display_name: p.display_name,
-            is_demo: p.is_demo,
-          })),
-        });
-
-        // Build profile map: start with fresh demo profiles, then add all profiles from RPC
-        // Fetch fresh (not cached) to ensure newly seeded profiles are included
-        const { data: freshAllProfiles } = await supabase.rpc('get_profiles_safe');
-        const profileMap = new Map<string, any>();
-        // Add all profiles first, then overlay demo profiles (fresh query takes priority)
-        for (const p of freshAllProfiles || []) profileMap.set(p.id, p);
-        for (const p of demoProfiles || []) profileMap.set(p.id, p);
-
-        // Get real friend IDs so we can include both demo AND real friends
-        const [{ data: sentF }, { data: recvF }] = await Promise.all([
+        // Fetch all demo data in a single Promise.all to minimize await points
+        // (each await allows React to interleave renders, which can cause hook errors)
+        const now = new Date().toISOString();
+        const [outRes, planRes, profileRes, sentRes, recvRes] = await Promise.all([
+          supabase.from('night_statuses').select('user_id, lat, lng, venue_name, is_demo').eq('status', 'out').not('expires_at', 'is', null).gt('expires_at', now),
+          supabase.from('night_statuses').select('user_id, planning_neighborhood, is_demo').eq('status', 'planning').not('expires_at', 'is', null).gt('expires_at', now),
+          supabase.from('profiles').select('id, display_name, avatar_url, is_demo'),
           supabase.from('friendships').select('friend_id').eq('user_id', user.id).eq('status', 'accepted'),
           supabase.from('friendships').select('user_id').eq('friend_id', user.id).eq('status', 'accepted'),
         ]);
-        const realFriendIds = new Set([
-          ...(sentF?.map(f => f.friend_id) || []),
-          ...(recvF?.map(f => f.user_id) || []),
+
+        const demoOutStatuses = outRes.data || [];
+        const demoPlanningStatuses = planRes.data || [];
+        const allProfiles = profileRes.data || [];
+        const realFriendIds = new globalThis.Set([
+          ...(sentRes.data?.map((f: any) => f.friend_id) || []),
+          ...(recvRes.data?.map((f: any) => f.user_id) || []),
         ]);
 
-        // Include demo users with valid coordinates + real friends who are out
-        const filteredOutStatuses = (demoOutStatuses || []).filter((status: any) => {
-          if (status.is_demo) {
-            return status.lat && status.lng;
-          }
-          return realFriendIds.has(status.user_id) && status.lat && status.lng;
-        });
+        console.log('[DEMO] fetched - out:', demoOutStatuses.length, 'planning:', demoPlanningStatuses.length, 'profiles:', allProfiles.length, 'friendIds:', realFriendIds.size);
 
-        // Deduplicate by display_name
-        const seenNames = new Set<string>();
-        const relationshipTypes: ('close' | 'direct' | 'mutual')[] = ['close', 'direct', 'mutual'];
+        // Build profile lookup (pure synchronous computation — no awaits)
+        const profileLookup: Record<string, any> = {};
+        for (const p of allProfiles) profileLookup[p.id] = p;
 
-        friendLocations = filteredOutStatuses
-          .filter((status: any) => {
-            const profile = profileMap.get(status.user_id);
-            const name = profile?.display_name;
-            if (!name || seenNames.has(name)) return false;
-            seenNames.add(name);
-            return true;
+        // Filter and build friend locations
+        const seenIds: Record<string, boolean> = {};
+        const relTypes: ('close' | 'direct' | 'mutual')[] = ['close', 'direct', 'mutual'];
+
+        friendLocations = demoOutStatuses
+          .filter((s: any) => {
+            if (seenIds[s.user_id]) return false;
+            seenIds[s.user_id] = true;
+            if (s.is_demo) return s.lat && s.lng;
+            return realFriendIds.has(s.user_id) && s.lat && s.lng;
           })
-          .map((status: any, index: number) => {
-            const profile = profileMap.get(status.user_id);
+          .map((s: any, i: number) => {
+            const p = profileLookup[s.user_id];
             return {
-              user_id: status.user_id,
-              lat: status.lat,
-              lng: status.lng,
-              venue_name: status.venue_name || 'Out',
+              user_id: s.user_id,
+              lat: s.lat,
+              lng: s.lng,
+              venue_name: s.venue_name || 'Out',
               last_location_at: new Date().toISOString(),
               profiles: {
-                display_name: profile?.display_name || 'Unknown',
-                avatar_url: profile?.avatar_url?.includes('dicebear.com') ? null : (profile?.avatar_url || null),
+                display_name: p?.display_name || 'Unknown',
+                avatar_url: p?.avatar_url || null,
               },
-              relationshipType: relationshipTypes[index % relationshipTypes.length],
+              relationshipType: relTypes[i % relTypes.length],
             };
           });
 
         friendIds = friendLocations.map(f => f.user_id);
+        console.log('[DEMO] built locations:', friendLocations.length);
 
-        // Planning friends: both demo and real
-        const planningFriendsData = (demoPlanningStatuses || [])
+        // Build planning friends data
+        const planningFriendsData = demoPlanningStatuses
           .filter((s: any) => s.is_demo || realFriendIds.has(s.user_id))
-          .map((status: any) => {
-            const profile = profileMap.get(status.user_id);
-            return {
-              user_id: status.user_id,
-              display_name: profile?.display_name || 'Friend',
-              avatar_url: profile?.avatar_url || null,
-              planning_neighborhood: status.planning_neighborhood || null,
-            };
-          });
+          .map((s: any) => ({
+            user_id: s.user_id,
+            display_name: profileLookup[s.user_id]?.display_name || 'Friend',
+            avatar_url: profileLookup[s.user_id]?.avatar_url || null,
+            planning_neighborhood: s.planning_neighborhood || null,
+          }));
         setPlanningFriends(planningFriendsData);
       } else {
         // Normal mode: show real friends only - use cached friend IDs if available
@@ -562,7 +591,7 @@ export default function Map() {
               .in('id', mutualFriendIds)
               .eq('is_out', true);
 
-            const mutualProfileMap = new Map((mutualProfiles || []).map((p: any) => [p.id, p]));
+            const mutualProfileMap = new globalThis.Map((mutualProfiles || []).map((p: any) => [p.id, p]));
 
             for (const ms of mutualStatuses || []) {
               const profile = mutualProfileMap.get(ms.user_id);
@@ -618,7 +647,7 @@ export default function Map() {
           setPlanningFriends(planningFriendsData);
 
           // Collect planning user IDs to exclude from "out" list (prevents duplicate)
-          const planningUserIds = new Set(planningFriendsData.map(f => f.user_id));
+          const planningUserIds = new globalThis.Set(planningFriendsData.map(f => f.user_id));
 
           // Get relationship types (close friends, mutual friends) - BATCHED QUERY
           const { data: closeFriends } = await supabase
@@ -626,7 +655,7 @@ export default function Map() {
             .select('close_friend_id')
             .eq('user_id', user.id);
 
-          const closeFriendIds = new Set(closeFriends?.map(cf => cf.close_friend_id) || []);
+          const closeFriendIds = new globalThis.Set(closeFriends?.map(cf => cf.close_friend_id) || []);
 
           // Batch query: Get all friendships for all friends in both directions
           const [fwdResult, revResult] = await Promise.all([
@@ -645,7 +674,7 @@ export default function Map() {
           // Build a map of each friend's connections (merge both directions)
           const friendConnections: Record<string, Set<string>> = {};
           const addConnection = (owner: string, conn: string) => {
-            if (!friendConnections[owner]) friendConnections[owner] = new Set();
+            if (!friendConnections[owner]) friendConnections[owner] = new globalThis.Set();
             friendConnections[owner].add(conn);
           };
           fwdResult.data?.forEach(f => addConnection(f.user_id, f.friend_id));
@@ -653,9 +682,9 @@ export default function Map() {
 
           // Determine relationship type for each friend in-memory (no N+1)
           const relationshipTypes: Record<string, 'close' | 'direct' | 'mutual'> = {};
-          const friendIdSet = new Set(friendIds);
+          const friendIdSet = new globalThis.Set(friendIds);
           
-          const mutualFriendIdSet = new Set(mutualFriendIds);
+          const mutualFriendIdSet = new globalThis.Set(mutualFriendIds);
           for (const friendId of friendIds) {
             if (closeFriendIds.has(friendId)) {
               relationshipTypes[friendId] = 'close';
@@ -709,16 +738,23 @@ export default function Map() {
         }
       }
 
-      setFriends(friendLocations.filter(Boolean) as FriendLocation[]);
+      const finalFriends = friendLocations.filter(Boolean) as FriendLocation[];
+      console.log('[DEBUG map] (5) setting friends:', finalFriends.length, 'locations', finalFriends.slice(0, 3).map(f => ({ name: f.profiles?.display_name, lat: f.lat, lng: f.lng, venue: f.venue_name })));
+      setFriends(finalFriends);
       setIsLoadingFriends(false);
 
-      logger.mapLoad(friendLocations.length, 0); // Log successful friends fetch
-
-      // Fetch venues and calculate heat scores
-      await fetchVenuesWithHeatScores(friendIds);
+      logger.mapLoad(finalFriends.length, 0); // Log successful friends fetch
     } catch (error) {
+      console.error('[DEBUG map] friends_fetch CAUGHT ERROR:', error);
       logger.apiError('map:friends_fetch', error);
       setIsLoadingFriends(false);
+    }
+
+    // Always fetch venues regardless of whether friend fetching succeeded
+    try {
+      await fetchVenuesWithHeatScores([]);
+    } catch (error) {
+      logger.apiError('map:venues_fetch_outer', error);
     }
   };
 
@@ -728,11 +764,12 @@ export default function Map() {
       // DEBUG (2): Log venue query parameters
       console.log('[DEBUG map] (2) venue query: venues.select(*).eq(city,', cityRef.current, ')');
 
-      // Fetch venues filtered by city (server-side filtering)
+      // Fetch real venues filtered by city
       const { data: venuesData, error: venuesError } = await supabase
         .from('venues')
         .select('*')
-        .eq('city', cityRef.current);
+        .eq('city', cityRef.current)
+        .eq('is_demo', false);
 
       // DEBUG (3): Log venue query response
       console.log('[DEBUG map] (3) venue query response:', {
@@ -849,30 +886,8 @@ export default function Map() {
       // Clear the state so it doesn't re-trigger
       navigate(location.pathname, { replace: true, state: {} });
     } else {
-      // Fly to user's current location on initial load
-      const flyToUserLocation = () => {
-        if ('geolocation' in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              const { latitude, longitude } = position.coords;
-              setUserLocation({ lat: latitude, lng: longitude });
-              map.current?.flyTo({
-                center: [longitude, latitude],
-                zoom: 14,
-                duration: 1500,
-                essential: true,
-              });
-            },
-            () => {}, // Silently fall back to city center
-            { timeout: 5000, enableHighAccuracy: true }
-          );
-        }
-      };
-      if (map.current.loaded()) {
-        flyToUserLocation();
-      } else {
-        map.current.once('load', flyToUserLocation);
-      }
+      // Initial load: center on the user's selected city, not raw GPS
+      // (GPS may be in a different location than the city they're viewing)
     }
 
     const handleCenterMapOnVenue = (e: Event) => {
@@ -923,21 +938,20 @@ export default function Map() {
     // Remove old marker
     userMarkerRef.current?.remove();
 
-    // Create user marker with personal avatar and yellow glow
+    // Create user marker — same avatar system with a pulsing yellow ring
     const el = document.createElement('div');
     el.className = 'user-marker';
-    el.style.width = '60px';
-    el.style.height = '60px';
+    el.style.width = `${MARKER.userSelf}px`;
+    el.style.height = `${MARKER.userSelf}px`;
     el.style.cursor = 'pointer';
-    el.style.zIndex = '15';
+    el.style.zIndex = MARKER.zUser;
 
     const displayName = userProfile?.display_name || 'Me';
 
     el.innerHTML = `
-      <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-        <div style="position: absolute; inset: -4px; border-radius: 50%; background: radial-gradient(circle, rgba(212, 255, 0, 0.15) 0%, transparent 70%); animation: pulse 2s infinite;"></div>
-        <div style="position: absolute; inset: 0; border-radius: 50%; border: 3px solid #d4ff00;"></div>
-        ${avatarHtml(userProfile?.avatar_url, displayName, '50px', 'border: 2px solid #1a0f2e;')}
+      <div style="position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+        <div style="position:absolute;inset:-4px;border-radius:50%;background:radial-gradient(circle,rgba(212,255,0,0.15) 0%,transparent 70%);animation:pulse 2s infinite;"></div>
+        ${personCircleHtml(userProfile?.avatar_url, displayName, '100%', 'close')}
       </div>
     `;
 
@@ -960,6 +974,7 @@ export default function Map() {
   const SPREAD_RADIUS = 0.0002; // ~20m spread when expanded
 
   useEffect(() => {
+    console.log('[DEBUG map] (6) marker effect: friends=', friends.length, 'isLoading=', isLoadingFriends, 'map=', !!map.current, 'layerVis=', layerVisibility);
     if (!map.current || isLoadingFriends) return;
 
     // Clear all markers first for clean re-render
@@ -978,13 +993,14 @@ export default function Map() {
 
     // Only render markers for friends with location < 60 min old
     const filteredFriends = filteredByRelationship.filter(f => getStalenessMins(f.last_location_at) < 60);
+    console.log('[DEBUG map] (7) filtered friends for markers:', filteredFriends.length, 'of', friends.length);
 
     // At high zoom (18+), don't cluster - show all individual avatars
     const shouldCluster = currentZoom < 18;
 
     // Group friends by location (within 5m threshold)
     const clusters: FriendLocation[][] = [];
-    const assigned = new Set<string>();
+    const assigned = new globalThis.Set<string>();
 
     filteredFriends.forEach((friend) => {
       if (assigned.has(friend.user_id)) return;
@@ -1007,18 +1023,17 @@ export default function Map() {
       clusters.push(cluster);
     });
 
-    // Z-index by relationship type
+    // Z-index: friends always above venues
     const getZIndex = (relType?: string) => {
-      if (relType === 'close') return '14';
-      if (relType === 'direct') return '11';
-      return '10'; // mutual
+      if (relType === 'close') return MARKER.zFriendClose;
+      if (relType === 'direct') return MARKER.zFriendDirect;
+      return MARKER.zFriendMutual;
     };
 
-    // Get highest priority relationship in a cluster
     const getClusterZIndex = (cluster: FriendLocation[]) => {
-      if (cluster.some(f => f.relationshipType === 'close')) return '14';
-      if (cluster.some(f => f.relationshipType === 'direct')) return '11';
-      return '10';
+      if (cluster.some(f => f.relationshipType === 'close')) return MARKER.zFriendClose;
+      if (cluster.some(f => f.relationshipType === 'direct')) return MARKER.zFriendDirect;
+      return MARKER.zFriendMutual;
     };
 
     // Sort cluster by priority: close > direct > mutual
@@ -1027,45 +1042,45 @@ export default function Map() {
       return (order[a.relationshipType || 'direct'] || 1) - (order[b.relationshipType || 'direct'] || 1);
     };
 
-    // Helper to create individual avatar marker (reduced size: 40px)
-    const createAvatarMarker = (friend: FriendLocation, lng: number, lat: number) => {
+    // Helper to create a single person marker element
+    const createPersonEl = (friend: FriendLocation): HTMLDivElement => {
       const el = document.createElement('div');
       el.className = 'friend-marker';
-      el.style.width = '40px';
-      el.style.height = '40px';
+      el.style.width = `${MARKER.friendSolo}px`;
+      el.style.height = `${MARKER.friendSolo}px`;
       el.style.cursor = 'pointer';
       el.style.zIndex = getZIndex(friend.relationshipType);
-      
-      // Dim markers for 15-60 min stale locations
+
       const staleMins = getStalenessMins(friend.last_location_at);
-      if (staleMins >= 15) {
-        el.style.opacity = '0.5';
-      }
-      
-      const ringColors = {
-        close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.35)', badge: '💛' },
-        direct: { border: '#a855f7', shadow: 'rgba(168, 85, 247, 0.35)', badge: '' },
-        mutual: { border: '#6366f1', shadow: 'rgba(99, 102, 241, 0.35)', badge: '🔗' },
-      };
-      
-      const colors = ringColors[friend.relationshipType || 'direct'];
-      
-      const safeDisplayName = escapeHtml(friend.profiles?.display_name);
+      if (staleMins >= 15) el.style.opacity = '0.5';
 
-      el.innerHTML = `
-        <div style="position: relative; width: 100%; height: 100%;">
-          <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${colors.border}; box-shadow: 0 0 8px ${colors.shadow};"></div>
-          ${avatarHtml(friend.profiles?.avatar_url, friend.profiles?.display_name || 'user', '100%', 'padding: 2px; border: 2px solid white;')}
-          ${colors.badge ? `
-            <div style="position: absolute; bottom: -2px; right: -2px; width: 14px; height: 14px; background: #1a0f2e; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid ${colors.border}; font-size: 8px;">
-              ${colors.badge}
+      if (friend.is_private_party) {
+        // House icon inside a ringed circle
+        const ring = RING_COLORS[friend.relationshipType || 'direct'];
+        const tooltip = friend.party_neighborhood
+          ? `${escapeHtml(friend.profiles?.display_name)} — ${escapeHtml(friend.party_neighborhood)}`
+          : escapeHtml(friend.profiles?.display_name);
+        el.innerHTML = `
+          <div style="position:relative;width:100%;height:100%;" title="${tooltip}">
+            <div style="position:absolute;inset:0;border-radius:50%;border:${MARKER.ringWidth}px solid ${ring.border};box-shadow:0 0 8px ${ring.shadow};background:rgba(26,15,46,0.9);"></div>
+            <div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/>
+                <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              </svg>
             </div>
-          ` : ''}
-        </div>
-      `;
+          </div>`;
+      } else {
+        el.innerHTML = personCircleHtml(
+          friend.profiles?.avatar_url,
+          friend.profiles?.display_name || 'user',
+          '100%',
+          friend.relationshipType || 'direct'
+        );
+      }
 
       el.addEventListener('click', () => {
-        const friendCardData: FriendCardData = {
+        openFriendCard({
           userId: friend.user_id,
           displayName: friend.profiles?.display_name || 'Friend',
           avatarUrl: friend.profiles?.avatar_url || null,
@@ -1073,67 +1088,9 @@ export default function Map() {
           lat: friend.lat,
           lng: friend.lng,
           relationshipType: friend.relationshipType,
-        };
-        openFriendCard(friendCardData);
+        });
       });
-
-      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([lng, lat])
-        .addTo(map.current!);
-
-      friendMarkersRef.current.set(friend.user_id, marker);
-    };
-
-    // Helper to create house icon marker for private party friends
-    const createHouseMarker = (friend: FriendLocation, lng: number, lat: number) => {
-      const el = document.createElement('div');
-      el.className = 'friend-marker house-marker';
-      el.style.width = '40px';
-      el.style.height = '40px';
-      el.style.cursor = 'pointer';
-      el.style.zIndex = getZIndex(friend.relationshipType);
-      
-      const ringColors = {
-        close: { border: '#d4ff00', shadow: 'rgba(212, 255, 0, 0.35)' },
-        direct: { border: '#a855f7', shadow: 'rgba(168, 85, 247, 0.35)' },
-        mutual: { border: '#6366f1', shadow: 'rgba(99, 102, 241, 0.35)' },
-      };
-      
-      const colors = ringColors[friend.relationshipType || 'direct'];
-      const tooltip = friend.party_neighborhood 
-        ? `${escapeHtml(friend.profiles?.display_name)} — ${escapeHtml(friend.party_neighborhood)}`
-        : escapeHtml(friend.profiles?.display_name);
-      
-      el.innerHTML = `
-        <div style="position: relative; width: 100%; height: 100%;" title="${tooltip}">
-          <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${colors.border}; box-shadow: 0 0 8px ${colors.shadow}; background: rgba(26, 15, 46, 0.95);"></div>
-          <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${colors.border}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/>
-              <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            </svg>
-          </div>
-        </div>
-      `;
-
-      el.addEventListener('click', () => {
-        const friendCardData: FriendCardData = {
-          userId: friend.user_id,
-          displayName: friend.profiles?.display_name || 'Friend',
-          avatarUrl: friend.profiles?.avatar_url || null,
-          venueName: friend.venue_name,
-          lat: friend.lat,
-          lng: friend.lng,
-          relationshipType: friend.relationshipType,
-        };
-        openFriendCard(friendCardData);
-      });
-
-      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([lng, lat])
-        .addTo(map.current!);
-
-      friendMarkersRef.current.set(friend.user_id, marker);
+      return el;
     };
 
     // Render clusters
@@ -1143,107 +1100,50 @@ export default function Map() {
       const centerLng = cluster[0].lng;
 
       if (cluster.length >= 2 && shouldCluster) {
-        // Sort by priority so highest-priority friend is shown first
+        // ── Group marker (unified for 2+) ──
         const sorted = [...cluster].sort(sortByPriority);
         const clusterZIndex = getClusterZIndex(cluster);
 
-        if (cluster.length <= 3) {
-          // Compact cluster for 2-3 friends: show top friend avatar with count badge
-          const topFriend = sorted[0];
-          const el = document.createElement('div');
-          el.className = 'cluster-marker';
-          el.style.width = '46px';
-          el.style.height = '46px';
-          el.style.cursor = 'pointer';
-          el.style.zIndex = clusterZIndex;
-          
-          const ringColors: Record<string, string> = {
-            close: '#d4ff00',
-            direct: '#9333ea',
-            mutual: '#6366f1',
-          };
-          const borderColor = ringColors[topFriend.relationshipType || 'direct'];
-          el.innerHTML = `
-            <div style="position: relative; width: 100%; height: 100%;">
-              <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid ${borderColor};"></div>
-              ${avatarHtml(topFriend.profiles?.avatar_url, topFriend.profiles?.display_name || 'user', '100%', 'padding: 2px; border: 2px solid white;')}
-              <div style="position: absolute; bottom: -4px; right: -4px; min-width: 18px; height: 18px; background: #9333ea; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 4px; font-size: 10px; font-weight: 700; color: white; border: 2px solid #0a0118;">
-                ${cluster.length}
-              </div>
-            </div>
-          `;
+        const members = sorted.map(f => ({
+          avatarUrl: f.profiles?.avatar_url,
+          displayName: f.profiles?.display_name || 'U',
+          relType: f.relationshipType || 'direct',
+        }));
 
-          el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const point = map.current!.project([centerLng, centerLat]);
-            setSelectedCluster({
-              friends: cluster,
-              venueName: cluster[0].venue_name,
-              screenX: point.x,
-              screenY: point.y,
-            });
+        const el = document.createElement('div');
+        el.className = 'cluster-marker';
+        const size = cluster.length <= 3 ? MARKER.friendGroup2_3 : MARKER.friendGroup4Plus;
+        el.style.width = `${size}px`;
+        el.style.height = `${size}px`;
+        el.style.cursor = 'pointer';
+        el.style.zIndex = clusterZIndex;
+
+        el.innerHTML = groupMarkerHtml(members, cluster.length);
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const point = map.current!.project([centerLng, centerLat]);
+          setSelectedCluster({
+            friends: cluster,
+            venueName: cluster[0].venue_name,
+            screenX: point.x,
+            screenY: point.y,
           });
+        });
 
-          const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([centerLng, centerLat])
-            .addTo(map.current!);
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([centerLng, centerLat])
+          .addTo(map.current!);
 
-          friendMarkersRef.current.set(clusterKey, marker);
-        } else {
-          // Cluster bubble for 4+ friends (reduced to 56px)
-          const el = document.createElement('div');
-          el.className = 'cluster-marker';
-          el.style.width = '48px';
-          el.style.height = '48px';
-          el.style.cursor = 'pointer';
-          el.style.zIndex = clusterZIndex;
-          
-          const displayFriends = sorted.slice(0, 3);
-          const remainingCount = cluster.length - 3;
-          
-          el.innerHTML = `
-            <div style="position: relative; width: 100%; height: 100%;">
-              <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(26, 10, 46, 0.95); border: 2px solid rgba(147, 51, 234, 0.5);"></div>
-              <div style="position: absolute; top: 4px; left: 50%; transform: translateX(-50%);">
-                ${avatarHtml(displayFriends[0]?.profiles?.avatar_url, displayFriends[0]?.profiles?.display_name || 'U', '18px', 'border: 1.5px solid white; font-size: 9px;')}
-              </div>
-              <div style="position: absolute; bottom: 12px; left: 8px;">
-                ${avatarHtml(displayFriends[1]?.profiles?.avatar_url, displayFriends[1]?.profiles?.display_name || 'U', '18px', 'border: 1.5px solid white; font-size: 9px;')}
-              </div>
-              <div style="position: absolute; bottom: 12px; right: 8px;">
-                ${avatarHtml(displayFriends[2]?.profiles?.avatar_url, displayFriends[2]?.profiles?.display_name || 'U', '18px', 'border: 1.5px solid white; font-size: 9px;')}
-              </div>
-              <div style="position: absolute; bottom: -4px; right: -4px; min-width: 18px; height: 18px; background: #9333ea; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 4px; font-size: 10px; font-weight: 600; color: white; border: 2px solid #0a0118;">
-                +${remainingCount}
-              </div>
-            </div>
-          `;
-
-          el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const point = map.current!.project([centerLng, centerLat]);
-            setSelectedCluster({
-              friends: cluster,
-              venueName: cluster[0].venue_name,
-              screenX: point.x,
-              screenY: point.y,
-            });
-          });
-
-          const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([centerLng, centerLat])
-            .addTo(map.current!);
-
-          friendMarkersRef.current.set(clusterKey, marker);
-        }
+        friendMarkersRef.current.set(clusterKey, marker);
       } else {
-        // Single friend - render individually (no offset needed since clusters handle 2+)
+        // ── Single person ──
         cluster.forEach((friend) => {
-          if (friend.is_private_party) {
-            createHouseMarker(friend, friend.lng, friend.lat);
-          } else {
-            createAvatarMarker(friend, friend.lng, friend.lat);
-          }
+          const el = createPersonEl(friend);
+          const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([friend.lng, friend.lat])
+            .addTo(map.current!);
+          friendMarkersRef.current.set(friend.user_id, marker);
         });
       }
     });
@@ -1312,7 +1212,7 @@ export default function Map() {
         clusterRadius: 50,
       });
 
-      // Cluster circles
+      // Cluster circles — muted so friends dominate
       m.addLayer({
         id: 'venue-clusters',
         type: 'circle',
@@ -1320,14 +1220,17 @@ export default function Map() {
         filter: ['has', 'point_count'],
         paint: {
           'circle-color': '#a855f7',
-          'circle-radius': ['step', ['get', 'point_count'], 18, 10, 24, 50, 30],
-          'circle-opacity': 0.85,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': 'rgba(255,255,255,0.8)',
+          'circle-radius': ['step', ['get', 'point_count'],
+            MARKER.venueClusterRadii[0], 10,
+            MARKER.venueClusterRadii[1], 50,
+            MARKER.venueClusterRadii[2]],
+          'circle-opacity': MARKER.venueClusterOpacity,
+          'circle-stroke-width': MARKER.venueClusterStroke,
+          'circle-stroke-color': MARKER.venueClusterStrokeColor,
         },
       });
 
-      // Cluster count labels
+      // Cluster count labels — floor at 11px so they stay legible after radius reduction
       m.addLayer({
         id: 'venue-cluster-count',
         type: 'symbol',
@@ -1336,7 +1239,7 @@ export default function Map() {
         layout: {
           'text-field': '{point_count_abbreviated}',
           'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
-          'text-size': 13,
+          'text-size': 11,
           'text-allow-overlap': true,
         },
         paint: {
@@ -1344,15 +1247,15 @@ export default function Map() {
         },
       });
 
-      // Create custom pin images for unclustered venues
+      // Create custom pin images for unclustered venues — smaller, muted
       if (!m.hasImage('venue-pin')) {
-        const size = 36;
-        const yOffset = 8;
+        const size = MARKER.venuePinSize;
+        const yOffset = 6;
         const canvas = document.createElement('canvas');
         canvas.width = size;
-        canvas.height = size + 16;
+        canvas.height = size + 14;
         const ctx = canvas.getContext('2d')!;
-        
+
         // Teardrop/pin shape
         ctx.beginPath();
         ctx.moveTo(size / 2, size + 4 + yOffset);
@@ -1360,15 +1263,15 @@ export default function Map() {
         ctx.arc(size / 2, size / 2 - 4 + yOffset, size / 2, Math.PI, 0, false);
         ctx.bezierCurveTo(size, size / 2 + yOffset, size / 2 + 2, size - 4 + yOffset, size / 2, size + 4 + yOffset);
         ctx.closePath();
-        ctx.fillStyle = '#a855f7';
+        ctx.fillStyle = 'rgba(168, 85, 247, 0.7)';
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = 1.5;
         ctx.stroke();
-        
+
         // White dot in center
         ctx.beginPath();
-        ctx.arc(size / 2, size / 2 - 4 + yOffset, 5, 0, Math.PI * 2);
+        ctx.arc(size / 2, size / 2 - 4 + yOffset, 4, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         
@@ -1389,7 +1292,7 @@ export default function Map() {
           'icon-allow-overlap': true,
         },
         paint: {
-          'icon-opacity': ['case', ['>', ['get', 'heatScore'], 0], 1, 0.7],
+          'icon-opacity': ['case', ['>', ['get', 'heatScore'], 0], 0.8, 0.55],
         },
       });
 
@@ -1422,7 +1325,7 @@ export default function Map() {
     }
 
     // === DOM markers for promoted venues only ===
-    const currentPromotedIds = new Set(promotedVenues.map(v => v.id));
+    const currentPromotedIds = new globalThis.Set(promotedVenues.map(v => v.id));
 
     // Remove stale promoted markers
     venueMarkersRef.current.forEach((marker, venueId) => {
@@ -1442,17 +1345,17 @@ export default function Map() {
 
       const el = document.createElement('div');
       el.className = 'venue-marker';
-      el.style.width = '58px';
-      el.style.height = '58px';
+      el.style.width = `${MARKER.venuePromoted}px`;
+      el.style.height = `${MARKER.venuePromoted}px`;
       el.style.cursor = 'pointer';
-      el.style.zIndex = '30';
+      el.style.zIndex = MARKER.zVenuePromoted;
       el.dataset.promoted = 'true';
 
       el.innerHTML = `
         <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-          <div class="promoted-halo" style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(212, 255, 0, 0.12) 0%, transparent 65%);"></div>
-          <div style="width: 38px; height: 38px; background: #a855f7; border-radius: 50%; box-shadow: 0 0 8px rgba(212, 255, 0, 0.15); display: flex; align-items: center; justify-content: center; border: 1.5px solid rgba(255, 255, 255, 0.8);">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="white">
+          <div class="promoted-halo" style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(212, 255, 0, 0.08) 0%, transparent 65%);"></div>
+          <div style="width: ${MARKER.venuePromotedInner}px; height: ${MARKER.venuePromotedInner}px; background: rgba(168, 85, 247, 0.75); border-radius: 50%; box-shadow: 0 0 6px rgba(212, 255, 0, 0.1); display: flex; align-items: center; justify-content: center; border: 1.5px solid rgba(255, 255, 255, 0.6);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="white">
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
             </svg>
           </div>
@@ -1466,7 +1369,7 @@ export default function Map() {
         .addTo(m);
 
       const wrapper = marker.getElement()?.parentElement;
-      if (wrapper) wrapper.style.zIndex = '30';
+      if (wrapper) wrapper.style.zIndex = MARKER.zVenuePromoted;
 
       venueMarkersRef.current.set(venue.id, marker);
     });
@@ -1486,7 +1389,7 @@ export default function Map() {
   };
 
   const toggleFriendsList = () => {
-    if (friends.length > 0) {
+    if ((friendsOutData?.outFriends?.length ?? 0) > 0) {
       setShowFriendsList(!showFriendsList);
     }
   };
@@ -1640,9 +1543,9 @@ export default function Map() {
     ? venues.filter(v => v.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.neighborhood.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 10)
     : [];
 
-  // Consistent bottom offset for all floating elements (nav height + padding + safe area)
-  const bottomOffset = 'calc(5rem + env(safe-area-inset-bottom, 0px))';
-  const legendBottomOffset = 'calc(9rem + env(safe-area-inset-bottom, 0px))';
+  // Bottom offset for floating elements (small padding above edge — nav is outside the map area)
+  const bottomOffset = '1rem';
+  const legendBottomOffset = '5rem';
 
   return (
     <div className="relative flex-1 w-full">
@@ -2219,7 +2122,7 @@ export default function Map() {
 
               {/* Friends Planning Section — use shared hook data, exclude anyone already shown as "out" */}
               {(() => {
-                const outUserIds = new Set(friends.map(f => f.user_id));
+                const outUserIds = new globalThis.Set(friends.map(f => f.user_id));
                 const hookPlanning = friendsOutData?.planningFriends || [];
                 const filteredPlanningFriends = hookPlanning.filter(f => !outUserIds.has(f.user_id));
                 return filteredPlanningFriends.length > 0 ? (
@@ -2280,7 +2183,7 @@ export default function Map() {
 
           {/* Clickable Pill */}
           <button
-            onClick={toggleFriendsList}
+            onClick={(e) => { e.stopPropagation(); toggleFriendsList(); }}
             className="bg-[#2d1b4e]/90 backdrop-blur border border-[#a855f7]/30 rounded-lg p-3 hover:bg-[#2d1b4e] transition-colors w-full"
           >
             <div className="flex items-center gap-2">
