@@ -312,7 +312,7 @@ export default function DemoSettings() {
         </div>
       </div>
 
-      <div className="max-w-[430px] mx-auto p-6 pb-24 space-y-6">
+      <div className="max-w-[430px] mx-auto p-6 pb-8 space-y-6">
         {/* City Selection */}
         <Card className="bg-[#2d1b4e]/60 border-2 border-[#a855f7]/40">
           <CardHeader>

@@ -9,7 +9,13 @@ const config: CapacitorConfig = {
     backgroundColor: '#110a24',
     allowsLinkPreview: false,
     preferredContentMode: 'mobile',
-    scrollEnabled: true,
+    // Disable the native webview's own scrolling. The app manages all
+    // scrolling in CSS overflow containers (html/body are overflow:hidden),
+    // so the only thing native scrolling did was iOS auto-panning the whole
+    // page when an input focused — fighting the keyboard resize and causing
+    // a double-jump. Revert to true if any plugin webview content stops
+    // scrolling.
+    scrollEnabled: false,
   },
   server: {
     iosScheme: 'capacitor',

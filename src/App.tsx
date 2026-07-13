@@ -47,6 +47,8 @@ import Thread from "./pages/Thread";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import CloseFriends from "./pages/CloseFriends";
+import BlockedHidden from "./pages/BlockedHidden";
+import Activity from "./pages/Activity";
 import DemoSettings from "./pages/DemoSettings";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
@@ -363,6 +365,22 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <CloseFriends />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/blocked-hidden"
+          element={
+            <ProtectedRoute>
+              <BlockedHidden />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/activity"
+          element={
+            <ProtectedRoute>
+              <Activity />
             </ProtectedRoute>
           }
         />

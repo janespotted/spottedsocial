@@ -127,12 +127,11 @@ export function FriendsOutPill() {
     <>
       {expanded && (
         <div
-          className="fixed inset-0"
-          style={{ zIndex: 29 }}
+          className="fixed inset-0 z-[34]"
           onClick={() => setExpanded(false)}
         />
       )}
-      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] left-4 z-30 flex flex-col items-start">
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+8px)] left-4 z-[35] flex flex-col items-start">
         {/* Expanded List */}
         {expanded && (
           <div className="mb-2 w-72 bg-[#1a0a2e]/95 backdrop-blur border border-white/10 rounded-2xl max-h-80 overflow-y-auto">

@@ -215,7 +215,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
     try {
       let query = supabase
         .from("yap_messages")
-        .select(`*, profiles:user_id (display_name, avatar_url)`)
+        .select(`*`)
         .gt("expires_at", new Date().toISOString());
 
       if (partyId) {
@@ -223,19 +223,32 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
         query = query.eq("party_id", partyId);
         if (!demoMode) query = query.eq("is_demo", false);
       } else if (demoMode) {
-        query = query.or(`venue_name.eq.${venueName},is_demo.eq.true`);
+        query = query.eq("venue_name", venueName);
       } else {
         query = query.eq("venue_name", venueName).eq("is_demo", false);
       }
 
       const { data: yaps } = await query;
+
       if (!yaps?.length) {
         setMessages([]);
         setIsLoading(false);
         return;
       }
 
-      const filteredYaps = yaps.filter((y) => !blockedUserIds.has(y.user_id));
+      // Enrich with profile data (since we dropped the join to avoid inner-join filtering)
+      const userIds = [...new Set(yaps.map(y => y.user_id))];
+      const { data: profileRows } = userIds.length > 0
+        ? await supabase.from('profiles').select('id, display_name, avatar_url').in('id', userIds)
+        : { data: [] };
+      const profileMap = new Map((profileRows || []).map((p: any) => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url }]));
+
+      const enrichedYaps = yaps.map(y => ({
+        ...y,
+        profiles: profileMap.get(y.user_id) || null,
+      }));
+
+      const filteredYaps = enrichedYaps.filter((y) => !blockedUserIds.has(y.user_id));
 
       // Resolve signed URLs for yap media (bucket is now private)
       const resolvedYaps = await Promise.all(
@@ -677,7 +690,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
   if (isLoading) return <YapSkeleton />;
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-4">
       {/* Back + Venue Header */}
       <div className="flex items-center gap-3 bg-white/[0.04] rounded-2xl px-4 py-3">
         <button onClick={onBack} className="text-white/60 hover:text-white transition-colors p-1">

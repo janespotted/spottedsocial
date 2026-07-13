@@ -423,8 +423,9 @@ export function useFeed(options: UseFeedOptions) {
     if (!text) {
       setNewComment(prev => ({ ...prev, [postId]: '' }));
     }
+    // Optimistically increment comments_count so the post card updates immediately
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p));
     await fetchComments(postId);
-    await fetchPosts();
   }, [newComment, userId, fetchComments, fetchPosts]);
 
   const handleLikePost = useCallback(async (postId: string) => {

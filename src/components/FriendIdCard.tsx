@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useMeetUp } from '@/contexts/MeetUpContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, ChevronRight, CalendarPlus, Share2, Megaphone, UserPlus } from 'lucide-react';
+import { X, ChevronRight, ChevronDown, CalendarPlus, Share2, Megaphone, UserPlus, Check, EyeOff } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MessageSquare, MoreVertical, Flag, Ban, X as CloseIcon } from 'lucide-react';
@@ -79,6 +79,7 @@ export function FriendIdCard() {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isDemoUser, setIsDemoUser] = useState(false);
   const [friendUsername, setFriendUsername] = useState('');
+  const [friendRing, setFriendRing] = useState<'close' | 'direct' | 'mutual' | null>(null);
   const [venueCoords, setVenueCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showCreatePlanDialog, setShowCreatePlanDialog] = useState(false);
   const [rallySent, setRallySent] = useState(false);
@@ -88,10 +89,58 @@ export function FriendIdCard() {
     avatar_url: string | null;
   } | null>(null);
   const [badgeConfirm, setBadgeConfirm] = useState<'add_close' | 'remove_close' | 'send_request' | null>(null);
+  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
+  const [statusPopoverView, setStatusPopoverView] = useState<'menu' | 'confirm'>('menu');
+  const [removingFriend, setRemovingFriend] = useState(false);
+  const removeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [friendRequestState, setFriendRequestState] = useState<'idle' | 'requested' | 'sending'>('idle');
+  const requestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isLocationHidden, setIsLocationHidden] = useState(false);
+  const [overflowView, setOverflowView] = useState<'menu' | 'block-confirm'>('menu');
+  const [blockingUser, setBlockingUser] = useState(false);
+  const blockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (selectedFriend && user) {
       console.log('Friend ID Card opened for:', selectedFriend);
+      // Use passed relationshipType as initial hint, then verify from DB
+      if (selectedFriend.relationshipType) {
+        setFriendRing(selectedFriend.relationshipType);
+      }
+      // Always verify relationship from DB (corrects stale/wrong hints)
+      (async () => {
+        const uid = user.id;
+        const fid = selectedFriend.userId;
+        // Check if direct friend
+        const { data: friendship } = await supabase
+          .from('friendships')
+          .select('id')
+          .or(`and(user_id.eq.${uid},friend_id.eq.${fid}),and(user_id.eq.${fid},friend_id.eq.${uid})`)
+          .eq('status', 'accepted')
+          .maybeSingle();
+        if (friendship) {
+          // Check if I consider them a close friend (one-directional)
+          const { data: close } = await supabase
+            .from('close_friends')
+            .select('id')
+            .eq('user_id', uid)
+            .eq('close_friend_id', fid)
+            .maybeSingle();
+          setFriendRing(close ? 'close' : 'direct');
+        } else {
+          setFriendRing('mutual');
+        }
+      })();
+      // Fetch hide state
+      (async () => {
+        const { data } = await supabase
+          .from('location_hidden')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('hidden_from_id', selectedFriend.userId)
+          .maybeSingle();
+        setIsLocationHidden(!!data);
+      })();
       // Check if this is a demo user
       checkIfDemoUser();
       // Fetch venue coordinates for distance calculation
@@ -115,6 +164,14 @@ export function FriendIdCard() {
       setUserStatus(null);
       setStatusSubtitle('');
       setIsDemoUser(false);
+      setFriendRing(null);
+      setStatusPopoverOpen(false);
+      setStatusPopoverView('menu');
+      setRemovingFriend(false);
+      setFriendRequestState('idle');
+      setIsLocationHidden(false);
+      setOverflowView('menu');
+      setBlockingUser(false);
       setVenueCoords(null);
       setShowCreatePlanDialog(false);
       setRallySent(false);
@@ -232,9 +289,13 @@ export function FriendIdCard() {
             canSeeLocation: true,
             isPrivateParty: true
           });
-          setStatusSubtitle(neighborhood ? `@ Private Party · ${neighborhood}` : '@ Private Party');
+          const ppMinsAgo = Math.floor((Date.now() - new Date(nightStatus.updated_at).getTime()) / 60000);
+          const ppTimeAgo = ppMinsAgo < 1 ? 'just now' : ppMinsAgo < 60 ? `${ppMinsAgo} min ago` : `${Math.floor(ppMinsAgo / 60)} hr ago`;
+          setStatusSubtitle(neighborhood ? `@ Private Party · ${neighborhood} • ${ppTimeAgo}` : `@ Private Party • ${ppTimeAgo}`);
         } else {
           const venueName = nightStatus.venue_name || null;
+          const nsMinsAgo = Math.floor((Date.now() - new Date(nightStatus.updated_at).getTime()) / 60000);
+          const nsTimeAgo = nsMinsAgo < 1 ? 'just now' : nsMinsAgo < 60 ? `${nsMinsAgo} min ago` : `${Math.floor(nsMinsAgo / 60)} hr ago`;
           setUserStatus({
             isOut: true,
             currentVenue: venueName || 'Out',
@@ -245,7 +306,7 @@ export function FriendIdCard() {
             canSeeLocation: true,
             isPrivateParty: false
           });
-          setStatusSubtitle(venueName ? `@ ${venueName}` : 'Out now');
+          setStatusSubtitle(venueName ? `@ ${venueName} • ${nsTimeAgo}` : `Out now • ${nsTimeAgo}`);
           if (venueName) fetchFriendsAtVenue(venueName);
         }
         return;
@@ -494,6 +555,339 @@ export function FriendIdCard() {
     }
   };
 
+  // ── Friend Status Popover handlers ──
+  const handleToggleStatus = async (targetRing: 'close' | 'direct') => {
+    if (!selectedFriend || !user || targetRing === friendRing) return;
+
+    const prevRing = friendRing;
+    setFriendRing(targetRing);
+    setStatusPopoverOpen(false);
+    haptic.light();
+
+    if (targetRing === 'close') {
+      const { error } = await supabase
+        .from('close_friends')
+        .insert({ user_id: user.id, close_friend_id: selectedFriend.userId });
+      if (error) {
+        setFriendRing(prevRing);
+        toast.error('Failed to update friend status');
+        return;
+      }
+      toast.success(`${selectedFriend.displayName.split(' ')[0]} added to Close Friends`);
+    } else {
+      const { error } = await supabase
+        .from('close_friends')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('close_friend_id', selectedFriend.userId);
+      if (error) {
+        setFriendRing(prevRing);
+        toast.error('Failed to update friend status');
+        return;
+      }
+      toast.success(`${selectedFriend.displayName.split(' ')[0]} moved to Friends`);
+    }
+  };
+
+  // ── Remove friend: immediate write, undo restores ──
+  const handleRemoveFriend = async () => {
+    if (!selectedFriend || !user || removingFriend) return;
+    setRemovingFriend(true);
+
+    const friendId = selectedFriend.userId;
+    const friendName = selectedFriend.displayName;
+    const prevRing = friendRing;
+
+    // Capture friendship row before deleting so undo can restore it
+    const { data: friendshipRows } = await supabase
+      .from('friendships')
+      .select('*')
+      .or(`and(user_id.eq.${user.id},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${user.id})`)
+      .eq('status', 'accepted');
+
+    // Delete close friend entry
+    const { error: cfErr } = await supabase
+      .from('close_friends')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('close_friend_id', friendId);
+
+    // Delete friendship (both directions)
+    const { error: fErr } = await supabase
+      .from('friendships')
+      .delete()
+      .or(`and(user_id.eq.${user.id},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${user.id})`);
+
+    if (cfErr || fErr) {
+      toast.error('Failed to remove friend');
+      setRemovingFriend(false);
+      return;
+    }
+
+    setStatusPopoverOpen(false);
+    closeFriendCard();
+    queryClient.invalidateQueries({ queryKey: ['friends-out-status'] });
+
+    toast(`Removed ${friendName} as a friend`, {
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          // Restore friendship row(s)
+          if (friendshipRows && friendshipRows.length > 0) {
+            for (const row of friendshipRows) {
+              const { id, created_at, ...insertData } = row;
+              await supabase.from('friendships').insert(insertData);
+            }
+          }
+          // Restore close friend if was close
+          if (prevRing === 'close') {
+            await supabase
+              .from('close_friends')
+              .insert({ user_id: user.id, close_friend_id: friendId });
+          }
+          queryClient.invalidateQueries({ queryKey: ['friends-out-status'] });
+          toast.success(`${friendName} restored`);
+          setRemovingFriend(false);
+        },
+      },
+      duration: 6000,
+      onAutoClose: () => setRemovingFriend(false),
+      onDismiss: () => setRemovingFriend(false),
+    });
+  };
+
+  // ── Mutual friend request: immediate write, undo cancels ──
+  const handleSendFriendRequest = async () => {
+    if (!selectedFriend || !user || friendRequestState !== 'idle') return;
+
+    setFriendRequestState('sending');
+    haptic.light();
+
+    const friendId = selectedFriend.userId;
+    const friendName = selectedFriend.displayName.split(' ')[0];
+
+    // Check if request already exists
+    const { data: existing } = await supabase
+      .from('friendships')
+      .select('status')
+      .or(`and(user_id.eq.${user.id},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${user.id})`)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.status === 'accepted') {
+      toast.info('Already friends!');
+      setFriendRequestState('requested');
+      return;
+    }
+    if (existing?.status === 'pending') {
+      toast.info('Request already pending');
+      setFriendRequestState('requested');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('friendships')
+      .insert({ user_id: user.id, friend_id: friendId, status: 'pending' });
+
+    if (error) {
+      setFriendRequestState('idle');
+      toast.error('Failed to send friend request');
+      return;
+    }
+
+    setFriendRequestState('requested');
+
+    // Send notification (skip demo users)
+    const cachedProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
+    const targetIsDemo = cachedProfiles.find((p: any) => p.id === friendId)?.is_demo;
+    if (!targetIsDemo) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', user.id)
+        .single();
+      const senderName = profile?.display_name || 'Someone';
+      const message = `${senderName} sent you a friend request`;
+
+      supabase.rpc('create_notification', {
+        p_receiver_id: friendId,
+        p_type: 'friend_request',
+        p_message: message,
+      }).then(({ data }) => {
+        const notif = Array.isArray(data) ? data[0] : data;
+        if (notif?.id) {
+          triggerPushNotification({
+            id: notif.id,
+            receiver_id: friendId,
+            sender_id: user!.id,
+            type: 'friend_request',
+            message,
+          });
+        }
+      });
+    }
+
+    toast(`Friend request sent to ${friendName}`, {
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          const { error: delErr } = await supabase
+            .from('friendships')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('friend_id', friendId)
+            .eq('status', 'pending');
+          if (!delErr) setFriendRequestState('idle');
+        },
+      },
+      duration: 6000,
+    });
+  };
+
+  const handleCancelFriendRequest = async () => {
+    if (!selectedFriend || !user) return;
+
+    const { error } = await supabase
+      .from('friendships')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('friend_id', selectedFriend.userId)
+      .eq('status', 'pending');
+
+    if (error) {
+      toast.error('Failed to cancel request');
+      return;
+    }
+    setFriendRequestState('idle');
+    toast.success('Friend request cancelled');
+  };
+
+  // ── Hide My Location toggle ──
+  const handleToggleHide = async () => {
+    if (!selectedFriend || !user) return;
+    const wasHidden = isLocationHidden;
+    setIsLocationHidden(!wasHidden);
+    haptic.light();
+
+    if (wasHidden) {
+      const { error } = await supabase
+        .from('location_hidden')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('hidden_from_id', selectedFriend.userId);
+      if (error) {
+        setIsLocationHidden(wasHidden);
+        toast.error('Failed to update location privacy');
+        return;
+      }
+      toast.success(`${selectedFriend.displayName.split(' ')[0]} can see your location again`);
+    } else {
+      const { error } = await supabase
+        .from('location_hidden')
+        .insert({ user_id: user.id, hidden_from_id: selectedFriend.userId });
+      if (error) {
+        setIsLocationHidden(wasHidden);
+        toast.error('Failed to update location privacy');
+        return;
+      }
+      toast.success(`${selectedFriend.displayName.split(' ')[0]} can no longer see your location`);
+    }
+  };
+
+  // ── Block: immediate write, undo reverses ──
+  const handleBlockWithUndo = async () => {
+    if (!selectedFriend || !user || blockingUser) return;
+    setBlockingUser(true);
+
+    const blockedId = selectedFriend.userId;
+    const blockedName = selectedFriend.displayName;
+    const prevRing = friendRing;
+
+    // Capture friendship state before deleting so undo can restore
+    const { data: friendshipRows } = await supabase
+      .from('friendships')
+      .select('*')
+      .or(`and(user_id.eq.${user.id},friend_id.eq.${blockedId}),and(user_id.eq.${blockedId},friend_id.eq.${user.id})`)
+      .eq('status', 'accepted');
+
+    // 1. Insert block
+    const { error: blockErr } = await supabase
+      .from('blocked_users')
+      .insert({ blocker_id: user.id, blocked_id: blockedId });
+
+    if (blockErr) {
+      if (blockErr.code === '23505') {
+        toast.info('User already blocked');
+      } else {
+        toast.error('Failed to block user');
+      }
+      setBlockingUser(false);
+      return;
+    }
+
+    // 2. Sever friendship
+    await supabase
+      .from('friendships')
+      .delete()
+      .or(`and(user_id.eq.${user.id},friend_id.eq.${blockedId}),and(user_id.eq.${blockedId},friend_id.eq.${user.id})`);
+
+    // 3. Remove close friend entries
+    await supabase
+      .from('close_friends')
+      .delete()
+      .or(`and(user_id.eq.${user.id},close_friend_id.eq.${blockedId}),and(user_id.eq.${blockedId},close_friend_id.eq.${user.id})`);
+
+    setOverflowView('menu');
+    closeFriendCard();
+    queryClient.invalidateQueries({ queryKey: ['friends-out-status'] });
+
+    toast(`${blockedName} blocked`, {
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          // Remove the block
+          const { error: unblockErr } = await supabase
+            .from('blocked_users')
+            .delete()
+            .eq('blocker_id', user.id)
+            .eq('blocked_id', blockedId);
+          if (unblockErr) {
+            toast.error('Failed to undo block');
+            return;
+          }
+          // Restore friendship
+          if (friendshipRows && friendshipRows.length > 0) {
+            for (const row of friendshipRows) {
+              const { id, created_at, ...insertData } = row;
+              await supabase.from('friendships').insert(insertData);
+            }
+          }
+          // Restore close friend if was close
+          if (prevRing === 'close') {
+            await supabase
+              .from('close_friends')
+              .insert({ user_id: user.id, close_friend_id: blockedId });
+          }
+          queryClient.invalidateQueries({ queryKey: ['friends-out-status'] });
+          toast.success(`${blockedName} unblocked`);
+          setBlockingUser(false);
+        },
+      },
+      duration: 6000,
+      onAutoClose: () => setBlockingUser(false),
+      onDismiss: () => setBlockingUser(false),
+    });
+  };
+
+  // Clean up on unmount (only requestTimeoutRef still deferred — remove/block are now immediate)
+  useEffect(() => {
+    return () => {
+      if (removeTimeoutRef.current) clearTimeout(removeTimeoutRef.current);
+      if (requestTimeoutRef.current) clearTimeout(requestTimeoutRef.current);
+      if (blockTimeoutRef.current) clearTimeout(blockTimeoutRef.current);
+    };
+  }, []);
+
   const handleOpenDM = () => {
     if (!selectedFriend) return;
 
@@ -729,30 +1123,103 @@ export function FriendIdCard() {
                 className="relative w-full max-w-[390px] bg-[#1a1030] border border-[#a855f7]/30 rounded-3xl p-0 overflow-hidden pointer-events-auto animate-card-lift shadow-[0_0_40px_rgba(168,85,247,0.15)]"
                 {...swipeHandlers}
               >
-                {/* Three-dot menu — top right */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="absolute right-4 top-4 z-20 w-7 h-7 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+                {/* Three-dot menu — top right — privacy controls */}
+                <Popover onOpenChange={(open) => { if (!open) setOverflowView('menu'); }}>
+                  <PopoverTrigger className="absolute right-4 top-4 z-20 w-7 h-7 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors" aria-haspopup="menu">
                     <MoreVertical className="h-4 w-4 text-white/50" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#a855f7]/40">
-                    <DropdownMenuItem
-                      onClick={() => setShowReportDialog(true)}
-                      className="text-white hover:bg-[#a855f7]/20 cursor-pointer"
-                    >
-                      <Flag className="h-4 w-4 mr-2" />
-                      Report User
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={handleBlockUser}
-                      className="text-red-400 hover:bg-red-500/20 cursor-pointer"
-                    >
-                      <Ban className="h-4 w-4 mr-2" />
-                      Block User
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    side="bottom"
+                    sideOffset={4}
+                    className="w-64 p-0 bg-[#1a0f2e] border border-[#a855f7]/30 rounded-xl z-[350]"
+                  >
+                    {overflowView === 'menu' ? (
+                      <div>
+                        {/* Privacy section */}
+                        <p className="text-white/40 text-[10px] uppercase tracking-wider font-medium px-3 pt-2.5 pb-1">
+                          Privacy
+                        </p>
 
-              <div className="p-5">
+                        {/* Hide My Location toggle */}
+                        {(friendRing === 'close' || friendRing === 'direct' || friendRing === 'mutual') && (
+                          <div className="px-3 py-2">
+                            <button
+                              onClick={handleToggleHide}
+                              className="w-full flex items-center gap-2.5"
+                              role="menuitemcheckbox"
+                              aria-checked={isLocationHidden}
+                            >
+                              <EyeOff className="h-4 w-4 text-white/50 flex-shrink-0" />
+                              <span className="text-white text-sm flex-1 text-left">
+                                {isLocationHidden ? 'Location Hidden' : 'Hide My Location'}
+                              </span>
+                              {/* Toggle switch */}
+                              <div className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${
+                                isLocationHidden ? 'bg-amber-500' : 'bg-white/15'
+                              }`}>
+                                <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                  isLocationHidden ? 'translate-x-4' : 'translate-x-0'
+                                }`} />
+                              </div>
+                            </button>
+                            <p className="text-white/30 text-[11px] leading-snug mt-1.5 ml-[26px]">
+                              {selectedFriend?.displayName.split(' ')[0]} stays your friend and won't be notified — they just won't see you on the map.
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="border-t border-white/[0.08] mx-2 my-1" />
+
+                        {/* Block */}
+                        <button
+                          onClick={() => setOverflowView('block-confirm')}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          <Ban className="h-4 w-4" />
+                          <span className="text-sm">Block {selectedFriend?.displayName.split(' ')[0]}…</span>
+                        </button>
+
+                        <div className="border-t border-white/[0.08] mx-2 my-1" />
+
+                        {/* Report — kept from original menu */}
+                        <button
+                          onClick={() => setShowReportDialog(true)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-white/70 hover:bg-white/5 transition-colors"
+                        >
+                          <Flag className="h-4 w-4" />
+                          <span className="text-sm">Report User</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-3">
+                        <p className="text-white text-sm font-medium mb-1">
+                          Block {selectedFriend?.displayName}?
+                        </p>
+                        <p className="text-white/40 text-xs mb-3 leading-relaxed">
+                          They won't see you on the map, message you, or send you requests. They won't be notified.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setOverflowView('menu')}
+                            className="flex-1 h-8 rounded-lg bg-white/10 text-white text-xs font-medium hover:bg-white/15 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleBlockWithUndo}
+                            disabled={blockingUser}
+                            className="flex-1 h-8 rounded-lg bg-red-500/80 text-white text-xs font-medium hover:bg-red-500 disabled:opacity-40 transition-colors"
+                          >
+                            Block
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+
+              <div className="pt-5 pb-6" style={{ paddingLeft: 20, paddingRight: 20 }}>
                 {/* Avatar + Info row */}
                 <div className="flex items-center gap-4 mb-4">
                   {/* Avatar with gradient ring */}
@@ -808,16 +1275,116 @@ export function FriendIdCard() {
                     ) : statusSubtitle ? (
                       <p className="text-white/40 text-sm leading-tight truncate">{statusSubtitle}</p>
                     ) : null}
-                    {distance !== null && isOutStatus && (
-                      <p className="text-white/30 text-xs leading-tight mt-0.5">
-                        {distance.toFixed(1)} mi away
-                      </p>
-                    )}
+                    {friendRing && friendRing !== 'mutual' ? (
+                      <Popover
+                        open={statusPopoverOpen}
+                        onOpenChange={(open) => {
+                          setStatusPopoverOpen(open);
+                          if (!open) setStatusPopoverView('menu');
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <button
+                            className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase transition-colors hover:opacity-80 ${
+                              friendRing === 'close'
+                                ? 'bg-[#d4ff00]/15 text-[#d4ff00]'
+                                : 'bg-[#9333ea]/15 text-[#c084fc]'
+                            }`}
+                            aria-haspopup="menu"
+                            aria-expanded={statusPopoverOpen}
+                          >
+                            {friendRing === 'close' ? 'Close Friend' : 'Friend'}
+                            <ChevronDown className={`w-3 h-3 transition-transform ${statusPopoverOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-56 p-0 bg-[#1a0f2e] border border-[#a855f7]/30 rounded-xl z-[350]"
+                          align="start"
+                          side="bottom"
+                          sideOffset={4}
+                        >
+                          {statusPopoverView === 'menu' ? (
+                            <div role="menu">
+                              <p className="text-white/40 text-[10px] uppercase tracking-wider font-medium px-3 pt-2.5 pb-1.5">
+                                Friend Status
+                              </p>
+                              <button
+                                role="menuitem"
+                                onClick={() => handleToggleStatus('close')}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/5 transition-colors"
+                              >
+                                <div className="w-2.5 h-2.5 rounded-full bg-[#d4ff00]" />
+                                <span className="text-white text-sm flex-1 text-left">Close Friend</span>
+                                {friendRing === 'close' && <Check className="w-4 h-4 text-[#d4ff00]" />}
+                              </button>
+                              <button
+                                role="menuitem"
+                                onClick={() => handleToggleStatus('direct')}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/5 transition-colors"
+                              >
+                                <div className="w-2.5 h-2.5 rounded-full bg-[#9333ea]" />
+                                <span className="text-white text-sm flex-1 text-left">Friend</span>
+                                {friendRing === 'direct' && <Check className="w-4 h-4 text-[#9333ea]" />}
+                              </button>
+                              <div className="border-t border-white/[0.08] mx-2 my-1" />
+                              <button
+                                role="menuitem"
+                                onClick={() => setStatusPopoverView('confirm')}
+                                className="w-full text-left px-3 py-2.5 text-red-400 text-sm hover:bg-red-500/10 transition-colors"
+                              >
+                                Remove Friend…
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="p-3">
+                              <p className="text-white text-sm font-medium mb-1">
+                                Remove {selectedFriend?.displayName}?
+                              </p>
+                              <p className="text-white/40 text-xs mb-3 leading-relaxed">
+                                They won't be notified, but you'll no longer see each other on the map.
+                              </p>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setStatusPopoverView('menu')}
+                                  className="flex-1 h-8 rounded-lg bg-white/10 text-white text-xs font-medium hover:bg-white/15 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={handleRemoveFriend}
+                                  disabled={removingFriend}
+                                  className="flex-1 h-8 rounded-lg bg-red-500/80 text-white text-xs font-medium hover:bg-red-500 disabled:opacity-40 transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
+                    ) : friendRing === 'mutual' ? (
+                      <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-[#6366f1]/15 text-[#818cf8]">
+                        Mutual Friend
+                      </span>
+                    ) : null}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {isLocationHidden && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-amber-500/15 text-amber-400" aria-label={`${selectedFriend?.displayName} can't see your location`}>
+                          <EyeOff className="w-2.5 h-2.5" />
+                          Hidden
+                        </span>
+                      )}
+                      {distance !== null && isOutStatus && (
+                        <p className="text-white/30 text-xs leading-tight">
+                          {distance.toFixed(1)} mi away
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex items-center gap-3">
+                {/* Action Buttons — single row, uniform 14px gap */}
+                <div className="flex items-center" style={{ gap: 8 }}>
               {/* Friends at Venue - Tappable with Popover */}
                 {friendsAtVenue.length > 0 && (
                   <Popover>
@@ -882,12 +1449,37 @@ export function FriendIdCard() {
 
                 {/* Action Buttons - Context-aware based on friend's status */}
                 {(!isDemoUser || demoEnabled) && (
-                  <div className="flex items-center gap-2 flex-1">
-                    {/* Show "Meet Up" if friend is out, "Make Plans" otherwise */}
+                  <>
+                    {/* Add Friend / Requested — flex:none, hugs content */}
+                    {friendRing === 'mutual' && (
+                      friendRequestState === 'idle' ? (
+                        <button
+                          onClick={handleSendFriendRequest}
+                          className="flex-none inline-flex items-center gap-1 h-[42px] rounded-full border border-[#a855f7]/40 text-[#a855f7] text-[11px] font-medium hover:bg-[#a855f7]/10 transition-colors"
+                          style={{ paddingLeft: 14, paddingRight: 14 }}
+                          aria-live="polite"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          Add Friend
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleCancelFriendRequest}
+                          disabled={friendRequestState === 'sending'}
+                          className="flex-none inline-flex items-center gap-1 h-[42px] rounded-full border border-white/15 text-white/40 text-[11px] font-medium whitespace-nowrap hover:bg-white/5 disabled:opacity-40 transition-colors"
+                          style={{ paddingLeft: 14, paddingRight: 14 }}
+                          aria-live="polite"
+                        >
+                          <Check className="h-4 w-4" />
+                          Requested
+                        </button>
+                      )
+                    )}
+                    {/* Meet Up / Make Plans — flex:1, takes remaining width */}
                     {isOutStatus ? (
                       <button
                         onClick={handleMeetUp}
-                        className="flex-1 h-11 rounded-full bg-[#d4ff00] text-black text-sm font-semibold hover:bg-[#d4ff00]/90 transition-colors flex items-center justify-center gap-2 shadow-[0_0_16px_rgba(212,255,0,0.25)]"
+                        className="flex-1 inline-flex items-center justify-center gap-2 h-[42px] px-5 rounded-full bg-[#d4ff00] text-black text-sm font-bold whitespace-nowrap hover:bg-[#d4ff00]/90 transition-colors shadow-[0_0_16px_rgba(212,255,0,0.25)]"
                       >
                         <UserPlus className="h-4 w-4" />
                         Meet Up
@@ -896,21 +1488,21 @@ export function FriendIdCard() {
                       <>
                         <button
                           onClick={handleMakePlans}
-                          className="flex-1 h-11 rounded-full border border-[#a855f7]/40 text-[#a855f7] text-sm font-semibold hover:bg-[#a855f7]/10 transition-colors flex items-center justify-center gap-2"
+                          className="flex-1 inline-flex items-center justify-center gap-2 h-[42px] px-5 rounded-full border border-[#a855f7]/40 text-[#a855f7] text-sm font-bold whitespace-nowrap hover:bg-[#a855f7]/10 transition-colors"
                         >
                           <CalendarPlus className="h-4 w-4" />
                           Make Plans
                         </button>
                         {isRallyNight && (
                           rallySent ? (
-                            <span className="h-11 px-4 rounded-full border border-[#d4ff00]/20 text-[#d4ff00]/50 text-sm font-semibold flex items-center justify-center gap-1.5">
+                            <span className="flex-none inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border border-[#d4ff00]/20 text-[#d4ff00]/50 text-[13px] font-semibold whitespace-nowrap">
                               <Megaphone className="h-4 w-4" />
                               Rallied
                             </span>
                           ) : (
                             <button
                               onClick={handleRally}
-                              className="h-11 px-4 rounded-full border border-[#d4ff00]/40 text-[#d4ff00] text-sm font-semibold hover:bg-[#d4ff00]/10 transition-colors flex items-center justify-center gap-1.5"
+                              className="flex-none inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border border-[#d4ff00]/40 text-[#d4ff00] text-[13px] font-semibold whitespace-nowrap hover:bg-[#d4ff00]/10 transition-colors"
                             >
                               <Megaphone className="h-4 w-4" />
                               Rally
@@ -919,13 +1511,14 @@ export function FriendIdCard() {
                         )}
                       </>
                     )}
+                    {/* Message — flex:none, matches button height */}
                     <button
                       onClick={handleOpenDM}
-                      className="w-11 h-11 rounded-full flex items-center justify-center border border-white/15 text-white/50 hover:bg-white/5 transition-colors flex-shrink-0"
+                      className="flex-none w-[42px] h-[42px] rounded-full flex items-center justify-center border border-white/15 text-white/50 hover:bg-white/5 transition-colors ml-1"
                     >
-                      <MessageSquare className="h-5 w-5" />
+                      <MessageSquare className="h-[18px] w-[18px]" />
                     </button>
-                  </div>
+                  </>
                 )}
 
                 {/* Demo user who isn't on Spotted — show invite CTA */}

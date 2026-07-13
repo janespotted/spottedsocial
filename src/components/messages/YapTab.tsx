@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Mic, MapPin, Pin, Flame, Home } from 'lucide-react';
+import { Mic, MapPin, Pin, Home, ChevronRight, Triangle } from 'lucide-react';
 import { isFromTonight } from '@/lib/time-context';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useUserCity } from '@/hooks/useUserCity';
@@ -298,33 +298,27 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
   }
 
   return (
-    <div className="space-y-4 pb-24">
-      {/* Header */}
-      <div className="animate-fade-in">
-        <h1 className="text-3xl font-bold text-white mb-1">Yap</h1>
-        <p className="text-white/60 text-sm">Live from the crowd — see what people are saying at venues tonight</p>
-      </div>
-
-      {/* You're At compact bar */}
+    <div className="-mx-4">
+      {/* You're At — slim tappable row */}
       {userStatus === 'out' && userVenueName && (
         <button
           onClick={() => openThread(userVenueName, userIsPrivateParty ? userNightStatusId : null)}
-          className="w-full flex items-center justify-between bg-white/[0.06] backdrop-blur-sm rounded-2xl px-4 py-2.5 active:bg-white/[0.10] transition-colors animate-fade-in"
+          className="w-full flex items-center gap-2 px-4 py-2 active:bg-white/[0.06] transition-colors"
         >
-          <span className="text-white text-sm flex items-center gap-1">
-            {userIsPrivateParty ? <Home className="h-4 w-4 text-[#d4ff00] inline" /> : <MapPin className="h-4 w-4 text-[#d4ff00] inline" />}
-            {' '}You're at <span className="font-semibold">{userVenueName}</span>
-          </span>
-          <span className="bg-[#d4ff00] text-[#1a0f2e] font-bold text-xs px-3 py-1 rounded-full">View</span>
+          {userIsPrivateParty
+            ? <Home className="h-4 w-4 text-[#d4ff00] flex-shrink-0" />
+            : <Home className="h-4 w-4 text-[#d4ff00] flex-shrink-0" />}
+          <span className="text-white text-[13px] font-medium truncate">{userVenueName}</span>
+          <ChevronRight className="h-3.5 w-3.5 text-white/30 flex-shrink-0 ml-auto" />
         </button>
       )}
 
-      {/* Sort Toggles */}
-      <div className="flex items-center gap-6 animate-fade-in">
+      {/* Sort Toggles — matches Newsfeed/Plans tab style */}
+      <div className="flex items-center px-4 mb-1">
         <button
           onClick={() => setSortMode('hot')}
-          className={`relative pb-2 text-lg font-medium transition-colors ${
-            sortMode === 'hot' ? 'text-white' : 'text-white/60'
+          className={`relative pb-2 text-lg font-semibold transition-colors mr-6 ${
+            sortMode === 'hot' ? 'text-white' : 'text-white/40'
           }`}
         >
           Hot
@@ -334,8 +328,8 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
         </button>
         <button
           onClick={() => setSortMode('new')}
-          className={`relative pb-2 text-lg font-medium transition-colors ${
-            sortMode === 'new' ? 'text-white' : 'text-white/60'
+          className={`relative pb-2 text-lg font-semibold transition-colors ${
+            sortMode === 'new' ? 'text-white' : 'text-white/40'
           }`}
         >
           New
@@ -343,74 +337,61 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
           )}
         </button>
+        <span className="ml-auto text-white/25 text-[11px]">resets 5am</span>
       </div>
 
-      {/* Quote Feed */}
+      {/* Yap Feed — flat list rows */}
       {sortedQuotes.length > 0 ? (
-        <div className="space-y-3">
+        <div>
           {sortedQuotes.map((quote, index) => {
             const venuePinnedCount = pinnedCounts.get(quote.venue_name) || 0;
             const isPartyYap = quote.is_private_party;
             const LocationIcon = isPartyYap ? Home : MapPin;
 
             return (
-              <div key={quote.id} className="animate-fade-in" style={{ animationDelay: `${index * 40}ms` }}>
-                {/* Quote card */}
-                <button
-                  onClick={() => openThread(quote.venue_name)}
-                  className={cn(
-                    'w-full text-left rounded-2xl p-5 relative',
-                    'bg-white/[0.06] backdrop-blur-sm',
-                    'active:bg-white/[0.10] transition-all duration-200',
-                    index === 0 && sortMode === 'hot' && 'p-6'
+              <button
+                key={quote.id}
+                onClick={() => openThread(quote.venue_name)}
+                className={cn(
+                  'w-full text-left px-4 py-3 active:bg-white/[0.04] transition-colors',
+                  index > 0 && 'border-t border-white/[0.06]'
+                )}
+              >
+                {/* Line 1: yap text (most prominent) */}
+                <p className="text-[15px] text-white leading-snug mb-1.5">
+                  {quote.text}
+                </p>
+
+                {/* Line 2: venue chip + timestamp */}
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="inline-flex items-center gap-1 bg-white/[0.06] rounded-full px-2 py-0.5 max-w-[70%]">
+                    <LocationIcon className="h-3 w-3 text-white/40 flex-shrink-0" />
+                    <span className="text-[12px] text-white/50 truncate">{quote.venue_name}</span>
+                    {quote.venue_neighborhood && (
+                      <span className="text-[11px] text-white/30 flex-shrink-0">· {quote.venue_neighborhood}</span>
+                    )}
+                  </span>
+                  {venuePinnedCount > 0 && (
+                    <span className="text-white/30 text-[11px] flex-shrink-0">
+                      <Pin className="h-3 w-3 text-[#d4ff00] inline" /> {venuePinnedCount}
+                    </span>
                   )}
-                >
-                  {/* Venue name — primary anchor */}
-                  <div className="mb-2">
-                    <p
-                      className="hover:text-white/80 transition-colors"
-                      onClick={(e) => { e.stopPropagation(); openThread(quote.venue_name); }}
-                    >
-                      <LocationIcon className="h-3.5 w-3.5 text-[#d4ff00] inline mr-0.5" />
-                      <span className={cn(
-                        "font-bold text-white",
-                        index === 0 && sortMode === 'hot' ? 'text-[17px]' : 'text-[15px]'
-                      )}>{quote.venue_name}</span>
-                      {quote.venue_neighborhood && <span className="text-white/40 text-xs ml-1">· {quote.venue_neighborhood}</span>}
-                    </p>
-                    {venuePinnedCount > 0 && (
-                      <p className="text-white/40 text-[11px] mt-0.5 ml-5">
-                        <Pin className="h-3.5 w-3.5 text-[#d4ff00] inline mr-0.5" /> {venuePinnedCount} update{venuePinnedCount > 1 ? 's' : ''} from venue
-                      </p>
-                    )}
-                  </div>
+                  <span className="text-white/25 text-[12px] ml-auto flex-shrink-0">{relativeTime(quote.created_at)}</span>
+                </div>
 
-                  {/* Yap text — secondary */}
-                  <p className={cn(
-                    "text-white/80 leading-relaxed mb-3",
-                    index === 0 && sortMode === 'hot' ? 'text-[15px]' : 'text-sm'
-                  )}>
-                    {quote.text}
-                  </p>
-
-                  {/* Bottom row: score + timestamp */}
-                  <div className="flex items-center justify-between">
-                    {quote.score > 0 ? (
-                      <span className="text-[#d4ff00] text-xs font-semibold">
-                        {index === 0 && sortMode === 'hot' && <Flame className="h-3.5 w-3.5 text-[#d4ff00] inline mr-0.5" />}▲ {quote.score}
-                      </span>
-                    ) : (
-                      <span />
-                    )}
-                    <span className="text-white/30 text-xs">{relativeTime(quote.created_at)}</span>
+                {/* Line 3: vote */}
+                {quote.score > 0 && (
+                  <div className="flex items-center gap-1">
+                    <Triangle className="h-3 w-3 text-white/30 fill-white/30" />
+                    <span className="text-white/40 text-[12px] font-medium">{quote.score}</span>
                   </div>
-                </button>
-              </div>
+                )}
+              </button>
             );
           })}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-fade-in">
+        <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
           <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-6">
             <Mic className="h-10 w-10 text-[#a855f7]/60" />
           </div>
@@ -418,7 +399,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
             Nothing happening yet
           </h3>
           <p className="text-white/50 text-sm max-w-xs">
-            Post when you're out tonight
+            Live from the crowd — see what people are saying at venues tonight
           </p>
         </div>
       )}

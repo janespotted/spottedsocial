@@ -482,22 +482,20 @@ export function CreatePlanDialog({ open, onOpenChange, userId, onPlanCreated, pr
                 </button>
               </div>
             </div>
+
+            {/* Submit */}
+            <div className="pt-2 pb-8">
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="w-full h-12 bg-[#d4ff00] text-black font-semibold text-base rounded-2xl hover:bg-[#d4ff00]/90 disabled:opacity-40 transition-colors"
+              >
+                {isSubmitting ? 'Sharing...' : 'Share Plan'}
+              </button>
+            </div>
           </div>
         )}
       </div>
-
-      {/* Bottom CTA */}
-      {selectedVenue && (
-        <div className="px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3 flex-shrink-0">
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full h-12 bg-[#d4ff00] text-black font-semibold text-base rounded-2xl hover:bg-[#d4ff00]/90 disabled:opacity-40 transition-colors"
-          >
-            {isSubmitting ? 'Sharing...' : 'Share Plan'}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

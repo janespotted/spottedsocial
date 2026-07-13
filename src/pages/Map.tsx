@@ -1563,7 +1563,7 @@ export default function Map() {
         </div>
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
+            onClick={() => navigate('/activity')}
             className="relative w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-all"
             aria-label="View activity"
           >
@@ -2072,62 +2072,94 @@ export default function Map() {
           {/* Expanded Friends List - Opens Upward */}
           {showFriendsList && (
             <div className="mb-2 bg-[#1a0a2e]/95 backdrop-blur border border-white/10 rounded-2xl max-h-96 overflow-y-auto relative z-[200]">
-              {/* Friends Out Section */}
-              {friendsWithDistances.map((friend) => {
-                const staleMins = getStalenessMins(friend.last_location_at);
-                const isVeryStale = staleMins >= 60;
-                return (
-                <button
-                  key={friend.user_id}
-                  onClick={() => handleFriendClick(friend)}
-                  className={`w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 ${isVeryStale ? 'opacity-50' : ''}`}
-                >
-                  {/* Avatar */}
-                  <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50 relative">
-                    <AvatarImage
-                      src={friend.profiles?.avatar_url || undefined}
-                    />
-                    <AvatarFallback className="bg-[#a855f7] text-white text-sm">
-                      {friend.profiles?.display_name?.[0] || '?'}
-                    </AvatarFallback>
-                    {friend.relationshipType === 'close' && (
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#1a0f2e] border-2 border-[#d4ff00] rounded-full flex items-center justify-center text-xs">
-                        💛
-                      </div>
-                    )}
-                    {friend.relationshipType === 'mutual' && (
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#1a0f2e] border-2 border-[#6366f1] rounded-full flex items-center justify-center text-xs">
-                        🔗
-                      </div>
-                    )}
-                  </Avatar>
+              {/* Friends Out Section — grouped by relationship */}
+              {(() => {
+                const ringOrder: Array<{ key: 'close' | 'direct' | 'mutual'; label: string }> = [
+                  { key: 'close', label: 'Close Friends' },
+                  { key: 'direct', label: 'Friends' },
+                  { key: 'mutual', label: 'Mutual Friends' },
+                ];
+                const groups = ringOrder.map(({ key, label }) => ({
+                  key,
+                  label,
+                  friends: friendsWithDistances.filter(f => (f.relationshipType || 'direct') === key),
+                })).filter(g => g.friends.length > 0);
+                const showHeaders = groups.length > 1;
 
-                  {/* Name & Venue */}
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="text-white font-semibold text-sm truncate">
-                      {friend.profiles?.display_name || 'Unknown'}
-                    </p>
-                    <p className="text-[#d4ff00] text-xs truncate">
-                      {friend.venue_name ? `At ${friend.venue_name}` : 'Out now'}
-                    </p>
+                return groups.map(({ key, label, friends: groupFriends }) => (
+                  <div key={key}>
+                    {showHeaders && (
+                      <div className="px-3 py-1.5 bg-white/[0.03] border-y border-[#a855f7]/10">
+                        <p className="text-white/40 text-[10px] uppercase tracking-wider font-medium">
+                          {label} · {groupFriends.length}
+                        </p>
+                      </div>
+                    )}
+                    {groupFriends.map((friend) => {
+                      const staleMins = getStalenessMins(friend.last_location_at);
+                      const isVeryStale = staleMins >= 60;
+                      return (
+                        <button
+                          key={friend.user_id}
+                          onClick={() => handleFriendClick(friend)}
+                          className={`w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 ${isVeryStale ? 'opacity-50' : ''}`}
+                        >
+                          <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50 relative">
+                            <AvatarImage src={friend.profiles?.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+                              {friend.profiles?.display_name?.[0] || '?'}
+                            </AvatarFallback>
+                            {friend.relationshipType === 'close' && (
+                              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#1a0f2e] border-2 border-[#d4ff00] rounded-full flex items-center justify-center text-xs">
+                                💛
+                              </div>
+                            )}
+                            {friend.relationshipType === 'mutual' && (
+                              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#1a0f2e] border-2 border-[#6366f1] rounded-full flex items-center justify-center text-xs">
+                                🔗
+                              </div>
+                            )}
+                          </Avatar>
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-white font-semibold text-sm truncate">
+                              {friend.profiles?.display_name || 'Unknown'}
+                            </p>
+                            <p className="text-[#d4ff00] text-xs truncate">
+                              {friend.venue_name ? `At ${friend.venue_name}` : 'Out now'}
+                            </p>
+                          </div>
+                          <span className="text-white/60 text-xs flex-shrink-0">
+                            {friend.distance} mi
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-
-                  {/* Distance */}
-                  <span className="text-white/60 text-xs flex-shrink-0">
-                    {friend.distance} mi
-                  </span>
-                </button>
-                );
-              })}
+                ));
+              })()}
 
               {/* Friends Planning Section — use shared hook data, exclude anyone already shown as "out" */}
               {(() => {
                 const outUserIds = new globalThis.Set(friends.map(f => f.user_id));
                 const hookPlanning = friendsOutData?.planningFriends || [];
                 const filteredPlanningFriends = hookPlanning.filter(f => !outUserIds.has(f.user_id));
-                return filteredPlanningFriends.length > 0 ? (
+                if (filteredPlanningFriends.length === 0) return null;
+
+                const tbdRingOrder: Array<{ key: string; label: string }> = [
+                  { key: 'close', label: 'Close Friends' },
+                  { key: 'friend', label: 'Friends' },
+                  { key: 'mutual', label: 'Mutual Friends' },
+                ];
+                const tbdGroups = tbdRingOrder.map(({ key, label }) => ({
+                  key,
+                  label,
+                  friends: filteredPlanningFriends.filter(f => (f.ring || 'friend') === key),
+                })).filter(g => g.friends.length > 0);
+                const showTbdHeaders = tbdGroups.length > 1;
+
+                return (
                 <>
-                  {/* Divider with header */}
+                  {/* TBD divider */}
                   <div className="px-3 py-2 bg-[#1a0f2e]/50 border-y border-[#a855f7]/20">
                     <p className="text-white/70 text-xs font-medium flex items-center gap-1.5">
                       TBD tonight
@@ -2135,48 +2167,53 @@ export default function Map() {
                     </p>
                   </div>
 
-                  {/* Planning Friends List */}
-                  {filteredPlanningFriends.map((friend) => (
-                    <button
-                      key={friend.user_id}
-                      onClick={() => {
-                        const friendCardData: FriendCardData = {
-                          userId: friend.user_id,
-                          displayName: friend.display_name || 'Friend',
-                          avatarUrl: friend.avatar_url || null,
-                          venueName: null,
-                          lat: undefined,
-                          lng: undefined,
-                          relationshipType: undefined,
-                        };
-                        openFriendCard(friendCardData);
-                        setShowFriendsList(false);
-                      }}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
-                    >
-                      {/* Avatar */}
-                      <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
-                        <AvatarImage
-                          src={friend.avatar_url || undefined}
-                        />
-                        <AvatarFallback className="bg-[#a855f7] text-white text-sm">
-                          {friend.display_name?.[0] || '?'}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      {/* Name & Planning Status */}
-                      <div className="flex-1 min-w-0 text-left">
-                        <p className="text-white font-semibold text-sm truncate">
-                          {friend.display_name || 'Unknown'}
-                        </p>
-                        <p className="text-[#a855f7] text-xs truncate">
-                          TBD{friend.planning_neighborhood ? ` · ${friend.planning_neighborhood}` : ''}
-                        </p>
-                      </div>
-                    </button>
+                  {tbdGroups.map(({ key, label, friends: groupFriends }) => (
+                    <div key={`tbd-${key}`}>
+                      {showTbdHeaders && (
+                        <div className="px-3 py-1.5 bg-white/[0.03] border-y border-[#a855f7]/10">
+                          <p className="text-white/40 text-[10px] uppercase tracking-wider font-medium">
+                            {label} · {groupFriends.length}
+                          </p>
+                        </div>
+                      )}
+                      {groupFriends.map((friend) => (
+                        <button
+                          key={friend.user_id}
+                          onClick={() => {
+                            const friendCardData: FriendCardData = {
+                              userId: friend.user_id,
+                              displayName: friend.display_name || 'Friend',
+                              avatarUrl: friend.avatar_url || null,
+                              venueName: null,
+                              lat: undefined,
+                              lng: undefined,
+                              relationshipType: undefined,
+                            };
+                            openFriendCard(friendCardData);
+                            setShowFriendsList(false);
+                          }}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+                        >
+                          <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
+                            <AvatarImage src={friend.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#a855f7] text-white text-sm">
+                              {friend.display_name?.[0] || '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-white font-semibold text-sm truncate">
+                              {friend.display_name || 'Unknown'}
+                            </p>
+                            <p className="text-[#a855f7] text-xs truncate">
+                              TBD{friend.planning_neighborhood ? ` · ${friend.planning_neighborhood}` : ''}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   ))}
                 </>
-              ) : null;
+                );
               })()}
             </div>
           )}

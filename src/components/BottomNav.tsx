@@ -1,8 +1,7 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { Home, MapPin, BarChart3, MessageSquare } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useInputFocusState, useInputFocus } from '@/contexts/InputFocusContext';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 
 const navItems = [
@@ -15,45 +14,44 @@ const navItems = [
 
 export const BottomNav = memo(function BottomNav() {
   const location = useLocation();
-  const isInputFocused = useInputFocusState();
-  const { setInputFocused } = useInputFocus();
+  const navRef = useRef<HTMLElement>(null);
 
-  // Safety net: reset focus state on route change
+  // Pin the nav to the PHYSICAL screen bottom. With Keyboard.resize:'native'
+  // the webview shrinks (late) when the keyboard opens, which made this
+  // fixed bottom-0 nav ride up and park on top of the keyboard. Compensate
+  // by translating it down by exactly the amount the viewport shrank, so it
+  // visually never moves — the keyboard simply slides over it. No hiding,
+  // no unmounting, no layout shift, in either direction.
   useEffect(() => {
-    setInputFocused(false);
-  }, [location.pathname, setInputFocused]);
+    const el = navRef.current;
+    const vv = window.visualViewport;
+    if (!el || !vv) return;
 
-  // Safety net: global blur listener catches cases where raw inputs
-  // (not wrapped in shadcn Input/Textarea) don't call setInputFocused(false)
-  useEffect(() => {
-    const handleFocusOut = () => {
-      // Small delay to allow focus to move to another input
-      setTimeout(() => {
-        const active = document.activeElement;
-        const isInput = active instanceof HTMLInputElement || 
-                        active instanceof HTMLTextAreaElement ||
-                        active?.getAttribute('contenteditable') === 'true';
-        if (!isInput) {
-          setInputFocused(false);
-        }
-      }, 100);
+    let baseline = vv.height;
+
+    const sync = () => {
+      baseline = Math.max(baseline, vv.height);
+      const resized = Math.max(0, Math.round(baseline - vv.height));
+      el.style.transform = resized > 0 ? `translate3d(0, ${resized}px, 0)` : '';
     };
 
-    document.addEventListener('focusout', handleFocusOut);
-    return () => document.removeEventListener('focusout', handleFocusOut);
-  }, [setInputFocused]);
+    const onOrientationChange = () => {
+      baseline = 0;
+    };
+
+    sync();
+    vv.addEventListener('resize', sync);
+    window.addEventListener('orientationchange', onOrientationChange);
+    return () => {
+      vv.removeEventListener('resize', sync);
+      window.removeEventListener('orientationchange', onOrientationChange);
+    };
+  }, []);
 
   return (
     <nav
-      className={cn(
-        // Fixed overlay: hiding the nav no longer reflows the page layout.
-        // It slides out in sync with the keyboard instead of unmounting,
-        // which was causing a visible content jump right before the
-        // keyboard appeared.
-        'fixed bottom-0 left-0 right-0 bg-background border-t border-white/8 z-50',
-        'transition-transform duration-200 ease-out',
-        isInputFocused && 'translate-y-full pointer-events-none'
-      )}
+      ref={navRef}
+      className="fixed bottom-0 left-0 right-0 bg-background border-t border-white/8 z-50"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">

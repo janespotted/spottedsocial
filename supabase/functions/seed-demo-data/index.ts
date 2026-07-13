@@ -35,7 +35,26 @@ const DEMO_USERNAMES: Record<string, string[][]> = {
     ["Dakota","dakota_palm"]
   ]
 };
-const CAPTIONS = ["Amazing! 🔥","Best night 💯","Vibes ✨","So packed!","DJ killing it 🎵"];
+const CAPTIONS = [
+  "Amazing! 🔥","Best night 💯","Vibes ✨","So packed!","DJ killing it 🎵",
+  "This place is going OFF 🤯","Crowd is insane rn","Can't believe this set 🎶",
+  "Night of the year 🙌","Who else is here??","Cheers 🥂","Living for this 💫",
+  "Absolutely unreal tonight","The vibes don't miss","Squad linked up 🔗",
+];
+const DEMO_IMAGES = [
+  "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1429962714451-bb934ecdc4ec?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1504680177321-2e6a879aac86?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1545128485-c400e7702712?w=800&h=1000&fit=crop",
+  "https://images.unsplash.com/photo-1551818255-e6e10975bc17?w=800&h=1000&fit=crop",
+];
 const DM_CONVOS = [
   [["Are you coming out tonight? 👀","Yeah definitely! Where's everyone at?","We're at {venue}, come through!"],["Omw! Save me a spot 🙌"]],
   [["This DJ is insane rn 🔥","Who is it??","No idea but the vibes are unmatched"],["Send me the location!"]],
@@ -43,7 +62,7 @@ const DM_CONVOS = [
   [["Best night out in a while 💯","Fr fr, we need to do this more often"],["Next weekend for sure 🤝"]],
 ];
 const YAP_TEXTS = ["Pretty sure Justin Bieber just walked in...","This music is awesome who's the DJ right now","What's everyone's move after close?","Anyone here? Looking for my friends","This DJ set is unreal!!!","Line is crazy long outside","The energy is INSANE right now","Dance floor is PACKED","Where's the after party at?","Bartender hooked it up"];
-const IMG = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&h=800&fit=crop";
+const IMG = DEMO_IMAGES[0];
 
 // Demo data expires 30 days from now so it persists across sessions
 const exp = () => new Date(Date.now() + 30 * 24 * 3600000).toISOString();
@@ -339,7 +358,7 @@ Deno.serve(async (req) => {
       }));
 
       // Posts
-      await sb.from('posts').insert(Array.from({length:15},()=>{const v=V[Math.floor(Math.random()*V.length)];return{user_id:uids[Math.floor(Math.random()*uids.length)],text:CAPTIONS[Math.floor(Math.random()*5)],venue_id:v.id,venue_name:v.name,image_url:Math.random()>0.4?IMG:null,expires_at:exp(),created_at:rec(4),is_demo:true,visibility:'all_friends'};}));
+      await sb.from('posts').insert(Array.from({length:20},(_,i)=>{const v=V[Math.floor(Math.random()*V.length)];const hasImage=Math.random()>0.25;return{user_id:uids[Math.floor(Math.random()*uids.length)],text:CAPTIONS[Math.floor(Math.random()*CAPTIONS.length)],venue_id:v.id,venue_name:v.name,image_url:hasImage?DEMO_IMAGES[i%DEMO_IMAGES.length]:null,expires_at:exp(),created_at:rec(5),is_demo:true,visibility:'all_friends'};}));
 
       // Yap messages
       const yapRows = YAP_TEXTS.map((text,i) => {

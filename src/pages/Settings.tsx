@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus, MapPin, RotateCcw, Eye } from 'lucide-react';
+import { ChevronLeft, User, Bell, Lock, HelpCircle, Info, Check, X, QrCode, UserPlus, MapPin, RotateCcw, Eye, EyeOff, Ban } from 'lucide-react';
 import { ReadReceiptsToggle } from '@/components/settings/ReadReceiptsToggle';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -126,7 +126,7 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118]">
-      <div className="max-w-[430px] mx-auto pb-24">
+      <div className="max-w-[430px] mx-auto pb-8">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
         <div className="flex items-center gap-4 px-4 py-6">
@@ -281,7 +281,7 @@ export default function Settings() {
         {/* Activity Notifications Section */}
         <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
           <button
-            onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
+            onClick={() => navigate('/activity')}
             className="w-full flex items-center justify-between p-4 hover:bg-[#a855f7]/10 transition-colors"
           >
             <div className="flex items-center gap-3">
@@ -309,6 +309,24 @@ export default function Settings() {
               <div className="text-left">
                 <h3 className="font-semibold text-white">Privacy</h3>
                 <p className="text-white/60 text-sm">Privacy policy and data usage</p>
+              </div>
+            </div>
+          </button>
+        </Card>
+
+        {/* Blocked & Hidden */}
+        <Card className="bg-[#2d1b4e]/60 border-[#a855f7]/20">
+          <button
+            onClick={() => navigate('/settings/blocked-hidden')}
+            className="w-full flex items-center justify-between p-4 hover:bg-[#a855f7]/10 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
+                <EyeOff className="h-5 w-5 text-[#a855f7]" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-white">Blocked & Hidden</h3>
+                <p className="text-white/60 text-sm">Manage blocked users and hidden locations</p>
               </div>
             </div>
           </button>

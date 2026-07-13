@@ -142,7 +142,7 @@ export default function Feed() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#110a24] pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#110a24]">
       {!isOnline && (
         <div className="bg-yellow-500/20 text-yellow-500 text-center py-2 text-sm">
           You're offline. Showing cached data.

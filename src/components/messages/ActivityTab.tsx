@@ -115,7 +115,7 @@ const generateDemoActivities = (city: SupportedCity, userCurrentVenue: string | 
 };
 
 // Unified card style - consistent purple aesthetic
-const CARD_STYLE = 'bg-[#2d1b4e]/60 border border-white/8';
+const CARD_STYLE = 'bg-[#2d1b4e]/40';
 // Unified avatar ring color - always purple
 const AVATAR_RING_COLOR = 'border-[#a855f7]';
 
@@ -916,10 +916,10 @@ export function ActivityTab() {
       {/* Friend Requests - Always at top */}
       <div
         onClick={() => navigate('/friends', { state: { tab: 'requests' } })}
-        className="bg-[#1a0a2e]/80 border border-white/8 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-white/8 transition-colors"
+        className="bg-[#1a0a2e]/80 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-white/8 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-white/5 border border-white/15 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
             <UserPlus className="h-6 w-6 text-[#d4ff00]" />
           </div>
           <div>
@@ -1015,7 +1015,7 @@ export function ActivityTab() {
         const friendRequests = activities.filter(a => a.type === 'friend_request');
 
         // Special muted style for city pulse
-        const PULSE_CARD_STYLE = 'bg-[#1a0f2e]/40 border border-white/10';
+        const PULSE_CARD_STYLE = 'bg-[#1a0f2e]/40';
 
         const renderActivityCard = (activity: Activity) => (
           <div

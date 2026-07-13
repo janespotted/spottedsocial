@@ -2,15 +2,13 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
-import { useNotifications } from '@/contexts/NotificationsContext';
 import { cn } from '@/lib/utils';
 import { MessagesTab } from '@/components/messages/MessagesTab';
 import { YapTab } from '@/components/messages/YapTab';
-import { ActivityTab } from '@/components/messages/ActivityTab';
 import { PageHeader } from '@/components/PageHeader';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
 
-type TabType = 'messages' | 'yap' | 'activity';
+type TabType = 'messages' | 'yap';
 
 interface PreselectedUser {
   id: string;
@@ -21,7 +19,6 @@ interface PreselectedUser {
 export default function Messages() {
   const { openCheckIn } = useCheckIn();
   const navigate = useNavigate();
-  const { unreadCount, markAllAsRead } = useNotifications();
   useAutoVenueTracking(); // Trigger auto-venue tracking on messages view
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<TabType>('yap');
@@ -31,13 +28,6 @@ export default function Messages() {
   const [yapIsPrivateParty, setYapIsPrivateParty] = useState(false);
   const [yapNavKey, setYapNavKey] = useState(0);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
-
-  // Mark all notifications as read when viewing the Activity tab
-  useEffect(() => {
-    if (activeTab === 'activity') {
-      markAllAsRead();
-    }
-  }, [activeTab, markAllAsRead]);
 
   useEffect(() => {
     const state = location.state as any;
@@ -60,17 +50,21 @@ export default function Messages() {
       setActiveTab('messages');
       navigate(location.pathname, { replace: true, state: {} });
     } else if (state?.activeTab) {
-      setActiveTab(state.activeTab);
-      navigate(location.pathname, { replace: true, state: {} });
+      if (state.activeTab === 'activity') {
+        navigate('/activity', { replace: true });
+      } else {
+        setActiveTab(state.activeTab);
+        navigate(location.pathname, { replace: true, state: {} });
+      }
     }
   }, [location.key]);
 
   return (
-    <div className="bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-24">
+    <div className="bg-gradient-to-b from-[#1a0f2e] to-[#110a24]">
       {/* Header */}
       <PageHeader
         title=""
-        subtitle="Everything disappears by 5am"
+        subtitle=""
         onSearchPress={() => setShowFriendSearch(true)}
       />
 
@@ -96,20 +90,10 @@ export default function Messages() {
           DMs
           {activeTab === 'messages' && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-[#d4ff00]" />}
         </button>
-        <button
-          onClick={() => setActiveTab('activity')}
-          className={cn(
-            'relative flex-1 pb-2 text-lg font-semibold text-center transition-colors',
-            activeTab === 'activity' ? 'text-white' : 'text-white/40'
-          )}
-        >
-          Activity
-          {activeTab === 'activity' && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-[#d4ff00]" />}
-        </button>
       </div>
 
       {/* Tab Content */}
-      <div className="px-4 py-6">
+      <div className="px-4 pt-2 pb-6">
         {activeTab === 'messages' && (
           <MessagesTab
             preselectedUser={preselectedUser}
@@ -118,7 +102,6 @@ export default function Messages() {
           />
         )}
         {activeTab === 'yap' && <YapTab key={yapNavKey} venueName={yapVenueName} isPrivatePartyNav={yapIsPrivateParty} />}
-        {activeTab === 'activity' && <ActivityTab />}
       </div>
 
       <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />

@@ -112,7 +112,7 @@ export function PageHeader({
           )}
           {showNotifications && (
             <button
-              onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
+              onClick={() => navigate('/activity')}
               className="relative w-10 h-10 rounded-full bg-[#a855f7] text-white flex items-center justify-center hover:bg-[#a855f7]/90 transition-colors"
               aria-label="Notifications"
             >

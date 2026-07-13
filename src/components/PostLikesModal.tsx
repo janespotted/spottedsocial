@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 
 interface PostLikesModalProps {
   postId: string;
@@ -25,6 +20,7 @@ interface LikeUser {
 export function PostLikesModal({ postId, isOpen, onClose }: PostLikesModalProps) {
   const [users, setUsers] = useState<LikeUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const { openFriendCard } = useFriendIdCard();
 
   useEffect(() => {
     if (isOpen && postId) {
@@ -61,40 +57,53 @@ export function PostLikesModal({ postId, isOpen, onClose }: PostLikesModalProps)
     setLoading(false);
   };
 
+  const handleUserTap = (user: LikeUser) => {
+    onClose();
+    openFriendCard({
+      userId: user.user_id,
+      displayName: user.display_name,
+      avatarUrl: user.avatar_url,
+    });
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-[#1a0f2e] border-2 border-[#a855f7]/40">
-        <DialogHeader>
-          <DialogTitle className="text-white text-xl">Likes</DialogTitle>
-        </DialogHeader>
-        <ScrollArea className="max-h-[400px] pr-4">
+    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()} shouldScaleBackground={false}>
+      <DrawerContent className="bg-[#1a0f2e] border-none rounded-t-2xl max-h-[60vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-center h-12 border-b border-white/[0.06] flex-shrink-0">
+          <h3 className="text-white font-semibold text-base">Likes</h3>
+        </div>
+
+        {/* List */}
+        <div className="flex-1 overflow-y-auto min-h-0">
           {loading ? (
-            <div className="text-white/60 text-center py-8">Loading...</div>
+            <div className="text-white/40 text-sm text-center py-8">Loading...</div>
           ) : users.length === 0 ? (
-            <div className="text-white/60 text-center py-8">No likes yet</div>
+            <div className="text-white/40 text-sm text-center py-8">No likes yet</div>
           ) : (
-            <div className="space-y-3">
+            <div>
               {users.map((user) => (
-                <div
+                <button
                   key={user.user_id}
-                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#a855f7]/10 transition-colors"
+                  onClick={() => handleUserTap(user)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors"
                 >
-                  <Avatar className="h-10 w-10 border-2 border-[#a855f7]">
+                  <Avatar className="h-11 w-11 flex-shrink-0">
                     <AvatarImage src={user.avatar_url || undefined} />
-                    <AvatarFallback className="bg-[#110a24] text-white">
+                    <AvatarFallback className="bg-[#2d1b4e] text-white text-sm">
                       {user.display_name[0]}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <p className="font-semibold text-white">{user.display_name}</p>
-                    <p className="text-sm text-white/60">@{user.username}</p>
+                  <div className="text-left min-w-0">
+                    <p className="font-semibold text-[15px] text-white truncate">{user.display_name}</p>
+                    <p className="text-[13px] text-white/40 truncate">@{user.username}</p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }

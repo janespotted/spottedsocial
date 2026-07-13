@@ -382,7 +382,7 @@ export default function Home() {
       if (!tickingRef.current) {
         tickingRef.current = true;
         requestAnimationFrame(() => {
-          const p = Math.min(1, Math.max(0, root.scrollTop / 80));
+          const p = Math.min(1, Math.max(0, root.scrollTop / 72));
           // Only update state if value actually changed (avoids unnecessary re-renders)
           if (p !== scrollRef.current) {
             scrollRef.current = p;
@@ -399,7 +399,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-24">
+    <div className="bg-gradient-to-b from-[#1a0f2e] to-[#110a24]">
       {/* Offline Indicator */}
       {!isOnline && (
         <div className="bg-yellow-500/20 text-yellow-500 text-center py-2 text-sm">
@@ -407,111 +407,122 @@ export default function Home() {
         </div>
       )}
 
-      {/* Header — collapsing on both Newsfeed and Plans */}
+      {/* Header — sticky top bar + collapsing large-title tabs */}
       <div
         className="sticky top-0 z-10 pt-[max(env(safe-area-inset-top),12px)]"
         style={{
-          backgroundColor: `rgba(26, 15, 46, ${0.95 + scrollProgress * 0.05})`,
-          backdropFilter: `blur(${scrollProgress * 12}px)`,
-          WebkitBackdropFilter: `blur(${scrollProgress * 12}px)`,
-          borderBottom: `1px solid rgba(255, 255, 255, ${scrollProgress * 0.08})`,
+          backgroundColor: `rgba(26, 15, 46, ${0.92 + scrollProgress * 0.08})`,
+          backdropFilter: `blur(${8 + scrollProgress * 8}px)`,
+          WebkitBackdropFilter: `blur(${8 + scrollProgress * 8}px)`,
         }}
       >
-        <div className="flex items-start justify-between px-5 pt-3 pb-3">
-          <div>
-            {/* Wordmark row — anchored */}
-            <div className="flex items-center gap-3 mb-1">
-              <span
-                className="text-[30px] tracking-[0.35em] text-white select-none cursor-pointer"
-                style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300 }}
-                onClick={handleWordmarkTap}
-              >
-                Spotted
-              </span>
-              <CityBadge />
-            </div>
+        {/* Top bar — fixed size, does not resize */}
+        <div className="flex items-center justify-between px-4 h-[40px]">
+          <span
+            className="text-white select-none cursor-pointer"
+            style={{
+              fontFamily: "'Montserrat', sans-serif",
+              fontWeight: 300,
+              fontSize: `${20 - scrollProgress * 2}px`,
+              letterSpacing: '0.28em',
+            }}
+            onClick={handleWordmarkTap}
+          >
+            Spotted
+          </span>
 
-            {/* Title — collapses */}
-            <h2
-              className="text-3xl font-bold text-white"
-              style={{
-                transform: `scale(${1 - scrollProgress})`,
-                transformOrigin: 'left top',
-                opacity: 1 - scrollProgress,
-                height: `${(1 - scrollProgress) * 36}px`,
-                overflow: 'hidden',
-              }}
-            >
-              {feedMode === 'plans' ? 'Plans' : 'Newsfeed'}
-            </h2>
-
-            {/* Tagline — fades fast */}
-            <p
-              className="text-white/50 text-sm mt-0.5 truncate"
-              style={{
-                opacity: Math.max(0, 1 - scrollProgress * 3),
-                height: `${Math.max(0, 1 - scrollProgress * 2) * 20}px`,
-                overflow: 'hidden',
-              }}
-            >
-              {feedMode === 'plans' ? 'What friends are up to' : 'Everything disappears by 5am'}
-            </p>
-          </div>
-
-          {/* Right: Actions — anchored, no animation */}
-          <div className="flex items-center gap-4 pt-1">
+          <div className="flex items-center gap-2">
+            <CityBadge />
             <button
               onClick={() => setShowFriendSearch(true)}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
               aria-label="Search"
             >
-              <Search className="w-5 h-5" />
+              <Search className="w-[18px] h-[18px]" />
             </button>
             <button
-              onClick={() => navigate('/messages', { state: { activeTab: 'activity' } })}
-              className="relative w-10 h-10 rounded-full bg-[#a855f7] text-white flex items-center justify-center hover:bg-[#a855f7]/90 transition-colors"
+              onClick={() => navigate('/activity')}
+              className="relative w-9 h-9 rounded-full bg-[#a855f7] text-white flex items-center justify-center hover:bg-[#a855f7]/90 transition-colors"
               aria-label="Notifications"
             >
-              <Bell className="w-5 h-5" />
+              <Bell className="w-[18px] h-[18px]" />
               <NotificationBadge count={unreadCount} />
             </button>
             <button
               onClick={openCheckIn}
               className="hover:scale-110 transition-transform"
             >
-              <img src={spottedLogo} alt="Go live" className="h-12 w-12 object-contain" />
+              <img src={spottedLogo} alt="Go live" className="h-9 w-9 object-contain" />
             </button>
           </div>
         </div>
 
-        {/* Feed Mode Toggle — inside sticky header */}
-        <div className="flex items-center justify-around px-5 pb-3">
+        {/* Tabs — large title that collapses on scroll */}
+        <div
+          className="flex items-end px-4"
+          style={{
+            paddingTop: `${12 - scrollProgress * 6}px`,
+            paddingBottom: `${12 - scrollProgress * 6}px`,
+            borderBottom: `1px solid rgba(255, 255, 255, ${0.04 + scrollProgress * 0.04})`,
+          }}
+        >
+          {/* Newsfeed tab */}
           <button
             onClick={() => {
               setFeedMode('newsfeed');
               document.getElementById('main-scroll')?.scrollTo({ top: 0 });
             }}
-            className={`relative pb-2 text-lg font-semibold transition-colors ${
-              feedMode === 'newsfeed' ? 'text-white' : 'text-white/40'
-            }`}
+            className="relative mr-6"
+            style={{ transformOrigin: 'left bottom' }}
           >
-            Newsfeed
+            <span
+              className="font-semibold text-white block"
+              style={{
+                fontSize: `${24 - scrollProgress * 11}px`,
+                lineHeight: 1.2,
+                opacity: feedMode === 'newsfeed' ? 1 : 0.4 + scrollProgress * 0.1,
+              }}
+            >
+              Newsfeed
+            </span>
             {feedMode === 'newsfeed' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+              <div
+                className="absolute left-0 right-0 bg-[#d4ff00] rounded-full"
+                style={{
+                  bottom: `${-2 - (12 - scrollProgress * 6)}px`,
+                  height: `${2.5 - scrollProgress * 0.5}px`,
+                }}
+              />
             )}
           </button>
+
+          {/* Plans tab */}
           <button
             onClick={() => {
               setFeedMode('plans');
               document.getElementById('main-scroll')?.scrollTo({ top: 0 });
             }}
-            className={`relative pb-2 text-lg font-semibold transition-colors ${
-              feedMode === 'plans' ? 'text-white' : 'text-white/40'
-            }`}
+            className="relative"
+            style={{ transformOrigin: 'left bottom' }}
           >
-            Plans
+            <span
+              className="font-semibold text-white block"
+              style={{
+                fontSize: `${24 - scrollProgress * 11}px`,
+                lineHeight: 1.2,
+                opacity: feedMode === 'plans' ? 1 : 0.4 + scrollProgress * 0.1,
+              }}
+            >
+              Plans
+            </span>
             {feedMode === 'plans' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#d4ff00]" />
+              <div
+                className="absolute left-0 right-0 bg-[#d4ff00] rounded-full"
+                style={{
+                  bottom: `${-2 - (12 - scrollProgress * 6)}px`,
+                  height: `${2.5 - scrollProgress * 0.5}px`,
+                }}
+              />
             )}
           </button>
         </div>
@@ -536,13 +547,13 @@ export default function Home() {
         </div>
       ) : (
       <PullToRefresh onRefresh={async () => { await fetchPosts(); await fetchPlanningFriends(); }}>
-        <div className="px-4 py-4 space-y-3">
+        <div>
         
         
         {isLoading ? (
-          <FeedSkeleton />
+          <div className="px-4 py-4"><FeedSkeleton /></div>
         ) : posts.length === 0 ? (
-          <div className="space-y-6">
+          <div className="px-4 py-4 space-y-6">
             {/* Share CTA — always visible */}
             <div className="flex justify-center">
               <button
@@ -674,62 +685,49 @@ export default function Home() {
             <div
               key={post.id}
               ref={(el) => { if (el) postRefs.current.set(post.id, el); else postRefs.current.delete(post.id); }}
-              className="rounded-2xl overflow-hidden bg-white/[0.04] border border-white/[0.08] post-animate-in transition-all duration-300 mb-3 p-4"
-              style={{ animationDelay: `${index * 50}ms` }}
+              className="border-b border-white/[0.06]"
             >
-              {/* Header — avatar with gradient ring, name, venue, time, menu */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => openFriendCard({
-                      userId: post.user_id,
-                      displayName: post.profiles?.display_name || 'Friend',
-                      avatarUrl: post.profiles?.avatar_url || null,
-                      venueName: post.venue_name || undefined,
-                    })}
-                    className="hover:opacity-80 transition-opacity flex-shrink-0"
-                  >
-                    <div className="w-12 h-12 rounded-full p-[2px]" style={{ background: 'linear-gradient(135deg, #a855f7, #d4ff00)' }}>
-                      <Avatar className="w-full h-full border-2 border-[#1a0f2e]">
-                        <AvatarImage src={post.profiles?.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[#1a0f2e] text-white text-sm">
-                          {post.profiles?.display_name?.[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                  </button>
-                  <div className="text-left min-w-0 flex-1">
-                    <button
-                      onClick={() => openFriendCard({
-                        userId: post.user_id,
-                        displayName: post.profiles?.display_name || 'Friend',
-                        avatarUrl: post.profiles?.avatar_url || null,
-                        venueName: post.venue_name || undefined,
-                      })}
-                      className="font-semibold text-white hover:text-[#d4ff00] transition-colors text-[15px]"
-                    >
-                      {post.profiles?.display_name}
-                    </button>
-                    {post.venue_name && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleVenueClick(post.venue_name!, post.venue_id);
-                        }}
-                        className="text-[#d4ff00] font-medium text-sm hover:text-[#d4ff00]/80 transition-colors block"
-                      >
-                        @{post.venue_name}
-                      </button>
-                    )}
+              {/* Header — compact single row */}
+              <div className="flex items-center px-4 py-3">
+                <button
+                  onClick={() => openFriendCard({
+                    userId: post.user_id,
+                    displayName: post.profiles?.display_name || 'Friend',
+                    avatarUrl: post.profiles?.avatar_url || null,
+                    venueName: post.venue_name || undefined,
+                  })}
+                  className="flex items-center gap-2.5 min-w-0 flex-1"
+                >
+                  <div className="w-8 h-8 rounded-full p-[1.5px] flex-shrink-0" style={{ background: 'linear-gradient(135deg, #a855f7, #d4ff00)' }}>
+                    <Avatar className="w-full h-full border-[1.5px] border-[#110a24]">
+                      <AvatarImage src={post.profiles?.avatar_url || undefined} />
+                      <AvatarFallback className="bg-[#110a24] text-white text-xs">
+                        {post.profiles?.display_name?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-white/40 text-sm">{getTimeAgo(post.created_at)}</span>
+                  <span className="font-semibold text-white text-sm truncate">
+                    {post.profiles?.display_name}
+                  </span>
+                  {post.venue_name && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleVenueClick(post.venue_name!, post.venue_id);
+                      }}
+                      className="text-[#d4ff00] text-xs font-medium truncate hover:underline"
+                    >
+                      @{post.venue_name}
+                    </button>
+                  )}
+                </button>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-white/35 text-xs">{getTimeAgo(post.created_at)}</span>
                   {post.user_id === user?.id && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button className="text-white/40 hover:text-white transition-colors p-1">
-                          <MoreHorizontal className="h-5 w-5" />
+                          <MoreHorizontal className="h-4 w-4" />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-[#1a0f2e] border-[#4a3566]">
@@ -746,9 +744,12 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Image/video — rounded corners within card */}
+              {/* Image/video — full bleed, 4:5 max */}
               {post.image_url && (
-                <div className="w-full aspect-[4/5] relative overflow-hidden rounded-xl mb-3 group">
+                <div
+                  className="w-full relative overflow-hidden"
+                  style={{ maxHeight: 'calc(100vw * 1.25)', aspectRatio: '4 / 5' }}
+                >
                   {post.media_type === 'video' ? (
                     <div
                       className="relative w-full h-full"
@@ -760,16 +761,14 @@ export default function Home() {
                             videoObserver.observe(el);
                             el.muted = !feedAudioEnabled;
                           }
-                          // Cleanup handled by IntersectionObserver disconnect on unmount
                         }}
                         src={post.image_url}
                         muted
                         playsInline
                         loop
                         preload="metadata"
-                        className="feed-video w-full h-full object-cover"
+                        className="feed-video w-full h-full object-cover object-center"
                       />
-                      {/* Mute/unmute indicator */}
                       <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center pointer-events-none">
                         {feedAudioEnabled ? (
                           <Volume2 className="w-4 h-4 text-white" />
@@ -782,7 +781,7 @@ export default function Home() {
                     <img
                       src={post.image_url}
                       alt="Post"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="w-full h-full object-cover object-center"
                       onError={(e) => {
                         const parent = e.currentTarget.parentElement;
                         if (parent) parent.style.display = 'none';
@@ -792,74 +791,79 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="space-y-2.5">
-                {/* Text-only posts — caption above engagement */}
+              {/* Action row + like count + caption — precise spacing */}
+              <div className="px-4 pt-2 pb-3">
+                {/* Text-only posts */}
                 {!post.image_url && post.text && (
-                  <div className="text-white text-[17px] leading-relaxed font-medium">
+                  <div className="text-white text-[15px] leading-snug mb-2">
                     {post.text}
                   </div>
                 )}
 
-                {/* Engagement row — heart count | comment count ... send */}
+                {/* Action icons — 24px, 16px gaps */}
                 <div className="flex items-center">
                   <button
                     onClick={() => handleLikePost(post.id)}
-                    className={`flex items-center gap-1.5 transition-all active:scale-90 ${
-                      likedPosts.has(post.id) ? 'text-[#d4ff00]' : 'text-white/70 hover:text-[#d4ff00]'
+                    className={`transition-all active:scale-90 ${
+                      likedPosts.has(post.id) ? 'text-[#d4ff00]' : 'text-white/80 hover:text-[#d4ff00]'
                     }`}
                   >
                     <Heart
-                      className={`h-[22px] w-[22px] transition-all ${
-                        animatingLike === post.id ? 'animate-scale-in' : ''
-                      }`}
+                      className={`h-6 w-6 ${animatingLike === post.id ? 'animate-scale-in' : ''}`}
                       fill={likedPosts.has(post.id) ? 'currentColor' : 'none'}
                     />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setSelectedPostForLikes(post.id); }}
-                      className="font-semibold text-sm text-white/80 hover:text-white transition-colors"
-                    >
-                      {post.likes_count || 0}
-                    </button>
                   </button>
-
-                  <div className="w-px h-4 bg-white/10 mx-3" />
-
                   <button
                     onClick={() => { setExpandedPostId(post.id); }}
-                    className="flex items-center gap-1.5 text-white/70 hover:text-[#d4ff00] transition-colors"
+                    className="text-white/80 hover:text-[#d4ff00] transition-colors ml-4"
                   >
-                    <MessageCircle className="h-[22px] w-[22px]" />
-                    <span className="font-semibold text-sm text-white/80">{post.comments_count || 0}</span>
+                    <MessageCircle className="h-6 w-6" />
                   </button>
-
                   <button
                     onClick={() => setSharePost(post)}
-                    className="text-white/50 hover:text-[#d4ff00] transition-colors ml-auto"
+                    className="text-white/80 hover:text-[#d4ff00] transition-colors ml-4"
                   >
-                    <Send className="h-[22px] w-[22px]" />
+                    <Send className="h-6 w-6" />
                   </button>
                 </div>
 
-                {/* Caption — below engagement, with thin separator */}
+                {/* Like count — 13px semibold, hidden when 0 */}
+                {(post.likes_count || 0) > 0 && (
+                  <button
+                    onClick={() => setSelectedPostForLikes(post.id)}
+                    className="text-white font-semibold text-[13px] mt-1.5 hover:text-white/80 transition-colors block"
+                  >
+                    {post.likes_count} {post.likes_count === 1 ? 'like' : 'likes'}
+                  </button>
+                )}
+
+                {/* Caption — username + text inline */}
                 {post.image_url && post.text && (
-                  <div className="pt-2 border-t border-white/[0.06]">
-                    <span className="text-white/90 text-sm">
-                      <button
-                        onClick={() => openFriendCard({
-                          userId: post.user_id,
-                          displayName: post.profiles?.display_name || 'Friend',
-                          avatarUrl: post.profiles?.avatar_url || null,
-                          venueName: post.venue_name || undefined,
-                        })}
-                        className="font-bold text-white hover:text-[#d4ff00] transition-colors mr-1.5"
-                      >
-                        {post.profiles?.display_name}
-                      </button>
-                      {post.text}
-                    </span>
+                  <div className="text-[13px] leading-snug mt-1.5">
+                    <button
+                      onClick={() => openFriendCard({
+                        userId: post.user_id,
+                        displayName: post.profiles?.display_name || 'Friend',
+                        avatarUrl: post.profiles?.avatar_url || null,
+                        venueName: post.venue_name || undefined,
+                      })}
+                      className="font-semibold text-white hover:text-[#d4ff00] transition-colors mr-1"
+                    >
+                      {post.profiles?.display_name}
+                    </button>
+                    <span className="text-white/80">{post.text}</span>
                   </div>
                 )}
 
+                {/* View comments — hidden when 0 */}
+                {(post.comments_count || 0) > 0 && (
+                  <button
+                    onClick={() => { setExpandedPostId(post.id); }}
+                    className="text-white/40 text-[13px] mt-1 hover:text-white/60 transition-colors block"
+                  >
+                    View {post.comments_count === 1 ? '1 comment' : `all ${post.comments_count} comments`}
+                  </button>
+                )}
               </div>
             </div>
           ))

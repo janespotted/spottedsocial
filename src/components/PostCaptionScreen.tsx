@@ -226,31 +226,35 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
           <X className="h-5 w-5 text-white/70" />
         </button>
         <span className="text-white font-semibold text-base">New Post</span>
-        <div className="w-6" />
+        <button
+          onClick={handleShare}
+          disabled={loading || !imageFile}
+          className="text-[#d4ff00] font-semibold text-sm disabled:opacity-40 transition-opacity"
+        >
+          {loading ? 'Sharing...' : 'Share'}
+        </button>
       </div>
 
-      {/* Photo — flexible height, caps at 45vh */}
-      <div className="shrink min-h-0 px-4 pb-2">
-        <div className="relative mx-auto rounded-2xl overflow-hidden bg-black/40 h-full" style={{ maxHeight: '45vh' }}>
+      {/* Photo — full width, 4:5 aspect, cover */}
+      <div className="shrink-0 px-4">
+        <div className="relative w-full overflow-hidden rounded-xl" style={{ aspectRatio: '4 / 5' }}>
           {mediaType === 'video' ? (
             <video
               src={imagePreview}
               autoPlay loop muted playsInline
-              className="w-full h-full object-contain rounded-2xl"
-              style={{ maxHeight: '45vh' }}
+              className="w-full h-full object-cover object-center"
               onLoadedData={(e) => { (e.target as HTMLVideoElement).play().catch(() => {}); }}
             />
           ) : (
             <img
               src={imagePreview}
               alt="Post preview"
-              className="w-full h-full object-contain rounded-2xl"
-              style={{ maxHeight: '45vh' }}
+              className="w-full h-full object-cover object-center"
             />
           )}
           <button
             onClick={onBack}
-            className="absolute bottom-2 left-2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white/80 text-xs font-medium"
+            className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white/80 text-xs font-medium"
           >
             Retake
           </button>
@@ -258,7 +262,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
       </div>
 
       {/* Metadata — fixed height rows, no scroll */}
-      <div className="shrink-0 px-5">
+      <div className="shrink-0 px-4 mt-0">
         {/* Caption — compact */}
         <div className="flex items-center gap-2.5 py-2">
           <Avatar className="h-7 w-7 flex-shrink-0">
@@ -353,7 +357,7 @@ export function PostCaptionScreen({ imageFile, imagePreview, mediaType = 'image'
       </div>
 
       {/* Post button — pinned at bottom, always visible */}
-      <div className="shrink-0 px-5 pt-2 mt-auto" style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="shrink-0 px-4 pt-2 mt-auto" style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>
         <button
           type="button"
           onClick={handleShare}

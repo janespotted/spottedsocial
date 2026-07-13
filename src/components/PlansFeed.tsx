@@ -641,7 +641,7 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
   }
 
   return (
-    <div className="space-y-7 px-4 pb-28">
+    <div className="space-y-7 px-4">
       {/* Weekend Rally Header - shown when activated via push notification */}
       {weekendFilter && (
         <div className="bg-gradient-to-br from-[#a855f7]/20 to-[#7c3aed]/10 rounded-2xl p-4">
@@ -715,22 +715,22 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
         />
       )}
       
-      {/* Subtle separator */}
-      {!weekendFilter && <div className="h-px bg-white/10" />}
-
-      {/* Share a Plan */}
-      <button
-        onClick={() => setShowCreateDialog(true)}
-        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-[#1a0a2e]/80 border border-white/8 hover:bg-[#1a0a2e] transition-colors"
-      >
-        <div className="w-11 h-11 rounded-full bg-[#d4ff00]/10 flex items-center justify-center flex-shrink-0">
-          <Plus className="w-5 h-5 text-[#d4ff00]" />
-        </div>
-        <div className="flex-1 text-left">
-          <p className="text-white font-medium text-[15px]">Share a plan</p>
-          <p className="text-white/35 text-xs mt-0.5">Post what you're doing — see who's down</p>
-        </div>
-      </button>
+      {/* PLANS section */}
+      <div>
+        <p className="text-white/30 text-[10px] uppercase tracking-wider font-semibold mb-2">Plans</p>
+        <button
+          onClick={() => setShowCreateDialog(true)}
+          className="w-full flex items-center gap-4 p-4 rounded-2xl bg-[#1a0a2e]/80 border border-white/8 hover:bg-[#1a0a2e] transition-colors"
+        >
+          <div className="w-11 h-11 rounded-full bg-[#d4ff00]/10 flex items-center justify-center flex-shrink-0">
+            <Plus className="w-5 h-5 text-[#d4ff00]" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-white font-medium text-[15px]">Share a plan</p>
+            <p className="text-white/35 text-xs mt-0.5">Post when and where — see who's down</p>
+          </div>
+        </button>
+      </div>
 
        {feedItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">

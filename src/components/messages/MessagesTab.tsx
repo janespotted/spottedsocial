@@ -358,7 +358,11 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
               <div
                 key={thread.id}
                 onClick={() => navigate(`/messages/${thread.id}`)}
-                className="bg-[#1a0a2e]/80 border border-white/8 rounded-2xl p-4 hover:bg-[#2d1b4e]/80 transition-colors cursor-pointer"
+                className={`rounded-2xl p-4 transition-colors cursor-pointer ${
+                  thread.unread_count > 0
+                    ? 'bg-white/[0.08]'
+                    : 'bg-white/[0.04]'
+                }`}
               >
                 <div className="flex items-center gap-3">
                   {thread.is_group ? (
@@ -411,6 +415,9 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
                       <h3 className="font-semibold text-white truncate">
                         {getThreadDisplayName(thread)}
                       </h3>
+                      {thread.unread_count > 0 && (
+                        <div className="w-2 h-2 rounded-full bg-[#d4ff00] flex-shrink-0" />
+                      )}
                       {thread.is_group && (
                         <span className="text-white/40 text-xs">({thread.members.length + 1})</span>
                       )}
@@ -419,20 +426,19 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
                       <p className="text-[#d4ff00] text-sm font-medium">@{thread.venue_name}</p>
                     )}
                     {thread.last_message && (
-                      <p className="text-white/60 text-sm truncate mt-0.5">
+                      <p className={`text-sm truncate mt-0.5 ${
+                        thread.unread_count > 0 ? 'text-white font-semibold' : 'text-white/60'
+                      }`}>
                         {thread.last_message.text}
                       </p>
                     )}
                   </div>
 
-                  <div className="flex flex-col items-end gap-2">
+                  <div className="flex flex-col items-end">
                     {thread.last_message && (
                       <span className="text-white/40 text-xs">
                         {getTimeAgo(thread.last_message.created_at).replace('about ', '')}
                       </span>
-                    )}
-                    {thread.unread_count > 0 && (
-                      <div className="bg-[#a855f7] rounded-full w-2 h-2" />
                     )}
                   </div>
                 </div>

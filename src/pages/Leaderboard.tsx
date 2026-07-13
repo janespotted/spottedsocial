@@ -599,7 +599,7 @@ export default function Leaderboard() {
   };
 
   return (
-    <div className="bg-gradient-to-b from-[#1a0f2e] to-[#110a24] pb-40">
+    <div className="bg-gradient-to-b from-[#1a0f2e] to-[#110a24]">
       {/* Header */}
       <PageHeader
         title="Leaderboard"

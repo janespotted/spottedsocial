@@ -127,7 +127,7 @@ export default function CloseFriends() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] pb-24">
+    <div className="h-[100dvh] bg-gradient-to-b from-[#2d1b4e] to-[#0a0118] flex flex-col overflow-hidden">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[#1a0f2e]/95 backdrop-blur border-b border-[#a855f7]/20 pt-[max(env(safe-area-inset-top),12px)]">
         <div className="flex items-center justify-between p-6">
@@ -142,8 +142,8 @@ export default function CloseFriends() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="px-4 py-6">
+      {/* Content — scrollable */}
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-6 pb-24">
         <div className="mb-6 p-4 bg-white/[0.06] backdrop-blur-sm rounded-2xl">
           <div className="flex items-center gap-2 mb-2">
             <Heart className="w-5 h-5 text-[#d4ff00]" />

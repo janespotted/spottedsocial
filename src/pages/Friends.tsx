@@ -616,7 +616,7 @@ export default function Friends() {
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gradient-to-b from-[#1a0f2e] to-[#110a24]">
-      <div className="max-w-[430px] mx-auto pb-24">
+      <div className="max-w-[430px] mx-auto">
         {/* Header */}
         <header className="sticky top-0 z-50 bg-[#110a24] pt-[env(safe-area-inset-top)]">
           <div className="flex items-center justify-between px-4 h-12">

@@ -54,9 +54,9 @@ interface FriendsPlanningProps {
 const getVisibilityLabel = (visibility: string | null | undefined): string => {
   if (!visibility) return '';
   const labels: Record<string, string> = {
-    'close_friends': '💛 close friends',
-    'all_friends': '👫 all friends',
-    'mutual_friends': '🔗 mutual friends',
+    'close_friends': 'Close friends',
+    'all_friends': 'All friends',
+    'mutual_friends': 'Mutual friends',
   };
   return labels[visibility] || visibility;
 };
@@ -232,14 +232,14 @@ export function FriendsPlanning({
           </Avatar>
         </button>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
             <button
               onClick={() => !isUser && handleOpenFriendCard(friend)}
               className={`text-white font-semibold text-[15px] truncate ${!isUser ? 'hover:text-[#d4ff00] transition-colors cursor-pointer' : ''}`}
             >
               {friend.display_name}
             </button>
-            {isUser && <span className="text-[#d4ff00] text-xs font-medium">You</span>}
+            {isUser && <span className="text-[#d4ff00] text-xs font-medium flex-shrink-0">You</span>}
           </div>
           {isUser ? (
             <div className="flex items-center gap-2 mt-1">
@@ -276,16 +276,9 @@ export function FriendsPlanning({
               </DropdownMenu>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 mt-0.5 text-white/40 text-xs">
-              <Users className="w-3 h-3" />
-              <span>{getVisibilityLabel(friend.planning_neighborhood ? 'close_friends' : 'all_friends')}</span>
-              {friend.planning_neighborhood && (
-                <>
-                  <span className="text-white/20">|</span>
-                  <MapPin className="w-3 h-3" />
-                  <span>{friend.planning_neighborhood}</span>
-                </>
-              )}
+            <div className="flex items-center gap-1 mt-0.5 text-white/40 text-xs truncate">
+              <MapPin className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{friend.planning_neighborhood || 'TBD'}</span>
             </div>
           )}
         </div>
@@ -329,10 +322,41 @@ export function FriendsPlanning({
   // Card variant for Home page
   return (
     <div className={`bg-[#1a1030] border border-[#a855f7]/20 rounded-2xl p-5 ${className}`}>
+      {/* YOUR NIGHT segmented control */}
+      <div className="mb-4">
+        <p className="text-white/30 text-[10px] uppercase tracking-wider font-semibold mb-2">Your Night</p>
+        <div className="flex items-center bg-white/[0.04] rounded-full p-1">
+          <button
+            onClick={() => { if (!isUserOut) onSwitchToOut?.(); }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-xs font-semibold transition-colors ${
+              isUserOut ? 'bg-[#d4ff00] text-black' : 'text-white/40 hover:text-white/60'
+            }`}
+          >
+            Out
+          </button>
+          <button
+            onClick={() => { if (!isUserPlanning) onJoinPlanning?.(); }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-xs font-semibold transition-colors ${
+              isUserPlanning ? 'bg-[#d4ff00] text-black' : 'text-white/40 hover:text-white/60'
+            }`}
+          >
+            TBD
+          </button>
+          <button
+            onClick={() => { if (isUserPlanning) onLeavePlanning?.(); }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-xs font-semibold transition-colors ${
+              !isUserPlanning && !isUserOut ? 'bg-[#d4ff00] text-black' : 'text-white/40 hover:text-white/60'
+            }`}
+          >
+            Staying In
+          </button>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="mb-3">
         <h3 className="text-white font-bold text-base">TBD tonight</h3>
-        <p className="text-white/40 text-sm">Let friends know when and where.</p>
+        <p className="text-white/40 text-sm">Friends who are down — plans TBD</p>
       </div>
 
       {/* User's own row first (when planning) */}
@@ -360,34 +384,6 @@ export function FriendsPlanning({
         </button>
       )}
 
-      {/* Bottom status bar (when planning) */}
-      {isUserPlanning && (
-        <div className="flex items-center justify-between pt-3 mt-2 border-t border-white/5">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
-            <span className="text-white/40 text-sm">You're TBD for tonight</span>
-          </div>
-          <button
-            onClick={() => onSwitchToOut?.()}
-            className="text-[#a855f7] text-sm font-medium hover:text-[#c084fc] transition-colors"
-          >
-            Edit
-          </button>
-        </div>
-      )}
-
-      {/* Join CTA (when not planning) */}
-      {showJoinOption && !isUserPlanning && (
-        <div className="mt-4 pt-3 border-t border-white/5">
-          <button
-            onClick={onJoinPlanning}
-            className="w-full h-10 bg-[#a855f7]/15 hover:bg-[#a855f7]/25 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 border border-[#a855f7]/40 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            {isUserOut ? 'Switch to TBD' : "I'm in"}
-          </button>
-        </div>
-      )}
 
       {/* Edit Status Sheet */}
       <Sheet open={showEditSheet} onOpenChange={setShowEditSheet}>
