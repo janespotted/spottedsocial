@@ -1428,7 +1428,7 @@ export function FriendIdCard() {
                                 });
                               }, 100);
                             }}
-                            className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
+                            className="w-full flex items-center gap-2 p-2 rounded-lg pressable-row"
                           >
                             <Avatar className="h-8 w-8 border border-[#a855f7]/40">
                               <AvatarImage src={friend.avatar_url || undefined} />

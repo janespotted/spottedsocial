@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 
 interface TypingUser {
   user_id: string;
@@ -37,9 +38,9 @@ export function useTypingIndicator(threadId: string | undefined, userId: string 
   useEffect(() => {
     if (!threadId || !userId) return;
 
-    const channel = supabase
-      .channel(`typing_${threadId}`)
-      .on(
+    const cleanupChannel = createResilientChannel({
+      name: `typing_${threadId}`,
+      configure: (ch) => ch.on(
         'postgres_changes',
         {
           event: '*',
@@ -55,11 +56,12 @@ export function useTypingIndicator(threadId: string | undefined, userId: string 
           if (row?.user_id === userId) return;
           fetchTypingUsers();
         }
-      )
-      .subscribe();
+      ),
+      // Typing indicators are ephemeral — no missed data to refetch
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      cleanupChannel();
       // Clean up own typing indicator on unmount
       supabase
         .from('dm_typing_indicators' as any)
@@ -74,7 +76,7 @@ export function useTypingIndicator(threadId: string | undefined, userId: string 
   const fetchTypingUsers = async () => {
     if (!threadId || !userId) return;
     const fiveSecsAgo = new Date(Date.now() - 5000).toISOString();
-    
+
     const { data } = await supabase
       .from('dm_typing_indicators' as any)
       .select('user_id, updated_at')

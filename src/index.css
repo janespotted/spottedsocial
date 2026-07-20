@@ -458,6 +458,26 @@ button, a, [role="button"] {
   -webkit-user-drag: none;
 }
 
+/* Pressable row — touch-safe active feedback for scrollable lists.
+   Uses a short delay so scroll gestures don't trigger the highlight. */
+.pressable-row {
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pressable-row:hover {
+    background-color: rgba(168, 85, 247, 0.2);
+  }
+}
+
+@media (hover: none) {
+  .pressable-row:active {
+    transition-delay: 80ms;
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
 /* Image rendering optimization */
 img, video {
   content-visibility: auto;

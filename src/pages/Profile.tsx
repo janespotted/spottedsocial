@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
@@ -100,9 +101,9 @@ export default function Profile() {
   useEffect(() => {
     if (!user?.id) return;
 
-    const channel = supabase
-      .channel('profile-night-status')
-      .on(
+    const cleanupChannel = createResilientChannel({
+      name: 'profile-night-status',
+      configure: (ch) => ch.on(
         'postgres_changes',
         {
           event: '*',
@@ -113,12 +114,11 @@ export default function Profile() {
         () => {
           fetchProfileData();
         }
-      )
-      .subscribe();
+      ),
+      onReconnect: fetchProfileData,
+    });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return cleanupChannel;
   }, [user?.id]);
 
   // Refetch night status on window focus (lightweight, avoids full re-fetch)

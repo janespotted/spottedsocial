@@ -143,7 +143,7 @@ export function InviteFriendsModal() {
     <button
       key={friend.id}
       onClick={() => handleToggleFriend(friend.id)}
-      className="w-full flex items-center gap-3 p-3 hover:bg-white/5 transition-colors rounded-xl"
+      className="w-full flex items-center gap-3 p-3 pressable-row rounded-xl"
     >
       <Checkbox
         checked={selectedFriends.has(friend.id)}

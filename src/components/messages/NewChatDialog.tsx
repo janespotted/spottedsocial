@@ -289,7 +289,7 @@ export function NewChatDialog({ open, onOpenChange, preselectedUser, source }: N
                     <button
                       key={friend.id}
                       onClick={() => createThread(friend.id)}
-                      className="w-full bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 hover:bg-white/[0.10] transition-colors flex items-center gap-3"
+                      className="w-full bg-white/[0.06] backdrop-blur-sm rounded-xl p-4 pressable-row flex items-center gap-3"
                     >
                       <Avatar className="h-12 w-12 border-2 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.6)]">
                         <AvatarImage src={friend.avatar_url || undefined} />

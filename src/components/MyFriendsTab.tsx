@@ -312,7 +312,7 @@ export function MyFriendsTab() {
     <button
       key={friend.id}
       onClick={() => handleSelect(friend)}
-      className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+      className="w-full flex items-center gap-3 p-3 pressable-row border-b border-[#a855f7]/10 last:border-b-0"
     >
       <Avatar className="w-11 h-11 flex-shrink-0 border-2 border-[#a855f7]/50">
         <AvatarImage src={friend.avatar_url || undefined} />

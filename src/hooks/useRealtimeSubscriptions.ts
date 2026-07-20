@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 
 interface SubscriptionConfig {
   onPostsChange?: () => void;
@@ -12,13 +12,11 @@ interface SubscriptionConfig {
 
 export function useRealtimeSubscriptions(config: SubscriptionConfig) {
   const { onPostsChange, onLikesChange, onNightStatusChange, onNewPost, onPostDeleted } = config;
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   const cleanup = useCallback(() => {
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
+    cleanupRef.current?.();
+    cleanupRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -28,48 +26,36 @@ export function useRealtimeSubscriptions(config: SubscriptionConfig) {
       return;
     }
 
-    const feedRealtimeChannel = supabase.channel('feed-realtime');
+    cleanupRef.current = createResilientChannel({
+      name: 'feed-realtime',
+      configure: (ch) => {
+        if (onNewPost) {
+          ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, onNewPost);
+        } else if (onPostsChange) {
+          ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, onPostsChange);
+        }
 
-    if (onNewPost) {
-      feedRealtimeChannel.on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'posts' },
-        onNewPost
-      );
-    } else if (onPostsChange) {
-      feedRealtimeChannel.on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'posts' },
-        onPostsChange
-      );
-    }
+        if (onPostDeleted) {
+          ch.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, onPostDeleted);
+        }
 
-    if (onPostDeleted) {
-      feedRealtimeChannel.on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'posts' },
-        onPostDeleted
-      );
-    }
+        if (onLikesChange) {
+          ch.on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, onLikesChange);
+        }
 
-    if (onLikesChange) {
-      feedRealtimeChannel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'post_likes' },
-        onLikesChange
-      );
-    }
+        if (onNightStatusChange) {
+          ch.on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, onNightStatusChange);
+        }
 
-    if (onNightStatusChange) {
-      feedRealtimeChannel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'night_statuses' },
-        onNightStatusChange
-      );
-    }
-
-    feedRealtimeChannel.subscribe();
-    channelRef.current = feedRealtimeChannel;
+        return ch;
+      },
+      onReconnect: () => {
+        // Refetch all data streams on reconnect
+        onPostsChange?.();
+        onLikesChange?.();
+        onNightStatusChange?.();
+      },
+    });
 
     return cleanup;
   }, [onPostsChange, onLikesChange, onNightStatusChange, onNewPost, onPostDeleted, cleanup]);

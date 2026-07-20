@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spotted — Privacy Rings Chart</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0118;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    letter-spacing: 8px;
+    color: #d4ff00;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    text-align: center;
+    color: rgba(255,255,255,0.4);
+    font-size: 14px;
+    margin-bottom: 48px;
+  }
+
+  /* ── Concentric rings diagram ── */
+  .rings-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 60px;
+  }
+  .rings {
+    position: relative;
+    width: 500px;
+    height: 500px;
+  }
+  .ring {
+    position: absolute;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ring-public {
+    width: 500px; height: 500px;
+    top: 0; left: 0;
+    background: rgba(168, 85, 247, 0.06);
+    border: 2px solid rgba(168, 85, 247, 0.15);
+  }
+  .ring-mutual {
+    width: 370px; height: 370px;
+    top: 65px; left: 65px;
+    background: rgba(168, 85, 247, 0.10);
+    border: 2px solid rgba(168, 85, 247, 0.25);
+  }
+  .ring-friends {
+    width: 240px; height: 240px;
+    top: 130px; left: 130px;
+    background: rgba(212, 255, 0, 0.08);
+    border: 2px solid rgba(212, 255, 0, 0.25);
+  }
+  .ring-close {
+    width: 120px; height: 120px;
+    top: 190px; left: 190px;
+    background: rgba(212, 255, 0, 0.15);
+    border: 2px solid rgba(212, 255, 0, 0.5);
+  }
+  .ring-label {
+    position: absolute;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+  .ring-public .ring-label { bottom: 18px; color: rgba(168,85,247,0.5); }
+  .ring-mutual .ring-label { bottom: 14px; color: rgba(168,85,247,0.7); }
+  .ring-friends .ring-label { bottom: 12px; color: rgba(212,255,0,0.6); }
+  .ring-close .ring-label { color: rgba(212,255,0,0.9); font-size: 10px; }
+
+  .you-dot {
+    width: 36px; height: 36px;
+    background: #d4ff00;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; color: #0a0118;
+    position: absolute;
+    top: 232px; left: 232px;
+    z-index: 10;
+    box-shadow: 0 0 20px rgba(212,255,0,0.4);
+  }
+
+  /* ── Feature matrix ── */
+  .matrix {
+    max-width: 900px;
+    margin: 0 auto 60px;
+  }
+  .matrix h2 {
+    font-size: 20px;
+    color: #d4ff00;
+    margin-bottom: 4px;
+  }
+  .matrix .desc {
+    color: rgba(255,255,255,0.35);
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  thead th {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 2px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.5);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+  thead th:not(:first-child) { text-align: center; }
+  tbody td {
+    padding: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    vertical-align: top;
+  }
+  tbody td:not(:first-child) { text-align: center; }
+  .feature-name {
+    font-weight: 600;
+    color: #fff;
+  }
+  .feature-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    margin-top: 2px;
+  }
+  .dot-yes {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(212, 255, 0, 0.2);
+    border: 2px solid #d4ff00;
+    line-height: 18px;
+    text-align: center;
+    font-size: 12px;
+    color: #d4ff00;
+  }
+  .dot-no {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.03);
+    border: 2px solid rgba(255,255,255,0.1);
+  }
+  .dot-default {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(212, 255, 0, 0.15);
+    border: 2px solid rgba(212,255,0,0.5);
+    position: relative;
+  }
+  .dot-default::after {
+    content: 'D';
+    font-size: 9px;
+    font-weight: 800;
+    color: rgba(212,255,0,0.8);
+    position: absolute;
+    top: 3px; left: 5px;
+  }
+  .na-label {
+    color: rgba(255,255,255,0.2);
+    font-size: 12px;
+    font-style: italic;
+  }
+  tr:hover { background: rgba(255,255,255,0.02); }
+
+  /* ── Enforcement detail ── */
+  .enforcement {
+    max-width: 900px;
+    margin: 0 auto 60px;
+  }
+  .enforcement h2 {
+    font-size: 20px;
+    color: #d4ff00;
+    margin-bottom: 4px;
+  }
+  .enforcement .desc {
+    color: rgba(255,255,255,0.35);
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  .enforce-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 700px) {
+    .enforce-grid { grid-template-columns: 1fr; }
+    .rings { transform: scale(0.7); transform-origin: top center; }
+    .rings-container { margin-bottom: 0; }
+  }
+  .enforce-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 20px;
+  }
+  .enforce-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .enforce-card .layer {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  .layer-rls { background: rgba(168,85,247,0.2); color: #c084fc; }
+  .layer-rpc { background: rgba(59,130,246,0.2); color: #60a5fa; }
+  .layer-client { background: rgba(212,255,0,0.15); color: #d4ff00; }
+  .layer-column { background: rgba(251,146,60,0.2); color: #fb923c; }
+  .enforce-card p {
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.5;
+  }
+  .enforce-card code {
+    font-size: 12px;
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: rgba(255,255,255,0.7);
+  }
+
+  /* ── Legend ── */
+  .legend {
+    max-width: 900px;
+    margin: 0 auto 40px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* ── Flow diagram ── */
+  .flow-section {
+    max-width: 900px;
+    margin: 0 auto 60px;
+  }
+  .flow-section h2 {
+    font-size: 20px;
+    color: #d4ff00;
+    margin-bottom: 4px;
+  }
+  .flow-section .desc {
+    color: rgba(255,255,255,0.35);
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .flow-step {
+    flex: 1;
+    min-width: 150px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    position: relative;
+  }
+  .flow-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0; height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-left: 12px solid rgba(212,255,0,0.3);
+    z-index: 2;
+  }
+  .flow-step:not(:last-child) { margin-right: 20px; }
+  .flow-num {
+    font-size: 11px;
+    font-weight: 800;
+    color: #d4ff00;
+    margin-bottom: 6px;
+  }
+  .flow-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .flow-detail {
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+<h1>S P O T T E D</h1>
+<p class="subtitle">Privacy Rings &mdash; How Visibility Works Across the App</p>
+
+<!-- ── Concentric Rings ── -->
+<div class="rings-container">
+  <div class="rings">
+    <div class="ring ring-public">
+      <span class="ring-label">Public / All Authenticated</span>
+    </div>
+    <div class="ring ring-mutual">
+      <span class="ring-label">Mutual Friends</span>
+    </div>
+    <div class="ring ring-friends">
+      <span class="ring-label">All Friends</span>
+    </div>
+    <div class="ring ring-close">
+      <span class="ring-label">Close Friends</span>
+    </div>
+    <div class="you-dot">YOU</div>
+  </div>
+</div>
+
+<!-- ── Legend ── -->
+<div class="legend">
+  <div class="legend-item"><span class="dot-yes"></span> Available at this ring</div>
+  <div class="legend-item"><span class="dot-default"></span> Default setting</div>
+  <div class="legend-item"><span class="dot-no"></span> Not visible at this ring</div>
+  <div class="legend-item"><span class="na-label">n/a</span> No visibility control</div>
+</div>
+
+<!-- ── Feature × Ring Matrix ── -->
+<div class="matrix">
+  <h2>Visibility Matrix</h2>
+  <p class="desc">Which audience ring can see each feature, based on the creator's visibility setting</p>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:35%">Feature</th>
+        <th>Close Friends</th>
+        <th>All Friends</th>
+        <th>Mutual Friends</th>
+        <th>Public</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <div class="feature-name">Posts (Newsfeed)</div>
+          <div class="feature-sub">User picks per post</div>
+        </td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-default"></span></td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-no"></span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="feature-name">Stories</div>
+          <div class="feature-sub">User picks per story</div>
+        </td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-default"></span></td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-no"></span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="feature-name">Plans</div>
+          <div class="feature-sub">User picks per plan</div>
+        </td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-default"></span></td>
+        <td><span class="dot-no"></span></td>
+        <td><span class="dot-no"></span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="feature-name">Planning / TBD Status</div>
+          <div class="feature-sub">User picks when entering TBD mode</div>
+        </td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-default"></span></td>
+        <td><span class="dot-no"></span></td>
+        <td><span class="dot-no"></span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="feature-name">Location on Map</div>
+          <div class="feature-sub">Profile-level setting</div>
+        </td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-default"></span></td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-no"></span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="feature-name">"Out" Status</div>
+          <div class="feature-sub">Follows location_sharing_level</div>
+        </td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-default"></span></td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-no"></span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="feature-name">Check-ins</div>
+          <div class="feature-sub">Follows location_sharing_level</div>
+        </td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-default"></span></td>
+        <td><span class="dot-yes"></span></td>
+        <td><span class="dot-no"></span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="feature-name">Yap (Venue Chat)</div>
+          <div class="feature-sub">No visibility control</div>
+        </td>
+        <td colspan="3" style="text-align:center"><span class="na-label">n/a &mdash; not restricted</span></td>
+        <td><span class="dot-yes"></span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="feature-name">Events</div>
+          <div class="feature-sub">No visibility control</div>
+        </td>
+        <td colspan="3" style="text-align:center"><span class="na-label">n/a &mdash; not restricted</span></td>
+        <td><span class="dot-yes"></span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="feature-name">Comments & Likes</div>
+          <div class="feature-sub">Inherits from parent post</div>
+        </td>
+        <td colspan="4" style="text-align:center;color:rgba(255,255,255,0.35);font-size:12px;font-style:italic">Inherits visibility from the post they belong to</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ── How It's Enforced ── -->
+<div class="enforcement">
+  <h2>Enforcement Layers</h2>
+  <p class="desc">Each feature uses one or more server-side layers to enforce privacy</p>
+  <div class="enforce-grid">
+    <div class="enforce-card">
+      <h3>Posts</h3>
+      <span class="layer layer-rls">RLS Policy</span>
+      <span class="layer layer-client">Client Query</span>
+      <p>
+        RLS uses <code>CASE visibility</code> with helper functions
+        <code>is_close_friend()</code>, <code>is_direct_friend()</code>,
+        <code>is_friend_or_mutual()</code>. Client also pre-filters by friendship type.
+      </p>
+    </div>
+    <div class="enforce-card">
+      <h3>Plans</h3>
+      <span class="layer layer-rls">RLS Policy</span>
+      <p>
+        RLS checks <code>visibility = 'friends'</code> (direct friend) or
+        <code>'close_friends'</code> (close friend). Client relies entirely on RLS.
+      </p>
+    </div>
+    <div class="enforce-card">
+      <h3>Stories</h3>
+      <span class="layer layer-rls">RLS Policy</span>
+      <p>
+        Same <code>CASE visibility</code> pattern as Posts. Also allows
+        <code>is_public_buzz = true</code> stories through.
+      </p>
+    </div>
+    <div class="enforce-card">
+      <h3>Planning / TBD</h3>
+      <span class="layer layer-rls">RLS Policy</span>
+      <p>
+        RLS on <code>night_statuses</code> checks
+        <code>planning_visibility</code>: uses <code>is_close_friend()</code>
+        or <code>is_direct_friend()</code>.
+      </p>
+    </div>
+    <div class="enforce-card">
+      <h3>Location on Map</h3>
+      <span class="layer layer-rpc">RPC Function</span>
+      <span class="layer layer-column">Column Grants</span>
+      <p>
+        <code>get_profiles_safe()</code> calls <code>can_see_location()</code>
+        to mask lat/lng. Direct column grants on <code>profiles</code> block
+        raw access to location fields.
+      </p>
+    </div>
+    <div class="enforce-card">
+      <h3>Comments & Likes</h3>
+      <span class="layer layer-rls">RLS Policy</span>
+      <p>
+        RLS checks if the viewer can see the parent <code>post</code> first
+        (via friendship join), then allows access to comments/likes.
+      </p>
+    </div>
+    <div class="enforce-card">
+      <h3>Yap Messages</h3>
+      <span class="layer layer-rls">RLS Policy</span>
+      <p>
+        Simple policy: all authenticated users can read all yap messages.
+        Intentionally public &mdash; anonymous venue chat.
+      </p>
+    </div>
+    <div class="enforce-card">
+      <h3>Events</h3>
+      <span class="layer layer-rls">RLS Policy</span>
+      <p>
+        All authenticated users can read all events.
+        Client filters by city only.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Request Flow ── -->
+<div class="flow-section">
+  <h2>Privacy Check Flow</h2>
+  <p class="desc">What happens when User A tries to see User B's content</p>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div class="flow-title">Client Query</div>
+      <div class="flow-detail">App requests data from Supabase (e.g. posts, night_statuses)</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div class="flow-title">Column Grants</div>
+      <div class="flow-detail">Sensitive columns (lat, lng) blocked at column level on profiles</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div class="flow-title">RLS Policy</div>
+      <div class="flow-detail">Row-level security checks relationship + visibility setting per row</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">4</div>
+      <div class="flow-title">RPC Masking</div>
+      <div class="flow-detail">For location: <code>can_see_location()</code> returns null if not permitted</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">5</div>
+      <div class="flow-title">Client Render</div>
+      <div class="flow-detail">Only permitted data reaches the UI &mdash; filtered rows are never sent</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Relationship helpers ── -->
+<div class="enforcement" style="margin-bottom: 20px;">
+  <h2>Relationship Helper Functions</h2>
+  <p class="desc">SQL functions used by RLS policies and RPC to determine relationships</p>
+  <div class="enforce-grid">
+    <div class="enforce-card">
+      <h3><code>is_direct_friend(a, b)</code></h3>
+      <p>Returns true if A and B have an accepted friendship in the <code>friendships</code> table (either direction).</p>
+    </div>
+    <div class="enforce-card">
+      <h3><code>is_close_friend(a, b)</code></h3>
+      <p>Returns true if A is in B's <code>close_friends</code> list. Directional &mdash; B chose to include A.</p>
+    </div>
+    <div class="enforce-card">
+      <h3><code>is_friend_or_mutual(a, b)</code></h3>
+      <p>Returns true if A is a direct friend of B, OR if they share at least one mutual friend.</p>
+    </div>
+    <div class="enforce-card">
+      <h3><code>can_see_location(a, b)</code></h3>
+      <p>Master location check. Reads B's <code>location_sharing_level</code> and calls the appropriate helper above.</p>
+    </div>
+  </div>
+</div>
+
+<p style="text-align:center;color:rgba(255,255,255,0.15);font-size:12px;padding:40px 0;">
+  Spotted Privacy Architecture &mdash; Generated July 2026
+</p>
+
+</body>
+</html>

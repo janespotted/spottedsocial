@@ -7,6 +7,7 @@ import { MessagesTab } from '@/components/messages/MessagesTab';
 import { YapTab } from '@/components/messages/YapTab';
 import { PageHeader } from '@/components/PageHeader';
 import { FriendSearchModal } from '@/components/FriendSearchModal';
+import { useScreenGuard } from '@/hooks/useScreenGuard';
 
 type TabType = 'messages' | 'yap';
 
@@ -17,6 +18,7 @@ interface PreselectedUser {
 }
 
 export default function Messages() {
+  useScreenGuard();
   const { openCheckIn } = useCheckIn();
   const navigate = useNavigate();
   useAutoVenueTracking(); // Trigger auto-venue tracking on messages view

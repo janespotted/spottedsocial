@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { useAuth } from './AuthContext';
 import { logEvent } from '@/lib/event-logger';
 import { isFromTonight } from '@/lib/time-context';
@@ -89,9 +90,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     fetchNotifications();
 
     // Subscribe to realtime notification updates
-    const notifChannel = supabase
-      .channel('notifications-changes')
-      .on(
+    const cleanupNotif = createResilientChannel({
+      name: 'notifications-changes',
+      configure: (ch) => ch.on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -101,7 +102,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         },
         async (payload) => {
           console.log('New notification received (realtime):', payload);
-          
+
           // Fetch sender profile
           const { data: profileData } = await supabase
             .from('profiles').select('id, display_name, username, avatar_url').eq('id', payload.new.sender_id);
@@ -130,13 +131,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           setNotifications(prev => [newNotification, ...prev]);
           setLatestNotification(newNotification);
         }
-      )
-      .subscribe();
+      ),
+      onReconnect: fetchNotifications,
+    });
 
     // Subscribe to DM messages for banner notifications
-    const dmChannel = supabase
-      .channel('dm-banner-notifications')
-      .on(
+    const cleanupDm = createResilientChannel({
+      name: 'dm-banner-notifications',
+      configure: (ch) => ch.on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -145,7 +147,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         },
         async (payload) => {
           const newMsg = payload.new as { id: string; sender_id: string; text: string; created_at: string; thread_id: string };
-          
+
           // Ignore own messages
           if (newMsg.sender_id === user.id) return;
 
@@ -180,12 +182,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
           setLatestNotification(syntheticNotification);
         }
-      )
-      .subscribe();
+      ),
+      // DM banner is ephemeral — refetch notifications for missed items
+      onReconnect: fetchNotifications,
+    });
 
     return () => {
-      supabase.removeChannel(notifChannel);
-      supabase.removeChannel(dmChannel);
+      cleanupNotif();
+      cleanupDm();
     };
   }, [user]);
 

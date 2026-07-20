@@ -20,6 +20,8 @@
 		B1A2C3D4E5F6A7B8C9D0E1F2 /* LocationPermissionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* LocationPermissionPlugin.swift */; };
 		C2B3D4E5F6A7B8C9D0E1F2A3 /* LocationPermissionPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = D3C4E5F6A7B8C9D0E1F2A3B4 /* LocationPermissionPlugin.m */; };
 		E4D5F6A7B8C9D0E1F2A3B4C5 /* SpottedBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E6A7B8C9D0E1F2A3B4C5D6 /* SpottedBridgeViewController.swift */; };
+		A1C2D3E4F5A6B7C8D9E0F1A2 /* ScreenGuardPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D3E4F5A6B7C8D9E0F1A2B3 /* ScreenGuardPlugin.swift */; };
+		C3E4F5A6B7C8D9E0F1A2B3C4 /* ScreenGuardPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = D4F5A6B7C8D9E0F1A2B3C4D5 /* ScreenGuardPlugin.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +41,8 @@
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* LocationPermissionPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationPermissionPlugin.swift; sourceTree = "<group>"; };
 		D3C4E5F6A7B8C9D0E1F2A3B4 /* LocationPermissionPlugin.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = LocationPermissionPlugin.m; sourceTree = "<group>"; };
 		F5E6A7B8C9D0E1F2A3B4C5D6 /* SpottedBridgeViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpottedBridgeViewController.swift; sourceTree = "<group>"; };
+		B2D3E4F5A6B7C8D9E0F1A2B3 /* ScreenGuardPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenGuardPlugin.swift; sourceTree = "<group>"; };
+		D4F5A6B7C8D9E0F1A2B3C4D5 /* ScreenGuardPlugin.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = ScreenGuardPlugin.m; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -96,6 +100,8 @@
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* LocationPermissionPlugin.swift */,
 				D3C4E5F6A7B8C9D0E1F2A3B4 /* LocationPermissionPlugin.m */,
 				F5E6A7B8C9D0E1F2A3B4C5D6 /* SpottedBridgeViewController.swift */,
+				B2D3E4F5A6B7C8D9E0F1A2B3 /* ScreenGuardPlugin.swift */,
+				D4F5A6B7C8D9E0F1A2B3C4D5 /* ScreenGuardPlugin.m */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -228,6 +234,8 @@
 				B1A2C3D4E5F6A7B8C9D0E1F2 /* LocationPermissionPlugin.swift in Sources */,
 				C2B3D4E5F6A7B8C9D0E1F2A3 /* LocationPermissionPlugin.m in Sources */,
 				E4D5F6A7B8C9D0E1F2A3B4C5 /* SpottedBridgeViewController.swift in Sources */,
+				A1C2D3E4F5A6B7C8D9E0F1A2 /* ScreenGuardPlugin.swift in Sources */,
+				C3E4F5A6B7C8D9E0F1A2B3C4 /* ScreenGuardPlugin.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

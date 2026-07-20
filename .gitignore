@@ -27,3 +27,11 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Environment files (keep .env.example if it exists)
+.env*
+!.env.example
+
+# Temp / scratch
+_claude_tmp/
+_to_delete/

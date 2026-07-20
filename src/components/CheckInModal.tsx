@@ -719,7 +719,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           }
 
           // Update night_statuses with private party info + neighborhood
-          await supabase.from('night_statuses').upsert({
+          const { error: ppError } = await supabase.from('night_statuses').upsert({
             user_id: user?.id,
             status: 'out',
             lat: locationData.lat,
@@ -732,6 +732,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             party_neighborhood: detectedNeighborhood,
             planning_visibility: shareOption,
           }, { onConflict: 'user_id' });
+          if (ppError) throw ppError;
 
           const displayName = detectedNeighborhood
             ? `${finalVenueName} (${detectedNeighborhood})`
@@ -796,14 +797,15 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
       if (status === 'out' && lat && lng && venue) {
         // End any active check-ins before creating a new one
-        await supabase
+        const { error: endError } = await supabase
           .from('checkins')
           .update({ ended_at: new Date().toISOString() })
           .eq('user_id', user?.id)
           .is('ended_at', null);
+        if (endError) throw endError;
 
         // Create new check-in with tracking fields
-        await supabase.from('checkins').insert({
+        const { error: insertError } = await supabase.from('checkins').insert({
           user_id: user?.id,
           venue_name: venue,
           venue_id: venueId,
@@ -812,6 +814,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           started_at: new Date().toISOString(),
           last_updated_at: new Date().toISOString(),
         });
+        if (insertError) throw insertError;
         
         // Mark manual checkin to prevent auto-tracker from overwriting
         markManualCheckin();

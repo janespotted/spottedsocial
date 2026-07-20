@@ -58,7 +58,10 @@ export function VenueInviteProvider({ children }: { children: ReactNode }) {
       const demoIds = new Set((allProfiles || []).filter((p: any) => p.is_demo).map((p: any) => p.id));
       const realFriends = filteredFriends.filter(f => !demoIds.has(f.id));
       if (realFriends.length === 0) {
+        setShowInviteModal(false);
+        setInvitedFriends(filteredFriends);
         setShowConfirmation(true);
+        haptic.success();
         return;
       }
       const notifications = realFriends.map(friend => ({

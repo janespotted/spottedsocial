@@ -173,20 +173,25 @@ export function ContactsSync({ open, onClose }: ContactsSyncProps) {
     if (!user || invited.has(contact.phone)) return;
     haptic.light();
 
-    const code = await getOrCreateInviteCode(user.id);
-    const link = getInviteLink(code);
-    const { data: profile } = await supabase
-      .from('profiles').select('display_name').eq('id', user.id).single();
+    try {
+      const code = await getOrCreateInviteCode(user.id);
+      const link = getInviteLink(code);
+      const { data: profile } = await supabase
+        .from('profiles').select('display_name').eq('id', user.id).single();
 
-    const senderName = profile?.display_name || 'Your friend';
-    const message = `${senderName} invited you to Spotted — see where your friends are going out tonight! 🎉\n\n${link}`;
-    const phoneNumber = contact.phone.startsWith('1') ? `+${contact.phone}` : `+1${contact.phone}`;
+      const senderName = profile?.display_name || 'Your friend';
+      const message = `${senderName} invited you to Spotted — see where your friends are going out tonight! 🎉\n\n${link}`;
+      const phoneNumber = contact.phone.startsWith('1') ? `+${contact.phone}` : `+1${contact.phone}`;
 
-    // Open SMS compose directly to this person's number
-    const smsBody = encodeURIComponent(message);
-    window.open(`sms:${phoneNumber}&body=${smsBody}`, '_self');
+      // Open SMS compose directly to this person's number
+      const smsBody = encodeURIComponent(message);
+      window.open(`sms:${phoneNumber}&body=${smsBody}`, '_self');
 
-    setInvited(prev => { const n = new globalThis.Set(prev); n.add(contact.phone); return n; });
+      setInvited(prev => { const n = new globalThis.Set(prev); n.add(contact.phone); return n; });
+    } catch (err) {
+      console.error('Invite failed:', err);
+      toast.error('Failed to create invite');
+    }
   };
 
   const handleAddAll = async (e: React.MouseEvent) => {
@@ -267,10 +272,15 @@ export function ContactsSync({ open, onClose }: ContactsSyncProps) {
                   type="button"
                   onClick={async () => {
                     if (!user) return;
-                    const code = await getOrCreateInviteCode(user.id);
-                    const link = getInviteLink(code);
-                    const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).single();
-                    await triggerSmsInvite({ senderName: profile?.display_name || 'Your friend', inviteLink: link });
+                    try {
+                      const code = await getOrCreateInviteCode(user.id);
+                      const link = getInviteLink(code);
+                      const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', user.id).single();
+                      await triggerSmsInvite({ senderName: profile?.display_name || 'Your friend', inviteLink: link });
+                    } catch (err) {
+                      console.error('Invite failed:', err);
+                      toast.error('Failed to create invite');
+                    }
                   }}
                   className="w-full h-11 bg-[#a855f7] text-white font-medium rounded-xl flex items-center justify-center gap-2"
                 >

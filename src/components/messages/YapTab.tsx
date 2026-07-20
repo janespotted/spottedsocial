@@ -303,7 +303,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
       {userStatus === 'out' && userVenueName && (
         <button
           onClick={() => openThread(userVenueName, userIsPrivateParty ? userNightStatusId : null)}
-          className="w-full flex items-center gap-2 px-4 py-2 active:bg-white/[0.06] transition-colors"
+          className="w-full flex items-center gap-2 px-4 py-2 pressable-row"
         >
           {userIsPrivateParty
             ? <Home className="h-4 w-4 text-[#d4ff00] flex-shrink-0" />
@@ -353,7 +353,7 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
                 key={quote.id}
                 onClick={() => openThread(quote.venue_name)}
                 className={cn(
-                  'w-full text-left px-4 py-3 active:bg-white/[0.04] transition-colors',
+                  'w-full text-left px-4 py-3 pressable-row',
                   index > 0 && 'border-t border-white/[0.06]'
                 )}
               >

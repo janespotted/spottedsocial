@@ -17,20 +17,36 @@ export async function getOrCreateInviteCode(userId: string): Promise<string> {
 
   if (existing?.code) return existing.code;
 
-  // Generate new code
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
+  // Generate new code and confirm it's persisted before returning
+  const generateCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let c = '';
+    for (let i = 0; i < 8; i++) {
+      c += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return c;
+  };
 
-  const { data } = await supabase
+  const code = generateCode();
+  const { data, error } = await supabase
     .from('invite_codes')
     .insert({ user_id: userId, code })
     .select('code')
     .single();
 
-  return data?.code || code;
+  if (!error && data?.code) return data.code;
+
+  // Retry once with a fresh code
+  const retryCode = generateCode();
+  const { data: retryData, error: retryError } = await supabase
+    .from('invite_codes')
+    .insert({ user_id: userId, code: retryCode })
+    .select('code')
+    .single();
+
+  if (!retryError && retryData?.code) return retryData.code;
+
+  throw new Error('Failed to create invite code');
 }
 
 /**

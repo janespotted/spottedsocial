@@ -8,6 +8,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -165,14 +166,16 @@ export default function Friends() {
         queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
       }, 1500);
     };
-    const channel = supabase
-      .channel('friends-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh)
-      .subscribe();
+    const cleanupChannel = createResilientChannel({
+      name: 'friends-realtime',
+      configure: (ch) => ch
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh),
+      onReconnect: refresh,
+    });
     return () => {
       clearTimeout(timer);
-      supabase.removeChannel(channel);
+      cleanupChannel();
     };
   }, [user]);
 
@@ -666,7 +669,7 @@ export default function Friends() {
                   {searchResults.map((result) => {
                     const status = friendshipStatuses[result.id];
                     return (
-                      <div key={result.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
+                      <div key={result.id} className="flex items-center gap-3 p-3 rounded-2xl pressable-row">
                         <button onClick={() => openFriendCard({ userId: result.id, displayName: result.display_name, avatarUrl: result.avatar_url })}>
                           <Avatar className="h-12 w-12">
                             <AvatarImage src={result.avatar_url || undefined} />
@@ -753,7 +756,7 @@ export default function Friends() {
                     {suggestedFriends.map((friend) => {
                       const status = friendshipStatuses[friend.id];
                       return (
-                        <div key={friend.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors">
+                        <div key={friend.id} className="flex items-center gap-3 p-3 rounded-2xl pressable-row">
                           <Avatar className="h-12 w-12">
                             <AvatarImage src={friend.avatar_url || undefined} />
                             <AvatarFallback className="bg-[#1a0a2e] text-white">{friend.display_name?.[0] || '?'}</AvatarFallback>
@@ -807,7 +810,7 @@ export default function Friends() {
                 <div className="space-y-2">
                   <button
                     onClick={handleTextFriend}
-                    className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+                    className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white/[0.03] pressable-row"
                   >
                     <div className="w-10 h-10 rounded-full bg-[#d4ff00]/10 flex items-center justify-center">
                       <MessageCircle className="h-5 w-5 text-[#d4ff00]" />
@@ -821,7 +824,7 @@ export default function Friends() {
 
                   <button
                     onClick={handleCopyLink}
-                    className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+                    className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white/[0.03] pressable-row"
                   >
                     <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
                       {justCopied ? <Check className="h-5 w-5 text-[#22c55e]" /> : <Copy className="h-5 w-5 text-white/50" />}

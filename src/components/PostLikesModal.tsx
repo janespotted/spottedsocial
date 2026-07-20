@@ -30,31 +30,36 @@ export function PostLikesModal({ postId, isOpen, onClose }: PostLikesModalProps)
 
   const fetchLikes = async () => {
     setLoading(true);
-    const [likesResult, profileResult] = await Promise.all([
-      supabase
-        .from('post_likes')
-        .select('user_id')
-        .eq('post_id', postId)
-        .order('created_at', { ascending: false }),
-      supabase.rpc('get_profiles_safe'),
-    ]);
+    try {
+      const [likesResult, profileResult] = await Promise.all([
+        supabase
+          .from('post_likes')
+          .select('user_id')
+          .eq('post_id', postId)
+          .order('created_at', { ascending: false }),
+        supabase.rpc('get_profiles_safe'),
+      ]);
 
-    if (likesResult.data) {
-      const profileMap = new Map(
-        (profileResult.data || []).map((p: any) => [p.id, p])
-      );
-      const likesData = likesResult.data.map((like: any) => {
-        const profile = profileMap.get(like.user_id);
-        return {
-          user_id: like.user_id,
-          display_name: profile?.display_name || 'Unknown',
-          username: profile?.username || 'unknown',
-          avatar_url: profile?.avatar_url || null,
-        };
-      });
-      setUsers(likesData);
+      if (likesResult.data) {
+        const profileMap = new Map(
+          (profileResult.data || []).map((p: any) => [p.id, p])
+        );
+        const likesData = likesResult.data.map((like: any) => {
+          const profile = profileMap.get(like.user_id);
+          return {
+            user_id: like.user_id,
+            display_name: profile?.display_name || 'Unknown',
+            username: profile?.username || 'unknown',
+            avatar_url: profile?.avatar_url || null,
+          };
+        });
+        setUsers(likesData);
+      }
+    } catch (err) {
+      console.error('Failed to load likes:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleUserTap = (user: LikeUser) => {
@@ -86,7 +91,7 @@ export function PostLikesModal({ postId, isOpen, onClose }: PostLikesModalProps)
                 <button
                   key={user.user_id}
                   onClick={() => handleUserTap(user)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 pressable-row"
                 >
                   <Avatar className="h-11 w-11 flex-shrink-0">
                     <AvatarImage src={user.avatar_url || undefined} />

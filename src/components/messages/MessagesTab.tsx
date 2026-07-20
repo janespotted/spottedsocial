@@ -358,7 +358,7 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
               <div
                 key={thread.id}
                 onClick={() => navigate(`/messages/${thread.id}`)}
-                className={`rounded-2xl p-4 transition-colors cursor-pointer ${
+                className={`rounded-2xl p-4 cursor-pointer pressable-row ${
                   thread.unread_count > 0
                     ? 'bg-white/[0.08]'
                     : 'bg-white/[0.04]'

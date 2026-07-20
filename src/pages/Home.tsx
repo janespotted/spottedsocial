@@ -6,6 +6,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
+import { useScreenGuard } from '@/hooks/useScreenGuard';
 import { useBootstrapMode } from '@/hooks/useBootstrapMode';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { haptic } from '@/lib/haptics';
@@ -58,6 +59,7 @@ export default function Home() {
   const { openVenueCard } = useVenueIdCard();
   const { sendMeetUpNotification } = useMeetUp();
   const demoEnabled = useDemoMode();
+  useScreenGuard();
   const { bootstrapEnabled } = useBootstrapMode();
   const navigate = useNavigate();
   const location = useLocation();
@@ -576,7 +578,7 @@ export default function Home() {
                   {friendsOut.map((friend) => (
                     <div
                       key={friend.user_id}
-                      className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                      className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 pressable-row cursor-pointer"
                       onClick={() => openFriendCard({
                         userId: friend.user_id,
                         displayName: friend.display_name,
@@ -622,7 +624,7 @@ export default function Home() {
                   {planningFriends.map((friend) => (
                     <div
                       key={friend.user_id}
-                      className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                      className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 pressable-row"
                     >
                       <div className="relative">
                         <div className="absolute inset-0 rounded-full bg-[#a855f7]/30 animate-pulse" style={{ transform: 'scale(1.2)' }} />

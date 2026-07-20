@@ -10,6 +10,7 @@ import { useUserCity } from '@/hooks/useUserCity';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { CITY_CENTERS } from '@/lib/city-detection';
 import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import spottedLogo from '@/assets/spotted-s-logo.png';
@@ -294,58 +295,60 @@ export default function Map() {
     if (!user) return;
 
     // Single unified channel for all map-related realtime updates
-    const mapRealtimeChannel = supabase
-      .channel('map-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'profiles' },
-        (payload) => {
-          console.log('Profile location updated:', payload);
-          debouncedFetchFriendsLocations();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'night_statuses' },
-        (payload) => {
-          console.log('Night status updated:', payload);
-          // Instantly update the user's own status pill without waiting for full refetch
-          const row = payload.new as any;
-          if (row && row.user_id === user.id) {
-            setCurrentUserStatus(row.status || null);
-            setCurrentUserVenue(row.venue_name || null);
-            if (row.status === 'out' && row.lat && row.lng) {
-              setUserLocation({ lat: row.lat, lng: row.lng });
-            } else {
-              setUserLocation(null);
-            }
+    const cleanupChannel = createResilientChannel({
+      name: 'map-realtime',
+      configure: (ch) => ch
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'profiles' },
+          (payload) => {
+            console.log('Profile location updated:', payload);
+            debouncedFetchFriendsLocations();
           }
-          debouncedFetchFriendsLocations();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'checkins' },
-        (payload) => {
-          console.log('Checkin updated:', payload);
-          debouncedFetchFriendsLocations();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'venues' },
-        (payload) => {
-          console.log('Venue promotion updated:', payload);
-          debouncedFetchFriendsLocations();
-        }
-      )
-      .subscribe();
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'night_statuses' },
+          (payload) => {
+            console.log('Night status updated:', payload);
+            // Instantly update the user's own status pill without waiting for full refetch
+            const row = payload.new as any;
+            if (row && row.user_id === user.id) {
+              setCurrentUserStatus(row.status || null);
+              setCurrentUserVenue(row.venue_name || null);
+              if (row.status === 'out' && row.lat && row.lng) {
+                setUserLocation({ lat: row.lat, lng: row.lng });
+              } else {
+                setUserLocation(null);
+              }
+            }
+            debouncedFetchFriendsLocations();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'checkins' },
+          (payload) => {
+            console.log('Checkin updated:', payload);
+            debouncedFetchFriendsLocations();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'venues' },
+          (payload) => {
+            console.log('Venue promotion updated:', payload);
+            debouncedFetchFriendsLocations();
+          }
+        ),
+      onReconnect: debouncedFetchFriendsLocations,
+    });
 
     return () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
-      supabase.removeChannel(mapRealtimeChannel);
+      cleanupChannel();
     };
   }, [user]); // Removed debouncedFetchFriendsLocations from deps - it's stable now
   
@@ -1544,7 +1547,7 @@ export default function Map() {
     : [];
 
   // Bottom offset for floating elements (small padding above edge — nav is outside the map area)
-  const bottomOffset = '1rem';
+  const bottomOffset = '5rem';
   const legendBottomOffset = '5rem';
 
   return (
@@ -1666,31 +1669,39 @@ export default function Map() {
               onAccept={async () => {
                 if (!user) return;
                 setShowVenueMoveBanner(false);
-                const now = new Date().toISOString();
-                // Instant one-tap update
-                await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
-                await supabase.from('checkins').insert({
-                  user_id: user.id,
-                  venue_id: venueShiftData.venue.id,
-                  venue_name: venueShiftData.venue.name,
-                  lat: venueShiftData.lat,
-                  lng: venueShiftData.lng,
-                  started_at: now,
-                });
-                await supabase.from('night_statuses').update({
-                  venue_id: venueShiftData.venue.id,
-                  venue_name: venueShiftData.venue.name,
-                  lat: venueShiftData.lat,
-                  lng: venueShiftData.lng,
-                  updated_at: now,
-                }).eq('user_id', user.id);
-                await supabase.from('profiles').update({
-                  last_known_lat: venueShiftData.lat,
-                  last_known_lng: venueShiftData.lng,
-                  last_location_at: now,
-                }).eq('id', user.id);
-                toast({ title: `📍 Now at ${venueShiftData.venue.name}` });
-                fetchFriendsLocations();
+                try {
+                  const now = new Date().toISOString();
+                  const { error: e1 } = await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
+                  if (e1) throw e1;
+                  const { error: e2 } = await supabase.from('checkins').insert({
+                    user_id: user.id,
+                    venue_id: venueShiftData.venue.id,
+                    venue_name: venueShiftData.venue.name,
+                    lat: venueShiftData.lat,
+                    lng: venueShiftData.lng,
+                    started_at: now,
+                  });
+                  if (e2) throw e2;
+                  const { error: e3 } = await supabase.from('night_statuses').update({
+                    venue_id: venueShiftData.venue.id,
+                    venue_name: venueShiftData.venue.name,
+                    lat: venueShiftData.lat,
+                    lng: venueShiftData.lng,
+                    updated_at: now,
+                  }).eq('user_id', user.id);
+                  if (e3) throw e3;
+                  const { error: e4 } = await supabase.from('profiles').update({
+                    last_known_lat: venueShiftData.lat,
+                    last_known_lng: venueShiftData.lng,
+                    last_location_at: now,
+                  }).eq('id', user.id);
+                  if (e4) throw e4;
+                  toast({ title: `📍 Now at ${venueShiftData.venue.name}` });
+                  fetchFriendsLocations();
+                } catch (err) {
+                  console.error('Venue move failed:', err);
+                  toast({ variant: 'destructive', title: 'Failed to update venue' });
+                }
               }}
               onDismiss={() => {
                 setShowVenueMoveBanner(false);
@@ -1758,26 +1769,38 @@ export default function Map() {
             <button
               onClick={async () => {
                 if (!user) return;
-                const now = new Date().toISOString();
-                const expiry = new Date();
-                if (expiry.getHours() < 5) { expiry.setHours(5, 0, 0, 0); } else { expiry.setDate(expiry.getDate() + 1); expiry.setHours(5, 0, 0, 0); }
+                const prevStatus = currentUserStatus;
+                const prevVenue = currentUserVenue;
+                try {
+                  const now = new Date().toISOString();
+                  const expiry = new Date();
+                  if (expiry.getHours() < 5) { expiry.setHours(5, 0, 0, 0); } else { expiry.setDate(expiry.getDate() + 1); expiry.setHours(5, 0, 0, 0); }
 
-                await supabase.from('night_statuses').upsert({
-                  user_id: user.id, status: 'off', venue_id: null, venue_name: null,
-                  lat: null, lng: null, updated_at: now, expires_at: expiry.toISOString(),
-                  is_private_party: false, planning_neighborhood: null,
-                }, { onConflict: 'user_id' });
+                  const { error: e1 } = await supabase.from('night_statuses').upsert({
+                    user_id: user.id, status: 'off', venue_id: null, venue_name: null,
+                    lat: null, lng: null, updated_at: now, expires_at: expiry.toISOString(),
+                    is_private_party: false, planning_neighborhood: null,
+                  }, { onConflict: 'user_id' });
+                  if (e1) throw e1;
 
-                await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
+                  const { error: e2 } = await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
+                  if (e2) throw e2;
 
-                await supabase.from('profiles').update({
-                  is_out: false, last_known_lat: null, last_known_lng: null, last_location_at: null,
-                }).eq('id', user.id);
+                  const { error: e3 } = await supabase.from('profiles').update({
+                    is_out: false, last_known_lat: null, last_known_lng: null, last_location_at: null,
+                  }).eq('id', user.id);
+                  if (e3) throw e3;
 
-                setCurrentUserStatus('off');
-                setCurrentUserVenue(null);
-                toast({ title: 'Location sharing stopped', description: 'Your friends can no longer see you.' });
-                fetchFriendsLocations();
+                  setCurrentUserStatus('off');
+                  setCurrentUserVenue(null);
+                  toast({ title: 'Location sharing stopped', description: 'Your friends can no longer see you.' });
+                  fetchFriendsLocations();
+                } catch (err) {
+                  console.error('Stop sharing failed:', err);
+                  setCurrentUserStatus(prevStatus);
+                  setCurrentUserVenue(prevVenue);
+                  toast({ variant: 'destructive', title: 'Failed to stop sharing' });
+                }
               }}
               className="flex items-center gap-1 px-2 py-1 rounded-full backdrop-blur-md border border-white/10 bg-black/40 text-red-400 hover:bg-black/50 transition-all text-[11px] font-medium"
             >
@@ -2102,7 +2125,7 @@ export default function Map() {
                         <button
                           key={friend.user_id}
                           onClick={() => handleFriendClick(friend)}
-                          className={`w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 ${isVeryStale ? 'opacity-50' : ''}`}
+                          className={`w-full flex items-center gap-3 p-3 pressable-row border-b border-[#a855f7]/10 ${isVeryStale ? 'opacity-50' : ''}`}
                         >
                           <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50 relative">
                             <AvatarImage src={friend.profiles?.avatar_url || undefined} />
@@ -2192,7 +2215,7 @@ export default function Map() {
                             openFriendCard(friendCardData);
                             setShowFriendsList(false);
                           }}
-                          className="w-full flex items-center gap-3 p-3 hover:bg-[#a855f7]/20 transition-colors border-b border-[#a855f7]/10 last:border-b-0"
+                          className="w-full flex items-center gap-3 p-3 pressable-row border-b border-[#a855f7]/10 last:border-b-0"
                         >
                           <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-[#a855f7]/50">
                             <AvatarImage src={friend.avatar_url || undefined} />

@@ -6,6 +6,7 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronLeft, Users, ChevronDown, UserPlus, ChevronRight, Camera, Pencil, Check, X, Heart } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -109,29 +110,37 @@ export default function Thread() {
 
     setIsUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      // Store images in thread folder for RLS policy matching
-      const fileName = `${threadId}/${Date.now()}.${fileExt}`;
-      
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `${user.id}/dm/${threadId}/${Date.now()}.${fileExt}`;
+
+      let contentType = file.type || 'image/jpeg';
+      if (contentType === 'image/jpg') contentType = 'image/jpeg';
+
       const { error: uploadError } = await supabase.storage
-        .from('dm-images')
-        .upload(fileName, file);
+        .from('post-images')
+        .upload(fileName, file, { contentType });
 
       if (uploadError) throw uploadError;
 
-      // Store the file path (not public URL) since bucket is now private
-      await supabase.from('dm_messages').insert({
+      const { data: urlData } = supabase.storage
+        .from('post-images')
+        .getPublicUrl(fileName);
+
+      const { error: insertError } = await supabase.from('dm_messages').insert({
         thread_id: threadId,
         sender_id: user.id,
         text: '',
-        image_url: fileName, // Store path for signed URL generation
+        image_url: urlData.publicUrl,
       });
+
+      if (insertError) throw insertError;
 
       logger.info('dm:image_upload', { threadId });
       toast.success('Image sent!');
-    } catch (error) {
+    } catch (error: any) {
       logger.apiError('dm:image_upload', error);
-      toast.error('Failed to send image');
+      const msg = error?.message || error?.error || JSON.stringify(error) || 'unknown';
+      toast.error(`Image error: ${msg}`, { duration: 10000 });
     } finally {
       setIsUploading(false);
     }
@@ -175,9 +184,9 @@ export default function Thread() {
       const cleanupMessages = subscribeToMessages();
 
       // Subscribe to read receipts for "Seen" indicator
-      const readChannel = supabase
-        .channel(`read_${threadId}`)
-        .on(
+      const cleanupRead = createResilientChannel({
+        name: `read_${threadId}`,
+        configure: (ch) => ch.on(
           'postgres_changes',
           {
             event: '*',
@@ -191,12 +200,12 @@ export default function Thread() {
               setOtherReadAt(row.last_read_at);
             }
           }
-        )
-        .subscribe();
+        ),
+      });
 
       return () => {
         cleanupMessages();
-        supabase.removeChannel(readChannel);
+        cleanupRead();
       };
     }
   }, [threadId, user]);
@@ -366,31 +375,35 @@ export default function Thread() {
       // Show messages immediately (images will load lazily)
       setMessages(tonightMessages);
 
-      // Then resolve signed URLs for images in background
+      // Resolve signed URLs for legacy images stored as paths (not full URLs)
       const imageMsgs = tonightMessages.filter(m => m.image_url && !m.image_url.startsWith('http'));
       if (imageMsgs.length > 0) {
-        const paths = imageMsgs.map(m => m.image_url!);
-        const { data: signedUrls } = await supabase.storage
-          .from('dm-images')
-          .createSignedUrls(paths, 3600);
+        try {
+          const paths = imageMsgs.map(m => m.image_url!);
+          const { data: signedUrls } = await supabase.storage
+            .from('dm-images')
+            .createSignedUrls(paths, 3600);
 
-        if (signedUrls) {
-          const urlMap = new Map(signedUrls.map(s => [s.path, s.signedUrl]));
-          setMessages(prev => prev.map(msg => {
-            if (msg.image_url && urlMap.has(msg.image_url)) {
-              return { ...msg, image_url: urlMap.get(msg.image_url)! };
-            }
-            return msg;
-          }));
+          if (signedUrls) {
+            const urlMap = new Map(signedUrls.map(s => [s.path, s.signedUrl]));
+            setMessages(prev => prev.map(msg => {
+              if (msg.image_url && urlMap.has(msg.image_url)) {
+                return { ...msg, image_url: urlMap.get(msg.image_url)! };
+              }
+              return msg;
+            }));
+          }
+        } catch {
+          // dm-images bucket may not be accessible; legacy images won't render
         }
       }
     }
   };
 
   const subscribeToMessages = () => {
-    const channel = supabase
-      .channel(`thread_${threadId}`)
-      .on(
+    return createResilientChannel({
+      name: `thread_${threadId}`,
+      configure: (ch) => ch.on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -400,12 +413,16 @@ export default function Thread() {
         },
         async (payload) => {
           const newMsg = payload.new as Message;
-          // Generate signed URL for new image messages
+          // Generate signed URL for legacy image messages stored as paths
           if (newMsg.image_url && !newMsg.image_url.startsWith('http')) {
-            const { data: signedData } = await supabase.storage
-              .from('dm-images')
-              .createSignedUrl(newMsg.image_url, 3600);
-            newMsg.image_url = signedData?.signedUrl || null;
+            try {
+              const { data: signedData } = await supabase.storage
+                .from('dm-images')
+                .createSignedUrl(newMsg.image_url, 3600);
+              newMsg.image_url = signedData?.signedUrl || null;
+            } catch {
+              newMsg.image_url = null;
+            }
           }
           setMessages((prev) => {
             // Skip if this message already exists (optimistic update or duplicate)
@@ -417,12 +434,9 @@ export default function Thread() {
             markAsRead();
           }
         }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      ),
+      onReconnect: fetchMessages,
+    });
   };
 
   const sendMessage = useCallback(async (text: string) => {

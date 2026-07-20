@@ -10,6 +10,7 @@ import { useUserCity } from '@/hooks/useUserCity';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { PageHeader } from '@/components/PageHeader';
@@ -132,14 +133,16 @@ export default function Leaderboard() {
         fetchLeaderboard();
       }, 1500);
     };
-    const channel = supabase
-      .channel('leaderboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh)
-      .subscribe();
+    const cleanupChannel = createResilientChannel({
+      name: 'leaderboard-realtime',
+      configure: (ch) => ch
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh),
+      onReconnect: refresh,
+    });
     return () => {
       clearTimeout(timer);
-      supabase.removeChannel(channel);
+      cleanupChannel();
     };
   }, [user]);
 
@@ -500,7 +503,7 @@ export default function Leaderboard() {
                     venueName: venue.venue_name,
                   });
                 }}
-                className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-[#a855f7]/20 transition-colors"
+                className="w-full flex items-center gap-2 p-2 rounded-lg pressable-row"
               >
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={friend.avatar_url || undefined} />
