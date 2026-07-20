@@ -33,9 +33,15 @@ interface CommentsSheetProps {
 
 const QUICK_EMOJIS = ['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'];
 
-// iOS keyboard animation feel
-const KB_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
-const KB_MS = 260;
+// iOS keyboard animation feel — measured from a 30fps screen recording on an
+// iPhone Pro Max: the keyboard's remaining travel decays exponentially and is
+// matched near-exactly by easeOutExpo over 400ms (remaining distance at
+// 100/200/300ms: measured 18.5%/3.4%/0.6% vs curve 17.7%/3.1%/0.6%).
+// The previous 260ms cubic-bezier(0.32,0.72,0,1) covered ~80% of the lift in
+// the first two frames while the keyboard had barely moved — that WAS the
+// visible jump. Do not "snappify" this curve again.
+const KB_EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'; // easeOutExpo
+const KB_MS = 400;
 
 export function CommentsSheet({
   open,
@@ -90,25 +96,31 @@ export function CommentsSheet({
   // then snaps up when the late resize lands.
   //
   // Fix: 'keyboardWillShow' fires BEFORE the keyboard animates and includes
-  // its height. We immediately animate the sheet up by that height (riding
-  // with the keyboard). When the late webview resize finally arrives, the
-  // sheet's bottom anchor moves up by the same amount — so we remove the
-  // transform in the same frame WITHOUT animation, and nothing visibly moves.
-  // The formula `outstanding = keyboardHeight - resizeApplied` handles
-  // show/hide in any event order.
+  // its height. We immediately animate the sheet up (riding with the
+  // keyboard). When the late webview resize finally arrives, the sheet's
+  // bottom anchor moves up by the same amount — so we remove the transform
+  // in the same frame WITHOUT animation, and nothing visibly moves.
+  //
+  // The seamless-swap invariant (measured, do not break): the input bar pads
+  // its bottom with max(env(safe-area-inset-bottom), PAD_MIN). While the
+  // webview is full-height, env() = safeBottom (34pt on notch devices); the
+  // moment iOS resizes the webview above the keyboard, env() collapses to 0
+  // and the padding becomes PAD_MIN — the sheet shrinks by
+  // (safeBottom - PAD_MIN) at the exact frame the anchor moves. The lift
+  // target below bakes that in; a previous version tucked by the full
+  // safeBottom and produced a visible 12pt snap at the swap frame.
   useEffect(() => {
     if (!open) return;
     const wrap = kbWrapRef.current;
     if (!wrap) return;
     const vv = window.visualViewport;
 
+    // Committed keyboard height (full reported value; 0 while hiding).
     let kb = 0;
     let baseline = vv?.height ?? window.innerHeight;
 
-    // iOS reports a keyboard height that includes the home-indicator safe
-    // area, so lifting by the raw value overshoots slightly. Measure the
-    // safe-area inset and subtract it for the animated lift; the viewport
-    // resize (when it lands) is the ground truth and clamps any residual.
+    // Measure the home-indicator safe-area inset (34pt-class on Face ID
+    // devices, 0 on older hardware).
     const probe = document.createElement('div');
     probe.style.cssText =
       'position:fixed;bottom:0;left:0;width:1px;height:env(safe-area-inset-bottom,0px);pointer-events:none;visibility:hidden;';
@@ -116,28 +128,41 @@ export function CommentsSheet({
     const safeBottom = probe.getBoundingClientRect().height;
     probe.remove();
 
+    // Must match the input bar's paddingBottom floor: max(env(...), 12px).
+    const PAD_MIN = 12;
+    const idlePad = Math.max(safeBottom, PAD_MIN);
+
     // Initial height cap: 75% of the pre-keyboard viewport.
     wrap.style.maxHeight = `${Math.round(baseline * 0.75)}px`;
+    wrap.style.willChange = 'transform';
 
     const apply = (animated: boolean) => {
       const current = vv?.height ?? window.innerHeight;
       const resized = Math.max(0, baseline - current);
-      const outstanding = kb - resized;
+      // Padding the input bar is rendering right now (env() collapses to 0
+      // once the webview has been resized above the keyboard):
+      const pad = resized > 0 ? PAD_MIN : idlePad;
+      // Where the input's content bottom should sit, measured up from the
+      // baseline viewport bottom:
+      const target = kb > 0 ? kb + PAD_MIN : idlePad;
+      // Sheet bottom sits at (baseline - resized) + translate; input content
+      // sits `pad` above that. Solve for translate (negative = lift up):
+      const translate = resized + pad - target;
       wrap.style.transition = animated
         ? `transform ${KB_MS}ms ${KB_EASE}, max-height ${KB_MS}ms ${KB_EASE}`
         : 'none';
       wrap.style.transform =
-        outstanding !== 0 ? `translate3d(0, ${-outstanding}px, 0)` : '';
+        translate !== 0 ? `translate3d(0, ${translate}px, 0)` : '';
       // Keep the sheet's top on screen while lifted: cap height to the
       // space that will remain above the keyboard.
       wrap.style.maxHeight = kb > 0
-        ? `${Math.max(baseline - kb - 12, 160)}px`
+        ? `${Math.max(baseline - kb - PAD_MIN, 160)}px`
         : `${Math.round(baseline * 0.75)}px`;
     };
 
     const onWillShow = (e: Event) => {
       const reported = (e as unknown as { keyboardHeight?: number }).keyboardHeight ?? 0;
-      kb = Math.max(0, reported - safeBottom);
+      kb = Math.max(0, reported);
       baseline = Math.max(baseline, vv?.height ?? window.innerHeight);
       apply(true);
     };

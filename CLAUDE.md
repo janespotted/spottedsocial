@@ -56,6 +56,13 @@ style={{ bottom: keyboardHeight }}
 
 This bug has been "fixed" multiple times in this codebase. The underlying issue was always double-counting: native resize + JS offset. This pattern is now documented to prevent regression.
 
+### Sheet keyboard-lift pattern (CommentsSheet)
+
+`CommentsSheet.tsx` is the one sanctioned exception: because the native webview resize lands ~300–450ms AFTER the keyboard animation finishes, the sheet lifts itself via an imperative transform on `keyboardWillShow`, then swaps to real layout (transform → 0, no animation) the frame the viewport resize lands. Two values in that file were measured frame-by-frame from a device screen recording — do not change them casually:
+
+- **Easing/duration:** iOS keyboard motion ≈ easeOutExpo, `cubic-bezier(0.16, 1, 0.3, 1)` over **400ms**. A shorter/snappier curve makes the sheet race ahead of the keyboard (~80% of travel in 2 frames) — this reads as the "keyboard jump" bug.
+- **Lift target:** the input bar's `max(env(safe-area-inset-bottom), 12px)` padding collapses 34pt → 12pt at the exact frame the webview resizes (env() → 0). The lift math must bake in that 22pt shrink, or the swap frame shows a 12pt snap.
+
 ## Demo Mode (CRITICAL SAFETY RULES)
 
 Demo mode seeds 24 fake users + content for testing. Real and demo data coexist in the same tables, distinguished by `is_demo` column.

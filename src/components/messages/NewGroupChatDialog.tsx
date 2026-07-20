@@ -191,7 +191,7 @@ export function NewGroupChatDialog({ open, onOpenChange }: NewGroupChatDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white p-0 max-w-md">
+      <DialogContent className="bg-[#1a0f2e] border-[#a855f7]/20 text-white p-0 max-w-md gap-0 [&>button]:hidden">
         {step === 'select' ? (
           <>
             {/* Header */}
