@@ -10,6 +10,7 @@ export function useScreenGuard() {
   const demoEnabled = useDemoMode();
 
   useEffect(() => {
+    console.log('[ScreenGuard JS] useScreenGuard effect, demoEnabled:', demoEnabled);
     if (demoEnabled) {
       disableScreenGuard();
       return;
