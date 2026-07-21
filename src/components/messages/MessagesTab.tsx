@@ -429,7 +429,9 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
                       <p className={`text-sm truncate mt-0.5 ${
                         thread.unread_count > 0 ? 'text-white font-semibold' : 'text-white/60'
                       }`}>
-                        {thread.last_message.text}
+                        {thread.last_message.text.match(/^\[shared_post:[a-f0-9-]+\]$/)
+                          ? 'Shared a post'
+                          : thread.last_message.text || '📷 Photo'}
                       </p>
                     )}
                   </div>

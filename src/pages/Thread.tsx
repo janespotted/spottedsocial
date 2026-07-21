@@ -18,6 +18,7 @@ import { isFromTonight } from '@/lib/time-context';
 import { logger } from '@/lib/logger';
 import { triggerPushNotification } from '@/lib/push-notifications';
 import { MessageInput } from '@/components/MessageInput';
+import { resolvePostImageUrl } from '@/lib/storage-utils';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 
@@ -686,9 +687,15 @@ export default function Thread() {
       const { data: profiles } = await supabase.rpc('get_profiles_safe');
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
+      // Resolve signed URLs for post images
+      const resolvedPosts = await Promise.all(data.map(async (post) => ({
+        ...post,
+        image_url: await resolvePostImageUrl(post.image_url),
+      })));
+
       setSharedPosts(prev => {
         const next = new Map(prev);
-        for (const post of data) {
+        for (const post of resolvedPosts) {
           const profile = profileMap.get(post.user_id);
           next.set(post.id, {
             id: post.id,
