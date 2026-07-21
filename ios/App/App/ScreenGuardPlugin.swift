@@ -9,25 +9,22 @@ public class ScreenGuardPlugin: CAPPlugin {
     private var brandedOverlay: UIView?
     private var isSetUp = false
 
-    /// One-time setup: create a hidden secure text field and reparent the window's
-    /// layer inside the text field's layer so the OS treats the entire window as
-    /// secure content when isSecureTextEntry is true.
-    ///
-    /// A branded overlay (dark purple + S logo) sits directly on the window OUTSIDE
-    /// the secure canvas layer. During normal use the app content renders on top of
-    /// it. In screenshots/recordings the canvas-layer content is hidden, revealing
-    /// the branded overlay instead of a black screen.
-    ///
-    /// Protection starts OFF — callers toggle via enable()/disable().
     private func setUp() {
         guard !isSetUp else { return }
-        guard let window = bridge?.webView?.window ?? UIApplication.shared.windows.first else { return }
+        guard let window = bridge?.webView?.window ?? UIApplication.shared.windows.first else {
+            NSLog("[ScreenGuard] No window found")
+            return
+        }
+
+        NSLog("[ScreenGuard] setUp — window: %@, sublayers: %d, subviews: %d",
+              String(describing: window),
+              window.layer.sublayers?.count ?? 0,
+              window.subviews.count)
 
         // --- Branded overlay (visible in screenshots when protection is on) ---
         let overlay = UIView()
         overlay.isUserInteractionEnabled = false
 
-        // Gradient background: #1a0f2e → #110a24
         let gradient = CAGradientLayer()
         gradient.colors = [
             UIColor(red: 0x1a/255.0, green: 0x0f/255.0, blue: 0x2e/255.0, alpha: 1).cgColor,
@@ -37,13 +34,12 @@ public class ScreenGuardPlugin: CAPPlugin {
         gradient.endPoint = CGPoint(x: 0.5, y: 1)
         overlay.layer.addSublayer(gradient)
 
-        // S logo centered
         let logoView = UIImageView(image: UIImage(named: "ScreenGuardLogo"))
         logoView.contentMode = .scaleAspectFit
         logoView.translatesAutoresizingMaskIntoConstraints = false
         overlay.addSubview(logoView)
 
-        overlay.isHidden = true  // hidden until enable() is called
+        overlay.isHidden = true
         window.addSubview(overlay)
 
         overlay.translatesAutoresizingMaskIntoConstraints = false
@@ -58,10 +54,8 @@ public class ScreenGuardPlugin: CAPPlugin {
             logoView.heightAnchor.constraint(equalToConstant: 80)
         ])
 
-        // Size gradient layer on layout
         overlay.layoutIfNeeded()
         gradient.frame = overlay.bounds
-        // Keep gradient in sync with rotation/resize
         let observer = overlay.observe(\.bounds, options: [.new]) { view, _ in
             gradient.frame = view.bounds
         }
@@ -69,22 +63,49 @@ public class ScreenGuardPlugin: CAPPlugin {
 
         brandedOverlay = overlay
 
-        // --- Secure text field (hides canvas-layer content in screenshots) ---
+        // --- Secure text field ---
         let field = UITextField()
-        field.isSecureTextEntry = false
+        field.isSecureTextEntry = true
         field.isUserInteractionEnabled = false
-        field.frame = .zero
 
+        // The field needs a non-zero size for iOS to fully instantiate the
+        // secure container layer hierarchy.
+        field.frame = window.bounds
         window.addSubview(field)
 
-        if let canvasLayer = field.layer.sublayers?.first {
-            // Move ALL existing window sublayers (except the field itself and
-            // the branded overlay) into the canvas layer so they are protected.
-            for sublayer in window.layer.sublayers ?? [] where sublayer !== field.layer && sublayer !== overlay.layer {
-                canvasLayer.addSublayer(sublayer)
-            }
+        // Force layout so the _UITextLayoutCanvasView is created
+        field.layoutIfNeeded()
+
+        NSLog("[ScreenGuard] field.layer.sublayers: %@",
+              String(describing: field.layer.sublayers?.map { String(describing: type(of: $0)) }))
+
+        // Find the secure canvas layer — it's the internal layer that iOS
+        // excludes from screen capture.
+        guard let canvasLayer = field.layer.sublayers?.first else {
+            NSLog("[ScreenGuard] ERROR: no canvas layer found, bailing out")
+            field.removeFromSuperview()
+            return
         }
 
+        NSLog("[ScreenGuard] canvasLayer: %@ (%@)",
+              String(describing: canvasLayer),
+              String(describing: type(of: canvasLayer)))
+
+        // Snapshot the current sublayers before we start moving things
+        let layersToMove = (window.layer.sublayers ?? []).filter {
+            $0 !== field.layer && $0 !== overlay.layer
+        }
+
+        NSLog("[ScreenGuard] Moving %d sublayers into canvas", layersToMove.count)
+
+        for sublayer in layersToMove {
+            canvasLayer.addSublayer(sublayer)
+        }
+
+        // Protection starts off
+        field.isSecureTextEntry = false
+
+        // Now switch to auto layout
         field.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             field.topAnchor.constraint(equalTo: window.topAnchor),
@@ -95,19 +116,26 @@ public class ScreenGuardPlugin: CAPPlugin {
 
         secureField = field
         isSetUp = true
+
+        NSLog("[ScreenGuard] setUp complete — isSetUp=true, secureField=%@",
+              String(describing: secureField))
     }
 
     @objc func enable(_ call: CAPPluginCall) {
         DispatchQueue.main.async { [weak self] in
-            self?.setUp()
-            self?.secureField?.isSecureTextEntry = true
-            self?.brandedOverlay?.isHidden = false
+            guard let self = self else { return }
+            self.setUp()
+            NSLog("[ScreenGuard] enable — secureField: %@, isSetUp: %d",
+                  String(describing: self.secureField), self.isSetUp ? 1 : 0)
+            self.secureField?.isSecureTextEntry = true
+            self.brandedOverlay?.isHidden = false
             call.resolve()
         }
     }
 
     @objc func disable(_ call: CAPPluginCall) {
         DispatchQueue.main.async { [weak self] in
+            NSLog("[ScreenGuard] disable")
             self?.secureField?.isSecureTextEntry = false
             self?.brandedOverlay?.isHidden = true
             call.resolve()
