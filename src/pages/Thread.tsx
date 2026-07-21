@@ -109,6 +109,7 @@ export default function Thread() {
     }
 
     setIsUploading(true);
+    const optimisticId = `optimistic-img-${Date.now()}`;
     try {
       const fileExt = file.name.split('.').pop() || 'jpg';
       const fileName = `${user.id}/dm/${threadId}/${Date.now()}.${fileExt}`;
@@ -126,21 +127,40 @@ export default function Thread() {
         .from('post-images')
         .getPublicUrl(fileName);
 
-      const { error: insertError } = await supabase.from('dm_messages').insert({
+      const imageUrl = urlData.publicUrl;
+
+      // Optimistic update — show image immediately
+      const previewUrl = URL.createObjectURL(file);
+      const optimisticMsg: Message = {
+        id: optimisticId,
+        sender_id: user.id,
+        text: '',
+        image_url: previewUrl,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, optimisticMsg]);
+
+      const { data: inserted, error: insertError } = await supabase.from('dm_messages').insert({
         thread_id: threadId,
         sender_id: user.id,
         text: '',
-        image_url: urlData.publicUrl,
-      });
+        image_url: imageUrl,
+      }).select().single();
 
       if (insertError) throw insertError;
 
+      // Replace optimistic message with real one
+      if (inserted) {
+        URL.revokeObjectURL(previewUrl);
+        setMessages((prev) => prev.map(m => m.id === optimisticId ? { ...inserted } : m));
+      }
+
       logger.info('dm:image_upload', { threadId });
-      toast.success('Image sent!');
     } catch (error: any) {
       logger.apiError('dm:image_upload', error);
-      const msg = error?.message || error?.error || JSON.stringify(error) || 'unknown';
-      toast.error(`Image error: ${msg}`, { duration: 10000 });
+      // Remove optimistic message on failure
+      setMessages((prev) => prev.filter(m => m.id !== optimisticId));
+      toast.error('Failed to send image');
     } finally {
       setIsUploading(false);
     }
