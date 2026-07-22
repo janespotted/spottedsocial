@@ -78,32 +78,41 @@ export function createResilientChannel(opts: ResilientChannelOptions): () => voi
 
   // App foreground listener — reconnect channel + refetch
   function setupForegroundListener() {
-    if (!isNativePlatform()) return;
+    if (isNativePlatform()) {
+      let removeListener: (() => void) | null = null;
 
-    let removeListener: (() => void) | null = null;
+      import('@capacitor/app').then(({ App }) => {
+        if (destroyed) return;
+        const handle = App.addListener('appStateChange', ({ isActive }) => {
+          if (isActive && !destroyed) {
+            onReconnect?.();
+          }
+        });
+        handle.then(h => {
+          if (destroyed) {
+            h.remove();
+          } else {
+            removeListener = () => h.remove();
+            appListenerCleanup = removeListener;
+          }
+        });
+      }).catch(() => {});
 
-    import('@capacitor/app').then(({ App }) => {
-      if (destroyed) return;
-      const handle = App.addListener('appStateChange', ({ isActive }) => {
-        if (isActive && !destroyed) {
-          // Supabase client auto-reconnects the socket, but the channel
-          // may have missed events while backgrounded. Refetch to catch up.
+      appListenerCleanup = () => {
+        removeListener?.();
+      };
+    } else {
+      // Web: refetch when tab becomes visible again (websocket may have dropped)
+      const handleVisibility = () => {
+        if (!destroyed && document.visibilityState === 'visible') {
           onReconnect?.();
         }
-      });
-      handle.then(h => {
-        if (destroyed) {
-          h.remove();
-        } else {
-          removeListener = () => h.remove();
-          appListenerCleanup = removeListener;
-        }
-      });
-    }).catch(() => {});
-
-    appListenerCleanup = () => {
-      removeListener?.();
-    };
+      };
+      document.addEventListener('visibilitychange', handleVisibility);
+      appListenerCleanup = () => {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      };
+    }
   }
 
   // Start

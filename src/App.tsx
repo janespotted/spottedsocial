@@ -107,6 +107,13 @@ async function registerPushToken(user: { id: string }) {
         userId: user.id.slice(0, 8),
       });
 
+      // Clear this token from any other user first (prevents cross-account pushes)
+      await supabase
+        .from('profiles')
+        .update({ apns_device_token: null, push_token: null })
+        .eq('apns_device_token', tokenValue)
+        .neq('id', user.id);
+
       const { error, data } = await supabase
         .from('profiles')
         .update({ push_token: tokenValue, apns_device_token: tokenValue, push_enabled: true })
