@@ -28,6 +28,13 @@ interface Venue {
   neighborhood: string;
 }
 
+interface PeopleResult {
+  id: string;
+  display_name: string;
+  username: string;
+  avatar_url: string | null;
+}
+
 interface FriendSearchModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,6 +52,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
   const { data: allProfiles } = useProfilesSafe();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
+  const [peopleResults, setPeopleResults] = useState<PeopleResult[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -173,6 +181,32 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
     openVenueCard(venue.id);
   };
 
+  // Search all users when typing (for adding new friends)
+  useEffect(() => {
+    if (!search.trim() || search.trim().length < 2 || !allProfiles || !user) {
+      setPeopleResults([]);
+      return;
+    }
+    const q = search.toLowerCase();
+    const friendSet = new Set(cachedFriendIds || []);
+    const results = allProfiles
+      .filter((p: any) =>
+        p.id !== user.id &&
+        !friendSet.has(p.id) &&
+        (!demoEnabled ? !p.is_demo : true) &&
+        (p.display_name?.toLowerCase().includes(q) ||
+         p.username?.toLowerCase().includes(q))
+      )
+      .slice(0, 10)
+      .map((p: any) => ({
+        id: p.id,
+        display_name: p.display_name,
+        username: p.username,
+        avatar_url: p.avatar_url,
+      }));
+    setPeopleResults(results);
+  }, [search, allProfiles, cachedFriendIds, demoEnabled, user]);
+
   const q = search.toLowerCase();
 
   const filteredFriends = useMemo(() =>
@@ -193,7 +227,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
   const planningFriends = filteredFriends.filter(f => f.status === 'planning');
   const homeFriends = filteredFriends.filter(f => f.status === 'home');
 
-  const hasResults = filteredFriends.length > 0 || filteredVenues.length > 0;
+  const hasResults = filteredFriends.length > 0 || filteredVenues.length > 0 || peopleResults.length > 0;
 
   const renderFriendRow = (friend: Friend) => (
     <button
@@ -244,7 +278,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Search friends or places..."
+            placeholder="Search people or places..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="bg-transparent text-white text-sm flex-1 outline-none placeholder:text-white/40"
@@ -274,7 +308,7 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
         ) : !hasResults ? (
           <div className="text-center py-12">
             <p className="text-white/40 text-sm">
-              {search ? 'No results found' : 'Your friend list is empty'}
+              {search ? 'No results found' : 'Search for people to add'}
             </p>
           </div>
         ) : (
@@ -338,6 +372,41 @@ export function FriendSearchModal({ open, onOpenChange }: FriendSearchModalProps
                 </h3>
                 <div className="space-y-1">
                   {homeFriends.map(renderFriendRow)}
+                </div>
+              </div>
+            )}
+
+            {/* People (non-friends) — only shown when searching */}
+            {peopleResults.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">People</h3>
+                <div className="space-y-1">
+                  {peopleResults.map(person => (
+                    <button
+                      key={person.id}
+                      onClick={() => {
+                        onOpenChange(false);
+                        openFriendCard({
+                          userId: person.id,
+                          displayName: person.display_name,
+                          avatarUrl: person.avatar_url,
+                        });
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
+                    >
+                      <Avatar className="w-9 h-9 border-2 border-white/10">
+                        <AvatarImage src={person.avatar_url || undefined} />
+                        <AvatarFallback className="bg-[#a855f7]/20 text-white text-xs">
+                          {person.display_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className="text-white font-medium text-sm truncate">{person.display_name}</p>
+                        <p className="text-white/40 text-xs truncate">@{person.username}</p>
+                      </div>
+                      <span className="text-[#a855f7] text-xs font-medium">Add</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
