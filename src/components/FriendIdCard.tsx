@@ -1378,65 +1378,69 @@ export function FriendIdCard() {
                         </PopoverContent>
                       </Popover>
                     ) : friendRing === 'mutual' ? (
-                      mutualFriends.length > 0 ? (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button
-                              className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-[#6366f1]/15 text-[#818cf8] transition-colors hover:opacity-80"
-                              aria-haspopup="menu"
-                            >
-                              {mutualFriends.length === 1
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-[#6366f1]/15 text-[#818cf8] transition-colors hover:opacity-80"
+                            aria-haspopup="menu"
+                          >
+                            {mutualFriends.length === 0
+                              ? 'Mutual Friend'
+                              : mutualFriends.length === 1
                                 ? `Friends with ${mutualFriends[0].display_name.split(' ')[0]}`
                                 : `Friends with ${mutualFriends[0].display_name.split(' ')[0]} + ${mutualFriends.length - 1} more`}
-                              <ChevronDown className="w-3 h-3" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl z-[350]"
-                            align="start"
-                            side="bottom"
-                            sideOffset={4}
-                          >
-                            <p className="text-white/60 text-xs px-2 mb-2">
-                              Also friends with {selectedFriend.displayName.split(' ')[0]}
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-56 p-2 bg-[#1a0f2e] border border-[#a855f7]/40 rounded-xl z-[350]"
+                          align="start"
+                          side="bottom"
+                          sideOffset={4}
+                        >
+                          {mutualFriends.length > 0 ? (
+                            <>
+                              <p className="text-white/60 text-xs px-2 mb-2">
+                                Also friends with {selectedFriend.displayName.split(' ')[0]}
+                              </p>
+                              <div className="max-h-48 overflow-y-auto space-y-1">
+                                {mutualFriends.map((mutual) => (
+                                  <button
+                                    key={mutual.user_id}
+                                    onClick={() => {
+                                      closeFriendCard();
+                                      setTimeout(() => {
+                                        openFriendCard({
+                                          userId: mutual.user_id,
+                                          displayName: mutual.display_name,
+                                          avatarUrl: mutual.avatar_url,
+                                          relationshipType: 'direct',
+                                        });
+                                      }, 100);
+                                    }}
+                                    className="w-full flex items-center gap-2 p-2 rounded-lg pressable-row"
+                                  >
+                                    <Avatar className="h-8 w-8 border border-[#a855f7]/40">
+                                      <AvatarImage src={mutual.avatar_url || undefined} />
+                                      <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                                        {mutual.display_name[0]}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-white text-sm font-medium flex-1 text-left truncate">
+                                      {mutual.display_name}
+                                    </span>
+                                    <ChevronRight className="h-4 w-4 text-white/40" />
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-white/40 text-xs px-2 py-3 text-center">
+                              No mutual friends yet
                             </p>
-                            <div className="max-h-48 overflow-y-auto space-y-1">
-                              {mutualFriends.map((mutual) => (
-                                <button
-                                  key={mutual.user_id}
-                                  onClick={() => {
-                                    closeFriendCard();
-                                    setTimeout(() => {
-                                      openFriendCard({
-                                        userId: mutual.user_id,
-                                        displayName: mutual.display_name,
-                                        avatarUrl: mutual.avatar_url,
-                                        relationshipType: 'direct',
-                                      });
-                                    }, 100);
-                                  }}
-                                  className="w-full flex items-center gap-2 p-2 rounded-lg pressable-row"
-                                >
-                                  <Avatar className="h-8 w-8 border border-[#a855f7]/40">
-                                    <AvatarImage src={mutual.avatar_url || undefined} />
-                                    <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                                      {mutual.display_name[0]}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span className="text-white text-sm font-medium flex-1 text-left truncate">
-                                    {mutual.display_name}
-                                  </span>
-                                  <ChevronRight className="h-4 w-4 text-white/40" />
-                                </button>
-                              ))}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      ) : (
-                        <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-[#6366f1]/15 text-[#818cf8]">
-                          Mutual Friend
-                        </span>
-                      )
+                          )}
+                        </PopoverContent>
+                      </Popover>
                     ) : null}
                     <div className="flex items-center gap-1.5 mt-0.5">
                       {isLocationHidden && (
