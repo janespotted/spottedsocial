@@ -315,16 +315,22 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
     const existingVote = currentMessage.user_vote;
     let scoreDelta = 0;
 
+    let voteError: any = null;
     if (existingVote === voteType) {
       scoreDelta = voteType === "up" ? -1 : 1;
-      await supabase.from("yap_votes").delete().eq("yap_id", yapId).eq("user_id", user!.id);
+      const { error } = await supabase.from("yap_votes").delete().eq("yap_id", yapId).eq("user_id", user!.id);
+      voteError = error;
     } else if (existingVote) {
       scoreDelta = voteType === "up" ? 2 : -2;
-      await supabase.from("yap_votes").update({ vote_type: voteType }).eq("yap_id", yapId).eq("user_id", user!.id);
+      const { error } = await supabase.from("yap_votes").update({ vote_type: voteType }).eq("yap_id", yapId).eq("user_id", user!.id);
+      voteError = error;
     } else {
       scoreDelta = voteType === "up" ? 1 : -1;
-      await supabase.from("yap_votes").insert({ yap_id: yapId, user_id: user!.id, vote_type: voteType });
+      const { error } = await supabase.from("yap_votes").insert({ yap_id: yapId, user_id: user!.id, vote_type: voteType });
+      voteError = error;
     }
+
+    if (voteError) return;
 
     await supabase.rpc('increment_yap_score', { p_yap_id: yapId, p_delta: scoreDelta });
     setMessages((prev) =>
@@ -532,7 +538,8 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
   const handleReportYap = async (yapId: string) => {
     if (!requireAuth()) return;
     try {
-      await supabase.from("reports").insert({ reporter_id: user!.id, reported_yap_id: yapId, reason: "user_reported" });
+      const { error } = await supabase.from("reports").insert({ reporter_id: user!.id, reported_yap_id: yapId, reason: "user_reported" });
+      if (error) throw error;
       setModerationYapId(null);
       toast.success("Got it — we'll take a look 👍");
     } catch {

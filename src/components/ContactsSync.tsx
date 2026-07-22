@@ -164,7 +164,9 @@ export function ContactsSync({ open, onClose }: ContactsSyncProps) {
     } else {
       toast.success(`Request sent to ${match.display_name}`);
     }
-    setSentRequests(prev => { const n = new globalThis.Set(prev); n.add(match.user_id); return n; });
+    if (!error) {
+      setSentRequests(prev => { const n = new globalThis.Set(prev); n.add(match.user_id); return n; });
+    }
   };
 
   const handleInvite = async (e: React.MouseEvent, contact: ContactToInvite) => {

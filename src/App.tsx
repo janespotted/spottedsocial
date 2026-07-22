@@ -108,11 +108,11 @@ async function registerPushToken(user: { id: string }) {
       });
 
       // Clear this token from any other user first (prevents cross-account pushes)
-      await supabase
-        .from('profiles')
-        .update({ apns_device_token: null, push_token: null })
-        .eq('apns_device_token', tokenValue)
-        .neq('id', user.id);
+      // Uses SECURITY DEFINER RPC because RLS blocks updating other users' profiles
+      await supabase.rpc('clear_stale_push_token', {
+        p_token: tokenValue,
+        p_keep_user_id: user.id,
+      });
 
       const { error, data } = await supabase
         .from('profiles')

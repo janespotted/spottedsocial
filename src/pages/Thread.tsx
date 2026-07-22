@@ -733,11 +733,17 @@ export default function Thread() {
     if (isHearted) {
       // Remove heart
       setHeartedMessages(prev => { const next = new Set(prev); next.delete(messageId); return next; });
-      await supabase.from('dm_message_reactions').delete().eq('message_id', messageId).eq('user_id', user.id);
+      const { error } = await supabase.from('dm_message_reactions').delete().eq('message_id', messageId).eq('user_id', user.id);
+      if (error) {
+        setHeartedMessages(prev => new Set(prev).add(messageId)); // revert
+      }
     } else {
       // Add heart
       setHeartedMessages(prev => new Set(prev).add(messageId));
-      await supabase.from('dm_message_reactions').insert({ message_id: messageId, user_id: user.id, reaction: '❤️' });
+      const { error } = await supabase.from('dm_message_reactions').insert({ message_id: messageId, user_id: user.id, reaction: '❤️' });
+      if (error) {
+        setHeartedMessages(prev => { const next = new Set(prev); next.delete(messageId); return next; }); // revert
+      }
     }
   }, [user, heartedMessages]);
 

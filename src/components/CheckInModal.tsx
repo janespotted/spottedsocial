@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
+import { clearUserLocation } from '@/lib/clear-user-location';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
@@ -228,15 +229,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     localStorage.removeItem('still_here_venue');
     localStorage.removeItem('still_here_deadline');
 
-    await supabase
-      .from('profiles')
-      .update({ 
-        is_out: false,
-        last_known_lat: null,
-        last_known_lng: null,
-        last_location_at: null
-      })
-      .eq('id', user?.id);
+    if (user?.id) await clearUserLocation(user.id);
   };
 
 
@@ -857,15 +850,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           .update({ ended_at: new Date().toISOString() })
           .eq('user_id', user?.id)
           .is('ended_at', null);
-        
-        // For planning, also update profile to not show location and notify friends
+
+        // Clear location from profile so user doesn't appear on friends' maps
+        if (user?.id) await clearUserLocation(user.id);
+
+        // For planning, also notify friends
         console.log('[PLANNING NOTIF] triggered for status: planning, visibility:', visibility);
         if (status === 'planning') {
-          await supabase
-            .from('profiles')
-            .update({ is_out: false })
-            .eq('id', user?.id);
-
           // Notify friends about planning status (best-effort, non-blocking)
           // Capture userId at call time to avoid stale closure if modal unmounts
           const planningUserId = user!.id;

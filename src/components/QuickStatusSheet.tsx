@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
+import { clearUserLocation } from '@/lib/clear-user-location';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { haptic } from '@/lib/haptics';
@@ -139,10 +140,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
           is_private_party: false,
         }, { onConflict: 'user_id' });
 
-      await supabase
-        .from('profiles')
-        .update({ is_out: false })
-        .eq('id', user.id);
+      await clearUserLocation(user.id);
 
       toast.success('You\'re TBD for tonight 🤔');
       onOpenChange(false);
@@ -181,15 +179,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
         .eq('user_id', user.id)
         .is('ended_at', null);
 
-      await supabase
-        .from('profiles')
-        .update({
-          is_out: false,
-          last_known_lat: null,
-          last_known_lng: null,
-          last_location_at: null,
-        })
-        .eq('id', user.id);
+      await clearUserLocation(user.id);
 
       toast.success('Enjoy your night in! 🛋️');
       onOpenChange(false);
@@ -233,15 +223,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
         .is('ended_at', null);
 
       // Clear location from profile
-      await supabase
-        .from('profiles')
-        .update({
-          is_out: false,
-          last_known_lat: null,
-          last_known_lng: null,
-          last_location_at: null,
-        })
-        .eq('id', user.id);
+      await clearUserLocation(user.id);
 
       toast.success('Location sharing stopped. Your friends can no longer see you.');
       onOpenChange(false);

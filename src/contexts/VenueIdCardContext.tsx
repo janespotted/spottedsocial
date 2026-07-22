@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 interface VenueIdCardContextType {
   selectedVenueId: string | null;
@@ -12,12 +12,21 @@ export function VenueIdCardProvider({ children }: { children: ReactNode }) {
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
 
   const openVenueCard = (venueId: string) => {
+    // Dismiss any open friend card so they don't stack
+    window.dispatchEvent(new CustomEvent('dismissFriendCard'));
     setSelectedVenueId(venueId);
   };
 
   const closeVenueCard = () => {
     setSelectedVenueId(null);
   };
+
+  // Listen for dismiss requests from friend card
+  useEffect(() => {
+    const handler = () => setSelectedVenueId(null);
+    window.addEventListener('dismissVenueCard', handler);
+    return () => window.removeEventListener('dismissVenueCard', handler);
+  }, []);
 
   return (
     <VenueIdCardContext.Provider value={{ selectedVenueId, openVenueCard, closeVenueCard }}>

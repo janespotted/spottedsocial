@@ -662,9 +662,10 @@ export function ActivityTab() {
       
       // Delete the original notification so it doesn't reappear
       if (activity.notificationId) {
-        await supabase.from('notifications').delete().eq('id', activity.notificationId);
+        const { error: delErr } = await supabase.from('notifications').delete().eq('id', activity.notificationId);
+        if (delErr) console.error('Failed to delete notification:', delErr);
       }
-      
+
       // Log invite accepted
       logEvent('invite_accepted', {
         type: 'meetup_request',
@@ -716,9 +717,10 @@ export function ActivityTab() {
       
       // Delete the original notification so it doesn't reappear
       if (activity.notificationId) {
-        await supabase.from('notifications').delete().eq('id', activity.notificationId);
+        const { error: delErr } = await supabase.from('notifications').delete().eq('id', activity.notificationId);
+        if (delErr) console.error('Failed to delete notification:', delErr);
       }
-      
+
       // Log invite accepted
       logEvent('invite_accepted', {
         type: 'venue_invite',
@@ -797,7 +799,8 @@ export function ActivityTab() {
 
       // Delete the original notification
       if (activity.notificationId) {
-        await supabase.from('notifications').delete().eq('id', activity.notificationId);
+        const { error: delErr } = await supabase.from('notifications').delete().eq('id', activity.notificationId);
+        if (delErr) console.error('Failed to delete notification:', delErr);
       }
 
       // Update activity in-place to show "added as a friend!" with Chat button

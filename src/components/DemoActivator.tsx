@@ -184,7 +184,7 @@ async function simulateCheckinForDemo(
     const now = new Date().toISOString();
 
     // Upsert night_status
-    await supabase.from('night_statuses').upsert({
+    const { error: nsErr } = await supabase.from('night_statuses').upsert({
       user_id: userId,
       status: 'out',
       venue_id: resolvedVenue.id,
@@ -196,9 +196,10 @@ async function simulateCheckinForDemo(
       is_private_party: false,
       planning_neighborhood: null,
     }, { onConflict: 'user_id' });
+    if (nsErr) console.error('Demo checkin: night_status upsert failed:', nsErr);
 
     // Create checkin record
-    await supabase.from('checkins').insert({
+    const { error: ciErr } = await supabase.from('checkins').insert({
       user_id: userId,
       venue_id: resolvedVenue.id,
       venue_name: resolvedVenue.name,
@@ -206,15 +207,17 @@ async function simulateCheckinForDemo(
       lng: venue.lng,
       started_at: now,
     });
+    if (ciErr) console.error('Demo checkin: checkin insert failed:', ciErr);
 
     // Update profile so map shows yellow "me" marker
-    await supabase.from('profiles').update({
+    const { error: profErr } = await supabase.from('profiles').update({
       is_out: true,
       last_known_lat: venue.lat,
       last_known_lng: venue.lng,
       last_location_at: now,
       last_active_at: now,
     }).eq('id', userId);
+    if (profErr) console.error('Demo checkin: profile update failed:', profErr);
 
     logger.debug('demo:checkin-simulated', { userId, venue: resolvedVenue.name });
     return resolvedVenue.name;

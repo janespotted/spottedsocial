@@ -257,9 +257,8 @@ export default function Home() {
         return;
       }
 
-      // Step 2: Get night_statuses + profiles via RPC (direct profiles table is
-      // blocked by RLS for non-own profiles — must use get_profiles_safe)
-      // Join with venues to get city so we can filter to current user's city
+      // Step 2: Get night_statuses + profiles via RPC
+      // (direct profiles table is blocked by RLS for non-own profiles)
       const [statusResult, profileResult] = await Promise.all([
         supabase
           .from('night_statuses')
@@ -268,8 +267,7 @@ export default function Home() {
           .not('expires_at', 'is', null)
           .gt('expires_at', new Date().toISOString()),
         supabase
-          .from('profiles')
-          .select('id, display_name, avatar_url, is_demo'),
+          .rpc('get_profiles_safe'),
       ]);
 
       const statuses = statusResult.data;

@@ -113,7 +113,11 @@ export async function sendCheckinNotifications(
         notification_type: 'friends_at_venue',
         notified_date: today,
       }));
-      await supabase.from('venue_notif_throttle').insert(throttleRows as any);
+      const { error: throttleErr } = await supabase.from('venue_notif_throttle').insert(throttleRows as any);
+      if (throttleErr) {
+        console.error('Failed to insert throttle records:', throttleErr);
+        return;
+      }
 
       // Send notifications
       for (const friendId of recipientIds) {

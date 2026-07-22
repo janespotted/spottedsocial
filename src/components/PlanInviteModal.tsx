@@ -52,10 +52,12 @@ export function PlanInviteModal({ open, invite, onClose }: PlanInviteModalProps)
     if (!user || responding) return;
     setResponding(true);
     try {
-      await supabase.from('plan_downs').upsert({
+      const { error } = await supabase.from('plan_downs').upsert({
         plan_id: invite.planId,
         user_id: user.id,
       }, { onConflict: 'plan_id,user_id' });
+
+      if (error) throw error;
 
       haptic.success();
       toast.success("You're in!");

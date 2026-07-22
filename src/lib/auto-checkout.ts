@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logEvent } from '@/lib/event-logger';
 import { stopBackgroundLocation } from '@/lib/background-location';
+import { clearUserLocation } from '@/lib/clear-user-location';
 
 /**
  * Shared utility to auto-checkout a user:
@@ -17,15 +18,7 @@ export async function performAutoCheckout(userId: string, reason: string = 'stil
       .update({ ended_at: now })
       .eq('user_id', userId)
       .is('ended_at', null),
-    supabase
-      .from('profiles')
-      .update({
-        is_out: false,
-        last_known_lat: null,
-        last_known_lng: null,
-        last_location_at: null,
-      })
-      .eq('id', userId),
+    clearUserLocation(userId),
     supabase
       .from('night_statuses')
       .update({

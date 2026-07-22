@@ -11,13 +11,14 @@ import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { CITY_CENTERS } from '@/lib/city-detection';
 import { supabase } from '@/integrations/supabase/client';
 import { createResilientChannel } from '@/lib/resilient-channel';
+import { clearUserLocation } from '@/lib/clear-user-location';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home, Map as MapIcon, Music, Wine, Beer, Building, UtensilsCrossed } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home, Map as MapIcon, Music, Wine, Beer, Building, UtensilsCrossed, UserPlus } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -30,6 +31,8 @@ import { CityBadge } from '@/components/CityBadge';
 import { logger } from '@/lib/logger';
 import { escapeHtml, escapeUrl } from '@/lib/html-escape';
 import { useFriendsOutStatus } from '@/hooks/useFriendsOutStatus';
+import { useProfilesSafe } from '@/hooks/useProfilesCache';
+import { useFriendIds } from '@/hooks/useFriendIds';
 
 // ── Shared marker sizing — single source of truth for all map markers ──
 const MARKER = {
@@ -186,7 +189,9 @@ export default function Map() {
   const navigate = useNavigate();
   const location = useLocation();
   const { unreadCount } = useNotifications();
-  
+  const { data: cachedAllProfiles } = useProfilesSafe();
+  const { data: cachedFriendIds } = useFriendIds(user?.id);
+
   // Venue arrival nudge with shift detection callback
   const handleVenueShift = useCallback((data: VenueShiftData) => {
     if (!venueMoveDismissedRef.current) {
@@ -1546,6 +1551,25 @@ export default function Map() {
     ? venues.filter(v => v.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.neighborhood.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 10)
     : [];
 
+  // Global user search — find non-friends by name or username
+  const searchGlobalPeople = searchFilterPeople && searchQuery.trim().length >= 2 && cachedAllProfiles && cachedFriendIds && user
+    ? (() => {
+        const q = searchQuery.toLowerCase();
+        const friendSet = new Set(cachedFriendIds);
+        const friendResultIds = new Set(searchPeopleResults.map(f => f.user_id));
+        return cachedAllProfiles
+          .filter((p: any) =>
+            p.id !== user.id &&
+            !friendSet.has(p.id) &&
+            !friendResultIds.has(p.id) &&
+            (!demoEnabled ? !p.is_demo : true) &&
+            (p.display_name?.toLowerCase().includes(q) ||
+             p.username?.toLowerCase().includes(q))
+          )
+          .slice(0, 10);
+      })()
+    : [];
+
   // Bottom offset for floating elements (small padding above edge — nav is outside the map area)
   const bottomOffset = '5rem';
   const legendBottomOffset = '5rem';
@@ -1786,10 +1810,7 @@ export default function Map() {
                   const { error: e2 } = await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
                   if (e2) throw e2;
 
-                  const { error: e3 } = await supabase.from('profiles').update({
-                    is_out: false, last_known_lat: null, last_known_lng: null, last_location_at: null,
-                  }).eq('id', user.id);
-                  if (e3) throw e3;
+                  await clearUserLocation(user.id);
 
                   setCurrentUserStatus('off');
                   setCurrentUserVenue(null);
@@ -1996,8 +2017,47 @@ export default function Map() {
                   </div>
                 )}
 
+                {/* Add People — non-friend results */}
+                {searchFilterPeople && searchGlobalPeople.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Add People</h3>
+                    <div className="space-y-1">
+                      {searchGlobalPeople.map((person: any) => (
+                        <button
+                          key={person.id}
+                          onClick={() => {
+                            setShowSearchOverlay(false);
+                            setSearchQuery('');
+                            openFriendCard({
+                              userId: person.id,
+                              displayName: person.display_name,
+                              avatarUrl: person.avatar_url,
+                            });
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
+                        >
+                          <Avatar className="w-9 h-9 border-2 border-white/10">
+                            <AvatarImage src={person.avatar_url || undefined} />
+                            <AvatarFallback className="bg-[#a855f7]/20 text-white text-xs">
+                              {person.display_name?.[0] || '?'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-white font-medium text-sm truncate">{person.display_name}</p>
+                            <p className="text-white/40 text-xs truncate">@{person.username}</p>
+                          </div>
+                          <span className="flex items-center gap-1 text-[#a855f7] text-xs font-medium">
+                            <UserPlus className="w-3.5 h-3.5" />
+                            Add
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* No results */}
-                {searchPeopleResults.length === 0 && searchVenueResults.length === 0 && (
+                {searchPeopleResults.length === 0 && searchVenueResults.length === 0 && searchGlobalPeople.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-white/40 text-sm">No results found</p>
                   </div>

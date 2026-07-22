@@ -66,11 +66,11 @@ async function subscribeNative(userId: string): Promise<boolean> {
         logger.info('push:native_registered', { token: token.value.slice(0, 8) + '…' });
 
         // Clear this token from any other user first (prevents cross-account pushes)
-        await supabase
-          .from('profiles')
-          .update({ apns_device_token: null, push_token: null })
-          .eq('apns_device_token', token.value)
-          .neq('id', userId);
+        // Uses SECURITY DEFINER RPC because RLS blocks updating other users' profiles
+        await supabase.rpc('clear_stale_push_token', {
+          p_token: token.value,
+          p_keep_user_id: userId,
+        });
 
         const { error } = await supabase
           .from('profiles')

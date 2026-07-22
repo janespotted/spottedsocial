@@ -150,10 +150,12 @@ export function VenueReportsPanel() {
       }
 
       // Mark report as approved
-      await supabase
+      const { error: approveErr } = await supabase
         .from('venue_location_reports')
         .update({ status: 'approved', reviewed_at: new Date().toISOString() })
         .eq('id', report.id);
+
+      if (approveErr) throw approveErr;
 
       toast.success('Report approved');
       fetchReports();

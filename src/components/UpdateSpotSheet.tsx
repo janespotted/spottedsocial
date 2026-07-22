@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { clearUserLocation } from '@/lib/clear-user-location';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -274,10 +275,7 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
       const { error: s2 } = await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
       if (s2) throw s2;
 
-      const { error: s3 } = await supabase.from('profiles').update({
-        is_out: false, last_known_lat: null, last_known_lng: null, last_location_at: null,
-      }).eq('id', user.id);
-      if (s3) throw s3;
+      await clearUserLocation(user.id);
 
       toast.success('Location sharing stopped');
       onOpenChange(false);

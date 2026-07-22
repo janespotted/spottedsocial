@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
@@ -30,6 +30,8 @@ export function FriendIdCardProvider({ children }: { children: ReactNode }) {
       navigate('/profile');
       return;
     }
+    // Dismiss any open venue card so they don't stack
+    window.dispatchEvent(new CustomEvent('dismissVenueCard'));
     setSelectedFriend(friend);
     // Track profile view for FOMO notification
     import('@/lib/fomo-notifications').then(({ notifyProfileViewed }) => {
@@ -40,6 +42,13 @@ export function FriendIdCardProvider({ children }: { children: ReactNode }) {
   const closeFriendCard = () => {
     setSelectedFriend(null);
   };
+
+  // Listen for dismiss requests from venue card
+  useEffect(() => {
+    const handler = () => setSelectedFriend(null);
+    window.addEventListener('dismissFriendCard', handler);
+    return () => window.removeEventListener('dismissFriendCard', handler);
+  }, []);
 
   return (
     <FriendIdCardContext.Provider value={{ selectedFriend, openFriendCard, closeFriendCard }}>
