@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +15,10 @@ export default function EditProfile() {
   const { user, signOut } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
+  const [originalUsername, setOriginalUsername] = useState('');
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameChecking, setUsernameChecking] = useState(false);
+  const usernameDebounceRef = useRef<ReturnType<typeof setTimeout>>();
   const [avatarUrl, setAvatarUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -41,6 +45,7 @@ export default function EditProfile() {
     if (data) {
       setDisplayName(data.display_name || '');
       setUsername(data.username || '');
+      setOriginalUsername(data.username || '');
       setAvatarUrl(data.avatar_url || '');
     }
   };
@@ -104,7 +109,38 @@ export default function EditProfile() {
     }
   };
 
+  const usernameRegex = /^[a-z0-9_.]{3,20}$/;
+
+  const checkUsername = useCallback(async (value: string) => {
+    if (value === originalUsername) { setUsernameError(null); return; }
+    if (!usernameRegex.test(value)) {
+      setUsernameError('lowercase letters, numbers, _ or . only (3-20 chars)');
+      return;
+    }
+    setUsernameChecking(true);
+    try {
+      const { data } = await supabase
+        .from('profiles').select('id').eq('username', value).maybeSingle();
+      setUsernameError(data ? 'username taken' : null);
+    } catch { setUsernameError(null); }
+    finally { setUsernameChecking(false); }
+  }, [originalUsername]);
+
+  const handleUsernameChange = (value: string) => {
+    const cleaned = value.toLowerCase().replace(/[^a-z0-9_.]/g, '').slice(0, 20);
+    setUsername(cleaned);
+    setUsernameError(null);
+    if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current);
+    if (cleaned.length >= 3 && cleaned !== originalUsername) {
+      usernameDebounceRef.current = setTimeout(() => checkUsername(cleaned), 400);
+    } else if (cleaned.length > 0 && cleaned.length < 3) {
+      setUsernameError('at least 3 characters');
+    }
+  };
+
   const handleSave = async () => {
+    if (usernameError) { toast.error(usernameError); return; }
+    if (username.length < 3) { toast.error('Username must be at least 3 characters'); return; }
     setLoading(true);
     try {
       const { error } = await supabase
@@ -241,15 +277,24 @@ export default function EditProfile() {
             <Input
               id="username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="bg-[#2d1b4e]/60 border-[#a855f7]/20 text-white"
+              onChange={(e) => handleUsernameChange(e.target.value)}
+              className={`bg-[#2d1b4e]/60 border-[#a855f7]/20 text-white ${usernameError ? 'border-red-500/50' : ''}`}
               placeholder="@username"
             />
+            {usernameChecking && (
+              <p className="text-white/40 text-xs">Checking...</p>
+            )}
+            {usernameError && (
+              <p className="text-red-400 text-xs">{usernameError}</p>
+            )}
+            {!usernameError && !usernameChecking && username !== originalUsername && username.length >= 3 && (
+              <p className="text-green-400 text-xs">available</p>
+            )}
           </div>
 
           <Button
             onClick={handleSave}
-            disabled={loading}
+            disabled={loading || !!usernameError || usernameChecking}
             className="w-full bg-[#d4ff00] text-[#1a0f2e] hover:bg-[#d4ff00]/90 font-semibold"
           >
             {loading ? 'Saving...' : 'Save Changes'}
