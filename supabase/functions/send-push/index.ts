@@ -57,17 +57,8 @@ const MAX_NOTIFICATION_ID_LENGTH = 100;
  * dangerous characters. This prevents XSS if push notifications render HTML.
  */
 function sanitizeMessage(message: string): string {
-  return (
-    message
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#x27;")
-      .replace(/\//g, "&#x2F;")
-      // Remove control characters except newlines and tabs
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-  );
+  // Push notifications are plain text — only strip control characters
+  return message.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
 }
 
 function validatePayload(payload: unknown): { valid: boolean; error?: string; sanitizedMessage?: string } {
