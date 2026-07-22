@@ -217,6 +217,7 @@ export default function Map() {
   const [showFriendsList, setShowFriendsList] = useState(false);
   const [isLoadingFriends, setIsLoadingFriends] = useState(true);
   const [currentZoom, setCurrentZoom] = useState(13);
+  const [userInCluster, setUserInCluster] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<{
     friends: FriendLocation[];
     venueName: string;
@@ -936,8 +937,9 @@ export default function Map() {
   }, [city]);
 
   // Add user's marker — only when both location AND profile are loaded
+  // Hidden when user is merged into a friend cluster
   useEffect(() => {
-    if (!map.current || !userLocation || !userProfile) {
+    if (!map.current || !userLocation || !userProfile || userInCluster) {
       userMarkerRef.current?.remove();
       userMarkerRef.current = null;
       return;
@@ -974,7 +976,7 @@ export default function Map() {
     })
       .setLngLat([userLocation.lng, userLocation.lat])
       .addTo(map.current);
-  }, [userLocation, userProfile]);
+  }, [userLocation, userProfile, userInCluster]);
 
   // Smart marker diffing with clustering for groups
   // ~5 meters = 0.000045 degrees (venue-level accuracy)
@@ -1012,10 +1014,10 @@ export default function Map() {
 
     filteredFriends.forEach((friend) => {
       if (assigned.has(friend.user_id)) return;
-      
+
       const cluster = [friend];
       assigned.add(friend.user_id);
-      
+
       if (shouldCluster) {
         filteredFriends.forEach((other) => {
           if (assigned.has(other.user_id)) return;
@@ -1027,9 +1029,33 @@ export default function Map() {
           }
         });
       }
-      
+
       clusters.push(cluster);
     });
+
+    // Merge current user into a cluster if they overlap with any friend
+    let mergedUserIntoCluster = false;
+    if (shouldCluster && userLocation && userProfile && user) {
+      for (const cluster of clusters) {
+        const latDiff = Math.abs(cluster[0].lat - userLocation.lat);
+        const lngDiff = Math.abs(cluster[0].lng - userLocation.lng);
+        if (latDiff < CLUSTER_THRESHOLD && lngDiff < CLUSTER_THRESHOLD) {
+          // Insert "self" as first member of this cluster
+          cluster.unshift({
+            user_id: user.id,
+            lat: userLocation.lat,
+            lng: userLocation.lng,
+            venue_name: cluster[0].venue_name,
+            profiles: { display_name: userProfile.display_name, avatar_url: userProfile.avatar_url },
+            relationshipType: 'close', // self gets highest priority ring
+            last_location_at: new Date().toISOString(),
+          });
+          mergedUserIntoCluster = true;
+          break;
+        }
+      }
+    }
+    setUserInCluster(mergedUserIntoCluster);
 
     // Z-index: friends always above venues
     const getZIndex = (relType?: string) => {
@@ -1088,15 +1114,19 @@ export default function Map() {
       }
 
       el.addEventListener('click', () => {
-        openFriendCard({
-          userId: friend.user_id,
-          displayName: friend.profiles?.display_name || 'Friend',
-          avatarUrl: friend.profiles?.avatar_url || null,
-          venueName: friend.venue_name,
-          lat: friend.lat,
-          lng: friend.lng,
-          relationshipType: friend.relationshipType,
-        });
+        if (user && friend.user_id === user.id) {
+          navigate('/profile');
+        } else {
+          openFriendCard({
+            userId: friend.user_id,
+            displayName: friend.profiles?.display_name || 'Friend',
+            avatarUrl: friend.profiles?.avatar_url || null,
+            venueName: friend.venue_name,
+            lat: friend.lat,
+            lng: friend.lng,
+            relationshipType: friend.relationshipType,
+          });
+        }
       });
       return el;
     };
@@ -1155,7 +1185,7 @@ export default function Map() {
         });
       }
     });
-  }, [friends, isLoadingFriends, currentZoom, layerVisibility, relationshipFilter]);
+  }, [friends, isLoadingFriends, currentZoom, layerVisibility, relationshipFilter, userLocation, userProfile, user]);
 
   // Filter venues based on selected filter — clustering handles density
   const typeFilteredVenues = venueFilter === 'all' 
@@ -2391,16 +2421,20 @@ export default function Map() {
                 key={friend.user_id}
                 onClick={() => {
                   setSelectedCluster(null);
-                  const friendCardData: FriendCardData = {
-                    userId: friend.user_id,
-                    displayName: friend.profiles?.display_name || 'Friend',
-                    avatarUrl: friend.profiles?.avatar_url || null,
-                    venueName: friend.venue_name,
-                    lat: friend.lat,
-                    lng: friend.lng,
-                    relationshipType: friend.relationshipType,
-                  };
-                  openFriendCard(friendCardData);
+                  if (user && friend.user_id === user.id) {
+                    navigate('/profile');
+                  } else {
+                    const friendCardData: FriendCardData = {
+                      userId: friend.user_id,
+                      displayName: friend.profiles?.display_name || 'Friend',
+                      avatarUrl: friend.profiles?.avatar_url || null,
+                      venueName: friend.venue_name,
+                      lat: friend.lat,
+                      lng: friend.lng,
+                      relationshipType: friend.relationshipType,
+                    };
+                    openFriendCard(friendCardData);
+                  }
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#a855f7]/10 transition-colors"
               >
@@ -2414,7 +2448,7 @@ export default function Map() {
                   </AvatarFallback>
                 </Avatar>
                 <span className="text-white font-medium text-sm flex-1 text-left">
-                  {friend.profiles?.display_name}
+                  {user && friend.user_id === user.id ? 'You' : friend.profiles?.display_name}
                 </span>
                 <ChevronDown className="w-4 h-4 text-white/40 -rotate-90" />
               </button>

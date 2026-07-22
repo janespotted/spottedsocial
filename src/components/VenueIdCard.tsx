@@ -752,7 +752,7 @@ export function VenueIdCard() {
 
                 {/* Primary CTA */}
                 <Button
-                  onClick={() => openInviteModal(venue.id, venue.name)}
+                  onClick={() => { closeVenueCard(); openInviteModal(venue.id, venue.name); }}
                   className="w-full mb-3 h-11 bg-[#d4ff00] text-black font-semibold hover:bg-[#d4ff00]/90 transition-colors rounded-xl"
                 >
                   <UserPlus className="w-4 h-4 mr-2" />
