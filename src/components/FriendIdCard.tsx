@@ -134,7 +134,12 @@ export function FriendIdCard() {
             .maybeSingle();
           setFriendRing(close ? 'close' : 'direct');
         } else {
-          setFriendRing('mutual');
+          // Only show "Mutual Friend" if we actually share a common friend
+          const { data: isMutual } = await supabase.rpc('is_mutual_friend', {
+            viewer_id: uid,
+            target_user_id: fid,
+          });
+          setFriendRing(isMutual ? 'mutual' : null);
         }
       })();
       // Fetch hide state
@@ -256,7 +261,10 @@ export function FriendIdCard() {
       ]);
 
       const nightStatus = nightStatusRes.data;
-      const activeCheckIn = activeCheckInRes.data;
+      // Only treat checkin as active if it's from tonight's window (resets at 5am)
+      const activeCheckIn = activeCheckInRes.data && isFromTonight(activeCheckInRes.data.started_at)
+        ? activeCheckInRes.data
+        : null;
 
       // Compare timestamps to determine which is more recent
       const checkinTime = activeCheckIn?.started_at ? new Date(activeCheckIn.started_at).getTime() : 0;
@@ -1384,11 +1392,7 @@ export function FriendIdCard() {
                             className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-[#6366f1]/15 text-[#818cf8] transition-colors hover:opacity-80"
                             aria-haspopup="menu"
                           >
-                            {mutualFriends.length === 0
-                              ? 'Mutual Friend'
-                              : mutualFriends.length === 1
-                                ? `Friends with ${mutualFriends[0].display_name.split(' ')[0]}`
-                                : `Friends with ${mutualFriends[0].display_name.split(' ')[0]} + ${mutualFriends.length - 1} more`}
+                            Mutual Friend
                             <ChevronDown className="w-3 h-3" />
                           </button>
                         </PopoverTrigger>
@@ -1398,47 +1402,54 @@ export function FriendIdCard() {
                           side="bottom"
                           sideOffset={4}
                         >
-                          {mutualFriends.length > 0 ? (
-                            <>
-                              <p className="text-white/60 text-xs px-2 mb-2">
-                                Also friends with {selectedFriend.displayName.split(' ')[0]}
-                              </p>
-                              <div className="max-h-48 overflow-y-auto space-y-1">
-                                {mutualFriends.map((mutual) => (
-                                  <button
-                                    key={mutual.user_id}
-                                    onClick={() => {
-                                      closeFriendCard();
-                                      setTimeout(() => {
-                                        openFriendCard({
-                                          userId: mutual.user_id,
-                                          displayName: mutual.display_name,
-                                          avatarUrl: mutual.avatar_url,
-                                          relationshipType: 'direct',
-                                        });
-                                      }, 100);
-                                    }}
-                                    className="w-full flex items-center gap-2 p-2 rounded-lg pressable-row"
-                                  >
-                                    <Avatar className="h-8 w-8 border border-[#a855f7]/40">
-                                      <AvatarImage src={mutual.avatar_url || undefined} />
-                                      <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                                        {mutual.display_name[0]}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <span className="text-white text-sm font-medium flex-1 text-left truncate">
-                                      {mutual.display_name}
-                                    </span>
-                                    <ChevronRight className="h-4 w-4 text-white/40" />
-                                  </button>
-                                ))}
-                              </div>
-                            </>
-                          ) : (
-                            <p className="text-white/40 text-xs px-2 py-3 text-center">
-                              No mutual friends yet
-                            </p>
-                          )}
+                          <p className="text-white/60 text-xs px-2 mb-2">
+                            Mutual friends
+                          </p>
+                          <div className="max-h-48 overflow-y-auto space-y-1">
+                            {/* Include the card person themselves */}
+                            <button
+                              className="w-full flex items-center gap-2 p-2 rounded-lg bg-white/[0.04]"
+                              disabled
+                            >
+                              <Avatar className="h-8 w-8 border border-[#a855f7]/40">
+                                <AvatarImage src={selectedFriend.avatarUrl || undefined} />
+                                <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                                  {selectedFriend.displayName[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-white text-sm font-medium flex-1 text-left truncate">
+                                {selectedFriend.displayName}
+                              </span>
+                            </button>
+                            {mutualFriends.map((mutual) => (
+                              <button
+                                key={mutual.user_id}
+                                onClick={() => {
+                                  closeFriendCard();
+                                  setTimeout(() => {
+                                    openFriendCard({
+                                      userId: mutual.user_id,
+                                      displayName: mutual.display_name,
+                                      avatarUrl: mutual.avatar_url,
+                                      relationshipType: 'direct',
+                                    });
+                                  }, 100);
+                                }}
+                                className="w-full flex items-center gap-2 p-2 rounded-lg pressable-row"
+                              >
+                                <Avatar className="h-8 w-8 border border-[#a855f7]/40">
+                                  <AvatarImage src={mutual.avatar_url || undefined} />
+                                  <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
+                                    {mutual.display_name[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-white text-sm font-medium flex-1 text-left truncate">
+                                  {mutual.display_name}
+                                </span>
+                                <ChevronRight className="h-4 w-4 text-white/40" />
+                              </button>
+                            ))}
+                          </div>
                         </PopoverContent>
                       </Popover>
                     ) : null}

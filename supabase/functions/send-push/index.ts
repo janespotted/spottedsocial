@@ -544,24 +544,23 @@ const TERMINAL_TOKEN_REASONS = ["BadDeviceToken", "Unregistered", "ExpiredToken"
 // Legacy bundle ID — tokens registered under old identity may still be in DB
 const LEGACY_BUNDLE_ID = "com.spotted.app";
 
-// Fallback APNs auth key — secrets UI truncates the value, so hardcode as fallback
-const APNS_AUTH_KEY_FALLBACK = "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgQstzz12h8+F/5b8pkLYRVq1gxfbNNqQNGYuTHOaVsNigCgYIKoZIzj0DAQehRANCAAQumzNEd7bSuV02R0XLHF8KLCjPZ3mHzbV+JKbT4hJ2Yh4J4wtZK56pU6rZ18Sk/JtA3h1F7YlOuWyh63pBVQAV";
-const APNS_KEY_ID_FALLBACK = "YLS4L5S8TN";
-
 async function sendApnsPush(
   deviceToken: string,
   notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string },
 ): Promise<{ success: boolean; terminalFailure: boolean }> {
   const teamId = Deno.env.get("APNS_TEAM_ID");
   const bundleId = Deno.env.get("APNS_BUNDLE_ID");
+  const authKey = Deno.env.get("APNS_AUTH_KEY") || "";
+  const keyId = Deno.env.get("APNS_KEY_ID") || "";
 
-  // Use env secret if it's long enough, otherwise fall back to hardcoded key
-  const envAuthKey = Deno.env.get("APNS_AUTH_KEY") || "";
-  const authKey = envAuthKey.length >= 100 ? envAuthKey : APNS_AUTH_KEY_FALLBACK;
-  const envKeyId = Deno.env.get("APNS_KEY_ID") || "";
-  const keyId = envKeyId.length >= 8 ? envKeyId : APNS_KEY_ID_FALLBACK;
-
-  console.log(`APNs key source: ${envAuthKey.length >= 100 ? "env" : "fallback"} (env length: ${envAuthKey.length})`);
+  if (!authKey || authKey.length < 100) {
+    console.error("APNS_AUTH_KEY is missing or malformed — cannot sign APNs requests");
+    return { success: false, terminalFailure: false };
+  }
+  if (!keyId || keyId.length < 8) {
+    console.error("APNS_KEY_ID is missing or malformed — cannot sign APNs requests");
+    return { success: false, terminalFailure: false };
+  }
 
   if (!teamId || !bundleId) {
     console.log("APNs secrets not configured, skipping APNs push");
