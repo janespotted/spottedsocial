@@ -6,7 +6,7 @@ import { cacheCity } from '@/lib/city-detection';
 import type { SupportedCity } from '@/lib/city-detection';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
-import { calculateExpiryTime } from '@/lib/time-utils';
+import { goOutAtVenue } from '@/lib/night-status';
 import { captureLocationWithVenue } from '@/lib/location-service';
 
 const PENDING_DEMO_KEY = 'pending_demo_activation';
@@ -147,12 +147,39 @@ async function activateDemo(city: SupportedCity, userId: string) {
 }
 
 async function simulateCheckinForDemo(
-  userId: string, 
-  city: SupportedCity, 
+  userId: string,
+  _city: SupportedCity,
   venue: { name: string; lat: number; lng: number }
 ): Promise<string | null> {
   try {
-    // Find venue ID from database — use maybeSingle to avoid throwing on 0 or 2+ rows
+    // Never clobber real state: skip if user has any current unexpired status or open checkin
+    const { data: existingStatus } = await supabase
+      .from('night_statuses')
+      .select('status')
+      .eq('user_id', userId)
+      .not('expires_at', 'is', null)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    if (existingStatus) {
+      logger.debug('demo:skip-checkin-existing-status', { status: existingStatus.status });
+      return null;
+    }
+
+    const { data: openCheckin } = await supabase
+      .from('checkins')
+      .select('id')
+      .eq('user_id', userId)
+      .is('ended_at', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (openCheckin) {
+      logger.debug('demo:skip-checkin-open-checkin');
+      return null;
+    }
+
+    // Resolve venue ID
     let resolvedVenue: { id: string; name: string } | null = null;
 
     const { data: venueData, error: venueError } = await supabase
@@ -163,61 +190,19 @@ async function simulateCheckinForDemo(
 
     if (venueError || !venueData) {
       logger.warn('demo:venue-not-found', { venueName: venue.name, error: venueError?.message });
-      // Fallback: try to find any venue in the city's demo set
-      const { data: fallbackVenue } = await supabase
-        .from('venues')
-        .select('id, name')
-        .eq('is_demo', true)
-        .limit(1)
-        .maybeSingle();
-      if (!fallbackVenue) {
-        logger.warn('demo:no-fallback-venue');
-        return null;
-      }
-      logger.debug('demo:using-fallback-venue', { fallback: fallbackVenue.name });
-      resolvedVenue = fallbackVenue;
-    } else {
-      resolvedVenue = venueData;
+      return null;
     }
+    resolvedVenue = venueData;
 
-    const expiresAt = calculateExpiryTime();
-    const now = new Date().toISOString();
-
-    // Upsert night_status
-    const { error: nsErr } = await supabase.from('night_statuses').upsert({
-      user_id: userId,
-      status: 'out',
-      venue_id: resolvedVenue.id,
-      venue_name: resolvedVenue.name,
-      lat: venue.lat,
-      lng: venue.lng,
-      expires_at: expiresAt,
-      updated_at: now,
-      is_private_party: false,
-      planning_neighborhood: null,
-    }, { onConflict: 'user_id' });
-    if (nsErr) console.error('Demo checkin: night_status upsert failed:', nsErr);
-
-    // Create checkin record
-    const { error: ciErr } = await supabase.from('checkins').insert({
-      user_id: userId,
-      venue_id: resolvedVenue.id,
-      venue_name: resolvedVenue.name,
-      lat: venue.lat,
-      lng: venue.lng,
-      started_at: now,
+    // Route through WP2 helper so all three stores (NS, checkin, profile) agree
+    await goOutAtVenue(userId, {
+      venue: { id: resolvedVenue.id, name: resolvedVenue.name },
+      coords: { lat: venue.lat, lng: venue.lng },
+      source: 'demo',
     });
-    if (ciErr) console.error('Demo checkin: checkin insert failed:', ciErr);
 
-    // Update profile so map shows yellow "me" marker
-    const { error: profErr } = await supabase.from('profiles').update({
-      is_out: true,
-      last_known_lat: venue.lat,
-      last_known_lng: venue.lng,
-      last_location_at: now,
-      last_active_at: now,
-    }).eq('id', userId);
-    if (profErr) console.error('Demo checkin: profile update failed:', profErr);
+    // Record that we simulated a check-in so demo clear can undo it
+    localStorage.setItem('demo_simulated_checkin', 'true');
 
     logger.debug('demo:checkin-simulated', { userId, venue: resolvedVenue.name });
     return resolvedVenue.name;

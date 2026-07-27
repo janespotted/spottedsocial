@@ -103,17 +103,17 @@ Deno.serve(async (req) => {
     const sb = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {auth:{autoRefreshToken:false,persistSession:false}});
     const {action, city='nyc', userId} = await req.json();
 
-    // Admin check: required for 'clear', optional for 'seed' and 'health-check'
+    // Admin check: required for 'seed' and 'clear'
     const { data: hasAdmin } = await authClient.rpc('has_role', {
-      user_id: user.id,
-      role: 'admin',
+      _user_id: user.id,
+      _role: 'admin',
     });
     const isAdmin = !!hasAdmin;
 
-    if (action === 'clear' && !isAdmin) {
-      console.error('Admin role required for clear action, user:', user.id);
+    if ((action === 'seed' || action === 'clear') && !isAdmin) {
+      console.error(`Admin role required for ${action} action, user:`, user.id);
       return new Response(
-        JSON.stringify({ error: 'Forbidden: Admin role required for clearing demo data' }),
+        JSON.stringify({ error: `Forbidden: Admin role required for ${action}` }),
         { status: 403, headers: { ...h, 'Content-Type': 'application/json' } }
       );
     }
@@ -205,16 +205,15 @@ Deno.serve(async (req) => {
       }
 
       // Friend structure:
-      // - Users 0-15 (directFriends): directly friended to ALL real users
-      // - Users 16-23 (mutualOnly): NOT direct friends, but friended to directFriends
+      // - Users 0-15 (directFriends): directly friended to the SEEDING USER only (CLAUDE.md rule 5)
+      // - Users 16-23 (mutualOnly): NOT direct friends of seeding user, but friended to directFriends
       const directFriends = uids.slice(0, 16);
       const mutualOnly = uids.slice(16, 24);
 
-      const {data:real}=await sb.from('profiles').select('id').eq('is_demo',false);
-      console.log(`[Seed] Real profiles found: ${real?.length || 0}`);
+      console.log(`[Seed] Creating friendships scoped to seeding user: ${user.id}`);
 
-      // Direct friendships
-      const directRows = (real||[]).flatMap((r:any) => directFriends.map(d => ({user_id:r.id, friend_id:d, status:'accepted'})));
+      // Direct friendships — seeding user <-> directFriends only
+      const directRows = directFriends.map(d => ({user_id:user.id, friend_id:d, status:'accepted'}));
       for(let i=0; i<directRows.length; i+=50) {
         const {error:fErr} = await sb.from('friendships').insert(directRows.slice(i,i+50));
         if(fErr) console.error('[Seed] Direct friendship error:', fErr.message);
@@ -244,14 +243,10 @@ Deno.serve(async (req) => {
         if(mErr) console.error('[Seed] Mutual friendship error:', mErr.message);
       }
 
-      // Close friends
-      if (real?.length) {
-        const closeFriendRows = real.flatMap((r:any) =>
-          directFriends.slice(0, 8).map(d => ({ user_id: r.id, close_friend_id: d }))
-        );
-        for (let i = 0; i < closeFriendRows.length; i += 50) {
-          await sb.from('close_friends').insert(closeFriendRows.slice(i, i+50));
-        }
+      // Close friends — seeding user's close friends only (CLAUDE.md rule 5)
+      const closeFriendRows = directFriends.slice(0, 8).map(d => ({ user_id: user.id, close_friend_id: d }));
+      for (let i = 0; i < closeFriendRows.length; i += 50) {
+        await sb.from('close_friends').insert(closeFriendRows.slice(i, i+50));
       }
 
       // Night statuses - 16 users "out" at REAL venues, clustered at top venues
@@ -316,9 +311,8 @@ Deno.serve(async (req) => {
           is_demo: true,
         });
       }
-      const planFriendRows = (real || []).flatMap((r: any) =>
-        planningUids.map(d => ({ user_id: r.id, friend_id: d, status: 'accepted' }))
-      );
+      // Planning user friendships — seeding user only
+      const planFriendRows = planningUids.map(d => ({ user_id: user.id, friend_id: d, status: 'accepted' }));
       for (let i = 0; i < planFriendRows.length; i += 50) {
         await sb.from('friendships').insert(planFriendRows.slice(i, i + 50));
       }
