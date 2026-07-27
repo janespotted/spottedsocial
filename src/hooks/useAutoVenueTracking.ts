@@ -4,6 +4,7 @@ import { autoTrackVenue } from '@/lib/auto-venue-tracker';
 import { supabase } from '@/integrations/supabase/client';
 import { performAutoCheckout } from '@/lib/auto-checkout';
 import { startBackgroundLocation, stopBackgroundLocation } from '@/lib/background-location';
+import { isUserCurrentlyOut, registerLocationTimer } from '@/lib/night-status';
 
 // Global tracking state to prevent duplicate calls across all hook instances
 let lastGlobalTrackTime = 0;
@@ -39,6 +40,16 @@ export const useAutoVenueTracking = () => {
 
     const heartbeat = async () => {
       if (cancelled) return;
+      // Re-check status on every tick — stop if no longer out
+      const stillOut = await isUserCurrentlyOut(user.id);
+      if (!stillOut || cancelled) {
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+        stopBackgroundLocation();
+        return;
+      }
       try {
         const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
           navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
@@ -100,6 +111,14 @@ export const useAutoVenueTracking = () => {
 
       heartbeat(); // immediate first tick
       intervalId = setInterval(heartbeat, 60000);
+
+      // Register with global timer registry so stopSharing() kills it
+      registerLocationTimer(() => {
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      });
     };
 
     start();

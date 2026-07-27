@@ -31,18 +31,29 @@ const TRACK_DEBOUNCE_MS = 30000;
 // Cooldown after manual check-in: 30 minutes
 const MANUAL_CHECKIN_COOLDOWN_MS = 30 * 60 * 1000;
 
+// Restore persisted manual cooldown from localStorage (survives app restart)
+const _persistedManualCheckin = (() => {
+  try {
+    const v = localStorage.getItem('manual_checkin_at');
+    return v ? parseInt(v, 10) : 0;
+  } catch { return 0; }
+})();
+
 const trackingState: TrackingState = {
   lastGPS: null,
   lastTrackTime: 0,
-  lastManualCheckinTime: 0,
+  lastManualCheckinTime: _persistedManualCheckin,
 };
 
 /**
  * Mark that the user just manually confirmed a venue.
  * Prevents autoTrackVenue from overwriting for 30 minutes.
+ * Persisted to localStorage so it survives app restarts.
  */
 export const markManualCheckin = (): void => {
-  trackingState.lastManualCheckinTime = Date.now();
+  const now = Date.now();
+  trackingState.lastManualCheckinTime = now;
+  try { localStorage.setItem('manual_checkin_at', String(now)); } catch { /* noop */ }
   console.log('🔒 Manual checkin marked — auto-tracking paused for 30 min');
 };
 
@@ -125,15 +136,14 @@ const isUserOut = async (userId: string): Promise<boolean> => {
       .single();
 
     if (error) return false;
-    
+
     if (!data || data.status !== 'out') return false;
-    
-    // Check if status hasn't expired
-    if (data.expires_at) {
-      const expiresAt = new Date(data.expires_at);
-      if (expiresAt < new Date()) return false;
-    }
-    
+
+    // Fail closed: require expires_at to exist AND be in the future
+    if (!data.expires_at) return false;
+    const expiresAt = new Date(data.expires_at);
+    if (expiresAt < new Date()) return false;
+
     return true;
   } catch (error) {
     console.error('Error checking user status:', error);
@@ -309,8 +319,15 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
       return;
     }
 
-    // Capture fresh GPS coordinates
+    // Capture fresh GPS coordinates (long await — TOCTOU window)
     const locationData = await captureLocationWithVenue();
+
+    // Re-check after the long await: user may have stopped sharing during GPS capture
+    const stillOutAfterCapture = await isUserOut(userId);
+    if (!stillOutAfterCapture) {
+      console.debug('🔵 User stopped sharing during GPS capture — aborting');
+      return;
+    }
 
     // Calculate distance from last checkin
     const distanceMeters = calculateDistance(
@@ -440,6 +457,13 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
         accuracy: locationData.accuracy, distance: nearestVenue.distance, speed: currentSpeed,
       });
 
+      return;
+    }
+
+    // Final TOCTOU re-check before writing — abort if user stopped sharing
+    const stillOutBeforeWrite = await isUserOut(userId);
+    if (!stillOutBeforeWrite) {
+      console.debug('🔵 User stopped sharing before venue write — aborting');
       return;
     }
 

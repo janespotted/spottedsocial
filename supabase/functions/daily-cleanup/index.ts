@@ -75,6 +75,57 @@ Deno.serve(async (req) => {
       console.log(`✅ Cleared ${clearedProfiles?.length || 0} stale locations`)
     }
 
+    // 1b. Backstop: clear is_out/GPS for any profile whose night_statuses row
+    // is NOT currently status='out' with unexpired expires_at.
+    // This guarantees a ≤24h ceiling on any GPS resurrection bug.
+    {
+      // Find profiles that are is_out=true but have no valid 'out' night_status
+      const { data: outProfiles, error: outProfErr } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_out', true)
+
+      if (outProfErr) {
+        console.error('Error fetching out profiles for backstop:', outProfErr)
+      } else if (outProfiles && outProfiles.length > 0) {
+        const outProfileIds = outProfiles.map(p => p.id)
+
+        // Find which of those profiles have a valid out status
+        const { data: validStatuses, error: validErr } = await supabase
+          .from('night_statuses')
+          .select('user_id')
+          .in('user_id', outProfileIds)
+          .eq('status', 'out')
+          .gt('expires_at', now.toISOString())
+
+        if (validErr) {
+          console.error('Error checking valid statuses for backstop:', validErr)
+        } else {
+          const validUserIds = new Set((validStatuses || []).map(s => s.user_id))
+          const orphanedIds = outProfileIds.filter(id => !validUserIds.has(id))
+
+          if (orphanedIds.length > 0) {
+            const { data: backstopCleared, error: backstopErr } = await supabase
+              .from('profiles')
+              .update({
+                is_out: false,
+                last_known_lat: null,
+                last_known_lng: null,
+                last_location_at: null,
+              })
+              .in('id', orphanedIds)
+              .select('id')
+
+            if (backstopErr) {
+              console.error('Error in is_out backstop clear:', backstopErr)
+            } else {
+              console.log(`✅ Backstop cleared ${backstopCleared?.length || 0} orphaned is_out profiles`)
+            }
+          }
+        }
+      }
+    }
+
     // 2. End stale check-ins
     const { data: endedCheckins, error: checkinsError } = await supabase
       .from('checkins')

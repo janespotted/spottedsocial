@@ -96,6 +96,47 @@ export function getStatusExpiry(): string {
   return fiveAmUTC.toISOString();
 }
 
+// ── Cached status gate ────────────────────────────────────────────────
+
+let _cachedOutResult: { out: boolean; ts: number; userId: string } | null = null;
+const STATUS_CACHE_TTL_MS = 60_000;
+
+/**
+ * Cached check: is the user currently status='out' with an unexpired expires_at?
+ * Result is cached for 60s to avoid a query per background fix.
+ * Always fails closed (returns false on error or null expires_at).
+ */
+export async function isUserCurrentlyOut(userId: string): Promise<boolean> {
+  const now = Date.now();
+  if (_cachedOutResult && _cachedOutResult.userId === userId && now - _cachedOutResult.ts < STATUS_CACHE_TTL_MS) {
+    return _cachedOutResult.out;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('night_statuses')
+      .select('status, expires_at')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) {
+      _cachedOutResult = { out: false, ts: now, userId };
+      return false;
+    }
+    // Fail closed: require status='out' AND expires_at in the future
+    const out = data.status === 'out' && !!data.expires_at && new Date(data.expires_at) > new Date();
+    _cachedOutResult = { out, ts: now, userId };
+    return out;
+  } catch {
+    _cachedOutResult = { out: false, ts: Date.now(), userId };
+    return false;
+  }
+}
+
+/** Invalidate the cached out status (call on stop-sharing / status change). */
+export function invalidateOutStatusCache(): void {
+  _cachedOutResult = null;
+}
+
 // ── Status transitions ───────────────────────────────────────────────
 
 /**
@@ -104,6 +145,9 @@ export function getStatusExpiry(): string {
  */
 export async function stopSharing(userId: string): Promise<void> {
   const now = new Date().toISOString();
+
+  // 0. Invalidate cached status so background callbacks see "not out" immediately
+  invalidateOutStatusCache();
 
   // 1. Kill all location timers + background GPS watcher
   stopAllLocationTimers();
@@ -212,7 +256,7 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
     .eq('id', userId));
 
   // Mark manual check-in for auto-tracker cooldown
-  if (opts.source === 'manual' || opts.source === 'arrival') {
+  if (opts.source === 'manual' || opts.source === 'arrival' || opts.source === 'venue_shift') {
     markManualCheckin();
   }
 }
