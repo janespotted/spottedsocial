@@ -8,7 +8,8 @@ import { triggerPushNotification } from '@/lib/push-notifications';
  * 2. "X friends are at [venue]" — when 3+ friends are at a venue, notifies
  *    friends NOT at that venue (once per venue per night per recipient).
  *
- * Replaces the old broadcast-to-all-friends pattern.
+ * All recipients are filtered through get_visible_recipients so only friends
+ * who can see the sender's location receive notifications.
  */
 export async function sendCheckinNotifications(
   userId: string,
@@ -17,19 +18,35 @@ export async function sendCheckinNotifications(
 ): Promise<void> {
   try {
     // 1. Get accepted friends (both directions)
-    const { data: friendships } = await supabase
+    const { data: friendships, error: friendErr } = await supabase
       .from('friendships')
       .select('user_id, friend_id')
       .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
       .eq('status', 'accepted');
 
+    if (friendErr) {
+      console.error('checkin-notifications: friendships query failed:', friendErr.message);
+      return;
+    }
     if (!friendships?.length) return;
 
-    const friendIds = friendships.map(f =>
+    const allFriendIds = friendships.map(f =>
       f.user_id === userId ? f.friend_id : f.user_id
     );
 
-    // 2. Get current user's display name
+    // 2. Privacy filter: only keep friends who can see the sender's location
+    const { data: visibleIds, error: visErr } = await supabase.rpc(
+      'get_visible_recipients',
+      { candidate_ids: allFriendIds },
+    );
+    if (visErr) {
+      console.error('checkin-notifications: get_visible_recipients failed:', visErr.message);
+      return;
+    }
+    const friendIds: string[] = visibleIds ?? [];
+    if (friendIds.length === 0) return;
+
+    // 3. Get current user's display name
     const { data: profile } = await supabase
       .from('profiles')
       .select('display_name')
@@ -38,7 +55,7 @@ export async function sendCheckinNotifications(
 
     const displayName = profile?.display_name || 'A friend';
 
-    // 3. Find friends currently checked in at THIS venue
+    // 4. Find friends currently checked in at THIS venue
     const { data: friendsAtVenue } = await supabase
       .from('checkins')
       .select('user_id')
@@ -50,7 +67,7 @@ export async function sendCheckinNotifications(
       (friendsAtVenue || []).map(c => c.user_id)
     );
 
-    // 4. "Friend arrived at your venue" — notify friends already here
+    // 5. "Friend arrived at your venue" — notify friends already here
     const arrivedMessage = `${displayName} just arrived at ${venueName} 👀`;
     for (const friendId of friendIdsAtVenue) {
       supabase.rpc('create_notification', {
@@ -75,7 +92,7 @@ export async function sendCheckinNotifications(
       });
     }
 
-    // 5. "X friends are at [venue]" — if 3+ friends at venue, notify others
+    // 6. "X friends are at [venue]" — if 3+ friends at venue, notify others
     //    Count includes the user who just checked in
     const totalAtVenue = friendIdsAtVenue.size + 1; // +1 for the current user
     if (totalAtVenue >= 3) {
@@ -84,12 +101,16 @@ export async function sendCheckinNotifications(
 
       // Check throttle: only send once per venue per night per recipient
       const today = new Date().toISOString().split('T')[0];
-      const { data: alreadyNotified } = await (supabase
+      const { data: alreadyNotified, error: throttleReadErr } = await (supabase
         .from('venue_notif_throttle') as any)
         .select('user_id')
         .eq('venue_id', venueId)
         .eq('notified_date', today)
         .in('user_id', friendsNotAtVenue);
+
+      if (throttleReadErr) {
+        console.error('checkin-notifications: throttle read failed:', throttleReadErr.message);
+      }
 
       const alreadyNotifiedSet = new Set(
         (alreadyNotified || []).map((r: any) => r.user_id)
@@ -105,18 +126,16 @@ export async function sendCheckinNotifications(
       const friendCountAtVenue = friendIdsAtVenue.size + 1; // friends + user
       const hotVenueMessage = `${friendCountAtVenue} of your friends are at ${venueName} 🔥`;
 
-      // Insert throttle records
+      // Insert throttle records — aligned with table schema (user_id, venue_id, notified_date)
       const throttleRows = recipientIds.map(uid => ({
         user_id: uid,
-        friend_id: userId,
         venue_id: venueId,
-        notification_type: 'friends_at_venue',
         notified_date: today,
       }));
       const { error: throttleErr } = await supabase.from('venue_notif_throttle').insert(throttleRows as any);
       if (throttleErr) {
-        console.error('Failed to insert throttle records:', throttleErr);
-        return;
+        console.error('checkin-notifications: throttle insert failed:', throttleErr.message);
+        // Continue anyway — better to double-notify than never notify
       }
 
       // Send notifications

@@ -745,6 +745,37 @@ Deno.serve(async (req) => {
     const { receiver_id, sender_id, type } = payload;
     const message = validation.sanitizedMessage!;
 
+    // ── Block check: reject if either side has blocked the other ──
+    if (sender_id !== receiver_id) {
+      const { data: blockRows } = await supabase
+        .from("blocked_users")
+        .select("id")
+        .or(`and(blocker_id.eq.${sender_id},blocked_id.eq.${receiver_id}),and(blocker_id.eq.${receiver_id},blocked_id.eq.${sender_id})`)
+        .limit(1);
+
+      if (blockRows && blockRows.length > 0) {
+        console.log(`[SEND-PUSH] Blocked: ${sender_id} ↔ ${receiver_id}`);
+        return new Response(JSON.stringify({ success: false, reason: "blocked" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // ── Location-bearing types: verify can_see_location server-side ──
+    const LOCATION_BEARING_TYPES = ["friend_checkin", "friend_arrived_venue", "friends_at_venue", "friend_arrived", "friend_planning"];
+    if (sender_id !== receiver_id && LOCATION_BEARING_TYPES.includes(type)) {
+      const { data: canSee } = await supabase.rpc("can_see_location", {
+        viewer_id: receiver_id,
+        target_user_id: sender_id,
+      });
+      if (canSee !== true) {
+        console.log(`[SEND-PUSH] Location not visible: receiver=${receiver_id} cannot see sender=${sender_id}`);
+        return new Response(JSON.stringify({ success: false, reason: "location_not_visible" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Get receiver's push subscription AND apns token
     const { data: receiverProfile, error: profileError } = await supabase
       .from("profiles")
