@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
-import { clearUserLocation } from '@/lib/clear-user-location';
+import { stopSharing, goOutAtVenue, goPlanning } from '@/lib/night-status';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { haptic } from '@/lib/haptics';
@@ -41,69 +41,19 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
     setCurrentVenue(data?.venue_name || null);
   };
 
-  const getExpiryTime = () => {
-    const now = new Date();
-    const expiry = new Date(now);
-    if (now.getHours() < 5) {
-      expiry.setHours(5, 0, 0, 0);
-    } else {
-      expiry.setDate(expiry.getDate() + 1);
-      expiry.setHours(5, 0, 0, 0);
-    }
-    return expiry.toISOString();
-  };
-
   const handleGoLive = async () => {
     if (!user) return;
-    
+
     if (suggestedVenue) {
       setLoading(true);
       haptic.medium();
-      
+
       try {
-        const now = new Date().toISOString();
-        
-        await supabase
-          .from('checkins')
-          .update({ ended_at: now })
-          .eq('user_id', user.id)
-          .is('ended_at', null);
-
-        await supabase
-          .from('checkins')
-          .insert({
-            user_id: user.id,
-            venue_id: suggestedVenue.id,
-            venue_name: suggestedVenue.name,
-            lat: suggestedVenue.lat,
-            lng: suggestedVenue.lng,
-            started_at: now,
-          });
-
-        await supabase
-          .from('night_statuses')
-          .upsert({
-            user_id: user.id,
-            status: 'out',
-            venue_id: suggestedVenue.id,
-            venue_name: suggestedVenue.name,
-            lat: suggestedVenue.lat,
-            lng: suggestedVenue.lng,
-            updated_at: now,
-            expires_at: getExpiryTime(),
-            is_private_party: false,
-            planning_neighborhood: null,
-          }, { onConflict: 'user_id' });
-
-        await supabase
-          .from('profiles')
-          .update({
-            is_out: true,
-            last_known_lat: suggestedVenue.lat,
-            last_known_lng: suggestedVenue.lng,
-            last_location_at: now,
-          })
-          .eq('id', user.id);
+        await goOutAtVenue(user.id, {
+          venue: { id: suggestedVenue.id, name: suggestedVenue.name },
+          coords: { lat: suggestedVenue.lat, lng: suggestedVenue.lng },
+          source: 'manual',
+        });
 
         toast.success(`You're live at ${suggestedVenue.name}! 🎉`);
         onOpenChange(false);
@@ -126,21 +76,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
     haptic.light();
 
     try {
-      await supabase
-        .from('night_statuses')
-        .upsert({
-          user_id: user.id,
-          status: 'planning',
-          venue_id: null,
-          venue_name: null,
-          lat: null,
-          lng: null,
-          updated_at: new Date().toISOString(),
-          expires_at: getExpiryTime(),
-          is_private_party: false,
-        }, { onConflict: 'user_id' });
-
-      await clearUserLocation(user.id);
+      await goPlanning(user.id);
 
       toast.success('You\'re TBD for tonight 🤔');
       onOpenChange(false);
@@ -158,28 +94,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
     haptic.light();
 
     try {
-      await supabase
-        .from('night_statuses')
-        .upsert({
-          user_id: user.id,
-          status: 'off',
-          venue_id: null,
-          venue_name: null,
-          lat: null,
-          lng: null,
-          updated_at: new Date().toISOString(),
-          expires_at: getExpiryTime(),
-          is_private_party: false,
-          planning_neighborhood: null,
-        }, { onConflict: 'user_id' });
-
-      await supabase
-        .from('checkins')
-        .update({ ended_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-        .is('ended_at', null);
-
-      await clearUserLocation(user.id);
+      await stopSharing(user.id);
 
       toast.success('Enjoy your night in! 🛋️');
       onOpenChange(false);
@@ -197,33 +112,7 @@ export function QuickStatusSheet({ open, onOpenChange, suggestedVenue }: QuickSt
     haptic.medium();
 
     try {
-      const now = new Date().toISOString();
-
-      // Clear night status location but keep status as 'home'
-      await supabase
-        .from('night_statuses')
-        .upsert({
-          user_id: user.id,
-          status: 'off',
-          venue_id: null,
-          venue_name: null,
-          lat: null,
-          lng: null,
-          updated_at: now,
-          expires_at: getExpiryTime(),
-          is_private_party: false,
-          planning_neighborhood: null,
-        }, { onConflict: 'user_id' });
-
-      // End active check-ins
-      await supabase
-        .from('checkins')
-        .update({ ended_at: now })
-        .eq('user_id', user.id)
-        .is('ended_at', null);
-
-      // Clear location from profile
-      await clearUserLocation(user.id);
+      await stopSharing(user.id);
 
       toast.success('Location sharing stopped. Your friends can no longer see you.');
       onOpenChange(false);

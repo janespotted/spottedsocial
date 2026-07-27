@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useInputFocus } from '@/contexts/InputFocusContext';
 import { supabase } from '@/integrations/supabase/client';
+import { goOutAtVenue } from '@/lib/night-status';
 import { getAccurateLocation, findNearestVenue, findNearbyVenues, calculateDistance } from '@/lib/location-service';
 import {
   canTriggerVenueArrival,
@@ -55,54 +56,17 @@ export function useVenueArrivalNudge(onVenueShiftDetected?: (data: VenueShiftDat
 
   // Silent venue update for toast flow (updates venue without changing status)
   const silentVenueUpdate = useCallback(async (
-    userId: string, 
-    venue: { id: string; name: string }, 
-    lat: number, 
+    userId: string,
+    venue: { id: string; name: string },
+    lat: number,
     lng: number
   ) => {
-    const now = new Date().toISOString();
-    
     try {
-      // End existing check-ins
-      await supabase
-        .from('checkins')
-        .update({ ended_at: now })
-        .eq('user_id', userId)
-        .is('ended_at', null);
-
-      // Create new check-in
-      await supabase
-        .from('checkins')
-        .insert({
-          user_id: userId,
-          venue_id: venue.id,
-          venue_name: venue.name,
-          lat,
-          lng,
-          started_at: now,
-        });
-
-      // Update night status venue (status stays 'out')
-      await supabase
-        .from('night_statuses')
-        .update({
-          venue_id: venue.id,
-          venue_name: venue.name,
-          lat,
-          lng,
-          updated_at: now,
-        })
-        .eq('user_id', userId);
-
-      // Update profile location
-      await supabase
-        .from('profiles')
-        .update({
-          last_known_lat: lat,
-          last_known_lng: lng,
-          last_location_at: now,
-        })
-        .eq('id', userId);
+      await goOutAtVenue(userId, {
+        venue,
+        coords: { lat, lng },
+        source: 'venue_shift',
+      });
 
       // Reset "still here?" timer since we just moved to a new venue
       localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));

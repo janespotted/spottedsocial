@@ -11,7 +11,7 @@ import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { CITY_CENTERS } from '@/lib/city-detection';
 import { supabase } from '@/integrations/supabase/client';
 import { createResilientChannel } from '@/lib/resilient-channel';
-import { clearUserLocation } from '@/lib/clear-user-location';
+import { stopSharing, goOutAtVenue } from '@/lib/night-status';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import spottedLogo from '@/assets/spotted-s-logo.png';
@@ -1724,32 +1724,11 @@ export default function Map() {
                 if (!user) return;
                 setShowVenueMoveBanner(false);
                 try {
-                  const now = new Date().toISOString();
-                  const { error: e1 } = await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
-                  if (e1) throw e1;
-                  const { error: e2 } = await supabase.from('checkins').insert({
-                    user_id: user.id,
-                    venue_id: venueShiftData.venue.id,
-                    venue_name: venueShiftData.venue.name,
-                    lat: venueShiftData.lat,
-                    lng: venueShiftData.lng,
-                    started_at: now,
+                  await goOutAtVenue(user.id, {
+                    venue: venueShiftData.venue,
+                    coords: { lat: venueShiftData.lat, lng: venueShiftData.lng },
+                    source: 'venue_shift',
                   });
-                  if (e2) throw e2;
-                  const { error: e3 } = await supabase.from('night_statuses').update({
-                    venue_id: venueShiftData.venue.id,
-                    venue_name: venueShiftData.venue.name,
-                    lat: venueShiftData.lat,
-                    lng: venueShiftData.lng,
-                    updated_at: now,
-                  }).eq('user_id', user.id);
-                  if (e3) throw e3;
-                  const { error: e4 } = await supabase.from('profiles').update({
-                    last_known_lat: venueShiftData.lat,
-                    last_known_lng: venueShiftData.lng,
-                    last_location_at: now,
-                  }).eq('id', user.id);
-                  if (e4) throw e4;
                   toast({ title: `📍 Now at ${venueShiftData.venue.name}` });
                   fetchFriendsLocations();
                 } catch (err) {
@@ -1826,23 +1805,9 @@ export default function Map() {
                 const prevStatus = currentUserStatus;
                 const prevVenue = currentUserVenue;
                 try {
-                  const now = new Date().toISOString();
-                  const expiry = new Date();
-                  if (expiry.getHours() < 5) { expiry.setHours(5, 0, 0, 0); } else { expiry.setDate(expiry.getDate() + 1); expiry.setHours(5, 0, 0, 0); }
+                  await stopSharing(user.id);
 
-                  const { error: e1 } = await supabase.from('night_statuses').upsert({
-                    user_id: user.id, status: 'off', venue_id: null, venue_name: null,
-                    lat: null, lng: null, updated_at: now, expires_at: expiry.toISOString(),
-                    is_private_party: false, planning_neighborhood: null,
-                  }, { onConflict: 'user_id' });
-                  if (e1) throw e1;
-
-                  const { error: e2 } = await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
-                  if (e2) throw e2;
-
-                  await clearUserLocation(user.id);
-
-                  setCurrentUserStatus('off');
+                  setCurrentUserStatus('home');
                   setCurrentUserVenue(null);
                   toast({ title: 'Location sharing stopped', description: 'Your friends can no longer see you.' });
                   fetchFriendsLocations();

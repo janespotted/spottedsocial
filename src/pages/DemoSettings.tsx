@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp, MapPin, RefreshCw, Navigation, Activity } from 'lucide-react';
 import { toast } from 'sonner';
+import { getStatusExpiry } from '@/lib/night-status';
 import { getDemoMode, setDemoMode, clearDemoData, seedDemoData, healthCheckDemoData } from '@/lib/demo-data';
 import { getBootstrapMode, setBootstrapMode } from '@/lib/bootstrap-config';
 import { useUserCity } from '@/hooks/useUserCity';
@@ -261,13 +262,7 @@ export default function DemoSettings() {
 
     setLoading(true);
     try {
-      // Calculate expiry time (5 AM next morning)
-      const now = new Date();
-      const expiresAt = new Date(now);
-      if (now.getHours() >= 5) {
-        expiresAt.setDate(expiresAt.getDate() + 1);
-      }
-      expiresAt.setHours(5, 0, 0, 0);
+      const expiresAt = new Date(getStatusExpiry());
 
       // Upsert night_status for the user
       const { error } = await supabase

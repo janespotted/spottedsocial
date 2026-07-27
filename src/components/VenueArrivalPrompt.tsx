@@ -6,6 +6,7 @@ import { MapPin, X, Navigation } from 'lucide-react';
 import { useCheckIn, DetectedVenue } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { goOutAtVenue } from '@/lib/night-status';
 import { dismissVenuePrompt } from '@/lib/venue-arrival-nudge';
 import { haptic } from '@/lib/haptics';
 import { logVenueConfirmation, logVenueDismissal } from '@/lib/location-detection-logger';
@@ -44,56 +45,13 @@ export function VenueArrivalPrompt() {
     haptic.success();
 
     try {
-      const now = new Date().toISOString();
-      const expiresAt = new Date();
-      expiresAt.setHours(5, 0, 0, 0);
-      if (expiresAt <= new Date()) {
-        expiresAt.setDate(expiresAt.getDate() + 1);
-      }
-
-      // End any existing check-ins
-      await supabase
-        .from('checkins')
-        .update({ ended_at: now })
-        .eq('user_id', user.id)
-        .is('ended_at', null);
-
-      // Create new check-in
-      await supabase
-        .from('checkins')
-        .insert({
-          user_id: user.id,
-          venue_id: selectedVenue.id,
-          venue_name: selectedVenue.name,
-          lat: selectedVenue.lat,
-          lng: selectedVenue.lng,
-          started_at: now,
-        });
-
-      // Update night status to 'out'
-      await supabase
-        .from('night_statuses')
-        .upsert({
-          user_id: user.id,
-          status: 'out',
-          venue_id: selectedVenue.id,
-          venue_name: selectedVenue.name,
-          lat: selectedVenue.lat,
-          lng: selectedVenue.lng,
-          expires_at: expiresAt.toISOString(),
-          updated_at: now,
-        }, { onConflict: 'user_id' });
-
-      // Update profile location
-      await supabase
-        .from('profiles')
-        .update({
-          is_out: true,
-          last_known_lat: selectedVenue.lat,
-          last_known_lng: selectedVenue.lng,
-          last_location_at: now,
-        })
-        .eq('id', user.id);
+      await goOutAtVenue(user.id, {
+        venue: { id: selectedVenue.id, name: selectedVenue.name },
+        coords: selectedVenue.lat && selectedVenue.lng
+          ? { lat: selectedVenue.lat, lng: selectedVenue.lng }
+          : undefined,
+        source: 'arrival',
+      });
 
       hideVenueArrival();
       // Log confirmation analytics

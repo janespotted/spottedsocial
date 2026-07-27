@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
-import { clearUserLocation } from '@/lib/clear-user-location';
+import { goOutAtVenue, goPlanning, stopSharing, getStatusExpiry, registerLocationTimer, must } from '@/lib/night-status';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
@@ -16,8 +16,6 @@ import { captureLocationWithVenue, createNewVenue, detectNeighborhoodFromGPS, ge
 import { haptic } from '@/lib/haptics';
 import { requestNotificationPermission } from '@/lib/notifications';
 import { logEvent } from '@/lib/event-logger';
-import { calculateExpiryTime } from '@/lib/time-utils';
-import { markManualCheckin } from '@/lib/auto-venue-tracker';
 import { triggerPushNotification } from '@/lib/push-notifications';
 import { sendCheckinNotifications } from '@/lib/checkin-notifications';
 import { scheduleMorningAfterNotification } from '@/lib/morning-after-notification';
@@ -190,7 +188,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if (!userId) return;
 
     // Update location every 60 seconds (reduced from 15s to lower DB load)
-    locationIntervalRef.current = window.setInterval(() => {
+    const intervalId = window.setInterval(() => {
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           async (position) => {
@@ -216,9 +214,16 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         );
       }
     }, 60000); // 60 seconds
+    locationIntervalRef.current = intervalId;
+
+    // Register with global timer registry so any stop path can kill it
+    registerLocationTimer(() => {
+      clearInterval(intervalId);
+      locationIntervalRef.current = null;
+    });
   };
 
-  const stopLocationTracking = async () => {
+  const stopLocationTracking = () => {
     if (locationIntervalRef.current) {
       clearInterval(locationIntervalRef.current);
       locationIntervalRef.current = null;
@@ -228,8 +233,6 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     localStorage.removeItem('still_here_check');
     localStorage.removeItem('still_here_venue');
     localStorage.removeItem('still_here_deadline');
-
-    if (user?.id) await clearUserLocation(user.id);
   };
 
 
@@ -390,8 +393,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       // Show privacy selector first for private party
       setShowPrivatePartyPrivacy(true);
     } else {
-      await stopLocationTracking();
-      await updateStatus(status, null, null, null);
+      stopLocationTracking();
+      if (user?.id) await stopSharing(user.id);
       onOpenChange(false);
     }
   };
@@ -449,35 +452,18 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       }
 
       const partyDisplayName = `Private Party (${privatePartyNeighborhood})`;
-      const statusData = {
-        user_id: user.id,
-        status: 'out' as const,
-        lat: userLat,
-        lng: userLng,
-        venue_name: partyDisplayName,
-        venue_id: null,
-        updated_at: new Date().toISOString(),
-        expires_at: calculateExpiryTime(),
-        planning_neighborhood: null,
-        planning_visibility: privatePartyVisibility,
-        is_private_party: true,
-        party_neighborhood: privatePartyNeighborhood,
-        party_address: privatePartyAddress || null,
-      };
+      const coords = userLat != null && userLng != null ? { lat: userLat, lng: userLng } : undefined;
+      await goOutAtVenue(user.id, {
+        venue: { id: null, name: partyDisplayName },
+        coords,
+        source: 'manual',
+        privateParty: { neighborhood: privatePartyNeighborhood, address: privatePartyAddress || null },
+      });
 
-      const { error } = await supabase
-        .from('night_statuses')
-        .upsert(statusData, { onConflict: 'user_id' });
-
-      if (error) throw error;
-
-      // Update profile
+      // WP7: Remove location_sharing_level write (audit P1-2)
       await supabase
         .from('profiles')
-        .update({ 
-          is_out: true,
-          location_sharing_level: privatePartyVisibility,
-        })
+        .update({ location_sharing_level: privatePartyVisibility })
         .eq('id', user.id);
 
       haptic.medium();
@@ -666,22 +652,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if (selectedStatus === 'out') {
       // Clear any pending reminder since user is now checking in
       localStorage.removeItem('checkin_reminder');
-      // Save all location data to profile
       try {
-        const { error: profileUpdateError } = await supabase
+        // WP7: Remove location_sharing_level write (audit P1-2)
+        await supabase
           .from('profiles')
-          .update({
-            is_out: true,
-            location_sharing_level: shareOption,
-            last_known_lat: locationData.lat,
-            last_known_lng: locationData.lng,
-            last_location_at: locationData.timestamp
-          })
+          .update({ location_sharing_level: shareOption })
           .eq('id', user?.id);
-
-        if (profileUpdateError) {
-          console.error('Failed to update profile location:', profileUpdateError);
-        }
 
         // Start tracking location updates
         startLocationTracking(locationData.lat, locationData.lng);
@@ -711,26 +687,17 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             console.warn('Neighborhood detection failed for custom venue:', e);
           }
 
-          // Update night_statuses with private party info + neighborhood
-          const { error: ppError } = await supabase.from('night_statuses').upsert({
-            user_id: user?.id,
-            status: 'out',
-            lat: locationData.lat,
-            lng: locationData.lng,
-            venue_name: finalVenueName,
-            venue_id: null,
-            updated_at: new Date().toISOString(),
-            expires_at: calculateExpiryTime(),
-            is_private_party: true,
-            party_neighborhood: detectedNeighborhood,
-            planning_visibility: shareOption,
-          }, { onConflict: 'user_id' });
-          if (ppError) throw ppError;
+          await goOutAtVenue(user!.id, {
+            venue: { id: null, name: finalVenueName },
+            coords: { lat: locationData.lat, lng: locationData.lng },
+            source: 'manual',
+            privateParty: { neighborhood: detectedNeighborhood },
+          });
 
           const displayName = detectedNeighborhood
             ? `${finalVenueName} (${detectedNeighborhood})`
             : finalVenueName;
-          
+
           onOpenChange(false);
           showOutConfirmation(displayName, '', shareOption, true);
         } else {
@@ -762,55 +729,15 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     visibility: 'close_friends' | 'all_friends' | 'mutual_friends' | null = null
   ) => {
     try {
-      const statusData: any = {
-        user_id: user?.id,
-        status,
-        lat,
-        lng,
-        venue_name: venue,
-        venue_id: venueId,
-        updated_at: new Date().toISOString(),
-        expires_at: status === 'home' ? null : calculateExpiryTime(),
-        planning_neighborhood: status === 'planning' ? neighborhood : null,
-        planning_visibility: status === 'planning' ? visibility : null,
-        // Always reset private party fields on non-private-party check-ins
-        is_private_party: false,
-        party_neighborhood: null,
-        party_address: null,
-      };
-
-      const { error } = await supabase
-        .from('night_statuses')
-        .upsert(statusData, { onConflict: 'user_id' });
-
-      if (error) throw error;
-
-      // Haptic feedback for successful check-in
-      haptic.medium();
-
       if (status === 'out' && lat && lng && venue) {
-        // End any active check-ins before creating a new one
-        const { error: endError } = await supabase
-          .from('checkins')
-          .update({ ended_at: new Date().toISOString() })
-          .eq('user_id', user?.id)
-          .is('ended_at', null);
-        if (endError) throw endError;
-
-        // Create new check-in with tracking fields
-        const { error: insertError } = await supabase.from('checkins').insert({
-          user_id: user?.id,
-          venue_name: venue,
-          venue_id: venueId,
-          lat,
-          lng,
-          started_at: new Date().toISOString(),
-          last_updated_at: new Date().toISOString(),
+        // Use consolidated helper for going out
+        await goOutAtVenue(user!.id, {
+          venue: { id: venueId, name: venue },
+          coords: { lat, lng },
+          source: 'manual',
         });
-        if (insertError) throw insertError;
-        
-        // Mark manual checkin to prevent auto-tracker from overwriting
-        markManualCheckin();
+
+        haptic.medium();
 
         // Check if this manual check-in corrects a recent auto check-in
         if (venueId && user?.id) {
@@ -818,8 +745,6 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         }
 
         // Venue-aware notifications (best-effort, non-blocking)
-        // - Notifies friends already at this venue that you arrived
-        // - If 3+ friends at venue, notifies others (once per venue per night)
         if (venueId) {
           sendCheckinNotifications(user!.id, venueId, venue);
         }
@@ -843,144 +768,159 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           source: 'manual_checkin',
           status,
         });
-      } else if (status === 'home' || status === 'planning') {
-        // End all active check-ins when going home or planning
-        await supabase
-          .from('checkins')
-          .update({ ended_at: new Date().toISOString() })
-          .eq('user_id', user?.id)
-          .is('ended_at', null);
-
-        // Clear location from profile so user doesn't appear on friends' maps
-        if (user?.id) await clearUserLocation(user.id);
+      } else if (status === 'home') {
+        await stopSharing(user!.id);
+        haptic.medium();
+      } else if (status === 'planning') {
+        await goPlanning(user!.id, { neighborhood, visibility });
+        haptic.medium();
 
         // For planning, also notify friends
         console.log('[PLANNING NOTIF] triggered for status: planning, visibility:', visibility);
-        if (status === 'planning') {
-          // Notify friends about planning status (best-effort, non-blocking)
-          // Capture userId at call time to avoid stale closure if modal unmounts
-          const planningUserId = user!.id;
-          (async () => {
-            try {
-              console.log('[PLANNING NOTIF] ===== NOTIFICATION FLOW STARTED =====');
-              console.log('[PLANNING NOTIF] user.id:', planningUserId, 'timestamp:', new Date().toISOString());
+        // Notify friends about planning status (best-effort, non-blocking)
+        // Capture userId at call time to avoid stale closure if modal unmounts
+        const planningUserId = user!.id;
+        (async () => {
+          try {
+            console.log('[PLANNING NOTIF] ===== NOTIFICATION FLOW STARTED =====');
+            console.log('[PLANNING NOTIF] user.id:', planningUserId, 'timestamp:', new Date().toISOString());
 
-              // Dedup: skip if we sent a planning notification in the last 30 minutes
-              const dedupCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+            // Dedup: skip if we sent a planning notification in the last 30 minutes
+            const dedupCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
-              const { data: existingNotifs } = await supabase
-                .from('notifications')
-                .select('id, created_at')
-                .eq('sender_id', planningUserId)
-                .eq('type', 'friend_planning')
-                .gte('created_at', dedupCutoff)
-                .limit(1);
+            const { data: existingNotifs } = await supabase
+              .from('notifications')
+              .select('id, created_at')
+              .eq('sender_id', planningUserId)
+              .eq('type', 'friend_planning')
+              .gte('created_at', dedupCutoff)
+              .limit(1);
 
-              console.log('[PLANNING NOTIF] Dedup check (last 30min):', existingNotifs?.length || 0, 'cutoff:', dedupCutoff);
-              if (existingNotifs && existingNotifs.length > 0) {
-                console.log('[PLANNING NOTIF] Skipping — sent within last 30 minutes, last sent:', existingNotifs[0].created_at);
-                return;
-              }
-
-              // Determine audience tier — default to all_friends if null
-              const effectiveVisibility = visibility || 'all_friends';
-              console.log('[PLANNING NOTIF] Visibility tier:', effectiveVisibility, '(raw:', visibility, ')');
-
-              // Build recipient list based on visibility tier
-              let recipientIds: string[] = [];
-
-              if (effectiveVisibility === 'close_friends') {
-                // Only close friends
-                const { data: closeFriends } = await supabase
-                  .from('close_friends')
-                  .select('close_friend_id')
-                  .eq('user_id', planningUserId);
-
-                recipientIds = closeFriends?.map(cf => cf.close_friend_id) || [];
-              } else if (effectiveVisibility === 'all_friends') {
-                // Direct (accepted) friends only
-                const { data: friendships } = await supabase
-                  .from('friendships')
-                  .select('user_id, friend_id')
-                  .or(`user_id.eq.${planningUserId},friend_id.eq.${planningUserId}`)
-                  .eq('status', 'accepted');
-
-                if (friendships?.length) {
-                  recipientIds = friendships.map(f =>
-                    f.user_id === planningUserId ? f.friend_id : f.user_id
-                  );
-                }
-              } else {
-                // mutual_friends — friends where both directions exist
-                const { data: friendships } = await supabase
-                  .from('friendships')
-                  .select('user_id, friend_id')
-                  .or(`user_id.eq.${planningUserId},friend_id.eq.${planningUserId}`)
-                  .eq('status', 'accepted');
-
-                if (friendships?.length) {
-                  const sentTo = new Set<string>();
-                  const receivedFrom = new Set<string>();
-                  for (const f of friendships) {
-                    if (f.user_id === planningUserId) sentTo.add(f.friend_id);
-                    else receivedFrom.add(f.user_id);
-                  }
-                  recipientIds = [...sentTo].filter(id => receivedFrom.has(id));
-                }
-              }
-
-              console.log('[PLANNING NOTIF] Recipients found:', recipientIds.length, recipientIds);
-              if (recipientIds.length === 0) {
-                console.log('[PLANNING NOTIF] Skipping — no recipients');
-                return;
-              }
-
-              // Get first name
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('display_name')
-                .eq('id', planningUserId)
-                .single();
-
-              const firstName = profile?.display_name?.split(' ')[0] || 'A friend';
-              const message = `${firstName} is deciding where to go tonight`;
-              console.log('[PLANNING NOTIF] Sending message:', message);
-
-              await Promise.allSettled(recipientIds.map(async (friendId) => {
-                console.log('[PLANNING NOTIF] Creating notification for:', friendId);
-                const { data, error } = await supabase.rpc('create_notification', {
-                  p_receiver_id: friendId,
-                  p_type: 'friend_planning',
-                  p_message: message,
-                });
-                if (error) {
-                  console.error('[PLANNING NOTIF] create_notification error for', friendId, ':', error);
-                  return;
-                }
-                const notif = Array.isArray(data) ? data[0] : data;
-                console.log('[PLANNING NOTIF] Notification created:', notif?.id, 'for', friendId);
-                if (notif?.id) {
-                  console.log('[PLANNING NOTIF] Triggering push for:', friendId);
-                  await triggerPushNotification({
-                    id: notif.id,
-                    receiver_id: friendId,
-                    sender_id: planningUserId,
-                    type: 'friend_planning',
-                    message,
-                  });
-                }
-              }));
-            } catch (err) {
-              console.warn('[PLANNING NOTIF] Planning notification failed:', err);
+            console.log('[PLANNING NOTIF] Dedup check (last 30min):', existingNotifs?.length || 0, 'cutoff:', dedupCutoff);
+            if (existingNotifs && existingNotifs.length > 0) {
+              console.log('[PLANNING NOTIF] Skipping — sent within last 30 minutes, last sent:', existingNotifs[0].created_at);
+              return;
             }
-          })();
-        }
+
+            // Determine audience tier — default to all_friends if null
+            const effectiveVisibility = visibility || 'all_friends';
+            console.log('[PLANNING NOTIF] Visibility tier:', effectiveVisibility, '(raw:', visibility, ')');
+
+            // Build recipient list based on visibility tier
+            let recipientIds: string[] = [];
+
+            if (effectiveVisibility === 'close_friends') {
+              // Only close friends
+              const { data: closeFriends } = await supabase
+                .from('close_friends')
+                .select('close_friend_id')
+                .eq('user_id', planningUserId);
+
+              recipientIds = closeFriends?.map(cf => cf.close_friend_id) || [];
+            } else if (effectiveVisibility === 'all_friends') {
+              // Direct (accepted) friends only
+              const { data: friendships } = await supabase
+                .from('friendships')
+                .select('user_id, friend_id')
+                .or(`user_id.eq.${planningUserId},friend_id.eq.${planningUserId}`)
+                .eq('status', 'accepted');
+
+              if (friendships?.length) {
+                recipientIds = friendships.map(f =>
+                  f.user_id === planningUserId ? f.friend_id : f.user_id
+                );
+              }
+            } else {
+              // mutual_friends — friends where both directions exist
+              const { data: friendships } = await supabase
+                .from('friendships')
+                .select('user_id, friend_id')
+                .or(`user_id.eq.${planningUserId},friend_id.eq.${planningUserId}`)
+                .eq('status', 'accepted');
+
+              if (friendships?.length) {
+                const sentTo = new Set<string>();
+                const receivedFrom = new Set<string>();
+                for (const f of friendships) {
+                  if (f.user_id === planningUserId) sentTo.add(f.friend_id);
+                  else receivedFrom.add(f.user_id);
+                }
+                recipientIds = [...sentTo].filter(id => receivedFrom.has(id));
+              }
+            }
+
+            console.log('[PLANNING NOTIF] Recipients found:', recipientIds.length, recipientIds);
+            if (recipientIds.length === 0) {
+              console.log('[PLANNING NOTIF] Skipping — no recipients');
+              return;
+            }
+
+            // Get first name
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('display_name')
+              .eq('id', planningUserId)
+              .single();
+
+            const firstName = profile?.display_name?.split(' ')[0] || 'A friend';
+            const message = `${firstName} is deciding where to go tonight`;
+            console.log('[PLANNING NOTIF] Sending message:', message);
+
+            await Promise.allSettled(recipientIds.map(async (friendId) => {
+              console.log('[PLANNING NOTIF] Creating notification for:', friendId);
+              const { data, error } = await supabase.rpc('create_notification', {
+                p_receiver_id: friendId,
+                p_type: 'friend_planning',
+                p_message: message,
+              });
+              if (error) {
+                console.error('[PLANNING NOTIF] create_notification error for', friendId, ':', error);
+                return;
+              }
+              const notif = Array.isArray(data) ? data[0] : data;
+              console.log('[PLANNING NOTIF] Notification created:', notif?.id, 'for', friendId);
+              if (notif?.id) {
+                console.log('[PLANNING NOTIF] Triggering push for:', friendId);
+                await triggerPushNotification({
+                  id: notif.id,
+                  receiver_id: friendId,
+                  sender_id: planningUserId,
+                  type: 'friend_planning',
+                  message,
+                });
+              }
+            }));
+          } catch (err) {
+            console.warn('[PLANNING NOTIF] Planning notification failed:', err);
+          }
+        })();
+      } else if (status === 'heading_out') {
+        // heading_out: just upsert NS with status
+        must(await supabase
+          .from('night_statuses')
+          .upsert({
+            user_id: user?.id,
+            status,
+            lat,
+            lng,
+            venue_name: venue,
+            venue_id: venueId,
+            updated_at: new Date().toISOString(),
+            expires_at: getStatusExpiry(),
+            planning_neighborhood: null,
+            planning_visibility: null,
+            is_private_party: false,
+            party_neighborhood: null,
+            party_address: null,
+          }, { onConflict: 'user_id' }));
+
+        haptic.medium();
       }
 
       // Only show toast for statuses that don't have confirmation cards
       if (status !== 'out' && status !== 'planning') {
-        const description = 
-          status === 'home' ? "You won't appear on tonight's list." : 
+        const description =
+          status === 'home' ? "You won't appear on tonight's list." :
           `You're still deciding - heading to ${venue}!`;
 
         toast({

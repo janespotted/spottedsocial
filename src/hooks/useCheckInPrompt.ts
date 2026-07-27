@@ -30,7 +30,7 @@ export function useCheckInPrompt() {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (data?.status && data.status !== 'home' && data.expires_at && new Date(data.expires_at) > new Date()) {
+      if (data?.status && data.status !== 'home' && data.status !== 'off' && data.expires_at && new Date(data.expires_at) > new Date()) {
         return;
       }
     } catch {

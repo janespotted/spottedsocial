@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { clearUserLocation } from '@/lib/clear-user-location';
+import { goOutAtVenue, stopSharing } from '@/lib/night-status';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -119,56 +119,14 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
     haptic.medium();
 
     try {
-      const now = new Date().toISOString();
-      const lat = userLocation?.lat ?? 0;
-      const lng = userLocation?.lng ?? 0;
-
-      // End existing check-ins
-      const { error: e1 } = await supabase
-        .from('checkins')
-        .update({ ended_at: now })
-        .eq('user_id', user.id)
-        .is('ended_at', null);
-      if (e1) throw e1;
-
-      // Create new check-in
-      const { error: e2 } = await supabase.from('checkins').insert({
-        user_id: user.id,
-        venue_id: venue.id,
-        venue_name: venue.name,
-        lat,
-        lng,
-        started_at: now,
+      await goOutAtVenue(user.id, {
+        venue: { id: venue.id, name: venue.name },
+        coords: userLocation || undefined,
+        source: 'manual',
       });
-      if (e2) throw e2;
-
-      // Update night status venue (keep existing status/privacy)
-      const { error: e3 } = await supabase
-        .from('night_statuses')
-        .update({
-          venue_id: venue.id,
-          venue_name: venue.name,
-          lat,
-          lng,
-          updated_at: now,
-        })
-        .eq('user_id', user.id);
-      if (e3) throw e3;
-
-      // Update profile location
-      const { error: e4 } = await supabase
-        .from('profiles')
-        .update({
-          last_known_lat: lat,
-          last_known_lng: lng,
-          last_location_at: now,
-        })
-        .eq('id', user.id);
-      if (e4) throw e4;
 
       onOpenChange(false);
       onUpdated?.();
-      // Show "You're out at X" confirmation card
       showOutConfirmation(venue.name, venue.id, 'all_friends');
     } catch (error) {
       console.error('Error switching venue:', error);
@@ -184,65 +142,34 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
     haptic.medium();
 
     try {
-      const now = new Date().toISOString();
-      const lat = userLocation?.lat ?? 0;
-      const lng = userLocation?.lng ?? 0;
-
       // Detect neighborhood from GPS coords
       let detectedNeighborhood: string | null = null;
-      try {
-        const { data: nearestVenue } = await supabase.rpc('find_nearest_venue', {
-          user_lat: lat,
-          user_lng: lng,
-          radius_meters: 50000,
-        });
-        if (nearestVenue?.[0]) {
-          const { data: venueData } = await supabase
-            .from('venues')
-            .select('neighborhood')
-            .eq('id', nearestVenue[0].venue_id)
-            .maybeSingle();
-          detectedNeighborhood = venueData?.neighborhood || null;
+      if (userLocation) {
+        try {
+          const { data: nearestVenue } = await supabase.rpc('find_nearest_venue', {
+            user_lat: userLocation.lat,
+            user_lng: userLocation.lng,
+            radius_meters: 50000,
+          });
+          if (nearestVenue?.[0]) {
+            const { data: venueData } = await supabase
+              .from('venues')
+              .select('neighborhood')
+              .eq('id', nearestVenue[0].venue_id)
+              .maybeSingle();
+            detectedNeighborhood = venueData?.neighborhood || null;
+          }
+        } catch (e) {
+          console.warn('Neighborhood detection failed:', e);
         }
-      } catch (e) {
-        console.warn('Neighborhood detection failed:', e);
       }
 
-      const { error: ce1 } = await supabase
-        .from('checkins')
-        .update({ ended_at: now })
-        .eq('user_id', user.id)
-        .is('ended_at', null);
-      if (ce1) throw ce1;
-
-      const { error: ce2 } = await supabase.from('checkins').insert({
-        user_id: user.id,
-        venue_name: customName.trim(),
-        lat,
-        lng,
-        started_at: now,
+      await goOutAtVenue(user.id, {
+        venue: { id: null, name: customName.trim() },
+        coords: userLocation || undefined,
+        source: 'manual',
+        privateParty: { neighborhood: detectedNeighborhood },
       });
-      if (ce2) throw ce2;
-
-      const { error: ce3 } = await supabase
-        .from('night_statuses')
-        .update({
-          venue_id: null,
-          venue_name: customName.trim(),
-          lat,
-          lng,
-          updated_at: now,
-          is_private_party: true,
-          party_neighborhood: detectedNeighborhood,
-        })
-        .eq('user_id', user.id);
-      if (ce3) throw ce3;
-
-      const { error: ce4 } = await supabase
-        .from('profiles')
-        .update({ last_known_lat: lat, last_known_lng: lng, last_location_at: now })
-        .eq('id', user.id);
-      if (ce4) throw ce4;
 
       onOpenChange(false);
       onUpdated?.();
@@ -261,21 +188,7 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
     haptic.medium();
 
     try {
-      const now = new Date().toISOString();
-      const expiry = new Date();
-      if (expiry.getHours() < 5) { expiry.setHours(5, 0, 0, 0); } else { expiry.setDate(expiry.getDate() + 1); expiry.setHours(5, 0, 0, 0); }
-
-      const { error: s1 } = await supabase.from('night_statuses').upsert({
-        user_id: user.id, status: 'off', venue_id: null, venue_name: null,
-        lat: null, lng: null, updated_at: now, expires_at: expiry.toISOString(),
-        is_private_party: false, planning_neighborhood: null,
-      }, { onConflict: 'user_id' });
-      if (s1) throw s1;
-
-      const { error: s2 } = await supabase.from('checkins').update({ ended_at: now }).eq('user_id', user.id).is('ended_at', null);
-      if (s2) throw s2;
-
-      await clearUserLocation(user.id);
+      await stopSharing(user.id);
 
       toast.success('Location sharing stopped');
       onOpenChange(false);

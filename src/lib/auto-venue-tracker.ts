@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { captureLocationWithVenue, calculateDistance, findNearestVenue, type LocationData } from './location-service';
+import { goOutAtVenue } from './night-status';
 import { logEvent } from './event-logger';
 import { sendCheckinNotifications } from './checkin-notifications';
 import { logLocationEvent, createEvaluationId, markAutoCheckin } from './location-event-logger';
@@ -141,7 +142,8 @@ const isUserOut = async (userId: string): Promise<boolean> => {
 };
 
 /**
- * Create a new checkin record and end any active check-ins
+ * Create a new checkin record and end any active check-ins.
+ * Routes all writes through goOutAtVenue (WP2).
  */
 const createCheckin = async (
   userId: string,
@@ -150,46 +152,11 @@ const createCheckin = async (
   venueName: string
 ): Promise<void> => {
   try {
-    // End any active check-ins before creating new one
-    await supabase
-      .from('checkins')
-      .update({ ended_at: new Date().toISOString() })
-      .eq('user_id', userId)
-      .is('ended_at', null);
-
-    // Create new check-in with tracking fields
-    await supabase.from('checkins').insert({
-      user_id: userId,
-      venue_name: venueName,
-      venue_id: venueId,
-      lat: locationData.lat,
-      lng: locationData.lng,
-      started_at: locationData.timestamp,
-      last_updated_at: locationData.timestamp,
+    await goOutAtVenue(userId, {
+      venue: { id: venueId, name: venueName },
+      coords: { lat: locationData.lat, lng: locationData.lng },
+      source: 'auto',
     });
-
-    // Update night_statuses with new venue
-    await supabase
-      .from('night_statuses')
-      .update({
-        venue_name: venueName,
-        venue_id: venueId,
-        lat: locationData.lat,
-        lng: locationData.lng,
-        updated_at: locationData.timestamp,
-      })
-      .eq('user_id', userId);
-
-    // Update profile with new location
-    await supabase
-      .from('profiles')
-      .update({
-        last_known_lat: locationData.lat,
-        last_known_lng: locationData.lng,
-        last_location_at: locationData.timestamp,
-      })
-      .eq('id', userId);
-
     console.log('✅ Auto-updated venue to:', venueName);
   } catch (error) {
     console.error('Error creating checkin:', error);

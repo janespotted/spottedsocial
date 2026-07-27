@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { goPlanning, stopSharing } from '@/lib/night-status';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -58,17 +59,12 @@ export function DailyNudgeModal({ open, onClose, nudgeType }: DailyNudgeModalPro
 
       if (nudgeError) throw nudgeError;
 
-      // Update night_statuses
-      const { error: statusError } = await supabase
-        .from('night_statuses')
-        .upsert({
-          user_id: user.id,
-          status: newStatus,
-          updated_at: new Date().toISOString(),
-          expires_at: getExpiryTime(),
-        }, { onConflict: 'user_id' });
-
-      if (statusError) throw statusError;
+      // Update night_statuses via helpers
+      if (newStatus === 'planning') {
+        await goPlanning(user.id);
+      } else {
+        await stopSharing(user.id);
+      }
 
       // Handle navigation based on response
       if (response === 'still_going') {
@@ -88,23 +84,6 @@ export function DailyNudgeModal({ open, onClose, nudgeType }: DailyNudgeModalPro
     } finally {
       setLoading(false);
     }
-  };
-
-  // Get 5am expiry time for tonight/tomorrow
-  const getExpiryTime = () => {
-    const now = new Date();
-    const expiry = new Date(now);
-    
-    // If before 5am, expire at 5am today
-    // If after 5am, expire at 5am tomorrow
-    if (now.getHours() < 5) {
-      expiry.setHours(5, 0, 0, 0);
-    } else {
-      expiry.setDate(expiry.getDate() + 1);
-      expiry.setHours(5, 0, 0, 0);
-    }
-    
-    return expiry.toISOString();
   };
 
   return (

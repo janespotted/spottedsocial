@@ -13,6 +13,7 @@ import { FriendsPlanning } from './FriendsPlanning';
 import { useToast } from '@/hooks/use-toast';
 import { haptic } from '@/lib/haptics';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { goPlanning, stopSharing } from '@/lib/night-status';
 import { useUserCity } from '@/hooks/useUserCity';
 import { EventCard } from './EventCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -367,26 +368,9 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
 
   const handleJoinPlanning = async () => {
     if (!userId) return;
-    
+
     try {
-      // Calculate 5am expiry
-      const now = new Date();
-      const expiry = new Date(now);
-      if (now.getHours() >= 5) {
-        expiry.setDate(expiry.getDate() + 1);
-      }
-      expiry.setHours(5, 0, 0, 0);
-
-      const { error } = await supabase
-        .from('night_statuses')
-        .upsert({
-          user_id: userId,
-          status: 'planning',
-          updated_at: new Date().toISOString(),
-          expires_at: expiry.toISOString(),
-        }, { onConflict: 'user_id' });
-
-      if (error) throw error;
+      await goPlanning(userId);
 
       haptic.light();
       setIsUserPlanning(true);
@@ -405,17 +389,9 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
 
   const handleLeavePlanning = async () => {
     if (!userId) return;
-    
-    try {
-      const { error } = await supabase
-        .from('night_statuses')
-        .update({
-          status: 'off',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
 
-      if (error) throw error;
+    try {
+      await stopSharing(userId);
 
       haptic.light();
       setIsUserPlanning(false);
