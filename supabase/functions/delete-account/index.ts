@@ -87,6 +87,10 @@ Deno.serve(async (req) => {
       { table: 'close_friends', column: 'user_id' },
       { table: 'close_friends', column: 'close_friend_id' },
       
+      // Delete location hiding (FK cascade added in WP6, but explicit for safety)
+      { table: 'location_hidden', column: 'user_id' },
+      { table: 'location_hidden', column: 'hidden_from_id' },
+
       // Delete messages and typing indicators
       { table: 'dm_typing_indicators', column: 'user_id' },
       { table: 'dm_messages', column: 'sender_id' },

@@ -153,16 +153,20 @@ Deno.serve(async (req) => {
       console.log(`✅ Deleted ${deletedDMs?.length || 0} expired DMs`)
     }
 
-    // 4. Clear expired night statuses
+    // 4. Clear expired night statuses (including private-party fields)
     const { data: clearedStatuses, error: statusesError } = await supabase
       .from('night_statuses')
-      .update({ 
+      .update({
         status: 'home',
         venue_name: null,
         venue_id: null,
         lat: null,
         lng: null,
         expires_at: null,
+        is_private_party: false,
+        party_neighborhood: null,
+        party_address: null,
+        planning_visibility: null,
       })
       .lt('expires_at', now.toISOString())
       .select('id')
