@@ -89,7 +89,19 @@ export async function notifyFriendArrived(
   venueName: string,
 ): Promise<void> {
   try {
-    const friendIds = await getFriendIds(userId);
+    const allFriendIds = await getFriendIds(userId);
+    if (allFriendIds.length === 0) return;
+
+    // Privacy filter: only friends who can see the sender's location
+    const { data: visibleIds, error: visErr } = await supabase.rpc(
+      'get_visible_recipients',
+      { candidate_ids: allFriendIds },
+    );
+    if (visErr) {
+      console.error('[FOMO:FriendArrived] get_visible_recipients failed:', visErr.message);
+      return;
+    }
+    const friendIds: string[] = visibleIds ?? [];
     if (friendIds.length === 0) return;
 
     // Count others at this venue (excluding the arriving user)
@@ -287,16 +299,6 @@ export async function checkGroupForming(
 
     if (!planningFriends || planningFriends.length < 2) return;
 
-    // Get names of the planning friends
-    const plannerIds = planningFriends.map(f => f.user_id).slice(0, 3);
-    const { data: profiles } = await supabase.rpc('get_profiles_safe');
-    const nameMap = new Map((profiles || []).map((p: any) => [p.id, p.display_name]));
-
-    const names = plannerIds.map(id => nameMap.get(id) || 'A friend');
-    const nameText = names.length === 2
-      ? `${names[0]} and ${names[1]} are`
-      : `${names[0]}, ${names[1]}, and ${planningFriends.length - 2} more are`;
-
     // Notify other friends who don't have a status yet
     const plannerSet = new Set(planningFriends.map(f => f.user_id));
     const { data: allStatuses } = await supabase
@@ -307,9 +309,23 @@ export async function checkGroupForming(
       .gt('expires_at', new Date().toISOString());
 
     const hasStatusSet = new Set((allStatuses || []).map(s => s.user_id));
-    const toNotify = friendIds.filter(id => !hasStatusSet.has(id) && !plannerSet.has(id));
+    const candidateIds = friendIds.filter(id => !hasStatusSet.has(id) && !plannerSet.has(id));
 
-    const message = `${nameText} both planning ${planningNeighborhood} tonight. Join the move?`;
+    // Privacy filter: only keep recipients who can see the planner (sender)
+    const { data: visibleIds, error: visErr } = await supabase.rpc(
+      'get_visible_recipients',
+      { candidate_ids: candidateIds },
+    );
+    if (visErr) {
+      console.error('[FOMO:GroupForming] get_visible_recipients failed:', visErr.message);
+      return;
+    }
+    const toNotify: string[] = visibleIds ?? [];
+    if (toNotify.length === 0) return;
+
+    // Degrade message: don't name third-party planners (we can't verify each
+    // recipient's visibility to every planner client-side). Use generic copy.
+    const message = `Friends are planning ${planningNeighborhood} tonight. Join the move?`;
 
     for (const recipientId of toNotify.slice(0, 20)) {
       triggerPushNotification({
