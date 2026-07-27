@@ -55,11 +55,21 @@ export async function checkFriendsOutWithoutYou(userId: string): Promise<void> {
     const friendIds = await getFriendIds(userId);
     if (friendIds.length === 0) return;
 
+    // Exclude demo users so their 30-day 'out' rows don't trigger real pushes
+    const { data: demoProfiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .in('id', friendIds)
+      .eq('is_demo', true);
+    const demoSet = new Set((demoProfiles || []).map(p => p.id));
+    const realFriendIds = friendIds.filter(id => !demoSet.has(id));
+    if (realFriendIds.length === 0) return;
+
     // Count friends who are out
     const { count } = await supabase
       .from('night_statuses')
       .select('user_id', { count: 'exact', head: true })
-      .in('user_id', friendIds)
+      .in('user_id', realFriendIds)
       .eq('status', 'out')
       .not('expires_at', 'is', null)
       .gt('expires_at', new Date().toISOString());

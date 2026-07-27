@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Users, Trash2, Sparkles, TrendingUp, MapPin, RefreshCw, Navigation, Activity } from 'lucide-react';
 import { toast } from 'sonner';
-import { getStatusExpiry } from '@/lib/night-status';
+import { goOutAtVenue, stopSharing } from '@/lib/night-status';
 import { getDemoMode, setDemoMode, clearDemoData, seedDemoData, healthCheckDemoData } from '@/lib/demo-data';
 import { getBootstrapMode, setBootstrapMode } from '@/lib/bootstrap-config';
 import { useUserCity } from '@/hooks/useUserCity';
@@ -175,14 +175,24 @@ export default function DemoSettings() {
   };
 
   const handleClearData = async () => {
+    if (!user) return;
     setLoading(true);
     try {
+      // If we simulated a check-in for the real user, undo it
+      if (localStorage.getItem('demo_simulated_checkin')) {
+        await stopSharing(user.id);
+        localStorage.removeItem('demo_simulated_checkin');
+      }
+
       const result = await clearDemoData();
       if (result.success) {
         setSeeded(false);
-        // Force refetch caches to remove stale demo data
-        await queryClient.refetchQueries({ queryKey: ['profiles-safe'] });
-        await queryClient.refetchQueries({ queryKey: ['friend-ids'] });
+        // Invalidate all four friend-graph caches so demo data doesn't linger
+        // WP7: replace with invalidateFriendGraph() when available
+        await queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+        await queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
+        await queryClient.invalidateQueries({ queryKey: ['friends-out-status'] });
+        await queryClient.invalidateQueries({ queryKey: ['mutual-friend-ids'] });
         toast.success('Demo data cleared!');
         setTimeout(() => navigate('/'), 1000);
       } else {
@@ -262,24 +272,14 @@ export default function DemoSettings() {
 
     setLoading(true);
     try {
-      const expiresAt = new Date(getStatusExpiry());
+      // Route through WP2 helper so NS, checkin, and profile all agree
+      await goOutAtVenue(user.id, {
+        venue: { id: venue.id, name: venue.name },
+        coords: { lat: venue.lat, lng: venue.lng },
+        source: 'demo',
+      });
 
-      // Upsert night_status for the user
-      const { error } = await supabase
-        .from('night_statuses')
-        .upsert({
-          user_id: user.id,
-          status: 'out',
-          venue_id: venue.id,
-          venue_name: venue.name,
-          lat: venue.lat,
-          lng: venue.lng,
-          expires_at: expiresAt.toISOString(),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' });
-
-      if (error) throw error;
-
+      localStorage.setItem('demo_simulated_checkin', 'true');
       toast.success(`You're now "at" ${venue.name}! Open its Venue Card to test Yap.`, { duration: 5000 });
     } catch (error) {
       console.error('Error simulating check-in:', error);
