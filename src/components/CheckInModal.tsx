@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
-import { goOutAtVenue, goPlanning, stopSharing, getStatusExpiry, registerLocationTimer, must } from '@/lib/night-status';
+import { goOutAtVenue, goPlanning, stopSharing, getStatusExpiry, registerLocationTimer, isUserCurrentlyOut, must } from '@/lib/night-status';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
@@ -188,7 +188,14 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     if (!userId) return;
 
     // Update location every 60 seconds (reduced from 15s to lower DB load)
-    const intervalId = window.setInterval(() => {
+    const intervalId = window.setInterval(async () => {
+      // Status gate: stop writing GPS if user is no longer out
+      const stillOut = await isUserCurrentlyOut(userId);
+      if (!stillOut) {
+        clearInterval(intervalId);
+        locationIntervalRef.current = null;
+        return;
+      }
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           async (position) => {

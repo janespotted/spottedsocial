@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { autoTrackVenue } from './auto-venue-tracker';
 import { supabase } from '@/integrations/supabase/client';
+import { isUserCurrentlyOut } from './night-status';
 import { findNearestVenue, findNearbyVenues, calculateDistance } from './location-service';
 import { triggerPushNotification } from './push-notifications';
 import { checkFriendsOutWithoutYou, sendWeekendPregameNudge, checkTopVenueTonight } from './fomo-notifications';
@@ -47,9 +48,17 @@ export async function startBackgroundLocation(userId: string): Promise<void> {
 
         console.log('[BgLocation] Got update:', location.latitude.toFixed(4), location.longitude.toFixed(4));
 
+        // Status gate: only write GPS if user is still out with valid expiry
+        const stillOut = await isUserCurrentlyOut(userId);
+        if (!stillOut) {
+          console.log('[BgLocation] User no longer out — self-stopping watcher');
+          stopBackgroundLocation();
+          return;
+        }
+
         // Update profile GPS
         const now = new Date().toISOString();
-        await supabase
+        const { error: profileErr } = await supabase
           .from('profiles')
           .update({
             last_known_lat: location.latitude,
@@ -57,13 +66,15 @@ export async function startBackgroundLocation(userId: string): Promise<void> {
             last_location_at: now,
           })
           .eq('id', userId);
+        if (profileErr) console.error('[BgLocation] Profile GPS update error:', profileErr);
 
         // Update active check-in timestamp
-        await supabase
+        const { error: checkinErr } = await supabase
           .from('checkins')
           .update({ last_updated_at: now })
           .eq('user_id', userId)
           .is('ended_at', null);
+        if (checkinErr) console.error('[BgLocation] Checkin timestamp update error:', checkinErr);
 
         // If user is 'planning', nudge them when they arrive at a venue
         try {
