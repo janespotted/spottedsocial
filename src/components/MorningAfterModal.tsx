@@ -238,7 +238,7 @@ export function MorningAfterModal({ open, onClose }: MorningAfterModalProps) {
           {/* Safe area spacer */}
           <div style={{ height: 'env(safe-area-inset-top, 0px)' }} className="bg-[#0a0a0a]" />
 
-          <div className="px-5 pb-16">
+          <div className="px-5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 64px)' }}>
             {/* Header */}
             <div className="flex items-start justify-between pt-4 pb-6">
               <div>
