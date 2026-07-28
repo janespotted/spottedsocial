@@ -16,6 +16,7 @@ import { captureLocationWithVenue, createNewVenue, detectNeighborhoodFromGPS, ge
 import { haptic } from '@/lib/haptics';
 import { requestNotificationPermission } from '@/lib/notifications';
 import { logEvent } from '@/lib/event-logger';
+import { getUserItem, setUserItem, removeUserItem } from '@/lib/user-storage';
 import { triggerPushNotification } from '@/lib/push-notifications';
 import { sendCheckinNotifications } from '@/lib/checkin-notifications';
 import { scheduleMorningAfterNotification } from '@/lib/morning-after-notification';
@@ -122,7 +123,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
       setShowPlanningPrivacy(false);
       setIsDetectingLocation(false);
 
-      const reminderTime = localStorage.getItem('checkin_reminder');
+      const reminderTime = user ? getUserItem(user.id, 'checkin_reminder') : null;
       if (reminderTime) {
         setHasPendingReminder(true);
         setPendingReminderTime(Number(reminderTime));
@@ -237,9 +238,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     }
 
     // Clear still-here nudge timers
-    localStorage.removeItem('still_here_check');
-    localStorage.removeItem('still_here_venue');
-    localStorage.removeItem('still_here_deadline');
+    if (user) {
+      removeUserItem(user.id, 'still_here_check');
+      removeUserItem(user.id, 'still_here_venue');
+      removeUserItem(user.id, 'still_here_deadline');
+    }
   };
 
 
@@ -467,12 +470,6 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         privateParty: { neighborhood: privatePartyNeighborhood, address: privatePartyAddress || null },
       });
 
-      // WP7: Remove location_sharing_level write (audit P1-2)
-      await supabase
-        .from('profiles')
-        .update({ location_sharing_level: privatePartyVisibility })
-        .eq('id', user.id);
-
       haptic.medium();
       
       // Show confirmation
@@ -522,7 +519,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     await requestNotificationPermission();
     
     const reminderTime = Date.now() + minutes * 60 * 1000;
-    localStorage.setItem('checkin_reminder', String(reminderTime));
+    if (user) setUserItem(user.id, 'checkin_reminder', String(reminderTime));
     
     haptic.light();
     const label = minutes >= 60 ? `${minutes / 60} hr${minutes > 60 ? 's' : ''}` : `${minutes} mins`;
@@ -531,7 +528,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   };
 
   const handleCancelReminder = () => {
-    localStorage.removeItem('checkin_reminder');
+    if (user) removeUserItem(user.id, 'checkin_reminder');
     setHasPendingReminder(false);
     setPendingReminderTime(null);
     haptic.light();
@@ -554,7 +551,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const handleSnooze = (minutes: number) => {
     const snoozeTime = Date.now() + minutes * 60 * 1000;
-    localStorage.setItem('checkin_reminder', String(snoozeTime));
+    if (user) setUserItem(user.id, 'checkin_reminder', String(snoozeTime));
     haptic.light();
     sonnerToast.success(`Snoozed for ${minutes} minutes! 😴`);
     onOpenChange(false);
@@ -658,20 +655,16 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
     if (selectedStatus === 'out') {
       // Clear any pending reminder since user is now checking in
-      localStorage.removeItem('checkin_reminder');
+      if (user) removeUserItem(user.id, 'checkin_reminder');
       try {
-        // WP7: Remove location_sharing_level write (audit P1-2)
-        await supabase
-          .from('profiles')
-          .update({ location_sharing_level: shareOption })
-          .eq('id', user?.id);
-
         // Start tracking location updates
         startLocationTracking(locationData.lat, locationData.lng);
 
         // Schedule "still here?" check for 2 hours from now
-        localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
-        localStorage.setItem('still_here_venue', finalVenueName);
+        if (user) {
+          setUserItem(user.id, 'still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
+          setUserItem(user.id, 'still_here_venue', finalVenueName);
+        }
 
         // For custom venues (no DB venue ID), detect neighborhood and set as private party
         if (isCustomVenue && !finalVenueId) {
