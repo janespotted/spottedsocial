@@ -15,6 +15,7 @@ import { Home, Share2, Users, ChevronRight, X } from 'lucide-react';
 import { getOrCreateInviteCode, getInviteLink, triggerSmsInvite } from '@/lib/sms-invite';
 import { haptic } from '@/lib/haptics';
 import { toast } from 'sonner';
+import { isFreshLocation } from '@/lib/time-context';
 
 interface Friend {
   id: string;
@@ -66,7 +67,11 @@ export function InviteFriendsModal() {
       ]);
 
       const checkinMap = new Map<string, { venue_name: string; started_at: string | null }>();
-      checkinsRes.data?.forEach(c => { if (!checkinMap.has(c.user_id)) checkinMap.set(c.user_id, { venue_name: c.venue_name, started_at: c.started_at }); });
+      checkinsRes.data?.forEach(c => {
+        if (!checkinMap.has(c.user_id) && isFreshLocation(c.started_at)) {
+          checkinMap.set(c.user_id, { venue_name: c.venue_name, started_at: c.started_at });
+        }
+      });
 
       const nightMap = new Map<string, { status: string; planning_neighborhood: string | null; venue_name: string | null; updated_at: string | null; is_private_party: boolean | null; party_neighborhood: string | null }>();
       nightRes.data?.forEach(n => { if (!nightMap.has(n.user_id)) nightMap.set(n.user_id, n); });

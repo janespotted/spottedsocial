@@ -6,6 +6,7 @@ import { findNearestVenue, findNearbyVenues, calculateDistance } from './locatio
 import { triggerPushNotification } from './push-notifications';
 import { checkFriendsOutWithoutYou, sendWeekendPregameNudge, checkTopVenueTonight } from './fomo-notifications';
 import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
+import { setUserItem, getPassiveNudgeKey } from './user-storage';
 
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>(
   'BackgroundGeolocation'
@@ -118,7 +119,7 @@ export async function startBackgroundLocation(userId: string): Promise<void> {
               lastNudgedVenueLng = location.longitude;
 
               // Store venue data so the notification tap handler can read it
-              localStorage.setItem('venue_arrival_planning_payload', JSON.stringify({
+              setUserItem(userId, 'venue_arrival_planning_payload', JSON.stringify({
                 venue_id: nearestVenue.id,
                 venue_name: nearestVenue.name,
               }));
@@ -143,7 +144,7 @@ export async function startBackgroundLocation(userId: string): Promise<void> {
 
             if (nearestVenue && nearestVenue.id !== lastNudgedVenueId) {
               // Only nudge once per venue per session, and max once per hour
-              const nudgeKey = `passive_venue_nudge_${nearestVenue.id}`;
+              const nudgeKey = getPassiveNudgeKey(userId, nearestVenue.id);
               const lastNudge = localStorage.getItem(nudgeKey);
               const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
@@ -155,7 +156,7 @@ export async function startBackgroundLocation(userId: string): Promise<void> {
                 localStorage.setItem(nudgeKey, String(Date.now()));
 
                 // Store venue data for tap handler
-                localStorage.setItem('venue_arrival_planning_payload', JSON.stringify({
+                setUserItem(userId, 'venue_arrival_planning_payload', JSON.stringify({
                   venue_id: nearestVenue.id,
                   venue_name: nearestVenue.name,
                 }));

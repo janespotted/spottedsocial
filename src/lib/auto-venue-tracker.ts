@@ -7,6 +7,7 @@ import { logEvent } from './event-logger';
 import { sendCheckinNotifications } from './checkin-notifications';
 import { logLocationEvent, createEvaluationId, markAutoCheckin } from './location-event-logger';
 import type { ThresholdsMet, TriggerResult } from './venue-arrival-nudge';
+import { setUserItem, removeUserItem } from './user-storage';
 
 interface LastCheckin {
   id: string;
@@ -488,9 +489,9 @@ export const autoTrackVenue = async (userId: string): Promise<void> => {
     sendVenueChangeNotification(nearestVenue.name);
 
     // Reset "still here?" timer since we just moved to a new venue
-    localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
-    localStorage.setItem('still_here_venue', nearestVenue.name);
-    localStorage.removeItem('still_here_deadline');
+    setUserItem(userId, 'still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
+    setUserItem(userId, 'still_here_venue', nearestVenue.name);
+    removeUserItem(userId, 'still_here_deadline');
 
     // Log location update
     logEvent('location_update', {

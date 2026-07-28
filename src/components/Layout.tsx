@@ -23,6 +23,8 @@ import { AlwaysOnGate } from './AlwaysOnGate';
 import { LocationDegradedBanner } from './LocationDegradedBanner';
 import { PlanInviteModal } from './PlanInviteModal';
 import { toast } from 'sonner';
+import { getCurrentLocation } from '@/lib/location-service';
+import { getUserItem, setUserItem, removeUserItem } from '@/lib/user-storage';
 
 interface LayoutProps {
   children: ReactNode;
@@ -209,13 +211,13 @@ export function Layout({ children }: LayoutProps) {
       }
 
       // Venue arrival while planning — open check-in at privacy selection with pre-populated venue
-      if (localStorage.getItem('venue_arrival_planning_open') === 'true') {
+      if (localStorage.getItem('venue_arrival_planning_open') === 'true' && user) {
         localStorage.removeItem('venue_arrival_planning_open');
         try {
-          const raw = localStorage.getItem('venue_arrival_planning_payload');
+          const raw = getUserItem(user.id, 'venue_arrival_planning_payload');
           if (raw) {
             const { venue_id, venue_name } = JSON.parse(raw);
-            localStorage.removeItem('venue_arrival_planning_payload');
+            removeUserItem(user.id, 'venue_arrival_planning_payload');
             if (venue_id && venue_name) {
               openCheckInForVenueArrival(venue_id, venue_name);
               return;
@@ -238,10 +240,11 @@ export function Layout({ children }: LayoutProps) {
   // Check for pending check-in reminders + still-here nudge
   useEffect(() => {
     const checkReminder = async () => {
+      if (!user) return;
       // Original check-in reminder
-      const reminderTime = localStorage.getItem('checkin_reminder');
+      const reminderTime = getUserItem(user.id, 'checkin_reminder');
       if (reminderTime && Date.now() >= Number(reminderTime)) {
-        localStorage.removeItem('checkin_reminder');
+        removeUserItem(user.id, 'checkin_reminder');
         showBrowserNotification(
           'Have you made up your mind?',
           'Are you going out tonight? Tap to let your friends know!'
@@ -250,8 +253,8 @@ export function Layout({ children }: LayoutProps) {
       }
 
       // "Still here?" nudge timer
-      const stillHereTime = localStorage.getItem('still_here_check');
-      if (stillHereTime && Date.now() >= Number(stillHereTime) && user) {
+      const stillHereTime = getUserItem(user.id, 'still_here_check');
+      if (stillHereTime && Date.now() >= Number(stillHereTime)) {
         // Check if user still has an active (non-expired) night status
         const { data: activeStatus } = await supabase
           .from('night_statuses')
@@ -263,18 +266,18 @@ export function Layout({ children }: LayoutProps) {
 
         if (!activeStatus) {
           // No active status — stale timer from a previous night, clean up
-          localStorage.removeItem('still_here_check');
-          localStorage.removeItem('still_here_venue');
-          localStorage.removeItem('still_here_deadline');
+          removeUserItem(user.id, 'still_here_check');
+          removeUserItem(user.id, 'still_here_venue');
+          removeUserItem(user.id, 'still_here_deadline');
           return;
         }
 
-        const venueName = localStorage.getItem('still_here_venue') || 'your spot';
-        localStorage.removeItem('still_here_check');
+        const venueName = getUserItem(user.id, 'still_here_venue') || 'your spot';
+        removeUserItem(user.id, 'still_here_check');
 
         // Set a 30-minute auto-checkout deadline
-        if (!localStorage.getItem('still_here_deadline')) {
-          localStorage.setItem('still_here_deadline', String(Date.now() + 30 * 60 * 1000));
+        if (!getUserItem(user.id, 'still_here_deadline')) {
+          setUserItem(user.id, 'still_here_deadline', String(Date.now() + 30 * 60 * 1000));
         }
 
         showBrowserNotification(
@@ -294,13 +297,24 @@ export function Layout({ children }: LayoutProps) {
                   onClick={async () => {
                     toast.dismiss(id);
                     const now = new Date().toISOString();
-                    await Promise.all([
-                      supabase.from('profiles').update({ last_location_at: now }).eq('id', user.id),
-                      supabase.from('checkins').update({ last_updated_at: now }).eq('user_id', user.id).is('ended_at', null),
-                    ]);
-                    localStorage.removeItem('still_here_deadline');
-                    localStorage.setItem('still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
-                    localStorage.setItem('still_here_venue', venueName);
+                    try {
+                      // Capture fresh GPS so the pin reflects real position
+                      const loc = await getCurrentLocation();
+                      await Promise.all([
+                        supabase.from('profiles').update({
+                          last_known_lat: loc.lat,
+                          last_known_lng: loc.lng,
+                          last_location_at: now,
+                        }).eq('id', user.id),
+                        supabase.from('checkins').update({ last_updated_at: now }).eq('user_id', user.id).is('ended_at', null),
+                      ]);
+                    } catch {
+                      // GPS failed — only bump checkin, NOT last_location_at (stale pin)
+                      await supabase.from('checkins').update({ last_updated_at: now }).eq('user_id', user.id).is('ended_at', null);
+                    }
+                    removeUserItem(user.id, 'still_here_deadline');
+                    setUserItem(user.id, 'still_here_check', String(Date.now() + 2 * 60 * 60 * 1000));
+                    setUserItem(user.id, 'still_here_venue', venueName);
                   }}
                   className="w-full h-10 bg-[#a855f7] hover:bg-[#a855f7]/80 text-white text-sm font-medium rounded-xl transition-colors"
                 >
@@ -309,9 +323,9 @@ export function Layout({ children }: LayoutProps) {
                 <button
                   onClick={() => {
                     toast.dismiss(id);
-                    localStorage.removeItem('still_here_deadline');
-                    localStorage.removeItem('still_here_venue');
-                    localStorage.removeItem('still_here_check');
+                    removeUserItem(user.id, 'still_here_deadline');
+                    removeUserItem(user.id, 'still_here_venue');
+                    removeUserItem(user.id, 'still_here_check');
                     openCheckInNewSpot();
                   }}
                   className="w-full h-10 bg-[#2d1b4e] hover:bg-[#2d1b4e]/80 text-[#d4ff00] text-sm font-medium rounded-xl border border-[#d4ff00]/30 transition-colors"
@@ -323,8 +337,8 @@ export function Layout({ children }: LayoutProps) {
                     toast.dismiss(id);
                     if (user) {
                       await performAutoCheckout(user.id, 'still_here_heading_home');
-                      localStorage.removeItem('still_here_deadline');
-                      localStorage.removeItem('still_here_venue');
+                      removeUserItem(user.id, 'still_here_deadline');
+                      removeUserItem(user.id, 'still_here_venue');
                     }
                   }}
                   className="w-full h-9 text-white/50 hover:text-white text-sm transition-colors"
@@ -338,11 +352,11 @@ export function Layout({ children }: LayoutProps) {
       }
 
       // Auto-checkout deadline (30 min after nudge with no response)
-      const deadline = localStorage.getItem('still_here_deadline');
-      if (deadline && Date.now() >= Number(deadline) && user) {
-        localStorage.removeItem('still_here_deadline');
-        localStorage.removeItem('still_here_venue');
-        localStorage.removeItem('still_here_check');
+      const deadline = getUserItem(user.id, 'still_here_deadline');
+      if (deadline && Date.now() >= Number(deadline)) {
+        removeUserItem(user.id, 'still_here_deadline');
+        removeUserItem(user.id, 'still_here_venue');
+        removeUserItem(user.id, 'still_here_check');
         performAutoCheckout(user.id, 'still_here_no_response');
       }
     };
