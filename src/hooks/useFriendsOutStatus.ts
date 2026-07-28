@@ -1,10 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFriendIds } from '@/hooks/useFriendIds';
 import { useMutualFriendIds } from '@/hooks/useMutualFriendIds';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useProfilesSafe } from '@/hooks/useProfilesCache';
+import { createResilientChannel } from '@/lib/resilient-channel';
 
 export type FriendRing = 'close' | 'friend' | 'mutual';
 
@@ -31,6 +33,42 @@ export function useFriendsOutStatus() {
   const { data: mutualFriendIds } = useMutualFriendIds(user?.id);
   const { data: allProfiles } = useProfilesSafe();
   const demoEnabled = useDemoMode();
+  const queryClient = useQueryClient();
+
+  // Debounced invalidation for realtime events
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const invalidate = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['friends-out-status'] });
+    }, 1000);
+  }, [queryClient]);
+
+  // Realtime subscription for night_statuses + checkins changes
+  useEffect(() => {
+    if (!user) return;
+
+    const cleanupChannel = createResilientChannel({
+      name: 'friends-out-status-realtime',
+      configure: (ch) => ch
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'night_statuses' },
+          () => invalidate()
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'checkins' },
+          () => invalidate()
+        ),
+      onReconnect: invalidate,
+    });
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      cleanupChannel();
+    };
+  }, [user, invalidate]);
 
   return useQuery({
     queryKey: ['friends-out-status', friendIds, mutualFriendIds, demoEnabled],

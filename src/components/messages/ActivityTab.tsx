@@ -9,6 +9,7 @@ import { useMeetUp } from '@/contexts/MeetUpContext';
 import { useVenueIdCard } from '@/contexts/VenueIdCardContext';
 import { useImDown } from '@/contexts/ImDownContext';
 import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { toast } from '@/hooks/use-toast';
 import { logEvent } from '@/lib/event-logger';
 import { triggerPushNotification } from '@/lib/push-notifications';
@@ -155,16 +156,18 @@ export function ActivityTab() {
       }, 2000);
     };
 
-    const channel = supabase
-      .channel('activity-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `receiver_id=eq.${user.id}` }, debouncedRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, debouncedRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, debouncedRefresh)
-      .subscribe();
+    const cleanupChannel = createResilientChannel({
+      name: 'activity-realtime',
+      configure: (ch) => ch
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `receiver_id=eq.${user.id}` }, debouncedRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, debouncedRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, debouncedRefresh),
+      onReconnect: debouncedRefresh,
+    });
 
     return () => {
       clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
+      cleanupChannel();
     };
   }, [user]);
 
