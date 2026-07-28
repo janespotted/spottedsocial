@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS public.close_friends (
 CREATE UNIQUE INDEX IF NOT EXISTS close_friends_user_pair_uniq
   ON public.close_friends (user_id, close_friend_id);
 
+-- Clean orphaned rows before adding FK constraints (deleted users / demo leftovers)
+DELETE FROM public.close_friends
+  WHERE user_id NOT IN (SELECT id FROM public.profiles);
+DELETE FROM public.close_friends
+  WHERE close_friend_id NOT IN (SELECT id FROM public.profiles);
+
 DO $$
 BEGIN
   IF NOT EXISTS (
