@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
+import { invalidateFriendGraph } from '@/lib/invalidate-friend-graph';
 import { useMutualFriendsWith } from '@/hooks/useMutualFriendsWith';
 import { ReportDialog } from '@/components/ReportDialog';
 import { isFromTonight } from '@/lib/time-context';
@@ -360,7 +361,7 @@ export function FriendIdCard() {
           canSeeLocation: false,
           isPrivateParty: false
         });
-        setStatusSubtitle('Location hidden');
+        setStatusSubtitle('Home');
       } else {
         // User is no longer out - fetch their last ended check-in
         const { data: lastCheckIn } = await supabase
@@ -642,7 +643,7 @@ export function FriendIdCard() {
 
     setStatusPopoverOpen(false);
     closeFriendCard();
-    queryClient.invalidateQueries({ queryKey: ['friends-out-status'] });
+    invalidateFriendGraph(queryClient);
 
     toast(`Removed ${friendName} as a friend`, {
       action: {
@@ -862,7 +863,7 @@ export function FriendIdCard() {
 
     setOverflowView('menu');
     closeFriendCard();
-    queryClient.invalidateQueries({ queryKey: ['friends-out-status'] });
+    invalidateFriendGraph(queryClient);
 
     toast(`${blockedName} blocked`, {
       action: {

@@ -9,6 +9,7 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { createResilientChannel } from '@/lib/resilient-channel';
+import { invalidateFriendGraph } from '@/lib/invalidate-friend-graph';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -162,8 +163,7 @@ export default function Friends() {
       timer = setTimeout(() => {
         fetchRequests();
         fetchSuggestedFriends();
-        queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-        queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+        invalidateFriendGraph(queryClient);
       }, 1500);
     };
     const cleanupChannel = createResilientChannel({
@@ -379,8 +379,7 @@ export default function Friends() {
     haptic.success();
     toast.success('Friend request accepted!');
     setRequests(requests.filter(r => r.id !== requestId));
-    queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-    queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+    invalidateFriendGraph(queryClient);
   };
 
   const declineRequest = async (requestId: string) => {
@@ -609,8 +608,7 @@ export default function Friends() {
   const pendingCount = requests.length;
 
   const handleRefresh = useCallback(async () => {
-    queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-    queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+    invalidateFriendGraph(queryClient);
     await Promise.all([fetchRequests(), fetchOrCreateInviteCode(), fetchSuggestedFriends()]);
   }, [queryClient, fetchRequests, fetchOrCreateInviteCode, fetchSuggestedFriends]);
 

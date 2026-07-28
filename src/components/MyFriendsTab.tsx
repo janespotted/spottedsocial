@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, X, MapPin, Target, Megaphone, Check, UserPlus, Clock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { invalidateFriendGraph } from '@/lib/invalidate-friend-graph';
 import { haptic } from '@/lib/haptics';
 import { triggerPushNotification } from '@/lib/push-notifications';
 
@@ -284,8 +285,7 @@ export function MyFriendsTab() {
   }, [user, friendProfiles]);
 
   const handleRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-    await queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+    invalidateFriendGraph(queryClient);
     await fetchStatuses();
   }, [queryClient, fetchStatuses]);
 
