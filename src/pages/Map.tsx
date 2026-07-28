@@ -130,7 +130,7 @@ function groupMarkerHtml(members: { avatarUrl: string | null | undefined; displa
     ${badge}
   </div>`;
 }
-import { isFromTonight } from '@/lib/time-context';
+import { isFromTonight, isFreshLocation } from '@/lib/time-context';
 import { QuickStatusSheet } from '@/components/QuickStatusSheet';
 import { UpdateSpotSheet } from '@/components/UpdateSpotSheet';
 import { VenueMoveBanner } from '@/components/VenueMoveBanner';
@@ -514,12 +514,8 @@ export default function Map() {
           }));
         setPlanningFriends(planningFriendsData);
       } else {
-        // Normal mode: show real friends only - use cached friend IDs if available
-        const cachedIds: string[] | undefined = (window as any).__cachedFriendIds;
-        
-        if (cachedIds) {
-          friendIds = cachedIds;
-        } else {
+        // Normal mode: show real friends only
+        {
           const { data: sentFriendships } = await supabase
             .from('friendships')
             .select('friend_id')
@@ -552,28 +548,20 @@ export default function Map() {
             profilesError = retry.error;
           }
 
-          // If RPC still fails, fall back to direct profiles query for friends
-          if (profilesError && friendIds.length > 0) {
-            console.warn('Map profiles RPC retry failed, falling back to direct query:', profilesError.message);
-            const { data: directProfiles } = await supabase
-              .from('profiles')
-              .select('id, display_name, username, avatar_url, is_out, last_known_lat, last_known_lng, last_location_at, is_demo')
-              .in('id', friendIds);
-            allProfiles = directProfiles;
+          // If RPC still fails, log and use empty array (direct profiles query
+          // won't have location columns due to RLS grants)
+          if (profilesError) {
+            console.warn('Map profiles RPC retry failed:', profilesError.message);
+            allProfiles = [];
           }
           
-          // Filter to only friends who are out with valid location data
-          // Also filter out stale locations (not from tonight's window)
+          // Filter to only friends who are out with valid, fresh location data
           const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
           let friendProfiles = (allProfiles || [])
             .filter((p: any) => {
               if (!friendIds.includes(p.id) || p.is_out !== true) return false;
               if (p.last_known_lat === null || p.last_known_lng === null) return false;
-              if (!isFromTonight(p.last_location_at)) return false;
-              // Filter out friends whose location is >2 hours stale
-              if (!p.last_location_at) return false;
-              const age = Date.now() - new Date(p.last_location_at).getTime();
-              return age < TWO_HOURS_MS;
+              return isFreshLocation(p.last_location_at);
             });
           
           // Only filter out demo users when demo mode is OFF (bootstrap mode)
@@ -594,19 +582,26 @@ export default function Map() {
               .not('expires_at', 'is', null)
               .gt('expires_at', new Date().toISOString());
 
-            const { data: mutualProfiles } = await supabase
-              .from('profiles')
-              .select('id, display_name, avatar_url, location_sharing_level, is_out, last_known_lat, last_known_lng, last_location_at')
-              .in('id', mutualFriendIds)
-              .eq('is_out', true);
-
-            const mutualProfileMap = new globalThis.Map((mutualProfiles || []).map((p: any) => [p.id, p]));
+            // Use allProfiles from get_profiles_safe (which respects RLS/server masking)
+            // instead of direct profiles query (which fails on location columns)
+            const mutualProfileMap = new globalThis.Map(
+              (allProfiles || [])
+                .filter((p: any) => mutualFriendIds.includes(p.id) && p.is_out === true)
+                .map((p: any) => [p.id, p])
+            );
 
             for (const ms of mutualStatuses || []) {
               const profile = mutualProfileMap.get(ms.user_id);
-              if (profile && profile.location_sharing_level === 'mutual_friends' && ms.lat && ms.lng) {
-                friendProfiles.push(profile);
-                if (!friendIds.includes(ms.user_id)) friendIds.push(ms.user_id);
+              if (profile && profile.location_sharing_level === 'mutual_friends') {
+                // Use coords from get_profiles_safe (server-masked per viewer)
+                // Apply same freshness rules as direct friends
+                if (profile.last_known_lat != null && profile.last_known_lng != null
+                    && isFromTonight(profile.last_location_at)
+                    && profile.last_location_at
+                    && (Date.now() - new Date(profile.last_location_at).getTime()) < TWO_HOURS_MS) {
+                  friendProfiles.push(profile);
+                  if (!friendIds.includes(ms.user_id)) friendIds.push(ms.user_id);
+                }
               }
             }
           }
