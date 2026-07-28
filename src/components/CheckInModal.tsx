@@ -911,8 +911,12 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             planning_visibility: null,
             is_private_party: false,
             party_neighborhood: null,
-            party_address: null,
           }, { onConflict: 'user_id' }));
+
+        must(await supabase
+          .from('night_statuses')
+          .update({ party_address: null })
+          .eq('user_id', user?.id));
 
         haptic.medium();
       }
