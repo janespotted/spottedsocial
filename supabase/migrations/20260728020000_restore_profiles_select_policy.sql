@@ -1,0 +1,10 @@
+-- NO-OP: This migration originally added a permissive USING(true) SELECT policy
+-- on profiles, which was incorrect — it exposed GPS/PII columns to all
+-- authenticated users. The policy was dropped within ~1 hour via the
+-- Management API. This file is kept as a no-op so migration history stays
+-- in sync with the remote schema_migrations table.
+--
+-- The friend-request bug that motivated this was fixed in client code instead:
+-- fetchRequests now sources sender profiles from the get_profiles_safe RPC
+-- cache rather than direct .from('profiles') reads (which are blocked by
+-- design — only own + demo rows are visible).
