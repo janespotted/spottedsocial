@@ -18,7 +18,8 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home, Map as MapIcon, Music, Wine, Beer, Building, UtensilsCrossed, UserPlus } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home, Map as MapIcon, Music, Wine, Beer, Building, UtensilsCrossed, UserPlus, Loader2 } from 'lucide-react';
+import { haptic } from '@/lib/haptics';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -213,6 +214,8 @@ export default function Map() {
   const venueMarkersRef = useRef<globalThis.Map<string, mapboxgl.Marker>>(new globalThis.Map());
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const userLocationTimestampRef = useRef<number>(0);
+  const [isLocating, setIsLocating] = useState(false);
   const [userProfile, setUserProfile] = useState<{ avatar_url: string | null; display_name: string } | null>(null);
   const [showFriendsList, setShowFriendsList] = useState(false);
   const [isLoadingFriends, setIsLoadingFriends] = useState(true);
@@ -1491,41 +1494,37 @@ export default function Map() {
     };
   }, [showFriendsList]);
 
-  const centerOnMyLocation = () => {
+  const centerOnMyLocation = async () => {
     if (!map.current) return;
+    haptic.light();
 
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          // Update user location state to show avatar marker
-          setUserLocation({ lat: latitude, lng: longitude });
-          
-          map.current?.flyTo({
-            center: [longitude, latitude],
-            zoom: 14,
-            duration: 1500,
-            essential: true
-          });
-        },
-        (error) => {
-          console.error('Location error:', error);
-          toast({
-            title: "Location unavailable",
-            description: "Turn on location services to use this feature",
-            variant: "destructive"
-          });
-        }
-      );
-    } else {
+    // Use cached location if fresh (< 60s)
+    const isFresh = userLocation && (Date.now() - userLocationTimestampRef.current < 60_000);
+    if (isFresh && userLocation) {
+      map.current.flyTo({ center: [userLocation.lng, userLocation.lat], zoom: 15.5, duration: 1200 });
+      return;
+    }
+
+    // Request a fresh fix
+    setIsLocating(true);
+    try {
+      const { getCurrentLocation } = await import('@/lib/location-service');
+      const loc = await getCurrentLocation();
+      if (loc.lat === 0 && loc.lng === 0) throw new Error('Zero coords');
+      setUserLocation({ lat: loc.lat, lng: loc.lng });
+      userLocationTimestampRef.current = Date.now();
+      map.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 15.5, duration: 1200 });
+    } catch {
       toast({
-        title: "Location unavailable",
-        description: "Your device doesn't support location services",
+        title: "Couldn't find your location",
+        description: "Turn on location services to use this feature",
         variant: "destructive"
       });
+    } finally {
+      setIsLocating(false);
     }
   };
+
 
 
   // Handle venue selection from search
@@ -2329,11 +2328,15 @@ export default function Map() {
       {/* My Location Button */}
       <button
         onClick={centerOnMyLocation}
+        disabled={isLocating}
         className={`absolute right-6 w-12 h-12 rounded-full bg-[#1a0a2e]/90 backdrop-blur border border-white/15 flex items-center justify-center z-20 hover:bg-[#1a0a2e] transition-all duration-300 ${focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
         style={{ bottom: bottomOffset }}
         aria-label="Center on my location"
       >
-        <Crosshair className="w-5 h-5 text-white" />
+        {isLocating
+          ? <Loader2 className="w-5 h-5 text-[#d4ff00] animate-spin" />
+          : <Crosshair className={`w-5 h-5 ${userLocation ? 'text-[#d4ff00]' : 'text-white'}`} />
+        }
       </button>
 
       {/* Legend - Hidden in venues-only mode */}
