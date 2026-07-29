@@ -683,6 +683,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
 
   const getTimeAgo = (date: string) => {
     const distance = formatDistanceToNow(new Date(date), { addSuffix: false });
+    if (distance.startsWith("less than")) return "just now";
     return distance
       .replace("about ", "")
       .replace(" minutes", "m")
