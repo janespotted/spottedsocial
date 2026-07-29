@@ -245,11 +245,14 @@ export default function Friends() {
         return;
       }
 
+      // Source profiles from get_profiles_safe RPC (SECURITY DEFINER, bypasses RLS)
+      // Direct .from('profiles') reads of other users are blocked by design.
+      const { data: safeProfiles } = await supabase.rpc('get_profiles_safe');
+      const profileMap = new Map((safeProfiles || []).map((p: any) => [p.id, p]));
+
       const requestsWithMutuals = await Promise.all(
         friendRequests.map(async (req) => {
-          const { data: profiles } = await supabase
-            .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', req.user_id);
-          const profile = profiles?.[0];
+          const profile = profileMap.get(req.user_id);
 
           if (!profile) return null;
           if (!demoEnabled && profile.is_demo) return null;
@@ -278,9 +281,7 @@ export default function Friends() {
       if (outgoing && outgoing.length > 0) {
         const outgoingWithProfiles = await Promise.all(
           outgoing.map(async (req) => {
-            const { data: profiles } = await supabase
-              .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', req.friend_id);
-            const profile = profiles?.[0];
+            const profile = profileMap.get(req.friend_id);
             if (!profile) return null;
             if (!demoEnabled && profile.is_demo) return null;
             return {

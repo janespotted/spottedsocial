@@ -1016,9 +1016,15 @@ export default function Map() {
       if (shouldCluster) {
         filteredFriends.forEach((other) => {
           if (assigned.has(other.user_id)) return;
+
+          // Cluster by same venue name (non-empty) OR by GPS proximity
+          const sameVenue = friend.venue_name && other.venue_name
+            && friend.venue_name.toLowerCase() === other.venue_name.toLowerCase();
           const latDiff = Math.abs(friend.lat - other.lat);
           const lngDiff = Math.abs(friend.lng - other.lng);
-          if (latDiff < CLUSTER_THRESHOLD && lngDiff < CLUSTER_THRESHOLD) {
+          const closeGps = latDiff < CLUSTER_THRESHOLD && lngDiff < CLUSTER_THRESHOLD;
+
+          if (sameVenue || closeGps) {
             cluster.push(other);
             assigned.add(other.user_id);
           }
@@ -1034,7 +1040,10 @@ export default function Map() {
       for (const cluster of clusters) {
         const latDiff = Math.abs(cluster[0].lat - userLocation.lat);
         const lngDiff = Math.abs(cluster[0].lng - userLocation.lng);
-        if (latDiff < CLUSTER_THRESHOLD && lngDiff < CLUSTER_THRESHOLD) {
+        const closeGps = latDiff < CLUSTER_THRESHOLD && lngDiff < CLUSTER_THRESHOLD;
+        const sameVenue = currentUserVenue && cluster[0].venue_name
+          && currentUserVenue.toLowerCase() === cluster[0].venue_name.toLowerCase();
+        if (closeGps || sameVenue) {
           // Insert "self" as first member of this cluster
           cluster.unshift({
             user_id: user.id,
