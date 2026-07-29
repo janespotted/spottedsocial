@@ -541,7 +541,7 @@ export default function Profile() {
             {([
               { value: 'close_friends', label: 'Close Friends' },
               { value: 'all_friends', label: 'All Friends' },
-              { value: 'mutual_friends', label: 'Friends of Friends' },
+              { value: 'mutual_friends', label: 'Mutual Friends' },
             ] as const).map((opt) => (
               <button
                 key={opt.value}
