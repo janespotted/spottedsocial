@@ -7,6 +7,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { createResilientChannel } from '@/lib/resilient-channel';
+import { emitSharingLevelChanged } from '@/lib/night-status';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
@@ -94,6 +95,16 @@ export default function Profile() {
       fetchProfileData();
     }
   }, [user]);
+
+  // Sync locationSharingLevel when changed from another surface (e.g. CheckInModal)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const level = (e as CustomEvent).detail?.level;
+      if (level) setLocationSharingLevel(level);
+    };
+    window.addEventListener('sharingLevelChanged', handler);
+    return () => window.removeEventListener('sharingLevelChanged', handler);
+  }, []);
 
   const getInviteUrl = () => `${APP_BASE_URL}/invite/${inviteCode}`;
 
@@ -354,6 +365,7 @@ export default function Profile() {
       if (!data || data.length === 0) throw new Error('Update matched no rows');
 
       setLocationSharingLevel(value);
+      emitSharingLevelChanged(value);
       await fetchProfileData();
       toast.success(`Now sharing with ${getLevelDisplayName(value)}`);
     } catch (error: any) {
@@ -582,7 +594,7 @@ export default function Profile() {
               <span className="text-[11px] text-white/60 uppercase tracking-wider">Tonight</span>
             </div>
             <span className="text-[11px] text-white/45">
-              {currentStatus === 'out' ? 'Visible to all friends' : currentStatus === 'planning' ? 'TBD' : 'Not sharing'}
+              {currentStatus === 'out' ? `Visible to ${getLevelDisplayName(locationSharingLevel).toLowerCase()}` : currentStatus === 'planning' ? 'TBD' : 'Not sharing'}
             </span>
           </div>
 

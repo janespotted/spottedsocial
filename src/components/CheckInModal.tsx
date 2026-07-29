@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
-import { goOutAtVenue, goPlanning, stopSharing, getStatusExpiry, registerLocationTimer, isUserCurrentlyOut, must } from '@/lib/night-status';
+import { goOutAtVenue, goPlanning, stopSharing, getStatusExpiry, registerLocationTimer, isUserCurrentlyOut, must, emitSharingLevelChanged } from '@/lib/night-status';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
@@ -478,6 +478,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         .update({ location_sharing_level: privatePartyVisibility })
         .eq('id', user.id)
         .select('location_sharing_level'));
+      emitSharingLevelChanged(privatePartyVisibility);
 
       haptic.medium();
 
@@ -709,6 +710,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             .update({ location_sharing_level: shareOption })
             .eq('id', user!.id)
             .select('location_sharing_level'));
+          emitSharingLevelChanged(shareOption);
 
           const displayName = detectedNeighborhood
             ? `${finalVenueName} (${detectedNeighborhood})`
@@ -723,6 +725,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             .update({ location_sharing_level: shareOption })
             .eq('id', user!.id)
             .select('location_sharing_level'));
+          emitSharingLevelChanged(shareOption);
 
           await updateStatus('out', locationData.lat, locationData.lng, finalVenueName, finalVenueId);
           onOpenChange(false);

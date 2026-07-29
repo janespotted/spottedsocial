@@ -11,6 +11,12 @@ import { clearUserLocation } from './clear-user-location';
 import { stopBackgroundLocation } from './background-location';
 import { markManualCheckin } from './auto-venue-tracker';
 
+// ── Sharing-level change event ───────────────────────────────────────
+
+export function emitSharingLevelChanged(level: string) {
+  window.dispatchEvent(new CustomEvent('sharingLevelChanged', { detail: { level } }));
+}
+
 // ── City → timezone mapping ──────────────────────────────────────────
 
 function cityToTimezone(city: SupportedCity): string {
