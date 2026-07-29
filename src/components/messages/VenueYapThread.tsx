@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemoMode } from "@/hooks/useDemoMode";
 import { supabase } from "@/integrations/supabase/client";
+import { createResilientChannel } from "@/lib/resilient-channel";
 import { MessageCircle, ChevronUp, ChevronDown, Send, Image, Video, X, MoreHorizontal, ArrowLeft, MapPin, Flame, EyeOff } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -295,17 +296,16 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
     const filterValue = partyId
       ? `party_id=eq.${partyId}`
       : `venue_name=eq.${venueName}`;
-    const channel = supabase
-      .channel("yap-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "yap_messages", filter: filterValue },
-        () => fetchYapMessages(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return createResilientChannel({
+      name: "yap-changes",
+      configure: (ch) => ch
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "yap_messages", filter: filterValue },
+          () => fetchYapMessages(),
+        ),
+      onReconnect: () => fetchYapMessages(),
+    });
   };
 
   const handleVote = async (yapId: string, voteType: "up" | "down") => {
@@ -683,6 +683,7 @@ export function VenueYapThread({ venueName, canPost, onBack, partyId }: VenueYap
 
   const getTimeAgo = (date: string) => {
     const distance = formatDistanceToNow(new Date(date), { addSuffix: false });
+    if (distance.startsWith("less than")) return "just now";
     return distance
       .replace("about ", "")
       .replace(" minutes", "m")

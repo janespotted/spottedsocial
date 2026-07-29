@@ -356,6 +356,8 @@ export default function Profile() {
     }
   };
 
+  // TODO: handlePlanningVisibilityChange is orphaned — planning visibility
+  // is settable per-status in CheckInModal, not as a global profile setting.
   const handlePlanningVisibilityChange = async (value: string) => {
     try {
       const { error } = await supabase
@@ -505,6 +507,38 @@ export default function Profile() {
           </div>
           <ChevronRight className="h-4 w-4 text-white/20" />
         </button>
+
+        {/* Location Sharing */}
+        <div className="w-full p-3.5 rounded-2xl bg-white/[0.03] border border-white/8">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-full bg-[#a855f7]/10 flex items-center justify-center">
+              <MapPin className="h-4 w-4 text-[#a855f7]" />
+            </div>
+            <div>
+              <p className="text-white text-sm font-medium">Location Sharing</p>
+              <p className="text-white/30 text-xs">Who can see you on the map when you're out</p>
+            </div>
+          </div>
+          <div className="flex gap-1.5 bg-white/[0.03] rounded-xl p-1">
+            {([
+              { value: 'close_friends', label: 'Close Friends' },
+              { value: 'all_friends', label: 'All Friends' },
+              { value: 'mutual_friends', label: 'Friends of Friends' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleLocationSharingChange(opt.value)}
+                className={`flex-1 py-2 px-1 rounded-lg text-xs font-medium transition-colors ${
+                  locationSharingLevel === opt.value
+                    ? 'bg-[#a855f7] text-white'
+                    : 'text-white/40 hover:text-white/60'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Find from Contacts */}
         <button

@@ -164,6 +164,9 @@ export async function stopSharing(userId: string): Promise<void> {
     .is('ended_at', null));
 
   // 4. Full-field night_statuses reset — every venue/party/planning field nulled
+  // party_address excluded from upsert (column-level SELECT revoked; ON CONFLICT
+  // DO UPDATE reads excluded.party_address which requires SELECT). Set via
+  // separate UPDATE which only writes a constant and needs no SELECT.
   must(await supabase
     .from('night_statuses')
     .upsert({
@@ -178,9 +181,13 @@ export async function stopSharing(userId: string): Promise<void> {
       planning_visibility: null,
       is_private_party: false,
       party_neighborhood: null,
-      party_address: null,
       updated_at: now,
     }, { onConflict: 'user_id' }));
+
+  must(await supabase
+    .from('night_statuses')
+    .update({ party_address: null })
+    .eq('user_id', userId));
 }
 
 export interface GoOutOptions {
@@ -201,7 +208,8 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
   const lat = opts.coords?.lat ?? null;
   const lng = opts.coords?.lng ?? null;
 
-  // Full-field NS upsert
+  // Full-field NS upsert (party_address excluded — see stopSharing comment)
+  const partyAddress = opts.privateParty?.address ?? null;
   must(await supabase
     .from('night_statuses')
     .upsert({
@@ -217,8 +225,12 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
       planning_visibility: null,
       is_private_party: opts.privateParty ? true : false,
       party_neighborhood: opts.privateParty?.neighborhood ?? null,
-      party_address: opts.privateParty?.address ?? null,
     }, { onConflict: 'user_id' }));
+
+  must(await supabase
+    .from('night_statuses')
+    .update({ party_address: partyAddress })
+    .eq('user_id', userId));
 
   // End prior check-ins
   must(await supabase
@@ -284,7 +296,7 @@ export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): 
   // Clear location from map
   await clearUserLocation(userId);
 
-  // Full-field NS upsert
+  // Full-field NS upsert (party_address excluded — see stopSharing comment)
   must(await supabase
     .from('night_statuses')
     .upsert({
@@ -300,6 +312,10 @@ export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): 
       planning_visibility: opts.visibility ?? null,
       is_private_party: false,
       party_neighborhood: null,
-      party_address: null,
     }, { onConflict: 'user_id' }));
+
+  must(await supabase
+    .from('night_statuses')
+    .update({ party_address: null })
+    .eq('user_id', userId));
 }

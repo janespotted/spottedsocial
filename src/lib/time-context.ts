@@ -47,6 +47,17 @@ export function getNightContext(): 'morning' | 'afternoon' | 'early-evening' | '
 }
 
 /**
+ * Check if a location timestamp is "fresh" — from tonight and less than 2 hours old.
+ * Shared predicate so Map, Leaderboard, InviteFriendsModal, and VenueIdCard agree.
+ */
+export function isFreshLocation(timestamp: string | Date | null): boolean {
+  if (!timestamp) return false;
+  if (!isFromTonight(timestamp)) return false;
+  const age = Date.now() - new Date(timestamp).getTime();
+  return age < 2 * 60 * 60 * 1000;
+}
+
+/**
  * Get a friendly message based on time of day
  */
 export function getTimeGreeting(): string {

@@ -9,6 +9,7 @@ import { useFriendIdCard } from '@/contexts/FriendIdCardContext';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { supabase } from '@/integrations/supabase/client';
 import { createResilientChannel } from '@/lib/resilient-channel';
+import { invalidateFriendGraph } from '@/lib/invalidate-friend-graph';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -162,8 +163,7 @@ export default function Friends() {
       timer = setTimeout(() => {
         fetchRequests();
         fetchSuggestedFriends();
-        queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-        queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+        invalidateFriendGraph(queryClient);
       }, 1500);
     };
     const cleanupChannel = createResilientChannel({
@@ -245,11 +245,14 @@ export default function Friends() {
         return;
       }
 
+      // Source profiles from get_profiles_safe RPC (SECURITY DEFINER, bypasses RLS)
+      // Direct .from('profiles') reads of other users are blocked by design.
+      const { data: safeProfiles } = await supabase.rpc('get_profiles_safe');
+      const profileMap = new Map((safeProfiles || []).map((p: any) => [p.id, p]));
+
       const requestsWithMutuals = await Promise.all(
         friendRequests.map(async (req) => {
-          const { data: profiles } = await supabase
-            .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', req.user_id);
-          const profile = profiles?.[0];
+          const profile = profileMap.get(req.user_id);
 
           if (!profile) return null;
           if (!demoEnabled && profile.is_demo) return null;
@@ -278,9 +281,7 @@ export default function Friends() {
       if (outgoing && outgoing.length > 0) {
         const outgoingWithProfiles = await Promise.all(
           outgoing.map(async (req) => {
-            const { data: profiles } = await supabase
-              .from('profiles').select('id, display_name, username, avatar_url, is_demo').eq('id', req.friend_id);
-            const profile = profiles?.[0];
+            const profile = profileMap.get(req.friend_id);
             if (!profile) return null;
             if (!demoEnabled && profile.is_demo) return null;
             return {
@@ -379,8 +380,7 @@ export default function Friends() {
     haptic.success();
     toast.success('Friend request accepted!');
     setRequests(requests.filter(r => r.id !== requestId));
-    queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-    queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+    invalidateFriendGraph(queryClient);
   };
 
   const declineRequest = async (requestId: string) => {
@@ -609,8 +609,7 @@ export default function Friends() {
   const pendingCount = requests.length;
 
   const handleRefresh = useCallback(async () => {
-    queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-    queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
+    invalidateFriendGraph(queryClient);
     await Promise.all([fetchRequests(), fetchOrCreateInviteCode(), fetchSuggestedFriends()]);
   }, [queryClient, fetchRequests, fetchOrCreateInviteCode, fetchSuggestedFriends]);
 

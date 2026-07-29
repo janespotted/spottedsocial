@@ -157,18 +157,25 @@ CREATE POLICY "Checkins viewable by friends" ON public.checkins
   );
 
 -- Schedule cleanup_old_checkins daily at 10:30 UTC (defined in 20251209044337)
-SELECT cron.schedule(
-  'cleanup-old-checkins',
-  '30 10 * * *',
-  $$SELECT public.cleanup_old_checkins()$$
-);
-
 -- Schedule location_events 90-day purge daily at 6:15 UTC (promised in 20260428010000)
-SELECT cron.schedule(
-  'cleanup-location-events-90d',
-  '15 6 * * *',
-  $$DELETE FROM public.location_events WHERE created_at < now() - interval '90 days'$$
-);
+-- Only if pg_cron is available (not all plans/projects have it enabled)
+DO $outer$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'cron') THEN
+    PERFORM cron.schedule(
+      'cleanup-old-checkins',
+      '30 10 * * *',
+      'SELECT public.cleanup_old_checkins()'
+    );
+    PERFORM cron.schedule(
+      'cleanup-location-events-90d',
+      '15 6 * * *',
+      $$DELETE FROM public.location_events WHERE created_at < now() - interval '90 days'$$
+    );
+  ELSE
+    RAISE NOTICE 'pg_cron not available — skipping cron job scheduling';
+  END IF;
+END $outer$;
 
 -- ═════════════════════════════════════════════════════════════════════
 -- 4. Small hardening (P2-6, P2-7)

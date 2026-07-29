@@ -36,6 +36,7 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customName, setCustomName] = useState('');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [privacyLevel, setPrivacyLevel] = useState<string>('all_friends');
 
   useEffect(() => {
     if (open) {
@@ -44,8 +45,13 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
       setShowCustomInput(false);
       setCustomName('');
       fetchNearbyVenues();
+      // Fetch current privacy level for confirmation card
+      if (user) {
+        supabase.from('profiles').select('location_sharing_level').eq('id', user.id).single()
+          .then(({ data }) => { if (data?.location_sharing_level) setPrivacyLevel(data.location_sharing_level); });
+      }
     }
-  }, [open]);
+  }, [open, user]);
 
   const fetchNearbyVenues = async () => {
     setLoadingVenues(true);
@@ -127,7 +133,7 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
 
       onOpenChange(false);
       onUpdated?.();
-      showOutConfirmation(venue.name, venue.id, 'all_friends');
+      showOutConfirmation(venue.name, venue.id, privacyLevel);
     } catch (error) {
       console.error('Error switching venue:', error);
       toast.error('Something went wrong');
@@ -173,7 +179,7 @@ export function UpdateSpotSheet({ open, onOpenChange, onUpdated }: UpdateSpotShe
 
       onOpenChange(false);
       onUpdated?.();
-      showOutConfirmation(customName.trim(), '', 'all_friends');
+      showOutConfirmation(customName.trim(), '', privacyLevel);
     } catch (error) {
       console.error('Error setting custom venue:', error);
       toast.error('Something went wrong');

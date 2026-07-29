@@ -1,0 +1,8 @@
+Privacy test failing: janerey set location sharing to close_friends but hello123 (a direct friend, NOT a close friend) can still see janerey's pin after a hard refresh. Via the Management API, check each layer:
+
+1. Did the setting save? SELECT id, username, location_sharing_level FROM profiles WHERE id = '<janerey_id>';
+2. Is hello123 unexpectedly a close friend? SELECT * FROM close_friends WHERE user_id = '<janerey_id>';
+3. What does the visibility function say? SELECT public._can_see_location_unchecked('<hello123_id>', '<janerey_id>');
+4. What would hello123's map actually receive? Check whether janerey's night_statuses row is visible under RLS for hello123 — inspect the current SELECT policy on night_statuses and evaluate its predicate manually for this pair.
+
+Report each result and identify which layer is leaking.

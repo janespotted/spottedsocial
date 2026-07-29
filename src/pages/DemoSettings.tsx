@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { goOutAtVenue, stopSharing } from '@/lib/night-status';
 import { getDemoMode, setDemoMode, clearDemoData, seedDemoData, healthCheckDemoData } from '@/lib/demo-data';
 import { getBootstrapMode, setBootstrapMode } from '@/lib/bootstrap-config';
+import { invalidateFriendGraph } from '@/lib/invalidate-friend-graph';
 import { useUserCity } from '@/hooks/useUserCity';
 import { cacheCity, clearCachedCity, detectUserCity, type SupportedCity } from '@/lib/city-detection';
 
@@ -187,12 +188,7 @@ export default function DemoSettings() {
       const result = await clearDemoData();
       if (result.success) {
         setSeeded(false);
-        // Invalidate all four friend-graph caches so demo data doesn't linger
-        // WP7: replace with invalidateFriendGraph() when available
-        await queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
-        await queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-        await queryClient.invalidateQueries({ queryKey: ['friends-out-status'] });
-        await queryClient.invalidateQueries({ queryKey: ['mutual-friend-ids'] });
+        invalidateFriendGraph(queryClient);
         toast.success('Demo data cleared!');
         setTimeout(() => navigate('/'), 1000);
       } else {

@@ -2,6 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { Calendar, Plus, Sparkles } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { PlanItem } from './PlanItem';
 import { CreatePlanDialog } from './CreatePlanDialog';
 import { CreateEventDialog } from './CreateEventDialog';
@@ -492,29 +493,34 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
       planningTimer = setTimeout(() => fetchPlanningFriends(), 500);
     };
 
-    const channel = supabase
-      .channel('plans-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'plans' },
-        debouncedFetchPlans
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'plan_downs' },
-        debouncedFetchPlans
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'night_statuses' },
-        debouncedFetchPlanning
-      )
-      .subscribe();
+    const cleanupChannel = createResilientChannel({
+      name: 'plans-realtime',
+      configure: (ch) => ch
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'plans' },
+          debouncedFetchPlans
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'plan_downs' },
+          debouncedFetchPlans
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'night_statuses' },
+          debouncedFetchPlanning
+        ),
+      onReconnect: () => {
+        debouncedFetchPlans();
+        debouncedFetchPlanning();
+      },
+    });
 
     return () => {
       clearTimeout(plansTimer);
       clearTimeout(planningTimer);
-      supabase.removeChannel(channel);
+      cleanupChannel();
     };
   }, [userId, demoEnabled]);
 

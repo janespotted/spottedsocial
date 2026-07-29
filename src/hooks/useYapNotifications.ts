@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { triggerPushNotification } from '@/lib/push-notifications';
+import { createResilientChannel } from '@/lib/resilient-channel';
 
 /**
  * Subscribes to realtime yap_messages at the user's current venue/private party.
@@ -15,7 +16,7 @@ export function useYapNotifications() {
   const { showBanner } = useNotifications();
   // Track which venue we've already notified for — reset when venue changes
   const notifiedForVenueRef = useRef<string | null>(null);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -51,8 +52,9 @@ export function useYapNotifications() {
       }
 
       // Clean up previous channel
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
       }
 
       // Subscribe to yap_messages for this venue — use party_id for private parties
@@ -60,74 +62,77 @@ export function useYapNotifications() {
         ? `party_id=eq.${nightStatus.id}`
         : `venue_name=eq.${venueName}`;
 
-      const channel = supabase
-        .channel(`yap-at-venue-${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'yap_messages',
-            filter: filterValue,
-          },
-          async (payload) => {
-            const newYap = payload.new as any;
+      cleanupRef.current = createResilientChannel({
+        name: `yap-at-venue-${user.id}`,
+        configure: (ch) => ch
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'yap_messages',
+              filter: filterValue,
+            },
+            async (payload) => {
+              const newYap = payload.new as any;
 
-            // Don't notify for own yaps
-            if (newYap.user_id === user.id) return;
+              // Don't notify for own yaps
+              if (newYap.user_id === user.id) return;
 
-            // Once-per-venue: skip if already notified for this venue session
-            if (notifiedForVenueRef.current === venueKey) return;
-            notifiedForVenueRef.current = venueKey;
+              // Once-per-venue: skip if already notified for this venue session
+              if (notifiedForVenueRef.current === venueKey) return;
+              notifiedForVenueRef.current = venueKey;
 
-            const locationLabel = nightStatus.is_private_party
-              ? `your private party${nightStatus.party_neighborhood ? ` (${nightStatus.party_neighborhood})` : ''}`
-              : venueName;
+              const locationLabel = nightStatus.is_private_party
+                ? `your private party${nightStatus.party_neighborhood ? ` (${nightStatus.party_neighborhood})` : ''}`
+                : venueName;
 
-            const yapPreview = newYap.text
-              ? (newYap.text.length > 40 ? newYap.text.slice(0, 40) + '…' : newYap.text)
-              : '📸 shared media';
+              const yapPreview = newYap.text
+                ? (newYap.text.length > 40 ? newYap.text.slice(0, 40) + '…' : newYap.text)
+                : '📸 shared media';
 
-            const yapMessage = `Yap @${locationLabel} "${yapPreview}"`;
+              const yapMessage = `Yap @${locationLabel} "${yapPreview}"`;
 
-            // Show banner immediately
-            showBanner({
-              id: `yap-${newYap.id}`,
-              sender_id: newYap.user_id,
-              receiver_id: user.id,
-              type: 'venue_yap',
-              message: yapMessage,
-              is_read: false,
-              created_at: new Date().toISOString(),
-            });
-
-            // Also create a notification in DB for the activity center
-            try {
-              const { data: notifData } = await supabase.rpc('create_notification', {
-                p_receiver_id: user.id,
-                p_type: 'venue_yap',
-                p_message: yapMessage,
+              // Show banner immediately
+              showBanner({
+                id: `yap-${newYap.id}`,
+                sender_id: newYap.user_id,
+                receiver_id: user.id,
+                type: 'venue_yap',
+                message: yapMessage,
+                is_read: false,
+                created_at: new Date().toISOString(),
               });
-              
-              const notif = Array.isArray(notifData) ? notifData[0] : notifData;
-              if (notif) {
-                triggerPushNotification({
-                  id: notif.id,
-                  receiver_id: user.id,
-                  sender_id: user.id,
-                  type: 'venue_yap',
-                  message: yapMessage,
-                });
-              }
-            } catch (err) {
-              // Non-critical — banner already shown
-              console.error('Failed to create yap activity entry:', err);
-            }
-          }
-        )
-        .subscribe();
 
-      channelRef.current = channel;
+              // Also create a notification in DB for the activity center
+              try {
+                const { data: notifData } = await supabase.rpc('create_notification', {
+                  p_receiver_id: user.id,
+                  p_type: 'venue_yap',
+                  p_message: yapMessage,
+                });
+
+                const notif = Array.isArray(notifData) ? notifData[0] : notifData;
+                if (notif) {
+                  triggerPushNotification({
+                    id: notif.id,
+                    receiver_id: user.id,
+                    sender_id: user.id,
+                    type: 'venue_yap',
+                    message: yapMessage,
+                  });
+                }
+              } catch (err) {
+                // Non-critical — banner already shown
+                console.error('Failed to create yap activity entry:', err);
+              }
+            }
+          ),
+        onReconnect: () => {
+          // On reconnect, re-run setup to pick up any missed yaps
+          setup();
+        },
+      });
     };
 
     setup();
@@ -138,9 +143,9 @@ export function useYapNotifications() {
     return () => {
       cancelled = true;
       clearInterval(interval);
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
       }
     };
   }, [user, showBanner]);

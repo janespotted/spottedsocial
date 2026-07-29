@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { Mic, MapPin, Pin, Home, ChevronRight, Triangle } from 'lucide-react';
 import { isFromTonight } from '@/lib/time-context';
 import { useDemoMode } from '@/hooks/useDemoMode';
@@ -99,37 +100,39 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
     fetchUserVenue();
 
     // Realtime subscription for venue changes
-    const channel = supabase
-      .channel(`yap-venue-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'night_statuses',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload: any) => {
-          const newRecord = payload.new;
-          if (newRecord) {
-            setUserStatus(newRecord.status || null);
-            if (newRecord.is_private_party) {
-              const displayName = newRecord.venue_name || `Private Party${newRecord.party_neighborhood ? ` · ${newRecord.party_neighborhood}` : ''}`;
-              setUserVenueName(displayName);
-              setUserIsPrivateParty(true);
-              setUserNightStatusId(newRecord.id);
-            } else {
-              setUserVenueName(newRecord.venue_name || null);
-              setUserIsPrivateParty(newRecord.is_private_party || false);
-              setUserNightStatusId(null);
+    const cleanupChannel = createResilientChannel({
+      name: `yap-venue-${user.id}`,
+      configure: (ch) => ch
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'night_statuses',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload: any) => {
+            const newRecord = payload.new;
+            if (newRecord) {
+              setUserStatus(newRecord.status || null);
+              if (newRecord.is_private_party) {
+                const displayName = newRecord.venue_name || `Private Party${newRecord.party_neighborhood ? ` · ${newRecord.party_neighborhood}` : ''}`;
+                setUserVenueName(displayName);
+                setUserIsPrivateParty(true);
+                setUserNightStatusId(newRecord.id);
+              } else {
+                setUserVenueName(newRecord.venue_name || null);
+                setUserIsPrivateParty(newRecord.is_private_party || false);
+                setUserNightStatusId(null);
+              }
             }
           }
-        }
-      )
-      .subscribe();
+        ),
+      onReconnect: fetchUserVenue,
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      cleanupChannel();
     };
   }, [user]);
 
@@ -143,22 +146,24 @@ export function YapTab({ venueName: venueNameProp, isPrivatePartyNav }: YapTabPr
   useEffect(() => {
     if (view !== 'directory') return;
 
-    const channel = supabase
-      .channel('yap-directory-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'yap_messages' },
-        () => fetchQuotes()
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'yap_messages' },
-        () => fetchQuotes()
-      )
-      .subscribe();
+    const cleanupChannel = createResilientChannel({
+      name: 'yap-directory-realtime',
+      configure: (ch) => ch
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'yap_messages' },
+          () => fetchQuotes()
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'yap_messages' },
+          () => fetchQuotes()
+        ),
+      onReconnect: () => fetchQuotes(),
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      cleanupChannel();
     };
   }, [view, user, demoEnabled, city]);
 
