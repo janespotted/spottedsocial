@@ -337,21 +337,27 @@ export default function Profile() {
   };
 
   const handleLocationSharingChange = async (value: string) => {
+    if (!user?.id) {
+      toast.error('Not signed in');
+      return;
+    }
     try {
-      const { error } = await supabase
+      console.log('[LocationSharing] updating', user.id, 'to', value);
+      const { data, error } = await supabase
         .from('profiles')
         .update({ location_sharing_level: value })
-        .eq('id', user?.id);
+        .eq('id', user.id)
+        .select('location_sharing_level');
 
       if (error) throw error;
+      console.log('[LocationSharing] result:', data);
+      if (!data || data.length === 0) throw new Error('Update matched no rows');
 
       setLocationSharingLevel(value);
-      
-      // Refresh profile data to sync state
       await fetchProfileData();
-      
       toast.success(`Now sharing with ${getLevelDisplayName(value)}`);
     } catch (error: any) {
+      console.error('[LocationSharing] failed:', error);
       toast.error('Failed to update location sharing');
     }
   };

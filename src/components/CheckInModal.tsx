@@ -470,9 +470,18 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         privateParty: { neighborhood: privatePartyNeighborhood, address: privatePartyAddress || null },
       });
 
+      // Save audience to profile — the check-in picker IS the sharing control
+      // (per-status audiences via status_visibility column remain a future refinement;
+      // see _claude_audit tracker)
+      must(await supabase
+        .from('profiles')
+        .update({ location_sharing_level: privatePartyVisibility })
+        .eq('id', user.id)
+        .select('location_sharing_level'));
+
       haptic.medium();
-      
-      // Show confirmation
+
+      // Show confirmation (after save, so the card reflects the persisted audience)
       showOutConfirmation(`Private Party (${privatePartyNeighborhood})`, '', privatePartyVisibility, true);
       
       logEvent('private_party_checkin', {
@@ -694,6 +703,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             privateParty: { neighborhood: detectedNeighborhood },
           });
 
+          // Save audience to profile before showing confirmation
+          must(await supabase
+            .from('profiles')
+            .update({ location_sharing_level: shareOption })
+            .eq('id', user!.id)
+            .select('location_sharing_level'));
+
           const displayName = detectedNeighborhood
             ? `${finalVenueName} (${detectedNeighborhood})`
             : finalVenueName;
@@ -701,6 +717,13 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           onOpenChange(false);
           showOutConfirmation(displayName, '', shareOption, true);
         } else {
+          // Save audience to profile before showing confirmation
+          must(await supabase
+            .from('profiles')
+            .update({ location_sharing_level: shareOption })
+            .eq('id', user!.id)
+            .select('location_sharing_level'));
+
           await updateStatus('out', locationData.lat, locationData.lng, finalVenueName, finalVenueId);
           onOpenChange(false);
           showOutConfirmation(finalVenueName, finalVenueId || '', shareOption);
