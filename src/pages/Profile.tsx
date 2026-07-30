@@ -7,7 +7,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { createResilientChannel } from '@/lib/resilient-channel';
-import { emitSharingLevelChanged, emitPlanningVisibilityChanged } from '@/lib/night-status';
+import { emitSharingLevelChanged, emitPlanningVisibilityChanged, type NightStatusDetail } from '@/lib/night-status';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
@@ -116,6 +116,42 @@ export default function Profile() {
     return () => window.removeEventListener('planningVisibilityChanged', handler);
   }, []);
 
+  // Instant same-device status update — no realtime round-trip needed
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent<NightStatusDetail>).detail;
+      if (!d) return;
+      const status = d.status;
+      if (status === 'home' || status === null) {
+        setCurrentStatus(null);
+        setCurrentVenue(null);
+        setPlanningNeighborhood(null);
+        setPlanningVisibility(null);
+        setIsPrivateParty(false);
+        setPartyNeighborhood(null);
+        setIsLocationSharing(false);
+      } else if (status === 'out' || status === 'heading_out') {
+        setCurrentStatus('out');
+        setCurrentVenue(d.venueName ?? null);
+        setPlanningNeighborhood(null);
+        setPlanningVisibility(null);
+        setIsPrivateParty(d.isPrivateParty ?? false);
+        setPartyNeighborhood(d.partyNeighborhood ?? null);
+        setIsLocationSharing(true);
+      } else if (status === 'planning') {
+        setCurrentStatus('planning');
+        setCurrentVenue(null);
+        setPlanningNeighborhood(d.planningNeighborhood ?? null);
+        setPlanningVisibility(d.planningVisibility ?? null);
+        setIsPrivateParty(false);
+        setPartyNeighborhood(null);
+        setIsLocationSharing(false);
+      }
+    };
+    window.addEventListener('nightStatusChanged', handler);
+    return () => window.removeEventListener('nightStatusChanged', handler);
+  }, []);
+
   const getInviteUrl = () => `${APP_BASE_URL}/invite/${inviteCode}`;
 
   // Realtime subscription for night_statuses changes
@@ -133,10 +169,17 @@ export default function Profile() {
           filter: `user_id=eq.${user.id}`,
         },
         () => {
+          console.log('[Profile RT] night_statuses change received');
           fetchProfileData();
         }
       ),
-      onReconnect: fetchProfileData,
+      onReconnect: () => {
+        console.log('[Profile RT] reconnected, refetching');
+        fetchProfileData();
+      },
+      onStatus: (status, err) => {
+        console.log('[Profile RT] channel status:', status, err || '');
+      },
     });
 
     return cleanupChannel;

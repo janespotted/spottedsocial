@@ -21,6 +21,19 @@ export function emitPlanningVisibilityChanged(level: string) {
   window.dispatchEvent(new CustomEvent('planningVisibilityChanged', { detail: { level } }));
 }
 
+export interface NightStatusDetail {
+  status: 'out' | 'heading_out' | 'planning' | 'home' | null;
+  venueName?: string | null;
+  isPrivateParty?: boolean;
+  partyNeighborhood?: string | null;
+  planningNeighborhood?: string | null;
+  planningVisibility?: string | null;
+}
+
+export function emitNightStatusChanged(detail: NightStatusDetail) {
+  window.dispatchEvent(new CustomEvent('nightStatusChanged', { detail }));
+}
+
 // ── City → timezone mapping ──────────────────────────────────────────
 
 function cityToTimezone(city: SupportedCity): string {
@@ -198,6 +211,8 @@ export async function stopSharing(userId: string): Promise<void> {
     .from('night_statuses')
     .update({ party_address: null })
     .eq('user_id', userId));
+
+  emitNightStatusChanged({ status: 'home' });
 }
 
 export interface GoOutOptions {
@@ -281,6 +296,13 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
   if (opts.source === 'manual' || opts.source === 'arrival' || opts.source === 'venue_shift') {
     markManualCheckin();
   }
+
+  emitNightStatusChanged({
+    status: 'out',
+    venueName: opts.venue.name,
+    isPrivateParty: !!opts.privateParty,
+    partyNeighborhood: opts.privateParty?.neighborhood ?? null,
+  });
 }
 
 export interface GoPlanningOptions {
@@ -328,4 +350,10 @@ export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): 
     .from('night_statuses')
     .update({ party_address: null })
     .eq('user_id', userId));
+
+  emitNightStatusChanged({
+    status: 'planning',
+    planningNeighborhood: opts.neighborhood ?? null,
+    planningVisibility: opts.visibility ?? null,
+  });
 }

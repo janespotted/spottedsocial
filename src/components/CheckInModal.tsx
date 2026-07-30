@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/integrations/supabase/client';
-import { goOutAtVenue, goPlanning, stopSharing, getStatusExpiry, registerLocationTimer, isUserCurrentlyOut, must, emitSharingLevelChanged } from '@/lib/night-status';
+import { goOutAtVenue, goPlanning, stopSharing, getStatusExpiry, registerLocationTimer, isUserCurrentlyOut, must, emitSharingLevelChanged, emitNightStatusChanged } from '@/lib/night-status';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
@@ -943,6 +943,11 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           .from('night_statuses')
           .update({ party_address: null })
           .eq('user_id', user?.id));
+
+        emitNightStatusChanged({
+          status: 'heading_out',
+          venueName: venue,
+        });
 
         haptic.medium();
       }

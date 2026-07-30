@@ -11,6 +11,8 @@ interface ResilientChannelOptions {
   configure: ChannelConfigurator;
   /** Called after a successful resubscribe (or app foreground) so the caller can refetch data missed while disconnected */
   onReconnect?: () => void;
+  /** Called on every subscribe status callback — useful for debugging channel health */
+  onStatus?: (status: string, err?: Error) => void;
 }
 
 /**
@@ -22,7 +24,7 @@ interface ResilientChannelOptions {
  * foreground listener. Call it on unmount.
  */
 export function createResilientChannel(opts: ResilientChannelOptions): () => void {
-  const { name, configure, onReconnect } = opts;
+  const { name, configure, onReconnect, onStatus } = opts;
 
   let channel: RealtimeChannel | null = null;
   let retryTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -45,6 +47,8 @@ export function createResilientChannel(opts: ResilientChannelOptions): () => voi
 
     ch.subscribe((status, err) => {
       if (destroyed) return;
+
+      onStatus?.(status, err as Error | undefined);
 
       if (status === 'SUBSCRIBED') {
         attempt = 0;
