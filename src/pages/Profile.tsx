@@ -7,7 +7,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAutoVenueTracking } from '@/hooks/useAutoVenueTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { createResilientChannel } from '@/lib/resilient-channel';
-import { emitSharingLevelChanged } from '@/lib/night-status';
+import { emitSharingLevelChanged, emitPlanningVisibilityChanged } from '@/lib/night-status';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
@@ -104,6 +104,16 @@ export default function Profile() {
     };
     window.addEventListener('sharingLevelChanged', handler);
     return () => window.removeEventListener('sharingLevelChanged', handler);
+  }, []);
+
+  // Sync planningVisibility when changed from another surface (e.g. PlansFeed)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const level = (e as CustomEvent).detail?.level;
+      if (level) setPlanningVisibility(level);
+    };
+    window.addEventListener('planningVisibilityChanged', handler);
+    return () => window.removeEventListener('planningVisibilityChanged', handler);
   }, []);
 
   const getInviteUrl = () => `${APP_BASE_URL}/invite/${inviteCode}`;
@@ -374,8 +384,6 @@ export default function Profile() {
     }
   };
 
-  // TODO: handlePlanningVisibilityChange is orphaned — planning visibility
-  // is settable per-status in CheckInModal, not as a global profile setting.
   const handlePlanningVisibilityChange = async (value: string) => {
     try {
       const { error } = await supabase
@@ -386,6 +394,7 @@ export default function Profile() {
       if (error) throw error;
 
       setPlanningVisibility(value);
+      emitPlanningVisibilityChanged(value);
       toast.success(`Planning visible to ${getLevelDisplayName(value)}`);
     } catch (error: any) {
       toast.error('Failed to update planning visibility');
@@ -526,38 +535,6 @@ export default function Profile() {
           <ChevronRight className="h-4 w-4 text-white/20" />
         </button>
 
-        {/* Location Sharing */}
-        <div className="w-full p-3.5 rounded-2xl bg-white/[0.03] border border-white/8">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 rounded-full bg-[#a855f7]/10 flex items-center justify-center">
-              <MapPin className="h-4 w-4 text-[#a855f7]" />
-            </div>
-            <div>
-              <p className="text-white text-sm font-medium">Location Sharing</p>
-              <p className="text-white/30 text-xs">Who can see you on the map when you're out</p>
-            </div>
-          </div>
-          <div className="flex gap-1.5 bg-white/[0.03] rounded-xl p-1">
-            {([
-              { value: 'close_friends', label: 'Close Friends' },
-              { value: 'all_friends', label: 'All Friends' },
-              { value: 'mutual_friends', label: 'Mutual Friends' },
-            ] as const).map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => handleLocationSharingChange(opt.value)}
-                className={`flex-1 py-2 px-1 rounded-lg text-xs font-medium transition-colors ${
-                  locationSharingLevel === opt.value
-                    ? 'bg-[#a855f7] text-white'
-                    : 'text-white/40 hover:text-white/60'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Find from Contacts */}
         <button
           onClick={() => setShowContactsSync(true)}
@@ -594,25 +571,63 @@ export default function Profile() {
               <span className="text-[11px] text-white/60 uppercase tracking-wider">Tonight</span>
             </div>
             <span className="text-[11px] text-white/45">
-              {currentStatus === 'out' ? `Visible to ${getLevelDisplayName(locationSharingLevel).toLowerCase()}` : currentStatus === 'planning' ? 'TBD' : 'Not sharing'}
+              {currentStatus === 'out'
+                ? `Visible to ${getLevelDisplayName(locationSharingLevel).toLowerCase()}`
+                : currentStatus === 'planning'
+                  ? 'TBD'
+                  : 'Not sharing'}
             </span>
           </div>
 
           {currentStatus === 'out' ? (
             <>
               <p className="text-lg font-medium text-white mb-1">
-                Out at {isPrivateParty ? (currentVenue || 'Private Party') : (currentVenue || 'Unknown')}
+                Out at {isPrivateParty ? (currentVenue || 'Private Party') : (currentVenue || 'Unknown')} — who can see you?
               </p>
-              <p className="text-xs text-white/55 mb-3.5">
-                {partyNeighborhood || planningNeighborhood || ''}{partyNeighborhood || planningNeighborhood ? ' · ' : ''}Live now
-              </p>
+              <div className="flex gap-1.5 bg-white/[0.03] rounded-xl p-1 mb-3.5">
+                {([
+                  { value: 'close_friends', label: 'Close Friends' },
+                  { value: 'all_friends', label: 'All Friends' },
+                  { value: 'mutual_friends', label: 'Mutual Friends' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => handleLocationSharingChange(opt.value)}
+                    className={`flex-1 py-2 px-1 rounded-lg text-xs font-medium transition-colors ${
+                      locationSharingLevel === opt.value
+                        ? 'bg-[#a855f7] text-white'
+                        : 'text-white/40 hover:text-white/60'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </>
           ) : currentStatus === 'planning' ? (
             <>
               <p className="text-lg font-medium text-white mb-1">
-                TBD{planningNeighborhood ? ` · ${planningNeighborhood}` : ''}
+                You're TBD — who can see it?
               </p>
-              <p className="text-xs text-white/55 mb-3.5">Looking for plans</p>
+              <div className="flex gap-1.5 bg-white/[0.03] rounded-xl p-1 mb-3.5">
+                {([
+                  { value: 'close_friends', label: 'Close Friends' },
+                  { value: 'all_friends', label: 'All Friends' },
+                  { value: 'mutual_friends', label: 'Mutual Friends' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => handlePlanningVisibilityChange(opt.value)}
+                    className={`flex-1 py-2 px-1 rounded-lg text-xs font-medium transition-colors ${
+                      (planningVisibility || 'all_friends') === opt.value
+                        ? 'bg-[#a855f7] text-white'
+                        : 'text-white/40 hover:text-white/60'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </>
           ) : (
             <>

@@ -13,6 +13,7 @@ import { useDemoMode } from '@/hooks/useDemoMode';
 import { FriendsPlanning } from './FriendsPlanning';
 import { useToast } from '@/hooks/use-toast';
 import { haptic } from '@/lib/haptics';
+import { emitPlanningVisibilityChanged } from '@/lib/night-status';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { goPlanning, stopSharing } from '@/lib/night-status';
 import { useUserCity } from '@/hooks/useUserCity';
@@ -353,6 +354,7 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
 
       haptic.light();
       setUserPlanningVisibility(visibility);
+      emitPlanningVisibilityChanged(visibility);
     } catch (error) {
       console.error('Error changing visibility:', error);
       toast({

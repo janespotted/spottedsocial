@@ -17,6 +17,10 @@ export function emitSharingLevelChanged(level: string) {
   window.dispatchEvent(new CustomEvent('sharingLevelChanged', { detail: { level } }));
 }
 
+export function emitPlanningVisibilityChanged(level: string) {
+  window.dispatchEvent(new CustomEvent('planningVisibilityChanged', { detail: { level } }));
+}
+
 // ── City → timezone mapping ──────────────────────────────────────────
 
 function cityToTimezone(city: SupportedCity): string {
