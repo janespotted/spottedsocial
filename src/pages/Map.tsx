@@ -360,7 +360,14 @@ export default function Map() {
       cleanupChannel();
     };
   }, [user]); // Removed debouncedFetchFriendsLocations from deps - it's stable now
-  
+
+  // Same-device friend graph changes (block/unfriend/accept) — refresh pins
+  useEffect(() => {
+    const handler = () => debouncedFetchFriendsLocations();
+    window.addEventListener('friendGraphChanged', handler);
+    return () => window.removeEventListener('friendGraphChanged', handler);
+  }, [debouncedFetchFriendsLocations]);
+
   // Keep the ref updated with the latest fetch function
   useEffect(() => {
     fetchFriendsLocationsRef.current = fetchFriendsLocations;

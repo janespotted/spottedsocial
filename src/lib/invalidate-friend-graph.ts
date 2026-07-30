@@ -9,4 +9,7 @@ export function invalidateFriendGraph(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ['mutual-friend-ids'] });
   queryClient.invalidateQueries({ queryKey: ['profiles-safe'] });
   queryClient.invalidateQueries({ queryKey: ['friends-out-status'] });
+
+  // Notify non-react-query surfaces (e.g. Map pins) that the friend graph changed
+  window.dispatchEvent(new CustomEvent('friendGraphChanged'));
 }
