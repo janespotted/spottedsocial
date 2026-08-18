@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Send, Plus, MoreHorizontal, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import { FriendSearchModal } from '@/components/FriendSearchModal';
+import { UnifiedSearch } from '@/components/UnifiedSearch';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { CreatePostDialog } from '@/components/CreatePostDialog';
@@ -442,7 +442,7 @@ export default function Feed() {
         />
       )}
 
-      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
+      <UnifiedSearch open={showFriendSearch} onOpenChange={setShowFriendSearch} />
     </div>
   );
 }

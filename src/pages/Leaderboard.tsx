@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { PageHeader } from '@/components/PageHeader';
 import { ChevronUp, ChevronDown, BarChart3, ChevronRight } from 'lucide-react';
-import { FriendSearchModal } from '@/components/FriendSearchModal';
+import { UnifiedSearch } from '@/components/UnifiedSearch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -737,7 +737,7 @@ export default function Leaderboard() {
         </div>
       )}
 
-      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
+      <UnifiedSearch open={showFriendSearch} onOpenChange={setShowFriendSearch} />
     </div>
   );
 }

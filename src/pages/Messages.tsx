@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { MessagesTab } from '@/components/messages/MessagesTab';
 import { YapTab } from '@/components/messages/YapTab';
 import { PageHeader } from '@/components/PageHeader';
-import { FriendSearchModal } from '@/components/FriendSearchModal';
+import { UnifiedSearch } from '@/components/UnifiedSearch';
 import { useScreenGuard } from '@/hooks/useScreenGuard';
 
 type TabType = 'messages' | 'yap';
@@ -106,7 +106,7 @@ export default function Messages() {
         {activeTab === 'yap' && <YapTab key={yapNavKey} venueName={yapVenueName} isPrivatePartyNav={yapIsPrivateParty} />}
       </div>
 
-      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
+      <UnifiedSearch open={showFriendSearch} onOpenChange={setShowFriendSearch} />
     </div>
   );
 }

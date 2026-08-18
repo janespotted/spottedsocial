@@ -18,7 +18,7 @@ import spottedLogo from '@/assets/spotted-s-logo.png';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, ArrowLeft, Users, Building2, Target, Home, Map as MapIcon, Music, Wine, Beer, Building, UtensilsCrossed, UserPlus, Loader2 } from 'lucide-react';
+import { MessageSquare, Crosshair, MapPin, MapPinOff, Bell, ChevronDown, Search, X, SlidersHorizontal, Users, Target, Home, Map as MapIcon, Music, Wine, Beer, Building, UtensilsCrossed, Loader2 } from 'lucide-react';
 import { haptic } from '@/lib/haptics';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -32,8 +32,6 @@ import { CityBadge } from '@/components/CityBadge';
 import { logger } from '@/lib/logger';
 import { escapeHtml, escapeUrl } from '@/lib/html-escape';
 import { useFriendsOutStatus } from '@/hooks/useFriendsOutStatus';
-import { useProfilesSafe } from '@/hooks/useProfilesCache';
-import { useFriendIds } from '@/hooks/useFriendIds';
 
 // ── Shared marker sizing — single source of truth for all map markers ──
 const MARKER = {
@@ -137,7 +135,7 @@ import { UpdateSpotSheet } from '@/components/UpdateSpotSheet';
 import { VenueMoveBanner } from '@/components/VenueMoveBanner';
 import { PlanningReadyBanner } from '@/components/PlanningReadyBanner';
 import { useVenueArrivalNudge, type VenueShiftData } from '@/hooks/useVenueArrivalNudge';
-import { FriendSearchModal } from '@/components/FriendSearchModal';
+import { UnifiedSearch } from '@/components/UnifiedSearch';
 
 interface FriendLocation {
   user_id: string;
@@ -190,8 +188,6 @@ export default function Map() {
   const navigate = useNavigate();
   const location = useLocation();
   const { unreadCount } = useNotifications();
-  const { data: cachedAllProfiles } = useProfilesSafe();
-  const { data: cachedFriendIds } = useFriendIds(user?.id);
 
   // Venue arrival nudge with shift detection callback
   const handleVenueShift = useCallback((data: VenueShiftData) => {
@@ -227,16 +223,12 @@ export default function Map() {
     screenX: number;
     screenY: number;
   } | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [focusMode, setFocusMode] = useState(false);
   const [layerVisibility, setLayerVisibility] = useState<'both' | 'friends' | 'venues'>('both');
   const [showSearchOverlay, setShowSearchOverlay] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
-  const [searchFilterPeople, setSearchFilterPeople] = useState(true);
-  const [searchFilterVenues, setSearchFilterVenues] = useState(true);
   const [relationshipFilter, setRelationshipFilter] = useState<'all' | 'close' | 'friends_only'>('all');
   const friendsListRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Status pill & quick-switch state
   const [showQuickStatus, setShowQuickStatus] = useState(false);
@@ -256,7 +248,6 @@ export default function Map() {
   
   // Planning ready banner — once per session
   const [showPlanningReady, setShowPlanningReady] = useState(false);
-  const [showFriendSearch, setShowFriendSearch] = useState(false);
   const planningReadyShownRef = useRef(false);
   const [styleLoaded, setStyleLoaded] = useState(false);
   
@@ -1535,81 +1526,6 @@ export default function Map() {
 
 
   // Handle venue selection from search
-  const handleVenueSearchSelect = (venue: Venue) => {
-    if (map.current) {
-      map.current.flyTo({
-        center: [venue.lng, venue.lat],
-        zoom: 16,
-        duration: 1500,
-      });
-    }
-    openVenueCard(venue.id);
-    setShowSearchOverlay(false);
-    setSearchQuery('');
-  };
-
-  // Handle friend selection from search
-  const handleFriendSearchSelect = (friend: FriendLocation) => {
-    if (map.current) {
-      map.current.flyTo({
-        center: [friend.lng, friend.lat],
-        zoom: 15,
-        duration: 1500,
-      });
-    }
-    const friendCardData: FriendCardData = {
-      userId: friend.user_id,
-      displayName: friend.profiles?.display_name || 'Friend',
-      avatarUrl: friend.profiles?.avatar_url || null,
-      venueName: friend.venue_name,
-      lat: friend.lat,
-      lng: friend.lng,
-      relationshipType: friend.relationshipType,
-    };
-    openFriendCard(friendCardData);
-    setShowSearchOverlay(false);
-    setSearchQuery('');
-  };
-
-  // Trending venues (top 3 by heat score)
-  const trendingVenues = venues.slice(0, 3);
-
-  // Venue type emoji helper
-  const venueTypeIcon = (type: string) => {
-    if (type === 'nightclub') return <Music className="h-4 w-4 text-[#a855f7]" />;
-    if (type === 'cocktail_bar') return <Wine className="h-4 w-4 text-[#a855f7]" />;
-    if (type === 'bar') return <Beer className="h-4 w-4 text-[#a855f7]" />;
-    if (type === 'rooftop') return <Building className="h-4 w-4 text-[#a855f7]" />;
-    return <MapPin className="h-4 w-4 text-[#d4ff00]" />;
-  };
-
-  // Filtered search results
-  const searchPeopleResults = searchFilterPeople && searchQuery.length > 0
-    ? friends.filter(f => f.profiles?.display_name?.toLowerCase().includes(searchQuery.toLowerCase()))
-    : [];
-  const searchVenueResults = searchFilterVenues && searchQuery.length > 0
-    ? venues.filter(v => v.name.toLowerCase().includes(searchQuery.toLowerCase()) || v.neighborhood.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 10)
-    : [];
-
-  // Global user search — find non-friends by name or username
-  const searchGlobalPeople = searchFilterPeople && searchQuery.trim().length >= 2 && cachedAllProfiles && cachedFriendIds && user
-    ? (() => {
-        const q = searchQuery.toLowerCase();
-        const friendSet = new Set(cachedFriendIds);
-        const friendResultIds = new Set(searchPeopleResults.map(f => f.user_id));
-        return cachedAllProfiles
-          .filter((p: any) =>
-            p.id !== user.id &&
-            !friendSet.has(p.id) &&
-            !friendResultIds.has(p.id) &&
-            (!demoEnabled ? !p.is_demo : true) &&
-            (p.display_name?.toLowerCase().includes(q) ||
-             p.username?.toLowerCase().includes(q))
-          )
-          .slice(0, 10);
-      })()
-    : [];
-
   // Bottom offset for floating elements (small padding above edge — nav is outside the map area)
   const bottomOffset = '5rem';
   const legendBottomOffset = '5rem';
@@ -1857,221 +1773,27 @@ export default function Map() {
         onUpdated={fetchFriendsLocations}
       />
 
-      {/* Full-Screen Search Overlay */}
-      {showSearchOverlay && (
-        <div className="fixed inset-0 bg-[#110a24] z-[500] flex flex-col animate-fade-in pointer-events-auto" style={{ touchAction: 'auto' }}>
-          {/* Search Header */}
-          <div className="flex items-center gap-3 px-4 py-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
-            <button 
-              onClick={() => { setShowSearchOverlay(false); setSearchQuery(''); }}
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-white" />
-            </button>
-            <div className="flex-1 bg-[#2d1b4e]/80 border border-[#a855f7]/30 rounded-xl px-4 py-2.5 flex items-center gap-2">
-              <Search className="w-4 h-4 text-white/40" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search people, venues, or neighborhoods..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent text-white text-sm flex-1 outline-none placeholder:text-white/40"
-                autoFocus
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')}>
-                  <X className="w-4 h-4 text-white/40 hover:text-white transition-colors" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Filter Chips */}
-          <div className="flex gap-2 px-4 pb-3">
-            <button
-              onClick={(e) => { e.stopPropagation(); setSearchFilterPeople(!searchFilterPeople); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                searchFilterPeople 
-                  ? 'bg-[#a855f7]/30 text-white border border-[#a855f7]/50' 
-                  : 'bg-[#2d1b4e]/50 text-white/50 border border-white/10'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              People
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setSearchFilterVenues(!searchFilterVenues); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                searchFilterVenues 
-                  ? 'bg-[#a855f7]/30 text-white border border-[#a855f7]/50' 
-                  : 'bg-[#2d1b4e]/50 text-white/50 border border-white/10'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              Venues
-            </button>
-          </div>
-
-          {/* Search Content */}
-          <div className="flex-1 overflow-y-auto px-4 pb-8">
-            {searchQuery.length === 0 ? (
-              <>
-                {/* Trending Tonight */}
-                {searchFilterVenues && trendingVenues.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Trending Tonight</h3>
-                    <div className="space-y-1">
-                      {trendingVenues.map((venue) => (
-                        <button
-                          key={venue.id}
-                          onClick={() => handleVenueSearchSelect(venue)}
-                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
-                        >
-                          <span className="flex items-center">{venueTypeIcon(venue.type)}</span>
-                          <div className="flex-1 text-left">
-                            <p className="text-white font-medium text-sm">{venue.name}</p>
-                            <p className="text-white/40 text-xs">{venue.neighborhood}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Friends Out Now */}
-                {searchFilterPeople && friends.length > 0 && (
-                  <div>
-                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Friends Out Now</h3>
-                    <div className="space-y-1">
-                      {friends.map((friend) => {
-                        const staleMins = getStalenessMins(friend.last_location_at);
-                        return (
-                        <button
-                          key={friend.user_id}
-                          onClick={() => handleFriendSearchSelect(friend)}
-                          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors ${staleMins >= 60 ? 'opacity-50' : ''}`}
-                        >
-                          <Avatar className="w-9 h-9 border-2 border-[#a855f7]/40">
-                            <AvatarImage src={friend.profiles?.avatar_url || undefined} />
-                            <AvatarFallback className="bg-[#a855f7]/20 text-white text-xs">
-                              {friend.profiles?.display_name?.[0] || '?'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 text-left">
-                            <p className="text-white font-medium text-sm">{friend.profiles?.display_name}</p>
-                            <p className="text-[#d4ff00] text-xs">{friend.venue_name ? `At ${friend.venue_name}` : 'Out now'}</p>
-                          </div>
-                        </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                {/* People Results */}
-                {searchFilterPeople && searchPeopleResults.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">People</h3>
-                    <div className="space-y-1">
-                      {searchPeopleResults.map((friend) => {
-                        return (
-                        <button
-                          key={friend.user_id}
-                          onClick={() => handleFriendSearchSelect(friend)}
-                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
-                        >
-                          <Avatar className="w-9 h-9 border-2 border-[#a855f7]/40">
-                            <AvatarImage src={friend.profiles?.avatar_url || undefined} />
-                            <AvatarFallback className="bg-[#a855f7]/20 text-white text-xs">
-                              {friend.profiles?.display_name?.[0] || '?'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 text-left">
-                            <p className="text-white font-medium text-sm">{friend.profiles?.display_name}</p>
-                            <p className="text-[#d4ff00] text-xs">{friend.venue_name ? `At ${friend.venue_name}` : 'Out now'}</p>
-                          </div>
-                        </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Venue Results */}
-                {searchFilterVenues && searchVenueResults.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Venues</h3>
-                    <div className="space-y-1">
-                      {searchVenueResults.map((venue) => (
-                        <button
-                          key={venue.id}
-                          onClick={() => handleVenueSearchSelect(venue)}
-                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
-                        >
-                          <span className="flex items-center">{venueTypeIcon(venue.type)}</span>
-                          <div className="flex-1 text-left">
-                            <p className="text-white font-medium text-sm">{venue.name}</p>
-                            <p className="text-white/40 text-xs">{venue.neighborhood}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Add People — non-friend results */}
-                {searchFilterPeople && searchGlobalPeople.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Add People</h3>
-                    <div className="space-y-1">
-                      {searchGlobalPeople.map((person: any) => (
-                        <button
-                          key={person.id}
-                          onClick={() => {
-                            setShowSearchOverlay(false);
-                            setSearchQuery('');
-                            openFriendCard({
-                              userId: person.id,
-                              displayName: person.display_name,
-                              avatarUrl: person.avatar_url,
-                            });
-                          }}
-                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#a855f7]/10 transition-colors"
-                        >
-                          <Avatar className="w-9 h-9 border-2 border-white/10">
-                            <AvatarImage src={person.avatar_url || undefined} />
-                            <AvatarFallback className="bg-[#a855f7]/20 text-white text-xs">
-                              {person.display_name?.[0] || '?'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0 text-left">
-                            <p className="text-white font-medium text-sm truncate">{person.display_name}</p>
-                            <p className="text-white/40 text-xs truncate">@{person.username}</p>
-                          </div>
-                          <span className="flex items-center gap-1 text-[#a855f7] text-xs font-medium">
-                            <UserPlus className="w-3.5 h-3.5" />
-                            Add
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* No results */}
-                {searchPeopleResults.length === 0 && searchVenueResults.length === 0 && searchGlobalPeople.length === 0 && (
-                  <div className="text-center py-12">
-                    <p className="text-white/40 text-sm">No results found</p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <UnifiedSearch
+        open={showSearchOverlay}
+        onOpenChange={setShowSearchOverlay}
+        onSelectVenue={(venue) => {
+          if (map.current) {
+            map.current.flyTo({ center: [venue.lng, venue.lat], zoom: 16, duration: 1500 });
+          }
+          openVenueCard(venue.id);
+        }}
+        onSelectPerson={(person) => {
+          if (person.lat && person.lng && map.current) {
+            map.current.flyTo({ center: [person.lng, person.lat], zoom: 15, duration: 1500 });
+          }
+          openFriendCard({
+            userId: person.id,
+            displayName: person.displayName,
+            avatarUrl: person.avatarUrl,
+            venueName: person.venueName || undefined,
+          });
+        }}
+      />
 
       {/* Quick Filter Bottom Sheet */}
       <Drawer open={showFilterSheet} onOpenChange={setShowFilterSheet}>
@@ -2436,7 +2158,6 @@ export default function Map() {
         </div>
       )}
 
-      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
 import { MapPin, Users, Share2, Settings, LogOut, Bookmark, Bell, ChevronRight, Home, Target, UserPlus, QrCode, Camera, Search, Heart, MessageCircle, Contact } from 'lucide-react';
 import { ContactsSync } from '@/components/ContactsSync';
-import { FriendSearchModal } from '@/components/FriendSearchModal';
+import { UnifiedSearch } from '@/components/UnifiedSearch';
 import { InviteFriendsSection } from '@/components/InviteFriendsSection';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -870,7 +870,7 @@ export default function Profile() {
         }}
       />
 
-      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
+      <UnifiedSearch open={showFriendSearch} onOpenChange={setShowFriendSearch} />
       <ContactsSync open={showContactsSync} onClose={() => setShowContactsSync(false)} />
 
       <UpdateSpotSheet

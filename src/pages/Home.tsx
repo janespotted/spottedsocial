@@ -43,7 +43,7 @@ import { PlansFeed } from '@/components/PlansFeed';
 import { DailyNudgeModal } from '@/components/DailyNudgeModal';
 import { NoFriendsBanner } from '@/components/NoFriendsBanner';
 import { isNightlifeHours } from '@/lib/time-context';
-import { FriendSearchModal } from '@/components/FriendSearchModal';
+import { UnifiedSearch } from '@/components/UnifiedSearch';
 import { MorningAfterBanner } from '@/components/MorningAfterBanner';
 import { FriendsOutPill } from '@/components/FriendsOutPill';
 import { MorningAfterModal } from '@/components/MorningAfterModal';
@@ -915,7 +915,7 @@ export default function Home() {
 
       <CreatePostDialog open={showCreatePost} onOpenChange={(open) => { setShowCreatePost(open); if (!open) fetchPosts(); }} />
 
-      <FriendSearchModal open={showFriendSearch} onOpenChange={setShowFriendSearch} />
+      <UnifiedSearch open={showFriendSearch} onOpenChange={setShowFriendSearch} />
 
       <MorningAfterModal open={showMorningAfter} onClose={() => setShowMorningAfter(false)} />
 
