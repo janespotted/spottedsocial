@@ -15,15 +15,15 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Copy, Users, Search, UserPlus, QrCode, Check, Loader2, Clock, ChevronRight, ChevronDown, MessageCircle, Link2, X, Heart, Megaphone, Contact } from 'lucide-react';
-import { ContactsSync } from '@/components/ContactsSync';
+import { ArrowLeft, Users, Search, UserPlus, QrCode, Check, Loader2, Clock, ChevronRight, ChevronDown, X, Heart, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
 import { triggerPushNotification } from '@/lib/push-notifications';
-import { APP_BASE_URL, copyToClipboard } from '@/lib/platform';
+import { APP_BASE_URL } from '@/lib/platform';
 import { QRCodeModal } from '@/components/QRCodeModal';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { MyFriendsTab } from '@/components/MyFriendsTab';
+import { InviteBlock } from '@/components/InviteBlock';
 
 interface SearchResult {
   id: string;
@@ -72,9 +72,6 @@ export default function Friends() {
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [requestsExpanded, setRequestsExpanded] = useState(false);
   
-  // Invite link state
-  const [inviteCode, setInviteCode] = useState<string | null>(null);
-  const [usesCount, setUsesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   
   // Search state
@@ -129,20 +126,18 @@ export default function Friends() {
   
   // QR modal state
   const [showQRModal, setShowQRModal] = useState(false);
-  const [showContactsSync, setShowContactsSync] = useState(false); // kept for button handler
-  
-  // Copy animation state
-  const [justCopied, setJustCopied] = useState(false);
-  
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
   // People you may know state
   const [suggestedFriends, setSuggestedFriends] = useState<SuggestedFriend[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
 
   useEffect(() => {
     if (user) {
-      fetchOrCreateInviteCode();
       fetchSuggestedFriends();
       fetchRequests();
+      // Fetch invite code for QR modal
+      supabase.from('invite_codes').select('code').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        .then(({ data }) => { if (data) setInviteCode(data.code); });
     }
   }, [user]);
 
@@ -189,46 +184,6 @@ export default function Friends() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
-  const fetchOrCreateInviteCode = async () => {
-    try {
-      const { data: existingCode } = await supabase
-        .from('invite_codes')
-        .select('code, uses_count')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingCode) {
-        setInviteCode(existingCode.code);
-        setUsesCount(existingCode.uses_count ?? 0);
-        setLoading(false);
-        return;
-      }
-
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      let newCode = '';
-      for (let i = 0; i < 8; i++) {
-        newCode += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-
-      const { data, error } = await supabase
-        .from('invite_codes')
-        .insert({ user_id: user?.id, code: newCode })
-        .select('code, uses_count')
-        .single();
-
-      if (!error && data) {
-        setInviteCode(data.code);
-        setUsesCount(data.uses_count ?? 0);
-      }
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching invite code:', error);
-      setLoading(false);
-    }
-  };
 
   const fetchRequests = async () => {
     setLoadingRequests(true);
@@ -456,26 +411,6 @@ export default function Friends() {
 
   const getInviteUrl = () => `${APP_BASE_URL}/invite/${inviteCode}`;
 
-  const handleTextFriend = () => {
-    const message = encodeURIComponent(
-      `Hey! Join me on Spotted to see where friends are going out tonight 🎉 ${getInviteUrl()}`
-    );
-    haptic.light();
-    window.location.href = `sms:?&body=${message}`;
-  };
-
-  const handleCopyLink = async () => {
-    try {
-      await copyToClipboard(getInviteUrl());
-      haptic.light();
-      setJustCopied(true);
-      toast.success('Link copied to clipboard!');
-      setTimeout(() => setJustCopied(false), 2000);
-    } catch (error) {
-      toast.error('Failed to copy link');
-    }
-  };
-
   const searchUsers = async () => {
     setSearching(true);
     try {
@@ -610,8 +545,8 @@ export default function Friends() {
 
   const handleRefresh = useCallback(async () => {
     invalidateFriendGraph(queryClient);
-    await Promise.all([fetchRequests(), fetchOrCreateInviteCode(), fetchSuggestedFriends()]);
-  }, [queryClient, fetchRequests, fetchOrCreateInviteCode, fetchSuggestedFriends]);
+    await Promise.all([fetchRequests(), fetchSuggestedFriends()]);
+  }, [queryClient, fetchRequests, fetchSuggestedFriends]);
 
   const isSearching = searchQuery.trim().length >= 2;
 
@@ -785,70 +720,13 @@ export default function Friends() {
               {/* My Friends */}
               <MyFriendsTab />
 
-              {/* Find from Contacts */}
-              <section>
-                <h2 className="text-xs text-white/40 uppercase tracking-[0.15em] font-semibold mb-3">Find friends</h2>
-                <button
-                  onClick={() => setShowContactsSync(true)}
-                  className="w-full flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-[#a855f7]/10 to-[#d4ff00]/5 border border-[#a855f7]/20 hover:border-[#a855f7]/40 transition-colors mb-4"
-                >
-                  <div className="w-10 h-10 rounded-full bg-[#a855f7]/20 flex items-center justify-center">
-                    <Contact className="h-5 w-5 text-[#a855f7]" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-white text-sm font-medium">Find from Contacts</p>
-                    <p className="text-white/30 text-xs">See who's already on Spotted</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-white/20" />
-                </button>
-              </section>
-
-              {/* Invite Section */}
-              <section>
-                <h2 className="text-xs text-white/40 uppercase tracking-[0.15em] font-semibold mb-3">Invite friends</h2>
-                <div className="space-y-2">
-                  <button
-                    onClick={handleTextFriend}
-                    className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white/[0.03] pressable-row"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-[#d4ff00]/10 flex items-center justify-center">
-                      <MessageCircle className="h-5 w-5 text-[#d4ff00]" />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className="text-white text-sm font-medium">Text a friend</p>
-                      <p className="text-white/30 text-xs">Send your invite link via iMessage</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-white/20" />
-                  </button>
-
-                  <button
-                    onClick={handleCopyLink}
-                    className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white/[0.03] pressable-row"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                      {justCopied ? <Check className="h-5 w-5 text-[#22c55e]" /> : <Copy className="h-5 w-5 text-white/50" />}
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className="text-white text-sm font-medium">{justCopied ? 'Link copied' : 'Copy invite link'}</p>
-                      <p className="text-white/30 text-xs">Share anywhere</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-white/20" />
-                  </button>
-                </div>
-
-                {usesCount > 0 && (
-                  <p className="text-white/25 text-xs text-center mt-3">
-                    {usesCount} friend{usesCount !== 1 ? 's' : ''} joined via your link
-                  </p>
-                )}
-              </section>
+              <InviteBlock />
             </>
           )}
         </div>
       </div>
 
       <QRCodeModal open={showQRModal} onOpenChange={setShowQRModal} inviteUrl={getInviteUrl()} />
-      <ContactsSync open={showContactsSync} onClose={() => setShowContactsSync(false)} />
     </div>
     </PullToRefresh>
   );

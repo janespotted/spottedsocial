@@ -9,6 +9,7 @@ import { useFriendsOutStatus } from '@/hooks/useFriendsOutStatus';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Search, X, Heart, ChevronRight, MapPin, Target } from 'lucide-react';
 import spottedLogo from '@/assets/spotted-s-logo.png';
+import { InviteBlock } from '@/components/InviteBlock';
 
 export default function AllFriends() {
   const { user } = useAuth();
@@ -259,6 +260,13 @@ export default function AllFriends() {
               </div>
             )}
           </>
+        )}
+
+        {/* Invite actions — hidden during search */}
+        {!search && (
+          <div className="mt-6 space-y-5" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            <InviteBlock />
+          </div>
         )}
       </div>
     </div>
