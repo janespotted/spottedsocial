@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
-import { MapPin, Edit3, Clock, Bell, X, AlarmClock, ChevronDown, Home } from 'lucide-react';
+import { MapPin, Clock, Bell, X, AlarmClock, Home } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -30,14 +30,6 @@ import { useKeyboardAware } from '@/hooks/useKeyboardAware';
 import { PrivatePartyInviteModal } from '@/components/PrivatePartyInviteModal';
 import { LocationPermissionPrompt } from '@/components/LocationPermissionPrompt';
 import { VisuallyHidden } from '@/components/ui/visually-hidden';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -1182,76 +1174,114 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const VenueConfirmContent = () => {
     const nearbyVenues = locationData?.nearbyVenues || [];
-    const hasMultipleVenues = nearbyVenues.length > 1;
+    const [showVenueList, setShowVenueList] = useState(false);
 
-    return (
-      <div className="relative p-6 space-y-6">
-        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
-        
-        <div className="space-y-2">
-          <h3 className="text-xl font-semibold text-white">
-            {detectedVenue ? 'Confirm Your Location' : 'Where Are You?'}
-          </h3>
-          <div className="h-px bg-white/20" />
-        </div>
+    const audienceExplainer = shareOption === 'close_friends'
+      ? 'Only your close friends will see you.'
+      : shareOption === 'all_friends'
+      ? "Everyone you're friends with will see you."
+      : 'Friends and friends-of-friends will see you.';
 
-        {detectedVenue && !isEditingVenue ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 p-4 bg-[#5b21b6]/20 border-2 border-[#d4ff00] rounded-xl">
-              <MapPin className="h-6 w-6 text-[#d4ff00]" />
-              <span className="text-lg text-white font-medium flex-1">{detectedVenue}</span>
+    if (showVenueList) {
+      return (
+        <div className="relative p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowVenueList(false)}
+              className="text-white/60 hover:text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg font-semibold text-white">Select a venue</h3>
+          </div>
+
+          <div className="space-y-1">
+            {nearbyVenues.map((venue) => (
               <button
-                onClick={() => setIsEditingVenue(true)}
-                className="text-white/60 hover:text-white transition-colors"
+                key={venue.id}
+                onClick={() => {
+                  handleVenueSelect(venue.id);
+                  setShowVenueList(false);
+                }}
+                className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-colors ${
+                  (selectedVenueId || nearbyVenues[0]?.id) === venue.id
+                    ? 'bg-[#d4ff00]/10 border border-[#d4ff00]/40'
+                    : 'hover:bg-white/5'
+                }`}
               >
-                <Edit3 className="h-5 w-5" />
+                <MapPin className="h-4 w-4 text-[#d4ff00] flex-shrink-0" />
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-white font-medium text-sm truncate">{venue.name}</p>
+                </div>
+                <span className="text-white/30 text-xs flex-shrink-0">{Math.round(venue.distance)}m</span>
               </button>
-            </div>
-            <p className="text-sm text-white/60 text-center">
-              We detected you're near this venue
-            </p>
+            ))}
+          </div>
 
-            {/* Dropdown to select different nearby venue */}
-            {hasMultipleVenues && (
-              <div className="space-y-2">
-                <p className="text-sm text-white/60">Not right? Select another:</p>
-                <Select value={selectedVenueId ?? undefined} onValueChange={handleVenueSelect}>
-                  <SelectTrigger className="h-12 bg-[#1a0f2e] border border-white/20 text-white focus:ring-[#d4ff00] focus:border-[#d4ff00]">
-                    <SelectValue placeholder="Select a different venue..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a0f2e] border border-white/20 z-[600]">
-                    {nearbyVenues.map((venue) => (
-                      <SelectItem 
-                        key={venue.id} 
-                        value={venue.id}
-                        className="text-white hover:bg-[#5b21b6]/30 focus:bg-[#5b21b6]/30 cursor-pointer"
-                      >
-                        {venue.name} ({Math.round(venue.distance)}m)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Manual entry fallback */}
+          <div className="pt-2 space-y-3">
+            <p className="text-white/40 text-xs text-center">Don't see your venue?</p>
+            <Input
+              value={customVenue}
+              onChange={(e) => setCustomVenue(e.target.value)}
+              onFocus={handleInputFocus}
+              placeholder="Enter venue name..."
+              className="h-12 bg-[#1a0f2e] border border-white/20 text-white placeholder:text-white/40 focus:ring-[#d4ff00] focus:border-[#d4ff00]"
+            />
+            {customVenue.trim() && customVenue !== detectedVenue && (
+              <Button
+                onClick={() => {
+                  setSelectedVenueId(null);
+                  setShowVenueList(false);
+                }}
+                className="w-full h-11 text-sm font-medium rounded-xl bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90"
+              >
+                Use "{customVenue.trim()}"
+              </Button>
             )}
           </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative p-6 space-y-5">
+        {/* Header row */}
+        <div className="flex items-center justify-between">
+          <p className="text-white/50 text-sm">You're checking in</p>
+          <div className="flex items-center gap-3">
+            <img src={spottedLogo} alt="Spotted" className="h-8 w-8 object-contain" />
+            <button onClick={() => setShowVenueConfirm(false)} className="text-white/40 hover:text-white transition-colors">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Tappable venue field */}
+        {detectedVenue && !isEditingVenue ? (
+          <button
+            onClick={() => nearbyVenues.length > 1 ? setShowVenueList(true) : setIsEditingVenue(true)}
+            className="w-full flex items-center gap-3 p-4 bg-[#1a0f2e]/60 border border-[#d4ff00]/40 rounded-2xl text-left transition-colors hover:bg-[#1a0f2e]/80"
+          >
+            <div className="w-10 h-10 rounded-full bg-[#d4ff00]/10 flex items-center justify-center flex-shrink-0">
+              <MapPin className="h-5 w-5 text-[#d4ff00]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-semibold text-[17px] truncate">{detectedVenue}</p>
+            </div>
+            <span className="text-[#d4ff00] text-sm font-medium flex-shrink-0">Change ›</span>
+          </button>
         ) : (
-          <div className="space-y-4">
-            {/* No venue detected - show options */}
+          <div className="space-y-3">
             {!detectedVenue && (
-              <div className="space-y-3 mb-4">
-                <p className="text-sm text-white/60 text-center">
-                  No nearby venues found
-                </p>
-                
-              </div>
+              <p className="text-sm text-white/40 text-center">No nearby venues found</p>
             )}
-            
             <Input
               value={customVenue}
               onChange={(e) => setCustomVenue(e.target.value)}
               onFocus={handleInputFocus}
               placeholder={detectedVenue ? "Enter different venue..." : "Enter venue name..."}
-              className="h-14 text-lg bg-[#1a0f2e] border-2 border-[#d4ff00] text-white placeholder:text-white/40 focus:ring-[#d4ff00]"
+              className="h-14 text-lg bg-[#1a0f2e] border border-[#d4ff00]/40 text-white placeholder:text-white/40 focus:ring-[#d4ff00] focus:border-[#d4ff00] rounded-2xl"
               autoFocus={!!detectedVenue}
             />
             {detectedVenue && (
@@ -1268,51 +1298,47 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
           </div>
         )}
 
-        {/* Inline Privacy Selector */}
-        <div className="space-y-2">
-          <p className="text-xs text-white/40 uppercase tracking-wider">Visible to</p>
-          <div className="flex gap-2">
+        {/* Audience picker */}
+        <div className="space-y-3">
+          <p className="text-white font-semibold text-[17px]">Who can see you tonight?</p>
+          <div className="flex items-center bg-white/[0.04] rounded-full p-1">
             {([
-              { value: 'close_friends' as const, label: 'Close' },
+              { value: 'close_friends' as const, label: 'Close Friends' },
               { value: 'all_friends' as const, label: 'All Friends' },
               { value: 'mutual_friends' as const, label: 'Mutual' },
             ]).map(opt => (
               <button
                 key={opt.value}
                 onClick={() => setShareOption(opt.value)}
-                className={`flex-1 py-2 rounded-full text-xs font-medium transition-colors ${
+                className={`flex-1 py-2.5 rounded-full text-sm font-medium transition-colors ${
                   shareOption === opt.value
                     ? 'bg-[#d4ff00] text-black'
-                    : 'bg-white/5 text-white/50 border border-white/10'
+                    : 'text-white/40 hover:text-white/60'
                 }`}
               >
                 {opt.label}
               </button>
             ))}
           </div>
+          <p className="text-white/40 text-sm">{audienceExplainer}</p>
         </div>
 
+        {/* Primary action */}
         <Button
           onClick={handleVenueConfirm}
           disabled={!customVenue.trim()}
           className="w-full h-14 text-lg font-semibold rounded-2xl bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90 disabled:opacity-50"
         >
-          Go Live
+          I'm Out
         </Button>
 
-        {/* Always show Private Party option */}
-        <div className="flex items-center gap-3 py-2">
-          <div className="flex-1 h-px bg-white/20" />
-          <span className="text-white/40 text-sm">or</span>
-          <div className="flex-1 h-px bg-white/20" />
-        </div>
-        <Button
+        {/* Private party link */}
+        <button
           onClick={handlePrivatePartyFromVenueConfirm}
-          className="w-full h-14 text-lg font-medium rounded-2xl border border-white/20 text-white bg-transparent hover:bg-white/10 transition-colors duration-200"
+          className="w-full text-center text-white/40 text-sm hover:text-white/60 transition-colors py-1"
         >
-          <Home className="w-5 h-5 mr-2" />
-          I'm at a Private Party
-        </Button>
+          At a private party instead? →
+        </button>
       </div>
     );
   };
