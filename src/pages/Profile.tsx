@@ -299,13 +299,13 @@ export default function Profile() {
       setInviteCode(inviteCodeResult.data.code);
     }
 
-    // Process friends count — filter out demo users when demo mode is off
-    const rawCount = (sentFriendshipsResult.data?.length || 0) + (receivedFriendshipsResult.data?.length || 0);
-    if (!demoEnabled && friendIds && allProfiles) {
-      const demoProfileIds = new Set(allProfiles.filter((p: any) => p.is_demo).map((p: any) => p.id));
-      const realFriendCount = friendIds.filter(id => !demoProfileIds.has(id)).length;
-      setFriendsCount(realFriendCount);
+    // Process friends count — use deduplicated friendIds from the hook
+    // (which already filters demo users when demo mode is off)
+    if (friendIds) {
+      setFriendsCount(friendIds.length);
     } else {
+      // Fallback while hook is loading: raw count (may include duplicates)
+      const rawCount = (sentFriendshipsResult.data?.length || 0) + (receivedFriendshipsResult.data?.length || 0);
       setFriendsCount(rawCount);
     }
 
