@@ -21,11 +21,12 @@ export default function AllFriends() {
   const [search, setSearch] = useState('');
 
   // Build sets for out/planning user IDs and venue map
-  const { outSet, planningSet, outVenueMap, planningNeighborhoodMap } = useMemo(() => {
+  const { outSet, planningSet, outVenueMap, planningNeighborhoodMap, planningVenueNameMap } = useMemo(() => {
     const os = new Set<string>();
     const ps = new Set<string>();
     const ovm = new Map<string, string>();
     const pnm = new Map<string, string | null>();
+    const pvnm = new Map<string, string | null>();
     if (outStatus?.outFriends) {
       for (const f of outStatus.outFriends) {
         os.add(f.user_id);
@@ -36,9 +37,10 @@ export default function AllFriends() {
       for (const f of outStatus.planningFriends) {
         ps.add(f.user_id);
         pnm.set(f.user_id, f.planning_neighborhood);
+        pvnm.set(f.user_id, f.planning_venue_name);
       }
     }
-    return { outSet: os, planningSet: ps, outVenueMap: ovm, planningNeighborhoodMap: pnm };
+    return { outSet: os, planningSet: ps, outVenueMap: ovm, planningNeighborhoodMap: pnm, planningVenueNameMap: pvnm };
   }, [outStatus]);
 
   // All friends filtered by search + demo

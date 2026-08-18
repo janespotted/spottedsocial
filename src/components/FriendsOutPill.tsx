@@ -47,7 +47,9 @@ function FriendRow({ friend, onTap }: { friend: FriendOutStatus; onTap: () => vo
         <p className={`text-xs truncate ${friend.status === 'out' ? 'text-[#d4ff00]' : 'text-white/40'}`}>
           {friend.status === 'out'
             ? friend.venue_name ? `At ${friend.venue_name}` : 'Out'
-            : `TBD${friend.planning_neighborhood ? ` · ${friend.planning_neighborhood}` : ''}`}
+            : friend.planning_venue_name
+              ? `thinking ${friend.planning_venue_name}`
+              : `TBD${friend.planning_neighborhood ? ` · ${friend.planning_neighborhood}` : ' · down for anything'}`}
         </p>
       </div>
     </button>

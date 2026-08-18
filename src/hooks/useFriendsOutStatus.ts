@@ -15,6 +15,7 @@ export interface FriendOutStatus {
   status: 'out' | 'planning';
   venue_name: string | null;
   planning_neighborhood: string | null;
+  planning_venue_name: string | null;
   display_name: string;
   avatar_url: string | null;
   ring: FriendRing;
@@ -93,7 +94,7 @@ export function useFriendsOutStatus() {
       // Fetch night statuses — RLS now handles visibility for both direct + mutual
       const { data } = await supabase
         .from('night_statuses')
-        .select('user_id, status, venue_name, planning_neighborhood')
+        .select('user_id, status, venue_name, planning_neighborhood, planning_venue_name')
         .in('user_id', allIds)
         .in('status', ['out', 'planning'])
         .gt('expires_at', new Date().toISOString());
@@ -163,6 +164,7 @@ export function useFriendsOutStatus() {
             status: s.status as 'out' | 'planning',
             venue_name: s.venue_name || null,
             planning_neighborhood: s.planning_neighborhood || null,
+            planning_venue_name: s.planning_venue_name || null,
             display_name: profile?.display_name || 'Friend',
             avatar_url: profile?.avatar_url || null,
             ring: getRing(s.user_id),
