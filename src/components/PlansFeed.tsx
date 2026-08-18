@@ -482,6 +482,24 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
      fetchEvents();
   }, [userId, demoEnabled]);
 
+  // Instant same-device status updates (realtime is unreliable for own writes)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      setIsUserOut(detail.status === 'out');
+      setIsUserPlanning(detail.status === 'planning');
+      if (detail.status === 'planning') {
+        setUserPlanningNeighborhood(detail.planningNeighborhood ?? null);
+        setUserPlanningVisibility(detail.planningVisibility ?? null);
+      }
+      // Also re-fetch to get updated friend lists
+      fetchPlanningFriends();
+    };
+    window.addEventListener('nightStatusChanged', handler);
+    return () => window.removeEventListener('nightStatusChanged', handler);
+  }, []);
+
   // Realtime subscription for plans, plan_downs, and night_statuses
   useEffect(() => {
     let plansTimer: ReturnType<typeof setTimeout>;
