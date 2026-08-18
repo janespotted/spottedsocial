@@ -38,7 +38,6 @@ import {
 import { CreatePostDialog } from '@/components/CreatePostDialog';
 import { PostLikesModal } from '@/components/PostLikesModal';
 import { FeedSkeleton } from '@/components/FeedSkeleton';
-import { FriendsPlanning } from '@/components/FriendsPlanning';
 import { PlansFeed } from '@/components/PlansFeed';
 import { DailyNudgeModal } from '@/components/DailyNudgeModal';
 import { NoFriendsBanner } from '@/components/NoFriendsBanner';

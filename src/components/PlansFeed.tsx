@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { Calendar, Plus, Sparkles } from 'lucide-react';
+import { Calendar, Plus, MapPin } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { createResilientChannel } from '@/lib/resilient-channel';
@@ -10,11 +10,11 @@ import { EditPlanDialog } from './EditPlanDialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDemoMode } from '@/hooks/useDemoMode';
-import { FriendsPlanning } from './FriendsPlanning';
 import { useToast } from '@/hooks/use-toast';
 import { haptic } from '@/lib/haptics';
 import { emitPlanningVisibilityChanged } from '@/lib/night-status';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { useMeetUp } from '@/contexts/MeetUpContext';
 import { goPlanning, stopSharing } from '@/lib/night-status';
 import { useUserCity } from '@/hooks/useUserCity';
 import { EventCard } from './EventCard';
@@ -94,14 +94,17 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
   const [showCreateEventDialog, setShowCreateEventDialog] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
+  const [friendsOut, setFriendsOut] = useState<{ user_id: string; display_name: string; avatar_url: string | null; venue_name: string }[]>([]);
   const [isUserPlanning, setIsUserPlanning] = useState(false);
   const [isUserOut, setIsUserOut] = useState(false);
   const [userProfile, setUserProfile] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
   const [userPlanningNeighborhood, setUserPlanningNeighborhood] = useState<string | null>(null);
   const [userPlanningVisibility, setUserPlanningVisibility] = useState<string | null>(null);
+  const [aroundTonightExpanded, setAroundTonightExpanded] = useState(false);
   const demoEnabled = useDemoMode();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { sendMeetUpNotification } = useMeetUp();
 
   // Auto-open create plan dialog when preselectedFriend is provided
   useEffect(() => {
@@ -161,47 +164,69 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
 
       const friendIds = friendships.map(f => f.user_id === userId ? f.friend_id : f.user_id);
 
-      // Get friends who are planning
-      let planningQuery = supabase
+      // Get friends who are planning OR out
+      let statusQuery = supabase
         .from('night_statuses')
-        .select('user_id, planning_neighborhood')
+        .select('user_id, planning_neighborhood, status, venue_name, is_demo')
         .in('user_id', friendIds)
-        .eq('status', 'planning')
+        .in('status', ['planning', 'out'])
         .gte('expires_at', new Date().toISOString());
       if (!demoEnabled) {
-        planningQuery = planningQuery.eq('is_demo', false);
+        statusQuery = statusQuery.eq('is_demo', false);
       }
-      const { data: planningStatuses } = await planningQuery;
+      const { data: activeStatuses } = await statusQuery;
 
-      if (!planningStatuses || planningStatuses.length === 0) {
+      if (!activeStatuses || activeStatuses.length === 0) {
         setPlanningFriends([]);
+        setFriendsOut([]);
         return;
       }
 
-      const planningUserIds = planningStatuses.map(s => s.user_id);
+      const activeUserIds = activeStatuses.map(s => s.user_id);
 
-      // Get profiles for planning friends using cache, with direct fallback
+      // Get profiles using cache, with direct fallback
       const allProfiles: any[] = queryClient.getQueryData(['profiles-safe']) || [];
-      let profiles = allProfiles.filter((p: any) => planningUserIds.includes(p.id));
-      // Fallback for profiles not in cache (e.g. freshly seeded demo users)
-      const missingIds = planningUserIds.filter(id => !profiles.some((p: any) => p.id === id));
+      let profiles = allProfiles.filter((p: any) => activeUserIds.includes(p.id));
+      const missingIds = activeUserIds.filter(id => !profiles.some((p: any) => p.id === id));
       if (missingIds.length > 0) {
         const { data: fallback } = await supabase
           .from('profiles')
-          .select('id, display_name, avatar_url')
+          .select('id, display_name, avatar_url, is_demo')
           .in('id', missingIds);
         if (fallback) profiles = [...profiles, ...fallback];
       }
 
-      if (profiles.length > 0) {
-        const friendsWithNeighborhood = profiles.map(p => ({
-          user_id: p.id,
-          display_name: p.display_name,
-          avatar_url: p.avatar_url,
-          planning_neighborhood: planningStatuses.find(s => s.user_id === p.id)?.planning_neighborhood
-        }));
-        setPlanningFriends(friendsWithNeighborhood);
+      // Filter out demo profiles when demo disabled
+      if (!demoEnabled) {
+        profiles = profiles.filter((p: any) => !p.is_demo);
       }
+
+      const planningResults: typeof planningFriends = [];
+      const outResults: typeof friendsOut = [];
+
+      for (const s of activeStatuses) {
+        const profile = profiles.find((p: any) => p.id === s.user_id);
+        if (!profile) continue;
+
+        if (s.status === 'planning') {
+          planningResults.push({
+            user_id: s.user_id,
+            display_name: profile.display_name,
+            avatar_url: profile.avatar_url,
+            planning_neighborhood: s.planning_neighborhood,
+          });
+        } else if (s.status === 'out' && s.venue_name) {
+          outResults.push({
+            user_id: s.user_id,
+            display_name: profile.display_name,
+            avatar_url: profile.avatar_url,
+            venue_name: s.venue_name,
+          });
+        }
+      }
+
+      setPlanningFriends(planningResults);
+      setFriendsOut(outResults);
     } catch (error) {
       console.error('Error fetching planning friends:', error);
     }
@@ -642,135 +667,168 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
     );
   }
 
-  return (
-    <div className="space-y-7 px-4">
-      {/* Weekend Rally Header - shown when activated via push notification */}
-      {weekendFilter && (
-        <div className="bg-gradient-to-br from-[#a855f7]/20 to-[#7c3aed]/10 rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-[#d4ff00]" />
-              <h3 className="text-white font-semibold text-lg">This Weekend</h3>
-            </div>
-            <button
-              onClick={onClearWeekendFilter}
-              className="text-white/50 hover:text-white text-sm transition-colors"
-            >
-              Show all
-            </button>
-          </div>
-          
-          {weekendPlanningFriendsCount > 0 ? (
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex -space-x-2">
-                {planningFriends.slice(0, 4).map((friend, i) => (
-                  <Avatar key={friend.user_id} className="h-8 w-8 border-2 border-[#1a0f2e]">
-                    <AvatarImage src={friend.avatar_url || undefined} />
-                    <AvatarFallback className="bg-[#2d1b4e] text-white text-xs">
-                      {friend.display_name[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
-                {planningFriends.length > 4 && (
-                  <div className="h-8 w-8 rounded-full bg-[#2d1b4e] border-2 border-[#1a0f2e] flex items-center justify-center">
-                    <span className="text-white/70 text-xs">+{planningFriends.length - 4}</span>
-                  </div>
-                )}
-              </div>
-              <span className="text-white/70 text-sm">
-                {weekendPlanningFriendsCount} friend{weekendPlanningFriendsCount !== 1 ? 's' : ''} making plans
-              </span>
-            </div>
-          ) : (
-            <p className="text-white/50 text-sm mb-4">No friends planning yet — be the first!</p>
-          )}
-          
-          {!isUserPlanning && (
-            <button
-              onClick={handleJoinPlanning}
-              className="w-full flex items-center justify-center gap-2 bg-[#a855f7] hover:bg-[#9333ea] text-white py-3 rounded-xl font-medium transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              I'm thinking too
-            </button>
-          )}
-        </div>
-      )}
+  // Combined "Around Tonight" list: out friends first, then TBD
+  const aroundTonight = [
+    ...friendsOut.map(f => ({ ...f, type: 'out' as const })),
+    ...planningFriends.map(f => ({ ...f, type: 'planning' as const, venue_name: f.planning_neighborhood || undefined })),
+  ];
+  const aroundTonightCount = aroundTonight.length;
+  const AROUND_TONIGHT_COLLAPSE = 4;
+  const visibleAroundTonight = aroundTonightExpanded ? aroundTonight : aroundTonight.slice(0, AROUND_TONIGHT_COLLAPSE);
+  const hasContent = aroundTonightCount > 0 || feedItems.length > 0;
 
-      {/* Friends Thinking About Going Out Section - hide in weekend mode */}
-      {!weekendFilter && (
-        <FriendsPlanning 
-          friends={planningFriends} 
-          variant="card" 
-          isUserPlanning={isUserPlanning}
-          isUserOut={isUserOut}
-          onJoinPlanning={handleJoinPlanning}
-          onLeavePlanning={handleLeavePlanning}
-          showJoinOption={true}
-          userProfile={userProfile}
-          userPlanningNeighborhood={userPlanningNeighborhood}
-          userPlanningVisibility={userPlanningVisibility}
-          onChangeNeighborhood={handleChangeNeighborhood}
-          onChangeVisibility={handleChangeVisibility}
-          onSwitchToOut={handleSwitchToOut}
-          city={city || 'la'}
-        />
-      )}
-      
-      {/* PLANS section */}
-      <div>
-        <p className="text-white/30 text-[10px] uppercase tracking-wider font-semibold mb-2">Plans</p>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="w-full flex items-center gap-4 p-4 rounded-2xl bg-[#1a0a2e]/80 border border-white/8 hover:bg-[#1a0a2e] transition-colors"
-        >
-          <div className="w-11 h-11 rounded-full bg-[#d4ff00]/10 flex items-center justify-center flex-shrink-0">
-            <Plus className="w-5 h-5 text-[#d4ff00]" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="text-white font-medium text-[15px]">Share a plan</p>
-            <p className="text-white/35 text-xs mt-0.5">Post when and where — see who's down</p>
-          </div>
-        </button>
+  return (
+    <div className="space-y-6 px-4">
+      {/* 1. QUIET STATUS CONTROL */}
+      <div className="flex items-center gap-3">
+        <span className="text-white/40 text-sm">You're</span>
+        <div className="flex-1 flex items-center bg-white/[0.04] rounded-full p-1">
+          <button
+            onClick={() => { if (!isUserOut) handleSwitchToOut(); }}
+            className={`flex-1 py-2 rounded-full text-xs font-semibold transition-colors ${
+              isUserOut ? 'bg-[#d4ff00] text-black' : 'text-white/40 hover:text-white/60'
+            }`}
+          >
+            Out
+          </button>
+          <button
+            onClick={() => { if (!isUserPlanning) handleJoinPlanning(); }}
+            className={`flex-1 py-2 rounded-full text-xs font-semibold transition-colors ${
+              isUserPlanning ? 'bg-[#d4ff00] text-black' : 'text-white/40 hover:text-white/60'
+            }`}
+          >
+            TBD
+          </button>
+          <button
+            onClick={() => { if (isUserPlanning || isUserOut) handleLeavePlanning(); }}
+            className={`flex-1 py-2 rounded-full text-xs font-semibold transition-colors ${
+              !isUserPlanning && !isUserOut ? 'bg-[#d4ff00] text-black' : 'text-white/40 hover:text-white/60'
+            }`}
+          >
+            Staying In
+          </button>
+        </div>
       </div>
 
-       {feedItems.length === 0 ? (
+      {!hasContent ? (
+        /* UNIFIED EMPTY STATE */
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center mb-5">
-            <Calendar className="w-10 h-10 text-primary" />
+          <div className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 flex items-center justify-center mb-5">
+            <Calendar className="w-10 h-10 text-[#a855f7]/60" />
           </div>
-          <h3 className="text-xl font-semibold text-foreground mb-2">
-            {weekendFilter ? 'No weekend plans yet' : "Tonight's a blank canvas"}
-          </h3>
-          <p className="text-muted-foreground text-sm max-w-[280px] leading-relaxed">
-            {weekendFilter 
-              ? 'Nothing here yet — share what you\'re up to this weekend!'
-              : 'Share a plan and see who\'s down to join.'
-            }
+          <h3 className="text-xl font-semibold text-white mb-2">Nobody's out yet</h3>
+          <p className="text-white/40 text-sm max-w-[260px] leading-relaxed">
+            Be the first — update your status or share a plan.
           </p>
         </div>
       ) : (
-         feedItems.map(item => 
-           item.type === 'plan' ? (
-             <PlanItem
-               key={`plan-${item.data.id}`}
-               plan={item.data}
-               currentUserId={userId}
-               userVote={userVotes[item.data.id] || null}
-               onVoteChange={fetchPlans}
-               onEdit={handleEditPlan}
-               onDelete={handleDeletePlan}
-             />
-           ) : (
-             <EventCard
-               key={`event-${item.data.id}`}
-               event={item.data}
-               currentUserId={userId}
-               friendsInterested={item.data.friendsInterested}
-               onRsvpChange={handleEventRsvpChange}
-             />
-           )
-         )
+        <>
+          {/* 2. AROUND TONIGHT — WEIGHTED CENTERPIECE */}
+          {aroundTonightCount > 0 && (
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <h2 className="text-white font-bold text-xl">
+                  Around tonight <span className="text-white/40 font-normal">· {aroundTonightCount}</span>
+                </h2>
+                {aroundTonightCount > AROUND_TONIGHT_COLLAPSE && (
+                  <button
+                    onClick={() => setAroundTonightExpanded(!aroundTonightExpanded)}
+                    className="text-white/40 text-sm hover:text-white/60 transition-colors"
+                  >
+                    {aroundTonightExpanded ? 'Show less' : 'See all'}
+                  </button>
+                )}
+              </div>
+              <p className="text-white/30 text-sm mb-4">Friends who are out or down to go</p>
+
+              <div className="space-y-0 divide-y divide-white/[0.06]">
+                {visibleAroundTonight.map((friend) => (
+                  <div key={friend.user_id} className="flex items-center gap-3 py-3.5">
+                    <Avatar className={`w-12 h-12 border-2 ${friend.type === 'out' ? 'border-[#d4ff00]/50' : 'border-[#a855f7]/50'}`}>
+                      <AvatarImage src={friend.avatar_url || undefined} />
+                      <AvatarFallback className={`text-white text-sm font-semibold ${friend.type === 'out' ? 'bg-[#d4ff00]/20' : 'bg-[#a855f7]/20'}`}>
+                        {friend.display_name[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold text-[15px] truncate">{friend.display_name}</p>
+                      {friend.type === 'out' ? (
+                        <p className="text-[#d4ff00] text-sm truncate">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#d4ff00] mr-1.5 align-middle" />
+                          Out · {friend.venue_name}
+                        </p>
+                      ) : (
+                        <p className="text-[#a855f7] text-sm truncate">
+                          TBD · {(friend as any).planning_neighborhood || 'down for anything'}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => sendMeetUpNotification(friend.user_id, friend.display_name, friend.avatar_url)}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors flex-shrink-0 ${
+                        friend.type === 'out'
+                          ? 'bg-[#d4ff00] text-black hover:bg-[#d4ff00]/80'
+                          : 'border border-white/20 text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                      Meet up
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Divider between sections */}
+          {aroundTonightCount > 0 && feedItems.length > 0 && (
+            <div className="h-px bg-white/[0.08]" />
+          )}
+
+          {/* 3. PLANS SECTION */}
+          <div>
+            <h2 className="text-white font-bold text-xl mb-3">Plans</h2>
+
+            {/* Share a plan — lightweight dashed row */}
+            <button
+              onClick={() => setShowCreateDialog(true)}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl border border-dashed border-white/15 hover:border-white/25 hover:bg-white/[0.02] transition-colors mb-4"
+            >
+              <div className="w-11 h-11 rounded-full bg-[#d4ff00]/10 flex items-center justify-center flex-shrink-0">
+                <Plus className="w-5 h-5 text-[#d4ff00]" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-white font-medium text-[15px]">Share a plan</p>
+                <p className="text-white/30 text-xs mt-0.5">Post when & where — see who's down</p>
+              </div>
+            </button>
+
+            {/* Plan + Event cards */}
+            <div className="space-y-4">
+              {feedItems.map(item =>
+                item.type === 'plan' ? (
+                  <PlanItem
+                    key={`plan-${item.data.id}`}
+                    plan={item.data}
+                    currentUserId={userId}
+                    userVote={userVotes[item.data.id] || null}
+                    onVoteChange={fetchPlans}
+                    onEdit={handleEditPlan}
+                    onDelete={handleDeletePlan}
+                  />
+                ) : (
+                  <EventCard
+                    key={`event-${item.data.id}`}
+                    event={item.data}
+                    currentUserId={userId}
+                    friendsInterested={item.data.friendsInterested}
+                    onRsvpChange={handleEventRsvpChange}
+                  />
+                )
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       <CreatePlanDialog
