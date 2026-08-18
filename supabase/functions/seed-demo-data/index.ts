@@ -105,8 +105,8 @@ Deno.serve(async (req) => {
 
     // Admin check: required for 'seed' and 'clear'
     const { data: hasAdmin } = await authClient.rpc('has_role', {
-      _user_id: user.id,
-      _role: 'admin',
+      user_id: user.id,
+      role: 'admin',
     });
     const isAdmin = !!hasAdmin;
 

@@ -74,7 +74,7 @@ export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     if (!user) return;
-    supabase.rpc('has_role', { user_id: user.id, role: 'admin' } as any)
+    supabase.rpc('has_role', { user_id: user.id, role: 'admin' })
       .then(({ data }) => setIsAdmin(data === true));
   }, [user]);
   const handleWordmarkTap = () => {

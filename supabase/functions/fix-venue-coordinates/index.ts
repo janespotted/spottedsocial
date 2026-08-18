@@ -40,8 +40,8 @@ serve(async (req) => {
     }
 
     const { data: hasAdmin, error: roleError } = await authClient.rpc('has_role', {
-      _user_id: user.id,
-      _role: 'admin',
+      user_id: user.id,
+      role: 'admin',
     });
     if (roleError || !hasAdmin) {
       console.error('Admin role check failed:', roleError?.message || 'User is not admin');

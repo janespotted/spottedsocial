@@ -43,7 +43,7 @@ export function PageHeader({
 
   useEffect(() => {
     if (!enableAdminGesture || !user) return;
-    supabase.rpc('has_role', { user_id: user.id, role: 'admin' } as any)
+    supabase.rpc('has_role', { user_id: user.id, role: 'admin' })
       .then(({ data, error }) => {
         if (error) console.error('[Admin] has_role error:', error);
         setIsAdmin(data === true);

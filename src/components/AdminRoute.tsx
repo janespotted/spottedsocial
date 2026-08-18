@@ -22,8 +22,8 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
       try {
         console.log('[AdminRoute] Calling has_role RPC for user:', user.id);
         const { data, error } = await supabase.rpc('has_role', {
-          _user_id: user.id,
-          _role: 'admin'
+          user_id: user.id,
+          role: 'admin'
         });
 
         console.log('[AdminRoute] RPC response - data:', data, 'error:', error);

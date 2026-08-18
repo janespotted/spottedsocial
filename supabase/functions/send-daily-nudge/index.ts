@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const { data: hasAdmin } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' });
+      const { data: hasAdmin } = await supabase.rpc('has_role', { user_id: user.id, role: 'admin' });
       if (!hasAdmin) {
         return new Response(JSON.stringify({ error: 'Forbidden: Admin role required' }), {
           status: 403,
