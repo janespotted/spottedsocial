@@ -563,21 +563,6 @@ export default function Profile() {
           </button>
         </div>
 
-        {/* Close Friends */}
-        <button
-          onClick={() => navigate('/profile/close-friends')}
-          className="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/8 hover:bg-white/[0.06] transition-colors"
-        >
-          <div className="w-9 h-9 rounded-full bg-[#d4ff00]/10 flex items-center justify-center">
-            <Heart className="h-4 w-4 text-[#d4ff00]" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="text-white text-sm font-medium">Close Friends</p>
-            <p className="text-white/30 text-xs">Manage your close friends list</p>
-          </div>
-          <ChevronRight className="h-4 w-4 text-white/20" />
-        </button>
-
         {/* All Friends */}
         <button
           onClick={() => navigate('/profile/all-friends')}
