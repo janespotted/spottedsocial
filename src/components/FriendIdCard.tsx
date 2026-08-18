@@ -245,7 +245,7 @@ export function FriendIdCard() {
       const [nightStatusRes, activeCheckInRes] = await Promise.all([
         supabase
           .from('night_statuses')
-          .select('status, planning_neighborhood, venue_name, is_private_party, party_neighborhood, updated_at, lat, lng')
+          .select('status, planning_neighborhood, planning_venue_name, venue_name, is_private_party, party_neighborhood, updated_at, lat, lng')
           .eq('user_id', selectedFriend.userId)
           .not('expires_at', 'is', null)
           .gt('expires_at', new Date().toISOString())
@@ -283,10 +283,12 @@ export function FriendIdCard() {
           canSeeLocation: true,
           isPrivateParty: false
         });
-        const neighborhoodText = nightStatus.planning_neighborhood 
-          ? `TBD tonight — thinking: ${nightStatus.planning_neighborhood}`
-          : 'TBD tonight';
-        setStatusSubtitle(neighborhoodText);
+        const subtitleText = nightStatus.planning_venue_name
+          ? `TBD tonight — thinking ${nightStatus.planning_venue_name}`
+          : nightStatus.planning_neighborhood
+          ? `TBD tonight — ${nightStatus.planning_neighborhood}`
+          : 'TBD tonight — down for anything';
+        setStatusSubtitle(subtitleText);
         return;
       }
 

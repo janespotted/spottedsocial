@@ -201,6 +201,8 @@ export async function stopSharing(userId: string): Promise<void> {
       lng: null,
       expires_at: null,
       planning_neighborhood: null,
+      planning_venue_id: null,
+      planning_venue_name: null,
       planning_visibility: null,
       is_private_party: false,
       party_neighborhood: null,
@@ -247,6 +249,8 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
       updated_at: now,
       expires_at: getStatusExpiry(),
       planning_neighborhood: null,
+      planning_venue_id: null,
+      planning_venue_name: null,
       planning_visibility: null,
       is_private_party: opts.privateParty ? true : false,
       party_neighborhood: opts.privateParty?.neighborhood ?? null,
@@ -308,6 +312,8 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
 export interface GoPlanningOptions {
   neighborhood?: string | null;
   visibility?: 'close_friends' | 'all_friends' | 'mutual_friends' | null;
+  venueId?: string | null;
+  venueName?: string | null;
 }
 
 /**
@@ -341,6 +347,8 @@ export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): 
       updated_at: now,
       expires_at: getStatusExpiry(),
       planning_neighborhood: opts.neighborhood ?? null,
+      planning_venue_id: opts.venueId ?? null,
+      planning_venue_name: opts.venueName ?? null,
       planning_visibility: opts.visibility ?? null,
       is_private_party: false,
       party_neighborhood: null,

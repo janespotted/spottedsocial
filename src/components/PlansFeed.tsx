@@ -93,7 +93,7 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
   const [dialogPreselectedFriend, setDialogPreselectedFriend] = useState<PreselectedFriend | null>(null);
   const [showCreateEventDialog, setShowCreateEventDialog] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
+  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null; planning_venue_name?: string | null }[]>([]);
   const [friendsOut, setFriendsOut] = useState<{ user_id: string; display_name: string; avatar_url: string | null; venue_name: string }[]>([]);
   const [isUserPlanning, setIsUserPlanning] = useState(false);
   const [isUserOut, setIsUserOut] = useState(false);
@@ -167,7 +167,7 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
       // Get friends who are planning OR out
       let statusQuery = supabase
         .from('night_statuses')
-        .select('user_id, planning_neighborhood, status, venue_name, is_demo')
+        .select('user_id, planning_neighborhood, planning_venue_name, status, venue_name, is_demo')
         .in('user_id', friendIds)
         .in('status', ['planning', 'out'])
         .gte('expires_at', new Date().toISOString());
@@ -214,6 +214,7 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
             display_name: profile.display_name,
             avatar_url: profile.avatar_url,
             planning_neighborhood: s.planning_neighborhood,
+            planning_venue_name: s.planning_venue_name || null,
           });
         } else if (s.status === 'out' && s.venue_name) {
           outResults.push({
@@ -759,7 +760,9 @@ export const PlansFeed = memo(function PlansFeed({ userId, weekendFilter = false
                         </p>
                       ) : (
                         <p className="text-[#a855f7] text-sm truncate">
-                          TBD · {(friend as any).planning_neighborhood || 'down for anything'}
+                          {(friend as any).planning_venue_name
+                            ? `thinking ${(friend as any).planning_venue_name}`
+                            : `TBD · ${(friend as any).planning_neighborhood || 'down for anything'}`}
                         </p>
                       )}
                     </div>

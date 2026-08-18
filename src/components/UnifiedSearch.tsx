@@ -19,6 +19,7 @@ interface SearchFriend {
   status: 'out' | 'planning' | 'home';
   venue_name: string | null;
   planning_neighborhood: string | null;
+  planning_venue_name: string | null;
   has_story: boolean;
   lat: number | null;
   lng: number | null;
@@ -118,7 +119,7 @@ export function UnifiedSearch({ open, onOpenChange, onSelectPerson, onSelectVenu
           ? supabase.from('checkins').select('user_id, venue_name, started_at').in('user_id', friendIds).is('ended_at', null).gt('started_at', twentyFourHoursAgo).order('started_at', { ascending: false })
           : Promise.resolve({ data: [] }),
         friendIds.length > 0
-          ? supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name, updated_at, is_private_party, party_neighborhood, lat, lng').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now)
+          ? supabase.from('night_statuses').select('user_id, status, planning_neighborhood, planning_venue_name, venue_name, updated_at, is_private_party, party_neighborhood, lat, lng').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now)
           : Promise.resolve({ data: [] }),
         friendIds.length > 0
           ? supabase.from('stories').select('user_id').in('user_id', friendIds).gt('expires_at', now)
@@ -143,6 +144,7 @@ export function UnifiedSearch({ open, onOpenChange, onSelectPerson, onSelectVenu
         let status: 'out' | 'planning' | 'home' = 'home';
         let venue_name: string | null = null;
         let planning_neighborhood: string | null = null;
+        let planning_venue_name: string | null = null;
         let lat: number | null = null;
         let lng: number | null = null;
 
@@ -171,6 +173,7 @@ export function UnifiedSearch({ open, onOpenChange, onSelectPerson, onSelectVenu
         } else if (nightStatus?.status === 'planning') {
           status = 'planning';
           planning_neighborhood = nightStatus.planning_neighborhood;
+          planning_venue_name = nightStatus.planning_venue_name || null;
         }
 
         return {
@@ -181,6 +184,7 @@ export function UnifiedSearch({ open, onOpenChange, onSelectPerson, onSelectVenu
           status,
           venue_name,
           planning_neighborhood,
+          planning_venue_name,
           has_story: storySet.has(profile.id),
           lat,
           lng,
@@ -339,7 +343,13 @@ export function UnifiedSearch({ open, onOpenChange, onSelectPerson, onSelectVenu
         {friend.status === 'out' ? (
           <p className="text-[#d4ff00] text-xs truncate">Out · {friend.venue_name || 'Nearby'}</p>
         ) : friend.status === 'planning' ? (
-          <p className="text-[#a855f7] text-xs truncate">TBD{friend.planning_neighborhood ? ` · ${friend.planning_neighborhood}` : ''}</p>
+          <p className="text-[#a855f7] text-xs truncate">
+            {friend.planning_venue_name
+              ? `thinking ${friend.planning_venue_name}`
+              : friend.planning_neighborhood
+              ? `TBD · ${friend.planning_neighborhood}`
+              : 'TBD · down for anything'}
+          </p>
         ) : (
           <p className="text-white/40 text-xs">Home</p>
         )}

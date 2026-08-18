@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
-import { MapPin, Clock, Bell, X, AlarmClock, Home } from 'lucide-react';
+import { MapPin, Clock, Bell, X, AlarmClock, Home, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import spottedLogo from '@/assets/spotted-s-logo.png';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -75,6 +75,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   const [showPlanningNeighborhood, setShowPlanningNeighborhood] = useState(false);
   const [showPlanningPrivacy, setShowPlanningPrivacy] = useState(false);
   const [planningNeighborhood, setPlanningNeighborhood] = useState<string | undefined>(undefined);
+  const [planningVenueId, setPlanningVenueId] = useState<string | null>(null);
+  const [planningVenueName, setPlanningVenueName] = useState<string | null>(null);
   const [planningVisibility, setPlanningVisibility] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('all_friends');
   const [shareOption, setShareOption] = useState<'close_friends' | 'all_friends' | 'mutual_friends'>('close_friends');
   const [detectedVenue, setDetectedVenue] = useState<string>('');
@@ -497,15 +499,18 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
 
   const handlePlanningPrivacyConfirm = async () => {
     setShowPlanningPrivacy(false);
-    // Refresh city detection based on current GPS before showing neighborhoods
     setPlanningNeighborhood(undefined);
+    setPlanningVenueId(null);
+    setPlanningVenueName(null);
     await refreshCity();
     setShowPlanningNeighborhood(true);
   };
 
-  const handlePlanningConfirm = async (skipNeighborhood: boolean = false) => {
-    const neighborhood = skipNeighborhood ? null : (planningNeighborhood || null);
-    await updateStatus('planning', null, null, null, null, neighborhood, planningVisibility);
+  const handlePlanningConfirm = async () => {
+    const neighborhood = planningNeighborhood || null;
+    const venueId = planningVenueId || null;
+    const venueName = planningVenueName || null;
+    await updateStatus('planning', null, null, null, null, neighborhood, planningVisibility, venueId, venueName);
     setShowPlanningNeighborhood(false);
     onOpenChange(false);
     // Show planning confirmation card
@@ -744,7 +749,9 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
     venue: string | null,
     venueId: string | null = null,
     neighborhood: string | null = null,
-    visibility: 'close_friends' | 'all_friends' | 'mutual_friends' | null = null
+    visibility: 'close_friends' | 'all_friends' | 'mutual_friends' | null = null,
+    pVenueId: string | null = null,
+    pVenueName: string | null = null
   ) => {
     try {
       if (status === 'out' && lat && lng && venue) {
@@ -790,7 +797,7 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
         await stopSharing(user!.id);
         haptic.medium();
       } else if (status === 'planning') {
-        await goPlanning(user!.id, { neighborhood, visibility });
+        await goPlanning(user!.id, { neighborhood, visibility, venueId: pVenueId, venueName: pVenueName });
         haptic.medium();
 
         // For planning, also notify friends
@@ -926,6 +933,8 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
             updated_at: new Date().toISOString(),
             expires_at: getStatusExpiry(),
             planning_neighborhood: null,
+            planning_venue_id: null,
+            planning_venue_name: null,
             planning_visibility: null,
             is_private_party: false,
             party_neighborhood: null,
@@ -1344,46 +1353,207 @@ export function CheckInModal({ open, onOpenChange }: CheckInModalProps) {
   };
 
   const PlanningNeighborhoodContent = () => {
-    const neighborhoods = CITY_NEIGHBORHOODS[city] || CITY_NEIGHBORHOODS['la'];
-    
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchVenues, setSearchVenues] = useState<Array<{ id: string; name: string; neighborhood: string }>>([]);
+    const [searchNeighborhoods, setSearchNeighborhoods] = useState<string[]>([]);
+    const [allVenues, setAllVenues] = useState<Array<{ id: string; name: string; neighborhood: string }>>([]);
+    const [showSearch, setShowSearch] = useState(false);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Fetch venues for the current city on mount
+    useEffect(() => {
+      (async () => {
+        const { data } = await supabase
+          .from('venues')
+          .select('id, name, neighborhood, is_demo')
+          .eq('city', city)
+          .order('popularity_rank');
+        const filtered = (data || []).filter((v: any) => !v.is_demo);
+        setAllVenues(filtered);
+      })();
+    }, [city]);
+
+    // Filter results as user types
+    useEffect(() => {
+      if (!searchQuery.trim()) {
+        setSearchVenues([]);
+        setSearchNeighborhoods([]);
+        return;
+      }
+      const q = searchQuery.toLowerCase();
+      const matchedVenues = allVenues
+        .filter(v => v.name.toLowerCase().includes(q) || v.neighborhood.toLowerCase().includes(q))
+        .slice(0, 5);
+      const seen = new Set<string>();
+      const matchedNbhds: string[] = [];
+      for (const v of allVenues) {
+        if (!seen.has(v.neighborhood) && v.neighborhood.toLowerCase().includes(q)) {
+          seen.add(v.neighborhood);
+          matchedNbhds.push(v.neighborhood);
+          if (matchedNbhds.length >= 3) break;
+        }
+      }
+      setSearchVenues(matchedVenues);
+      setSearchNeighborhoods(matchedNbhds);
+    }, [searchQuery, allVenues]);
+
+    useEffect(() => {
+      if (showSearch) setTimeout(() => searchInputRef.current?.focus(), 100);
+    }, [showSearch]);
+
+    const handleSelectVenue = (venue: { id: string; name: string }) => {
+      setPlanningVenueId(venue.id);
+      setPlanningVenueName(venue.name);
+      setPlanningNeighborhood(undefined);
+      setShowSearch(false);
+      setSearchQuery('');
+    };
+
+    const handleSelectNeighborhood = (nbhd: string) => {
+      setPlanningNeighborhood(nbhd);
+      setPlanningVenueId(null);
+      setPlanningVenueName(null);
+      setShowSearch(false);
+      setSearchQuery('');
+    };
+
+    const handleClearSelection = () => {
+      setPlanningVenueId(null);
+      setPlanningVenueName(null);
+      setPlanningNeighborhood(undefined);
+    };
+
+    const hasSelection = !!planningVenueName || !!planningNeighborhood;
+
+    const footerText = planningVenueName
+      ? `Friends will see you're thinking ${planningVenueName} tonight`
+      : planningNeighborhood
+      ? `Friends will see you're planning ${planningNeighborhood} tonight`
+      : "Friends will see you're down tonight";
+
     return (
-      <div className="relative p-6 space-y-6">
-        <img src={spottedLogo} alt="Spotted" className="absolute top-4 right-4 h-10 w-10 object-contain" />
-        
-        <div className="space-y-2">
-          <h3 className="text-xl font-semibold text-white">Share what area you're thinking tonight?</h3>
-          <p className="text-white/60 text-sm">(optional)</p>
-          <div className="h-px bg-white/20" />
+      <div className="relative p-6 space-y-5">
+        {/* Header row */}
+        <div className="flex items-start justify-between">
+          <div className="space-y-1 flex-1">
+            <h3 className="text-2xl font-bold text-white">TBD tonight</h3>
+            <p className="text-white/50 text-sm">Down to go out — plans TBD</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <img src={spottedLogo} alt="Spotted" className="h-8 w-8 object-contain" />
+            <button
+              onClick={() => { setShowPlanningNeighborhood(false); onOpenChange(false); }}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"
+            >
+              <X className="w-5 h-5 text-white/60" />
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-4">
-          <Select value={planningNeighborhood ?? undefined} onValueChange={setPlanningNeighborhood}>
-            <SelectTrigger className="h-14 text-lg bg-[#1a0f2e] border-2 border-white/20 text-white focus:ring-white/30 focus:border-white/30">
-              <SelectValue placeholder="Select neighborhood..." />
-            </SelectTrigger>
-            <SelectContent className="bg-[#1a0f2e] border-2 border-white/15 max-h-60 z-[600]">
-              {neighborhoods.map((neighborhood) => (
-                <SelectItem 
-                  key={neighborhood} 
-                  value={neighborhood}
-                  className="text-white hover:bg-[#a855f7]/20 focus:bg-[#a855f7]/20 cursor-pointer"
-                >
-                  {neighborhood}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="h-px bg-white/15" />
+
+        {/* Venue/neighborhood field */}
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-white">
+            Anywhere in mind? <span className="text-white/50 font-normal">(optional)</span>
+          </p>
+
+          {!showSearch && !hasSelection && (
+            <button
+              onClick={() => setShowSearch(true)}
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/20 bg-transparent hover:border-white/30 transition-colors"
+            >
+              <MapPin className="w-4 h-4 text-white/40" />
+              <span className="text-white/40 text-sm flex-1 text-left">Add a neighborhood or spot</span>
+              <span className="text-white/30 text-sm">›</span>
+            </button>
+          )}
+
+          {showSearch && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-[#d4ff00]/50 bg-[#1a0f2e]">
+                <Search className="w-4 h-4 text-white/40" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Add a neighborhood or spot"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={handleInputFocus}
+                  className="bg-transparent text-white text-sm flex-1 outline-none placeholder:text-white/40"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')}>
+                    <X className="w-4 h-4 text-white/40" />
+                  </button>
+                )}
+              </div>
+
+              {searchQuery.trim() && (searchVenues.length > 0 || searchNeighborhoods.length > 0) && (
+                <div className="rounded-xl border border-white/15 bg-[#1a0f2e] overflow-hidden max-h-52 overflow-y-auto">
+                  {searchVenues.length > 0 && (
+                    <div className="p-3">
+                      <p className="text-[#d4ff00] text-[10px] font-bold uppercase tracking-wider mb-2">Spots</p>
+                      {searchVenues.map(v => (
+                        <button
+                          key={v.id}
+                          onClick={() => handleSelectVenue(v)}
+                          className="w-full flex items-center gap-3 py-2.5 hover:bg-white/5 rounded-lg transition-colors"
+                        >
+                          <MapPin className="w-4 h-4 text-[#d4ff00]" />
+                          <span className="text-white text-sm font-medium">{v.name}</span>
+                          <span className="text-white/40 text-xs ml-1">· {v.neighborhood}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {searchNeighborhoods.length > 0 && (
+                    <div className="p-3 border-t border-white/10">
+                      <p className="text-[#a855f7] text-[10px] font-bold uppercase tracking-wider mb-2">Neighborhoods</p>
+                      {searchNeighborhoods.map(nbhd => (
+                        <button
+                          key={nbhd}
+                          onClick={() => handleSelectNeighborhood(nbhd)}
+                          className="w-full flex items-center gap-3 py-2.5 hover:bg-white/5 rounded-lg transition-colors"
+                        >
+                          <div className="w-4 h-4 rounded-full border-2 border-[#a855f7]" />
+                          <span className="text-white text-sm font-medium">{nbhd}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {hasSelection && !showSearch && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl border border-[#d4ff00]/50 bg-[#1a0f2e]">
+                <MapPin className="w-4 h-4 text-[#d4ff00]" />
+                <span className="text-white text-sm font-medium flex-1">{planningVenueName || planningNeighborhood}</span>
+                <button onClick={handleClearSelection} className="p-1 hover:bg-white/10 rounded">
+                  <X className="w-4 h-4 text-white/40" />
+                </button>
+              </div>
+              {planningVenueName && (
+                <p className="text-[#d4ff00]/80 text-xs flex items-center gap-1.5">
+                  <span>✓</span> Shows as "thinking {planningVenueName}" — not checked in
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <Button
-          onClick={() => handlePlanningConfirm(!planningNeighborhood)}
+          onClick={handlePlanningConfirm}
           className="w-full h-14 text-lg font-semibold rounded-2xl bg-[#d4ff00] text-black hover:bg-[#d4ff00]/90"
         >
           Share
         </Button>
 
-        <p className="text-center text-sm text-white/60 italic">
-          Friends will see you're planning tonight
+        <p className="text-center text-sm text-[#d4ff00]/70 italic">
+          {footerText}
         </p>
       </div>
     );

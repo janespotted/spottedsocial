@@ -202,7 +202,7 @@ export default function Map() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
-  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
+  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null; planning_venue_name?: string | null }[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [venueFilter, setVenueFilter] = useState<'all' | 'nightclub' | 'cocktail_bar' | 'bar' | 'rooftop' | 'restaurant'>('all');
   // Use Map object keyed by user_id to prevent duplicate markers
@@ -454,7 +454,7 @@ export default function Map() {
         const now = new Date().toISOString();
         const [outRes, planRes, profileRes, sentRes, recvRes] = await Promise.all([
           supabase.from('night_statuses').select('user_id, lat, lng, venue_name, is_demo').eq('status', 'out').not('expires_at', 'is', null).gt('expires_at', now),
-          supabase.from('night_statuses').select('user_id, planning_neighborhood, is_demo').eq('status', 'planning').not('expires_at', 'is', null).gt('expires_at', now),
+          supabase.from('night_statuses').select('user_id, planning_neighborhood, planning_venue_name, is_demo').eq('status', 'planning').not('expires_at', 'is', null).gt('expires_at', now),
           supabase.from('profiles').select('id, display_name, avatar_url, is_demo'),
           supabase.from('friendships').select('friend_id').eq('user_id', user.id).eq('status', 'accepted'),
           supabase.from('friendships').select('user_id').eq('friend_id', user.id).eq('status', 'accepted'),
@@ -512,6 +512,7 @@ export default function Map() {
             display_name: profileLookup[s.user_id]?.display_name || 'Friend',
             avatar_url: profileLookup[s.user_id]?.avatar_url || null,
             planning_neighborhood: s.planning_neighborhood || null,
+            planning_venue_name: s.planning_venue_name || null,
           }));
         setPlanningFriends(planningFriendsData);
       } else {
@@ -610,14 +611,14 @@ export default function Map() {
           // Get friends' night statuses to determine status type (including planning_neighborhood)
           const { data: statuses } = await supabase
             .from('night_statuses')
-            .select('user_id, venue_name, status, planning_neighborhood, is_private_party, party_neighborhood, lat, lng')
+            .select('user_id, venue_name, status, planning_neighborhood, planning_venue_name, is_private_party, party_neighborhood, lat, lng')
             .in('user_id', friendIds)
             .not('expires_at', 'is', null)
             .gt('expires_at', new Date().toISOString());
 
           const venueMap: Record<string, string> = {};
           const privatePartyMap: Record<string, { is_private_party: boolean; party_neighborhood: string | null; lat: number | null; lng: number | null }> = {};
-          const planningFriendsData: { user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[] = [];
+          const planningFriendsData: { user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null; planning_venue_name?: string | null }[] = [];
           
           statuses?.forEach(s => {
             if (s.status === 'planning') {
@@ -633,6 +634,7 @@ export default function Map() {
                   display_name: profile.display_name || 'Friend',
                   avatar_url: profile.avatar_url,
                   planning_neighborhood: s.planning_neighborhood || null,
+                  planning_venue_name: s.planning_venue_name || null,
                 });
               }
             } else if (s.venue_name) {
@@ -2015,7 +2017,11 @@ export default function Map() {
                               {friend.display_name || 'Unknown'}
                             </p>
                             <p className="text-[#a855f7] text-xs truncate">
-                              TBD{friend.planning_neighborhood ? ` · ${friend.planning_neighborhood}` : ''}
+                              {friend.planning_venue_name
+                                ? `thinking ${friend.planning_venue_name}`
+                                : friend.planning_neighborhood
+                                ? `TBD · ${friend.planning_neighborhood}`
+                                : 'TBD · down for anything'}
                             </p>
                           </div>
                         </button>

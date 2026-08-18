@@ -23,6 +23,7 @@ interface PlanningFriend {
   display_name: string;
   avatar_url: string | null;
   planning_neighborhood?: string | null;
+  planning_venue_name?: string | null;
 }
 
 interface UserProfile {
@@ -154,12 +155,13 @@ export function FriendsPlanning({
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-white/60 text-xs">TBD</span>
-                    {friend.planning_neighborhood && (
-                      <span className="text-xs bg-[#a855f7]/20 text-[#a855f7] px-1.5 py-0.5 rounded-full">
-                        {shortenNeighborhood(friend.planning_neighborhood)}
-                      </span>
-                    )}
+                    <span className="text-white/60 text-xs">
+                      {friend.planning_venue_name
+                        ? `thinking ${friend.planning_venue_name}`
+                        : friend.planning_neighborhood
+                        ? `TBD · ${shortenNeighborhood(friend.planning_neighborhood)}`
+                        : 'TBD · down for anything'}
+                    </span>
                   </div>
                 </div>
                 <Button
@@ -278,7 +280,11 @@ export function FriendsPlanning({
           ) : (
             <div className="flex items-center gap-1 mt-0.5 text-white/40 text-xs truncate">
               <MapPin className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">{friend.planning_neighborhood || 'TBD'}</span>
+              <span className="truncate">
+                {friend.planning_venue_name
+                  ? `thinking ${friend.planning_venue_name}`
+                  : friend.planning_neighborhood || 'TBD'}
+              </span>
             </div>
           )}
         </div>

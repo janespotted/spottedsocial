@@ -24,6 +24,7 @@ interface Friend {
   status: 'out' | 'planning' | 'home';
   venue_name: string | null;
   planning_neighborhood: string | null;
+  planning_venue_name: string | null;
 }
 
 export function InviteFriendsModal() {
@@ -63,7 +64,7 @@ export function InviteFriendsModal() {
 
       const [checkinsRes, nightRes] = await Promise.all([
         supabase.from('checkins').select('user_id, venue_name, started_at').in('user_id', friendIds).is('ended_at', null).gt('started_at', twentyFourHoursAgo).order('started_at', { ascending: false }),
-        supabase.from('night_statuses').select('user_id, status, planning_neighborhood, venue_name, updated_at, is_private_party, party_neighborhood').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
+        supabase.from('night_statuses').select('user_id, status, planning_neighborhood, planning_venue_name, venue_name, updated_at, is_private_party, party_neighborhood').in('user_id', friendIds).not('expires_at', 'is', null).gt('expires_at', now),
       ]);
 
       const checkinMap = new Map<string, { venue_name: string; started_at: string | null }>();
@@ -73,7 +74,7 @@ export function InviteFriendsModal() {
         }
       });
 
-      const nightMap = new Map<string, { status: string; planning_neighborhood: string | null; venue_name: string | null; updated_at: string | null; is_private_party: boolean | null; party_neighborhood: string | null }>();
+      const nightMap = new Map<string, { status: string; planning_neighborhood: string | null; planning_venue_name: string | null; venue_name: string | null; updated_at: string | null; is_private_party: boolean | null; party_neighborhood: string | null }>();
       nightRes.data?.forEach(n => { if (!nightMap.has(n.user_id)) nightMap.set(n.user_id, n); });
 
       const seenNames = new Set<string>();
@@ -86,6 +87,7 @@ export function InviteFriendsModal() {
         let status: 'out' | 'planning' | 'home' = 'home';
         let venue_name: string | null = null;
         let planning_neighborhood: string | null = null;
+        let planning_venue_name: string | null = null;
 
         const activeCheckin = checkinMap.get(profile.id);
         const nightStatus = nightMap.get(profile.id);
@@ -109,9 +111,10 @@ export function InviteFriendsModal() {
         } else if (nightStatus?.status === 'planning') {
           status = 'planning';
           planning_neighborhood = nightStatus.planning_neighborhood;
+          planning_venue_name = nightStatus.planning_venue_name || null;
         }
 
-        friendsData.push({ id: profile.id, display_name: profile.display_name, avatar_url: profile.avatar_url, status, venue_name, planning_neighborhood });
+        friendsData.push({ id: profile.id, display_name: profile.display_name, avatar_url: profile.avatar_url, status, venue_name, planning_neighborhood, planning_venue_name });
       }
 
       const STATUS_ORDER: Record<string, number> = { out: 0, planning: 1, home: 2 };
@@ -166,7 +169,13 @@ export function InviteFriendsModal() {
         {friend.status === 'out' ? (
           <p className="text-[#d4ff00] text-xs truncate">At {friend.venue_name || 'Nearby'}</p>
         ) : friend.status === 'planning' ? (
-          <p className="text-[#a855f7] text-xs truncate">TBD{friend.planning_neighborhood ? ` · ${friend.planning_neighborhood}` : ''}</p>
+          <p className="text-[#a855f7] text-xs truncate">
+            {friend.planning_venue_name
+              ? `thinking ${friend.planning_venue_name}`
+              : friend.planning_neighborhood
+              ? `TBD · ${friend.planning_neighborhood}`
+              : 'TBD · down for anything'}
+          </p>
         ) : (
           <p className="text-white/30 text-xs">Home</p>
         )}

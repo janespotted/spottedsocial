@@ -723,6 +723,8 @@ export type Database = {
           party_address: string | null
           party_neighborhood: string | null
           planning_neighborhood: string | null
+          planning_venue_id: string | null
+          planning_venue_name: string | null
           planning_visibility: string | null
           status: Database["public"]["Enums"]["night_status_enum"]
           updated_at: string | null
@@ -741,6 +743,8 @@ export type Database = {
           party_address?: string | null
           party_neighborhood?: string | null
           planning_neighborhood?: string | null
+          planning_venue_id?: string | null
+          planning_venue_name?: string | null
           planning_visibility?: string | null
           status?: Database["public"]["Enums"]["night_status_enum"]
           updated_at?: string | null
@@ -759,6 +763,8 @@ export type Database = {
           party_address?: string | null
           party_neighborhood?: string | null
           planning_neighborhood?: string | null
+          planning_venue_id?: string | null
+          planning_venue_name?: string | null
           planning_visibility?: string | null
           status?: Database["public"]["Enums"]["night_status_enum"]
           updated_at?: string | null

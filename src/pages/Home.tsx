@@ -132,7 +132,7 @@ export default function Home() {
   const [selectedPostForLikes, setSelectedPostForLikes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
-  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
+  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null; planning_venue_name?: string | null }[]>([]);
   const [friendsOut, setFriendsOut] = useState<{ user_id: string; display_name: string; avatar_url: string | null; venue_name: string }[]>([]);
   const [feedMode, setFeedMode] = useState<'newsfeed' | 'plans'>(() => isNightlifeHours() ? 'newsfeed' : 'plans');
   const [showFriendSearch, setShowFriendSearch] = useState(false);
@@ -261,7 +261,7 @@ export default function Home() {
       const [statusResult, profileResult] = await Promise.all([
         supabase
           .from('night_statuses')
-          .select('user_id, venue_name, status, planning_neighborhood, is_demo, venue_id')
+          .select('user_id, venue_name, status, planning_neighborhood, planning_venue_name, is_demo, venue_id')
           .in('user_id', queryIds)
           .not('expires_at', 'is', null)
           .gt('expires_at', new Date().toISOString()),
@@ -296,6 +296,7 @@ export default function Home() {
               display_name: displayName,
               avatar_url: avatarUrl,
               planning_neighborhood: s.planning_neighborhood || null,
+              planning_venue_name: s.planning_venue_name || null,
             });
           } else if (s.status === 'out' && s.venue_name) {
             outResults.push({
@@ -635,12 +636,13 @@ export default function Home() {
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-white/50 text-xs">TBD tonight</span>
-                          {friend.planning_neighborhood && (
-                            <span className="text-xs bg-[#a855f7]/25 text-[#c084fc] px-2 py-0.5 rounded-full font-medium">
-                              {friend.planning_neighborhood}
-                            </span>
-                          )}
+                          <span className="text-white/50 text-xs">
+                            {friend.planning_venue_name
+                              ? `thinking ${friend.planning_venue_name}`
+                              : friend.planning_neighborhood
+                              ? `TBD · ${friend.planning_neighborhood}`
+                              : 'TBD · down for anything'}
+                          </span>
                         </div>
                       </div>
                       <button

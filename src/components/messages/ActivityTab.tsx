@@ -848,7 +848,7 @@ export function ActivityTab() {
     }
   };
 
-  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null }[]>([]);
+  const [planningFriends, setPlanningFriends] = useState<{ user_id: string; display_name: string; avatar_url: string | null; planning_neighborhood?: string | null; planning_venue_name?: string | null }[]>([]);
 
 
 
@@ -876,7 +876,7 @@ export function ActivityTab() {
     // In bootstrap mode, also filter out demo night_statuses
     let statusQuery = supabase
       .from('night_statuses')
-      .select('user_id, planning_neighborhood, is_demo')
+      .select('user_id, planning_neighborhood, planning_venue_name, is_demo')
       .in('user_id', friendIds)
       .eq('status', 'planning')
       .not('expires_at', 'is', null)
@@ -896,6 +896,7 @@ export function ActivityTab() {
 
     const planningUserIds = planningStatuses.map(s => s.user_id);
     const neighborhoodMap = new Map(planningStatuses.map(s => [s.user_id, s.planning_neighborhood]));
+    const venueNameMap = new Map(planningStatuses.map(s => [s.user_id, s.planning_venue_name]));
 
     // Get profiles for planning friends - use safe RPC
     const { data: allProfiles } = await supabase.rpc('get_profiles_safe');
@@ -911,6 +912,7 @@ export function ActivityTab() {
       display_name: p.display_name,
       avatar_url: p.avatar_url,
       planning_neighborhood: neighborhoodMap.get(p.id) || null,
+      planning_venue_name: venueNameMap.get(p.id) || null,
     })));
   };
 
@@ -975,9 +977,11 @@ export function ActivityTab() {
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-medium text-sm truncate">{friend.display_name}</p>
                     <p className="text-[#a855f7] text-xs">
-                      {friend.planning_neighborhood 
-                        ? `Planning tonight (${friend.planning_neighborhood})`
-                        : 'Planning tonight'}
+                      {friend.planning_venue_name
+                        ? `thinking ${friend.planning_venue_name}`
+                        : friend.planning_neighborhood
+                        ? `TBD · ${friend.planning_neighborhood}`
+                        : 'TBD · down for anything'}
                     </p>
                   </div>
                   <Button
