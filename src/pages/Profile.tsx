@@ -536,7 +536,7 @@ export default function Profile() {
         <div className="flex items-center gap-3 text-sm text-white/65">
           <span><span className="text-white font-medium">{placesCount}</span> spots</span>
           <span className="text-white/25">·</span>
-          <span><span className="text-white font-medium">{friendsCount}</span> friends</span>
+          <button onClick={() => navigate('/profile/all-friends')} className="hover:text-white/80 transition-colors"><span className="text-white font-medium">{friendsCount}</span> friends</button>
           <span className="text-white/25">·</span>
           <span><span className="text-white font-medium">{weeklyCount || 0}</span> this week</span>
         </div>
@@ -574,6 +574,21 @@ export default function Profile() {
           <div className="flex-1 text-left">
             <p className="text-white text-sm font-medium">Close Friends</p>
             <p className="text-white/30 text-xs">Manage your close friends list</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-white/20" />
+        </button>
+
+        {/* All Friends */}
+        <button
+          onClick={() => navigate('/profile/all-friends')}
+          className="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/8 hover:bg-white/[0.06] transition-colors"
+        >
+          <div className="w-9 h-9 rounded-full bg-[#a855f7]/15 flex items-center justify-center">
+            <Users className="h-4 w-4 text-[#a855f7]" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-white text-sm font-medium">All Friends</p>
+            <p className="text-white/30 text-xs">See everyone you're connected with</p>
           </div>
           <ChevronRight className="h-4 w-4 text-white/20" />
         </button>

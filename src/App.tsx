@@ -47,6 +47,7 @@ import Thread from "./pages/Thread";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import CloseFriends from "./pages/CloseFriends";
+import AllFriends from "./pages/AllFriends";
 import BlockedHidden from "./pages/BlockedHidden";
 import Activity from "./pages/Activity";
 import DemoSettings from "./pages/DemoSettings";
@@ -372,6 +373,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <CloseFriends />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile/all-friends"
+          element={
+            <ProtectedRoute>
+              <AllFriends />
             </ProtectedRoute>
           }
         />
