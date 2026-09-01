@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+@import 'uniwind';
+@import 'heroui-native/styles';
+
+@source './node_modules/heroui-native/lib';
+
+/*
+ * Spotted brand palette mapped onto HeroUI Native's theme variables.
+ * HeroUI derives its --color-* tokens from these un-prefixed variables
+ * (see heroui-native/src/styles/theme.css), so overrides must target the
+ * un-prefixed names. Spotted is a dark-branded app — both variants use the
+ * same palette so the UI stays on-brand regardless of device color scheme.
+ */
+@layer theme {
+  :root {
+    @variant light {
+      --background: #110a24;
+      --foreground: #ffffff;
+      --muted: #8b7fb8;
+
+      --surface: #1a1033;
+      --surface-foreground: #ffffff;
+      --surface-secondary: #2a1d4d;
+      --surface-secondary-foreground: #ffffff;
+      --surface-tertiary: #241640;
+      --surface-tertiary-foreground: #ffffff;
+
+      --overlay: #1a1033;
+      --overlay-foreground: #ffffff;
+      --backdrop: rgba(0, 0, 0, 0.7);
+
+      --default: #2a1d4d;
+      --default-foreground: #ffffff;
+      --accent: #a78bfa;
+      --accent-foreground: #110a24;
+
+      --field-background: #1a1033;
+      --field-foreground: #ffffff;
+      --field-placeholder: #5b4d85;
+      --field-border: #2a1d4d;
+
+      --segment: #2a1d4d;
+      --segment-foreground: #ffffff;
+
+      --success: #2dd4a7;
+      --success-foreground: #04160f;
+      --warning: #facc15;
+      --warning-foreground: #1c1503;
+      --danger: #f87171;
+      --danger-foreground: #1d0808;
+
+      --border: #2a1d4d;
+      --separator: #2a1d4d;
+      --focus: #a78bfa;
+      --link: #a78bfa;
+
+      /* Spotted extras (not part of HeroUI's token set) */
+      --color-accent-soft: #c4b5fd;
+      --color-muted-dark: #5b4d85;
+    }
+    @variant dark {
+      --background: #110a24;
+      --foreground: #ffffff;
+      --muted: #8b7fb8;
+
+      --surface: #1a1033;
+      --surface-foreground: #ffffff;
+      --surface-secondary: #2a1d4d;
+      --surface-secondary-foreground: #ffffff;
+      --surface-tertiary: #241640;
+      --surface-tertiary-foreground: #ffffff;
+
+      --overlay: #1a1033;
+      --overlay-foreground: #ffffff;
+      --backdrop: rgba(0, 0, 0, 0.7);
+
+      --default: #2a1d4d;
+      --default-foreground: #ffffff;
+      --accent: #a78bfa;
+      --accent-foreground: #110a24;
+
+      --field-background: #1a1033;
+      --field-foreground: #ffffff;
+      --field-placeholder: #5b4d85;
+      --field-border: #2a1d4d;
+
+      --segment: #2a1d4d;
+      --segment-foreground: #ffffff;
+
+      --success: #2dd4a7;
+      --success-foreground: #04160f;
+      --warning: #facc15;
+      --warning-foreground: #1c1503;
+      --danger: #f87171;
+      --danger-foreground: #1d0808;
+
+      --border: #2a1d4d;
+      --separator: #2a1d4d;
+      --focus: #a78bfa;
+      --link: #a78bfa;
+
+      /* Spotted extras (not part of HeroUI's token set) */
+      --color-accent-soft: #c4b5fd;
+      --color-muted-dark: #5b4d85;
+    }
+  }
+}
