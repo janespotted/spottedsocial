@@ -209,7 +209,13 @@ function HomeHeader({
               </View>
             ) : null}
           </Pressable>
-          <Image source={spottedLogo} className="h-9 w-9" contentFit="contain" />
+          <Pressable
+            onPress={() => router.push('/check-in')}
+            hitSlop={4}
+            className="active:scale-110"
+          >
+            <Image source={spottedLogo} className="h-9 w-9" contentFit="contain" />
+          </Pressable>
         </View>
       </View>
 

@@ -68,10 +68,11 @@ export function PushNotificationManager() {
     };
   }, [session, onboardingNeeded]);
 
-  // Tapping a push opens the Activity screen
+  // Tapping a push routes by payload (venue-shift → check-in), else Activity
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener(() => {
-      router.push('/activity');
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const url = response.notification.request.content.data?.url;
+      router.push(typeof url === 'string' && url.startsWith('/') ? (url as '/activity') : '/activity');
     });
     return () => sub.remove();
   }, []);

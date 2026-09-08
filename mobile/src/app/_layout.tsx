@@ -47,6 +47,15 @@ function RootNavigator() {
       <Stack.Screen name="search" options={{ presentation: 'modal' }} />
       <Stack.Screen name="venue" options={{ presentation: 'modal' }} />
       <Stack.Screen
+        name="check-in"
+        options={{
+          presentation: 'formSheet',
+          sheetAllowedDetents: 'fitToContents',
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
+      <Stack.Screen
         name="new-chat"
         options={{
           presentation: 'formSheet',

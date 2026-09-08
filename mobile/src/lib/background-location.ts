@@ -1,10 +1,15 @@
-import BackgroundGeolocation, {
-  DesiredAccuracy,
-  LogLevel,
-  type Location,
-} from 'react-native-background-geolocation';
+import BackgroundGeolocation, { type Location } from 'react-native-background-geolocation';
+import * as Notifications from 'expo-notifications';
 import { supabase } from './supabase';
+import { ensureLocationReady, setLocationHandler } from './location-ready';
 import { isUserCurrentlyOut } from './night-status';
+import { findNearestVenue, distanceMeters } from './location-service';
+import {
+  canTriggerVenueArrival,
+  hydrateArrivalEngine,
+  markToastShown,
+  recordDeparture,
+} from './venue-arrival-engine';
 
 /**
  * Background venue tracking on the Transistorsoft SDK.
@@ -19,9 +24,16 @@ import { isUserCurrentlyOut } from './night-status';
  * - startOnBoot: false — never resurrect tracking on device reboot.
  */
 
-let isReady = false;
 let isTracking = false;
 let currentUserId: string | null = null;
+
+// Plug the fix pipeline into location-ready's permanent dispatcher.
+// handleLocation is fully guarded: no user or not "out" → no-op.
+setLocationHandler((location) => {
+  handleLocation(location).catch((err) =>
+    console.error('[BgLocation] handleLocation error:', err)
+  );
+});
 
 async function handleLocation(location: Location): Promise<void> {
   const userId = currentUserId;
@@ -56,40 +68,76 @@ async function handleLocation(location: Location): Promise<void> {
   if (profileErr) console.error('[BgLocation] Profile GPS update error:', profileErr);
   if (checkinErr) console.error('[BgLocation] Checkin timestamp update error:', checkinErr);
 
-  // TODO(port): venue-arrival nudges, friends-nearby pushes, and the
-  // auto-venue-tracker decision engine from the web app land here next.
+  // Auto-venue-tracker decision engine (port of the web venue-arrival-nudge
+  // trigger): each fix while "out" evaluates the nearest venue through the
+  // hard gates (35m accuracy, 200m radius, 45s dwell, cooldowns). A fired
+  // decision delivers a local notification that deep-links to /check-in.
+  // Note: dwell needs a second fix ≥45s later at the same venue — with the
+  // 100m distanceFilter that's the next natural fix, matching web behavior
+  // where the foreground poll re-evaluated on an interval.
+  try {
+    await runVenueShiftDetection(userId, latitude, longitude, location.coords.accuracy);
+  } catch (err) {
+    console.warn('[BgLocation] Venue-shift detection error:', err);
+  }
 }
 
-async function ensureReady(): Promise<void> {
-  if (isReady) return;
+const venueCoordsCache = new Map<string, { lat: number; lng: number } | null>();
 
-  BackgroundGeolocation.onLocation(
-    (location) => {
-      handleLocation(location).catch((err) =>
-        console.error('[BgLocation] handleLocation error:', err)
-      );
-    },
-    (error) => console.warn('[BgLocation] Location error:', error)
-  );
+async function getVenueCoords(venueId: string): Promise<{ lat: number; lng: number } | null> {
+  if (venueCoordsCache.has(venueId)) return venueCoordsCache.get(venueId) ?? null;
+  const { data } = await supabase.from('venues').select('lat, lng').eq('id', venueId).maybeSingle();
+  const coords = data?.lat != null && data?.lng != null ? { lat: data.lat, lng: data.lng } : null;
+  venueCoordsCache.set(venueId, coords);
+  return coords;
+}
 
-  await BackgroundGeolocation.ready({
-    geolocation: {
-      desiredAccuracy: DesiredAccuracy.High,
-      distanceFilter: 100, // metres — parity with the Capacitor watcher
-      stopTimeout: 5, // minutes stationary before motion tracking pauses
-      locationAuthorizationRequest: 'Always',
-    },
-    app: {
-      stopOnTerminate: true, // privacy invariant — see header comment
-      startOnBoot: false, // privacy invariant — see header comment
-    },
-    logger: {
-      debug: false,
-      logLevel: __DEV__ ? LogLevel.Verbose : LogLevel.Error,
-    },
+async function runVenueShiftDetection(
+  userId: string,
+  lat: number,
+  lng: number,
+  accuracy: number
+): Promise<void> {
+  const { data: status } = await supabase
+    .from('night_statuses')
+    .select('venue_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+  const currentVenueId = status?.venue_id ?? null;
+
+  const nearest = await findNearestVenue(lat, lng, 500);
+
+  // Track departure from the current venue so re-entries don't re-nudge
+  if (currentVenueId && nearest?.id !== currentVenueId) {
+    const coords = await getVenueCoords(currentVenueId);
+    if (coords) {
+      recordDeparture(currentVenueId, distanceMeters(lat, lng, coords.lat, coords.lng));
+    }
+  }
+
+  if (!nearest) return;
+  const decision = canTriggerVenueArrival({
+    userId,
+    status: 'out', // background tracking only runs while out
+    currentVenueId,
+    detectedVenueId: nearest.id,
+    distance: nearest.distance,
+    gpsAccuracy: accuracy,
+    lat,
+    lng,
+    timestamp: Date.now(),
   });
+  if (!decision.shouldNudge) return;
 
-  isReady = true;
+  markToastShown(nearest.id);
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Moved to a new spot?',
+      body: `Looks like you're at ${nearest.name} — tap to update your status.`,
+      data: { url: '/check-in' },
+    },
+    trigger: null,
+  });
 }
 
 /**
@@ -98,7 +146,7 @@ async function ensureReady(): Promise<void> {
  */
 export async function getCurrentPosition(): Promise<{ lat: number; lng: number } | null> {
   try {
-    await ensureReady();
+    await ensureLocationReady();
     const location = await BackgroundGeolocation.getCurrentPosition({
       timeout: 10,
       samples: 1,
@@ -114,7 +162,8 @@ export async function getCurrentPosition(): Promise<{ lat: number; lng: number }
 export async function startBackgroundLocation(userId: string): Promise<void> {
   currentUserId = userId;
   try {
-    await ensureReady();
+    await ensureLocationReady();
+    await hydrateArrivalEngine();
     if (isTracking) return;
     const state = await BackgroundGeolocation.start();
     isTracking = state.enabled;

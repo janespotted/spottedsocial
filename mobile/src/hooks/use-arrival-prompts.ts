@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { goOutAtVenue } from '@/lib/night-status';
 import { getCurrentPosition, startBackgroundLocation } from '@/lib/background-location';
+import { dismissVenuePrompt, markToastShown } from '@/lib/venue-arrival-engine';
 import { useSession } from './use-session';
 
 export interface MyNightStatus {
@@ -131,7 +132,12 @@ export function useArrivalPrompts() {
   }, [session, moveBanner, refresh]);
 
   const dismissMove = useCallback(() => {
-    if (moveBanner) moveDismissed.current.add(moveBanner.venue.id);
+    if (moveBanner) {
+      moveDismissed.current.add(moveBanner.venue.id);
+      // Keep the background engine in sync so it doesn't re-nag via push
+      dismissVenuePrompt(moveBanner.venue.id);
+      markToastShown(moveBanner.venue.id);
+    }
     setMoveBanner(null);
   }, [moveBanner]);
 

@@ -282,7 +282,13 @@ function LeaderboardHeader({
               </View>
             ) : null}
           </Pressable>
-          <Image source={spottedLogo} className="h-9 w-9" contentFit="contain" />
+          <Pressable
+            onPress={() => router.push('/check-in')}
+            hitSlop={4}
+            className="active:scale-110"
+          >
+            <Image source={spottedLogo} className="h-9 w-9" contentFit="contain" />
+          </Pressable>
         </View>
       </View>
 
@@ -414,7 +420,7 @@ export default function LeaderboardScreen() {
                 When people check in, the hottest spots show up here.
               </Text>
               <Pressable
-                onPress={() => router.push('/create-post')}
+                onPress={() => router.push('/check-in')}
                 className="rounded-full px-6 py-2.5 active:opacity-90"
                 style={{ backgroundColor: PURPLE }}
               >

@@ -125,7 +125,7 @@ export async function fetchDmThreads(userId: string): Promise<DmThreadPreview[]>
     const info = threadInfo.get(threadId);
     const members: DmMember[] = allMembers
       .filter((m) => m.thread_id === threadId)
-      .map((m) => {
+      .map((m): DmMember | null => {
         const p = profileMap.get(m.user_id);
         if (!p) return null;
         return {

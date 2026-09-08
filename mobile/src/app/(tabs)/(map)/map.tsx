@@ -18,9 +18,10 @@ import Mapbox, {
   ShapeSource,
   SymbolLayer,
 } from '@rnmapbox/maps';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { CITY_CENTERS } from '@/lib/city-neighborhoods';
+import { stopSharing } from '@/lib/night-status';
 import { useSession } from '@/hooks/use-session';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useMapData, type MapFriend } from '@/hooks/use-map-data';
@@ -205,6 +206,7 @@ function PromotedVenueMarker({
 export default function MapScreen() {
   const { session } = useSession();
   const { unreadCount } = useNotifications();
+  const queryClient = useQueryClient();
   const cameraRef = useRef<Camera>(null);
   const mapRef = useRef<MapView>(null);
 
@@ -576,6 +578,48 @@ export default function MapScreen() {
               onDismiss={dismissMove}
             />
           ) : null}
+        </View>
+      ) : null}
+
+      {/* Status pill — go live / current status + stop (web parity) */}
+      {!focusMode ? (
+        <View className="absolute bottom-safe-offset-28 left-4 right-4 items-center">
+          {myStatus?.status === 'out' ? (
+            <View className="flex-row items-center gap-2 px-4 py-2 rounded-full bg-[#1a0f2e]/95 border border-[#d4ff00]/30">
+              <View className="w-2 h-2 rounded-full bg-[#22c55e]" />
+              <Text className="text-white text-sm font-sans-medium" numberOfLines={1}>
+                {myStatus.venue_name ? `@ ${myStatus.venue_name}` : "You're out"}
+              </Text>
+              <Pressable
+                onPress={async () => {
+                  if (!session) return;
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  await stopSharing(session.user.id);
+                  queryClient.invalidateQueries({ queryKey: ['my-night-status'] });
+                  queryClient.invalidateQueries({ queryKey: ['map-data'] });
+                }}
+                hitSlop={6}
+              >
+                <Text className="text-red-400 text-sm font-sans-medium ml-1">Stop</Text>
+              </Pressable>
+            </View>
+          ) : myStatus?.status === 'planning' ? (
+            <Pressable
+              onPress={() => router.push('/check-in')}
+              className="flex-row items-center gap-2 px-4 py-2 rounded-full bg-[#1a0f2e]/95 border border-[#a855f7]/40 active:opacity-90"
+            >
+              <SymbolView name="target" size={13} tintColor="#a855f7" />
+              <Text className="text-white text-sm font-sans-medium">Planning tonight — TBD</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => router.push('/check-in')}
+              className="px-5 py-2.5 rounded-full active:opacity-90"
+              style={{ backgroundColor: '#d4ff00', boxShadow: '0 4px 16px rgba(212,255,0,0.3)' }}
+            >
+              <Text className="text-[#1a0f2e] text-sm font-sans-semibold">Go Live</Text>
+            </Pressable>
+          )}
         </View>
       ) : null}
 

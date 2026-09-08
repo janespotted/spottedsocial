@@ -298,14 +298,16 @@ export default function ThreadScreen() {
     if (messages.length === 0 || !userId) return;
     (async () => {
       const { data } = await supabase
-        .from('dm_message_reactions')
+        .from('dm_message_reactions' as never)
         .select('message_id')
         .in(
           'message_id',
           messages.filter((m) => !m.id.startsWith('optimistic')).map((m) => m.id)
         )
         .eq('user_id', userId);
-      if (data) setHearted(new Set(data.map((r) => r.message_id)));
+      if (data) {
+        setHearted(new Set((data as Array<{ message_id: string }>).map((r) => r.message_id)));
+      }
     })();
   }, [messages.length, userId]);
 
@@ -470,13 +472,13 @@ export default function ThreadScreen() {
       });
       const { error } = isHearted
         ? await supabase
-            .from('dm_message_reactions')
+            .from('dm_message_reactions' as never)
             .delete()
             .eq('message_id', messageId)
             .eq('user_id', userId)
         : await supabase
-            .from('dm_message_reactions')
-            .insert({ message_id: messageId, user_id: userId, reaction: '❤️' });
+            .from('dm_message_reactions' as never)
+            .insert({ message_id: messageId, user_id: userId, reaction: '❤️' } as never);
       if (error) {
         setHearted((prev) => {
           const next = new Set(prev);
