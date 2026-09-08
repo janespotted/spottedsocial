@@ -92,6 +92,25 @@ async function ensureReady(): Promise<void> {
   isReady = true;
 }
 
+/**
+ * One-shot GPS fix for foreground features (arrival prompts, smart prompt).
+ * Does not start tracking; null on denial/timeout.
+ */
+export async function getCurrentPosition(): Promise<{ lat: number; lng: number } | null> {
+  try {
+    await ensureReady();
+    const location = await BackgroundGeolocation.getCurrentPosition({
+      timeout: 10,
+      samples: 1,
+      desiredAccuracy: 40,
+      persist: false,
+    });
+    return { lat: location.coords.latitude, lng: location.coords.longitude };
+  } catch {
+    return null;
+  }
+}
+
 export async function startBackgroundLocation(userId: string): Promise<void> {
   currentUserId = userId;
   try {

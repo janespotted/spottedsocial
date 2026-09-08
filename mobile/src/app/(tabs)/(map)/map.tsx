@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActionSheetIOS, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -24,8 +24,11 @@ import { CITY_CENTERS } from '@/lib/city-neighborhoods';
 import { useSession } from '@/hooks/use-session';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useMapData, type MapFriend } from '@/hooks/use-map-data';
+import { useArrivalPrompts } from '@/hooks/use-arrival-prompts';
 import { Avatar } from '@/components/avatar';
 import { FriendIdCard } from '@/components/friend-id-card';
+import { useMapFilters } from '@/lib/map-filters';
+import { SmartArrivalPrompt, VenueMoveBanner } from '@/components/venue-move-banner';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_PUBLIC_TOKEN ?? null);
 
@@ -37,6 +40,13 @@ const RELATIONSHIP_COLORS: Record<string, string> = {
   direct: '#9333ea',
   mutual: '#6366f1',
 };
+
+// Same-spot grouping threshold (~5m) and zoom above which clustering stops
+const CLUSTER_THRESHOLD = 0.000045;
+const NO_CLUSTER_ZOOM = 18;
+
+const stalenessMins = (f: MapFriend): number =>
+  f.last_location_at ? (Date.now() - new Date(f.last_location_at).getTime()) / 60000 : 999;
 
 /** Soft expanding pulse behind close-friend markers (web self-marker pulse) */
 function PulseRing({ color }: { color: string }) {
@@ -59,33 +69,135 @@ function PulseRing({ color }: { color: string }) {
   );
 }
 
+/** Ringed avatar circle (or house icon for private parties) */
+function PersonCircle({ friend, isSelf }: { friend: MapFriend; isSelf?: boolean }) {
+  const ring = RELATIONSHIP_COLORS[friend.relationshipType] ?? RELATIONSHIP_COLORS.direct;
+  return (
+    <View
+      className="rounded-full p-px"
+      style={{ borderWidth: 3, borderColor: ring, boxShadow: `0 0 8px ${ring}66` }}
+    >
+      {friend.is_private_party ? (
+        <View className="w-8 h-8 rounded-full bg-[#1a0f2e]/90 items-center justify-center">
+          <SymbolView name="house.fill" size={16} tintColor="#ffffff" />
+        </View>
+      ) : (
+        <Avatar name={friend.display_name} url={friend.avatar_url} size={isSelf ? 'md' : 'sm'} />
+      )}
+    </View>
+  );
+}
+
 function FriendMarker({
   friend,
   index,
+  isSelf,
   onPress,
 }: {
   friend: MapFriend;
   index: number;
+  isSelf?: boolean;
   onPress: (friend: MapFriend) => void;
 }) {
-  const ring = RELATIONSHIP_COLORS[friend.relationshipType] ?? RELATIONSHIP_COLORS.direct;
+  const stale = stalenessMins(friend) >= 15;
   return (
     <MarkerView coordinate={[friend.lng, friend.lat]} allowOverlap>
-      <Animated.View entering={ZoomIn.springify().damping(14).delay(index * 60)}>
-        {friend.relationshipType === 'close' ? <PulseRing color={ring} /> : null}
+      <Animated.View
+        entering={ZoomIn.springify().damping(14).delay(index * 60)}
+        style={stale ? { opacity: 0.5 } : undefined}
+      >
+        {friend.relationshipType === 'close' ? (
+          <PulseRing color={RELATIONSHIP_COLORS.close} />
+        ) : null}
         <Pressable onPress={() => onPress(friend)} hitSlop={6}>
-          <View
-            className="rounded-full p-px"
-            style={{
-              borderWidth: 3,
-              borderColor: ring,
-              boxShadow: `0 0 8px ${ring}66`,
-            }}
-          >
-            <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
-          </View>
+          <PersonCircle friend={friend} isSelf={isSelf} />
         </Pressable>
       </Animated.View>
+    </MarkerView>
+  );
+}
+
+/** Group marker: up to 3 member circles, +N badge when more (web parity) */
+function FriendGroupMarker({
+  cluster,
+  index,
+  onPress,
+}: {
+  cluster: MapFriend[];
+  index: number;
+  onPress: (cluster: MapFriend[]) => void;
+}) {
+  const order: Record<string, number> = { close: 0, direct: 1, mutual: 2 };
+  const sorted = [...cluster].sort(
+    (a, b) => (order[a.relationshipType] ?? 1) - (order[b.relationshipType] ?? 1)
+  );
+  const shown = sorted.slice(0, 3);
+  const extra = cluster.length - shown.length;
+  const size = cluster.length <= 3 ? 72 : 80;
+
+  // Member positions: 2 → side-by-side, 3 → triangle (web groupMarkerHtml)
+  const positions: Array<{ top?: number; bottom?: number; left?: number; right?: number }> =
+    shown.length === 2
+      ? [
+          { top: size / 2 - 19, left: 0 },
+          { top: size / 2 - 19, right: 0 },
+        ]
+      : shown.length === 3
+        ? [
+            { top: 0, left: size / 2 - 19 },
+            { bottom: 2, left: 2 },
+            { bottom: 2, right: 2 },
+          ]
+        : [{ top: size / 2 - 19, left: size / 2 - 19 }];
+
+  return (
+    <MarkerView coordinate={[cluster[0].lng, cluster[0].lat]} allowOverlap>
+      <Animated.View entering={ZoomIn.springify().damping(14).delay(index * 60)}>
+        <Pressable onPress={() => onPress(cluster)} style={{ width: size, height: size }}>
+          <View className="absolute inset-0 rounded-full border border-white/15" />
+          {shown.map((member, i) => (
+            <View key={member.user_id} style={{ position: 'absolute', ...positions[i] }}>
+              <PersonCircle friend={member} />
+            </View>
+          ))}
+          {extra > 0 ? (
+            <View className="absolute -bottom-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#1a0f2e] border border-white/30 items-center justify-center">
+              <Text className="text-white text-[11px] font-sans-semibold">+{extra}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      </Animated.View>
+    </MarkerView>
+  );
+}
+
+/** Promoted venue pin — halo + purple circle, above clustered venue dots */
+function PromotedVenueMarker({
+  venue,
+  onPress,
+}: {
+  venue: { id: string; name: string; lat: number; lng: number };
+  onPress: (venueId: string, lng: number, lat: number) => void;
+}) {
+  return (
+    <MarkerView coordinate={[venue.lng, venue.lat]} allowOverlap>
+      <Pressable
+        onPress={() => onPress(venue.id, venue.lng, venue.lat)}
+        hitSlop={6}
+        style={{ width: 42, height: 42 }}
+        className="items-center justify-center"
+      >
+        <View className="absolute inset-0 rounded-full bg-[#d4ff00]/10" />
+        <View
+          className="w-[30px] h-[30px] rounded-full items-center justify-center border border-white/60"
+          style={{
+            backgroundColor: 'rgba(168, 85, 247, 0.75)',
+            boxShadow: '0 0 6px rgba(212, 255, 0, 0.1)',
+          }}
+        >
+          <SymbolView name="mappin" size={15} tintColor="#ffffff" />
+        </View>
+      </Pressable>
     </MarkerView>
   );
 }
@@ -94,6 +206,7 @@ export default function MapScreen() {
   const { session } = useSession();
   const { unreadCount } = useNotifications();
   const cameraRef = useRef<Camera>(null);
+  const mapRef = useRef<MapView>(null);
 
   const { data: city } = useQuery({
     queryKey: ['home-city', session?.user.id],
@@ -109,17 +222,127 @@ export default function MapScreen() {
     },
   });
 
+  // Own profile for the self marker
+  const { data: selfProfile } = useQuery({
+    queryKey: ['self-profile', session?.user.id],
+    enabled: !!session,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('display_name, avatar_url')
+        .eq('id', session!.user.id)
+        .maybeSingle();
+      return data ?? null;
+    },
+  });
+
   const { data } = useMapData(city ?? null);
   const friends = data?.friends ?? [];
   const venues = data?.venues ?? [];
+
   const [selectedFriend, setSelectedFriend] = useState<MapFriend | null>(null);
   const [friendCardOpen, setFriendCardOpen] = useState(false);
+  const { relationship: relationshipFilter, venueType: venueFilter } = useMapFilters();
+  const [shouldCluster, setShouldCluster] = useState(true);
+  const [focusMode, setFocusMode] = useState(false);
+
+  const {
+    myStatus,
+    smartPrompt,
+    acceptSmartPrompt,
+    dismissSmartPrompt,
+    moveBanner,
+    acceptMove,
+    dismissMove,
+  } = useArrivalPrompts();
 
   const center = CITY_CENTERS[city ?? 'nyc'] ?? CITY_CENTERS.nyc;
 
+  // ── Friend clustering (web parity: same venue OR ~5m GPS proximity) ──
+  const { clusters, selfSolo } = useMemo(() => {
+    let filtered =
+      relationshipFilter === 'close'
+        ? friends.filter((f) => f.relationshipType === 'close')
+        : friends;
+    filtered = filtered.filter((f) => stalenessMins(f) < 60);
+
+    const self: MapFriend | null =
+      session && selfProfile && myStatus?.status === 'out' && myStatus.lat && myStatus.lng
+        ? {
+            user_id: session.user.id,
+            lat: myStatus.lat,
+            lng: myStatus.lng,
+            venue_name: myStatus.venue_name ?? '',
+            display_name: selfProfile.display_name ?? 'Me',
+            avatar_url: selfProfile.avatar_url,
+            relationshipType: 'close', // self gets highest priority ring
+            is_private_party: false,
+            party_neighborhood: null,
+            last_location_at: new Date().toISOString(),
+          }
+        : null;
+
+    const groups: MapFriend[][] = [];
+    const assigned = new Set<string>();
+    for (const friend of filtered) {
+      if (assigned.has(friend.user_id)) continue;
+      const cluster = [friend];
+      assigned.add(friend.user_id);
+      if (shouldCluster) {
+        for (const other of filtered) {
+          if (assigned.has(other.user_id)) continue;
+          const sameVenue =
+            !!friend.venue_name &&
+            !!other.venue_name &&
+            friend.venue_name.toLowerCase() === other.venue_name.toLowerCase();
+          const closeGps =
+            Math.abs(friend.lat - other.lat) < CLUSTER_THRESHOLD &&
+            Math.abs(friend.lng - other.lng) < CLUSTER_THRESHOLD;
+          if (sameVenue || closeGps) {
+            cluster.push(other);
+            assigned.add(other.user_id);
+          }
+        }
+      }
+      groups.push(cluster);
+    }
+
+    // Merge self into an overlapping cluster (self shown first)
+    let selfMerged = false;
+    if (self && shouldCluster) {
+      for (const cluster of groups) {
+        const sameVenue =
+          !!self.venue_name &&
+          !!cluster[0].venue_name &&
+          self.venue_name.toLowerCase() === cluster[0].venue_name.toLowerCase();
+        const closeGps =
+          Math.abs(cluster[0].lat - self.lat) < CLUSTER_THRESHOLD &&
+          Math.abs(cluster[0].lng - self.lng) < CLUSTER_THRESHOLD;
+        if (sameVenue || closeGps) {
+          cluster.unshift(self);
+          selfMerged = true;
+          break;
+        }
+      }
+    }
+
+    return { clusters: groups, selfSolo: self && !selfMerged ? self : null };
+  }, [friends, shouldCluster, relationshipFilter, session, selfProfile, myStatus]);
+
+  // ── Venues: type filter, promoted split, friends-only hides all ──
+  const typeFilteredVenues =
+    relationshipFilter === 'friends_only'
+      ? []
+      : venueFilter === 'all'
+        ? venues
+        : venues.filter((v) => v.type === venueFilter);
+  const promotedVenues = typeFilteredVenues.filter((v) => v.is_map_promoted);
+  const regularVenues = typeFilteredVenues.filter((v) => !v.is_map_promoted);
+
   const venueGeoJSON: GeoJSON.FeatureCollection = {
     type: 'FeatureCollection',
-    features: venues.map((v) => ({
+    features: regularVenues.map((v) => ({
       type: 'Feature',
       id: v.id,
       geometry: { type: 'Point', coordinates: [v.lng, v.lat] },
@@ -127,51 +350,61 @@ export default function MapScreen() {
     })),
   };
 
+  const flyTo = (lng: number, lat: number, zoomLevel: number, duration = 800) => {
+    cameraRef.current?.setCamera({
+      centerCoordinate: [lng, lat],
+      zoomLevel,
+      animationDuration: duration,
+    });
+  };
+
+  const openVenue = (venueId: string, lng: number, lat: number) => {
+    flyTo(lng, lat, 15);
+    router.push({ pathname: '/venue', params: { venueId } });
+  };
+
   const handleVenuePress = async (event: { features?: GeoJSON.Feature[] }) => {
     const feature = event.features?.[0];
     if (!feature) return;
     const props = feature.properties as Record<string, any> | null;
+    const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
     if (props?.cluster) {
-      // Zoom into the cluster
-      const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
       const currentZoom = await mapRef.current?.getZoom();
-      cameraRef.current?.setCamera({
-        centerCoordinate: [lng, lat],
-        zoomLevel: Math.min((currentZoom ?? 13) + 2, 17),
-        animationDuration: 500,
-      });
+      flyTo(lng, lat, Math.min((currentZoom ?? 13) + 2, 17), 500);
       return;
     }
-    if (props?.venueId) {
-      // Fly toward the venue as the page opens (web flyTo parity)
-      const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
-      cameraRef.current?.setCamera({
-        centerCoordinate: [lng, lat],
-        zoomLevel: 15,
-        animationDuration: 800,
-      });
-      router.push({ pathname: '/venue', params: { venueId: props.venueId } });
-    }
+    if (props?.venueId) openVenue(props.venueId, lng, lat);
   };
 
-  const mapRef = useRef<MapView>(null);
-
-  // Web parity: clicking a person flies to them (zoom 15, 1.5s) + opens card
+  // Web parity: clicking a person flies to them (zoom 15) + opens card
   const handleFriendPress = (friend: MapFriend) => {
+    if (session && friend.user_id === session.user.id) return; // self — no card
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    cameraRef.current?.setCamera({
-      centerCoordinate: [friend.lng, friend.lat],
-      zoomLevel: 15,
-      animationDuration: 1200,
-    });
+    flyTo(friend.lng, friend.lat, 15, 1200);
     setSelectedFriend(friend);
     setFriendCardOpen(true);
+  };
+
+  const handleClusterPress = (cluster: MapFriend[]) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    flyTo(cluster[0].lng, cluster[0].lat, 15, 800);
+    const venueName = cluster[0].venue_name;
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: venueName || 'Friends here',
+        options: [...cluster.map((f) => f.display_name), 'Cancel'],
+        cancelButtonIndex: cluster.length,
+      },
+      (index) => {
+        if (index < cluster.length) handleFriendPress(cluster[index]);
+      }
+    );
   };
 
   const openVenueByName = async (venueName: string) => {
     const { data: venue } = await supabase
       .from('venues')
-      .select('id')
+      .select('id, lat, lng')
       .eq('name', venueName)
       .maybeSingle();
     if (venue?.id) {
@@ -180,13 +413,7 @@ export default function MapScreen() {
     }
   };
 
-  const recenter = () => {
-    cameraRef.current?.setCamera({
-      centerCoordinate: [center.lng, center.lat],
-      zoomLevel: 13,
-      animationDuration: 800,
-    });
-  };
+  const recenter = () => flyTo(center.lng, center.lat, 13);
 
   return (
     <View className="flex-1 bg-[#110a24]">
@@ -197,6 +424,14 @@ export default function MapScreen() {
         logoEnabled={false}
         attributionPosition={{ bottom: 100, left: 8 }}
         scaleBarEnabled={false}
+        onPress={() => setFocusMode((prev) => !prev)}
+        onCameraChanged={(e) => {
+          const zoom = e.properties?.zoom ?? 13;
+          setShouldCluster((prev) => {
+            const next = zoom < NO_CLUSTER_ZOOM;
+            return next === prev ? prev : next;
+          });
+        }}
       >
         <Camera
           ref={cameraRef}
@@ -243,65 +478,127 @@ export default function MapScreen() {
           />
         </ShapeSource>
 
-        {/* Friends out tonight — avatar pins with relationship rings */}
-        {friends.map((friend, index) => (
-          <FriendMarker
-            key={friend.user_id}
-            friend={friend}
-            index={index}
-            onPress={handleFriendPress}
-          />
+        {/* Promoted venue pins — rendered before friends so friends sit above */}
+        {promotedVenues.map((venue) => (
+          <PromotedVenueMarker key={venue.id} venue={venue} onPress={openVenue} />
         ))}
+
+        {/* Friends out tonight — grouped when overlapping, solo otherwise */}
+        {clusters.map((cluster, index) =>
+          cluster.length >= 2 && shouldCluster ? (
+            <FriendGroupMarker
+              key={`cluster-${cluster
+                .map((f) => f.user_id)
+                .sort()
+                .join('-')}`}
+              cluster={cluster}
+              index={index}
+              onPress={handleClusterPress}
+            />
+          ) : (
+            cluster.map((friend) => (
+              <FriendMarker
+                key={friend.user_id}
+                friend={friend}
+                index={index}
+                onPress={handleFriendPress}
+              />
+            ))
+          )
+        )}
+
+        {/* Self marker (when out and not merged into a cluster) */}
+        {selfSolo ? (
+          <FriendMarker friend={selfSolo} index={0} isSelf onPress={() => {}} />
+        ) : null}
       </MapView>
 
       {/* Floating controls */}
-      <View className="absolute top-safe-offset-3 right-4 gap-2">
-        <Pressable
-          onPress={() => router.push('/search')}
-          className="w-10 h-10 rounded-full items-center justify-center bg-[#1a0f2e]/90 border border-white/10 active:opacity-70"
-        >
-          <SymbolView name="magnifyingglass" size={18} tintColor="rgba(255,255,255,0.8)" />
-        </Pressable>
-        <Pressable
-          onPress={() => router.push('/activity')}
-          className="w-10 h-10 rounded-full items-center justify-center active:opacity-90"
-          style={{ backgroundColor: PURPLE }}
-        >
-          <SymbolView name="bell" size={18} tintColor="#ffffff" />
-          {unreadCount > 0 ? (
-            <View className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 items-center justify-center">
-              <Text className="text-white text-[9px] font-sans-semibold">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </Text>
-            </View>
+      {!focusMode ? (
+        <View className="absolute top-safe-offset-3 right-4 gap-2">
+          <Pressable
+            onPress={() => router.push('/search')}
+            className="w-10 h-10 rounded-full items-center justify-center bg-[#1a0f2e]/90 border border-white/10 active:opacity-70"
+          >
+            <SymbolView name="magnifyingglass" size={18} tintColor="rgba(255,255,255,0.8)" />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/activity')}
+            className="w-10 h-10 rounded-full items-center justify-center active:opacity-90"
+            style={{ backgroundColor: PURPLE }}
+          >
+            <SymbolView name="bell" size={18} tintColor="#ffffff" />
+            {unreadCount > 0 ? (
+              <View className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 items-center justify-center">
+                <Text className="text-white text-[9px] font-sans-semibold">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/map-filters')}
+            className="w-10 h-10 rounded-full items-center justify-center bg-[#1a0f2e]/90 border border-white/10 active:opacity-70"
+          >
+            <SymbolView
+              name="slider.horizontal.3"
+              size={18}
+              tintColor={
+                relationshipFilter !== 'all' || venueFilter !== 'all'
+                  ? '#d4ff00'
+                  : 'rgba(255,255,255,0.8)'
+              }
+            />
+          </Pressable>
+          <Pressable
+            onPress={recenter}
+            className="w-10 h-10 rounded-full items-center justify-center bg-[#1a0f2e]/90 border border-white/10 active:opacity-70"
+          >
+            <SymbolView name="location" size={18} tintColor="rgba(255,255,255,0.8)" />
+          </Pressable>
+        </View>
+      ) : null}
+
+      {/* Arrival prompts — top banners */}
+      {!focusMode && (smartPrompt || moveBanner) ? (
+        <View className="absolute top-safe-offset-3 left-4 right-16 gap-2">
+          {smartPrompt ? (
+            <SmartArrivalPrompt
+              venueName={smartPrompt.venue.name}
+              onAccept={acceptSmartPrompt}
+              onDismiss={dismissSmartPrompt}
+            />
           ) : null}
-        </Pressable>
-        <Pressable
-          onPress={recenter}
-          className="w-10 h-10 rounded-full items-center justify-center bg-[#1a0f2e]/90 border border-white/10 active:opacity-70"
-        >
-          <SymbolView name="location" size={18} tintColor="rgba(255,255,255,0.8)" />
-        </Pressable>
-      </View>
+          {moveBanner ? (
+            <VenueMoveBanner
+              venueName={moveBanner.venue.name}
+              onAccept={acceptMove}
+              onDismiss={dismissMove}
+            />
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Relationship legend — bottom-left above the tab bar */}
-      <View className="absolute bottom-safe-offset-16 left-4 flex-row gap-3 px-3 py-2 rounded-full bg-[#1a0f2e]/90 border border-white/10">
-        {(
-          [
-            ['close', 'Close'],
-            ['direct', 'Friend'],
-            ['mutual', 'Mutual'],
-          ] as const
-        ).map(([key, label]) => (
-          <View key={key} className="flex-row items-center gap-1.5">
-            <View
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: RELATIONSHIP_COLORS[key] }}
-            />
-            <Text className="text-white/70 text-xs font-sans-medium">{label}</Text>
-          </View>
-        ))}
-      </View>
+      {!focusMode ? (
+        <View className="absolute bottom-safe-offset-16 left-4 flex-row gap-3 px-3 py-2 rounded-full bg-[#1a0f2e]/90 border border-white/10">
+          {(
+            [
+              ['close', 'Close'],
+              ['direct', 'Friend'],
+              ['mutual', 'Mutual'],
+            ] as const
+          ).map(([key, label]) => (
+            <View key={key} className="flex-row items-center gap-1.5">
+              <View
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: RELATIONSHIP_COLORS[key] }}
+              />
+              <Text className="text-white/70 text-xs font-sans-medium">{label}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {/* Friend ID card */}
       {session ? (

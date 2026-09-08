@@ -46,6 +46,17 @@ function RootNavigator() {
       <Stack.Screen name="activity" options={{ presentation: 'modal' }} />
       <Stack.Screen name="search" options={{ presentation: 'modal' }} />
       <Stack.Screen name="venue" options={{ presentation: 'modal' }} />
+      <Stack.Screen
+        name="map-filters"
+        options={{
+          presentation: 'formSheet',
+          sheetAllowedDetents: 'fitToContents',
+          sheetGrabberVisible: true,
+          // Transparent so the native sheet material (liquid glass on iOS 26)
+          // shows instead of the app's solid contentStyle
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
       <Stack.Screen name="business" />
     </Stack>
   );

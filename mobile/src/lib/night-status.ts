@@ -212,3 +212,69 @@ export async function stopSharing(userId: string): Promise<void> {
 
   must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
 }
+
+export interface GoOutOptions {
+  venue: { id: string | null; name: string };
+  coords?: { lat: number; lng: number } | null;
+  city?: string | null;
+}
+
+/**
+ * The ONE way to go "out" at a venue. Full-field night_statuses upsert
+ * (party_address never in the payload — WP6), ends prior check-ins and opens
+ * a new one. Port of the web goOutAtVenue minus private-party options, which
+ * land with the check-in flow. Callers that flip planning→out must also
+ * startBackgroundLocation (see BackgroundLocationManager contract).
+ */
+export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<void> {
+  const now = new Date().toISOString();
+  invalidateOutStatusCache();
+  const lat = opts.coords?.lat ?? null;
+  const lng = opts.coords?.lng ?? null;
+
+  must(
+    await supabase.from('night_statuses').upsert(
+      {
+        user_id: userId,
+        status: 'out' as const,
+        venue_id: opts.venue.id,
+        venue_name: opts.venue.name,
+        lat,
+        lng,
+        updated_at: now,
+        expires_at: getStatusExpiry(opts.city),
+        planning_neighborhood: null,
+        planning_venue_id: null,
+        planning_venue_name: null,
+        planning_visibility: null,
+        is_private_party: false,
+        party_neighborhood: null,
+      },
+      { onConflict: 'user_id' }
+    )
+  );
+
+  must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
+
+  // End prior check-ins, open a new one
+  must(
+    await supabase
+      .from('checkins')
+      .update({ ended_at: now })
+      .eq('user_id', userId)
+      .is('ended_at', null)
+  );
+  const checkin: Record<string, unknown> = {
+    user_id: userId,
+    venue_id: opts.venue.id,
+    venue_name: opts.venue.name,
+    started_at: now,
+    last_updated_at: now,
+  };
+  // Omit lat/lng when coords unavailable — never write 0,0
+  if (lat !== null && lng !== null) {
+    checkin.lat = lat;
+    checkin.lng = lng;
+  }
+  must(await supabase.from('checkins').insert(checkin as never));
+}
