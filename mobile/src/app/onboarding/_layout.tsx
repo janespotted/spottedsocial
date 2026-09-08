@@ -8,6 +8,7 @@ export default function OnboardingLayout() {
     <Stack screenOptions={{ headerShown: false, contentStyle }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="username" />
+      <Stack.Screen name="city" />
       <Stack.Screen name="welcome" />
     </Stack>
   );

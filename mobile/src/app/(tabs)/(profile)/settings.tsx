@@ -85,7 +85,7 @@ export default function SettingsScreen() {
         {
           text: 'Delete Forever',
           style: 'destructive',
-          onPress: async (text) => {
+          onPress: async (text?: string) => {
             if (text !== 'DELETE') {
               Alert.alert('Not deleted', 'You must type DELETE exactly to confirm.');
               return;

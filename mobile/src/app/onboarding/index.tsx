@@ -22,7 +22,7 @@ export default function NameScreen() {
       keyboardShouldPersistTaps="handled"
       bottomOffset={24}
     >
-      <ProgressDots current={2} total={4} />
+      <ProgressDots current={2} total={5} />
 
       <View className="mt-12 mb-10">
         <Text className="text-[28px] font-sans-light text-white leading-tight">

@@ -99,7 +99,7 @@ export default function UsernameScreen() {
       setError(err.message);
       return;
     }
-    router.push('/onboarding/welcome');
+    router.push('/onboarding/city');
   };
 
   return (
@@ -117,7 +117,7 @@ export default function UsernameScreen() {
         <SymbolView name="arrow.left" size={20} tintColor="rgba(255,255,255,0.6)" />
       </Pressable>
 
-      <ProgressDots current={3} total={4} />
+      <ProgressDots current={3} total={5} />
 
       <View className="mt-12 mb-10">
         <Text className="text-[28px] font-sans-light text-white leading-tight">
