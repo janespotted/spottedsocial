@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { markManualCheckin } from './venue-arrival-engine';
 
 const STATUS_CACHE_TTL_MS = 60_000;
 let _cachedOutResult: { out: boolean; ts: number; userId: string } | null = null;
@@ -230,6 +231,10 @@ export interface GoOutOptions {
 export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<void> {
   const now = new Date().toISOString();
   invalidateOutStatusCache();
+  // Every goOutAtVenue call is a user-confirmed venue (sheet, arrival prompt,
+  // venue shift) — quiet the arrival engine so GPS disagreement can't re-nudge
+  // a venue the user just corrected away from.
+  markManualCheckin();
   const lat = opts.coords?.lat ?? null;
   const lng = opts.coords?.lng ?? null;
 

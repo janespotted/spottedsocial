@@ -42,11 +42,17 @@ const TOAST_COOLDOWN_MS = 15 * 60 * 1000;
 const REENTRY_COOLDOWN_MS = 20 * 60 * 1000;
 const REENTRY_MIN_DISTANCE_M = 300;
 
+// After a manual venue confirm, the engine stays quiet — otherwise GPS that
+// disagrees with the user's correction re-nudges the rejected venue as soon
+// as the dismiss cooldown lapses (web: MANUAL_CHECKIN_COOLDOWN_MS).
+const MANUAL_CHECKIN_COOLDOWN_MS = 30 * 60 * 1000;
+
 const STALE_LOCATION_THRESHOLD_MS = 5000;
 
 /* ── State (module-scoped; suppression also persisted for app restarts) ── */
 
 let dwellTracker: { venueId: string; firstSeenAt: number; lastSeenAt: number } | null = null;
+let lastManualCheckinAt = 0;
 let lastToastTime = 0;
 let lastDeparture: { venueId: string; departedAt: number; maxDistanceReached: number } | null =
   null;
@@ -61,19 +67,38 @@ function tonightKey(): string {
 }
 
 const SUPPRESS_STORAGE_KEY = 'venue_suppressed';
+const MANUAL_CHECKIN_STORAGE_KEY = 'manual_checkin_at';
 
-/** Hydrate tonight's suppressions from disk (call once at startup). */
+/** Hydrate tonight's suppressions + manual cooldown from disk (call once at startup). */
 export async function hydrateArrivalEngine(): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(SUPPRESS_STORAGE_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw) as { night: string; venueIds: string[] };
-    if (parsed.night === tonightKey()) {
-      for (const id of parsed.venueIds) suppressedTonight.add(id);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { night: string; venueIds: string[] };
+      if (parsed.night === tonightKey()) {
+        for (const id of parsed.venueIds) suppressedTonight.add(id);
+      }
     }
   } catch {
     /* fresh state on parse failure */
   }
+  try {
+    const raw = await AsyncStorage.getItem(MANUAL_CHECKIN_STORAGE_KEY);
+    if (raw) lastManualCheckinAt = parseInt(raw, 10) || 0;
+  } catch {
+    /* fresh state on parse failure */
+  }
+}
+
+/**
+ * The user just manually confirmed a venue (check-in sheet, arrival prompt,
+ * venue shift). Quiets the engine for 30 min and drops any accrued dwell so
+ * the rejected venue can't nudge the moment the cooldown ends.
+ */
+export function markManualCheckin(): void {
+  lastManualCheckinAt = Date.now();
+  dwellTracker = null;
+  AsyncStorage.setItem(MANUAL_CHECKIN_STORAGE_KEY, String(lastManualCheckinAt)).catch(() => {});
 }
 
 export function suppressVenueTonight(venueId: string): void {
@@ -139,6 +164,9 @@ function updateDwellTime(venueId: string): boolean {
 
 export function canTriggerVenueArrival(context: VenueArrivalContext): NudgeDecision {
   // Universal hard gates
+  if (Date.now() - lastManualCheckinAt < MANUAL_CHECKIN_COOLDOWN_MS) {
+    return { shouldNudge: false, reason: 'manual check-in cooldown (30min)' };
+  }
   if (context.gpsAccuracy > GPS_ACCURACY_THRESHOLD) {
     return { shouldNudge: false, reason: `accuracy ${Math.round(context.gpsAccuracy)}m > ${GPS_ACCURACY_THRESHOLD}m` };
   }
