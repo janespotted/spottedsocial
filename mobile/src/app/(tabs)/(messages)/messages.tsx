@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
 import { fetchDmThreads, previewText, threadTitle, type DmThreadPreview } from '@/lib/dm';
+import { fetchYapDirectory, type YapQuote } from '@/lib/yap';
 import { useSession } from '@/hooks/use-session';
 import { useNotifications } from '@/hooks/use-notifications';
 import { Avatar } from '@/components/avatar';
@@ -86,6 +87,49 @@ function ThreadRow({ thread, onPress }: { thread: DmThreadPreview; onPress: () =
   );
 }
 
+const relativeTime = (dateStr: string) => {
+  const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  return `${Math.floor(mins / 60)}h`;
+};
+
+/** Yap directory row — text, venue chip, pins, time, score (web parity) */
+function YapRow({ quote, index, onPress }: { quote: YapQuote; index: number; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`px-4 py-3 active:opacity-70 ${index > 0 ? 'border-t border-white/[0.06]' : ''}`}
+    >
+      <Text className="text-white text-[15px] font-sans leading-snug mb-1.5">{quote.text}</Text>
+      <View className="flex-row items-center gap-1.5">
+        <View className="flex-row items-center gap-1 bg-white/[0.06] rounded-full px-2 py-0.5 shrink">
+          <SymbolView name="mappin" size={11} tintColor="rgba(255,255,255,0.4)" />
+          <Text className="text-white/50 text-xs font-sans" numberOfLines={1}>
+            {quote.venue_name}
+            {quote.venue_neighborhood ? ` · ${quote.venue_neighborhood}` : ''}
+          </Text>
+        </View>
+        {quote.pinned_count > 0 ? (
+          <View className="flex-row items-center gap-0.5">
+            <SymbolView name="pin.fill" size={10} tintColor={NEON} />
+            <Text className="text-white/30 text-[11px] font-sans">{quote.pinned_count}</Text>
+          </View>
+        ) : null}
+        <Text className="text-white/25 text-xs font-sans ml-auto">
+          {relativeTime(quote.created_at)}
+        </Text>
+      </View>
+      {quote.score > 0 ? (
+        <View className="flex-row items-center gap-1 mt-1">
+          <SymbolView name="arrowtriangle.up.fill" size={10} tintColor="rgba(255,255,255,0.3)" />
+          <Text className="text-white/40 text-xs font-sans-medium">{quote.score}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
 function RowSkeleton() {
   return (
     <View className="flex-row items-center gap-3 py-3">
@@ -102,8 +146,10 @@ export default function MessagesScreen() {
   const { session } = useSession();
   const { unreadCount } = useNotifications();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TabType>('messages');
+  const [activeTab, setActiveTab] = useState<TabType>('yap');
+  const [yapSort, setYapSort] = useState<'hot' | 'new'>('hot');
   const contentContainerStyle = useResolveClassNames('px-4 pb-6');
+  const yapContentStyle = useResolveClassNames('pb-6');
 
   const { data: city } = useQuery({
     queryKey: ['home-city', session?.user.id],
@@ -131,7 +177,35 @@ export default function MessagesScreen() {
     queryFn: () => fetchDmThreads(session!.user.id),
   });
 
-  // Any new DM anywhere refreshes the list (thread ordering + unread dots)
+  // Yap directory + own venue for the "You're At" row
+  const {
+    data: yaps,
+    isLoading: yapsLoading,
+    refetch: refetchYaps,
+    isRefetching: yapsRefetching,
+  } = useQuery({
+    queryKey: ['yap-directory', city],
+    enabled: !!session && !!city && activeTab === 'yap',
+    staleTime: 15_000,
+    queryFn: () => fetchYapDirectory(city!),
+  });
+  const { data: myVenue } = useQuery({
+    queryKey: ['my-night-status', session?.user.id],
+    enabled: !!session,
+    refetchInterval: 120_000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('night_statuses')
+        .select('status, venue_id, venue_name, lat, lng')
+        .eq('user_id', session!.user.id)
+        .not('expires_at', 'is', null)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+      return data ?? null;
+    },
+  });
+
+  // Any new DM/yap anywhere refreshes the lists
   useEffect(() => {
     if (!session) return;
     const channel = supabase
@@ -141,11 +215,26 @@ export default function MessagesScreen() {
         { event: 'INSERT', schema: 'public', table: 'dm_messages' },
         () => queryClient.invalidateQueries({ queryKey: ['dm-threads'] })
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'yap_messages' },
+        () => queryClient.invalidateQueries({ queryKey: ['yap-directory'] })
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [session, queryClient]);
+
+  const sortedYaps = [...(yaps ?? [])].sort((a, b) =>
+    yapSort === 'hot'
+      ? b.score - a.score
+      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+
+  const openYapThread = (venueName: string) => {
+    router.push({ pathname: '/yap-thread', params: { venueName } });
+  };
 
   const openThread = (thread: DmThreadPreview) => {
     router.push({
@@ -250,15 +339,82 @@ export default function MessagesScreen() {
       </View>
 
       {activeTab === 'yap' ? (
-        <View className="items-center justify-center py-20 px-8">
-          <View className="w-20 h-20 rounded-full bg-white/5 items-center justify-center mb-6">
-            <SymbolView name="bubble.left.and.bubble.right" size={36} tintColor="rgba(168,85,247,0.6)" />
-          </View>
-          <Text className="text-xl font-sans-semibold text-white mb-2">Yap</Text>
-          <Text className="text-white/50 text-sm font-sans text-center">
-            Venue group chats open when you check in — coming with the check-in flow.
-          </Text>
-        </View>
+        <LegendList
+          data={sortedYaps}
+          keyExtractor={(q) => q.id}
+          recycleItems
+          contentContainerStyle={yapContentStyle}
+          refreshControl={
+            <RefreshControl
+              refreshing={yapsRefetching}
+              onRefresh={refetchYaps}
+              tintColorClassName="accent-[#d4ff00]"
+            />
+          }
+          ListHeaderComponent={
+            <View>
+              {/* You're At — slim tappable row */}
+              {myVenue?.status === 'out' && myVenue.venue_name ? (
+                <Pressable
+                  onPress={() => openYapThread(myVenue.venue_name!)}
+                  className="flex-row items-center gap-2 px-4 py-2 active:opacity-70"
+                >
+                  <SymbolView name="house" size={14} tintColor={NEON} />
+                  <Text className="text-white text-[13px] font-sans-medium flex-1" numberOfLines={1}>
+                    {myVenue.venue_name}
+                  </Text>
+                  <SymbolView name="chevron.right" size={12} tintColor="rgba(255,255,255,0.3)" />
+                </Pressable>
+              ) : null}
+              {/* Hot / New sort */}
+              <View className="flex-row items-center px-4 pb-1">
+                {(
+                  [
+                    ['hot', 'Hot'],
+                    ['new', 'New'],
+                  ] as const
+                ).map(([mode, label]) => (
+                  <Pressable key={mode} onPress={() => setYapSort(mode)} className="mr-6 pb-1">
+                    <Text
+                      className="text-lg font-sans-semibold"
+                      style={{ color: yapSort === mode ? '#ffffff' : 'rgba(255,255,255,0.4)' }}
+                    >
+                      {label}
+                    </Text>
+                    {yapSort === mode ? (
+                      <View className="h-0.5 rounded-full" style={{ backgroundColor: NEON }} />
+                    ) : null}
+                  </Pressable>
+                ))}
+                <Text className="text-white/25 text-[11px] font-sans ml-auto">resets 5am</Text>
+              </View>
+            </View>
+          }
+          ListEmptyComponent={
+            yapsLoading ? (
+              <View className="px-4 gap-3 py-3">
+                {[0, 1, 2, 3].map((i) => (
+                  <View key={i} className="h-24 rounded-2xl bg-[#2d1b4e]/40" />
+                ))}
+              </View>
+            ) : (
+              <View className="items-center justify-center py-16 px-8">
+                <View className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 items-center justify-center mb-6">
+                  <SymbolView name="mic" size={36} tintColor="rgba(168,85,247,0.6)" />
+                </View>
+                <Text className="text-xl font-sans-semibold text-white mb-2">
+                  Nothing happening yet
+                </Text>
+                <Text className="text-white/50 text-sm font-sans text-center max-w-xs">
+                  Live from the crowd — see what people are saying at venues tonight
+                </Text>
+              </View>
+            )
+          }
+          renderItem={({ item, index }) => (
+            <YapRow quote={item} index={index} onPress={() => openYapThread(item.venue_name)} />
+          )}
+        />
       ) : (
         <LegendList
           data={threads ?? []}

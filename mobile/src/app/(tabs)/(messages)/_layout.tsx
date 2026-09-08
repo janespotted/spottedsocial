@@ -9,6 +9,7 @@ export default function MessagesLayout() {
       {/* Custom static headers inside the screens (web PageHeader parity) */}
       <Stack.Screen name="messages" options={{ title: 'Chat' }} />
       <Stack.Screen name="thread" options={{ title: 'Conversation' }} />
+      <Stack.Screen name="yap-thread" options={{ title: 'Yap' }} />
     </Stack>
   );
 }
