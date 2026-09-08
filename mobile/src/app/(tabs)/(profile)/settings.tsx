@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -74,6 +74,37 @@ export default function SettingsScreen() {
     queryClient.invalidateQueries({ queryKey: ['dm-threads'] });
   };
 
+  // Apple requires an in-app account-deletion path. The delete-account edge
+  // function removes/anonymizes the user across all tables (web parity).
+  const confirmDeleteAccount = () => {
+    Alert.prompt(
+      'Delete account?',
+      'This permanently deletes your account and all your data — posts, messages, friends, check-ins. This cannot be undone.\n\nType DELETE to confirm.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Forever',
+          style: 'destructive',
+          onPress: async (text) => {
+            if (text !== 'DELETE') {
+              Alert.alert('Not deleted', 'You must type DELETE exactly to confirm.');
+              return;
+            }
+            const { error } = await supabase.functions.invoke('delete-account', {
+              body: { confirmation: 'DELETE' },
+            });
+            if (error) {
+              Alert.alert('Could not delete account', 'Try again or contact support.');
+              return;
+            }
+            await supabase.auth.signOut();
+          },
+        },
+      ],
+      'plain-text'
+    );
+  };
+
   return (
     <View className="flex-1">
       <View
@@ -133,6 +164,13 @@ export default function SettingsScreen() {
         >
           <SymbolView name="rectangle.portrait.and.arrow.right" size={15} tintColor="#f87171" />
           <Text className="text-red-400 text-sm font-sans-medium">Log Out</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={confirmDeleteAccount}
+          className="items-center py-3 active:opacity-70"
+        >
+          <Text className="text-red-400/60 text-xs font-sans">Delete Account</Text>
         </Pressable>
       </ScrollView>
     </View>
