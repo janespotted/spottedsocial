@@ -58,7 +58,8 @@
           "photosPermission": "Spotted lets you share photos from your library in your posts.",
           "cameraPermission": "Spotted uses the camera so you can capture and share moments from your night."
         }
-      ]
+      ],
+      "@rnmapbox/maps"
     ],
     "experiments": {
       "typedRoutes": true,

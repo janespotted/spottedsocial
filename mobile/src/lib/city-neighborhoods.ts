@@ -54,6 +54,13 @@ export const CITY_NEIGHBORHOODS: Record<string, string[]> = {
   ],
 };
 
+// Map camera centers per city (from the web src/lib/city-detection.ts)
+export const CITY_CENTERS: Record<string, { lat: number; lng: number }> = {
+  nyc: { lat: 40.7128, lng: -74.006 },
+  la: { lat: 34.0522, lng: -118.2437 },
+  pb: { lat: 26.7056, lng: -80.0364 },
+};
+
 export const getCityLabel = (city: string): string => {
   if (city === 'la') return 'LA';
   if (city === 'pb') return 'Palm Beach';

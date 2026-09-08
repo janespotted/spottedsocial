@@ -12,8 +12,10 @@ export interface SafeProfile {
   username: string;
   avatar_url: string | null;
   is_demo: boolean;
+  is_out: boolean | null;
   last_known_lat: number | null;
   last_known_lng: number | null;
+  last_location_at: string | null;
   location_sharing_level: string | null;
 }
 
