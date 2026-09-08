@@ -217,6 +217,7 @@ export interface GoOutOptions {
   venue: { id: string | null; name: string };
   coords?: { lat: number; lng: number } | null;
   city?: string | null;
+  privateParty?: { neighborhood: string | null; address?: string | null } | null;
 }
 
 /**
@@ -247,14 +248,19 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
         planning_venue_id: null,
         planning_venue_name: null,
         planning_visibility: null,
-        is_private_party: false,
-        party_neighborhood: null,
+        is_private_party: !!opts.privateParty,
+        party_neighborhood: opts.privateParty?.neighborhood ?? null,
       },
       { onConflict: 'user_id' }
     )
   );
 
-  must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
+  must(
+    await supabase
+      .from('night_statuses')
+      .update({ party_address: opts.privateParty?.address ?? null })
+      .eq('user_id', userId)
+  );
 
   // End prior check-ins, open a new one
   must(

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ActionSheetIOS, Pressable, RefreshControl, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -6,6 +7,7 @@ import { LegendList } from '@legendapp/list/react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
+import { fetchPeopleYouMayKnow, sendFriendRequest, type SuggestedFriend } from '@/lib/friends';
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
@@ -13,7 +15,7 @@ import { Avatar } from '@/components/avatar';
 const NEON = '#d4ff00';
 
 interface FriendRow {
-  kind: 'request' | 'friend' | 'header';
+  kind: 'request' | 'friend' | 'header' | 'suggestion';
   key: string;
   title?: string;
   requestId?: string;
@@ -22,6 +24,7 @@ interface FriendRow {
   username?: string;
   avatar_url?: string | null;
   isClose?: boolean;
+  mutualCount?: number;
 }
 
 interface FriendsData {
@@ -29,7 +32,7 @@ interface FriendsData {
 }
 
 async function fetchFriendsData(userId: string): Promise<FriendsData> {
-  const [profiles, incomingRes, sentRes, receivedRes, closeRes] = await Promise.all([
+  const [profiles, incomingRes, sentRes, receivedRes, closeRes, suggestions] = await Promise.all([
     fetchProfilesSafe(),
     supabase
       .from('friendships')
@@ -39,6 +42,7 @@ async function fetchFriendsData(userId: string): Promise<FriendsData> {
     supabase.from('friendships').select('friend_id').eq('user_id', userId).eq('status', 'accepted'),
     supabase.from('friendships').select('user_id').eq('friend_id', userId).eq('status', 'accepted'),
     supabase.from('close_friends').select('close_friend_id').eq('user_id', userId),
+    fetchPeopleYouMayKnow(userId),
   ]);
 
   const profileMap = new Map(profiles.map((p) => [p.id, p]));
@@ -64,6 +68,24 @@ async function fetchFriendsData(userId: string): Promise<FriendsData> {
         display_name: p.display_name,
         username: p.username,
         avatar_url: p.avatar_url,
+      });
+    }
+  }
+
+  // People you may know — exclude anyone already a friend or requester
+  const excluded = new Set([...friendIds, ...requests.map((r) => r.user_id), userId]);
+  const visibleSuggestions = suggestions.filter((s: SuggestedFriend) => !excluded.has(s.id));
+  if (visibleSuggestions.length > 0) {
+    rows.push({ kind: 'header', key: 'h-suggestions', title: 'People You May Know' });
+    for (const s of visibleSuggestions) {
+      rows.push({
+        kind: 'suggestion',
+        key: `sug-${s.id}`,
+        userId: s.id,
+        display_name: s.display_name,
+        username: s.username,
+        avatar_url: s.avatar_url,
+        mutualCount: s.mutual_count,
       });
     }
   }
@@ -94,6 +116,7 @@ export default function FriendsScreen() {
   const queryClient = useQueryClient();
   const userId = session?.user.id;
   const contentContainerStyle = useResolveClassNames('px-4 pb-10');
+  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
 
   const { data, refetch, isRefetching } = useQuery({
     queryKey: ['friends-page', userId],
@@ -152,6 +175,20 @@ export default function FriendsScreen() {
         .insert({ user_id: userId, close_friend_id: row.userId });
     }
     invalidate();
+  };
+
+  const addSuggested = async (row: FriendRow) => {
+    if (!userId || !row.userId || requestedIds.has(row.userId)) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setRequestedIds((prev) => new Set(prev).add(row.userId!));
+    const ok = await sendFriendRequest(userId, row.userId);
+    if (!ok) {
+      setRequestedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(row.userId!);
+        return next;
+      });
+    }
   };
 
   const showFriendActions = (row: FriendRow) => {
@@ -259,6 +296,33 @@ export default function FriendsScreen() {
                 className="w-8 h-8 rounded-full items-center justify-center border border-white/15 active:bg-white/5"
               >
                 <SymbolView name="xmark" size={12} tintColor="rgba(255,255,255,0.5)" />
+              </Pressable>
+            </View>
+          ) : item.kind === 'suggestion' ? (
+            <View className="flex-row items-center gap-3 py-2.5">
+              <Avatar name={item.display_name ?? '?'} url={item.avatar_url ?? null} size="md" />
+              <View className="flex-1 min-w-0">
+                <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
+                  {item.display_name}
+                </Text>
+                <Text className="text-white/40 text-xs font-sans" numberOfLines={1}>
+                  {item.mutualCount && item.mutualCount > 0
+                    ? `${item.mutualCount} mutual friend${item.mutualCount !== 1 ? 's' : ''}`
+                    : `@${item.username}`}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => addSuggested(item)}
+                disabled={requestedIds.has(item.userId ?? '')}
+                className="px-4 py-2 rounded-full border border-[#a855f7]/40 active:bg-[#a855f7]/15"
+              >
+                <Text
+                  className={`text-xs font-sans-semibold ${
+                    requestedIds.has(item.userId ?? '') ? 'text-white/40' : 'text-[#a855f7]'
+                  }`}
+                >
+                  {requestedIds.has(item.userId ?? '') ? 'Requested' : 'Add Friend'}
+                </Text>
               </Pressable>
             </View>
           ) : (

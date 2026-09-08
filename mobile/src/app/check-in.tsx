@@ -9,8 +9,10 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { ActionSheetIOS } from 'react-native';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { DEMO_MODE } from '@/lib/demo-mode';
@@ -23,14 +25,14 @@ import {
   type VenueMatch,
 } from '@/lib/location-service';
 import { goOutAtVenue, goPlanning, stopSharing } from '@/lib/night-status';
-import { startBackgroundLocation } from '@/lib/background-location';
+import { getCurrentPosition, startBackgroundLocation } from '@/lib/background-location';
 import { notifyFriendArrived, notifyFriendsPlanning } from '@/lib/notifications';
 import { useSession } from '@/hooks/use-session';
 
 const NEON = '#d4ff00';
 
 type Audience = 'close_friends' | 'all_friends' | 'mutual_friends';
-type Step = 'status' | 'detecting' | 'venue' | 'planning' | 'gps-denied';
+type Step = 'status' | 'detecting' | 'venue' | 'planning' | 'party' | 'gps-denied';
 
 const AUDIENCES: Array<{ value: Audience; label: string }> = [
   { value: 'close_friends', label: 'Close Friends' },
@@ -39,15 +41,36 @@ const AUDIENCES: Array<{ value: Audience; label: string }> = [
 ];
 
 const STATUS_OPTIONS: Array<{
-  key: 'out' | 'planning' | 'home';
+  key: 'out' | 'planning' | 'private_party' | 'home';
   label: string;
   desc: string;
   icon: SFSymbol;
 }> = [
   { key: 'out', label: "I'm Out", desc: 'Share your spot with friends', icon: 'mappin.and.ellipse' },
   { key: 'planning', label: 'Planning Tonight', desc: "TBD — let friends know you're deciding", icon: 'target' },
-  { key: 'home', label: 'Staying In', desc: "You won't appear on tonight's list", icon: 'house' },
+  { key: 'private_party', label: 'Private Party', desc: 'House party — exact spot for close friends only', icon: 'house' },
+  { key: 'home', label: 'Staying In', desc: "You won't appear on tonight's list", icon: 'moon.zzz' },
 ];
+
+/** Schedule the 10am morning-after recap (web scheduleMorningAfterNotification). */
+async function scheduleMorningAfter(): Promise<void> {
+  try {
+    const next = new Date();
+    next.setDate(next.getDate() + 1);
+    next.setHours(10, 0, 0, 0);
+    await Notifications.scheduleNotificationAsync({
+      identifier: 'morning-after-recap', // same id → replaces prior schedule
+      content: {
+        title: 'Last night on Spotted ☀️',
+        body: 'See who you crossed paths with and relive the night.',
+        data: { url: '/activity' },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: next },
+    });
+  } catch {
+    /* notifications denied — skip */
+  }
+}
 
 function AudiencePicker({
   value,
@@ -164,14 +187,15 @@ export default function CheckInSheet() {
     }
   };
 
-  const handleStatus = async (key: 'out' | 'planning' | 'home') => {
+  const handleStatus = async (key: 'out' | 'planning' | 'private_party' | 'home') => {
     if (!userId) return;
     if (key === 'out') {
       detectVenue();
-    } else if (key === 'planning') {
-      setStep('planning');
+    } else if (key === 'planning' || key === 'private_party') {
+      setStep(key === 'planning' ? 'planning' : 'party');
       setShowHoodPicker(false);
       setNeighborhood(null);
+      if (key === 'private_party') setAudience('close_friends');
       setDetectingHood(true);
       const detected = await detectNeighborhoodFromGPS(city ?? 'nyc');
       setDetectingHood(false);
@@ -188,6 +212,36 @@ export default function CheckInSheet() {
         setSubmitting(false);
       }
     }
+  };
+
+  /** "Remind me later" — local notification deep-linking back to check-in. */
+  const scheduleReminder = () => {
+    const options = ['In 30 minutes', 'In 1 hour', 'In 2 hours', 'Cancel'];
+    const minutes = [30, 60, 120];
+    ActionSheetIOS.showActionSheetWithOptions(
+      { title: 'Remind me to go live', options, cancelButtonIndex: 3 },
+      async (index) => {
+        if (index >= minutes.length) return;
+        try {
+          await Notifications.scheduleNotificationAsync({
+            identifier: 'checkin-reminder', // same id → replaces prior reminder
+            content: {
+              title: 'Going out tonight? 🌃',
+              body: 'Go live so friends can find you.',
+              data: { url: '/check-in' },
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+              seconds: minutes[index] * 60,
+            },
+          });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          router.back();
+        } catch {
+          /* notifications denied */
+        }
+      }
+    );
   };
 
   /* ── Venue search (curated venues table; free text allowed) ── */
@@ -228,6 +282,7 @@ export default function CheckInSheet() {
       // The check-in picker IS the sharing control (web parity)
       await supabase.from('profiles').update({ location_sharing_level: audience }).eq('id', userId);
       await startBackgroundLocation(userId);
+      scheduleMorningAfter();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       if (selectedVenue?.id) {
@@ -247,6 +302,31 @@ export default function CheckInSheet() {
       router.back();
     } catch {
       setGpsError('Could not check in. Try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const confirmParty = async () => {
+    if (!userId || !neighborhood || submitting) return;
+    setSubmitting(true);
+    try {
+      // Exact GPS goes to close/direct friends only (mutuals get no pin)
+      const coords = await getCurrentPosition();
+      await goOutAtVenue(userId, {
+        venue: { id: null, name: `Private Party (${neighborhood})` },
+        coords,
+        city,
+        privateParty: { neighborhood },
+      });
+      await supabase.from('profiles').update({ location_sharing_level: audience }).eq('id', userId);
+      await startBackgroundLocation(userId);
+      scheduleMorningAfter();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      refreshStatusQueries();
+      router.back();
+    } catch {
+      setGpsError('Could not start your party. Try again.');
     } finally {
       setSubmitting(false);
     }
@@ -299,6 +379,13 @@ export default function CheckInSheet() {
               <SymbolView name="chevron.right" size={14} tintColor="rgba(255,255,255,0.3)" />
             </Pressable>
           ))}
+          <Pressable
+            onPress={scheduleReminder}
+            className="flex-row items-center justify-center gap-2 py-2.5 active:opacity-70"
+          >
+            <SymbolView name="clock" size={13} tintColor="rgba(255,255,255,0.4)" />
+            <Text className="text-white/40 text-sm font-sans">Remind me later</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -419,6 +506,81 @@ export default function CheckInSheet() {
               <ActivityIndicator size="small" color="#1a0f2e" />
             ) : (
               <Text className="text-[#1a0f2e] text-base font-sans-semibold">Go Live</Text>
+            )}
+          </Pressable>
+        </View>
+      ) : null}
+
+      {/* ── Private party ── */}
+      {step === 'party' ? (
+        <View className="gap-4">
+          <Text className="text-white text-lg font-sans-semibold">Private Party</Text>
+          {gpsError ? <Text className="text-amber-400/90 text-xs font-sans">{gpsError}</Text> : null}
+
+          <View className="gap-2">
+            <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">
+              Neighborhood
+            </Text>
+            {detectingHood ? (
+              <View className="flex-row items-center gap-2 py-2">
+                <ActivityIndicator size="small" color={NEON} />
+                <Text className="text-white/50 text-sm font-sans">Detecting...</Text>
+              </View>
+            ) : neighborhood && !showHoodPicker ? (
+              <View className="flex-row items-center gap-2">
+                <View className="rounded-xl px-4 py-2.5 bg-[#a855f7]/20 border border-[#a855f7]/40">
+                  <Text className="text-[#d4ff00] text-sm font-sans-semibold">{neighborhood}</Text>
+                </View>
+                <Pressable onPress={() => setShowHoodPicker(true)} hitSlop={6}>
+                  <Text className="text-white/50 text-sm font-sans underline">Change</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <ScrollView style={{ maxHeight: 180 }}>
+                <View className="flex-row flex-wrap gap-2">
+                  {(CITY_NEIGHBORHOODS[city ?? 'nyc'] ?? []).map((hood) => (
+                    <Pressable
+                      key={hood}
+                      onPress={() => {
+                        setNeighborhood(hood);
+                        setShowHoodPicker(false);
+                      }}
+                      className={`px-3 py-2 rounded-xl border ${
+                        neighborhood === hood
+                          ? 'bg-[#a855f7]/25 border-[#a855f7]/40'
+                          : 'bg-[#2d1b4e]/50 border-transparent'
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-sans ${
+                          neighborhood === hood ? 'text-[#d4ff00]' : 'text-white/70'
+                        }`}
+                      >
+                        {hood}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            )}
+          </View>
+
+          <AudiencePicker value={audience} onChange={setAudience} />
+          <Text className="text-white/40 text-xs font-sans">
+            Close and direct friends see your exact spot. Mutuals only see the neighborhood — no
+            map pin.
+          </Text>
+
+          <Pressable
+            onPress={confirmParty}
+            disabled={submitting || !neighborhood}
+            className="rounded-full py-3.5 items-center active:opacity-90 disabled:opacity-30"
+            style={{ backgroundColor: NEON }}
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color="#1a0f2e" />
+            ) : (
+              <Text className="text-[#1a0f2e] text-base font-sans-semibold">Start the Party</Text>
             )}
           </Pressable>
         </View>

@@ -7,9 +7,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Image } from '@/components/styled';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { LegendList } from '@legendapp/list/react-native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -85,6 +87,7 @@ export default function YapThreadScreen() {
   const userId = session?.user.id;
 
   const [draft, setDraft] = useState('');
+  const [pendingImage, setPendingImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [posting, setPosting] = useState(false);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const lastPostRef = useRef(0);
@@ -105,23 +108,32 @@ export default function YapThreadScreen() {
     queryFn: () => fetchPinnedVenueMessages(venueName!),
   });
 
-  // canPost: checked in at THIS venue right now
-  const { data: canPost } = useQuery({
+  // canPost: checked in at THIS venue right now (party threads carry the
+  // night_statuses id so party yaps tag party_id + GPS like the web)
+  const { data: postContext } = useQuery({
     queryKey: ['yap-can-post', venueName, userId],
     enabled: !!userId && !!venueName,
     refetchInterval: 60_000,
     queryFn: async () => {
       const { data } = await supabase
         .from('night_statuses')
-        .select('venue_name, status')
+        .select('id, venue_name, status, is_private_party, lat, lng')
         .eq('user_id', userId!)
         .eq('status', 'out')
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
         .maybeSingle();
-      return data?.venue_name?.toLowerCase() === venueName!.toLowerCase();
+      const here = data?.venue_name?.toLowerCase() === venueName!.toLowerCase();
+      return {
+        canPost: here,
+        party:
+          here && data?.is_private_party
+            ? { id: data.id, lat: data.lat, lng: data.lng }
+            : null,
+      };
     },
   });
+  const canPost = postContext?.canPost ?? false;
 
   // Realtime: new yaps at this venue
   useEffect(() => {
@@ -174,21 +186,46 @@ export default function YapThreadScreen() {
     }
   };
 
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    const asset = result.assets?.[0];
+    if (!result.canceled && asset) setPendingImage(asset);
+  };
+
   const handlePost = async () => {
     if (!userId || !venueName || posting) return;
     const text = draft.trim();
-    if (!text) return;
+    if (!text && !pendingImage) return;
     const sinceLast = Date.now() - lastPostRef.current;
     if (lastPostRef.current && sinceLast < YAP_COOLDOWN_MS) return;
     setPosting(true);
     try {
-      await postYap(userId, venueName, text);
+      let imagePath: string | null = null;
+      if (pendingImage) {
+        const ext = pendingImage.mimeType === 'image/png' ? 'png' : 'jpg';
+        imagePath = `${userId}/yap/${Date.now()}.${ext}`;
+        const body = await fetch(pendingImage.uri).then((r) => r.arrayBuffer());
+        const { error: uploadErr } = await supabase.storage
+          .from('post-images')
+          .upload(imagePath, body, {
+            contentType: pendingImage.mimeType ?? 'image/jpeg',
+            upsert: true,
+          });
+        if (uploadErr) throw uploadErr;
+      }
+      await postYap(userId, venueName, text, imagePath, postContext?.party ?? null);
       lastPostRef.current = Date.now();
       setCooldownLeft(YAP_COOLDOWN_MS);
       setDraft('');
+      setPendingImage(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refetch();
       queryClient.invalidateQueries({ queryKey: ['yap-directory'] });
+    } catch {
+      /* upload/post failed — keep draft for retry */
     } finally {
       setPosting(false);
     }
@@ -301,6 +338,13 @@ export default function YapThreadScreen() {
             <View className="flex-row gap-3">
               <VoteColumn yap={item} onVote={handleVote} />
               <View className="flex-1 min-w-0">
+                {item.image_url ? (
+                  <Image
+                    source={{ uri: item.image_url }}
+                    className="w-full aspect-[4/3] rounded-xl mb-2"
+                    contentFit="cover"
+                  />
+                ) : null}
                 <Text className="text-white text-[15px] font-sans leading-snug">{item.text}</Text>
                 <View className="flex-row items-center gap-2 mt-1.5">
                   <Text className="text-white/30 text-xs font-sans">
@@ -361,7 +405,28 @@ export default function YapThreadScreen() {
       <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
         <View className="border-t border-white/10 bg-[#110a24]">
           {canPost ? (
-            <View className="flex-row items-center gap-3 px-4 py-3 pb-safe-offset-3">
+            <View className="px-4 py-3 pb-safe-offset-3">
+              {pendingImage ? (
+                <View className="flex-row items-center gap-2 mb-2">
+                  <Image
+                    source={{ uri: pendingImage.uri }}
+                    className="w-14 h-14 rounded-lg"
+                    contentFit="cover"
+                  />
+                  <Pressable onPress={() => setPendingImage(null)} hitSlop={8}>
+                    <SymbolView name="xmark.circle.fill" size={18} tintColor="rgba(255,255,255,0.5)" />
+                  </Pressable>
+                </View>
+              ) : null}
+              <View className="flex-row items-center gap-3">
+              <Pressable
+                onPress={pickImage}
+                disabled={posting}
+                hitSlop={6}
+                className="w-9 h-9 rounded-full items-center justify-center bg-white/5 border border-white/15 active:opacity-70 disabled:opacity-30"
+              >
+                <SymbolView name="photo" size={15} tintColor="rgba(255,255,255,0.6)" />
+              </Pressable>
               <TextInput
                 value={draft}
                 onChangeText={setDraft}
@@ -373,7 +438,7 @@ export default function YapThreadScreen() {
               />
               <Pressable
                 onPress={handlePost}
-                disabled={!draft.trim() || posting || cooldownLeft > 0}
+                disabled={(!draft.trim() && !pendingImage) || posting || cooldownLeft > 0}
                 hitSlop={8}
                 className="min-w-10 h-10 px-2 rounded-full items-center justify-center disabled:opacity-30"
                 style={{ backgroundColor: NEON }}
@@ -386,6 +451,7 @@ export default function YapThreadScreen() {
                   <SymbolView name="arrow.up" size={18} tintColor="#1a0f2e" weight="semibold" />
                 )}
               </Pressable>
+              </View>
             </View>
           ) : (
             <View className="flex-row items-center gap-2 px-4 py-3.5 pb-safe-offset-3">

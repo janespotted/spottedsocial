@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
+  Alert,
   Pressable,
   Text,
   TextInput,
@@ -525,6 +526,70 @@ export default function ThreadScreen() {
     );
   };
 
+  const renameGroup = () => {
+    if (!groupInfo || !threadId) return;
+    Alert.prompt(
+      'Group name',
+      undefined,
+      async (name) => {
+        const newName = name?.trim() || null;
+        const { error } = await supabase
+          .from('dm_threads')
+          .update({ name: newName })
+          .eq('id', threadId);
+        if (!error) setGroupInfo((prev) => (prev ? { ...prev, name: newName } : prev));
+      },
+      'plain-text',
+      groupInfo.name ?? ''
+    );
+  };
+
+  const changeGroupPhoto = async () => {
+    if (!threadId) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    const asset = result.assets?.[0];
+    if (result.canceled || !asset) return;
+    try {
+      const ext = asset.mimeType === 'image/png' ? 'png' : 'jpg';
+      const path = `group-avatars/${threadId}/${Date.now()}.${ext}`;
+      const body = await fetch(asset.uri).then((r) => r.arrayBuffer());
+      const { error: uploadErr } = await supabase.storage
+        .from('post-images')
+        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: urlData } = supabase.storage.from('post-images').getPublicUrl(path);
+      const { error } = await supabase
+        .from('dm_threads')
+        .update({ group_avatar_url: urlData.publicUrl })
+        .eq('id', threadId);
+      if (!error) {
+        setGroupInfo((prev) => (prev ? { ...prev, group_avatar_url: urlData.publicUrl } : prev));
+      }
+    } catch {
+      /* upload failed — keep prior photo */
+    }
+  };
+
+  const showGroupOptions = () => {
+    if (!groupInfo) return;
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ['View Members', 'Rename Group', 'Change Group Photo', 'Cancel'],
+        cancelButtonIndex: 3,
+      },
+      (index) => {
+        if (index === 0) showGroupMembers();
+        if (index === 1) renameGroup();
+        if (index === 2) changeGroupPhoto();
+      }
+    );
+  };
+
   const headerTitle = groupInfo
     ? (groupInfo.name ??
       groupInfo.members
@@ -554,7 +619,7 @@ export default function ThreadScreen() {
           <SymbolView name="chevron.left" size={22} tintColor="rgba(255,255,255,0.6)" />
         </Pressable>
         <Pressable
-          onPress={groupInfo ? showGroupMembers : undefined}
+          onPress={groupInfo ? showGroupOptions : undefined}
           className="flex-1 flex-row items-center gap-3"
         >
           {groupInfo && !headerAvatar ? (

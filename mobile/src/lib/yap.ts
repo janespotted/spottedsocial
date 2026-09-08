@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { DEMO_MODE } from './demo-mode';
 import { getStatusExpiry } from './night-status';
+import { resolvePostImageUrl } from './posts';
 import { isFromTonight } from './time-context';
 
 /**
@@ -135,25 +136,28 @@ export async function fetchVenueYaps(venueName: string, userId: string): Promise
     : { data: [] };
   const voteByYap = new Map((votes ?? []).map((v) => [v.yap_id, v.vote_type as 'up' | 'down']));
 
-  return visible
-    .map(
-      (y): YapMessage => ({
-        id: y.id,
-        text: y.text,
-        created_at: y.created_at ?? new Date().toISOString(),
-        author_handle: y.author_handle,
-        image_url: y.image_url,
-        user_id: y.user_id,
-        score: y.score ?? 0,
-        comments_count: y.comments_count ?? 0,
-        user_vote: voteByYap.get(y.id) ?? null,
-      })
-    )
-    .sort((a, b) =>
-      b.score !== a.score
-        ? b.score - a.score
-        : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+  const result = await Promise.all(
+    visible.map(async (y): Promise<YapMessage> => ({
+      id: y.id,
+      text: y.text,
+      created_at: y.created_at ?? new Date().toISOString(),
+      author_handle: y.author_handle,
+      // Storage paths (mobile uploads) resolve to signed URLs
+      image_url:
+        y.image_url && !y.image_url.startsWith('http')
+          ? await resolvePostImageUrl(y.image_url)
+          : y.image_url,
+      user_id: y.user_id,
+      score: y.score ?? 0,
+      comments_count: y.comments_count ?? 0,
+      user_vote: voteByYap.get(y.id) ?? null,
+    }))
+  );
+  return result.sort((a, b) =>
+    b.score !== a.score
+      ? b.score - a.score
+      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 }
 
 export async function fetchPinnedVenueMessages(venueName: string): Promise<PinnedVenueMessage[]> {
@@ -223,17 +227,34 @@ export async function voteOnYap(
   return { delta, vote };
 }
 
-export async function postYap(userId: string, venueName: string, text: string): Promise<void> {
+export interface YapPartyContext {
+  id: string; // night_statuses.id — the unique party identifier
+  lat: number | null;
+  lng: number | null;
+}
+
+export async function postYap(
+  userId: string,
+  venueName: string,
+  text: string,
+  imagePath?: string | null,
+  party?: YapPartyContext | null
+): Promise<void> {
   const { error } = await supabase.from('yap_messages').insert({
     user_id: userId,
-    text: text.trim(),
+    text: text.trim() || '📸',
     venue_name: venueName,
     is_anonymous: true,
     author_handle: randomHandle(),
     score: 0,
     comments_count: 0,
     expires_at: getStatusExpiry(),
-    is_private_party: false,
+    image_url: imagePath ?? null,
+    media_type: imagePath ? 'image' : null,
+    is_private_party: !!party,
+    party_id: party?.id ?? null,
+    party_lat: party?.lat ?? null,
+    party_lng: party?.lng ?? null,
   } as never);
   if (error) throw error;
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActionSheetIOS, Pressable, Share, Text, View, useWindowDimensions } from 'react-native';
+import { ActionSheetIOS, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -116,9 +116,9 @@ export function PostCard({ post, isLiked, currentUserId, onToggleLike, onDelete 
   };
 
   const sharePost = () => {
-    const where = post.venue_name ? ` at ${post.venue_name}` : '';
-    Share.share({
-      message: `${post.display_name}${where} on Spotted: "${post.text}"`.trim(),
+    router.push({
+      pathname: '/share-post',
+      params: { postId: post.id, authorId: post.user_id, authorName: post.display_name },
     });
   };
 

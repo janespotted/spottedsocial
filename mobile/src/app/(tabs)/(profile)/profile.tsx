@@ -334,6 +334,23 @@ export default function ProfileScreen() {
           <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.2)" />
         </Pressable>
 
+        {/* Find from Contacts (web ContactsSync entry) */}
+        <Pressable
+          onPress={() => router.push('/contacts-sync')}
+          className="flex-row items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-[#a855f7]/20 active:bg-white/[0.06]"
+        >
+          <View className="w-9 h-9 rounded-full bg-[#a855f7]/20 items-center justify-center">
+            <SymbolView name="person.crop.circle.badge.plus" size={15} tintColor={PURPLE} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-white text-sm font-sans-medium">Find Friends from Contacts</Text>
+            <Text className="text-white/30 text-xs font-sans">
+              See who&apos;s already on Spotted
+            </Text>
+          </View>
+          <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.2)" />
+        </Pressable>
+
         {/* Invite Friends row (web InviteFriendsSection) */}
         <Pressable
           onPress={() => router.push('/invite-friends')}

@@ -59,6 +59,12 @@
           "cameraPermission": "Spotted uses the camera so you can capture and share moments from your night."
         }
       ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Spotted matches your contacts to find friends already on the app. Numbers are never stored."
+        }
+      ],
       "@rnmapbox/maps"
     ],
     "experiments": {
