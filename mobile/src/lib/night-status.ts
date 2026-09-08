@@ -44,3 +44,171 @@ export async function isUserCurrentlyOut(userId: string): Promise<boolean> {
 export function invalidateOutStatusCache(): void {
   _cachedOutResult = null;
 }
+
+/** Throw on Supabase error so catch blocks actually fire on DB failures. */
+function must<T>(result: { data: T; error: unknown }): T {
+  if (result.error) throw result.error;
+  return result.data;
+}
+
+function cityToTimezone(city: string | null | undefined): string {
+  return city === 'la' ? 'America/Los_Angeles' : 'America/New_York';
+}
+
+/**
+ * Next 5 AM in the user's city timezone as a UTC ISO string. Port of the web
+ * getStatusExpiry; the web reads the cached detected city, here callers pass
+ * the profile's home_city (defaults to NY time).
+ * DST-safe: derives the UTC offset via Intl at call time.
+ */
+export function getStatusExpiry(city?: string | null): string {
+  const tz = cityToTimezone(city);
+  const now = new Date();
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)!.value;
+  const hour = parseInt(get('hour'), 10) % 24; // Intl can emit "24" at midnight
+
+  // Build the local "now" as a naive Date, then diff against real UTC to get offset
+  const localNow = new Date(
+    `${get('year')}-${get('month')}-${get('day')}T${String(hour).padStart(2, '0')}:${get('minute')}:${get('second')}`
+  );
+  const offsetMs = now.getTime() - localNow.getTime();
+
+  // Build 5:00 AM local (naive), convert to UTC
+  const fiveAmLocal = new Date(`${get('year')}-${get('month')}-${get('day')}T05:00:00`);
+  let fiveAmUTC = new Date(fiveAmLocal.getTime() + offsetMs);
+
+  // If already past 5 AM local, target tomorrow
+  if (now >= fiveAmUTC) {
+    fiveAmUTC = new Date(fiveAmUTC.getTime() + 86400000);
+  }
+
+  return fiveAmUTC.toISOString();
+}
+
+/**
+ * Clear the user's location from their profile so they no longer appear on
+ * friends' maps. Every code path that ends a night must call this.
+ */
+export async function clearUserLocation(userId: string): Promise<void> {
+  must(
+    await supabase
+      .from('profiles')
+      .update({
+        is_out: false,
+        last_known_lat: null,
+        last_known_lng: null,
+        last_location_at: null,
+      })
+      .eq('id', userId)
+  );
+}
+
+export interface GoPlanningOptions {
+  city?: string | null;
+  neighborhood?: string | null;
+  visibility?: 'close_friends' | 'all_friends' | 'mutual_friends' | null;
+  venueId?: string | null;
+  venueName?: string | null;
+}
+
+/**
+ * The ONE way to enter planning mode ("TBD"). Ends open check-ins and clears
+ * location, then full-field night_statuses upsert. party_address is never in
+ * the upsert payload (WP6) — it's nulled via a separate constant UPDATE.
+ */
+export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): Promise<void> {
+  const now = new Date().toISOString();
+  invalidateOutStatusCache();
+
+  must(
+    await supabase
+      .from('checkins')
+      .update({ ended_at: now })
+      .eq('user_id', userId)
+      .is('ended_at', null)
+  );
+
+  await clearUserLocation(userId);
+
+  must(
+    await supabase.from('night_statuses').upsert(
+      {
+        user_id: userId,
+        status: 'planning' as const,
+        venue_name: null,
+        venue_id: null,
+        lat: null,
+        lng: null,
+        updated_at: now,
+        expires_at: getStatusExpiry(opts.city),
+        planning_neighborhood: opts.neighborhood ?? null,
+        planning_venue_id: opts.venueId ?? null,
+        planning_venue_name: opts.venueName ?? null,
+        planning_visibility: opts.visibility ?? null,
+        is_private_party: false,
+        party_neighborhood: null,
+      },
+      { onConflict: 'user_id' }
+    )
+  );
+
+  must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
+}
+
+/**
+ * The ONE way to stop sharing ("Staying In"). Kills background GPS, clears
+ * location, ends check-ins, and resets every night_statuses field.
+ */
+export async function stopSharing(userId: string): Promise<void> {
+  const now = new Date().toISOString();
+  invalidateOutStatusCache();
+
+  // Lazy import: background-location imports isUserCurrentlyOut from this
+  // module, so a top-level import here would be a require cycle.
+  const { stopBackgroundLocation } = await import('./background-location');
+  await stopBackgroundLocation();
+  await clearUserLocation(userId);
+
+  must(
+    await supabase
+      .from('checkins')
+      .update({ ended_at: now })
+      .eq('user_id', userId)
+      .is('ended_at', null)
+  );
+
+  must(
+    await supabase.from('night_statuses').upsert(
+      {
+        user_id: userId,
+        status: 'home' as const,
+        venue_name: null,
+        venue_id: null,
+        lat: null,
+        lng: null,
+        expires_at: null,
+        planning_neighborhood: null,
+        planning_venue_id: null,
+        planning_venue_name: null,
+        planning_visibility: null,
+        is_private_party: false,
+        party_neighborhood: null,
+        updated_at: now,
+      },
+      { onConflict: 'user_id' }
+    )
+  );
+
+  must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
+}

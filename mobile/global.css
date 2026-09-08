@@ -4,6 +4,13 @@
 
 @source './node_modules/heroui-native/lib';
 
+@theme {
+  --font-sans: 'Montserrat_400Regular';
+  --font-sans-light: 'Montserrat_300Light';
+  --font-sans-medium: 'Montserrat_500Medium';
+  --font-sans-semibold: 'Montserrat_600SemiBold';
+}
+
 /*
  * Spotted brand palette mapped onto HeroUI Native's theme variables.
  * HeroUI derives its --color-* tokens from these un-prefixed variables

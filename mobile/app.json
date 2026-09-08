@@ -12,10 +12,15 @@
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.janereynolds.spotted",
       "infoPlist": {
+        "TSLocationManagerLicense": "eyJhbGciOiJFZERTQSIsImtpZCI6ImVkMjU1MTktbWFpbi12MSJ9.eyJvcyI6ImlvcyIsImFwcF9pZCI6ImNvbS5qYW5lcmV5bm9sZHMuc3BvdHRlZCIsIm9yZGVyX251bWJlciI6IiIsInJlbmV3YWxfdXJsIjoiIiwiY3VzdG9tZXJfaWQiOiIiLCJwcm9kdWN0IjoicmVhY3QtbmF0aXZlLWJhY2tncm91bmQtZ2VvbG9jYXRpb24iLCJrZXlfdmVyc2lvbiI6MSwiYWxsb3dlZF9zdWZmaXhlcyI6WyIuZGV2IiwiLmRldmVsb3BtZW50IiwiLnN0YWdpbmciLCIuc3RhZ2UiLCIucWEiLCIudWF0IiwiLnRlc3QiLCIuZGVidWciXSwibWF4X2J1aWxkX3N0YW1wIjoyMDI2MTAwNywiZ3JhY2VfYnVpbGRzIjowLCJlbnRpdGxlbWVudHMiOlsiY29yZSIsInBvbHlnb24tZ2VvZmVuY2luZyJdLCJpYXQiOjE3ODg3NzM2MDgsImV4cCI6MTc5MTM2NTYwOCwidHJpYWwiOnRydWUsInRyaWFsX2RheXMiOjMwfQ.SQK8lO2GLpxyKEo5cgRpoJSn5-FEgjtCeTGqLHh1T7Zmrp7fcZVInuwWJk_bZQ3o6Q27z6l4aodSEZ7oGaRVCQ",
         "NSLocationWhenInUseUsageDescription": "Spotted uses your location to show which friends are nearby and detect when you arrive at venues.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Spotted uses background location to notify you when friends arrive at venues and auto-detect your check-ins, even when the app is closed. Your location is only shared with friends you choose.",
         "NSMotionUsageDescription": "Spotted uses motion detection to save battery while tracking your venue.",
-        "UIBackgroundModes": ["location", "fetch", "processing"]
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "processing"
+        ]
       }
     },
     "android": {
@@ -25,7 +30,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.janereynolds.spotted"
     },
     "web": {
       "output": "static",
@@ -42,7 +48,17 @@
         }
       ],
       "react-native-background-geolocation",
-      "react-native-background-fetch"
+      "react-native-background-fetch",
+      "expo-font",
+      "expo-video",
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Spotted lets you share photos from your library in your posts.",
+          "cameraPermission": "Spotted uses the camera so you can capture and share moments from your night."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

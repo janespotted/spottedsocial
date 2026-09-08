@@ -1,0 +1,649 @@
+import { useState } from 'react';
+import {
+  ActionSheetIOS,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  Share,
+  Text,
+  View,
+} from 'react-native';
+import { Image } from '@/components/styled';
+import { router, useLocalSearchParams } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
+import * as Haptics from 'expo-haptics';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { buildProfileMap, fetchProfilesSafe, type SafeProfile } from '@/lib/profiles';
+import { DEMO_MODE } from '@/lib/demo-mode';
+import { reportContent } from '@/lib/moderation';
+import { getHoursDisplayString, type VenueHours, type VenueHoursDisplay } from '@/lib/venue-hours';
+import { calculateDistanceMiles, getVenuePhotoUrl, getVenueTypeDisplay } from '@/lib/venues';
+import { sendVenueInvites, type InviteFriend } from '@/lib/venue-invites';
+import { useFriendIds } from '@/hooks/use-friend-ids';
+import { useSession } from '@/hooks/use-session';
+import { Avatar } from '@/components/avatar';
+import { VenueEventsSection } from '@/components/venue-events-section';
+
+const NEON = '#d4ff00';
+
+interface VenueData {
+  id: string;
+  name: string;
+  neighborhood: string | null;
+  city: string | null;
+  type: string | null;
+  lat: number;
+  lng: number;
+  is_map_promoted: boolean | null;
+  google_photo_refs: string[] | null;
+  google_rating: number | null;
+  google_user_ratings_total: number | null;
+  operating_hours: VenueHours | null;
+}
+
+interface FriendAtVenue {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+interface SimilarVenue {
+  id: string;
+  name: string;
+  neighborhood: string | null;
+}
+
+interface VenueCardData {
+  venue: VenueData;
+  isInWishlist: boolean;
+  distance: string | null;
+  friendsAtVenue: FriendAtVenue[];
+  friendsPlanning: FriendAtVenue[];
+  similarVenues: SimilarVenue[];
+}
+
+function toFriend(p: SafeProfile): FriendAtVenue {
+  return { id: p.id, display_name: p.display_name, avatar_url: p.avatar_url };
+}
+
+/** Avatar stack + count; tapping expands the name list inline (web's popover). */
+function FriendRow({ friends, label }: { friends: FriendAtVenue[]; label: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = friends.slice(0, 4);
+  const remaining = friends.length - visible.length;
+
+  return (
+    <View>
+      <Pressable
+        onPress={() => setExpanded((v) => !v)}
+        className="flex-row items-center gap-3 active:opacity-80"
+      >
+        <View className="flex-row -space-x-2">
+          {visible.map((friend) => (
+            <Avatar key={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
+          ))}
+          {remaining > 0 ? (
+            <View className="w-8 h-8 rounded-full bg-[#a855f7]/30 border-2 border-[#0d0a18] items-center justify-center">
+              <Text className="text-white text-[10px] font-sans-medium">+{remaining}</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text className="text-sm text-white/60 font-sans">{label}</Text>
+      </Pressable>
+      {expanded ? (
+        <View className="mt-2 ml-1 gap-1.5">
+          {friends.map((friend) => (
+            <View key={friend.id} className="flex-row items-center gap-2">
+              <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+              <Text className="text-white text-sm font-sans">{friend.display_name}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** Full port of the web VenueIdCard, presented as a modal route. */
+export default function VenueScreen() {
+  const { venueId } = useLocalSearchParams<{ venueId: string }>();
+  const { session } = useSession();
+  const { data: friendIds } = useFriendIds(session?.user.id);
+  const queryClient = useQueryClient();
+  const [moreInfoOpen, setMoreInfoOpen] = useState(false);
+  // Keyed by venueId so Trending Nearby swaps retry the new venue's photo
+  const [photoFailedFor, setPhotoFailedFor] = useState<string | null>(null);
+  const photoFailed = photoFailedFor === venueId;
+  const [wishlistOverride, setWishlistOverride] = useState<boolean | null>(null);
+  const [invitePickerOpen, setInvitePickerOpen] = useState(false);
+  const [selectedInvitees, setSelectedInvitees] = useState<Set<string>>(new Set());
+  const [sendingInvites, setSendingInvites] = useState(false);
+
+  // friendIds deliberately NOT in the key: its refetches produce a new array
+  // reference, and re-keying flips the query back to loading — the whole card
+  // (banner included) blinks. Friend changes mid-view aren't worth that.
+  const { data, isLoading } = useQuery({
+    queryKey: ['venue-card', venueId],
+    enabled: !!venueId && !!session && friendIds !== undefined,
+    queryFn: async (): Promise<VenueCardData | null> => {
+      const nowIso = new Date().toISOString();
+      const { data: venue } = await supabase
+        .from('venues')
+        .select('*')
+        .eq('id', venueId!)
+        .single();
+      if (!venue) return null;
+
+      const [
+        { data: wishlistEntry },
+        { data: myProfile },
+        { data: statuses },
+        { data: venuePlans },
+        profiles,
+      ] = await Promise.all([
+        supabase
+          .from('wishlist_places')
+          .select('id')
+          .eq('user_id', session!.user.id)
+          .eq('venue_name', venue.name)
+          .maybeSingle(),
+        supabase
+          .from('profiles')
+          .select('last_known_lat, last_known_lng')
+          .eq('id', session!.user.id)
+          .single(),
+        supabase
+          .from('night_statuses')
+          .select('user_id')
+          .eq('venue_name', venue.name)
+          .not('expires_at', 'is', null)
+          .gt('expires_at', nowIso),
+        supabase
+          .from('plans')
+          .select('id, user_id')
+          .eq('venue_id', venueId!)
+          .eq('plan_date', nowIso.split('T')[0])
+          .gt('expires_at', nowIso),
+        fetchProfilesSafe(),
+      ]);
+
+      const profileMap = buildProfileMap(profiles);
+      const friendSet = new Set(friendIds ?? []);
+
+      // Friends here now — dedupe by display name like web
+      const seenNames = new Set<string>();
+      const friendsAtVenue = (statuses ?? [])
+        .map((s) => s.user_id)
+        .filter((id) => friendSet.has(id) && profileMap.has(id))
+        .map((id) => profileMap.get(id)!)
+        .filter((p) => {
+          if (seenNames.has(p.display_name)) return false;
+          seenNames.add(p.display_name);
+          return true;
+        })
+        .map(toFriend);
+
+      // Friends planning: plan creators + "I'm down" + participants, today
+      let friendsPlanning: FriendAtVenue[] = [];
+      if (venuePlans?.length) {
+        const planIds = venuePlans.map((p) => p.id);
+        const [{ data: downs }, { data: participants }] = await Promise.all([
+          supabase.from('plan_downs').select('user_id').in('plan_id', planIds),
+          supabase.from('plan_participants').select('user_id').in('plan_id', planIds),
+        ]);
+        const atVenueIds = new Set(friendsAtVenue.map((f) => f.id));
+        const interested = [
+          ...new Set([
+            ...venuePlans.map((p) => p.user_id),
+            ...(downs ?? []).map((d) => d.user_id),
+            ...(participants ?? []).map((p) => p.user_id),
+          ]),
+        ].filter(
+          (id) =>
+            id !== session!.user.id &&
+            friendSet.has(id) &&
+            !atVenueIds.has(id) &&
+            profileMap.has(id) &&
+            (DEMO_MODE || !profileMap.get(id)!.is_demo)
+        );
+        friendsPlanning = interested.map((id) => toFriend(profileMap.get(id)!));
+      }
+
+      // Distance from last known location
+      let distance: string | null = null;
+      if (myProfile?.last_known_lat && myProfile?.last_known_lng) {
+        distance = calculateDistanceMiles(
+          myProfile.last_known_lat,
+          myProfile.last_known_lng,
+          venue.lat,
+          venue.lng
+        );
+      }
+
+      // Trending nearby: same neighborhood, fall back to same city
+      let { data: similar } = await supabase
+        .from('venues')
+        .select('id, name, neighborhood')
+        .eq('neighborhood', venue.neighborhood ?? '')
+        .eq('city', venue.city ?? '')
+        .neq('id', venueId!)
+        .order('popularity_rank', { ascending: true })
+        .limit(4);
+      if (!similar || similar.length < 3) {
+        const { data: cityVenues } = await supabase
+          .from('venues')
+          .select('id, name, neighborhood')
+          .eq('city', venue.city ?? '')
+          .neq('id', venueId!)
+          .order('popularity_rank', { ascending: true })
+          .limit(4);
+        similar = cityVenues ?? [];
+      }
+
+      return {
+        venue: venue as VenueData,
+        isInWishlist: !!wishlistEntry,
+        distance,
+        friendsAtVenue,
+        friendsPlanning,
+        similarVenues: (similar ?? []) as SimilarVenue[],
+      };
+    },
+  });
+
+  // Hours + photos + rating: live edge function with cached-columns fallback
+  const { data: hoursData } = useQuery({
+    queryKey: ['venue-hours', venueId],
+    enabled: !!venueId,
+    staleTime: 10 * 60_000,
+    queryFn: async (): Promise<{
+      hours: VenueHoursDisplay | null;
+      photoCount: number;
+      rating: number | null;
+      ratingsCount: number;
+    }> => {
+      const fromCached = (v: VenueData | undefined) => ({
+        hours: v?.operating_hours ? getHoursDisplayString(v.operating_hours) : null,
+        photoCount: v?.google_photo_refs?.length ?? 0,
+        rating: v?.google_rating ?? null,
+        ratingsCount: v?.google_user_ratings_total ?? 0,
+      });
+      try {
+        const { data: live, error } = await supabase.functions.invoke('get-venue-hours', {
+          body: { venueId },
+        });
+        if (error || !live) throw error;
+        return {
+          hours: live.operating_hours
+            ? getHoursDisplayString(live.operating_hours as VenueHours)
+            : null,
+          photoCount: Array.isArray(live.google_photo_refs) ? live.google_photo_refs.length : 0,
+          rating: live.google_rating ?? null,
+          ratingsCount: live.google_user_ratings_total ?? 0,
+        };
+      } catch {
+        const { data: cached } = await supabase
+          .from('venues')
+          .select('google_photo_refs, google_rating, google_user_ratings_total, operating_hours')
+          .eq('id', venueId!)
+          .single();
+        return fromCached(cached as VenueData | undefined);
+      }
+    },
+  });
+
+  const venue = data?.venue;
+  const isInWishlist = wishlistOverride ?? data?.isInWishlist ?? false;
+
+  const toggleWishlist = async () => {
+    if (!venue || !session) return;
+    if (isInWishlist) {
+      setWishlistOverride(false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await supabase
+        .from('wishlist_places')
+        .delete()
+        .eq('user_id', session.user.id)
+        .eq('venue_name', venue.name);
+    } else {
+      setWishlistOverride(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await supabase
+        .from('wishlist_places')
+        .insert({ user_id: session.user.id, venue_name: venue.name, venue_image_url: null });
+    }
+  };
+
+  const openDirections = () => {
+    if (!venue) return;
+    Linking.openURL(`maps://?daddr=${venue.lat},${venue.lng}`).catch(() =>
+      Linking.openURL(
+        `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`
+      )
+    );
+  };
+
+  const shareVenue = () => {
+    if (!venue) return;
+    Share.share({
+      message: `Check out ${venue.name}${venue.neighborhood ? ` in ${venue.neighborhood}` : ''}! 🎉`,
+    });
+  };
+
+  const openMenu = () => {
+    if (!venue || !session) return;
+    ActionSheetIOS.showActionSheetWithOptions(
+      { options: ['Report Venue', 'Cancel'], cancelButtonIndex: 1 },
+      (index) => {
+        if (index === 0) reportContent(session.user.id, { type: 'venue', id: venue.id });
+      }
+    );
+  };
+
+  // Invite picker data: my friends (demo visible only in dev via fetchProfilesSafe)
+  const { data: allProfiles } = useQuery({
+    queryKey: ['profiles-safe-all'],
+    staleTime: 60_000,
+    queryFn: fetchProfilesSafe,
+  });
+  const inviteFriends: InviteFriend[] = (friendIds ?? [])
+    .map((id) => allProfiles?.find((p) => p.id === id))
+    .filter((p): p is SafeProfile => !!p)
+    .map((p) => ({ id: p.id, display_name: p.display_name, avatar_url: p.avatar_url }));
+
+  const submitInvites = async () => {
+    if (!venue || !session || sendingInvites) return;
+    const selected = inviteFriends.filter((f) => selectedInvitees.has(f.id));
+    if (selected.length === 0) return;
+    setSendingInvites(true);
+    const ok = await sendVenueInvites(session.user.id, venue.name, selected);
+    setSendingInvites(false);
+    setInvitePickerOpen(false);
+    setSelectedInvitees(new Set());
+    Alert.alert(
+      ok ? 'Invites sent! 🎉' : 'Could not send invites',
+      ok
+        ? `${selected.length} friend${selected.length > 1 ? 's' : ''} invited to ${venue.name}.`
+        : 'Please try again.'
+    );
+  };
+
+  const typeInfo = venue?.type ? getVenueTypeDisplay(venue.type) : null;
+  const distNum = data?.distance ? parseFloat(data.distance) : NaN;
+  const metaParts: string[] = [];
+  if (typeInfo) metaParts.push(typeInfo.label);
+  if (venue?.neighborhood) metaParts.push(venue.neighborhood);
+  if (!isNaN(distNum) && distNum <= 10) metaParts.push(`${data!.distance} mi`);
+
+  return (
+    <View className="flex-1 bg-[#0d0a18]">
+      <ScrollView contentContainerClassName="pb-safe-offset-6">
+        {/* ── ZONE 1: Identity — banner renders immediately from venueId alone,
+            so the photo downloads in parallel with the data queries. On error
+            (venue has no Google photos) it falls back to the gradient. ── */}
+        <View className="relative">
+          {!photoFailed && venueId ? (
+            <Image
+              source={{ uri: getVenuePhotoUrl(venueId, 0) }}
+              className="w-full h-40"
+              contentFit="cover"
+              transition={200}
+              onError={() => setPhotoFailedFor(venueId)}
+            />
+          ) : (
+            <View
+              className="w-full h-40 items-center justify-center"
+              style={{
+                experimental_backgroundImage:
+                  'linear-gradient(135deg, rgba(168,85,247,0.25), #1a0f2e 55%, rgba(212,255,0,0.15))',
+              }}
+            >
+              <Text className="text-5xl font-sans-semibold text-white/20">
+                {venue?.name?.[0] ?? ''}
+              </Text>
+            </View>
+          )}
+          <View
+            className="absolute inset-x-0 bottom-0 h-20"
+            style={{
+              experimental_backgroundImage:
+                'linear-gradient(to top, #0d0a18, rgba(13,10,24,0.4), transparent)',
+            }}
+          />
+          {venue ? (
+            <Pressable
+              onPress={openMenu}
+              hitSlop={8}
+              className="absolute left-3 top-3 w-8 h-8 rounded-full bg-black/50 items-center justify-center"
+            >
+              <SymbolView name="ellipsis" size={15} tintColor="rgba(255,255,255,0.8)" />
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={8}
+            className="absolute right-3 top-3 w-8 h-8 rounded-full bg-black/50 items-center justify-center"
+          >
+            <SymbolView name="xmark" size={14} tintColor="#ffffff" />
+          </Pressable>
+          <View className="absolute bottom-0 left-0 right-0 px-5 pb-3">
+            {venue?.is_map_promoted ? (
+              <View className="self-start px-2 py-0.5 mb-1.5 rounded-full bg-[#d4ff00]/15 border border-[#d4ff00]/20">
+                <Text className="text-[10px] font-sans-medium" style={{ color: NEON }}>
+                  Featured Tonight
+                </Text>
+              </View>
+            ) : null}
+            <Text className="text-xl font-sans-semibold text-white leading-tight">
+              {venue?.name ?? ''}
+            </Text>
+          </View>
+        </View>
+
+        {isLoading || !venue ? (
+          <View className="items-center py-16">
+            <ActivityIndicator color={NEON} />
+          </View>
+        ) : (
+        <View className="px-5 pt-2 pb-5">
+          {metaParts.length > 0 ? (
+            <Text className="text-xs text-white/45 font-sans mb-4">{metaParts.join(' · ')}</Text>
+          ) : null}
+
+          {/* ── ZONE 2: Social — who's here / planning ── */}
+          <View className="mb-4 gap-4">
+            {data!.friendsAtVenue.length > 0 ? (
+              <FriendRow
+                friends={data!.friendsAtVenue}
+                label={`${data!.friendsAtVenue.length} friend${data!.friendsAtVenue.length !== 1 ? 's' : ''} here`}
+              />
+            ) : (
+              <Text className="text-sm font-sans-medium" style={{ color: 'rgba(212,255,0,0.8)' }}>
+                Be the first spotted here tonight
+              </Text>
+            )}
+            {data!.friendsPlanning.length > 0 ? (
+              <FriendRow
+                friends={data!.friendsPlanning}
+                label={`${data!.friendsPlanning.length} friend${data!.friendsPlanning.length !== 1 ? 's' : ''} planning`}
+              />
+            ) : null}
+          </View>
+
+          {/* Primary CTA */}
+          <Pressable
+            onPress={() => setInvitePickerOpen(true)}
+            className="w-full h-11 mb-3 rounded-xl flex-row items-center justify-center gap-2 active:opacity-90"
+            style={{ backgroundColor: NEON }}
+          >
+            <SymbolView name="person.badge.plus" size={16} tintColor="#000000" />
+            <Text className="text-black font-sans-semibold text-[15px]">Invite Friends Here</Text>
+          </Pressable>
+
+          {/* ── ZONE 3: Utility row ── */}
+          <View className="flex-row items-center gap-2 mb-3">
+            <Pressable
+              onPress={openDirections}
+              className="flex-row items-center gap-1.5 h-9 px-3 rounded-lg bg-white/5 border border-white/10 active:bg-white/10"
+            >
+              <SymbolView name="mappin" size={13} tintColor="rgba(255,255,255,0.6)" />
+              <Text className="text-white/60 text-xs font-sans">Directions</Text>
+            </Pressable>
+            <Pressable
+              onPress={shareVenue}
+              className="flex-row items-center gap-1.5 h-9 px-3 rounded-lg bg-white/5 border border-white/10 active:bg-white/10"
+            >
+              <SymbolView name="square.and.arrow.up" size={13} tintColor="rgba(255,255,255,0.6)" />
+              <Text className="text-white/60 text-xs font-sans">Share</Text>
+            </Pressable>
+            <Pressable
+              onPress={toggleWishlist}
+              className="h-9 w-9 rounded-lg bg-white/5 border border-white/10 items-center justify-center active:bg-white/10"
+            >
+              <SymbolView
+                name={isInWishlist ? 'bookmark.fill' : 'bookmark'}
+                size={15}
+                tintColor={isInWishlist ? NEON : 'rgba(255,255,255,0.5)'}
+              />
+            </Pressable>
+          </View>
+
+          {/* More Info — collapsed by default */}
+          <Pressable
+            onPress={() => setMoreInfoOpen((v) => !v)}
+            className="flex-row items-center justify-between py-2"
+          >
+            <Text className="text-white/40 text-xs font-sans">More Info</Text>
+            <SymbolView
+              name={moreInfoOpen ? 'chevron.up' : 'chevron.down'}
+              size={12}
+              tintColor="rgba(255,255,255,0.4)"
+            />
+          </Pressable>
+          {moreInfoOpen ? (
+            <View className="pt-2 gap-3">
+              <VenueEventsSection venueId={venue.id} />
+
+              {hoursData?.hours ? (
+                <Text className="text-xs text-white/40 font-sans">
+                  {hoursData.hours.isOpen ? 'Open now' : 'Closed'}
+                  {hoursData.hours.displayText ? ` · ${hoursData.hours.displayText}` : ''}
+                </Text>
+              ) : null}
+
+              {data!.similarVenues.length > 0 ? (
+                <View>
+                  <Text className="text-xs font-sans-semibold text-white/50 mb-1.5">
+                    Trending Nearby
+                  </Text>
+                  <View className="gap-1.5">
+                    {data!.similarVenues.map((sv) => (
+                      <Pressable
+                        key={sv.id}
+                        onPress={() => {
+                          setMoreInfoOpen(false);
+                          router.setParams({ venueId: sv.id });
+                        }}
+                        className="p-2.5 bg-white/[0.03] rounded-lg active:bg-white/[0.06]"
+                      >
+                        <Text className="text-white text-sm font-sans-medium">{sv.name}</Text>
+                        {sv.neighborhood ? (
+                          <Text className="text-[10px] text-white/40 font-sans">
+                            {sv.neighborhood}
+                          </Text>
+                        ) : null}
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {hoursData?.rating ? (
+                <Text className="text-[10px] text-white/30 font-sans text-center pb-1">
+                  {hoursData.rating.toFixed(1)} on Google (
+                  {(hoursData.ratingsCount ?? 0).toLocaleString()})
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+        )}
+      </ScrollView>
+
+      {/* Invite picker overlay */}
+      {invitePickerOpen ? (
+        <View className="absolute inset-0 bg-[#0d0a18]">
+          <View className="flex-row items-center justify-between px-4 py-4 border-b border-white/10">
+            <Text className="text-white text-base font-sans-semibold">
+              Invite to {venue?.name ?? 'venue'}
+            </Text>
+            <Pressable onPress={() => setInvitePickerOpen(false)} hitSlop={12}>
+              <SymbolView name="xmark" size={18} tintColor="rgba(255,255,255,0.6)" />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerClassName="p-4 gap-3">
+            {inviteFriends.length === 0 ? (
+              <Text className="text-white/40 text-sm font-sans text-center py-10">
+                Add some friends first.
+              </Text>
+            ) : (
+              inviteFriends.map((friend) => {
+                const selected = selectedInvitees.has(friend.id);
+                return (
+                  <Pressable
+                    key={friend.id}
+                    onPress={() =>
+                      setSelectedInvitees((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(friend.id)) next.delete(friend.id);
+                        else next.add(friend.id);
+                        return next;
+                      })
+                    }
+                    className="flex-row items-center gap-3 p-2 rounded-xl active:bg-white/5"
+                  >
+                    <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+                    <Text className="flex-1 text-white text-sm font-sans-medium" numberOfLines={1}>
+                      {friend.display_name}
+                    </Text>
+                    <View
+                      className="w-5 h-5 rounded-full border items-center justify-center"
+                      style={{
+                        borderColor: selected ? NEON : 'rgba(255,255,255,0.3)',
+                        backgroundColor: selected ? NEON : 'transparent',
+                      }}
+                    >
+                      {selected ? (
+                        <SymbolView name="checkmark" size={11} tintColor="#000000" />
+                      ) : null}
+                    </View>
+                  </Pressable>
+                );
+              })
+            )}
+          </ScrollView>
+          <View className="px-4 pb-safe-offset-4 pt-2">
+            <Pressable
+              onPress={submitInvites}
+              disabled={selectedInvitees.size === 0 || sendingInvites}
+              className="w-full h-11 rounded-xl items-center justify-center active:opacity-90 disabled:opacity-30"
+              style={{ backgroundColor: NEON }}
+            >
+              {sendingInvites ? (
+                <ActivityIndicator size="small" color="#000000" />
+              ) : (
+                <Text className="text-black font-sans-semibold">
+                  Send Invite{selectedInvitees.size > 1 ? 's' : ''}
+                  {selectedInvitees.size > 0 ? ` (${selectedInvitees.size})` : ''}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
