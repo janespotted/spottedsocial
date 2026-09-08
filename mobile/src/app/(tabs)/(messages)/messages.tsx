@@ -1,26 +1,26 @@
-import { RefreshControl, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, RefreshControl, Text, View } from 'react-native';
+import { Image } from '@/components/styled';
+import { router } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { LegendList } from '@legendapp/list/react-native';
-import { Card, Skeleton } from 'heroui-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
-import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
-import { Avatar } from '@/components/avatar';
+import { fetchDmThreads, previewText, threadTitle, type DmThreadPreview } from '@/lib/dm';
 import { useSession } from '@/hooks/use-session';
+import { useNotifications } from '@/hooks/use-notifications';
+import { Avatar } from '@/components/avatar';
+import spottedLogo from '../../../../assets/images/spotted-s-logo.png';
 
-interface ThreadPreview {
-  id: string;
-  title: string;
-  avatarUrl: string | null;
-  lastMessage: string | null;
-  lastMessageAt: string | null;
-  isGroup: boolean;
-}
+const NEON = '#d4ff00';
+const PURPLE = '#a855f7';
+
+type TabType = 'yap' | 'messages';
 
 function formatWhen(iso: string | null): string {
   if (!iso) return '';
-  const then = new Date(iso);
-  const mins = Math.floor((Date.now() - then.getTime()) / 60_000);
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
   if (mins < 1) return 'now';
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
@@ -28,81 +28,71 @@ function formatWhen(iso: string | null): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
-async function fetchThreads(userId: string): Promise<ThreadPreview[]> {
-  const { data: myMemberships } = await supabase
-    .from('dm_thread_members')
-    .select('thread_id')
-    .eq('user_id', userId);
-  const threadIds = (myMemberships ?? []).map((m) => m.thread_id);
-  if (threadIds.length === 0) return [];
-
-  const [{ data: threads }, { data: members }, { data: messages }, profiles] =
-    await Promise.all([
-      supabase.from('dm_threads').select('*').in('id', threadIds),
-      supabase.from('dm_thread_members').select('thread_id, user_id').in('thread_id', threadIds),
-      supabase
-        .from('dm_messages')
-        .select('thread_id, text, created_at')
-        .in('thread_id', threadIds)
-        .order('created_at', { ascending: false })
-        .limit(200),
-      fetchProfilesSafe(),
-    ]);
-
-  const profileMap = buildProfileMap(profiles);
-
-  const lastByThread = new Map<string, { text: string; created_at: string | null }>();
-  for (const m of messages ?? []) {
-    if (!lastByThread.has(m.thread_id)) {
-      lastByThread.set(m.thread_id, { text: m.text, created_at: m.created_at });
-    }
+function GroupAvatar({ thread }: { thread: DmThreadPreview }) {
+  if (thread.group_avatar_url) {
+    return <Avatar name={threadTitle(thread)} url={thread.group_avatar_url} size="md" />;
   }
-
-  const previews = (threads ?? []).map((t) => {
-    const others = (members ?? [])
-      .filter((m) => m.thread_id === t.id && m.user_id !== userId)
-      .map((m) => profileMap.get(m.user_id))
-      .filter(Boolean);
-    const last = lastByThread.get(t.id);
-    return {
-      id: t.id,
-      title: t.is_group
-        ? t.name ?? others.map((p) => p!.display_name).join(', ')
-        : others[0]?.display_name ?? 'Conversation',
-      avatarUrl: t.is_group ? t.group_avatar_url : others[0]?.avatar_url ?? null,
-      lastMessage: last?.text ?? null,
-      lastMessageAt: last?.created_at ?? null,
-      isGroup: t.is_group ?? false,
-    };
-  });
-
-  return previews.sort((a, b) => (b.lastMessageAt ?? '').localeCompare(a.lastMessageAt ?? ''));
+  return (
+    <View className="w-11 h-11 rounded-full bg-[#1a0f2e] border-2 border-white/20 items-center justify-center">
+      <SymbolView name="person.2.fill" size={18} tintColor={PURPLE} />
+    </View>
+  );
 }
 
-function ThreadRow({ thread }: { thread: ThreadPreview }) {
+function ThreadRow({ thread, onPress }: { thread: DmThreadPreview; onPress: () => void }) {
+  const title = threadTitle(thread);
+  const subtitle = thread.last_message
+    ? previewText(thread.last_message.text)
+    : thread.venue_name
+      ? `@ ${thread.venue_name}`
+      : 'Say hi 👋';
   return (
-    <View className="flex-row items-center gap-3 py-2.5">
-      <Avatar name={thread.title} url={thread.avatarUrl} size="md" />
-      <View className="flex-1 gap-0.5">
-        <Text className="text-foreground text-base font-semibold" numberOfLines={1}>
-          {thread.title}
+    <Pressable onPress={onPress} className="flex-row items-center gap-3 py-3 active:opacity-70">
+      {thread.is_group ? (
+        <GroupAvatar thread={thread} />
+      ) : (
+        <Avatar name={title} url={thread.members[0]?.avatar_url ?? null} size="md" />
+      )}
+      <View className="flex-1 min-w-0 gap-0.5">
+        <Text
+          className={`text-base ${thread.unread ? 'text-white font-sans-semibold' : 'text-white font-sans-medium'}`}
+          numberOfLines={1}
+        >
+          {title}
         </Text>
-        <Text className="text-muted text-sm" numberOfLines={1}>
-          {thread.lastMessage ?? 'Say hi 👋'}
-        </Text>
+        <View className="flex-row items-center gap-1.5">
+          {thread.venue_name && thread.last_message ? (
+            <Text className="text-[#d4ff00] text-xs font-sans-medium" numberOfLines={1}>
+              @ {thread.venue_name}
+            </Text>
+          ) : null}
+          <Text
+            className={`text-sm shrink font-sans ${thread.unread ? 'text-white/90' : 'text-white/40'}`}
+            numberOfLines={1}
+          >
+            {subtitle}
+          </Text>
+        </View>
       </View>
-      <Text className="text-muted-dark text-sm">{formatWhen(thread.lastMessageAt)}</Text>
-    </View>
+      <View className="items-end gap-1.5">
+        <Text className="text-white/30 text-xs font-sans">
+          {formatWhen(thread.last_message?.created_at ?? null)}
+        </Text>
+        {thread.unread ? (
+          <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NEON }} />
+        ) : null}
+      </View>
+    </Pressable>
   );
 }
 
 function RowSkeleton() {
   return (
-    <View className="flex-row items-center gap-3 py-2.5">
-      <Skeleton className="h-11 w-11 rounded-full" />
+    <View className="flex-row items-center gap-3 py-3">
+      <View className="h-11 w-11 rounded-full bg-white/10" />
       <View className="flex-1 gap-1.5">
-        <Skeleton className="h-3.5 w-36 rounded-md" />
-        <Skeleton className="h-3 w-48 rounded-md" />
+        <View className="h-3.5 w-36 rounded-md bg-white/10" />
+        <View className="h-3 w-48 rounded-md bg-white/[0.06]" />
       </View>
     </View>
   );
@@ -110,46 +100,201 @@ function RowSkeleton() {
 
 export default function MessagesScreen() {
   const { session } = useSession();
-  const contentContainerStyle = useResolveClassNames('p-4');
-  const { data: threads, isLoading, refetch, isRefetching } = useQuery({
+  const { unreadCount } = useNotifications();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<TabType>('messages');
+  const contentContainerStyle = useResolveClassNames('px-4 pb-6');
+
+  const { data: city } = useQuery({
+    queryKey: ['home-city', session?.user.id],
+    enabled: !!session,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('home_city')
+        .eq('id', session!.user.id)
+        .maybeSingle();
+      return data?.home_city ?? 'nyc';
+    },
+  });
+
+  const {
+    data: threads,
+    isLoading,
+    refetch,
+    isRefetching,
+  } = useQuery({
     queryKey: ['dm-threads', session?.user.id],
     enabled: !!session,
     staleTime: 15_000,
-    queryFn: () => fetchThreads(session!.user.id),
+    queryFn: () => fetchDmThreads(session!.user.id),
   });
 
+  // Any new DM anywhere refreshes the list (thread ordering + unread dots)
+  useEffect(() => {
+    if (!session) return;
+    const channel = supabase
+      .channel('dm-list-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'dm_messages' },
+        () => queryClient.invalidateQueries({ queryKey: ['dm-threads'] })
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session, queryClient]);
+
+  const openThread = (thread: DmThreadPreview) => {
+    router.push({
+      pathname: '/thread',
+      params: {
+        threadId: thread.id,
+        title: threadTitle(thread),
+        avatarUrl: thread.is_group
+          ? (thread.group_avatar_url ?? '')
+          : (thread.members[0]?.avatar_url ?? ''),
+      },
+    });
+  };
+
   return (
-    <LegendList
-      data={threads ?? []}
-      keyExtractor={(t) => t.id}
-      recycleItems
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={contentContainerStyle}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={refetch}
-          tintColorClassName="accent-accent"
-        />
-      }
-      ListEmptyComponent={
-        isLoading ? (
-          <View>
-            <RowSkeleton />
-            <RowSkeleton />
-            <RowSkeleton />
+    <View className="flex-1">
+      {/* Header — static, web PageHeader parity */}
+      <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
+        <View className="flex-row items-center justify-between px-4 h-10">
+          <View className="flex-row items-center gap-2 flex-1 min-w-0">
+            <Text
+              className="text-white font-sans-light"
+              numberOfLines={1}
+              style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
+            >
+              Spotted
+            </Text>
+            {city ? (
+              <View className="px-2.5 py-1 rounded-full bg-white/10">
+                <Text className="text-white/70 text-xs font-sans-medium uppercase">{city}</Text>
+              </View>
+            ) : null}
           </View>
-        ) : (
-          <Card className="bg-surface border-0 p-4">
-            <Card.Body>
-              <Text className="text-muted text-base">
-                No conversations yet — DM a friend from their profile.
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={() => router.push('/search')}
+              hitSlop={4}
+              className="w-9 h-9 rounded-full items-center justify-center active:opacity-70"
+            >
+              <SymbolView name="magnifyingglass" size={18} tintColor="rgba(255,255,255,0.6)" />
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/activity')}
+              hitSlop={4}
+              className="w-9 h-9 rounded-full items-center justify-center active:opacity-90"
+              style={{ backgroundColor: PURPLE }}
+            >
+              <SymbolView name="bell" size={18} tintColor="#ffffff" />
+              {unreadCount > 0 ? (
+                <View className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 items-center justify-center">
+                  <Text className="text-white text-[9px] font-sans-semibold">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+            <Image source={spottedLogo} className="h-9 w-9" contentFit="contain" />
+          </View>
+        </View>
+
+        {/* Yap | Messages tabs (web parity) + new chat */}
+        <View className="flex-row items-center px-4 pt-2 pb-3">
+          {(
+            [
+              ['yap', 'Yap'],
+              ['messages', 'Messages'],
+            ] as const
+          ).map(([tab, label]) => (
+            <Pressable key={tab} onPress={() => setActiveTab(tab)} className="mr-6">
+              <Text
+                className="font-sans-semibold text-2xl"
+                style={{ color: activeTab === tab ? '#ffffff' : 'rgba(255,255,255,0.4)' }}
+              >
+                {label}
               </Text>
-            </Card.Body>
-          </Card>
-        )
-      }
-      renderItem={({ item }) => <ThreadRow thread={item} />}
-    />
+              {activeTab === tab ? (
+                <View
+                  className="rounded-full mt-0.5"
+                  style={{ height: 2.5, backgroundColor: NEON }}
+                />
+              ) : null}
+            </Pressable>
+          ))}
+          <View className="flex-1" />
+          {activeTab === 'messages' ? (
+            <Pressable
+              onPress={() => router.push('/new-chat')}
+              hitSlop={4}
+              className="w-9 h-9 rounded-full items-center justify-center active:opacity-90"
+              style={{ backgroundColor: NEON }}
+            >
+              <SymbolView name="plus" size={18} tintColor="#1a0f2e" weight="semibold" />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
+      {activeTab === 'yap' ? (
+        <View className="items-center justify-center py-20 px-8">
+          <View className="w-20 h-20 rounded-full bg-white/5 items-center justify-center mb-6">
+            <SymbolView name="bubble.left.and.bubble.right" size={36} tintColor="rgba(168,85,247,0.6)" />
+          </View>
+          <Text className="text-xl font-sans-semibold text-white mb-2">Yap</Text>
+          <Text className="text-white/50 text-sm font-sans text-center">
+            Venue group chats open when you check in — coming with the check-in flow.
+          </Text>
+        </View>
+      ) : (
+        <LegendList
+          data={threads ?? []}
+          keyExtractor={(t) => t.id}
+          recycleItems
+          contentContainerStyle={contentContainerStyle}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColorClassName="accent-[#d4ff00]"
+            />
+          }
+          ListEmptyComponent={
+            isLoading ? (
+              <View>
+                <RowSkeleton />
+                <RowSkeleton />
+                <RowSkeleton />
+              </View>
+            ) : (
+              <View className="items-center justify-center py-20 px-8">
+                <View className="w-20 h-20 rounded-full bg-white/5 items-center justify-center mb-6">
+                  <SymbolView name="bubble.left" size={36} tintColor="rgba(168,85,247,0.6)" />
+                </View>
+                <Text className="text-xl font-sans-semibold text-white mb-2">No messages yet</Text>
+                <Text className="text-white/50 text-sm font-sans text-center mb-6">
+                  Start a conversation with a friend.
+                </Text>
+                <Pressable
+                  onPress={() => router.push('/new-chat')}
+                  className="rounded-full px-6 py-2.5 active:opacity-90"
+                  style={{ backgroundColor: NEON }}
+                >
+                  <Text className="text-[#1a0f2e] font-sans-medium">New Chat</Text>
+                </Pressable>
+              </View>
+            )
+          }
+          renderItem={({ item }) => <ThreadRow thread={item} onPress={() => openThread(item)} />}
+        />
+      )}
+    </View>
   );
 }

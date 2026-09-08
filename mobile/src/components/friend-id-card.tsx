@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ActionSheetIOS, Pressable, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { Dialog } from 'heroui-native';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
+import { createDmThread } from '@/lib/dm';
 import { sendMeetUp } from '@/lib/meet-up';
 import { blockUser, reportContent } from '@/lib/moderation';
 import { Avatar } from '@/components/avatar';
@@ -65,6 +67,25 @@ export function FriendIdCard({
     sendMeetUp(currentUserId, friend);
     setMeetUpSent(true);
     setTimeout(() => onOpenChange(false), 900);
+  };
+
+  const handleMessage = async () => {
+    try {
+      const threadId = await createDmThread(friend.user_id);
+      onOpenChange(false);
+      setTimeout(() => {
+        router.push({
+          pathname: '/thread',
+          params: {
+            threadId,
+            title: friend.display_name,
+            avatarUrl: friend.avatar_url ?? '',
+          },
+        });
+      }, 250);
+    } catch {
+      /* demo users / offline — DM stays unavailable */
+    }
   };
 
   const showOverflow = () => {
@@ -207,6 +228,14 @@ export function FriendIdCard({
               <Text className="text-black text-sm font-sans-semibold">
                 {meetUpSent ? 'Sent' : 'Meet Up'}
               </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleMessage}
+              hitSlop={4}
+              className="w-[42px] h-[42px] rounded-full items-center justify-center border border-white/15 active:bg-white/5"
+            >
+              <SymbolView name="bubble.left" size={17} tintColor="rgba(255,255,255,0.5)" />
             </Pressable>
           </View>
         </Dialog.Content>
