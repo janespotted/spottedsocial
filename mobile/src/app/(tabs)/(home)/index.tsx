@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -8,6 +8,7 @@ import {
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ViewToken,
 } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
@@ -313,6 +314,24 @@ export default function HomeScreen() {
   const outFriends = friendsData?.outFriends ?? [];
   const planningFriends = friendsData?.planningFriends ?? [];
 
+  // Viewport-based video pause: track which video posts are ≥50% on screen.
+  // Only video ids go in the set so image-only scrolling never re-renders.
+  const [visibleVideoIds, setVisibleVideoIds] = useState<Set<string>>(new Set());
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const next = new Set<string>();
+      for (const token of viewableItems) {
+        const item = token.item as { id?: string; media_type?: string | null } | null;
+        if (token.isViewable && item?.media_type === 'video' && item.id) next.add(item.id);
+      }
+      setVisibleVideoIds((prev) => {
+        if (prev.size === next.size && [...next].every((id) => prev.has(id))) return prev;
+        return next;
+      });
+    }
+  ).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
+
   return (
     <View className="flex-1 bg-[#110a24]">
       <HomeHeader
@@ -335,6 +354,8 @@ export default function HomeScreen() {
           scrollEventThrottle={16}
           onEndReached={feed.loadMore}
           onEndReachedThreshold={0.5}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           refreshControl={
             <RefreshControl
               refreshing={feed.isRefreshing}
@@ -384,6 +405,7 @@ export default function HomeScreen() {
               currentUserId={session?.user.id ?? ''}
               onToggleLike={feed.toggleLike}
               onDelete={feed.deletePost}
+              isVisible={item.media_type !== 'video' || visibleVideoIds.has(item.id)}
             />
           )}
         />

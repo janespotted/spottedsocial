@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActionSheetIOS, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
@@ -10,13 +10,24 @@ import { supabase } from '@/lib/supabase';
 
 const NEON = '#d4ff00';
 
-function PostVideo({ uri }: { uri: string }) {
+function PostVideo({ uri, isVisible }: { uri: string; isVisible: boolean }) {
   const [muted, setMuted] = useState(true);
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.muted = true;
     p.play();
   });
+
+  // Viewport-based pause: only the on-screen video plays (web parity —
+  // saves battery and stops off-screen audio when unmuted)
+  useEffect(() => {
+    try {
+      if (isVisible) player.play();
+      else player.pause();
+    } catch {
+      /* player may be released during unmount */
+    }
+  }, [isVisible, player]);
 
   const toggleMute = () => {
     player.muted = !muted;
@@ -67,9 +78,18 @@ interface PostCardProps {
   currentUserId: string;
   onToggleLike: (postId: string) => void;
   onDelete: (postId: string) => void;
+  /** Viewport visibility from the list — off-screen videos pause. */
+  isVisible?: boolean;
 }
 
-export function PostCard({ post, isLiked, currentUserId, onToggleLike, onDelete }: PostCardProps) {
+export function PostCard({
+  post,
+  isLiked,
+  currentUserId,
+  onToggleLike,
+  onDelete,
+  isVisible = true,
+}: PostCardProps) {
   const { width } = useWindowDimensions();
   const isOwner = post.user_id === currentUserId;
 
@@ -149,7 +169,7 @@ export function PostCard({ post, isLiked, currentUserId, onToggleLike, onDelete 
       {post.image_url ? (
         <View style={{ width, height: width * 1.25 }} className="overflow-hidden">
           {post.media_type === 'video' ? (
-            <PostVideo uri={post.image_url} />
+            <PostVideo uri={post.image_url} isVisible={isVisible} />
           ) : (
             <Image
               source={{ uri: post.image_url }}
