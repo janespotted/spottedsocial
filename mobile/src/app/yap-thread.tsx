@@ -87,6 +87,12 @@ export default function YapThreadScreen() {
   const queryClient = useQueryClient();
   const userId = session?.user.id;
 
+  // Push deep links / restored routes can land here with no history
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
   const [draft, setDraft] = useState('');
   const [pendingImage, setPendingImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [posting, setPosting] = useState(false);
@@ -292,7 +298,7 @@ export default function YapThreadScreen() {
         className="pt-safe-offset-3 pb-3 px-4 flex-row items-center gap-3 border-b border-white/10"
         style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}
       >
-        <Pressable onPress={() => router.back()} hitSlop={8} className="active:opacity-60">
+        <Pressable onPress={goBack} hitSlop={8} className="active:opacity-60">
           <SymbolView name="chevron.left" size={22} tintColor="rgba(255,255,255,0.6)" />
         </Pressable>
         <View className="flex-1 min-w-0">
