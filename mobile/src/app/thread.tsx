@@ -19,7 +19,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResolveClassNames } from 'uniwind';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
-import { DEMO_MODE } from '@/lib/demo-mode';
 import {
   markThreadRead,
   notifyDmRecipients,
@@ -113,7 +112,9 @@ export default function ThreadScreen() {
             .select('user_id')
             .eq('thread_id', threadId)
             .neq('user_id', userId),
-          fetchProfilesSafe(),
+          // A transient RPC failure must not kill member loading — the
+          // direct backfill below fills any gaps
+          fetchProfilesSafe().catch(() => []),
           supabase.from('profiles').select('display_name').eq('id', userId).maybeSingle(),
         ]);
       if (cancelled) return;
@@ -121,15 +122,13 @@ export default function ThreadScreen() {
 
       const memberIds = (members ?? []).map((m) => m.user_id);
       const profileMap = new Map(profiles.map((p) => [p.id, p]));
-      if (DEMO_MODE) {
-        const missing = memberIds.filter((id) => !profileMap.has(id));
-        if (missing.length > 0) {
-          const { data: fallback } = await supabase
-            .from('profiles')
-            .select('id, display_name, username, avatar_url')
-            .in('id', missing);
-          for (const p of fallback ?? []) profileMap.set(p.id, p as never);
-        }
+      const missing = memberIds.filter((id) => !profileMap.has(id));
+      if (missing.length > 0) {
+        const { data: fallback } = await supabase
+          .from('profiles')
+          .select('id, display_name, username, avatar_url')
+          .in('id', missing);
+        for (const p of fallback ?? []) profileMap.set(p.id, p as never);
       }
 
       const { data: statuses } = memberIds.length
