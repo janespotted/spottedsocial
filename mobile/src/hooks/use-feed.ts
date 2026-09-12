@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { DEMO_MODE } from '@/lib/demo-mode';
 import { notifyPostLike } from '@/lib/notifications';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { onCommentAdded, onFeedInvalidated, resolvePostImageUrl } from '@/lib/posts';
@@ -155,13 +155,7 @@ export function useFeed() {
   // Refresh immediately when a new post is created (composer calls invalidateFeed)
   useEffect(() => onFeedInvalidated(refresh), [refresh]);
 
-  // Refresh when the app returns to the foreground (web useVisibilityRefresh)
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refresh();
-    });
-    return () => sub.remove();
-  }, [refresh]);
+  // Foreground refresh is handled by the resilient channel's onReconnect.
 
   // Bump the card count as soon as a comment is posted in the comments modal
   useEffect(
@@ -181,9 +175,11 @@ export function useFeed() {
     if (!session || friendIds === undefined) return;
     const friendSet = new Set(friendIds ?? []);
 
-    const channel = supabase
-      .channel('feed-realtime')
-      .on(
+    return createResilientChannel({
+      name: 'feed-realtime',
+      onReconnect: refresh,
+      configure: (ch) => ch
+        .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'posts' },
         async (payload) => {
@@ -217,20 +213,16 @@ export function useFeed() {
           setPosts((prev) => (prev.some((x) => x.id === post.id) ? prev : [post, ...prev]));
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'posts' },
-        (payload) => {
-          const id = (payload.old as Record<string, any>)?.id;
-          if (id) setPosts((prev) => prev.filter((x) => x.id !== id));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [session, friendIds]);
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'posts' },
+          (payload) => {
+            const id = (payload.old as Record<string, any>)?.id;
+            if (id) setPosts((prev) => prev.filter((x) => x.id !== id));
+          }
+        ),
+    });
+  }, [session, friendIds, refresh]);
 
   const toggleLike = useCallback(
     async (postId: string) => {

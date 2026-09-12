@@ -75,6 +75,7 @@ The Transistorsoft SDK must be configured with `BackgroundGeolocation.ready()`
 | Engine trigger radius | ≤200m to venue (reject >500m) | `venue-arrival-engine.ts` |
 | Engine dwell | 45s at the same venue across fixes | `venue-arrival-engine.ts` |
 | Engine cooldowns | 15 min dismiss/toast; re-entry 20 min + 300m | `venue-arrival-engine.ts` |
+| Manual check-in cooldown | 30 min engine silence after any `goOutAtVenue` (persisted; protects manual venue corrections from GPS re-nudges) | `venue-arrival-engine.ts` |
 
 ## Licensing
 

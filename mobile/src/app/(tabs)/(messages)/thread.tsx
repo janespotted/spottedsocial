@@ -17,6 +17,7 @@ import { LegendList } from '@legendapp/list/react-native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResolveClassNames } from 'uniwind';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { DEMO_MODE } from '@/lib/demo-mode';
 import {
@@ -219,9 +220,13 @@ export default function ThreadScreen() {
     fetchMessages();
     markThreadRead(threadId, userId);
 
-    const channel = supabase
-      .channel(`thread-${threadId}`)
-      .on(
+    const teardown = createResilientChannel({
+      name: `thread-${threadId}`,
+      // Refetch the gap after a reconnect/foreground; a message that arrived
+      // while disconnected would otherwise be missing until screen re-mount.
+      onReconnect: fetchMessages,
+      configure: (ch) => ch
+        .on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -278,11 +283,11 @@ export default function ThreadScreen() {
           );
           setTypingNames((prev) => (prev.length === 0 && names.length === 0 ? prev : names));
         }
-      )
-      .subscribe();
+      ),
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      teardown();
       // Clean up own typing indicator on leave
       supabase
         .from('dm_typing_indicators' as never)

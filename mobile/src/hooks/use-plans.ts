@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { fetchEventsWithFriends, fetchMyVotes, fetchPlans } from '@/lib/plans';
 import { useFriendIds } from './use-friend-ids';
@@ -92,27 +93,31 @@ export function usePlansRealtime() {
       );
     };
 
-    // Unique topic per mount — a repeated channel name returns the existing
-    // subscribed instance and .on() would throw (see useFriendsOut).
-    const channel = supabase
-      .channel(`plans-realtime-${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'plans' }, invalidatePlans)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'plan_downs' },
-        invalidatePlans
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'night_statuses' },
-        invalidateStatus
-      )
-      .subscribe();
+    const teardown = createResilientChannel({
+      name: 'plans-realtime',
+      onReconnect: () => {
+        invalidatePlans();
+        invalidateStatus();
+      },
+      configure: (ch) =>
+        ch
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'plans' }, invalidatePlans)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'plan_downs' },
+            invalidatePlans
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'night_statuses' },
+            invalidateStatus
+          ),
+    });
 
     return () => {
       clearTimeout(plansTimer);
       clearTimeout(statusTimer);
-      supabase.removeChannel(channel);
+      teardown();
     };
   }, [session, queryClient]);
 }

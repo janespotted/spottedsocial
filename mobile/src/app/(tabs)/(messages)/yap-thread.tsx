@@ -17,6 +17,7 @@ import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import {
   fetchPinnedVenueMessages,
@@ -138,22 +139,21 @@ export default function YapThreadScreen() {
   // Realtime: new yaps at this venue
   useEffect(() => {
     if (!venueName) return;
-    const channel = supabase
-      .channel(`yap-${venueName}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'yap_messages',
-          filter: `venue_name=eq.${venueName}`,
-        },
-        () => refetch()
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return createResilientChannel({
+      name: `yap-${venueName}`,
+      onReconnect: () => refetch(),
+      configure: (ch) =>
+        ch.on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'yap_messages',
+            filter: `venue_name=eq.${venueName}`,
+          },
+          () => refetch()
+        ),
+    });
   }, [venueName, refetch]);
 
   // Cooldown ticker

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { DEMO_MODE } from '@/lib/demo-mode';
 import { fetchProfilesSafe, type SafeProfile } from '@/lib/profiles';
@@ -238,13 +239,15 @@ export function useMapData(city: string | null) {
         queryClient.invalidateQueries({ queryKey: ['map-data'] });
       }, 1500);
     };
-    const channel = supabase
-      .channel('map-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh)
-      .subscribe();
+    const teardown = createResilientChannel({
+      name: 'map-realtime',
+      onReconnect: refresh,
+      configure: (ch) =>
+        ch.on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh),
+    });
     return () => {
       clearTimeout(timer);
-      supabase.removeChannel(channel);
+      teardown();
     };
   }, [session, queryClient]);
 

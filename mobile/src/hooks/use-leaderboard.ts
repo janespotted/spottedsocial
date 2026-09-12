@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { DEMO_MODE } from '@/lib/demo-mode';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
@@ -341,14 +342,17 @@ export function useLeaderboard(city: string | null, neighborhood: string | null)
         queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
       }, 1500);
     };
-    const channel = supabase
-      .channel('leaderboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh)
-      .subscribe();
+    const teardown = createResilientChannel({
+      name: 'leaderboard-realtime',
+      onReconnect: refresh,
+      configure: (ch) =>
+        ch
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'checkins' }, refresh)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh),
+    });
     return () => {
       clearTimeout(timer);
-      supabase.removeChannel(channel);
+      teardown();
     };
   }, [session, queryClient]);
 

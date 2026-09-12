@@ -1,49 +1,52 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { queryClient as sharedQueryClient } from '@/lib/query-client';
 import { useSession } from './use-session';
 
 /**
- * One shared realtime channel, refcounted across hook instances. Two mounted
- * useNotifications() (header badge + Activity screen) must NOT each call
- * supabase.channel() with the same topic — supabase-js returns the existing
- * subscribed channel and a second .on() throws.
+ * One shared resilient channel, refcounted across hook instances so two
+ * mounted useNotifications() (header badge + Activity screen) share a single
+ * websocket subscription.
  */
-let notifChannel: RealtimeChannel | null = null;
+let notifTeardown: (() => void) | null = null;
 let notifChannelUserId: string | null = null;
 let notifSubscribers = 0;
 
 function retainNotificationsChannel(userId: string): () => void {
   notifSubscribers++;
-  if (notifChannel && notifChannelUserId !== userId) {
+  if (notifTeardown && notifChannelUserId !== userId) {
     // Account switched — replace the channel
-    supabase.removeChannel(notifChannel);
-    notifChannel = null;
+    notifTeardown();
+    notifTeardown = null;
   }
-  if (!notifChannel) {
+  if (!notifTeardown) {
     notifChannelUserId = userId;
-    notifChannel = supabase
-      .channel(`notifications-realtime-${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `receiver_id=eq.${userId}`,
-        },
-        () => sharedQueryClient.invalidateQueries({ queryKey: ['notifications'] })
-      )
-      .subscribe();
+    const invalidate = () =>
+      sharedQueryClient.invalidateQueries({ queryKey: ['notifications'] });
+    notifTeardown = createResilientChannel({
+      name: 'notifications-realtime',
+      onReconnect: invalidate,
+      configure: (ch) =>
+        ch.on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `receiver_id=eq.${userId}`,
+          },
+          invalidate
+        ),
+    });
   }
   return () => {
     notifSubscribers--;
-    if (notifSubscribers <= 0 && notifChannel) {
-      supabase.removeChannel(notifChannel);
-      notifChannel = null;
+    if (notifSubscribers <= 0 && notifTeardown) {
+      notifTeardown();
+      notifTeardown = null;
       notifChannelUserId = null;
     }
   };

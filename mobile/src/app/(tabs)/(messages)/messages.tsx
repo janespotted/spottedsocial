@@ -6,6 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { LegendList } from '@legendapp/list/react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
+import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { fetchDmThreads, previewText, threadTitle, type DmThreadPreview } from '@/lib/dm';
 import { fetchYapDirectory, type YapQuote } from '@/lib/yap';
@@ -208,22 +209,25 @@ export default function MessagesScreen() {
   // Any new DM/yap anywhere refreshes the lists
   useEffect(() => {
     if (!session) return;
-    const channel = supabase
-      .channel('dm-list-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'dm_messages' },
-        () => queryClient.invalidateQueries({ queryKey: ['dm-threads'] })
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'yap_messages' },
-        () => queryClient.invalidateQueries({ queryKey: ['yap-directory'] })
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return createResilientChannel({
+      name: 'dm-list-realtime',
+      onReconnect: () => {
+        queryClient.invalidateQueries({ queryKey: ['dm-threads'] });
+        queryClient.invalidateQueries({ queryKey: ['yap-directory'] });
+      },
+      configure: (ch) =>
+        ch
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'dm_messages' },
+            () => queryClient.invalidateQueries({ queryKey: ['dm-threads'] })
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'yap_messages' },
+            () => queryClient.invalidateQueries({ queryKey: ['yap-directory'] })
+          ),
+    });
   }, [session, queryClient]);
 
   const sortedYaps = [...(yaps ?? [])].sort((a, b) =>
