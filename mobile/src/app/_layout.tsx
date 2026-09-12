@@ -15,6 +15,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaListener, SafeAreaProvider } from 'react-native-safe-area-context';
 import { Uniwind, useResolveClassNames } from 'uniwind';
 import { SessionProvider, useSession } from '@/hooks/use-session';
+import { SCREEN_GRADIENT } from '@/lib/theme';
 import { BackgroundLocationManager } from '@/components/background-location-manager';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import { queryClient } from '@/lib/query-client';
@@ -22,11 +23,16 @@ import { queryClient } from '@/lib/query-client';
 function RootNavigator() {
   const { session, loading, onboardingNeeded } = useSession();
   const contentStyle = useResolveClassNames('bg-background');
+  const gradientStyle = useResolveClassNames(SCREEN_GRADIENT);
 
   if (loading) return null;
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle }}>
+      {/* Chat threads: root-level pushes so they slide OVER the native tab
+          bar (per-screen tab-bar hiding pops visibly with native tabs) */}
+      <Stack.Screen name="thread" options={{ contentStyle: gradientStyle }} />
+      <Stack.Screen name="yap-thread" options={{ contentStyle: gradientStyle }} />
       <Stack.Protected guard={!!session && !onboardingNeeded}>
         <Stack.Screen name="(tabs)" />
       </Stack.Protected>

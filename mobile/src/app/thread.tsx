@@ -30,7 +30,6 @@ import {
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { resolvePostImageUrl } from '@/lib/posts';
 import { isFromTonight } from '@/lib/time-context';
-import { useHideTabBar } from '@/lib/tab-bar';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
 
@@ -70,8 +69,6 @@ export default function ThreadScreen() {
   const threadId = params.threadId;
   const { session } = useSession();
   const insets = useSafeAreaInsets();
-  // The composer is bottom-anchored — the floating tab bar would cover it
-  useHideTabBar();
   const userId = session?.user.id;
 
   const [messages, setMessages] = useState<DmMessage[]>([]);
