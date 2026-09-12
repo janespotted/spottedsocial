@@ -13,8 +13,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { LegendList } from '@legendapp/list/react-native';
-import { KeyboardStickyView } from 'react-native-keyboard-controller';
+import { KeyboardAwareLegendList } from '@legendapp/list/keyboard';
+import { KeyboardGestureArea, KeyboardStickyView } from 'react-native-keyboard-controller';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResolveClassNames } from 'uniwind';
 import { createResilientChannel } from '@/lib/resilient-channel';
@@ -89,6 +90,8 @@ export default function ThreadScreen() {
   const [draft, setDraft] = useState('');
   const [uploading, setUploading] = useState(false);
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
+  // Ids already on screen — only messages arriving AFTER a fetch animate in
+  const seenIdsRef = useRef<Set<string>>(new Set());
   const lastTypingSentRef = useRef(0);
   const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const memberMapRef = useRef(memberMap);
@@ -197,6 +200,12 @@ export default function ThreadScreen() {
     };
   }, [threadId, userId]);
 
+  // After each commit, everything rendered counts as seen (entrance
+  // animations only fire at row mount, so live arrivals animate once)
+  useEffect(() => {
+    for (const m of messages) seenIdsRef.current.add(m.id);
+  }, [messages]);
+
   /* ── Messages: fetch + realtime ── */
   const fetchMessages = useCallback(async () => {
     if (!threadId) return;
@@ -207,6 +216,8 @@ export default function ThreadScreen() {
       .order('created_at', { ascending: true });
     if (!data) return;
     const tonight = data.filter((m) => isFromTonight(m.created_at)) as DmMessage[];
+    // Fetched history must not play entrance animations — only live arrivals
+    for (const m of tonight) seenIdsRef.current.add(m.id);
     setMessages(tonight);
     // Resolve storage paths to signed URLs (mobile uploads store paths)
     const pathMsgs = tonight.filter((m) => m.image_url && !m.image_url.startsWith('http'));
@@ -671,16 +682,26 @@ export default function ThreadScreen() {
         </Pressable>
       </View>
 
-      {/* Messages */}
-      <LegendList
+      {/* Messages — KeyboardAwareLegendList is LegendList wired to
+          KeyboardChatScrollView (keyboard-controller chat-app guide):
+          content lifts with the keyboard, interactive swipe-to-dismiss */}
+      <KeyboardGestureArea
+        interpolator="ios"
+        textInputNativeID="dm-input"
+        style={{ flex: 1 }}
+      >
+      <KeyboardAwareLegendList
         data={messages}
-        keyExtractor={(m) => m.id}
+        keyExtractor={(m: DmMessage) => m.id}
         contentContainerStyle={contentContainerStyle}
         alignItemsAtEnd
         maintainScrollAtEnd
         maintainScrollAtEndThreshold={0.2}
-        renderItem={({ item, index }) => {
+        keyboardDismissMode="interactive"
+        keyboardOffset={insets.bottom}
+        renderItem={({ item, index }: { item: DmMessage; index: number }) => {
           const isMine = item.sender_id === userId;
+          const isNew = !seenIdsRef.current.has(item.id);
           const sender = !isMine ? memberMap.get(item.sender_id) : null;
           const showSeen =
             isMine &&
@@ -693,6 +714,9 @@ export default function ThreadScreen() {
           const sharedPost = postMatch ? sharedPosts.get(postMatch[1]) : null;
 
           return (
+            <Animated.View
+              entering={isNew ? FadeInDown.springify().damping(20).stiffness(250) : undefined}
+            >
             <View className="mb-2.5">
               {needsTimestamp(messages[index - 1], item) ? (
                 <Text className="text-white/40 text-xs font-sans text-center py-2">
@@ -791,17 +815,21 @@ export default function ThreadScreen() {
                 <Text className="text-white/40 text-xs font-sans text-right mt-1 mr-1">Seen</Text>
               ) : null}
             </View>
+            </Animated.View>
           );
         }}
       />
+      </KeyboardGestureArea>
 
       {/* Typing indicator */}
       {typingNames.length > 0 ? (
-        <Text className="text-white/50 text-sm font-sans px-4 py-1.5">
-          {typingNames.length === 1
-            ? `${typingNames[0]} is typing...`
-            : `${typingNames.join(', ')} are typing...`}
-        </Text>
+        <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)}>
+          <Text className="text-white/50 text-sm font-sans px-4 py-1.5">
+            {typingNames.length === 1
+              ? `${typingNames[0]} is typing...`
+              : `${typingNames.join(', ')} are typing...`}
+          </Text>
+        </Animated.View>
       ) : null}
 
       {/* Composer */}
@@ -821,6 +849,7 @@ export default function ThreadScreen() {
               )}
             </Pressable>
             <TextInput
+              nativeID="dm-input"
               value={draft}
               onChangeText={(text) => {
                 setDraft(text);
