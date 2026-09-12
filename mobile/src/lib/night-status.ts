@@ -59,7 +59,7 @@ function cityToTimezone(city: string | null | undefined): string {
 /**
  * Next 5 AM in the user's city timezone as a UTC ISO string. Port of the web
  * getStatusExpiry; the web reads the cached detected city, here callers pass
- * the profile's home_city (defaults to NY time).
+ * the profile's city (defaults to NY time).
  * DST-safe: derives the UTC offset via Intl at call time.
  */
 export function getStatusExpiry(city?: string | null): string {

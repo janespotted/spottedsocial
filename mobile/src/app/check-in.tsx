@@ -140,10 +140,10 @@ export default function CheckInSheet() {
     queryFn: async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('home_city')
+        .select('city')
         .eq('id', userId!)
-        .maybeSingle();
-      return data?.home_city ?? 'nyc';
+        .maybeSingle<{ city: string | null }>();
+      return data?.city ?? 'nyc';
     },
   });
 

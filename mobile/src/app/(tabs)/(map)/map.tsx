@@ -217,10 +217,10 @@ export default function MapScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('home_city')
+        .select('city')
         .eq('id', session!.user.id)
-        .maybeSingle();
-      return data?.home_city ?? 'nyc';
+        .maybeSingle<{ city: string | null }>();
+      return data?.city ?? 'nyc';
     },
   });
 

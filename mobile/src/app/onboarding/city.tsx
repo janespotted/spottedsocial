@@ -9,7 +9,8 @@ import { ProgressDots } from '@/components/progress-dots';
 const NEON = '#d4ff00';
 
 // Everything city-scoped (leaderboard, map camera, venue search, plan feeds)
-// keys off profiles.home_city — without this step new users silently land in NYC.
+// keys off profiles.city — without this step new users silently land in NYC.
+// (Generated types call it home_city; the LIVE column is `city` — hence the cast.)
 const CITIES: { id: string; label: string; sublabel: string }[] = [
   { id: 'nyc', label: 'New York', sublabel: 'Manhattan + Brooklyn + Queens' },
   { id: 'la', label: 'Los Angeles', sublabel: 'WeHo + Hollywood + Downtown' },
@@ -28,7 +29,7 @@ export default function CityScreen() {
     setError(null);
     const { error: err } = await supabase
       .from('profiles')
-      .update({ home_city: selected })
+      .update({ city: selected } as never)
       .eq('id', session.user.id);
     setLoading(false);
     if (err) {
