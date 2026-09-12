@@ -699,6 +699,10 @@ export default function ThreadScreen() {
         maintainScrollAtEndThreshold={0.2}
         keyboardDismissMode="interactive"
         keyboardOffset={insets.bottom}
+        // The animated LegendList variant freezes mounted rows unless
+        // extraData invalidates them — everything renderItem reads from
+        // component state must be listed here
+        extraData={{ memberMap, otherMember, hearted, sharedPosts, otherReadAt, bothShowReceipts }}
         renderItem={({ item, index }: { item: DmMessage; index: number }) => {
           const isMine = item.sender_id === userId;
           const isNew = !seenIdsRef.current.has(item.id);
