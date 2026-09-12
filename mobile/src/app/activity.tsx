@@ -18,9 +18,18 @@ function iconForType(type: string): SFSymbol {
 }
 
 function NotificationRow({ item }: { item: AppNotification }) {
+  // Friend requests are actioned on the Friends screen — take the user there.
+  const isFriendType = item.type.includes('friend');
+  const handlePress = () => {
+    if (!isFriendType) return;
+    router.back();
+    router.push('/friends');
+  };
   return (
-    <View
-      className={`flex-row items-center gap-3 p-3 rounded-xl ${item.is_read ? '' : 'bg-white/5'}`}
+    <Pressable
+      onPress={handlePress}
+      disabled={!isFriendType}
+      className={`flex-row items-center gap-3 p-3 rounded-xl active:opacity-70 ${item.is_read ? '' : 'bg-white/5'}`}
     >
       {item.sender_name ? (
         <Avatar name={item.sender_name} url={item.sender_avatar_url} size="sm" />
@@ -33,8 +42,12 @@ function NotificationRow({ item }: { item: AppNotification }) {
         <Text className="text-white text-sm font-sans leading-snug">{item.message}</Text>
         <Text className="text-white/35 text-xs font-sans mt-0.5">{getTimeAgo(item.created_at)}</Text>
       </View>
-      {!item.is_read ? <View className="w-2 h-2 rounded-full" style={{ backgroundColor: NEON }} /> : null}
-    </View>
+      {isFriendType ? (
+        <SymbolView name="chevron.right" size={12} tintColor="rgba(255,255,255,0.3)" />
+      ) : !item.is_read ? (
+        <View className="w-2 h-2 rounded-full" style={{ backgroundColor: NEON }} />
+      ) : null}
+    </Pressable>
   );
 }
 
