@@ -1,6 +1,7 @@
 import { Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { supabase } from './supabase';
+import { createDmThread } from './dm';
 import { fetchProfilesSafe } from './profiles';
 
 /**
@@ -68,5 +69,55 @@ export async function sendMeetUp(
     Alert.alert('Meet up sent!', `${target.display_name} will get a ping.`);
   } catch (e) {
     Alert.alert('Could not send meet up', e instanceof Error ? e.message : 'try again');
+  }
+}
+
+/**
+ * Accept a meet-up request (web ActivityTab.handleAcceptMeetUp parity):
+ * notify the sender they're on, clear the request notification, and open a
+ * DM thread together. Returns the thread id for navigation, null on failure.
+ */
+export async function acceptMeetUp(
+  currentUserId: string,
+  senderId: string,
+  notificationId: string
+): Promise<string | null> {
+  try {
+    const { data: me } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', currentUserId)
+      .maybeSingle();
+    const myName = me?.display_name?.split(' ')[0] ?? 'Someone';
+    const message = `${myName} is down to meet up! 🎉`;
+
+    const { data, error } = await supabase.rpc('create_notification', {
+      p_receiver_id: senderId,
+      p_type: 'meetup_accepted',
+      p_message: message,
+    });
+    if (error) throw error;
+    const notif = Array.isArray(data) ? data[0] : data;
+    if (notif?.id) {
+      supabase.functions
+        .invoke('send-push', {
+          body: {
+            notification_id: notif.id,
+            receiver_id: senderId,
+            sender_id: currentUserId,
+            type: 'meetup_accepted',
+            message,
+          },
+        })
+        .catch(() => {});
+    }
+
+    // Clear the request so it doesn't reappear as actionable
+    await supabase.from('notifications').delete().eq('id', notificationId);
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    return await createDmThread(senderId);
+  } catch {
+    return null;
   }
 }

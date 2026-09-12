@@ -1,10 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import { LegendList } from '@legendapp/list/react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { openFriendCard } from '@/lib/friend-card';
+import { acceptMeetUp } from '@/lib/meet-up';
 import { useNotifications, type AppNotification } from '@/hooks/use-notifications';
+import { useSession } from '@/hooks/use-session';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
 
@@ -19,6 +22,11 @@ function iconForType(type: string): SFSymbol {
 }
 
 function NotificationRow({ item }: { item: AppNotification }) {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+  const [accepting, setAccepting] = useState(false);
+  const isMeetUpRequest = item.type === 'meetup_request' && !!item.sender_id;
+
   // Friend requests are actioned on the Friends screen — take the user
   // there. Any other row with a sender opens their Friend ID card (SOW §14).
   const isFriendType = item.type.includes('friend');
@@ -28,6 +36,31 @@ function NotificationRow({ item }: { item: AppNotification }) {
       router.push('/friends');
     } else if (item.sender_id) {
       openFriendCard(item.sender_id);
+    }
+  };
+
+  // Web ActivityTab parity: accepting pings the sender back and opens a DM
+  const handleAcceptMeetUp = async () => {
+    if (!session || !item.sender_id || accepting) return;
+    setAccepting(true);
+    const threadId = await acceptMeetUp(session.user.id, item.sender_id, item.id);
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    if (threadId) {
+      router.back();
+      setTimeout(
+        () =>
+          router.push({
+            pathname: '/thread',
+            params: {
+              threadId,
+              title: item.sender_name ?? 'Meet up',
+              avatarUrl: item.sender_avatar_url ?? '',
+            },
+          }),
+        250
+      );
+    } else {
+      setAccepting(false);
     }
   };
   return (
@@ -47,7 +80,18 @@ function NotificationRow({ item }: { item: AppNotification }) {
         <Text className="text-white text-sm font-sans leading-snug">{item.message}</Text>
         <Text className="text-white/35 text-xs font-sans mt-0.5">{getTimeAgo(item.created_at)}</Text>
       </View>
-      {isFriendType ? (
+      {isMeetUpRequest ? (
+        <Pressable
+          onPress={handleAcceptMeetUp}
+          disabled={accepting}
+          className="px-3.5 py-2 rounded-full active:opacity-90"
+          style={{ backgroundColor: NEON, opacity: accepting ? 0.6 : 1 }}
+        >
+          <Text className="text-[#1a0f2e] text-xs font-sans-semibold">
+            {accepting ? '...' : "I'm Down"}
+          </Text>
+        </Pressable>
+      ) : isFriendType ? (
         <SymbolView name="chevron.right" size={12} tintColor="rgba(255,255,255,0.3)" />
       ) : !item.is_read ? (
         <View className="w-2 h-2 rounded-full" style={{ backgroundColor: NEON }} />
