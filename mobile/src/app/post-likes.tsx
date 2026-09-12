@@ -5,6 +5,7 @@ import { LegendList } from '@legendapp/list/react-native';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
+import { openFriendCard } from '@/lib/friend-card';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
 
@@ -69,7 +70,10 @@ export default function PostLikesScreen() {
             </Text>
           }
           renderItem={({ item }) => (
-            <View className="flex-row items-center gap-3">
+            <Pressable
+              onPress={() => openFriendCard(item.user_id, session?.user.id)}
+              className="flex-row items-center gap-3 active:opacity-70"
+            >
               <Avatar name={item.display_name} url={item.avatar_url} size="sm" />
               <View className="flex-1 min-w-0">
                 <Text className="text-white font-sans-medium text-sm" numberOfLines={1}>
@@ -81,7 +85,7 @@ export default function PostLikesScreen() {
                   </Text>
                 ) : null}
               </View>
-            </View>
+            </Pressable>
           )}
         />
       )}

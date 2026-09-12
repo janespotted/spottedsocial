@@ -9,6 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { notifyCommentAdded } from '@/lib/posts';
+import { openFriendCard } from '@/lib/friend-card';
 import { validateCommentText } from '@/lib/validation';
 import { useSession } from '@/hooks/use-session';
 import { getTimeAgo } from '@/hooks/use-feed';
@@ -159,10 +160,17 @@ export default function CommentsScreen() {
           }
           renderItem={({ item }) => (
             <View className="flex-row gap-3">
-              <Avatar name={item.display_name} url={item.avatar_url} size="sm" />
+              <Pressable onPress={() => openFriendCard(item.user_id, session?.user.id)} hitSlop={4}>
+                <Avatar name={item.display_name} url={item.avatar_url} size="sm" />
+              </Pressable>
               <View className="flex-1 min-w-0">
                 <Text className="text-sm font-sans text-white leading-snug">
-                  <Text className="font-sans-semibold">{item.display_name}</Text>{' '}
+                  <Text
+                    className="font-sans-semibold"
+                    onPress={() => openFriendCard(item.user_id, session?.user.id)}
+                  >
+                    {item.display_name}
+                  </Text>{' '}
                   <Text className="text-white/40 text-xs">{getTimeAgo(item.created_at)}</Text>
                 </Text>
                 <Text className="text-white/90 text-sm font-sans leading-snug mt-0.5">

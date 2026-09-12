@@ -6,6 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { getTimeAgo, type FeedPost } from '@/hooks/use-feed';
 import { blockUser, reportContent } from '@/lib/moderation';
+import { openFriendCard } from '@/lib/friend-card';
 import { supabase } from '@/lib/supabase';
 
 const NEON = '#d4ff00';
@@ -147,10 +148,16 @@ export function PostCard({
       {/* Header — compact single row */}
       <View className="flex-row items-center px-4 py-3">
         <View className="flex-row items-center gap-2.5 min-w-0 flex-1">
-          <GradientRingAvatar name={post.display_name} url={post.avatar_url} />
-          <Text className="font-sans-semibold text-white text-sm" numberOfLines={1}>
-            {post.display_name}
-          </Text>
+          <Pressable
+            onPress={() => openFriendCard(post.user_id, currentUserId)}
+            hitSlop={4}
+            className="flex-row items-center gap-2.5 shrink active:opacity-70"
+          >
+            <GradientRingAvatar name={post.display_name} url={post.avatar_url} />
+            <Text className="font-sans-semibold text-white text-sm" numberOfLines={1}>
+              {post.display_name}
+            </Text>
+          </Pressable>
           {post.venue_name ? (
             <Pressable onPress={openVenue} hitSlop={4} className="shrink">
               <Text className="text-[#d4ff00] text-xs font-sans-medium" numberOfLines={1}>

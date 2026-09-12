@@ -101,6 +101,15 @@ function RootNavigator() {
         }}
       />
       <Stack.Screen
+        name="friend-card"
+        options={{
+          presentation: 'formSheet',
+          sheetAllowedDetents: 'fitToContents',
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
+      <Stack.Screen
         name="map-filters"
         options={{
           presentation: 'formSheet',

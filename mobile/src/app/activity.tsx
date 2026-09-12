@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import { LegendList } from '@legendapp/list/react-native';
+import { openFriendCard } from '@/lib/friend-card';
 import { useNotifications, type AppNotification } from '@/hooks/use-notifications';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
@@ -18,17 +19,21 @@ function iconForType(type: string): SFSymbol {
 }
 
 function NotificationRow({ item }: { item: AppNotification }) {
-  // Friend requests are actioned on the Friends screen — take the user there.
+  // Friend requests are actioned on the Friends screen — take the user
+  // there. Any other row with a sender opens their Friend ID card (SOW §14).
   const isFriendType = item.type.includes('friend');
   const handlePress = () => {
-    if (!isFriendType) return;
-    router.back();
-    router.push('/friends');
+    if (isFriendType) {
+      router.back();
+      router.push('/friends');
+    } else if (item.sender_id) {
+      openFriendCard(item.sender_id);
+    }
   };
   return (
     <Pressable
       onPress={handlePress}
-      disabled={!isFriendType}
+      disabled={!isFriendType && !item.sender_id}
       className={`flex-row items-center gap-3 p-3 rounded-xl active:opacity-70 ${item.is_read ? '' : 'bg-white/5'}`}
     >
       {item.sender_name ? (

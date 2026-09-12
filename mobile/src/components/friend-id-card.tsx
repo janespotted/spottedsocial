@@ -28,35 +28,30 @@ const formatLastSeen = (lastLocationAt: string | null): string => {
 };
 
 /**
- * Port of the web FriendIdCard core on the HeroUI Native Dialog (animated
- * overlay + drag-to-dismiss for free): gradient avatar ring, relationship
- * badge, friends-also-here row, Meet Up CTA, report/block overflow.
- * Deferred vs web: DM button (chat unported), hide-my-location toggle,
- * rally, make-plans branch, mutual-friends list, distance.
+ * Card body shared by the map's Dialog card and the app-wide /friend-card
+ * form sheet: gradient avatar ring, relationship badge, friends-also-here
+ * row, Meet Up CTA, message button, report/block overflow.
  */
-export function FriendIdCard({
+export function FriendCardBody({
   friend,
-  isOpen,
-  onOpenChange,
-  friendsAtVenue,
   currentUserId,
+  onDismiss,
+  friendsAtVenue = [],
   onSelectFriend,
   onOpenVenue,
 }: {
-  friend: MapFriend | null;
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  friendsAtVenue: MapFriend[];
+  friend: MapFriend;
   currentUserId: string;
-  onSelectFriend: (friend: MapFriend) => void;
-  onOpenVenue: (venueName: string) => void;
+  /** Close the containing surface (dialog dismiss / sheet router.back) */
+  onDismiss: () => void;
+  friendsAtVenue?: MapFriend[];
+  onSelectFriend?: (friend: MapFriend) => void;
+  onOpenVenue?: (venueName: string) => void;
 }) {
   const [meetUpSent, setMeetUpSent] = useState(false);
   useEffect(() => {
     setMeetUpSent(false);
-  }, [friend?.user_id]);
-
-  if (!friend) return null;
+  }, [friend.user_id]);
 
   const ring = RING_GRADIENTS[friend.relationshipType] ?? RING_GRADIENTS.direct;
   const lastSeen = formatLastSeen(friend.last_location_at);
@@ -66,13 +61,13 @@ export function FriendIdCard({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     sendMeetUp(currentUserId, friend);
     setMeetUpSent(true);
-    setTimeout(() => onOpenChange(false), 900);
+    setTimeout(() => onDismiss(), 900);
   };
 
   const handleMessage = async () => {
     try {
       const threadId = await createDmThread(friend.user_id);
-      onOpenChange(false);
+      onDismiss();
       setTimeout(() => {
         router.push({
           pathname: '/thread',
@@ -100,7 +95,7 @@ export function FriendIdCard({
         if (index === 0) reportContent(currentUserId, { type: 'user', id: friend.user_id });
         if (index === 1) {
           blockUser(currentUserId, friend.user_id, friend.display_name);
-          onOpenChange(false);
+          onDismiss();
         }
       }
     );
@@ -115,16 +110,13 @@ export function FriendIdCard({
         cancelButtonIndex: friendsAtVenue.length,
       },
       (index) => {
-        if (index < friendsAtVenue.length) onSelectFriend(friendsAtVenue[index]);
+        if (index < friendsAtVenue.length) onSelectFriend?.(friendsAtVenue[index]);
       }
     );
   };
 
   return (
-    <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="bg-black/80" />
-        <Dialog.Content className="w-full max-w-[390px] bg-[#1a1030] border border-[#a855f7]/30 rounded-3xl p-5">
+    <View className="p-5">
           {/* Overflow menu */}
           <Pressable
             onPress={showOverflow}
@@ -148,7 +140,7 @@ export function FriendIdCard({
               </Text>
               {friend.venue_name ? (
                 <Pressable
-                  onPress={() => !friend.is_private_party && onOpenVenue(friend.venue_name)}
+                  onPress={() => !friend.is_private_party && onOpenVenue?.(friend.venue_name)}
                   hitSlop={4}
                 >
                   <Text className="text-[#d4ff00] text-sm font-sans-medium" numberOfLines={1}>
@@ -238,6 +230,47 @@ export function FriendIdCard({
               <SymbolView name="bubble.left" size={17} tintColor="rgba(255,255,255,0.5)" />
             </Pressable>
           </View>
+    </View>
+  );
+}
+
+/**
+ * Map's Dialog presentation of the card (HeroUI Native Dialog: animated
+ * overlay + drag-to-dismiss). App-wide surfaces use the /friend-card form
+ * sheet instead (see lib/friend-card.ts openFriendCard), which stacks above
+ * native modals where a Dialog portal cannot.
+ */
+export function FriendIdCard({
+  friend,
+  isOpen,
+  onOpenChange,
+  friendsAtVenue,
+  currentUserId,
+  onSelectFriend,
+  onOpenVenue,
+}: {
+  friend: MapFriend | null;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  friendsAtVenue: MapFriend[];
+  currentUserId: string;
+  onSelectFriend: (friend: MapFriend) => void;
+  onOpenVenue: (venueName: string) => void;
+}) {
+  if (!friend) return null;
+  return (
+    <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="bg-black/80" />
+        <Dialog.Content className="w-full max-w-[390px] bg-[#1a1030] border border-[#a855f7]/30 rounded-3xl p-0">
+          <FriendCardBody
+            friend={friend}
+            currentUserId={currentUserId}
+            onDismiss={() => onOpenChange(false)}
+            friendsAtVenue={friendsAtVenue}
+            onSelectFriend={onSelectFriend}
+            onOpenVenue={onOpenVenue}
+          />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog>

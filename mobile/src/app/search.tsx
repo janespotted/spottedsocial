@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { sendFriendRequest } from '@/lib/friends';
+import { openFriendCard } from '@/lib/friend-card';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
@@ -103,15 +104,20 @@ export default function SearchScreen() {
                   const isSent = sentIds.has(p.id);
                   return (
                     <View key={p.id} className="flex-row items-center gap-3">
-                      <Avatar name={p.display_name} url={p.avatar_url} size="sm" />
-                      <View className="flex-1 min-w-0">
-                        <Text className="text-white font-sans-medium text-sm" numberOfLines={1}>
-                          {p.display_name}
-                        </Text>
-                        <Text className="text-white/40 text-xs font-sans" numberOfLines={1}>
-                          @{p.username}
-                        </Text>
-                      </View>
+                      <Pressable
+                        onPress={() => openFriendCard(p.id, session?.user.id)}
+                        className="flex-1 flex-row items-center gap-3 min-w-0 active:opacity-70"
+                      >
+                        <Avatar name={p.display_name} url={p.avatar_url} size="sm" />
+                        <View className="flex-1 min-w-0">
+                          <Text className="text-white font-sans-medium text-sm" numberOfLines={1}>
+                            {p.display_name}
+                          </Text>
+                          <Text className="text-white/40 text-xs font-sans" numberOfLines={1}>
+                            @{p.username}
+                          </Text>
+                        </View>
+                      </Pressable>
                       {isFriend ? (
                         <View className="flex-row items-center gap-1 px-3 py-1.5">
                           <SymbolView name="checkmark" size={12} tintColor="rgba(255,255,255,0.4)" />
