@@ -1,14 +1,16 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useCSSVariable } from 'uniwind';
+import { useTabBarHidden } from '@/lib/tab-bar';
 
 export default function TabsLayout() {
   const [accent, muted] = useCSSVariable(['--color-accent', '--color-muted']) as [
     string,
     string,
   ];
+  const hidden = useTabBarHidden();
 
   return (
-    <NativeTabs tintColor={accent} iconColor={muted}>
+    <NativeTabs hidden={hidden} tintColor={accent} iconColor={muted}>
       <NativeTabs.Trigger name="(home)">
         <NativeTabs.Trigger.Icon sf="house.fill" />
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>

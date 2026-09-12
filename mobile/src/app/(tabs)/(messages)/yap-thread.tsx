@@ -30,6 +30,7 @@ import {
   type YapComment,
   type YapMessage,
 } from '@/lib/yap';
+import { useHideTabBar } from '@/lib/tab-bar';
 import { useSession } from '@/hooks/use-session';
 
 const NEON = '#d4ff00';
@@ -81,6 +82,8 @@ function VoteColumn({
 
 /** Anonymous venue chat room. Port of the web VenueYapThread (media deferred). */
 export default function YapThreadScreen() {
+  // The composer is bottom-anchored — the floating tab bar would cover it
+  useHideTabBar();
   const { venueName } = useLocalSearchParams<{ venueName: string }>();
   const { session } = useSession();
   const insets = useSafeAreaInsets();
