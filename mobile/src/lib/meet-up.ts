@@ -82,6 +82,33 @@ export async function acceptMeetUp(
   senderId: string,
   notificationId: string
 ): Promise<string | null> {
+  return acceptInviteNotification(currentUserId, senderId, notificationId, 'meetup_accepted');
+}
+
+/** Accept a venue invite (web handleAcceptVenueInvite parity). */
+export async function acceptVenueInvite(
+  currentUserId: string,
+  senderId: string,
+  notificationId: string,
+  inviteMessage: string
+): Promise<string | null> {
+  const venue = inviteMessage.match(/invited you to (.+?)\. Want to go\?/)?.[1] ?? null;
+  return acceptInviteNotification(
+    currentUserId,
+    senderId,
+    notificationId,
+    'venue_invite_accepted',
+    venue
+  );
+}
+
+async function acceptInviteNotification(
+  currentUserId: string,
+  senderId: string,
+  notificationId: string,
+  acceptedType: 'meetup_accepted' | 'venue_invite_accepted',
+  venueName?: string | null
+): Promise<string | null> {
   try {
     const { data: me } = await supabase
       .from('profiles')
@@ -89,11 +116,14 @@ export async function acceptMeetUp(
       .eq('id', currentUserId)
       .maybeSingle();
     const myName = me?.display_name?.split(' ')[0] ?? 'Someone';
-    const message = `${myName} is down to meet up! 🎉`;
+    const message =
+      acceptedType === 'venue_invite_accepted'
+        ? `${myName} is down for ${venueName ?? 'it'}! 🎉`
+        : `${myName} is down to meet up! 🎉`;
 
     const { data, error } = await supabase.rpc('create_notification', {
       p_receiver_id: senderId,
-      p_type: 'meetup_accepted',
+      p_type: acceptedType,
       p_message: message,
     });
     if (error) throw error;
@@ -105,7 +135,7 @@ export async function acceptMeetUp(
             notification_id: notif.id,
             receiver_id: senderId,
             sender_id: currentUserId,
-            type: 'meetup_accepted',
+            type: acceptedType,
             message,
           },
         })
