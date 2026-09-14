@@ -177,12 +177,17 @@ export default function PhoneScreen() {
               {busy ? (mode === 'phone' ? 'sending...' : 'signing in...') : 'continue'}
             </Text>
           </Pressable>
+          {/* Email/password was the Twilio-outage workaround (SOW FIX #12:
+              phone-OTP only). Toggle hidden per client; uncomment to restore.
+              NOTE: with Twilio still suspended, fresh sign-ins are impossible
+              while this is hidden — existing sessions are unaffected.
           <Text
             className="text-sm text-center text-white/40 font-sans underline"
             onPress={() => switchMode(mode === 'phone' ? 'email' : 'phone')}
           >
             {mode === 'phone' ? 'sign in with email instead' : 'sign in with phone instead'}
           </Text>
+          */}
           <Text className="text-xs text-center text-white/40 font-sans">
             by continuing, you agree to our{' '}
             <Text
