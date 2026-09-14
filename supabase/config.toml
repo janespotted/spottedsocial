@@ -29,3 +29,18 @@ verify_jwt = true
 
 [functions.refresh-leaderboard-energy]
 verify_jwt = true
+
+# Test phone numbers for phone/OTP login. No SMS is sent; the fixed code below
+# is accepted for these numbers only. Applies to local dev, and to the hosted
+# project when pushed with `supabase config push`. See supabase/TEST-PHONE-USERS.md.
+[auth.sms.test_otp]
+15550000001 = "123456"
+15550000002 = "123456"
+15550000003 = "123456"
+15550000004 = "123456"
+15550000005 = "123456"
+15550000006 = "123456"
+15550000007 = "123456"
+15550000008 = "123456"
+15550000009 = "123456"
+15550000010 = "123456"
