@@ -89,10 +89,21 @@ export default function UsernameScreen() {
     if (!usernameAvailable || !agreedToTerms || !session) return;
     setLoading(true);
     setError(null);
+    // Default avatar: unique DiceBear cartoon per user (same style/palette
+    // as the seeded profiles), unless the profile already has a photo
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', session.user.id)
+      .maybeSingle();
+    const cleanUsername = username.trim();
     const { error: err } = await supabase.from('profiles').upsert({
       id: session.user.id,
       display_name: (displayName ?? '').trim(),
-      username: username.trim(),
+      username: cleanUsername,
+      avatar_url:
+        existing?.avatar_url ??
+        `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(cleanUsername)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`,
     });
     setLoading(false);
     if (err) {
