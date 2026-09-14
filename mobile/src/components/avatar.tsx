@@ -13,9 +13,13 @@ export function Avatar({ name, url, size = 'md' }: AvatarProps) {
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
 
+  // Seeded profiles store DiceBear SVG urls; RN's core Image (inside
+  // HeroAvatar.Image) can't render SVG — DiceBear serves PNG at the same path
+  const resolvedUrl = url?.includes('api.dicebear.com') ? url.replace('/svg', '/png') : url;
+
   return (
     <HeroAvatar size={size} color="accent" alt={name}>
-      {url ? <HeroAvatar.Image source={{ uri: url }} /> : null}
+      {resolvedUrl ? <HeroAvatar.Image source={{ uri: resolvedUrl }} /> : null}
       <HeroAvatar.Fallback>{initials || '?'}</HeroAvatar.Fallback>
     </HeroAvatar>
   );
