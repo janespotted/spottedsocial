@@ -29,10 +29,6 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle }}>
-      {/* Chat threads: root-level pushes so they slide OVER the native tab
-          bar (per-screen tab-bar hiding pops visibly with native tabs) */}
-      <Stack.Screen name="thread" options={{ contentStyle: gradientStyle }} />
-      <Stack.Screen name="yap-thread" options={{ contentStyle: gradientStyle }} />
       <Stack.Protected guard={!!session && !onboardingNeeded}>
         <Stack.Screen name="(tabs)" />
       </Stack.Protected>
@@ -44,6 +40,14 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Screen name="terms" options={{ presentation: 'modal' }} />
       <Stack.Screen name="privacy" options={{ presentation: 'modal' }} />
+      {/* Everything below requires a session — the guard evicts any of
+          these left open (thread, sheets, modals) the moment it drops,
+          instead of stranding them above the auth screen */}
+      <Stack.Protected guard={!!session}>
+      {/* Chat threads: root-level pushes so they slide OVER the native tab
+          bar (per-screen tab-bar hiding pops visibly with native tabs) */}
+      <Stack.Screen name="thread" options={{ contentStyle: gradientStyle }} />
+      <Stack.Screen name="yap-thread" options={{ contentStyle: gradientStyle }} />
       <Stack.Screen name="comments" options={{ presentation: 'modal' }} />
       <Stack.Screen name="create-post" options={{ presentation: 'modal' }} />
       <Stack.Screen name="create-plan" options={{ presentation: 'modal' }} />
@@ -126,6 +130,7 @@ function RootNavigator() {
           contentStyle: { backgroundColor: 'transparent' },
         }}
       />
+      </Stack.Protected>
       <Stack.Screen name="business" />
     </Stack>
   );
