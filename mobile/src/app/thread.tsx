@@ -31,6 +31,7 @@ import { fetchProfilesSafe } from '@/lib/profiles';
 import { resolvePostImageUrl } from '@/lib/posts';
 import { isFromTonight } from '@/lib/time-context';
 import { useSession } from '@/hooks/use-session';
+import { useTypingIndicator } from '@/hooks/use-typing-indicator';
 import { Avatar } from '@/components/avatar';
 
 const NEON = '#d4ff00';
@@ -86,17 +87,13 @@ export default function ThreadScreen() {
   const [sharedPosts, setSharedPosts] = useState<Map<string, SharedPostData>>(new Map());
   const [otherReadAt, setOtherReadAt] = useState<string | null>(null);
   const [bothShowReceipts, setBothShowReceipts] = useState(false);
-  const [typingNames, setTypingNames] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
   const [uploading, setUploading] = useState(false);
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   // Ids already on screen — only messages arriving AFTER a fetch animate in
   const seenIdsRef = useRef<Set<string>>(new Set());
-  const lastTypingSentRef = useRef(0);
-  const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const memberMapRef = useRef(memberMap);
-  memberMapRef.current = memberMap;
   const contentContainerStyle = useResolveClassNames('px-4 py-4');
+  const { typingNames, setTyping } = useTypingIndicator(threadId, userId, memberMap);
 
   /* ── Thread data: members, group info, read-receipt privacy ── */
   useEffect(() => {
@@ -275,44 +272,10 @@ export default function ThreadScreen() {
             setOtherReadAt(row.last_read_at);
           }
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'dm_typing_indicators',
-          filter: `thread_id=eq.${threadId}`,
-        },
-        async (payload) => {
-          const row = (payload.new ?? payload.old) as { user_id?: string } | null;
-          if (row?.user_id === userId) return;
-          const fiveSecsAgo = new Date(Date.now() - 5000).toISOString();
-          const { data } = await supabase
-            .from('dm_typing_indicators' as never)
-            .select('user_id, updated_at')
-            .eq('thread_id', threadId)
-            .neq('user_id', userId)
-            .gt('updated_at', fiveSecsAgo);
-          const names = ((data ?? []) as Array<{ user_id: string }>).map(
-            (r) => memberMapRef.current.get(r.user_id)?.display_name.split(' ')[0] ?? 'Someone'
-          );
-          setTypingNames((prev) => (prev.length === 0 && names.length === 0 ? prev : names));
-        }
       ),
     });
 
-    return () => {
-      teardown();
-      // Clean up own typing indicator on leave
-      supabase
-        .from('dm_typing_indicators' as never)
-        .delete()
-        .eq('thread_id', threadId)
-        .eq('user_id', userId)
-        .then(() => {});
-      if (typingClearRef.current) clearTimeout(typingClearRef.current);
-    };
+    return teardown;
   }, [threadId, userId, fetchMessages]);
 
   /* ── My reactions on visible messages ── */
@@ -368,31 +331,6 @@ export default function ThreadScreen() {
       });
     })();
   }, [messages, sharedPosts]);
-
-  /* ── Typing indicator (mine) ── */
-  const setTyping = useCallback(() => {
-    if (!threadId || !userId) return;
-    const now = Date.now();
-    if (now - lastTypingSentRef.current < 2000) return;
-    lastTypingSentRef.current = now;
-    if (typingClearRef.current) clearTimeout(typingClearRef.current);
-    supabase
-      .from('dm_typing_indicators' as never)
-      .upsert({
-        thread_id: threadId,
-        user_id: userId,
-        updated_at: new Date().toISOString(),
-      } as never)
-      .then(() => {});
-    typingClearRef.current = setTimeout(() => {
-      supabase
-        .from('dm_typing_indicators' as never)
-        .delete()
-        .eq('thread_id', threadId)
-        .eq('user_id', userId)
-        .then(() => {});
-    }, 4000);
-  }, [threadId, userId]);
 
   /* ── Send ── */
   const recipientIds = groupInfo
@@ -693,6 +631,9 @@ export default function ThreadScreen() {
       <KeyboardAwareLegendList
         data={messages}
         keyExtractor={(m: DmMessage) => m.id}
+        // Rows run a one-shot FadeInDown gated on seenIdsRef; a recycled row
+        // would replay or skip that animation against the wrong message.
+        recycleItems={false}
         contentContainerStyle={contentContainerStyle}
         alignItemsAtEnd
         maintainScrollAtEnd

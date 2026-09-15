@@ -313,6 +313,10 @@ export default function YapThreadScreen() {
       <LegendList
         data={messages ?? []}
         keyExtractor={(y) => y.id}
+        // Rows read expanded/comments/commentDrafts from component state and
+        // pass no extraData, so recycled rows would show stale comment
+        // sections. Remount-on-reuse until that state is wired to extraData.
+        recycleItems={false}
         contentContainerStyle={contentContainerStyle}
         ListHeaderComponent={
           (pinned ?? []).length > 0 ? (

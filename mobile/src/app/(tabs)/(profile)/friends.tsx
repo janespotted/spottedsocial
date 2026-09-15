@@ -252,6 +252,9 @@ export default function FriendsScreen() {
       <LegendList
         data={data?.rows ?? []}
         keyExtractor={(r) => r.key}
+        // Mixed row kinds (header/request/friend) reading requestedIds from
+        // component state, with no extraData — remount on reuse.
+        recycleItems={false}
         contentContainerStyle={contentContainerStyle}
         refreshControl={
           <RefreshControl

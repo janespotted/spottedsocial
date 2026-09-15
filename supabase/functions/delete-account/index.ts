@@ -91,8 +91,7 @@ Deno.serve(async (req) => {
       { table: 'location_hidden', column: 'user_id' },
       { table: 'location_hidden', column: 'hidden_from_id' },
 
-      // Delete messages and typing indicators
-      { table: 'dm_typing_indicators', column: 'user_id' },
+      // Delete messages (typing indicators are Presence-only — nothing stored)
       { table: 'dm_messages', column: 'sender_id' },
       { table: 'dm_read_receipts', column: 'user_id' },
       { table: 'dm_thread_members', column: 'user_id' },

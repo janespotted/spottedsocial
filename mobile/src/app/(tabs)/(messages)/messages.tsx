@@ -170,7 +170,6 @@ export default function MessagesScreen() {
     data: threads,
     isLoading,
     refetch,
-    isRefetching,
   } = useQuery({
     queryKey: ['dm-threads', session?.user.id],
     enabled: !!session,
@@ -183,7 +182,6 @@ export default function MessagesScreen() {
     data: yaps,
     isLoading: yapsLoading,
     refetch: refetchYaps,
-    isRefetching: yapsRefetching,
   } = useQuery({
     queryKey: ['yap-directory', city],
     enabled: !!session && !!city && activeTab === 'yap',
@@ -229,6 +227,19 @@ export default function MessagesScreen() {
           ),
     });
   }, [session, queryClient]);
+
+  // Pull-to-refresh owns this flag, not the query's isRefetching: realtime
+  // invalidations (a DM sent from the thread screen) refetch in the
+  // background, and isRefetching would show a spinner nobody pulled for.
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const pullToRefresh = async (fn: () => Promise<unknown>) => {
+    setIsRefreshing(true);
+    try {
+      await fn();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const sortedYaps = [...(yaps ?? [])].sort((a, b) =>
     yapSort === 'hot'
@@ -350,8 +361,8 @@ export default function MessagesScreen() {
           contentContainerStyle={yapContentStyle}
           refreshControl={
             <RefreshControl
-              refreshing={yapsRefetching}
-              onRefresh={refetchYaps}
+              refreshing={isRefreshing}
+              onRefresh={() => pullToRefresh(refetchYaps)}
               tintColorClassName="accent-[#d4ff00]"
             />
           }
@@ -427,8 +438,8 @@ export default function MessagesScreen() {
           contentContainerStyle={contentContainerStyle}
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
+              refreshing={isRefreshing}
+              onRefresh={() => pullToRefresh(refetch)}
               tintColorClassName="accent-[#d4ff00]"
             />
           }
