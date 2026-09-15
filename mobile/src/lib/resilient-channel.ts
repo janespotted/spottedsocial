@@ -22,6 +22,12 @@ interface ResilientChannelOptions {
 // supabase.channel() returns the existing instance for a repeated topic, and
 // .on() on an already-subscribed channel throws — so every instance gets a
 // unique topic and callers never need Math.random() suffixes.
+//
+// The topic must ALSO be unique per subscribe attempt: removeChannel() is
+// async and the old channel stays in the client's list until its leave is
+// acked. Reusing the topic on retry handed back that dying instance, stacked
+// another close/error callback on it, and every CLOSED then scheduled N more
+// retries — an unbounded resubscribe loop after any transport drop.
 let topicCounter = 0;
 
 /**
@@ -36,11 +42,12 @@ let topicCounter = 0;
  */
 export function createResilientChannel(opts: ResilientChannelOptions): () => void {
   const { configure, onReconnect, onStatus } = opts;
-  const topic = `${opts.name}-r${++topicCounter}`;
+  const baseTopic = `${opts.name}-r${++topicCounter}`;
 
   let channel: RealtimeChannel | null = null;
   let retryTimeout: ReturnType<typeof setTimeout> | null = null;
   let attempt = 0;
+  let generation = 0;
   let destroyed = false;
   let everSubscribed = false;
 
@@ -50,14 +57,20 @@ export function createResilientChannel(opts: ResilientChannelOptions): () => voi
     if (destroyed) return;
 
     if (channel) {
-      supabase.removeChannel(channel);
+      // Fire-and-forget: the leave is acked asynchronously, which is exactly
+      // why the replacement below must not share this channel's topic.
+      void supabase.removeChannel(channel);
       channel = null;
     }
 
+    const topic = `${baseTopic}-s${++generation}`;
     const ch = configure(supabase.channel(topic));
+    channel = ch;
 
     ch.subscribe((status, err) => {
-      if (destroyed) return;
+      // Status callbacks from a channel we've already replaced (its deferred
+      // CLOSED after removeChannel) must not drive the current one.
+      if (destroyed || ch !== channel) return;
 
       onStatus?.(status, err as Error | undefined);
 
@@ -73,8 +86,6 @@ export function createResilientChannel(opts: ResilientChannelOptions): () => voi
         scheduleRetry();
       }
     });
-
-    channel = ch;
   }
 
   function scheduleRetry() {
