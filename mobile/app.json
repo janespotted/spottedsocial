@@ -11,6 +11,7 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.janereynolds.spotted",
+      "buildNumber": "46",
       "infoPlist": {
         "TSLocationManagerLicense": "eyJhbGciOiJFZERTQSIsImtpZCI6ImVkMjU1MTktbWFpbi12MSJ9.eyJvcyI6ImlvcyIsImFwcF9pZCI6ImNvbS5qYW5lcmV5bm9sZHMuc3BvdHRlZCIsIm9yZGVyX251bWJlciI6IiIsInJlbmV3YWxfdXJsIjoiIiwiY3VzdG9tZXJfaWQiOiIiLCJwcm9kdWN0IjoicmVhY3QtbmF0aXZlLWJhY2tncm91bmQtZ2VvbG9jYXRpb24iLCJrZXlfdmVyc2lvbiI6MSwiYWxsb3dlZF9zdWZmaXhlcyI6WyIuZGV2IiwiLmRldmVsb3BtZW50IiwiLnN0YWdpbmciLCIuc3RhZ2UiLCIucWEiLCIudWF0IiwiLnRlc3QiLCIuZGVidWciXSwibWF4X2J1aWxkX3N0YW1wIjoyMDI2MTAwNywiZ3JhY2VfYnVpbGRzIjowLCJlbnRpdGxlbWVudHMiOlsiY29yZSIsInBvbHlnb24tZ2VvZmVuY2luZyJdLCJpYXQiOjE3ODg3NzM2MDgsImV4cCI6MTc5MTM2NTYwOCwidHJpYWwiOnRydWUsInRyaWFsX2RheXMiOjMwfQ.SQK8lO2GLpxyKEo5cgRpoJSn5-FEgjtCeTGqLHh1T7Zmrp7fcZVInuwWJk_bZQ3o6Q27z6l4aodSEZ7oGaRVCQ",
         "NSLocationWhenInUseUsageDescription": "Spotted uses your location to show which friends are nearby and detect when you arrive at venues.",

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spotted — How Privacy Works</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Poppins', -apple-system, sans-serif;
+    background: #0d0817;
+    color: #fff;
+    padding: 40px 20px 60px;
+    max-width: 860px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  h1 { font-size: 30px; font-weight: 800; letter-spacing: 0.3px; margin-bottom: 6px; }
+  .sub { color: rgba(255,255,255,0.5); font-size: 15px; margin-bottom: 34px; }
+  .lime { color: #d4ff00; }
+  .purple { color: #c9a5f7; }
+
+  .rule {
+    background: linear-gradient(135deg, rgba(212,255,0,0.12), rgba(168,85,247,0.1));
+    border: 1px solid rgba(212,255,0,0.3);
+    border-radius: 18px; padding: 22px 24px; margin-bottom: 34px;
+  }
+  .rule .k { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #d4ff00; margin-bottom: 8px; }
+  .rule .t { font-size: 20px; font-weight: 700; line-height: 1.35; }
+  .rule .t span { color: #d4ff00; }
+
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,0.5); margin: 38px 0 16px; }
+
+  /* three levels */
+  .levels { display: flex; flex-direction: column; gap: 12px; }
+  .lvl { display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px 18px; }
+  .lvl .badge { flex-shrink: 0; width: 108px; text-align: center; font-size: 13px; font-weight: 700; padding: 8px 6px; border-radius: 10px; }
+  .lvl.close .badge { background: rgba(212,255,0,0.15); color: #d4ff00; }
+  .lvl.all .badge { background: rgba(96,165,250,0.15); color: #93c5fd; }
+  .lvl.mutual .badge { background: rgba(168,85,247,0.2); color: #c9a5f7; }
+  .lvl .desc { font-size: 14.5px; }
+  .lvl .desc b { font-weight: 600; }
+  .lvl .desc .who { color: rgba(255,255,255,0.55); font-size: 13px; }
+
+  /* one-directional cards */
+  .oneway { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .oneway { grid-template-columns: 1fr; } }
+  .ow { background: rgba(255,255,255,0.04); border: 1px solid rgba(168,85,247,0.2); border-radius: 16px; padding: 18px 20px; }
+  .ow .h { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+  .ow .flow { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
+  .node { background: rgba(255,255,255,0.08); border-radius: 10px; padding: 7px 12px; font-size: 13px; font-weight: 600; }
+  .arrow { color: #d4ff00; font-size: 18px; font-weight: 700; }
+  .arrow.dead { color: #ef6a6a; }
+  .ow .note { font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 8px; }
+  .ow .note b { color: #fff; font-weight: 600; }
+
+  /* worked example */
+  .ex { background: #16101f; border: 1px solid rgba(168,85,247,0.2); border-radius: 18px; padding: 24px; }
+  .ex .people { display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 22px; }
+  .person { text-align: center; }
+  .av { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; margin: 0 auto 8px; }
+  .av.jane { background: linear-gradient(135deg,#d4ff00,#8faf00); color: #16250a; }
+  .av.sam { background: linear-gradient(135deg,#a855f7,#6d28d9); color: #fff; }
+  .person .nm { font-weight: 600; font-size: 15px; }
+  .person .set { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .rel { color: rgba(255,255,255,0.4); font-size: 13px; font-style: italic; align-self: center; }
+
+  .directions { display: flex; flex-direction: column; gap: 12px; }
+  .dir { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 13px; }
+  .dir.yes { background: rgba(212,255,0,0.08); border: 1px solid rgba(212,255,0,0.3); }
+  .dir.no { background: rgba(239,106,106,0.08); border: 1px solid rgba(239,106,106,0.3); }
+  .dir .icon { font-size: 22px; flex-shrink: 0; }
+  .dir .txt { font-size: 14.5px; }
+  .dir .txt b { font-weight: 700; }
+  .dir .txt .why { display: block; color: rgba(255,255,255,0.55); font-size: 13px; margin-top: 2px; }
+  .dir.yes .icon { color: #d4ff00; }
+  .dir.no .icon { color: #ef6a6a; }
+
+  .takeaway { margin-top: 16px; font-size: 14px; color: rgba(255,255,255,0.65); text-align: center; font-style: italic; }
+
+  /* the check */
+  .check { display: flex; flex-direction: column; gap: 8px; }
+  .step { display: flex; gap: 12px; align-items: flex-start; background: rgba(255,255,255,0.03); border-radius: 12px; padding: 13px 16px; }
+  .step .n { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: rgba(168,85,247,0.25); color: #c9a5f7; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .step .c { font-size: 14px; }
+  .step .c b { font-weight: 600; }
+  .step .c .r { color: rgba(255,255,255,0.5); font-size: 13px; }
+
+  .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+
+  <h1>How location privacy works on <span class="lime">Spotted</span></h1>
+  <div class="sub">Three sharing levels, and one rule that explains all of it.</div>
+
+  <div class="rule">
+    <div class="k">The one rule</div>
+    <div class="t">Your privacy setting controls <span>who can see you</span> — and only you. It says nothing about who <em>you</em> can see. Everyone has their own setting.</div>
+  </div>
+
+  <h2>The three levels — who's allowed to see you</h2>
+  <div class="levels">
+    <div class="lvl close">
+      <div class="badge">Close Friends</div>
+      <div class="desc"><b>Only people on your Close Friends list.</b> <span class="who">The tightest circle — you pick exactly who's in it.</span></div>
+    </div>
+    <div class="lvl all">
+      <div class="badge">All Friends</div>
+      <div class="desc"><b>Anyone you're friends with.</b> <span class="who">Your full accepted-friends list.</span></div>
+    </div>
+    <div class="lvl mutual">
+      <div class="badge">Mutual</div>
+      <div class="desc"><b>Friends — plus friends of your friends.</b> <span class="who">The widest circle: anyone who shares at least one friend with you.</span></div>
+    </div>
+  </div>
+
+  <h2>Two things that only go one way</h2>
+  <div class="oneway">
+    <div class="ow">
+      <div class="h">🤝 Close Friends is one-directional</div>
+      <div class="flow"><span class="node">You add Sam</span><span class="arrow">→</span><span class="node">Sam is your close friend</span></div>
+      <div class="flow"><span class="node">You</span><span class="arrow dead">✕</span><span class="node">…but you're not automatically Sam's</span></div>
+      <div class="note">Your Close Friends list is <b>yours alone.</b> Adding someone doesn't add you to theirs — they choose their own list, separately.</div>
+    </div>
+    <div class="ow">
+      <div class="h">👁️ Visibility is one-directional too</div>
+      <div class="flow"><span class="node">You see Sam</span><span class="arrow dead">✕</span><span class="node">doesn't mean Sam sees you</span></div>
+      <div class="note">Whether <b>you</b> see Sam depends on <b>Sam's</b> setting. Whether <b>Sam</b> sees you depends on <b>your</b> setting. Two separate checks — they can disagree.</div>
+    </div>
+  </div>
+
+  <h2>What that looks like — a real example</h2>
+  <div class="ex">
+    <div class="people">
+      <div class="person">
+        <div class="av jane">J</div>
+        <div class="nm">You</div>
+        <div class="set">Sharing: <span class="purple">Mutual</span></div>
+      </div>
+      <div class="rel">friends of friends<br>(1 shared friend)</div>
+      <div class="person">
+        <div class="av sam">S</div>
+        <div class="nm">Sam</div>
+        <div class="set">Sharing: <span class="lime">Close Friends</span></div>
+      </div>
+    </div>
+
+    <div class="directions">
+      <div class="dir yes">
+        <span class="icon">✓</span>
+        <div class="txt"><b>Sam CAN see you.</b><span class="why">Your setting is <span class="purple">Mutual</span>, and Sam is a friend-of-a-friend → Sam qualifies. So Sam sees you.</span></div>
+      </div>
+      <div class="dir no">
+        <span class="icon">✕</span>
+        <div class="txt"><b>You CANNOT see Sam.</b><span class="why">Sam's setting is <span class="lime">Close Friends only</span>, and you're not on Sam's close list → you don't qualify. So Sam stays hidden from you.</span></div>
+      </div>
+    </div>
+    <div class="takeaway">Same two people, opposite results — because each person's own setting decides who sees <em>them.</em> One-way visibility is normal, not a bug.</div>
+  </div>
+
+  <h2>How the app decides "can A see B?" — in order</h2>
+  <div class="check">
+    <div class="step"><span class="n">1</span><div class="c"><b>Blocked?</b> <span class="r">If either has blocked the other → no. Stop.</span></div></div>
+    <div class="step"><span class="n">2</span><div class="c"><b>Hidden?</b> <span class="r">If B specifically hid their location from A → no. Stop.</span></div></div>
+    <div class="step"><span class="n">3</span><div class="c"><b>Check B's sharing level:</b> <span class="r">Close Friends → is A on B's close list? · All Friends → are they friends? · Mutual → friends, or friends-of-friends?</span></div></div>
+    <div class="step"><span class="n">4</span><div class="c"><b>Qualifies → A sees B. Otherwise → hidden.</b> <span class="r">This runs separately for each direction.</span></div></div>
+  </div>
+
+  <div class="footer">Spotted — location privacy model. Your dial controls who sees you; their dial controls who sees them.</div>
+
+</body>
+</html>
