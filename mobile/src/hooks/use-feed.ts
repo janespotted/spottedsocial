@@ -31,20 +31,29 @@ export interface FeedPost {
  * newest first, cursor-paginated. Port of the web useFeed core. Demo posts
  * are excluded except in dev builds (see DEMO_MODE).
  */
+// Stable fallback so a failed friend-ids query can't hand the effects a fresh
+// [] every render (a new reference would re-run the feed fetch each time).
+const NO_FRIENDS: string[] = [];
+
 export function useFeed() {
   const { session } = useSession();
-  const { data: friendIds } = useFriendIds(session?.user.id);
+  const userId = session?.user.id;
+  const friendQuery = useFriendIds(userId);
+  // undefined = still loading (feed waits); a failed query degrades to own posts
+  const friendIds = friendQuery.data ?? (friendQuery.isError ? NO_FRIENDS : undefined);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const loadingMoreRef = useRef(false);
+  const refreshInFlight = useRef<Promise<void> | null>(null);
+  const refreshQueued = useRef(false);
 
   const fetchPage = useCallback(
     async (cursor: string | null): Promise<FeedPost[]> => {
-      if (!session) return [];
-      const userIds = [session.user.id, ...(friendIds ?? [])];
+      if (!userId) return [];
+      const userIds = [userId, ...(friendIds ?? [])];
 
       let query = supabase
         .from('posts')
@@ -60,7 +69,7 @@ export function useFeed() {
         // Friends' posts (any visibility) + friends-of-friends' posts marked
         // mutual_friends — port of the web expansion via get_mutual_friend_ids.
         const { data: mutualData } = await supabase.rpc('get_mutual_friend_ids', {
-          p_user_id: session.user.id,
+          p_user_id: userId,
         });
         const mutualIds = (mutualData ?? []).map((r: { user_id: string }) => r.user_id);
         if (mutualIds.length > 0) {
@@ -92,7 +101,7 @@ export function useFeed() {
         const mine = new Set<string>();
         for (const l of likeRows ?? []) {
           likeCounts.set(l.post_id, (likeCounts.get(l.post_id) ?? 0) + 1);
-          if (l.user_id === session.user.id) mine.add(l.post_id);
+          if (l.user_id === userId) mine.add(l.post_id);
         }
         for (const c of commentRows ?? []) {
           commentCounts.set(c.post_id, (commentCounts.get(c.post_id) ?? 0) + 1);
@@ -126,34 +135,69 @@ export function useFeed() {
       }));
       return page;
     },
-    [session, friendIds]
+    [userId, friendIds]
   );
 
-  const refresh = useCallback(async () => {
-    setIsRefreshing(true);
-    const page = await fetchPage(null);
-    setPosts(page);
-    setHasMore(page.length === POSTS_PER_PAGE);
-    setIsRefreshing(false);
-    setIsLoading(false);
-  }, [fetchPage]);
+  /**
+   * Reload page one. Single-flight: a foreground, a realtime reconnect and a
+   * composer invalidation routinely land together, and each used to run its
+   * own fetch and flip the pull-to-refresh spinner. Concurrent calls now
+   * share the in-flight fetch (one more run is queued so nothing is missed),
+   * and only a user pull shows the RefreshControl spinner — background
+   * refreshes are silent. try/finally so a failed fetch can't leave the
+   * spinner (or the initial skeleton) stuck on forever.
+   */
+  const refresh = useCallback(
+    (opts?: { userInitiated?: boolean }): Promise<void> => {
+      if (opts?.userInitiated) setIsRefreshing(true);
+      if (refreshInFlight.current) {
+        refreshQueued.current = true;
+        return refreshInFlight.current;
+      }
+      const run = (async () => {
+        try {
+          const page = await fetchPage(null);
+          setPosts(page);
+          setHasMore(page.length === POSTS_PER_PAGE);
+        } catch (e) {
+          console.warn('[feed] refresh failed', e);
+        } finally {
+          refreshInFlight.current = null;
+          setIsRefreshing(false);
+          setIsLoading(false);
+        }
+        if (refreshQueued.current) {
+          refreshQueued.current = false;
+          await refresh();
+        }
+      })();
+      refreshInFlight.current = run;
+      return run;
+    },
+    [fetchPage]
+  );
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMoreRef.current || posts.length === 0) return;
     loadingMoreRef.current = true;
-    const page = await fetchPage(posts[posts.length - 1].created_at);
-    setPosts((prev) => [...prev, ...page]);
-    setHasMore(page.length === POSTS_PER_PAGE);
-    loadingMoreRef.current = false;
+    try {
+      const page = await fetchPage(posts[posts.length - 1].created_at);
+      setPosts((prev) => [...prev, ...page]);
+      setHasMore(page.length === POSTS_PER_PAGE);
+    } catch (e) {
+      console.warn('[feed] loadMore failed', e);
+    } finally {
+      loadingMoreRef.current = false;
+    }
   }, [fetchPage, hasMore, posts]);
 
   useEffect(() => {
-    if (!session || friendIds === undefined) return;
+    if (!userId || friendIds === undefined) return;
     refresh();
-  }, [session, friendIds, refresh]);
+  }, [userId, friendIds, refresh]);
 
   // Refresh immediately when a new post is created (composer calls invalidateFeed)
-  useEffect(() => onFeedInvalidated(refresh), [refresh]);
+  useEffect(() => onFeedInvalidated(() => void refresh()), [refresh]);
 
   // Foreground refresh is handled by the resilient channel's onReconnect.
 
@@ -172,12 +216,12 @@ export function useFeed() {
   // incremental handlers). RLS scopes what postgres_changes delivers, but we
   // still gate on authorship because demo posts are dev-only.
   useEffect(() => {
-    if (!session || friendIds === undefined) return;
-    const friendSet = new Set(friendIds ?? []);
+    if (!userId || friendIds === undefined) return;
+    const friendSet = new Set(friendIds);
 
     return createResilientChannel({
       name: 'feed-realtime',
-      onReconnect: refresh,
+      onReconnect: () => void refresh(),
       configure: (ch) => ch
         .on(
         'postgres_changes',
@@ -186,7 +230,7 @@ export function useFeed() {
           const p = payload.new as Record<string, any>;
           if (!p?.id) return;
           const visible =
-            p.user_id === session.user.id ||
+            p.user_id === userId ||
             friendSet.has(p.user_id) ||
             (DEMO_MODE && p.is_demo);
           if (!visible) return;
@@ -222,7 +266,7 @@ export function useFeed() {
           }
         ),
     });
-  }, [session, friendIds, refresh]);
+  }, [userId, friendIds, refresh]);
 
   const toggleLike = useCallback(
     async (postId: string) => {

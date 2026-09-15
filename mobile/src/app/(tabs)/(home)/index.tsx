@@ -360,7 +360,7 @@ export default function HomeScreen() {
             <RefreshControl
               refreshing={feed.isRefreshing}
               onRefresh={() => {
-                feed.refresh();
+                feed.refresh({ userInitiated: true });
                 refetchFriends();
               }}
               tintColorClassName="accent-[#d4ff00]"

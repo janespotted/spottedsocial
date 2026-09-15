@@ -53,14 +53,30 @@ export function createResilientChannel(opts: ResilientChannelOptions): () => voi
 
   const backoff = () => Math.min(1000 * Math.pow(2, attempt), 30000);
 
+  function clearRetry() {
+    if (retryTimeout) {
+      clearTimeout(retryTimeout);
+      retryTimeout = null;
+    }
+  }
+
   function subscribe() {
     if (destroyed) return;
+    clearRetry();
 
-    if (channel) {
+    // Detach the old instance BEFORE leaving it. When the old channel is not
+    // joined (errored after a transport drop, or still joining), phoenix acks
+    // the leave synchronously and fires CLOSED right here — with `channel`
+    // still pointing at it, that CLOSED passed the identity guard below and
+    // scheduled the next retry, which replaced the healthy replacement a
+    // second later, which fired CLOSED, which scheduled a retry… a permanent
+    // 1s CLOSED → SUBSCRIBED → onReconnect loop from a single socket drop.
+    const old = channel;
+    channel = null;
+    if (old) {
       // Fire-and-forget: the leave is acked asynchronously, which is exactly
       // why the replacement below must not share this channel's topic.
-      void supabase.removeChannel(channel);
-      channel = null;
+      void supabase.removeChannel(old);
     }
 
     const topic = `${baseTopic}-s${++generation}`;
@@ -75,6 +91,10 @@ export function createResilientChannel(opts: ResilientChannelOptions): () => voi
       onStatus?.(status, err as Error | undefined);
 
       if (status === 'SUBSCRIBED') {
+        // Phoenix rejoins an errored channel by itself once the socket is
+        // back, so SUBSCRIBED can arrive while our own retry is still
+        // pending. That retry would tear down this healthy channel — drop it.
+        clearRetry();
         attempt = 0;
         if (everSubscribed) onReconnect?.();
         everSubscribed = true;
@@ -102,8 +122,7 @@ export function createResilientChannel(opts: ResilientChannelOptions): () => voi
     if (destroyed || state !== 'active') return;
     // A backoff retry scheduled while backgrounded never ran — fire it now.
     if (retryTimeout) {
-      clearTimeout(retryTimeout);
-      retryTimeout = null;
+      clearRetry();
       subscribe();
     }
     onReconnect?.();
@@ -113,10 +132,7 @@ export function createResilientChannel(opts: ResilientChannelOptions): () => voi
 
   return () => {
     destroyed = true;
-    if (retryTimeout) {
-      clearTimeout(retryTimeout);
-      retryTimeout = null;
-    }
+    clearRetry();
     if (channel) {
       supabase.removeChannel(channel);
       channel = null;

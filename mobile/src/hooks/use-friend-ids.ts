@@ -28,7 +28,11 @@ export function useFriendIds(userId: string | undefined) {
         ...(sent.data?.map((f) => f.friend_id) ?? []),
         ...(received.data?.map((f) => f.user_id) ?? []),
       ];
-      return [...new Set(ids)];
+      // Sorted so react-query's structural sharing keeps the SAME array
+      // reference across refetches (the selects have no ORDER BY). Consumers
+      // key effects and query keys on this array — a reordered copy would
+      // re-run the feed fetch and rebuild realtime channels on every refetch.
+      return [...new Set(ids)].sort();
     },
   });
 }
