@@ -13,13 +13,13 @@ import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
-import { goPlanning, stopSharing } from '@/lib/night-status';
+import { stayIn } from '@/lib/night-status';
 import { sendMeetUp } from '@/lib/meet-up';
 import { type Plan, type EventWithFriends } from '@/lib/plans';
 import { useSession } from '@/hooks/use-session';
 import { useFriendsOut, type FriendNightStatus } from '@/hooks/use-friends-out';
 import { useMyNightStatus, usePlanEvents, usePlans, usePlansRealtime } from '@/hooks/use-plans';
-import { OWN_NIGHT_STATUS_KEY } from '@/hooks/use-own-night-status';
+import { invalidateNightStatusQueries } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
 import { PlanCard } from '@/components/plan-card';
 import { EventCard } from '@/components/event-card';
@@ -90,50 +90,31 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
   const [aroundExpanded, setAroundExpanded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const isUserOut = myStatus?.status === 'out';
+  // `off` (Stop sharing) is still "out tonight" for the owner — just hidden
+  const isUserOut = myStatus?.status === 'out' || myStatus?.status === 'off';
   const isUserPlanning = myStatus?.status === 'planning';
 
   const refreshAll = async () => {
     setIsRefreshing(true);
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['plans'] }),
       queryClient.invalidateQueries({ queryKey: ['plan-events'] }),
-      queryClient.invalidateQueries({ queryKey: ['friends-out'] }),
-      queryClient.invalidateQueries({ queryKey: ['my-night-status'] }),
+      invalidateNightStatusQueries(queryClient),
     ]);
     setIsRefreshing(false);
   };
 
-  const invalidateStatus = () => {
-    queryClient.invalidateQueries({ queryKey: ['my-night-status'] });
-    queryClient.invalidateQueries({ queryKey: [OWN_NIGHT_STATUS_KEY] });
-    queryClient.invalidateQueries({ queryKey: ['friends-out'] });
-  };
+  // Out and TBD go through the same Yes/TBD setup as everywhere else (venue,
+  // audience, final "Share…" action); No needs no setup and applies directly.
+  const handleSwitchToOut = () => router.push('/check-in');
+  const handleJoinPlanning = () => router.push({ pathname: '/check-in', params: { step: 'tbd' } });
 
-  const handleSwitchToOut = () => {
-    // The check-in flow (venue picker + GPS) is the next migration milestone;
-    // until it lands, "Out" can't be set from here.
-    Alert.alert('Check in', 'Checking in at a venue is coming to the app next.');
-  };
-
-  const handleJoinPlanning = async () => {
+  const handleStayIn = async () => {
     try {
-      await goPlanning(userId, { city });
+      await stayIn(userId, { city });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      invalidateStatus();
+      invalidateNightStatusQueries(queryClient);
     } catch (e) {
-      console.error('Error joining planning mode:', e);
-      Alert.alert('Something went wrong', "Couldn't update your status. Try again.");
-    }
-  };
-
-  const handleLeavePlanning = async () => {
-    try {
-      await stopSharing(userId, { city });
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      invalidateStatus();
-    } catch (e) {
-      console.error('Error leaving planning mode:', e);
+      console.error('Error setting staying in:', e);
       Alert.alert('Something went wrong', "Couldn't update your status. Try again.");
     }
   };
@@ -209,7 +190,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
               {
                 label: 'Staying In',
                 active: !isUserPlanning && !isUserOut,
-                onPress: () => (isUserPlanning || isUserOut) && handleLeavePlanning(),
+                onPress: () => (isUserPlanning || isUserOut) && handleStayIn(),
               },
             ] as const
           ).map((seg) => (
@@ -288,7 +269,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
                     </Text>
                     {friend.isOut ? (
                       <Text className="text-[#d4ff00] text-sm font-sans" numberOfLines={1}>
-                        ● Out · {friend.venue_name}
+                        ● Out{friend.venue_name ? ` · ${friend.venue_name}` : ''}
                       </Text>
                     ) : (
                       <Text className="text-[#a855f7] text-sm font-sans" numberOfLines={1}>

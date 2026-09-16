@@ -67,7 +67,7 @@ export function SmartArrivalPrompt({
         <Text className="text-white text-sm font-sans-medium" numberOfLines={2}>
           Looks like you&apos;re at <Text className="text-[#d4ff00]">{venueName}</Text>
         </Text>
-        <Text className="text-white/50 text-xs font-sans">Go live?</Text>
+        <Text className="text-white/50 text-xs font-sans">Share your spot?</Text>
       </View>
       <Pressable
         onPress={onAccept}

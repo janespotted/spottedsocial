@@ -124,19 +124,24 @@ export default function YapThreadScreen() {
     queryFn: async () => {
       const { data } = await supabase
         .from('night_statuses')
-        .select('id, venue_name, status, is_private_party, lat, lng')
+        .select('id, venue_name, status, is_private_party')
         .eq('user_id', userId!)
         .eq('status', 'out')
         .not('expires_at', 'is', null)
         .gt('expires_at', new Date().toISOString())
         .maybeSingle();
       const here = data?.venue_name?.toLowerCase() === venueName!.toLowerCase();
+      if (!here || !data?.is_private_party) return { canPost: here, party: null };
+      // Party coordinates live in party_locations (close friends only); the
+      // host reads their own row.
+      const { data: party } = await supabase
+        .from('party_locations')
+        .select('lat, lng')
+        .eq('user_id', userId!)
+        .maybeSingle();
       return {
         canPost: here,
-        party:
-          here && data?.is_private_party
-            ? { id: data.id, lat: data.lat, lng: data.lng }
-            : null,
+        party: { id: data.id, lat: party?.lat ?? null, lng: party?.lng ?? null },
       };
     },
   });
@@ -474,7 +479,7 @@ export default function YapThreadScreen() {
                 className="px-3 py-1.5 rounded-full active:opacity-90"
                 style={{ backgroundColor: NEON }}
               >
-                <Text className="text-[#1a0f2e] text-xs font-sans-semibold">Go Live</Text>
+                <Text className="text-[#1a0f2e] text-xs font-sans-semibold">Update status</Text>
               </Pressable>
             </View>
           )}

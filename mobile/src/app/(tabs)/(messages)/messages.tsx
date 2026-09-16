@@ -12,6 +12,7 @@ import { fetchDmThreads, previewText, threadTitle, type DmThreadPreview } from '
 import { fetchYapDirectory, type YapQuote } from '@/lib/yap';
 import { useSession } from '@/hooks/use-session';
 import { useNotifications } from '@/hooks/use-notifications';
+import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
 import spottedLogo from '../../../../assets/images/spotted-s-logo.png';
 
@@ -188,21 +189,8 @@ export default function MessagesScreen() {
     staleTime: 15_000,
     queryFn: () => fetchYapDirectory(city!),
   });
-  const { data: myVenue } = useQuery({
-    queryKey: ['my-night-status', session?.user.id],
-    enabled: !!session,
-    refetchInterval: 120_000,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('night_statuses')
-        .select('status, venue_id, venue_name, lat, lng')
-        .eq('user_id', session!.user.id)
-        .not('expires_at', 'is', null)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle();
-      return data ?? null;
-    },
-  });
+  const { data: ownNight } = useOwnNightStatus();
+  const myVenue = ownNight?.status ?? null;
 
   // Any new DM/yap anywhere refreshes the lists
   useEffect(() => {

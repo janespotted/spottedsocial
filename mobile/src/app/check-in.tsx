@@ -28,21 +28,16 @@ import { goOutAtVenue, goPlanning, stayIn } from '@/lib/night-status';
 import { getCurrentPosition, startBackgroundLocation } from '@/lib/background-location';
 import { notifyFriendArrived, notifyFriendsPlanning } from '@/lib/notifications';
 import { markNightAnswered } from '@/lib/night-gate';
+import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
 import { useFriendIds } from '@/hooks/use-friend-ids';
-import { OWN_NIGHT_STATUS_KEY, useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { AudienceRow } from '@/components/audience-row';
 
 const NEON = '#d4ff00';
 const PURPLE = '#a855f7';
 
-type Audience = 'close_friends' | 'all_friends' | 'mutual_friends';
 type Step = 'ask' | 'detecting' | 'gps-denied' | 'venue' | 'party' | 'planning' | 'done';
-
-const AUDIENCES: Array<{ value: Audience; label: string; desc: string }> = [
-  { value: 'close_friends', label: 'Close Friends', desc: "Only people you've starred" },
-  { value: 'all_friends', label: 'Friends', desc: "Everyone you're friends with" },
-  { value: 'mutual_friends', label: 'Friends + Mutuals', desc: 'Friends, plus friends of friends' },
-];
 
 const ANSWERS: Array<{ key: 'yes' | 'tbd' | 'no'; label: string; desc: string; icon: SFSymbol }> = [
   { key: 'yes', label: "Yes, I'm out", desc: 'Share your spot with friends', icon: 'mappin.and.ellipse' },
@@ -179,57 +174,6 @@ function SecondaryButton({ label, onPress }: { label: string; onPress: () => voi
   );
 }
 
-/** Compact "Visible to Friends ▾" row that expands into stacked choices. */
-function AudienceRow({ value, onChange }: { value: Audience; onChange: (a: Audience) => void }) {
-  const [open, setOpen] = useState(false);
-  const current = AUDIENCES.find((a) => a.value === value) ?? AUDIENCES[1];
-  return (
-    <View className="rounded-xl bg-[#2d1b4e]/50 border border-white/[0.06] overflow-hidden">
-      <Pressable
-        onPress={() => setOpen((o) => !o)}
-        accessibilityLabel={`Visible to ${current.label}. Change audience`}
-        className="flex-row items-center gap-2 px-4 py-3 active:bg-white/5"
-      >
-        <SymbolView name="eye" size={14} tintColor="rgba(255,255,255,0.5)" />
-        <Text className="text-white/60 text-sm font-sans">Visible to</Text>
-        <Text className="text-white text-sm font-sans-semibold flex-1">{current.label}</Text>
-        <SymbolView
-          name={open ? 'chevron.up' : 'chevron.down'}
-          size={12}
-          tintColor="rgba(255,255,255,0.4)"
-        />
-      </Pressable>
-      {open
-        ? AUDIENCES.map((opt) => {
-            const selected = opt.value === value;
-            return (
-              <Pressable
-                key={opt.value}
-                onPress={() => {
-                  onChange(opt.value);
-                  setOpen(false);
-                }}
-                className="flex-row items-center gap-3 px-4 py-3 border-t border-white/[0.06] active:bg-white/5"
-              >
-                <View className="flex-1">
-                  <Text
-                    className={`text-sm ${
-                      selected ? 'text-[#d4ff00] font-sans-semibold' : 'text-white font-sans-medium'
-                    }`}
-                  >
-                    {opt.label}
-                  </Text>
-                  <Text className="text-white/40 text-xs font-sans">{opt.desc}</Text>
-                </View>
-                {selected ? <SymbolView name="checkmark" size={14} tintColor={NEON} /> : null}
-              </Pressable>
-            );
-          })
-        : null}
-    </View>
-  );
-}
-
 function VenueRow({
   name,
   distance,
@@ -339,13 +283,14 @@ function NeighborhoodPicker({
  * - Gate mode (`?gate=1`, from NightStatusGate): required opening prompt.
  *   Non-dismissible (layout options), no close/skip, hardware back swallowed.
  * - Update status (no param): same sheet, dismissible, with a close button.
+ *   `?step=tbd` opens straight on the TBD setup (Plans segment control).
  *
  * Nothing is written until a final action: "Share my spot" (Yes), "Share TBD
  * status" (TBD) or the No button. Yes runs GPS venue detection only; TBD
  * touches no location APIs at all.
  */
 export default function CheckInSheet() {
-  const { gate } = useLocalSearchParams<{ gate?: string }>();
+  const { gate, step: initialStep } = useLocalSearchParams<{ gate?: string; step?: string }>();
   const isGate = gate === '1';
   const { session } = useSession();
   const queryClient = useQueryClient();
@@ -370,7 +315,7 @@ export default function CheckInSheet() {
       const level = data?.location_sharing_level;
       return {
         city: data?.city ?? 'nyc',
-        level: AUDIENCES.some((a) => a.value === level) ? (level as Audience) : null,
+        level: isAudience(level) ? level : null,
         displayName: data?.display_name ?? null,
       };
     },
@@ -380,11 +325,11 @@ export default function CheckInSheet() {
   // Audience: the saved level is the default (new users → Friends). Only an
   // explicit change is persisted, so a saved narrower choice is never
   // silently broadened.
-  const savedAudience: Audience = profile?.level ?? 'all_friends';
+  const savedAudience: Audience = profile?.level ?? DEFAULT_AUDIENCE;
   const [audienceOverride, setAudienceOverride] = useState<Audience | null>(null);
   const audience = audienceOverride ?? savedAudience;
 
-  const [step, setStep] = useState<Step>('ask');
+  const [step, setStep] = useState<Step>(initialStep === 'tbd' ? 'planning' : 'ask');
   const [location, setLocation] = useState<LocationData | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<VenueMatch | null>(null);
   const [guessedVenueId, setGuessedVenueId] = useState<string | null>(null);
@@ -413,19 +358,10 @@ export default function CheckInSheet() {
     []
   );
 
-  /** After any successful Yes / TBD / No write: tell the gate, then refresh. */
+  /** After any successful Yes / TBD / No write: tell the gate, then refresh every status reader. */
   const refreshStatusQueries = () => {
     markNightAnswered();
-    for (const key of [
-      OWN_NIGHT_STATUS_KEY,
-      'my-night-status',
-      'map-data',
-      'leaderboard',
-      'friends-out',
-      'profile-page',
-    ]) {
-      queryClient.invalidateQueries({ queryKey: [key] });
-    }
+    invalidateNightStatusQueries(queryClient);
   };
 
   const persistAudience = async () => {
@@ -625,7 +561,8 @@ export default function CheckInSheet() {
         privateParty: { neighborhood },
       });
       await persistAudience();
-      startBackgroundLocation(userId).catch(() => {});
+      // No background tracking at a private party: the exact spot is for
+      // close friends only and a house party does not move.
       scheduleMorningAfter();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refreshStatusQueries();
@@ -667,7 +604,9 @@ export default function CheckInSheet() {
       ? `Right now: out at ${own.status.venue_name ?? 'a spot'}`
       : own.status.status === 'planning'
         ? 'Right now: TBD'
-        : 'Right now: staying in'
+        : own.status.status === 'off'
+          ? 'Right now: out, location hidden'
+          : 'Right now: staying in'
     : null;
 
   const nearbyCandidates = (location?.nearbyVenues ?? [])
@@ -828,7 +767,7 @@ export default function CheckInSheet() {
         <>
           <SheetHeader
             title="Private party"
-            subtitle="Friends see a house icon in your neighborhood."
+            subtitle="No public venue is created and no address is shared."
             onBack={() => {
               setError(null);
               setStep('venue');
@@ -843,8 +782,8 @@ export default function CheckInSheet() {
           />
           <AudienceRow value={audience} onChange={setAudienceOverride} />
           <Text className="text-white/40 text-xs font-sans">
-            Close and direct friends see your exact spot. Mutuals only see the neighborhood — no
-            map pin.
+            Only Close Friends see your exact spot on the map. Everyone else in your audience sees
+            just the neighborhood — no pin.
           </Text>
           <PrimaryButton
             label="Share my spot"

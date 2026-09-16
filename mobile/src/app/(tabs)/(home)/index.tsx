@@ -83,7 +83,7 @@ function PlanningTonightCard({ friends }: { friends: FriendNightStatus[] }) {
     <View className="rounded-2xl bg-[#1a0a2e]/80 border border-white/10 p-4 gap-3">
       <View className="flex-row items-center gap-2">
         <SymbolView name="target" size={16} tintColor={PURPLE} />
-        <Text className="text-white font-sans-semibold text-sm">Planning Tonight</Text>
+        <Text className="text-white font-sans-semibold text-sm">TBD Tonight</Text>
         <Text className="text-white/40 text-xs font-sans">({friends.length})</Text>
       </View>
       {friends.map((friend) => (

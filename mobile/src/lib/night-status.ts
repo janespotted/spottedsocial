@@ -3,7 +3,41 @@ import { getNightResetIso, isUnexpired } from './tonight';
 import { markManualCheckin } from './venue-arrival-engine';
 
 const STATUS_CACHE_TTL_MS = 60_000;
-let _cachedOutResult: { out: boolean; ts: number; userId: string } | null = null;
+let _cachedOutResult: {
+  out: boolean;
+  privateParty: boolean;
+  ts: number;
+  userId: string;
+} | null = null;
+
+async function getOutState(userId: string): Promise<{ out: boolean; privateParty: boolean }> {
+  const now = Date.now();
+  if (
+    _cachedOutResult &&
+    _cachedOutResult.userId === userId &&
+    now - _cachedOutResult.ts < STATUS_CACHE_TTL_MS
+  ) {
+    return _cachedOutResult;
+  }
+  let out = false;
+  let privateParty = false;
+  try {
+    const { data, error } = await supabase
+      .from('night_statuses')
+      .select('status, expires_at, is_private_party')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!error && data) {
+      // Fail closed: require status='out' AND expires_at in the future
+      out = data.status === 'out' && !!data.expires_at && new Date(data.expires_at) > new Date();
+      privateParty = out && !!data.is_private_party;
+    }
+  } catch {
+    /* fail closed */
+  }
+  _cachedOutResult = { out, privateParty, ts: now, userId };
+  return _cachedOutResult;
+}
 
 /**
  * Whether the user is currently "out" with an unexpired status.
@@ -12,34 +46,18 @@ let _cachedOutResult: { out: boolean; ts: number; userId: string } | null = null
  * Port of the web app's night-status.ts.
  */
 export async function isUserCurrentlyOut(userId: string): Promise<boolean> {
-  const now = Date.now();
-  if (
-    _cachedOutResult &&
-    _cachedOutResult.userId === userId &&
-    now - _cachedOutResult.ts < STATUS_CACHE_TTL_MS
-  ) {
-    return _cachedOutResult.out;
-  }
-  try {
-    const { data, error } = await supabase
-      .from('night_statuses')
-      .select('status, expires_at')
-      .eq('user_id', userId)
-      .maybeSingle();
+  return (await getOutState(userId)).out;
+}
 
-    if (error || !data) {
-      _cachedOutResult = { out: false, ts: now, userId };
-      return false;
-    }
-    // Fail closed: require status='out' AND expires_at in the future
-    const out =
-      data.status === 'out' && !!data.expires_at && new Date(data.expires_at) > new Date();
-    _cachedOutResult = { out, ts: now, userId };
-    return out;
-  } catch {
-    _cachedOutResult = { out: false, ts: now, userId };
-    return false;
-  }
+/**
+ * Gate for the background GPS pipeline: out at a venue, NOT at a private
+ * party. A party host's exact spot is for close friends only and lives in
+ * party_locations; profile coordinates are readable by the whole audience,
+ * so a party must never feed them.
+ */
+export async function shouldTrackLiveLocation(userId: string): Promise<boolean> {
+  const s = await getOutState(userId);
+  return s.out && !s.privateParty;
 }
 
 /** Drop the cache — call after any local status write so gates re-check immediately. */
@@ -61,10 +79,18 @@ export function getStatusExpiry(city?: string | null): string {
   return getNightResetIso(city);
 }
 
-/** The three answers to "Are you out tonight?" plus the legacy heading_out. */
-export type NightStatusKind = 'out' | 'planning' | 'home' | 'heading_out';
+/**
+ * The three answers to "Are you out tonight?" (out / planning / home), plus
+ * `off` = "Stop sharing": still out tonight, but hidden from friends. Every
+ * friend-facing reader keys on out/planning, so an `off` row is invisible
+ * to others while still counting as "answered tonight" for the owner.
+ * `heading_out` is legacy.
+ */
+export type NightStatusKind = 'out' | 'planning' | 'home' | 'off' | 'heading_out';
 
 export interface OwnNightStatus {
+  /** night_statuses.id — the party identifier for party yaps. */
+  id: string;
   status: NightStatusKind;
   venue_id: string | null;
   venue_name: string | null;
@@ -87,18 +113,33 @@ export async function fetchOwnNightStatus(userId: string): Promise<OwnNightStatu
   const { data, error } = await supabase
     .from('night_statuses')
     .select(
-      'status, venue_id, venue_name, lat, lng, is_private_party, party_neighborhood, planning_neighborhood, planning_visibility, expires_at'
+      'id, status, venue_id, venue_name, lat, lng, is_private_party, party_neighborhood, planning_neighborhood, planning_visibility, expires_at'
     )
     .eq('user_id', userId)
     .maybeSingle();
   if (error) throw error;
   if (!data || !isUnexpired(data.expires_at)) return null;
+
+  // A private party's exact spot never rests on the status row (DB trigger
+  // moves it to party_locations); the owner reads their own row back here.
+  let lat = data.lat;
+  let lng = data.lng;
+  if (data.is_private_party) {
+    const { data: party } = await supabase
+      .from('party_locations')
+      .select('lat, lng')
+      .eq('user_id', userId)
+      .maybeSingle();
+    lat = party?.lat ?? null;
+    lng = party?.lng ?? null;
+  }
   return {
+    id: data.id,
     status: data.status as NightStatusKind,
     venue_id: data.venue_id,
     venue_name: data.venue_name,
-    lat: data.lat,
-    lng: data.lng,
+    lat,
+    lng,
     is_private_party: !!data.is_private_party,
     party_neighborhood: data.party_neighborhood,
     planning_neighborhood: data.planning_neighborhood,
@@ -204,14 +245,17 @@ export interface StopSharingOptions {
 }
 
 /**
- * The ONE way to stop sharing / answer "No". Kills background GPS, clears
- * location, ends check-ins, and writes a `home` row that EXPIRES AT THE
- * NEXT RESET. The real expiry is what makes "No" a recorded answer for
- * tonight (the opening prompt does not repeat) while still reading as
- * "not sharing" everywhere else — every reader keys on status/venue, never
- * on the mere presence of an unexpired row.
+ * Shared tail of "Stop sharing" and "No": kill background GPS, clear the
+ * profile pin, end open check-ins, then write the given status with
+ * TONIGHT'S EXPIRY. The real expiry is what makes either a recorded answer
+ * (the opening prompt does not repeat) while reading as "not sharing"
+ * everywhere else — readers key on status/venue, never on row presence.
  */
-export async function stopSharing(userId: string, opts: StopSharingOptions = {}): Promise<void> {
+async function endLiveSharing(
+  userId: string,
+  status: 'home' | 'off',
+  opts: StopSharingOptions
+): Promise<void> {
   const now = new Date().toISOString();
   invalidateOutStatusCache();
 
@@ -233,7 +277,7 @@ export async function stopSharing(userId: string, opts: StopSharingOptions = {})
     await supabase.from('night_statuses').upsert(
       {
         user_id: userId,
-        status: 'home' as const,
+        status,
         venue_name: null,
         venue_id: null,
         lat: null,
@@ -255,12 +299,18 @@ export async function stopSharing(userId: string, opts: StopSharingOptions = {})
 }
 
 /**
- * "No, I'm staying in" from the opening prompt. Today identical to
- * stopSharing; kept as its own entry point so "Stop sharing" (keep status,
- * hide location) can diverge from "No" (home for the night) without
- * touching call sites.
+ * "Stop sharing" — the user may still be out, but becomes invisible:
+ * location, venue and check-in are dropped and the row becomes `off`.
+ * Distinct from "No" (see stayIn): the answer for tonight stays "out".
  */
-export const stayIn = stopSharing;
+export function stopSharing(userId: string, opts: StopSharingOptions = {}): Promise<void> {
+  return endLiveSharing(userId, 'off', opts);
+}
+
+/** "No, I'm staying in" — records `home` for the night. */
+export function stayIn(userId: string, opts: StopSharingOptions = {}): Promise<void> {
+  return endLiveSharing(userId, 'home', opts);
+}
 
 export interface GoOutOptions {
   venue: { id: string | null; name: string };
@@ -271,10 +321,15 @@ export interface GoOutOptions {
 
 /**
  * The ONE way to go "out" at a venue. Full-field night_statuses upsert
- * (party_address never in the payload — WP6), ends prior check-ins and opens
- * a new one. Port of the web goOutAtVenue minus private-party options, which
- * land with the check-in flow. Callers that flip planning→out must also
- * startBackgroundLocation (see BackgroundLocationManager contract).
+ * (party_address never in the payload — WP6), ends prior check-ins, opens a
+ * new one and marks the profile out. Port of the web goOutAtVenue. Callers
+ * that flip planning→out at a VENUE must also startBackgroundLocation (see
+ * BackgroundLocationManager contract).
+ *
+ * Private party: coordinates go on the status row as usual, but a DB trigger
+ * moves them to party_locations (close friends only) and nulls them on the
+ * row. The profile pin is withheld and background GPS is stopped, because
+ * profile coordinates are readable by the whole audience.
  */
 export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<void> {
   const now = new Date().toISOString();
@@ -336,4 +391,19 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
     checkin.lng = lng;
   }
   must(await supabase.from('checkins').insert(checkin as never));
+
+  // Profile: this is what friends' maps read (via get_profiles_safe). The
+  // web client has always written it; without it a check-in never pins.
+  const profile: Record<string, unknown> = { is_out: true, last_location_at: now };
+  if (opts.privateParty) {
+    // Exact spot is close-friends-only → never on the audience-readable profile
+    profile.last_known_lat = null;
+    profile.last_known_lng = null;
+    const { stopBackgroundLocation } = await import('./background-location');
+    await stopBackgroundLocation();
+  } else if (lat !== null && lng !== null) {
+    profile.last_known_lat = lat;
+    profile.last_known_lng = lng;
+  }
+  must(await supabase.from('profiles').update(profile as never).eq('id', userId));
 }

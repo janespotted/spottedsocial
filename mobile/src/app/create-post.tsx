@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
@@ -9,7 +9,9 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { supabase } from '@/lib/supabase';
 import { getPostExpiry, invalidateFeed } from '@/lib/posts';
 import { validatePostText, validateVenueName } from '@/lib/validation';
+import { DEFAULT_AUDIENCE, loadPostAudience, savePostAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
+import { AudienceRow } from '@/components/audience-row';
 
 const NEON = '#d4ff00';
 
@@ -25,14 +27,6 @@ interface VenueSuggestion {
   name: string;
 }
 
-type PostVisibility = 'close_friends' | 'all_friends' | 'mutual_friends';
-
-/** Same audience tiers as the web PostCaptionScreen. */
-const VISIBILITY_OPTIONS: { value: PostVisibility; label: string; icon: SFSymbol; description: string }[] = [
-  { value: 'close_friends', label: 'Close Friends', icon: 'heart.fill', description: 'Only your closest friends' },
-  { value: 'all_friends', label: 'All Friends', icon: 'person.2.fill', description: "Everyone you're friends with" },
-  { value: 'mutual_friends', label: 'Mutual Friends', icon: 'person.3.fill', description: 'Friends + their friends' },
-];
 
 async function pickMedia(source: 'library' | 'camera'): Promise<PickedMedia | null> {
   const options: ImagePicker.ImagePickerOptions = {
@@ -75,7 +69,18 @@ export default function CreatePostScreen() {
   const [venueName, setVenueName] = useState('');
   const [venueId, setVenueId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<VenueSuggestion[]>([]);
-  const [visibility, setVisibility] = useState<PostVisibility>('all_friends');
+  // Post audience is remembered per device, separately from the live-status
+  // audience; the saved value is the default so it is never silently broadened.
+  const [visibility, setVisibility] = useState<Audience>(DEFAULT_AUDIENCE);
+  useEffect(() => {
+    let cancelled = false;
+    loadPostAudience().then((saved) => {
+      if (!cancelled) setVisibility(saved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,20 +107,6 @@ export default function CreatePostScreen() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user.id]);
-
-  const chooseVisibility = () => {
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: 'Who can see this post?',
-        options: [...VISIBILITY_OPTIONS.map((o) => `${o.label} — ${o.description}`), 'Cancel'],
-        cancelButtonIndex: VISIBILITY_OPTIONS.length,
-      },
-      (index) => {
-        const opt = VISIBILITY_OPTIONS[index];
-        if (opt) setVisibility(opt.value);
-      }
-    );
-  };
 
   // Venue autocomplete against the venues table (mirrors the web composer)
   useEffect(() => {
@@ -179,6 +170,7 @@ export default function CreatePostScreen() {
         visibility,
       });
       if (insertErr) throw insertErr;
+      savePostAudience(visibility);
       invalidateFeed();
       router.back();
     } catch (e) {
@@ -290,21 +282,8 @@ export default function CreatePostScreen() {
           ))}
         </View>
 
-        {/* Audience */}
-        <Pressable
-          onPress={chooseVisibility}
-          className="flex-row items-center gap-2 rounded-2xl bg-white/5 border border-white/15 px-4 h-12 active:bg-white/10"
-        >
-          <SymbolView
-            name={VISIBILITY_OPTIONS.find((o) => o.value === visibility)!.icon}
-            size={16}
-            tintColor={NEON}
-          />
-          <Text className="flex-1 text-white text-[15px] font-sans">
-            {VISIBILITY_OPTIONS.find((o) => o.value === visibility)!.label}
-          </Text>
-          <SymbolView name="chevron.up.chevron.down" size={14} tintColor="rgba(255,255,255,0.4)" />
-        </Pressable>
+        {/* Audience — same names and selector as live statuses, separate preference */}
+        <AudienceRow value={visibility} onChange={setVisibility} context="post" />
 
         {error ? (
           <Text selectable className="text-sm text-red-400 font-sans">

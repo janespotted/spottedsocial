@@ -437,7 +437,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
               <View className="flex-row gap-2">
                 {(
                   [
-                    { value: 'friends', label: 'All Friends' },
+                    { value: 'friends', label: 'Friends' },
                     { value: 'close_friends', label: 'Close Friends' },
                   ] as const
                 ).map((opt) => (

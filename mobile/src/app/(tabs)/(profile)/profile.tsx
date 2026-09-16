@@ -8,29 +8,20 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
 import { getVenuePhotoUrl } from '@/lib/venues';
+import { stopSharing } from '@/lib/night-status';
+import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useNotifications } from '@/hooks/use-notifications';
+import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
+import { AudienceRow } from '@/components/audience-row';
 import spottedLogo from '../../../../assets/images/spotted-s-logo.png';
 
 const NEON = '#d4ff00';
 const PURPLE = '#a855f7';
 
-type Audience = 'close_friends' | 'all_friends' | 'mutual_friends';
 type SpotsView = 'recent' | 'wishlist' | 'posts';
-
-const AUDIENCES: Array<{ value: Audience; label: string }> = [
-  { value: 'close_friends', label: 'Close Friends' },
-  { value: 'all_friends', label: 'All Friends' },
-  { value: 'mutual_friends', label: 'Mutual Friends' },
-];
-
-const LEVEL_NAMES: Record<string, string> = {
-  close_friends: 'Close Friends',
-  all_friends: 'All Friends',
-  mutual_friends: 'Mutual Friends',
-};
 
 const SPOTS_LABELS: Record<SpotsView, string> = {
   recent: 'Recent Spots',
@@ -44,12 +35,6 @@ interface ProfileData {
     username: string | null;
     avatar_url: string | null;
     location_sharing_level: string | null;
-  } | null;
-  status: {
-    status: string;
-    venue_name: string | null;
-    planning_visibility: string | null;
-    is_private_party: boolean | null;
   } | null;
   placesCount: number;
   weeklyCount: number;
@@ -67,19 +52,11 @@ interface ProfileData {
 }
 
 async function fetchProfileData(userId: string): Promise<ProfileData> {
-  const nowIso = new Date().toISOString();
-  const [profileRes, statusRes, checkinsRes, wishlistRes, postsRes, inviteRes] = await Promise.all([
+  const [profileRes, checkinsRes, wishlistRes, postsRes, inviteRes] = await Promise.all([
     supabase
       .from('profiles')
       .select('display_name, username, avatar_url, location_sharing_level')
       .eq('id', userId)
-      .maybeSingle(),
-    supabase
-      .from('night_statuses')
-      .select('status, venue_name, planning_visibility, is_private_party')
-      .eq('user_id', userId)
-      .not('expires_at', 'is', null)
-      .gt('expires_at', nowIso)
       .maybeSingle(),
     supabase
       .from('checkins')
@@ -120,7 +97,6 @@ async function fetchProfileData(userId: string): Promise<ProfileData> {
 
   return {
     profile: profileRes.data ?? null,
-    status: statusRes.data ?? null,
     placesCount: new Set(checkins.map((c) => c.venue_name)).size,
     weeklyCount: checkins.filter((c) => c.started_at && c.started_at > weekAgo).length,
     recentSpots,
@@ -174,29 +150,69 @@ export default function ProfileScreen() {
   const contentContainerStyle = useResolveClassNames('px-4 pb-10 gap-5');
 
   const profile = data?.profile;
-  const status = data?.status;
-  const sharingLevel = profile?.location_sharing_level ?? 'all_friends';
+  // The card reads the ONE shared status query so it can never lag Plans/Map
+  const { data: ownNight } = useOwnNightStatus();
+  const status = ownNight?.status ?? null;
+  const sharingLevel: Audience = isAudience(profile?.location_sharing_level)
+    ? profile.location_sharing_level
+    : DEFAULT_AUDIENCE;
+  const planningLevel: Audience = isAudience(status?.planning_visibility)
+    ? status.planning_visibility
+    : DEFAULT_AUDIENCE;
 
+  const syncStatus = () => {
+    refetch();
+    invalidateNightStatusQueries(queryClient);
+  };
+
+  // Audience changes come back from the "Who can see this?" sheet's Confirm —
+  // a live status keeps its venue; only who can see it changes.
   const setSharingLevel = async (level: Audience) => {
     if (!session) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await supabase
       .from('profiles')
       .update({ location_sharing_level: level })
       .eq('id', session.user.id);
-    refetch();
-    queryClient.invalidateQueries({ queryKey: ['map-data'] });
+    syncStatus();
   };
 
   const setPlanningVisibility = async (level: Audience) => {
     if (!session) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await supabase
       .from('night_statuses')
       .update({ planning_visibility: level })
       .eq('user_id', session.user.id);
-    refetch();
+    syncStatus();
   };
+
+  /** Stop sharing ≠ No: the night stays answered "out", but friends can no longer see you. */
+  const handleStopSharing = async () => {
+    if (!session) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await stopSharing(session.user.id, { city: ownNight?.city });
+    } finally {
+      syncStatus();
+    }
+  };
+
+  const statusKind = status?.status ?? null;
+  const statusHeadline =
+    statusKind === 'out'
+      ? 'Out tonight'
+      : statusKind === 'planning'
+        ? 'TBD tonight'
+        : statusKind === 'off'
+          ? 'Out tonight · hidden'
+          : 'Not out tonight';
+  const statusLine =
+    statusKind === 'out'
+      ? (status?.venue_name ?? 'Somewhere')
+      : statusKind === 'planning'
+        ? (status?.planning_neighborhood ?? 'Anywhere')
+        : statusKind === 'off'
+          ? 'Location hidden'
+          : 'Staying in';
 
   const shareProfile = () => router.push('/invite-friends');
 
@@ -317,7 +333,7 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        {/* All Friends row */}
+        {/* Friends row */}
         <Pressable
           onPress={() => router.push('/friends')}
           className="flex-row items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] active:bg-white/[0.06]"
@@ -326,7 +342,7 @@ export default function ProfileScreen() {
             <SymbolView name="person.2" size={15} tintColor={PURPLE} />
           </View>
           <View className="flex-1">
-            <Text className="text-white text-sm font-sans-medium">All Friends</Text>
+            <Text className="text-white text-sm font-sans-medium">Friends</Text>
             <Text className="text-white/30 text-xs font-sans">
               See everyone you&apos;re connected with
             </Text>
@@ -371,96 +387,56 @@ export default function ProfileScreen() {
           <SymbolView name="qrcode" size={16} tintColor="rgba(255,255,255,0.4)" />
         </Pressable>
 
-        {/* Tonight status card */}
-        <View className="bg-[#1F1740] border border-[#d4ff00]/25 rounded-2xl p-4">
-          <View className="flex-row items-center justify-between mb-2.5">
-            <View className="flex-row items-center gap-1.5">
-              <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: NEON }} />
-              <Text className="text-[11px] text-white/60 uppercase tracking-wider font-sans">
-                Tonight
-              </Text>
-            </View>
-            <Text className="text-[11px] text-white/45 font-sans">
-              {status?.status === 'out'
-                ? `Visible to ${(LEVEL_NAMES[sharingLevel] ?? '').toLowerCase()}`
-                : status?.status === 'planning'
-                  ? 'TBD'
-                  : 'Not sharing'}
+        {/* Tonight status card — status / venue / audience, Update + Stop sharing */}
+        <View className="bg-[#1F1740] border border-[#d4ff00]/25 rounded-2xl p-4 gap-2.5">
+          <View className="flex-row items-center gap-1.5">
+            <View
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor:
+                  statusKind === 'out' ? NEON : statusKind === 'planning' ? PURPLE : 'rgba(255,255,255,0.3)',
+              }}
+            />
+            <Text className="text-[11px] text-white/60 uppercase tracking-wider font-sans-semibold">
+              {statusHeadline}
             </Text>
           </View>
 
-          {status?.status === 'out' ? (
-            <>
-              <Text className="text-lg font-sans-medium text-white mb-2">
-                Out at {status.venue_name ?? 'Unknown'} — who can see you?
-              </Text>
-              <View className="flex-row gap-1.5 bg-white/[0.03] rounded-xl p-1 mb-3.5">
-                {AUDIENCES.map((opt) => (
-                  <Pressable
-                    key={opt.value}
-                    onPress={() => setSharingLevel(opt.value)}
-                    className="flex-1 py-2 px-1 rounded-lg items-center"
-                    style={
-                      sharingLevel === opt.value ? { backgroundColor: PURPLE } : undefined
-                    }
-                  >
-                    <Text
-                      className={`text-xs font-sans-medium text-center ${
-                        sharingLevel === opt.value ? 'text-white' : 'text-white/40'
-                      }`}
-                    >
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          ) : status?.status === 'planning' ? (
-            <>
-              <Text className="text-lg font-sans-medium text-white mb-2">
-                You&apos;re TBD — who can see it?
-              </Text>
-              <View className="flex-row gap-1.5 bg-white/[0.03] rounded-xl p-1 mb-3.5">
-                {AUDIENCES.map((opt) => (
-                  <Pressable
-                    key={opt.value}
-                    onPress={() => setPlanningVisibility(opt.value)}
-                    className="flex-1 py-2 px-1 rounded-lg items-center"
-                    style={
-                      (status.planning_visibility ?? 'all_friends') === opt.value
-                        ? { backgroundColor: PURPLE }
-                        : undefined
-                    }
-                  >
-                    <Text
-                      className={`text-xs font-sans-medium text-center ${
-                        (status.planning_visibility ?? 'all_friends') === opt.value
-                          ? 'text-white'
-                          : 'text-white/40'
-                      }`}
-                    >
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
+          <Text className="text-xl font-sans-medium text-white" numberOfLines={2}>
+            {statusLine}
+          </Text>
+
+          {statusKind === 'out' ? (
+            <AudienceRow value={sharingLevel} onChange={setSharingLevel} compact />
+          ) : statusKind === 'planning' ? (
+            <AudienceRow value={planningLevel} onChange={setPlanningVisibility} compact />
+          ) : statusKind === 'off' ? (
+            <Text className="text-xs text-white/55 font-sans">
+              Friends can&apos;t see you right now. Update your status to share again.
+            </Text>
           ) : (
-            <>
-              <Text className="text-lg font-sans-medium text-white mb-1">Not out tonight</Text>
-              <Text className="text-xs text-white/55 font-sans mb-3.5">
-                Tap to change your status
-              </Text>
-            </>
+            <Text className="text-xs text-white/55 font-sans">
+              Going out after all? Update your status to see who&apos;s where.
+            </Text>
           )}
 
-          <Pressable
-            onPress={() => router.push('/check-in')}
-            className="py-2.5 rounded-full items-center active:opacity-90"
-            style={{ backgroundColor: NEON }}
-          >
-            <Text className="text-[#15102E] text-sm font-sans-medium">Change status</Text>
-          </Pressable>
+          <View className="flex-row gap-2 mt-1">
+            <Pressable
+              onPress={() => router.push('/check-in')}
+              className="flex-1 py-2.5 rounded-full items-center active:opacity-90"
+              style={{ backgroundColor: NEON }}
+            >
+              <Text className="text-[#15102E] text-sm font-sans-medium">Update status</Text>
+            </Pressable>
+            {statusKind === 'out' || statusKind === 'planning' ? (
+              <Pressable
+                onPress={handleStopSharing}
+                className="flex-1 py-2.5 rounded-full items-center border border-red-400/40 active:bg-red-500/10"
+              >
+                <Text className="text-red-300 text-sm font-sans-medium">Stop sharing</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         {/* Spots section */}
@@ -488,7 +464,7 @@ export default function ProfileScreen() {
               <EmptyCard
                 icon="mappin.and.ellipse"
                 title="Your night out history starts here"
-                subtitle="Go live at spots and they'll show up on your profile."
+                subtitle="Share your spot at venues and they'll show up on your profile."
               />
             )
           ) : spotsView === 'wishlist' ? (

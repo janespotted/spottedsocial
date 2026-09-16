@@ -26,7 +26,7 @@ import { useSession } from '@/hooks/use-session';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useMapData, type MapFriend } from '@/hooks/use-map-data';
 import { useArrivalPrompts } from '@/hooks/use-arrival-prompts';
-import { OWN_NIGHT_STATUS_KEY, useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
 import { FriendIdCard } from '@/components/friend-id-card';
 import { useMapFilters } from '@/lib/map-filters';
@@ -609,44 +609,58 @@ export default function MapScreen() {
         </View>
       ) : null}
 
-      {/* Status pill — go live / current status + stop (web parity) */}
+      {/* Status pill — current status, Update status, Stop sharing */}
       {!focusMode ? (
         <View className="absolute bottom-safe-offset-28 left-4 right-4 items-center">
           {myStatus?.status === 'out' ? (
-            <View className="flex-row items-center gap-2 px-4 py-2 rounded-full bg-[#1a0f2e]/95 border border-[#d4ff00]/30">
+            <View className="flex-row items-center gap-1 pl-4 pr-1 py-1 rounded-full bg-[#1a0f2e]/95 border border-[#d4ff00]/30">
               <View className="w-2 h-2 rounded-full bg-[#22c55e]" />
-              <Text className="text-white text-sm font-sans-medium" numberOfLines={1}>
-                {myStatus.venue_name ? `@ ${myStatus.venue_name}` : "You're out"}
-              </Text>
+              <Pressable
+                onPress={() => router.push('/check-in')}
+                accessibilityLabel="Update status"
+                className="py-2 pr-2 pl-1 active:opacity-70"
+              >
+                <Text className="text-white text-sm font-sans-medium" numberOfLines={1}>
+                  {myStatus.venue_name ? `@ ${myStatus.venue_name}` : "You're out"}
+                </Text>
+              </Pressable>
               <Pressable
                 onPress={async () => {
                   if (!session) return;
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   await stopSharing(session.user.id, { city });
-                  queryClient.invalidateQueries({ queryKey: ['my-night-status'] });
-                  queryClient.invalidateQueries({ queryKey: [OWN_NIGHT_STATUS_KEY] });
-                  queryClient.invalidateQueries({ queryKey: ['map-data'] });
+                  invalidateNightStatusQueries(queryClient);
                 }}
-                hitSlop={6}
+                accessibilityLabel="Stop sharing"
+                hitSlop={4}
+                className="min-h-11 px-3 rounded-full items-center justify-center border border-red-400/40 active:bg-red-500/15"
               >
-                <Text className="text-red-400 text-sm font-sans-medium ml-1">Stop</Text>
+                <Text className="text-red-300 text-sm font-sans-medium">Stop sharing</Text>
               </Pressable>
             </View>
-          ) : myStatus?.status === 'planning' ? (
+          ) : myStatus?.status === 'planning' || myStatus?.status === 'off' ? (
             <Pressable
               onPress={() => router.push('/check-in')}
-              className="flex-row items-center gap-2 px-4 py-2 rounded-full bg-[#1a0f2e]/95 border border-[#a855f7]/40 active:opacity-90"
+              accessibilityLabel="Update status"
+              className="flex-row items-center gap-2 px-4 min-h-11 rounded-full bg-[#1a0f2e]/95 border border-[#a855f7]/40 active:opacity-90"
             >
-              <SymbolView name="target" size={13} tintColor="#a855f7" />
-              <Text className="text-white text-sm font-sans-medium">Planning tonight — TBD</Text>
+              <SymbolView
+                name={myStatus.status === 'planning' ? 'target' : 'eye.slash'}
+                size={13}
+                tintColor="#a855f7"
+              />
+              <Text className="text-white text-sm font-sans-medium">
+                {myStatus.status === 'planning' ? 'TBD tonight' : 'Out · location hidden'}
+              </Text>
+              <Text className="text-white/40 text-xs font-sans">Update</Text>
             </Pressable>
           ) : (
             <Pressable
               onPress={() => router.push('/check-in')}
-              className="px-5 py-2.5 rounded-full active:opacity-90"
+              className="px-5 min-h-11 justify-center rounded-full active:opacity-90"
               style={{ backgroundColor: '#d4ff00', boxShadow: '0 4px 16px rgba(212,255,0,0.3)' }}
             >
-              <Text className="text-[#1a0f2e] text-sm font-sans-semibold">Go Live</Text>
+              <Text className="text-[#1a0f2e] text-sm font-sans-semibold">Update status</Text>
             </Pressable>
           )}
         </View>

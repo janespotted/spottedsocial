@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
-import { goOutAtVenue } from '@/lib/night-status';
+import { goOutAtVenue, type OwnNightStatus } from '@/lib/night-status';
 import { getCurrentPosition, startBackgroundLocation } from '@/lib/background-location';
 import { dismissVenuePrompt, markToastShown } from '@/lib/venue-arrival-engine';
+import { invalidateNightStatusQueries, useOwnNightStatus } from './use-own-night-status';
 import { useSession } from './use-session';
 
-export interface MyNightStatus {
-  status: string;
-  venue_id: string | null;
-  venue_name: string | null;
-  lat: number | null;
-  lng: number | null;
-}
+export type MyNightStatus = OwnNightStatus;
 
 export interface NearbyVenue {
   id: string;
@@ -41,21 +36,10 @@ export function useArrivalPrompts() {
   const smartDismissed = useRef(new Set<string>());
   const moveDismissed = useRef(new Set<string>());
 
-  const { data: myStatus } = useQuery({
-    queryKey: ['my-night-status', session?.user.id],
-    enabled: !!session,
-    refetchInterval: 120_000,
-    queryFn: async (): Promise<MyNightStatus | null> => {
-      const { data } = await supabase
-        .from('night_statuses')
-        .select('status, venue_id, venue_name, lat, lng')
-        .eq('user_id', session!.user.id)
-        .not('expires_at', 'is', null)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle();
-      return data ?? null;
-    },
-  });
+  // Shared status query; the 2-minute interval is what re-runs the GPS
+  // arrival check while the map is open.
+  const { data: own } = useOwnNightStatus({ refetchInterval: 120_000 });
+  const myStatus: MyNightStatus | null = own?.status ?? null;
 
   useEffect(() => {
     if (!session || !myStatus || (myStatus.status !== 'planning' && myStatus.status !== 'out')) {
@@ -98,10 +82,7 @@ export function useArrivalPrompts() {
     };
   }, [session, myStatus]);
 
-  const refresh = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['my-night-status'] });
-    queryClient.invalidateQueries({ queryKey: ['map-data'] });
-  }, [queryClient]);
+  const refresh = useCallback(() => invalidateNightStatusQueries(queryClient), [queryClient]);
 
   const acceptSmartPrompt = useCallback(async () => {
     if (!session || !smartPrompt) return;

@@ -1,42 +1,33 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
-import { supabase } from '@/lib/supabase';
 import { fetchEventsWithFriends, fetchMyVotes, fetchPlans } from '@/lib/plans';
+import type { NightStatusKind } from '@/lib/night-status';
+import { OWN_NIGHT_STATUS_KEY, useOwnNightStatus } from './use-own-night-status';
 import { useFriendIds } from './use-friend-ids';
 import { useSession } from './use-session';
 
 export interface MyNightStatus {
-  status: 'out' | 'heading_out' | 'planning' | 'home' | null;
+  status: NightStatusKind | null;
   planning_neighborhood: string | null;
   planning_visibility: string | null;
 }
 
-/** The caller's own unexpired night status — drives the Out/TBD/Staying In control. */
+/**
+ * The caller's own unexpired night status — drives the Out/TBD/Staying In
+ * control. A projection of the one shared status query (useOwnNightStatus).
+ */
 export function useMyNightStatus() {
-  const { session } = useSession();
-  return useQuery({
-    queryKey: ['my-night-status', session?.user.id],
-    enabled: !!session,
-    staleTime: 30_000,
-    queryFn: async (): Promise<MyNightStatus> => {
-      const { data } = await supabase
-        .from('night_statuses')
-        .select('status, planning_neighborhood, planning_visibility, expires_at')
-        .eq('user_id', session!.user.id)
-        .maybeSingle();
-      // Every answer (out / planning / home) carries tonight's expiry; an
-      // expired or missing row means the night reset — nothing to show.
-      if (!data || !data.expires_at || new Date(data.expires_at) <= new Date()) {
-        return { status: null, planning_neighborhood: null, planning_visibility: null };
+  const query = useOwnNightStatus();
+  const s = query.data?.status ?? null;
+  const data: MyNightStatus | undefined = query.data
+    ? {
+        status: s?.status ?? null,
+        planning_neighborhood: s?.planning_neighborhood ?? null,
+        planning_visibility: s?.planning_visibility ?? null,
       }
-      return {
-        status: data.status as MyNightStatus['status'],
-        planning_neighborhood: data.planning_neighborhood,
-        planning_visibility: data.planning_visibility,
-      };
-    },
-  });
+    : undefined;
+  return { ...query, data };
 }
 
 /** Unexpired plans (score-sorted) plus the caller's votes. */
@@ -89,7 +80,7 @@ export function usePlansRealtime() {
     const invalidateStatus = () => {
       clearTimeout(statusTimer);
       statusTimer = setTimeout(
-        () => queryClient.invalidateQueries({ queryKey: ['my-night-status'] }),
+        () => queryClient.invalidateQueries({ queryKey: [OWN_NIGHT_STATUS_KEY] }),
         500
       );
     };

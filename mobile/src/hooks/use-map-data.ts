@@ -101,6 +101,8 @@ async function fetchMapData(
   // Night statuses → venue names, planning exclusion, private parties
   const venueNameByUser: Record<string, string> = {};
   const planningUserIds = new Set<string>();
+  // Party rows carry only the neighborhood; the exact spot is filled in
+  // below from party_locations, which RLS serves to close friends only.
   const privateParty: Record<
     string,
     { party_neighborhood: string | null; lat: number | null; lng: number | null }
@@ -126,12 +128,29 @@ async function fetchMapData(
       if (s.is_private_party) {
         privateParty[s.user_id] = {
           party_neighborhood: s.party_neighborhood ?? null,
-          lat: s.lat ?? null,
-          lng: s.lng ?? null,
+          lat: null,
+          lng: null,
         };
       }
       if (DEMO_MODE && s.is_demo && s.status === 'out' && s.lat && s.lng) {
         demoOutStatuses.push(s);
+      }
+    }
+  }
+
+  // Exact party spots: the server returns a row only when the viewer is a
+  // close friend of the host (or the host). No row → no pin, by design.
+  const partyHostIds = Object.keys(privateParty);
+  if (partyHostIds.length > 0) {
+    const { data: partySpots } = await supabase
+      .from('party_locations')
+      .select('user_id, lat, lng')
+      .in('user_id', partyHostIds);
+    for (const spot of partySpots ?? []) {
+      const pp = privateParty[spot.user_id];
+      if (pp) {
+        pp.lat = spot.lat;
+        pp.lng = spot.lng;
       }
     }
   }
@@ -147,35 +166,51 @@ async function fetchMapData(
     closeFriendIds.has(id) ? 'close' : mutualIdSet.has(id) ? 'mutual' : 'direct';
 
   const friends: MapFriend[] = [];
+  const profileById = new Map(profiles.map((p) => [p.id, p]));
+
+  // Venue check-ins: live profile pin (server-masked per viewer, freshness-gated)
   for (const p of friendProfiles) {
     if (planningUserIds.has(p.id)) continue; // planning ≠ out
-    const pp = privateParty[p.id];
-    const relationship = relationshipOf(p.id);
-    // Mutual friends at private parties get no map pin
-    if (pp && relationship === 'mutual') continue;
-    // Private parties: exact GPS from night_statuses for close/direct friends
-    const lat = pp?.lat ?? p.last_known_lat!;
-    const lng = pp?.lng ?? p.last_known_lng!;
+    if (privateParty[p.id]) continue; // parties are pinned below, from party_locations
     friends.push({
       user_id: p.id,
-      lat,
-      lng,
-      venue_name: pp
-        ? `Private Party${pp.party_neighborhood ? ` (${pp.party_neighborhood})` : ''}`
-        : venueNameByUser[p.id] || '',
+      lat: p.last_known_lat!,
+      lng: p.last_known_lng!,
+      venue_name: venueNameByUser[p.id] || '',
       display_name: p.display_name || 'Unknown',
       avatar_url: p.avatar_url,
-      relationshipType: relationship,
-      is_private_party: !!pp,
-      party_neighborhood: pp?.party_neighborhood ?? null,
+      relationshipType: relationshipOf(p.id),
+      is_private_party: false,
+      party_neighborhood: null,
       last_location_at: p.last_location_at,
+    });
+  }
+
+  // Private parties: a pin exists only when party_locations gave us the spot
+  // (close friend of the host). A party does not move, so it never fades.
+  for (const hostId of partyHostIds) {
+    const pp = privateParty[hostId];
+    if (pp.lat === null || pp.lng === null) continue;
+    if (planningUserIds.has(hostId)) continue;
+    const p = profileById.get(hostId);
+    if (!p) continue;
+    friends.push({
+      user_id: hostId,
+      lat: pp.lat,
+      lng: pp.lng,
+      venue_name: `Private Party${pp.party_neighborhood ? ` (${pp.party_neighborhood})` : ''}`,
+      display_name: p.display_name || 'Unknown',
+      avatar_url: p.avatar_url,
+      relationshipType: relationshipOf(hostId),
+      is_private_party: true,
+      party_neighborhood: pp.party_neighborhood,
+      last_location_at: nowIso,
     });
   }
 
   // Dev only: demo users pin from their night_statuses GPS (their profiles
   // don't carry live coords). Ring types cycle like the web demo branch.
   if (DEMO_MODE && demoOutStatuses.length > 0) {
-    const profileById = new Map(profiles.map((p) => [p.id, p]));
     const relCycle: RelationshipType[] = ['close', 'direct', 'mutual'];
     demoOutStatuses.forEach((s, i) => {
       if (friends.some((f) => f.user_id === s.user_id)) return;

@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { router, useRootNavigationState, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
-import { OWN_NIGHT_STATUS_KEY, useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import {
   deferDeepLink,
   setNightGateState,
@@ -13,6 +13,9 @@ import {
 import { nightResetAt } from '@/lib/tonight';
 
 const GATE_HREF: Href = { pathname: '/check-in', params: { gate: '1' } };
+
+// Screens the check-in sheet itself opens on top of the pending question.
+const ALLOWED_ABOVE_GATE = new Set(['check-in', 'audience']);
 
 // setTimeout overflows past ~24.8 days; clamp so a long-lived session
 // re-arms instead of firing immediately.
@@ -29,17 +32,6 @@ const NAV_IN_FLIGHT_MS = 1_000;
 
 // Replay a parked deep link only after the sheet's dismiss animation.
 const REPLAY_DELAY_MS = 400;
-
-/** Query keys that describe "tonight" and must refresh when the night resets. */
-const NIGHT_SCOPED_KEYS = [
-  OWN_NIGHT_STATUS_KEY,
-  'my-night-status',
-  'map-data',
-  'friends-out',
-  'leaderboard',
-  'profile-page',
-  'plans',
-];
 
 /**
  * Required opening status prompt.
@@ -98,7 +90,7 @@ export function NightStatusGate() {
     if (gateState !== 'open' || !navReady) return;
     const routes = rootState.routes;
     const top = routes[routes.length - 1];
-    if (top?.name === 'check-in') return;
+    if (top && ALLOWED_ABOVE_GATE.has(top.name)) return;
     if (Date.now() - lastNavRef.current < NAV_IN_FLIGHT_MS) return;
     lastNavRef.current = Date.now();
 
@@ -134,9 +126,7 @@ export function NightStatusGate() {
       ? new Date(data.status.expires_at).getTime()
       : nightResetAt(new Date(), data.city).getTime();
     const delay = Math.min(Math.max(target - Date.now(), 1_000) + 500, MAX_TIMEOUT_MS);
-    const timer = setTimeout(() => {
-      for (const key of NIGHT_SCOPED_KEYS) queryClient.invalidateQueries({ queryKey: [key] });
-    }, delay);
+    const timer = setTimeout(() => invalidateNightStatusQueries(queryClient), delay);
     return () => clearTimeout(timer);
   }, [data, queryClient]);
 

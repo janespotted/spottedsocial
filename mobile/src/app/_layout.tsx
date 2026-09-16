@@ -111,6 +111,15 @@ function RootNavigator() {
         }}
       />
       <Stack.Screen
+        name="audience"
+        options={{
+          presentation: 'formSheet',
+          sheetAllowedDetents: 'fitToContents',
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
+      <Stack.Screen
         name="new-chat"
         options={{
           presentation: 'formSheet',

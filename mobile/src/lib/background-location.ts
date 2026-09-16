@@ -2,7 +2,7 @@ import BackgroundGeolocation, { type Location } from 'react-native-background-ge
 import * as Notifications from 'expo-notifications';
 import { supabase } from './supabase';
 import { ensureLocationReady, setLocationHandler } from './location-ready';
-import { isUserCurrentlyOut } from './night-status';
+import { shouldTrackLiveLocation } from './night-status';
 import { findNearestVenue, distanceMeters } from './location-service';
 import {
   canTriggerVenueArrival,
@@ -39,10 +39,11 @@ async function handleLocation(location: Location): Promise<void> {
   const userId = currentUserId;
   if (!userId) return;
 
-  // Status gate: only write GPS if user is still out with valid expiry
-  const stillOut = await isUserCurrentlyOut(userId);
+  // Status gate: only write GPS while out at a VENUE with a valid expiry.
+  // A private party never feeds profile coordinates (close-friends-only spot).
+  const stillOut = await shouldTrackLiveLocation(userId);
   if (!stillOut) {
-    console.log('[BgLocation] User no longer out — self-stopping watcher');
+    console.log('[BgLocation] User no longer out at a venue — self-stopping watcher');
     stopBackgroundLocation();
     return;
   }

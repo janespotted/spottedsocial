@@ -94,7 +94,7 @@ async function fetchFriendsData(userId: string): Promise<FriendsData> {
     .map((id) => profileMap.get(id))
     .filter((p): p is NonNullable<typeof p> => !!p)
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
-  rows.push({ kind: 'header', key: 'h-friends', title: `All Friends (${friends.length})` });
+  rows.push({ kind: 'header', key: 'h-friends', title: `Friends (${friends.length})` });
   for (const p of friends) {
     rows.push({
       kind: 'friend',
