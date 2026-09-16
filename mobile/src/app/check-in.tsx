@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   BackHandler,
   Linking,
   Pressable,
@@ -25,7 +26,13 @@ import {
   type VenueMatch,
 } from '@/lib/location-service';
 import { goOutAtVenue, goPlanning, stayIn } from '@/lib/night-status';
-import { getCurrentPosition, startBackgroundLocation } from '@/lib/background-location';
+import {
+  enableAutomaticUpdates,
+  getCurrentPosition,
+  startBackgroundLocation,
+  type TrackingResult,
+} from '@/lib/background-location';
+import { getLocationPermission, hasLocationAccess } from '@/lib/location-ready';
 import { notifyFriendArrived, notifyFriendsPlanning } from '@/lib/notifications';
 import { markNightAnswered } from '@/lib/night-gate';
 import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
@@ -37,7 +44,15 @@ import { AudienceRow } from '@/components/audience-row';
 const NEON = '#d4ff00';
 const PURPLE = '#a855f7';
 
-type Step = 'ask' | 'detecting' | 'gps-denied' | 'venue' | 'party' | 'planning' | 'done';
+type Step =
+  | 'ask'
+  | 'location-intro'
+  | 'detecting'
+  | 'gps-denied'
+  | 'venue'
+  | 'party'
+  | 'planning'
+  | 'done';
 
 const ANSWERS: Array<{ key: 'yes' | 'tbd' | 'no'; label: string; desc: string; icon: SFSymbol }> = [
   { key: 'yes', label: "Yes, I'm out", desc: 'Share your spot with friends', icon: 'mappin.and.ellipse' },
@@ -48,8 +63,16 @@ const ANSWERS: Array<{ key: 'yes' | 'tbd' | 'no'; label: string; desc: string; i
 interface Payoff {
   kind: 'out' | 'planning';
   venueName: string | null;
+  /** Private party: automatic updates are never offered (exact spot is close-friends-only). */
+  isParty: boolean;
   out: number;
   planning: number;
+}
+
+/** State of the separate "automatic updates" step shown on the payoff screen. */
+interface AutoUpdates extends TrackingResult {
+  /** The user has tapped "Turn on" at least once this session. */
+  asked: boolean;
 }
 
 /** Schedule the 10am morning-after recap (web scheduleMorningAfterNotification). */
@@ -341,8 +364,12 @@ export default function CheckInSheet() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [payoff, setPayoff] = useState<Payoff | null>(null);
+  const [auto, setAuto] = useState<AutoUpdates | null>(null);
+  const [autoBusy, setAutoBusy] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const detectSeq = useRef(0);
+  const stepRef = useRef<Step>('ask');
+  stepRef.current = step;
 
   // Gate mode: Android hardware back must not dismiss the question
   useEffect(() => {
@@ -373,10 +400,51 @@ export default function CheckInSheet() {
     queryClient.invalidateQueries({ queryKey: ['check-in-profile'] });
   };
 
-  const showPayoff = async (kind: Payoff['kind'], venueName: string | null) => {
+  const showPayoff = async (kind: Payoff['kind'], venueName: string | null, isParty = false) => {
     const counts = await fetchFriendCounts(friendIds ?? []).catch(() => ({ out: 0, planning: 0 }));
-    setPayoff({ kind, venueName, ...counts });
+    setPayoff({ kind, venueName, isParty, ...counts });
     setStep('done');
+  };
+
+  /* ── Location permission (client feedback §3) ──
+     Yes explains before asking, asks for When In Use only, and never
+     treats a permission outcome as a check-in outcome. */
+  const startYes = async () => {
+    const permission = await getLocationPermission().catch(() => 'denied' as const);
+    if (permission === 'not_determined') setStep('location-intro');
+    else if (permission === 'denied') setStep('gps-denied');
+    else detectVenue();
+  };
+
+  // Returning from Settings: re-check and move on automatically
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (state) => {
+      if (state !== 'active') return;
+      const current = stepRef.current;
+      if (current !== 'gps-denied' && current !== 'location-intro') return;
+      const permission = await getLocationPermission().catch(() => 'denied' as const);
+      if (hasLocationAccess(permission) && stepRef.current === current) detectVenue();
+    });
+    return () => sub.remove();
+  }, []);
+
+  /** After a venue check-in is saved: start updates if allowed, describe the rest. */
+  const settleAutomaticUpdates = async (uid: string) => {
+    const result = await startBackgroundLocation(uid).catch(
+      (): TrackingResult => ({ tracking: false, permission: 'denied' })
+    );
+    setAuto({ ...result, asked: false });
+  };
+
+  const turnOnAutomaticUpdates = async () => {
+    if (!userId || autoBusy) return;
+    setAutoBusy(true);
+    try {
+      const result = await enableAutomaticUpdates(userId);
+      setAuto({ ...result, asked: true });
+    } finally {
+      setAutoBusy(false);
+    }
   };
 
   const backToAsk = () => {
@@ -437,7 +505,7 @@ export default function CheckInSheet() {
     if (!userId) return;
     setError(null);
     if (key === 'yes') {
-      detectVenue();
+      startYes();
     } else if (key === 'tbd') {
       // TBD never asks for location — neighborhood is optional and manual
       setNeighborhood(null);
@@ -510,9 +578,9 @@ export default function CheckInSheet() {
         city,
       });
       await persistAudience();
-      // The check-in is saved; automatic updates are best-effort and must
-      // not turn a successful share into an error.
-      startBackgroundLocation(userId).catch(() => {});
+      // The check-in is saved. Automatic updates are a separate outcome,
+      // reported on the payoff screen — never as a check-in failure.
+      settleAutomaticUpdates(userId);
       scheduleMorningAfter();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (selectedVenue?.id) {
@@ -566,7 +634,7 @@ export default function CheckInSheet() {
       scheduleMorningAfter();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refreshStatusQueries();
-      await showPayoff('out', venueName);
+      await showPayoff('out', venueName, true);
     } catch {
       setError('Could not start your party. Try again.');
     } finally {
@@ -666,6 +734,26 @@ export default function CheckInSheet() {
         </>
       ) : null}
 
+      {/* ── Why location, before the system prompt ── */}
+      {step === 'location-intro' ? (
+        <>
+          <SheetHeader title="Find your spot" onBack={backToAsk} />
+          <View className="items-center py-2 gap-3">
+            <SymbolView name="location.circle" size={36} tintColor={PURPLE} />
+            <Text className="text-white/70 text-sm font-sans text-center">
+              Spotted uses your location to guess the venue you&apos;re at. Nothing is shared
+              until you tap &ldquo;Share my spot&rdquo;, and only the friends you choose can see
+              it.
+            </Text>
+            <Text className="text-white/40 text-xs font-sans text-center">
+              iOS will ask for &ldquo;While Using the App&rdquo; access next.
+            </Text>
+          </View>
+          <PrimaryButton label="Continue" onPress={detectVenue} />
+          <SecondaryButton label="Pick a venue instead" onPress={pickVenueManually} />
+        </>
+      ) : null}
+
       {/* ── Detecting ── */}
       {step === 'detecting' ? (
         <>
@@ -681,14 +769,19 @@ export default function CheckInSheet() {
       {step === 'gps-denied' ? (
         <>
           <SheetHeader title="Location access is off" onBack={backToAsk} />
-          <View className="items-center py-4 gap-4">
+          <View className="items-center py-2 gap-3">
             <SymbolView name="location.slash" size={36} tintColor="rgba(168,85,247,0.6)" />
-            <Text className="text-white/50 text-sm font-sans text-center">
-              Turn it on in Settings to auto-detect your venue, or pick one yourself.
+            <Text className="text-white/70 text-sm font-sans text-center">
+              Everything still works: pick your venue yourself, share it, and see who&apos;s out.
+              Location only lets Spotted guess the venue for you.
+            </Text>
+            <Text className="text-white/40 text-xs font-sans text-center">
+              Allow &ldquo;While Using the App&rdquo; in Settings and come back — this screen
+              updates on its own.
             </Text>
           </View>
-          <PrimaryButton label="Open Settings" onPress={() => Linking.openSettings()} />
-          <SecondaryButton label="Pick a venue" onPress={pickVenueManually} />
+          <PrimaryButton label="Pick a venue" onPress={pickVenueManually} />
+          <SecondaryButton label="Open Settings" onPress={() => Linking.openSettings()} />
         </>
       ) : null}
 
@@ -829,6 +922,67 @@ export default function CheckInSheet() {
               Friends can see you at {payoff.venueName}.
             </Text>
           ) : null}
+
+          {/* Automatic updates — a separate outcome from the check-in above */}
+          {payoff.kind === 'out' && !payoff.isParty && auto ? (
+            <View className="self-stretch rounded-xl px-4 py-3 bg-[#2d1b4e]/50 border border-white/[0.06] gap-2 mt-1">
+              <View className="flex-row items-center gap-2">
+                <SymbolView
+                  name={auto.permission === 'always' ? 'location.fill' : 'location'}
+                  size={14}
+                  tintColor={auto.permission === 'always' ? NEON : 'rgba(255,255,255,0.5)'}
+                />
+                <Text className="text-white text-sm font-sans-semibold flex-1">
+                  {auto.permission === 'always'
+                    ? 'Automatic updates on'
+                    : auto.permission === 'when_in_use'
+                      ? auto.asked
+                        ? 'Updates only while Spotted is open'
+                        : 'Keep your spot updated automatically?'
+                      : 'Automatic updates off'}
+                </Text>
+              </View>
+              <Text className="text-white/50 text-xs font-sans">
+                {auto.permission === 'always'
+                  ? "If you move to another spot, friends see it even when Spotted is closed."
+                  : auto.permission === 'when_in_use'
+                    ? auto.asked
+                      ? 'Your check-in is active. Move to a new spot and you can update it here.'
+                      : 'Your check-in is active. With background access, moving to a new spot updates automatically — iOS will ask for "Always" and Motion & Fitness.'
+                    : 'Your check-in is active. Without location access you update your spot manually.'}
+              </Text>
+              {auto.permission === 'when_in_use' && !auto.asked ? (
+                <View className="flex-row gap-2 pt-1">
+                  <Pressable
+                    onPress={turnOnAutomaticUpdates}
+                    disabled={autoBusy}
+                    className="flex-1 rounded-full py-2 items-center border border-[#d4ff00]/50 active:bg-[#d4ff00]/10 disabled:opacity-50"
+                  >
+                    {autoBusy ? (
+                      <ActivityIndicator size="small" color={NEON} />
+                    ) : (
+                      <Text className="text-[#d4ff00] text-sm font-sans-medium">Turn on</Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setAuto({ ...auto, asked: true })}
+                    className="flex-1 rounded-full py-2 items-center active:opacity-70"
+                  >
+                    <Text className="text-white/50 text-sm font-sans-medium">Not now</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              {auto.permission === 'denied' ? (
+                <Pressable
+                  onPress={() => Linking.openSettings()}
+                  className="self-start rounded-full px-3 py-1.5 border border-white/15 active:bg-white/5"
+                >
+                  <Text className="text-white/70 text-xs font-sans-medium">Open Settings</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+
           <View className="self-stretch gap-2 pt-2">
             {payoff.out > 0 ? (
               <>

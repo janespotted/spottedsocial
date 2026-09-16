@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import BackgroundGeolocation from 'react-native-background-geolocation';
+import { ensureLocationReady } from '@/lib/location-ready';
 import { useSession } from '@/hooks/use-session';
 
 const NEON = '#d4ff00';
@@ -53,13 +54,15 @@ export default function WelcomeScreen() {
   const finish = async () => {
     if (!session || finishing) return;
     setFinishing(true);
-    // Trigger the iOS location permission dialog (Always request).
-    // Denial is fine — the app degrades gracefully; permission state is
-    // re-checked whenever tracking starts. The plugin queues calls until
-    // ready() runs, which may never happen here — so never wait forever.
+    // The slide above explained why; now ask for When In Use only. The
+    // background ("Always") upgrade is a separate, explained step offered
+    // after the first successful check-in (lib/location-ready.ts).
+    // Denial is fine — the app degrades gracefully and the check-in sheet
+    // re-checks. Never wait forever on the native prompt.
     try {
       await Promise.race([
-        BackgroundGeolocation.requestPermission(),
+        // ready() is configured for When In Use, so this is the standard prompt only
+        ensureLocationReady().then(() => BackgroundGeolocation.requestPermission()),
         new Promise((resolve) => setTimeout(resolve, 10000)),
       ]);
     } catch {

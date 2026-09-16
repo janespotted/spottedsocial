@@ -1,7 +1,14 @@
 import BackgroundGeolocation, { type Location } from 'react-native-background-geolocation';
 import * as Notifications from 'expo-notifications';
 import { supabase } from './supabase';
-import { ensureLocationReady, setLocationHandler } from './location-ready';
+import {
+  ensureLocationReady,
+  getLocationPermission,
+  hasLocationAccess,
+  requestAutomaticUpdates,
+  setLocationHandler,
+  type LocationPermission,
+} from './location-ready';
 import { shouldTrackLiveLocation } from './night-status';
 import { findNearestVenue, distanceMeters } from './location-service';
 import {
@@ -143,11 +150,13 @@ async function runVenueShiftDetection(
 
 /**
  * One-shot GPS fix for foreground features (arrival prompts, smart prompt).
- * Does not start tracking; null on denial/timeout.
+ * Does not start tracking and NEVER prompts — only the check-in Yes path
+ * asks for permission, after explaining why. Null when not authorized,
+ * on timeout, or on error.
  */
 export async function getCurrentPosition(): Promise<{ lat: number; lng: number } | null> {
   try {
-    await ensureLocationReady();
+    if (!hasLocationAccess(await getLocationPermission())) return null;
     const location = await BackgroundGeolocation.getCurrentPosition({
       timeout: 10,
       samples: 1,
@@ -160,18 +169,49 @@ export async function getCurrentPosition(): Promise<{ lat: number; lng: number }
   }
 }
 
-export async function startBackgroundLocation(userId: string): Promise<void> {
+export interface TrackingResult {
+  /** Whether the watcher is running. */
+  tracking: boolean;
+  permission: LocationPermission;
+}
+
+/**
+ * Start the watcher if we are already allowed to. Never prompts: with
+ * When In Use it updates while Spotted is open; with Always it keeps going
+ * in the background. Not authorized → returns without starting. Safe to
+ * call at launch (BackgroundLocationManager) and after every check-in.
+ */
+export async function startBackgroundLocation(userId: string): Promise<TrackingResult> {
   currentUserId = userId;
+  let permission: LocationPermission = 'not_determined';
   try {
-    await ensureLocationReady();
+    permission = await getLocationPermission();
+    if (!hasLocationAccess(permission)) return { tracking: false, permission };
     await hydrateArrivalEngine();
-    if (isTracking) return;
+    if (isTracking) return { tracking: true, permission };
     const state = await BackgroundGeolocation.start();
     isTracking = state.enabled;
     console.log('[BgLocation] Tracking started:', state.enabled);
+    return { tracking: isTracking, permission };
   } catch (err) {
     console.error('[BgLocation] Failed to start:', err);
+    return { tracking: false, permission };
   }
+}
+
+/**
+ * The explicit "automatic updates" step after a successful check-in:
+ * asks for Always (+ Motion & Fitness), then starts the watcher with
+ * whatever the user granted. The check-in itself is already saved by the
+ * time this runs, so nothing here can make it look failed.
+ */
+export async function enableAutomaticUpdates(userId: string): Promise<TrackingResult> {
+  try {
+    await requestAutomaticUpdates();
+  } catch (err) {
+    console.warn('[BgLocation] Automatic updates request failed:', err);
+  }
+  return startBackgroundLocation(userId);
 }
 
 export async function stopBackgroundLocation(): Promise<void> {

@@ -1,13 +1,15 @@
 import { useEffect } from 'react';
 import { useSession } from '@/hooks/use-session';
-import { isUserCurrentlyOut } from '@/lib/night-status';
+import { shouldTrackLiveLocation } from '@/lib/night-status';
 import { startBackgroundLocation, stopBackgroundLocation } from '@/lib/background-location';
 
 /**
  * Owns the background-tracking lifecycle:
- * - app launch / sign-in: resume tracking if the user is already "out"
+ * - app launch / sign-in: resume tracking if the user is already out at a
+ *   venue (never for a private party) and permission was already granted —
+ *   startBackgroundLocation never prompts
  * - sign-out: always stop
- * Status changes made in-app (Home status card) call start/stop directly.
+ * Status changes made in-app (check-in sheet, Stop sharing) call start/stop directly.
  */
 export function BackgroundLocationManager() {
   const { session } = useSession();
@@ -18,8 +20,8 @@ export function BackgroundLocationManager() {
       return;
     }
     let cancelled = false;
-    isUserCurrentlyOut(session.user.id).then((out) => {
-      if (!cancelled && out) startBackgroundLocation(session.user.id);
+    shouldTrackLiveLocation(session.user.id).then((track) => {
+      if (!cancelled && track) startBackgroundLocation(session.user.id);
     });
     return () => {
       cancelled = true;
