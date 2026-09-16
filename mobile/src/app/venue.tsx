@@ -9,6 +9,7 @@ import {
   Share,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { Image } from '@/components/styled';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -22,12 +23,12 @@ import { reportContent } from '@/lib/moderation';
 import { getHoursDisplayString, type VenueHours, type VenueHoursDisplay } from '@/lib/venue-hours';
 import { calculateDistanceMiles, getVenuePhotoUrl, getVenueTypeDisplay } from '@/lib/venues';
 import { sendVenueInvites, type InviteFriend } from '@/lib/venue-invites';
+import { APP_BASE_URL, fetchOrCreateInviteCode, getInviteUrl } from '@/lib/invites';
+import { NEON, control, outlineControl } from '@/lib/theme';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
 import { VenueEventsSection } from '@/components/venue-events-section';
-
-const NEON = '#d4ff00';
 
 interface VenueData {
   id: string;
@@ -69,40 +70,87 @@ function toFriend(p: SafeProfile): FriendAtVenue {
   return { id: p.id, display_name: p.display_name, avatar_url: p.avatar_url };
 }
 
-/** Avatar stack + count; tapping expands the name list inline (web's popover). */
-function FriendRow({ friends, label }: { friends: FriendAtVenue[]; label: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const visible = friends.slice(0, 4);
-  const remaining = friends.length - visible.length;
+/** Names as a sentence: "Ava, Ben and 2 others". */
+function namesLine(friends: FriendAtVenue[]): string {
+  const names = friends.map((f) => f.display_name.split(' ')[0]);
+  if (names.length <= 2) return names.join(' and ');
+  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]}`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} others`;
+}
 
+/**
+ * Who's here — the headline of the card when friends are present (client
+ * feedback §7): big avatar stack, count as the title, names underneath,
+ * tap to expand the full list.
+ */
+function WhosHere({ friends, planning }: { friends: FriendAtVenue[]; planning: FriendAtVenue[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = friends.slice(0, 5);
+  const remaining = friends.length - visible.length;
+  const count = friends.length;
   return (
-    <View>
-      <Pressable
-        onPress={() => setExpanded((v) => !v)}
-        className="flex-row items-center gap-3 active:opacity-80"
-      >
-        <View className="flex-row -space-x-2">
+    <Pressable
+      onPress={() => setExpanded((v) => !v)}
+      accessibilityRole="button"
+      accessibilityLabel={`${count} friends here: ${namesLine(friends)}`}
+      className="rounded-2xl px-4 py-3.5 gap-2.5 active:opacity-90"
+      style={{ backgroundColor: 'rgba(212,255,0,0.08)', borderWidth: 1, borderColor: 'rgba(212,255,0,0.3)' }}
+    >
+      <View className="flex-row items-center gap-3">
+        <View className="flex-row -space-x-3">
           {visible.map((friend) => (
-            <Avatar key={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
+            <View key={friend.id} className="rounded-full border-2 border-[#0d0a18]">
+              <Avatar name={friend.display_name} url={friend.avatar_url} size="md" />
+            </View>
           ))}
           {remaining > 0 ? (
-            <View className="w-8 h-8 rounded-full bg-[#a855f7]/30 border-2 border-[#0d0a18] items-center justify-center">
-              <Text className="text-white text-[10px] font-sans-medium">+{remaining}</Text>
+            <View className="w-10 h-10 rounded-full bg-[#a855f7]/40 border-2 border-[#0d0a18] items-center justify-center">
+              <Text className="text-white text-xs font-sans-semibold">+{remaining}</Text>
             </View>
           ) : null}
         </View>
-        <Text className="text-sm text-white/60 font-sans">{label}</Text>
-      </Pressable>
+        <View className="flex-1 min-w-0">
+          <Text className="text-white text-base font-sans-semibold">
+            {count} {count === 1 ? 'friend is' : 'friends are'} here
+          </Text>
+          <Text className="text-white/60 text-xs font-sans" numberOfLines={expanded ? undefined : 1}>
+            {namesLine(friends)}
+          </Text>
+        </View>
+        <SymbolView name={expanded ? 'chevron.up' : 'chevron.down'} size={12} tintColor="rgba(255,255,255,0.4)" />
+      </View>
       {expanded ? (
-        <View className="mt-2 ml-1 gap-1.5">
+        <View className="gap-1.5 pt-1 border-t border-white/10">
           {friends.map((friend) => (
-            <View key={friend.id} className="flex-row items-center gap-2">
+            <View key={friend.id} className="flex-row items-center gap-2 pt-1.5">
               <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
               <Text className="text-white text-sm font-sans">{friend.display_name}</Text>
             </View>
           ))}
         </View>
       ) : null}
+      {planning.length > 0 ? (
+        <Text className="text-white/55 text-xs font-sans">
+          {planning.length} more {planning.length === 1 ? 'is' : 'are'} planning to come.
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
+/** Secondary "planning" row when nobody is here yet. */
+function PlanningRow({ friends }: { friends: FriendAtVenue[] }) {
+  const visible = friends.slice(0, 4);
+  return (
+    <View className="flex-row items-center gap-3">
+      <View className="flex-row -space-x-2">
+        {visible.map((friend) => (
+          <Avatar key={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
+        ))}
+      </View>
+      <Text className="text-sm text-white/60 font-sans">
+        {friends.length} {friends.length === 1 ? 'friend is' : 'friends are'} planning to come
+      </Text>
     </View>
   );
 }
@@ -113,6 +161,7 @@ export default function VenueScreen() {
   const { session } = useSession();
   const { data: friendIds } = useFriendIds(session?.user.id);
   const queryClient = useQueryClient();
+  const { height: windowHeight } = useWindowDimensions();
   const [moreInfoOpen, setMoreInfoOpen] = useState(false);
   // Keyed by venueId so Trending Nearby swaps retry the new venue's photo
   const [photoFailedFor, setPhotoFailedFor] = useState<string | null>(null);
@@ -125,16 +174,18 @@ export default function VenueScreen() {
   // friendIds deliberately NOT in the key: its refetches produce a new array
   // reference, and re-keying flips the query back to loading — the whole card
   // (banner included) blinks. Friend changes mid-view aren't worth that.
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['venue-card', venueId],
     enabled: !!venueId && !!session && friendIds !== undefined,
+    retry: 1,
     queryFn: async (): Promise<VenueCardData | null> => {
       const nowIso = new Date().toISOString();
-      const { data: venue } = await supabase
+      const { data: venue, error: venueError } = await supabase
         .from('venues')
         .select('*')
         .eq('id', venueId!)
-        .single();
+        .maybeSingle();
+      if (venueError) throw venueError;
       if (!venue) return null;
 
       const [
@@ -298,23 +349,29 @@ export default function VenueScreen() {
   const venue = data?.venue;
   const isInWishlist = wishlistOverride ?? data?.isInWishlist ?? false;
 
+  // Optimistic, and rolled back if the write fails (it never was before)
   const toggleWishlist = async () => {
     if (!venue || !session) return;
-    if (isInWishlist) {
-      setWishlistOverride(false);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      await supabase
-        .from('wishlist_places')
-        .delete()
-        .eq('user_id', session.user.id)
-        .eq('venue_name', venue.name);
-    } else {
-      setWishlistOverride(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await supabase
-        .from('wishlist_places')
-        .insert({ user_id: session.user.id, venue_name: venue.name, venue_image_url: null });
+    const wasSaved = isInWishlist;
+    setWishlistOverride(!wasSaved);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const { error } = wasSaved
+      ? await supabase
+          .from('wishlist_places')
+          .delete()
+          .eq('user_id', session.user.id)
+          .eq('venue_name', venue.name)
+      : await supabase
+          .from('wishlist_places')
+          .insert({ user_id: session.user.id, venue_name: venue.name, venue_image_url: null });
+    if (error) {
+      setWishlistOverride(wasSaved);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(wasSaved ? "Couldn't remove from saved" : "Couldn't save this spot", 'Please try again.');
+      return;
     }
+    if (!wasSaved) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    queryClient.invalidateQueries({ queryKey: ['profile-page'] });
   };
 
   const openDirections = () => {
@@ -326,10 +383,17 @@ export default function VenueScreen() {
     );
   };
 
-  const shareVenue = () => {
+  // Share carries the user's invite link so a friend who isn't on Spotted
+  // yet lands somewhere useful (there is no public venue page)
+  const shareVenue = async () => {
     if (!venue) return;
+    let url = APP_BASE_URL;
+    if (session) {
+      const invite = await fetchOrCreateInviteCode(session.user.id).catch(() => null);
+      if (invite) url = getInviteUrl(invite.code);
+    }
     Share.share({
-      message: `Check out ${venue.name}${venue.neighborhood ? ` in ${venue.neighborhood}` : ''}! 🎉`,
+      message: `Check out ${venue.name}${venue.neighborhood ? ` in ${venue.neighborhood}` : ''} on Spotted 🎉 ${url}`,
     });
   };
 
@@ -378,9 +442,90 @@ export default function VenueScreen() {
   if (venue?.neighborhood) metaParts.push(venue.neighborhood);
   if (!isNaN(distNum) && distNum <= 10) metaParts.push(`${data!.distance} mi`);
 
+  const friendsHere = data?.friendsAtVenue ?? [];
+  const friendsPlanning = data?.friendsPlanning ?? [];
+
+  if (invitePickerOpen) {
+    return (
+      <View className="bg-[#0d0a18]" style={{ height: Math.round(windowHeight * 0.7) }}>
+        <View className="flex-row items-center justify-between px-4 py-4 border-b border-white/10">
+          <Text className="text-white text-base font-sans-semibold">
+            Invite to {venue?.name ?? 'venue'}
+          </Text>
+          <Pressable onPress={() => setInvitePickerOpen(false)} hitSlop={12} accessibilityLabel="Close invite picker">
+            <SymbolView name="xmark" size={18} tintColor="rgba(255,255,255,0.6)" />
+          </Pressable>
+        </View>
+        <ScrollView contentContainerClassName="p-4 gap-3">
+          {inviteFriends.length === 0 ? (
+            <Text className="text-white/40 text-sm font-sans text-center py-10">
+              Add some friends first.
+            </Text>
+          ) : (
+            inviteFriends.map((friend) => {
+              const selected = selectedInvitees.has(friend.id);
+              return (
+                <Pressable
+                  key={friend.id}
+                  onPress={() =>
+                    setSelectedInvitees((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(friend.id)) next.delete(friend.id);
+                      else next.add(friend.id);
+                      return next;
+                    })
+                  }
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected }}
+                  className="flex-row items-center gap-3 p-2 rounded-xl active:bg-white/5"
+                >
+                  <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+                  <Text className="flex-1 text-white text-sm font-sans-medium" numberOfLines={1}>
+                    {friend.display_name}
+                  </Text>
+                  <View
+                    className="w-5 h-5 rounded-full border items-center justify-center"
+                    style={{
+                      borderColor: selected ? NEON : 'rgba(255,255,255,0.3)',
+                      backgroundColor: selected ? NEON : 'transparent',
+                    }}
+                  >
+                    {selected ? <SymbolView name="checkmark" size={11} tintColor="#000000" /> : null}
+                  </View>
+                </Pressable>
+              );
+            })
+          )}
+        </ScrollView>
+        <View className="px-4 pb-safe-offset-4 pt-2">
+          <Pressable
+            onPress={submitInvites}
+            disabled={selectedInvitees.size === 0 || sendingInvites}
+            className="w-full h-11 rounded-xl items-center justify-center active:opacity-90 disabled:opacity-30"
+            style={{ backgroundColor: NEON }}
+          >
+            {sendingInvites ? (
+              <ActivityIndicator size="small" color="#000000" />
+            ) : (
+              <Text className="text-black font-sans-semibold">
+                Send Invite{selectedInvitees.size > 1 ? 's' : ''}
+                {selectedInvitees.size > 0 ? ` (${selectedInvitees.size})` : ''}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  // The sheet is sized to this content (fitToContents). A ScrollView as the
+  // root child breaks that measurement on iOS — the sheet opens tall with the
+  // content pinned to its bottom — so the card is a plain View and only the
+  // expandable More Info section scrolls, inside a bounded height (the same
+  // nested pattern the check-in sheet uses).
   return (
-    <View className="flex-1 bg-[#0d0a18]">
-      <ScrollView contentContainerClassName="pb-safe-offset-6">
+    <View className="bg-[#0d0a18]">
+      <View className="pb-safe-offset-6">
         {/* ── ZONE 1: Identity — banner renders immediately from venueId alone,
             so the photo downloads in parallel with the data queries. On error
             (venue has no Google photos) it falls back to the gradient. ── */}
@@ -388,14 +533,14 @@ export default function VenueScreen() {
           {!photoFailed && venueId ? (
             <Image
               source={{ uri: getVenuePhotoUrl(venueId, 0) }}
-              className="w-full h-40"
+              className="w-full h-36"
               contentFit="cover"
               transition={200}
               onError={() => setPhotoFailedFor(venueId)}
             />
           ) : (
             <View
-              className="w-full h-40 items-center justify-center"
+              className="w-full h-36 items-center justify-center"
               style={{
                 experimental_backgroundImage:
                   'linear-gradient(135deg, rgba(168,85,247,0.25), #1a0f2e 55%, rgba(212,255,0,0.15))',
@@ -443,71 +588,102 @@ export default function VenueScreen() {
           </View>
         </View>
 
-        {isLoading || !venue ? (
+        {isError ? (
+          // The sheet stays dismissible (X above); the body offers Retry
+          <View className="items-center px-6 py-10 gap-3">
+            <SymbolView name="wifi.exclamationmark" size={26} tintColor="rgba(255,255,255,0.4)" />
+            <Text className="text-white text-sm font-sans-semibold">Couldn&apos;t load this venue</Text>
+            <Text className="text-white/50 text-xs font-sans text-center">Check your connection and try again.</Text>
+            <Pressable
+              onPress={() => refetch()}
+              disabled={isRefetching}
+              accessibilityRole="button"
+              className="mt-1 h-10 px-5 rounded-full items-center justify-center active:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: NEON }}
+            >
+              {isRefetching ? (
+                <ActivityIndicator size="small" color="#000000" />
+              ) : (
+                <Text className="text-black text-sm font-sans-semibold">Retry</Text>
+              )}
+            </Pressable>
+          </View>
+        ) : !isLoading && data === null ? (
+          <View className="items-center px-6 py-10 gap-2">
+            <Text className="text-white text-sm font-sans-semibold">This venue isn&apos;t available</Text>
+            <Text className="text-white/50 text-xs font-sans text-center">It may have been removed.</Text>
+          </View>
+        ) : isLoading || !venue ? (
           <View className="items-center py-16">
             <ActivityIndicator color={NEON} />
           </View>
         ) : (
         <View className="px-5 pt-2 pb-5">
           {metaParts.length > 0 ? (
-            <Text className="text-xs text-white/45 font-sans mb-4">{metaParts.join(' · ')}</Text>
+            <Text className="text-xs text-white/45 font-sans mb-3">{metaParts.join(' · ')}</Text>
           ) : null}
 
-          {/* ── ZONE 2: Social — who's here / planning ── */}
-          <View className="mb-4 gap-4">
-            {data!.friendsAtVenue.length > 0 ? (
-              <FriendRow
-                friends={data!.friendsAtVenue}
-                label={`${data!.friendsAtVenue.length} friend${data!.friendsAtVenue.length !== 1 ? 's' : ''} here`}
-              />
+          {/* ── ZONE 2: Social — who's here leads the card ── */}
+          <View className="mb-3 gap-3">
+            {friendsHere.length > 0 ? (
+              <WhosHere friends={friendsHere} planning={friendsPlanning} />
             ) : (
-              <Text className="text-sm font-sans-medium" style={{ color: 'rgba(212,255,0,0.8)' }}>
-                Be the first spotted here tonight
-              </Text>
+              <>
+                <Text className="text-sm font-sans-medium" style={{ color: 'rgba(212,255,0,0.8)' }}>
+                  Be the first spotted here tonight
+                </Text>
+                {friendsPlanning.length > 0 ? <PlanningRow friends={friendsPlanning} /> : null}
+              </>
             )}
-            {data!.friendsPlanning.length > 0 ? (
-              <FriendRow
-                friends={data!.friendsPlanning}
-                label={`${data!.friendsPlanning.length} friend${data!.friendsPlanning.length !== 1 ? 's' : ''} planning`}
-              />
-            ) : null}
           </View>
 
-          {/* Primary CTA */}
+          {/* Invite: the headline action when nobody is here, quieter once
+              the who's-here card carries the story */}
           <Pressable
             onPress={() => setInvitePickerOpen(true)}
-            className="w-full h-11 mb-3 rounded-xl flex-row items-center justify-center gap-2 active:opacity-90"
-            style={{ backgroundColor: NEON }}
+            accessibilityRole="button"
+            className={`w-full h-11 mb-3 rounded-xl flex-row items-center justify-center gap-2 active:opacity-90 ${friendsHere.length > 0 ? outlineControl : ''}`}
+            style={friendsHere.length > 0 ? undefined : { backgroundColor: NEON }}
           >
-            <SymbolView name="person.badge.plus" size={16} tintColor="#000000" />
-            <Text className="text-black font-sans-semibold text-[15px]">Invite Friends Here</Text>
+            <SymbolView name="person.badge.plus" size={16} tintColor={friendsHere.length > 0 ? '#ffffff' : '#000000'} />
+            <Text className={`font-sans-semibold text-[15px] ${friendsHere.length > 0 ? 'text-white' : 'text-black'}`}>
+              Invite friends here
+            </Text>
           </Pressable>
 
-          {/* ── ZONE 3: Utility row ── */}
+          {/* ── ZONE 3: Utility row — Save has a label and a clear on state ── */}
           <View className="flex-row items-center gap-2 mb-3">
             <Pressable
               onPress={openDirections}
-              className="flex-row items-center gap-1.5 h-9 px-3 rounded-lg bg-white/5 border border-white/10 active:bg-white/10"
+              accessibilityRole="button"
+              className={`flex-row items-center gap-1.5 h-10 px-3 rounded-lg active:opacity-70 ${control.ordinary}`}
             >
-              <SymbolView name="mappin" size={13} tintColor="rgba(255,255,255,0.6)" />
-              <Text className="text-white/60 text-xs font-sans">Directions</Text>
+              <SymbolView name="mappin" size={13} tintColor="rgba(255,255,255,0.7)" />
+              <Text className="text-white/80 text-xs font-sans-medium">Directions</Text>
             </Pressable>
             <Pressable
               onPress={shareVenue}
-              className="flex-row items-center gap-1.5 h-9 px-3 rounded-lg bg-white/5 border border-white/10 active:bg-white/10"
+              accessibilityRole="button"
+              className={`flex-row items-center gap-1.5 h-10 px-3 rounded-lg active:opacity-70 ${control.ordinary}`}
             >
-              <SymbolView name="square.and.arrow.up" size={13} tintColor="rgba(255,255,255,0.6)" />
-              <Text className="text-white/60 text-xs font-sans">Share</Text>
+              <SymbolView name="square.and.arrow.up" size={13} tintColor="rgba(255,255,255,0.7)" />
+              <Text className="text-white/80 text-xs font-sans-medium">Share</Text>
             </Pressable>
             <Pressable
               onPress={toggleWishlist}
-              className="h-9 w-9 rounded-lg bg-white/5 border border-white/10 items-center justify-center active:bg-white/10"
+              accessibilityRole="button"
+              accessibilityLabel={isInWishlist ? 'Saved. Remove from wishlist' : 'Save to wishlist'}
+              accessibilityState={{ selected: isInWishlist }}
+              className={`flex-row items-center gap-1.5 h-10 px-3 rounded-lg active:opacity-70 ${isInWishlist ? control.selected : control.ordinary}`}
             >
               <SymbolView
                 name={isInWishlist ? 'bookmark.fill' : 'bookmark'}
-                size={15}
-                tintColor={isInWishlist ? NEON : 'rgba(255,255,255,0.5)'}
+                size={13}
+                tintColor={isInWishlist ? NEON : 'rgba(255,255,255,0.7)'}
               />
+              <Text className="text-xs font-sans-medium" style={{ color: isInWishlist ? NEON : 'rgba(255,255,255,0.8)' }}>
+                {isInWishlist ? 'Saved' : 'Save'}
+              </Text>
             </Pressable>
           </View>
 
@@ -524,7 +700,11 @@ export default function VenueScreen() {
             />
           </Pressable>
           {moreInfoOpen ? (
-            <View className="pt-2 gap-3">
+            <ScrollView
+              style={{ maxHeight: Math.round(windowHeight * 0.32) }}
+              contentContainerClassName="pt-2 gap-3"
+              showsVerticalScrollIndicator={false}
+            >
               <VenueEventsSection venueId={venue.id} />
 
               {hoursData?.hours ? (
@@ -567,83 +747,11 @@ export default function VenueScreen() {
                   {(hoursData.ratingsCount ?? 0).toLocaleString()})
                 </Text>
               ) : null}
-            </View>
+            </ScrollView>
           ) : null}
         </View>
         )}
-      </ScrollView>
-
-      {/* Invite picker overlay */}
-      {invitePickerOpen ? (
-        <View className="absolute inset-0 bg-[#0d0a18]">
-          <View className="flex-row items-center justify-between px-4 py-4 border-b border-white/10">
-            <Text className="text-white text-base font-sans-semibold">
-              Invite to {venue?.name ?? 'venue'}
-            </Text>
-            <Pressable onPress={() => setInvitePickerOpen(false)} hitSlop={12}>
-              <SymbolView name="xmark" size={18} tintColor="rgba(255,255,255,0.6)" />
-            </Pressable>
-          </View>
-          <ScrollView contentContainerClassName="p-4 gap-3">
-            {inviteFriends.length === 0 ? (
-              <Text className="text-white/40 text-sm font-sans text-center py-10">
-                Add some friends first.
-              </Text>
-            ) : (
-              inviteFriends.map((friend) => {
-                const selected = selectedInvitees.has(friend.id);
-                return (
-                  <Pressable
-                    key={friend.id}
-                    onPress={() =>
-                      setSelectedInvitees((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(friend.id)) next.delete(friend.id);
-                        else next.add(friend.id);
-                        return next;
-                      })
-                    }
-                    className="flex-row items-center gap-3 p-2 rounded-xl active:bg-white/5"
-                  >
-                    <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
-                    <Text className="flex-1 text-white text-sm font-sans-medium" numberOfLines={1}>
-                      {friend.display_name}
-                    </Text>
-                    <View
-                      className="w-5 h-5 rounded-full border items-center justify-center"
-                      style={{
-                        borderColor: selected ? NEON : 'rgba(255,255,255,0.3)',
-                        backgroundColor: selected ? NEON : 'transparent',
-                      }}
-                    >
-                      {selected ? (
-                        <SymbolView name="checkmark" size={11} tintColor="#000000" />
-                      ) : null}
-                    </View>
-                  </Pressable>
-                );
-              })
-            )}
-          </ScrollView>
-          <View className="px-4 pb-safe-offset-4 pt-2">
-            <Pressable
-              onPress={submitInvites}
-              disabled={selectedInvitees.size === 0 || sendingInvites}
-              className="w-full h-11 rounded-xl items-center justify-center active:opacity-90 disabled:opacity-30"
-              style={{ backgroundColor: NEON }}
-            >
-              {sendingInvites ? (
-                <ActivityIndicator size="small" color="#000000" />
-              ) : (
-                <Text className="text-black font-sans-semibold">
-                  Send Invite{selectedInvitees.size > 1 ? 's' : ''}
-                  {selectedInvitees.size > 0 ? ` (${selectedInvitees.size})` : ''}
-                </Text>
-              )}
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+      </View>
     </View>
   );
 }

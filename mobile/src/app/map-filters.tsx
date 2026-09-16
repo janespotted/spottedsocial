@@ -1,25 +1,28 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { Description, Label, RadioGroup } from 'heroui-native';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import {
   isDefaultMapFilters,
   resetMapFilters,
   setMapFilters,
   useMapFilters,
-  type RelationshipFilter,
+  type PeopleFilter,
   type VenueTypeFilter,
 } from '@/lib/map-filters';
-import { NEON } from '@/lib/theme';
+import { NEON, PURPLE, control, controlTint, primaryControl, primaryControlText } from '@/lib/theme';
 
-const PEOPLE_OPTIONS: Array<{ value: RelationshipFilter; label: string; desc: string }> = [
-  { value: 'all', label: 'Everyone', desc: 'Show all friends & venues' },
-  { value: 'close', label: 'Close Friends Only', desc: 'Only close friends, still show venues' },
-  { value: 'friends_only', label: 'Friends Only', desc: 'Hide venue pins' },
+/**
+ * Same tier names as the sharing audience, but these descriptions say what
+ * the viewer SEES. The sharing sheet (`/audience`) says who can see them.
+ */
+const PEOPLE_OPTIONS: Array<{ value: PeopleFilter; label: string; desc: string }> = [
+  { value: 'close_friends', label: 'Close Friends', desc: 'Only people on your Close Friends list.' },
+  { value: 'all_friends', label: 'Friends', desc: 'Everyone you are friends with.' },
+  { value: 'mutual_friends', label: 'Friends + Mutuals', desc: 'Friends, plus friends-of-friends who share with mutuals.' },
 ];
 
 const VENUE_OPTIONS: Array<{ key: VenueTypeFilter; label: string; icon: SFSymbol }> = [
-  { key: 'all', label: 'All Venues', icon: 'map' },
+  { key: 'all', label: 'All types', icon: 'map' },
   { key: 'nightclub', label: 'Clubs', icon: 'music.note' },
   { key: 'cocktail_bar', label: 'Cocktails', icon: 'wineglass' },
   { key: 'bar', label: 'Bars', icon: 'mug' },
@@ -27,107 +30,111 @@ const VENUE_OPTIONS: Array<{ key: VenueTypeFilter; label: string; icon: SFSymbol
   { key: 'rooftop', label: 'Rooftops', icon: 'building.2' },
 ];
 
+function SectionTitle({ children }: { children: string }) {
+  return (
+    <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">{children}</Text>
+  );
+}
+
 /**
- * "Show on Map" filters — native form sheet (liquid glass on iOS 26), port
- * of the web map's filter drawer.
+ * "Show on Map" — three independent choices (client feedback §7): which
+ * people, whether venues show at all, and which venue types. Nothing here
+ * changes who can see the viewer; the note says so.
  */
 export default function MapFiltersSheet() {
   const filters = useMapFilters();
   const filtered = !isDefaultMapFilters(filters);
 
   return (
-    <View className="px-5 pt-6 pb-10 gap-6">
-      <View className="flex-row items-center justify-between">
-        <View className="gap-0.5">
+    <View className="px-5 pt-6 pb-safe-offset-6 gap-6">
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="flex-1 gap-0.5">
           <Text className="text-white text-lg font-sans-semibold">Show on Map</Text>
-          <Text className="text-white/45 text-xs font-sans">Changes what you see, not who can see you.</Text>
+          <Text className="text-white/45 text-xs font-sans leading-4">
+            Changes what you see, not who can see you. Your sharing audience is set from your status.
+          </Text>
         </View>
         {filtered ? (
           <Pressable
-            onPress={() => {
-              resetMapFilters();
-              router.back();
-            }}
+            onPress={resetMapFilters}
             hitSlop={6}
             accessibilityLabel="Reset filters"
-            className="h-9 px-3.5 rounded-full items-center justify-center border active:opacity-70"
-            style={{ borderColor: 'rgba(212,255,0,0.45)', backgroundColor: 'rgba(212,255,0,0.12)' }}
+            className={`h-9 px-3.5 rounded-full items-center justify-center active:opacity-70 ${control.selected}`}
           >
             <Text className="text-xs font-sans-semibold" style={{ color: NEON }}>Reset</Text>
           </Pressable>
         ) : null}
       </View>
 
-      {/* People filter */}
-      <View className="gap-3">
-        <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">
-          People
-        </Text>
-        <RadioGroup
-          value={filters.relationship}
-          onValueChange={(value) => {
-            setMapFilters({ relationship: value as RelationshipFilter });
-            router.back();
-          }}
-        >
-          {PEOPLE_OPTIONS.map((opt) => (
-            <RadioGroup.Item
+      {/* People — progressive tiers */}
+      <View className="gap-2.5">
+        <SectionTitle>People</SectionTitle>
+        {PEOPLE_OPTIONS.map((opt) => {
+          const selected = filters.people === opt.value;
+          return (
+            <Pressable
               key={opt.value}
-              value={opt.value}
-              className={`rounded-xl px-3 py-3 mb-2 border ${
-                filters.relationship === opt.value
-                  ? 'bg-[#a855f7]/20 border-[#a855f7]/40'
-                  : 'bg-[#2d1b4e]/50 border-transparent'
-              }`}
+              onPress={() => setMapFilters({ people: opt.value })}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              className={`flex-row items-center gap-3 rounded-xl px-3.5 py-3 ${selected ? control.selected : control.ordinary}`}
             >
-              {/* Stack label over description; default radio sits to the right */}
-              <View className="flex-1 pr-2 gap-0.5">
-                <Label className="text-white text-sm font-sans-medium">{opt.label}</Label>
-                <Description className="text-white/40 text-xs font-sans">{opt.desc}</Description>
+              <View className="flex-1 gap-0.5">
+                <Text className="text-white text-sm font-sans-medium">{opt.label}</Text>
+                <Text className="text-white/45 text-xs font-sans">{opt.desc}</Text>
               </View>
-            </RadioGroup.Item>
-          ))}
-        </RadioGroup>
+              {selected ? <SymbolView name="checkmark" size={14} weight="semibold" tintColor={NEON} /> : null}
+            </Pressable>
+          );
+        })}
       </View>
 
-      {/* Venue type filter */}
-      <View className="gap-3">
-        <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">
-          Venue Type
-        </Text>
-        <View className="flex-row flex-wrap gap-2">
-          {VENUE_OPTIONS.map((filter) => (
-            <Pressable
-              key={filter.key}
-              onPress={() => {
-                setMapFilters({ venueType: filter.key });
-                router.back();
-              }}
-              className={`flex-row items-center gap-2 px-3 py-2.5 rounded-xl border ${
-                filters.venueType === filter.key
-                  ? 'bg-[#a855f7]/25 border-[#a855f7]/40'
-                  : 'bg-[#2d1b4e]/50 border-transparent'
-              }`}
-              style={{ width: '48%' }}
-            >
-              <SymbolView
-                name={filter.icon}
-                size={15}
-                tintColor={filters.venueType === filter.key ? '#d4ff00' : 'rgba(255,255,255,0.7)'}
-              />
-              <Text
-                className={`text-sm ${
-                  filters.venueType === filter.key
-                    ? 'text-[#d4ff00] font-sans-semibold'
-                    : 'text-white/70 font-sans'
-                }`}
+      {/* Venues — on/off, then type */}
+      <View className="gap-2.5">
+        <SectionTitle>Venues</SectionTitle>
+        <View className={`flex-row items-center justify-between rounded-xl px-3.5 py-2.5 ${control.ordinary}`}>
+          <View className="flex-1 gap-0.5">
+            <Text className="text-white text-sm font-sans-medium">Show venues</Text>
+            <Text className="text-white/45 text-xs font-sans">Venue pins and hot spots.</Text>
+          </View>
+          <Switch
+            value={filters.showVenues}
+            onValueChange={(v) => setMapFilters({ showVenues: v })}
+            trackColor={{ true: PURPLE, false: 'rgba(255,255,255,0.15)' }}
+            accessibilityLabel="Show venues"
+          />
+        </View>
+        <View className="flex-row flex-wrap gap-2" style={{ opacity: filters.showVenues ? 1 : 0.4 }}>
+          {VENUE_OPTIONS.map((opt) => {
+            const selected = filters.venueType === opt.key;
+            const state = !filters.showVenues ? 'disabled' : selected ? 'selected' : 'ordinary';
+            return (
+              <Pressable
+                key={opt.key}
+                onPress={() => setMapFilters({ venueType: opt.key })}
+                disabled={!filters.showVenues}
+                accessibilityRole="radio"
+                accessibilityState={{ selected, disabled: !filters.showVenues }}
+                className={`flex-row items-center gap-2 px-3 py-2.5 rounded-xl ${control[state]}`}
+                style={{ width: '48%' }}
               >
-                {filter.label}
-              </Text>
-            </Pressable>
-          ))}
+                <SymbolView name={opt.icon} size={15} tintColor={controlTint[state]} />
+                <Text className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans'}`} style={{ color: controlTint[state] }}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
+
+      <Pressable
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        className={`h-12 rounded-full items-center justify-center active:opacity-90 ${primaryControl}`}
+      >
+        <Text className={`text-[15px] font-sans-semibold ${primaryControlText}`}>Done</Text>
+      </Pressable>
     </View>
   );
 }

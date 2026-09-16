@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionSheetIOS, Pressable, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActionSheetIOS, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -29,7 +29,7 @@ import { useArrivalPrompts } from '@/hooks/use-arrival-prompts';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
 import { FriendIdCard } from '@/components/friend-id-card';
-import { isDefaultMapFilters, useMapFilters } from '@/lib/map-filters';
+import { isDefaultMapFilters, peopleFilterIncludes, useMapFilters } from '@/lib/map-filters';
 import { getCurrentPosition } from '@/lib/background-location';
 import { IconButton } from '@/components/icon-button';
 import { SmartArrivalPrompt, VenueMoveBanner } from '@/components/venue-move-banner';
@@ -210,6 +210,7 @@ export default function MapScreen() {
   const queryClient = useQueryClient();
   const cameraRef = useRef<Camera>(null);
   const mapRef = useRef<MapView>(null);
+  const { height: windowHeight } = useWindowDimensions();
 
   const { data: city } = useQuery({
     queryKey: ['home-city', session?.user.id],
@@ -251,7 +252,7 @@ export default function MapScreen() {
   const [selectedFriend, setSelectedFriend] = useState<MapFriend | null>(null);
   const [friendCardOpen, setFriendCardOpen] = useState(false);
   const mapFilters = useMapFilters();
-  const { relationship: relationshipFilter, venueType: venueFilter } = mapFilters;
+  const { people: peopleFilter, showVenues, venueType: venueFilter } = mapFilters;
   const filtersActive = !isDefaultMapFilters(mapFilters);
   const [locating, setLocating] = useState(false);
   const [shouldCluster, setShouldCluster] = useState(true);
@@ -271,10 +272,8 @@ export default function MapScreen() {
 
   // ── Friend clustering (web parity: same venue OR ~5m GPS proximity) ──
   const { clusters, selfSolo } = useMemo(() => {
-    let filtered =
-      relationshipFilter === 'close'
-        ? friends.filter((f) => f.relationshipType === 'close')
-        : friends;
+    // People tier is a viewing choice (Close Friends ⊂ Friends ⊂ + Mutuals)
+    let filtered = friends.filter((f) => peopleFilterIncludes(peopleFilter, f.relationshipType));
     filtered = filtered.filter((f) => stalenessMins(f) < 60);
 
     const self: MapFriend | null =
@@ -338,15 +337,14 @@ export default function MapScreen() {
     }
 
     return { clusters: groups, selfSolo: self && !selfMerged ? self : null };
-  }, [friends, shouldCluster, relationshipFilter, session, selfProfile, myStatus]);
+  }, [friends, shouldCluster, peopleFilter, session, selfProfile, myStatus]);
 
-  // ── Venues: type filter, promoted split, friends-only hides all ──
-  const typeFilteredVenues =
-    relationshipFilter === 'friends_only'
-      ? []
-      : venueFilter === 'all'
-        ? venues
-        : venues.filter((v) => v.type === venueFilter);
+  // ── Venues: independent on/off switch, then type filter, promoted split ──
+  const typeFilteredVenues = !showVenues
+    ? []
+    : venueFilter === 'all'
+      ? venues
+      : venues.filter((v) => v.type === venueFilter);
   const promotedVenues = typeFilteredVenues.filter((v) => v.is_map_promoted);
   const regularVenues = typeFilteredVenues.filter((v) => !v.is_map_promoted);
 
@@ -368,10 +366,39 @@ export default function MapScreen() {
     });
   };
 
-  const openVenue = (venueId: string, lng: number, lat: number) => {
-    flyTo(lng, lat, 15);
+  // Opening a venue pans (same zoom) so the pin sits above the half-height
+  // sheet, and remembers where the map was; dismissing the sheet puts the
+  // map back exactly there (client feedback §7).
+  const cameraBeforeVenue = useRef<{ center: [number, number]; zoom: number } | null>(null);
+  const openVenue = async (venueId: string, lng: number, lat: number) => {
+    try {
+      const [[east, north], [west, south]] = await mapRef.current!.getVisibleBounds();
+      const zoom = await mapRef.current!.getZoom();
+      cameraBeforeVenue.current = { center: [(east + west) / 2, (north + south) / 2], zoom };
+    } catch {
+      cameraBeforeVenue.current = null;
+    }
+    cameraRef.current?.setCamera({
+      centerCoordinate: [lng, lat],
+      padding: { paddingTop: 0, paddingLeft: 0, paddingRight: 0, paddingBottom: Math.round(windowHeight * 0.5) },
+      animationDuration: 500,
+    });
     router.push({ pathname: '/venue', params: { venueId } });
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      const saved = cameraBeforeVenue.current;
+      if (!saved) return;
+      cameraBeforeVenue.current = null;
+      cameraRef.current?.setCamera({
+        centerCoordinate: saved.center,
+        zoomLevel: saved.zoom,
+        padding: { paddingTop: 0, paddingLeft: 0, paddingRight: 0, paddingBottom: 0 },
+        animationDuration: 500,
+      });
+    }, [])
+  );
 
   const handleVenuePress = async (event: { features?: GeoJSON.Feature[] }) => {
     const feature = event.features?.[0];
@@ -669,7 +696,7 @@ export default function MapScreen() {
         <View className="absolute bottom-safe-offset-16 left-4 flex-row gap-3 px-3 py-2 rounded-full bg-[#1a0f2e]/90 border border-white/10">
           {(
             [
-              ['close', 'Close'],
+              ['close', 'Close Friend'],
               ['direct', 'Friend'],
               ['mutual', 'Mutual'],
             ] as const

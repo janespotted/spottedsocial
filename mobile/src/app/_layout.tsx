@@ -61,7 +61,20 @@ function RootNavigator() {
       <Stack.Screen name="post-likes" options={{ presentation: 'modal' }} />
       <Stack.Screen name="activity" options={{ presentation: 'modal' }} />
       <Stack.Screen name="search" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="venue" options={{ presentation: 'modal' }} />
+      {/* Venue card: sheet sized to its content (grows when More Info opens),
+          like every other sheet here — a full modal read as a blank panel.
+          Fixed detents left flex-1 content with no height to fill. The
+          sheet's own background matches the card so the safe-area strip
+          under the content doesn't show as a lighter band. */}
+      <Stack.Screen
+        name="venue"
+        options={{
+          presentation: 'formSheet',
+          sheetAllowedDetents: 'fitToContents',
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: '#0d0a18' },
+        }}
+      />
       <Stack.Screen
         name="contacts-sync"
         options={{
