@@ -53,7 +53,7 @@ function PostVideo({ uri, isVisible }: { uri: string; isVisible: boolean }) {
   );
 }
 
-function GradientRingAvatar({ name, url }: { name: string; url: string | null }) {
+export function GradientRingAvatar({ name, url }: { name: string; url: string | null }) {
   return (
     <View
       className="w-8 h-8 rounded-full items-center justify-center"

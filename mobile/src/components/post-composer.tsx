@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Image } from '@/components/styled';
 import { SymbolView } from 'expo-symbols';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { supabase } from '@/lib/supabase';
-import { getPostExpiry, invalidateFeed } from '@/lib/posts';
 import { validatePostText, validateVenueName } from '@/lib/validation';
 import { savePostAudience, type Audience } from '@/lib/audience';
 import { getCityLabel } from '@/lib/city-neighborhoods';
 import { getActiveCity } from '@/lib/tonight';
+import { PublishError, publishPost, type PublishPhase, type PublishedPost } from '@/lib/publish-post';
 import { useSession } from '@/hooks/use-session';
 import { AudienceRow } from '@/components/audience-row';
 import type { CapturedMedia } from '@/lib/post-media';
@@ -50,6 +51,26 @@ function VideoPreview({ uri }: { uri: string }) {
   );
 }
 
+/** Thin neon bar under the header — width follows real upload bytes. */
+function UploadBar({ progress, visible }: { progress: number; visible: boolean }) {
+  const width = useSharedValue(0);
+  const opacity = useSharedValue(0);
+  useEffect(() => {
+    width.value = withTiming(progress, { duration: 220 });
+  }, [progress, width]);
+  useEffect(() => {
+    opacity.value = withTiming(visible ? 1 : 0, { duration: 200 });
+    if (!visible) width.value = 0;
+  }, [visible, opacity, width]);
+  const track = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const fill = useAnimatedStyle(() => ({ width: `${Math.round(width.value * 100)}%` }));
+  return (
+    <Animated.View style={[{ height: 2, backgroundColor: 'rgba(255,255,255,0.08)' }, track]}>
+      <Animated.View style={[{ height: 2, backgroundColor: NEON, borderRadius: 1 }, fill]} />
+    </Animated.View>
+  );
+}
+
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <View
@@ -80,15 +101,22 @@ export function PostComposer({
   onDraftChange: (patch: Partial<PostDraft>) => void;
   onRetake: () => void;
   onClose: () => void;
-  onShared: () => void;
+  onShared: (post: PublishedPost) => void;
 }) {
   const { session } = useSession();
   const { width } = useWindowDimensions();
   const [suggestions, setSuggestions] = useState<VenueSuggestion[]>([]);
-  const [posting, setPosting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<PublishPhase | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A failed attempt whose upload got through: the retry skips the file
+  const uploadedRef = useRef<{ uri: string; path: string } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const { caption, venueName, venueId, visibility } = draft;
+  const posting = phase !== null;
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   // Venue autocomplete against the venues table (mirrors the web composer)
   useEffect(() => {
@@ -118,57 +146,77 @@ export function PostComposer({
     const textCheck = validatePostText(caption);
     const venueCheck = validateVenueName(venueName);
     if (!textCheck.success || !venueCheck.success) {
-      setError(textCheck.error ?? venueCheck.error ?? 'invalid post');
+      setError({ message: textCheck.error ?? venueCheck.error ?? 'invalid post', retryable: false });
       return;
     }
     const text = textCheck.data!;
     if (!text && !media) {
-      setError('Add a photo or write something first.');
+      setError({ message: 'Add a photo or write something first.', retryable: false });
       return;
     }
-    setPosting(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
     setError(null);
+    setProgress(0);
+    setPhase(media ? 'uploading' : 'publishing');
+    // Reuse the uploaded file only if the media is still the same capture
+    const reusable = uploadedRef.current?.uri === media?.uri ? uploadedRef.current?.path : null;
     try {
-      let imagePath: string | null = null;
-      if (media) {
-        imagePath = `${session.user.id}/${Date.now()}.${media.fileExt}`;
-        const body = await fetch(media.uri).then((r) => r.arrayBuffer());
-        const { error: uploadErr } = await supabase.storage
-          .from('post-images')
-          .upload(imagePath, body, { contentType: media.mimeType, upsert: true });
-        if (uploadErr) throw uploadErr;
-      }
-      const { error: insertErr } = await supabase.from('posts').insert({
-        user_id: session.user.id,
+      const { post } = await publishPost({
+        userId: session.user.id,
+        media,
         text,
-        image_url: imagePath,
-        media_type: media?.type ?? null,
-        venue_name: venueCheck.data || null,
-        venue_id: venueId,
-        expires_at: getPostExpiry(),
+        venueName: venueCheck.data || null,
+        venueId,
         visibility,
+        uploadedPath: reusable,
+        onPhase: setPhase,
+        onProgress: setProgress,
+        signal: controller.signal,
       });
-      if (insertErr) throw insertErr;
       savePostAudience(visibility);
-      invalidateFeed();
-      onShared();
+      uploadedRef.current = null;
+      onShared(post);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't share your post.");
-      setPosting(false);
+      if (e instanceof PublishError) {
+        if (e.uploadedPath && media) uploadedRef.current = { uri: media.uri, path: e.uploadedPath };
+        if (!e.cancelled) setError({ message: e.message, retryable: true });
+      } else {
+        setError({ message: e instanceof Error ? e.message : "Couldn't share your post.", retryable: true });
+      }
+      setPhase(null);
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  };
+
+  // Close mid-upload cancels it and returns to editing; nothing is lost
+  const close = () => {
+    if (posting) {
+      abortRef.current?.abort();
+      return;
+    }
+    onClose();
   };
 
   const previewHeight = Math.min(width * 1.3, 460);
   const cityLabel = getCityLabel(getActiveCity() ?? 'nyc');
+  const percent = Math.round(progress * 100);
+  const statusLine =
+    phase === 'uploading'
+      ? `Uploading ${media?.type === 'video' ? 'video' : 'photo'} · ${percent}%`
+      : phase === 'publishing'
+        ? 'Publishing…'
+        : `Gone at 5:00 AM ${cityLabel}`;
 
   return (
     <View className="flex-1 bg-linear-to-b from-[#34215c] via-[#1d1240] to-[#110a24]">
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 pt-safe-offset-2 pb-3">
         <Pressable
-          onPress={onClose}
+          onPress={close}
           hitSlop={8}
-          accessibilityLabel="Close"
+          accessibilityLabel={posting ? 'Cancel upload' : 'Close'}
           className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
           style={{ backgroundColor: GLASS_BG, borderWidth: 1, borderColor: GLASS_BORDER }}
         >
@@ -176,23 +224,33 @@ export function PostComposer({
         </Pressable>
         <View className="items-center">
           <Text className="text-white text-base font-sans-semibold">New post</Text>
-          <Text className="text-white/40 text-[11px] font-sans">Gone at 5:00 AM {cityLabel}</Text>
+          <Text
+            className={`text-[11px] font-sans ${posting ? 'text-[#d4ff00]/90' : 'text-white/40'}`}
+            style={{ fontVariant: ['tabular-nums'] }}
+          >
+            {statusLine}
+          </Text>
         </View>
         <Pressable
           onPress={share}
           disabled={!canShare}
           hitSlop={6}
           accessibilityLabel="Share post"
-          className="h-10 px-5 rounded-full items-center justify-center active:opacity-90 disabled:opacity-40"
+          className="h-10 min-w-21 px-5 rounded-full items-center justify-center active:opacity-90 disabled:opacity-40"
           style={{ backgroundColor: NEON, boxShadow: canShare ? '0 6px 20px rgba(212,255,0,0.3)' : undefined }}
         >
-          {posting ? (
+          {phase === 'uploading' && media ? (
+            <Text className="text-[#110a24] text-sm font-sans-semibold" style={{ fontVariant: ['tabular-nums'] }}>
+              {percent}%
+            </Text>
+          ) : posting ? (
             <ActivityIndicator size="small" color={INK} />
           ) : (
             <Text className="text-[#110a24] text-sm font-sans-semibold">Share</Text>
           )}
         </Pressable>
       </View>
+      <UploadBar progress={phase === 'publishing' ? 1 : progress} visible={posting && !!media} />
 
       <KeyboardAwareScrollView
         contentContainerClassName="px-4 pt-1 gap-4 pb-safe-offset-8"
@@ -259,6 +317,7 @@ export function PostComposer({
             placeholder="What's the vibe tonight?"
             placeholderTextColorClassName="accent-white/30"
             multiline
+            editable={!posting}
             maxLength={CAPTION_MAX}
             className="min-h-20 text-white text-[16px] font-sans leading-6"
             style={{ textAlignVertical: 'top' }}
@@ -277,6 +336,7 @@ export function PostComposer({
               onChangeText={(t) => onDraftChange({ venueName: t, venueId: null })}
               placeholder="Tag a venue (optional)"
               placeholderTextColorClassName="accent-white/30"
+              editable={!posting}
               className="flex-1 h-13 py-0 text-white text-[15px] font-sans"
             />
             {venueName ? (
@@ -316,13 +376,32 @@ export function PostComposer({
 
         {error ? (
           <View
-            className="flex-row items-start gap-2 rounded-xl px-3 py-2.5"
-            style={{ backgroundColor: 'rgba(251,191,36,0.1)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)' }}
+            className="rounded-2xl px-3.5 py-3 gap-2.5"
+            style={{ backgroundColor: 'rgba(251,191,36,0.08)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)' }}
           >
-            <SymbolView name="exclamationmark.triangle" size={14} tintColor="#fbbf24" />
-            <Text selectable className="text-amber-200/90 text-xs font-sans flex-1">
-              {error}
-            </Text>
+            <View className="flex-row items-start gap-2">
+              <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor="#fbbf24" />
+              <View className="flex-1 gap-0.5">
+                <Text className="text-amber-100 text-[13px] font-sans-semibold">
+                  {error.retryable ? "Couldn't share your post" : 'Almost there'}
+                </Text>
+                <Text selectable className="text-amber-200/80 text-xs font-sans leading-4">
+                  {error.message}
+                  {error.retryable ? ' Your draft is saved.' : ''}
+                </Text>
+              </View>
+            </View>
+            {error.retryable ? (
+              <Pressable
+                onPress={share}
+                accessibilityLabel="Retry sharing"
+                className="self-start flex-row items-center gap-1.5 h-9 px-4 rounded-full active:opacity-80"
+                style={{ backgroundColor: NEON }}
+              >
+                <SymbolView name="arrow.clockwise" size={13} tintColor={INK} />
+                <Text className="text-[#110a24] text-[13px] font-sans-semibold">Retry</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 

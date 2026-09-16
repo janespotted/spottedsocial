@@ -4,10 +4,12 @@ import { router } from 'expo-router';
 import { DEFAULT_AUDIENCE, loadPostAudience } from '@/lib/audience';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import type { CapturedMedia } from '@/lib/post-media';
+import type { PublishedPost } from '@/lib/publish-post';
 import { SpottedCamera } from '@/components/spotted-camera';
 import { PostComposer, type PostDraft } from '@/components/post-composer';
+import { PostShared } from '@/components/post-shared';
 
-type Mode = 'camera' | 'compose';
+type Mode = 'camera' | 'compose' | 'shared';
 
 /**
  * Camera → capture/select → preview + caption → share (client feedback §4).
@@ -20,6 +22,7 @@ export default function CreatePostScreen() {
   const { data: ownNight } = useOwnNightStatus();
   const [mode, setMode] = useState<Mode>('camera');
   const [media, setMedia] = useState<CapturedMedia | null>(null);
+  const [published, setPublished] = useState<PublishedPost | null>(null);
   const [draft, setDraft] = useState<PostDraft>({
     caption: '',
     venueName: '',
@@ -76,6 +79,18 @@ export default function CreatePostScreen() {
     ]);
   };
 
+  const shared = (post: PublishedPost) => {
+    setPublished(post);
+    setMode('shared');
+  };
+
+  // Dismiss, then switch tabs once the modal is gone — navigating while the
+  // dismissal is in flight re-presents the destination as a modal card.
+  const viewInFeed = () => {
+    router.back();
+    setTimeout(() => router.navigate('/'), 350);
+  };
+
   if (mode === 'camera') {
     return (
       <SpottedCamera
@@ -87,6 +102,10 @@ export default function CreatePostScreen() {
     );
   }
 
+  if (mode === 'shared' && published) {
+    return <PostShared post={published} onViewFeed={viewInFeed} onDone={() => router.back()} />;
+  }
+
   return (
     <PostComposer
       media={media}
@@ -94,7 +113,7 @@ export default function CreatePostScreen() {
       onDraftChange={patchDraft}
       onRetake={() => setMode('camera')}
       onClose={closeComposer}
-      onShared={() => router.back()}
+      onShared={shared}
     />
   );
 }
