@@ -17,10 +17,8 @@ import {
   type LeaderboardVenue,
 } from '@/hooks/use-leaderboard';
 import { Avatar } from '@/components/avatar';
-import spottedLogo from '../../../../assets/images/spotted-s-logo.png';
-
-const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
+import { HeaderActions } from '@/components/header-actions';
+import { NEON, PURPLE } from '@/lib/theme';
 
 function openVenue(venueName: string, venueId?: string | null) {
   if (venueId) {
@@ -259,37 +257,7 @@ function LeaderboardHeader({
             </View>
           ) : null}
         </View>
-        <View className="flex-row items-center gap-2">
-          <Pressable
-            onPress={() => router.push('/search')}
-            hitSlop={4}
-            className="w-9 h-9 rounded-full items-center justify-center active:opacity-70"
-          >
-            <SymbolView name="magnifyingglass" size={18} tintColor="rgba(255,255,255,0.6)" />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push('/activity')}
-            hitSlop={4}
-            className="w-9 h-9 rounded-full items-center justify-center active:opacity-90"
-            style={{ backgroundColor: PURPLE }}
-          >
-            <SymbolView name="bell" size={18} tintColor="#ffffff" />
-            {unreadCount > 0 ? (
-              <View className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 items-center justify-center">
-                <Text className="text-white text-[9px] font-sans-semibold">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
-          <Pressable
-            onPress={() => router.push('/check-in')}
-            hitSlop={4}
-            className="active:scale-110"
-          >
-            <Image source={spottedLogo} className="h-9 w-9" contentFit="contain" />
-          </Pressable>
-        </View>
+        <HeaderActions unreadCount={unreadCount} />
       </View>
 
       {/* Title + subtitle — full-width rows below the top bar */}

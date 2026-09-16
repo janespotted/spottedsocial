@@ -14,10 +14,8 @@ import { useSession } from '@/hooks/use-session';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
-import spottedLogo from '../../../../assets/images/spotted-s-logo.png';
-
-const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
+import { HeaderActions } from '@/components/header-actions';
+import { NEON, PURPLE } from '@/lib/theme';
 
 type TabType = 'yap' | 'messages';
 
@@ -271,37 +269,7 @@ export default function MessagesScreen() {
               </View>
             ) : null}
           </View>
-          <View className="flex-row items-center gap-2">
-            <Pressable
-              onPress={() => router.push('/search')}
-              hitSlop={4}
-              className="w-9 h-9 rounded-full items-center justify-center active:opacity-70"
-            >
-              <SymbolView name="magnifyingglass" size={18} tintColor="rgba(255,255,255,0.6)" />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/activity')}
-              hitSlop={4}
-              className="w-9 h-9 rounded-full items-center justify-center active:opacity-90"
-              style={{ backgroundColor: PURPLE }}
-            >
-              <SymbolView name="bell" size={18} tintColor="#ffffff" />
-              {unreadCount > 0 ? (
-                <View className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 items-center justify-center">
-                  <Text className="text-white text-[9px] font-sans-semibold">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </Text>
-                </View>
-              ) : null}
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/check-in')}
-              hitSlop={4}
-              className="active:scale-110"
-            >
-              <Image source={spottedLogo} className="h-9 w-9" contentFit="contain" />
-            </Pressable>
-          </View>
+          <HeaderActions unreadCount={unreadCount} />
         </View>
 
         {/* Yap | Messages tabs (web parity) + new chat */}
@@ -329,13 +297,16 @@ export default function MessagesScreen() {
           ))}
           <View className="flex-1" />
           {activeTab === 'messages' ? (
+            // Compose icon, same flow as the empty-state "New chat" button
             <Pressable
               onPress={() => router.push('/new-chat')}
               hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel="New chat"
               className="w-9 h-9 rounded-full items-center justify-center active:opacity-90"
               style={{ backgroundColor: NEON }}
             >
-              <SymbolView name="plus" size={18} tintColor="#1a0f2e" weight="semibold" />
+              <SymbolView name="square.and.pencil" size={17} tintColor="#1a0f2e" weight="semibold" />
             </Pressable>
           ) : null}
         </View>
@@ -449,10 +420,12 @@ export default function MessagesScreen() {
                 </Text>
                 <Pressable
                   onPress={() => router.push('/new-chat')}
-                  className="rounded-full px-6 py-2.5 active:opacity-90"
+                  accessibilityRole="button"
+                  className="flex-row items-center gap-2 rounded-full pl-4 pr-5 min-h-11 active:opacity-90"
                   style={{ backgroundColor: NEON }}
                 >
-                  <Text className="text-[#1a0f2e] font-sans-medium">New Chat</Text>
+                  <SymbolView name="square.and.pencil" size={15} tintColor="#1a0f2e" weight="semibold" />
+                  <Text className="text-[#1a0f2e] font-sans-semibold">New chat</Text>
                 </Pressable>
               </View>
             )

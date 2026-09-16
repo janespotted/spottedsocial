@@ -3,11 +3,14 @@ import { router } from 'expo-router';
 import { Description, Label, RadioGroup } from 'heroui-native';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import {
+  isDefaultMapFilters,
+  resetMapFilters,
   setMapFilters,
   useMapFilters,
   type RelationshipFilter,
   type VenueTypeFilter,
 } from '@/lib/map-filters';
+import { NEON } from '@/lib/theme';
 
 const PEOPLE_OPTIONS: Array<{ value: RelationshipFilter; label: string; desc: string }> = [
   { value: 'all', label: 'Everyone', desc: 'Show all friends & venues' },
@@ -30,10 +33,30 @@ const VENUE_OPTIONS: Array<{ key: VenueTypeFilter; label: string; icon: SFSymbol
  */
 export default function MapFiltersSheet() {
   const filters = useMapFilters();
+  const filtered = !isDefaultMapFilters(filters);
 
   return (
     <View className="px-5 pt-6 pb-10 gap-6">
-      <Text className="text-white text-lg font-sans-semibold">Show on Map</Text>
+      <View className="flex-row items-center justify-between">
+        <View className="gap-0.5">
+          <Text className="text-white text-lg font-sans-semibold">Show on Map</Text>
+          <Text className="text-white/45 text-xs font-sans">Changes what you see, not who can see you.</Text>
+        </View>
+        {filtered ? (
+          <Pressable
+            onPress={() => {
+              resetMapFilters();
+              router.back();
+            }}
+            hitSlop={6}
+            accessibilityLabel="Reset filters"
+            className="h-9 px-3.5 rounded-full items-center justify-center border active:opacity-70"
+            style={{ borderColor: 'rgba(212,255,0,0.45)', backgroundColor: 'rgba(212,255,0,0.12)' }}
+          >
+            <Text className="text-xs font-sans-semibold" style={{ color: NEON }}>Reset</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       {/* People filter */}
       <View className="gap-3">

@@ -19,12 +19,24 @@ export interface MapFilters {
  * form sheet route (native sheets are separate screens, so plain props
  * can't cross the boundary).
  */
-let state: MapFilters = { relationship: 'all', venueType: 'all' };
+export const DEFAULT_MAP_FILTERS: MapFilters = { relationship: 'all', venueType: 'all' };
+
+let state: MapFilters = DEFAULT_MAP_FILTERS;
 const listeners = new Set<() => void>();
 
 export function setMapFilters(partial: Partial<MapFilters>): void {
   state = { ...state, ...partial };
   listeners.forEach((listener) => listener());
+}
+
+export function resetMapFilters(): void {
+  state = DEFAULT_MAP_FILTERS;
+  listeners.forEach((listener) => listener());
+}
+
+/** True when nothing is narrowing the map — drives the filter button's badge. */
+export function isDefaultMapFilters(f: MapFilters): boolean {
+  return f.relationship === DEFAULT_MAP_FILTERS.relationship && f.venueType === DEFAULT_MAP_FILTERS.venueType;
 }
 
 export function useMapFilters(): MapFilters {

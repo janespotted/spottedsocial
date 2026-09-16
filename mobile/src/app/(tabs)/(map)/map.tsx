@@ -29,12 +29,12 @@ import { useArrivalPrompts } from '@/hooks/use-arrival-prompts';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
 import { FriendIdCard } from '@/components/friend-id-card';
-import { useMapFilters } from '@/lib/map-filters';
+import { isDefaultMapFilters, useMapFilters } from '@/lib/map-filters';
+import { getCurrentPosition } from '@/lib/background-location';
+import { IconButton } from '@/components/icon-button';
 import { SmartArrivalPrompt, VenueMoveBanner } from '@/components/venue-move-banner';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_PUBLIC_TOKEN ?? null);
-
-const PURPLE = '#a855f7';
 
 // Relationship ring colors — must match the legend (web map parity)
 const RELATIONSHIP_COLORS: Record<string, string> = {
@@ -250,7 +250,10 @@ export default function MapScreen() {
 
   const [selectedFriend, setSelectedFriend] = useState<MapFriend | null>(null);
   const [friendCardOpen, setFriendCardOpen] = useState(false);
-  const { relationship: relationshipFilter, venueType: venueFilter } = useMapFilters();
+  const mapFilters = useMapFilters();
+  const { relationship: relationshipFilter, venueType: venueFilter } = mapFilters;
+  const filtersActive = !isDefaultMapFilters(mapFilters);
+  const [locating, setLocating] = useState(false);
   const [shouldCluster, setShouldCluster] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
 
@@ -420,7 +423,24 @@ export default function MapScreen() {
     }
   };
 
-  const recenter = () => flyTo(center.lng, center.lat, 13);
+  // Recenter on the user, not the city (client feedback §6). Keeps the
+  // current zoom and never touches filters; falls back to the city centre
+  // only when there is no location permission or no fix.
+  const recenter = async () => {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const me = await getCurrentPosition();
+      if (me) {
+        cameraRef.current?.setCamera({ centerCoordinate: [me.lng, me.lat], animationDuration: 800 });
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        cameraRef.current?.setCamera({ centerCoordinate: [center.lng, center.lat], animationDuration: 800 });
+      }
+    } finally {
+      setLocating(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-[#110a24]">
@@ -520,49 +540,27 @@ export default function MapScreen() {
         ) : null}
       </MapView>
 
-      {/* Floating controls */}
+      {/* Floating controls — one control style; the filter button turns
+          "selected" with a dot while a filter narrows the map */}
       {!focusMode ? (
         <View className="absolute top-safe-offset-3 right-4 gap-2">
-          <Pressable
-            onPress={() => router.push('/search')}
-            className="w-10 h-10 rounded-full items-center justify-center bg-[#1a0f2e]/90 border border-white/10 active:opacity-70"
-          >
-            <SymbolView name="magnifyingglass" size={18} tintColor="rgba(255,255,255,0.8)" />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push('/activity')}
-            className="w-10 h-10 rounded-full items-center justify-center active:opacity-90"
-            style={{ backgroundColor: PURPLE }}
-          >
-            <SymbolView name="bell" size={18} tintColor="#ffffff" />
-            {unreadCount > 0 ? (
-              <View className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 items-center justify-center">
-                <Text className="text-white text-[9px] font-sans-semibold">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
-          <Pressable
+          <IconButton icon="magnifyingglass" label="Search" size={40} onPress={() => router.push('/search')} />
+          <IconButton icon="bell" label="Notifications" size={40} badge={unreadCount} onPress={() => router.push('/activity')} />
+          <IconButton
+            icon="slider.horizontal.3"
+            label={filtersActive ? 'Map filters, active' : 'Map filters'}
+            size={40}
+            state={filtersActive ? 'selected' : 'ordinary'}
+            badge={filtersActive}
             onPress={() => router.push('/map-filters')}
-            className="w-10 h-10 rounded-full items-center justify-center bg-[#1a0f2e]/90 border border-white/10 active:opacity-70"
-          >
-            <SymbolView
-              name="slider.horizontal.3"
-              size={18}
-              tintColor={
-                relationshipFilter !== 'all' || venueFilter !== 'all'
-                  ? '#d4ff00'
-                  : 'rgba(255,255,255,0.8)'
-              }
-            />
-          </Pressable>
-          <Pressable
+          />
+          <IconButton
+            icon={locating ? 'location.fill' : 'location'}
+            label="Recenter on me"
+            size={40}
+            state={locating ? 'selected' : 'ordinary'}
             onPress={recenter}
-            className="w-10 h-10 rounded-full items-center justify-center bg-[#1a0f2e]/90 border border-white/10 active:opacity-70"
-          >
-            <SymbolView name="location" size={18} tintColor="rgba(255,255,255,0.8)" />
-          </Pressable>
+          />
         </View>
       ) : null}
 

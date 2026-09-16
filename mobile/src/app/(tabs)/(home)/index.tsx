@@ -25,10 +25,8 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { PostCard } from '@/components/post-card';
 import { PlansFeed } from '@/components/plans-feed';
 import { Avatar } from '@/components/avatar';
-import spottedLogo from '../../../../assets/images/spotted-s-logo.png';
-
-const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
+import { HeaderActions } from '@/components/header-actions';
+import { NEON, PURPLE } from '@/lib/theme';
 
 type FeedMode = 'newsfeed' | 'plans';
 
@@ -188,35 +186,7 @@ function HomeHeader({
               <Text className="text-white/70 text-xs font-sans-medium uppercase">{city}</Text>
             </View>
           ) : null}
-          <Pressable
-            onPress={() => router.push('/search')}
-            hitSlop={4}
-            className="w-9 h-9 rounded-full items-center justify-center active:opacity-70"
-          >
-            <SymbolView name="magnifyingglass" size={18} tintColor="rgba(255,255,255,0.6)" />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push('/activity')}
-            hitSlop={4}
-            className="w-9 h-9 rounded-full items-center justify-center active:opacity-90"
-            style={{ backgroundColor: PURPLE }}
-          >
-            <SymbolView name="bell" size={18} tintColor="#ffffff" />
-            {unreadCount > 0 ? (
-              <View className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 items-center justify-center">
-                <Text className="text-white text-[9px] font-sans-semibold">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
-          <Pressable
-            onPress={() => router.push('/check-in')}
-            hitSlop={4}
-            className="active:scale-110"
-          >
-            <Image source={spottedLogo} className="h-9 w-9" contentFit="contain" />
-          </Pressable>
+          <HeaderActions unreadCount={unreadCount} />
         </View>
       </View>
 
@@ -412,17 +382,29 @@ export default function HomeScreen() {
       )}
 
       {/* Compose FAB — bottom-safe-offset-16 clears the native tab bar
-          (49pt) plus the home indicator, with a visible gap above it */}
+          (49pt) plus the home indicator, with a visible gap above it.
+          Labelled per view (client feedback §6): a bare "+" over Plans used
+          to open the photo composer. */}
       {keyboardOpen ? null : (
       <Pressable
-        onPress={() => router.push('/create-post')}
-        className="absolute bottom-safe-offset-16 right-4 w-14 h-14 rounded-full items-center justify-center active:opacity-90"
+        onPress={() => router.push(feedMode === 'plans' ? '/create-plan' : '/create-post')}
+        accessibilityRole="button"
+        accessibilityLabel={feedMode === 'plans' ? 'Share a plan' : 'New post'}
+        className="absolute bottom-safe-offset-16 right-4 h-14 pl-4 pr-5 rounded-full flex-row items-center gap-2 active:opacity-90"
         style={{
           backgroundColor: NEON,
           boxShadow: '0 4px 20px rgba(212, 255, 0, 0.35)',
         }}
       >
-        <SymbolView name="plus" size={24} tintColor="#1a0f2e" weight="semibold" />
+        <SymbolView
+          name={feedMode === 'plans' ? 'calendar.badge.plus' : 'camera.fill'}
+          size={20}
+          tintColor="#1a0f2e"
+          weight="semibold"
+        />
+        <Text className="text-[#1a0f2e] text-[15px] font-sans-semibold">
+          {feedMode === 'plans' ? 'Plan' : 'Post'}
+        </Text>
       </Pressable>
       )}
     </View>

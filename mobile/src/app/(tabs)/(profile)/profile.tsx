@@ -17,10 +17,8 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
 import { AudienceRow } from '@/components/audience-row';
-import spottedLogo from '../../../../assets/images/spotted-s-logo.png';
-
-const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
+import { HeaderActions } from '@/components/header-actions';
+import { NEON, PURPLE, outlineControl } from '@/lib/theme';
 
 type SpotsView = 'recent' | 'wishlist' | 'posts';
 
@@ -235,33 +233,7 @@ export default function ProfileScreen() {
           >
             Spotted
           </Text>
-          <View className="flex-row items-center gap-2">
-            <Pressable
-              onPress={() => router.push('/search')}
-              hitSlop={4}
-              className="w-9 h-9 rounded-full items-center justify-center active:opacity-70"
-            >
-              <SymbolView name="magnifyingglass" size={18} tintColor="rgba(255,255,255,0.6)" />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/activity')}
-              hitSlop={4}
-              className="w-9 h-9 rounded-full items-center justify-center active:opacity-90"
-              style={{ backgroundColor: PURPLE }}
-            >
-              <SymbolView name="bell" size={18} tintColor="#ffffff" />
-              {unreadCount > 0 ? (
-                <View className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 items-center justify-center">
-                  <Text className="text-white text-[9px] font-sans-semibold">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </Text>
-                </View>
-              ) : null}
-            </Pressable>
-            <Pressable onPress={() => router.push('/check-in')} hitSlop={4} className="active:scale-110">
-              <Image source={spottedLogo} className="h-9 w-9" contentFit="contain" />
-            </Pressable>
-          </View>
+          <HeaderActions unreadCount={unreadCount} />
         </View>
       </View>
 
@@ -313,23 +285,28 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Edit / Share / Settings */}
+        {/* Edit profile / Share profile / Settings — full labels so neither
+            reads as posting or location sharing (client feedback §6) */}
         <View className="flex-row gap-2">
           <Pressable
             onPress={() => router.push('/edit-profile')}
-            className="flex-1 border border-white/20 py-2.5 rounded-full items-center active:bg-white/5"
+            accessibilityRole="button"
+            className={`flex-1 min-h-11 rounded-full items-center justify-center ${outlineControl}`}
           >
-            <Text className="text-white text-sm font-sans-medium">Edit</Text>
+            <Text className="text-white text-sm font-sans-medium">Edit profile</Text>
           </Pressable>
           <Pressable
             onPress={shareProfile}
-            className="flex-1 border border-white/20 py-2.5 rounded-full items-center active:bg-white/5"
+            accessibilityRole="button"
+            className={`flex-1 min-h-11 rounded-full items-center justify-center ${outlineControl}`}
           >
-            <Text className="text-white text-sm font-sans-medium">Share</Text>
+            <Text className="text-white text-sm font-sans-medium">Share profile</Text>
           </Pressable>
           <Pressable
             onPress={() => router.push('/settings')}
-            className="w-11 border border-white/20 rounded-full items-center justify-center active:bg-white/5"
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            className={`w-11 min-h-11 rounded-full items-center justify-center ${outlineControl}`}
           >
             <SymbolView name="gearshape" size={16} tintColor="#ffffff" />
           </Pressable>
