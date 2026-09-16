@@ -1,5 +1,6 @@
 import { File } from 'expo-file-system';
 import type { Audience } from './audience';
+import { prepareForUpload, type PreparedMedia } from './media-prep';
 import type { CapturedMedia } from './post-media';
 import { getPostExpiry, invalidateFeed } from './posts';
 import { supabase, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './supabase';
@@ -19,7 +20,7 @@ export interface PublishedPost {
   media: CapturedMedia | null;
 }
 
-export type PublishPhase = 'uploading' | 'publishing';
+export type PublishPhase = 'preparing' | 'uploading' | 'publishing';
 
 export interface PublishInput {
   userId: string;
@@ -77,7 +78,7 @@ function friendly(e: unknown, fallback: string): string {
  */
 async function uploadMedia(
   path: string,
-  media: CapturedMedia,
+  media: PreparedMedia,
   onProgress?: (fraction: number) => void,
   signal?: AbortSignal
 ): Promise<void> {
@@ -96,7 +97,9 @@ async function uploadMedia(
       apikey: SUPABASE_PUBLISHABLE_KEY,
       'Content-Type': media.mimeType,
       'x-upsert': 'true',
-      'cache-control': 'max-age=3600',
+      // Paths are unique per upload (userId/timestamp), so the object never
+      // changes: let the CDN and every device cache it for a year.
+      'cache-control': 'max-age=31536000, immutable',
     },
     onProgress: ({ bytesSent, totalBytes }) => {
       if (totalBytes > 0) onProgress?.(Math.min(1, bytesSent / totalBytes));
@@ -125,18 +128,27 @@ async function uploadMedia(
 export async function publishPost(input: PublishInput): Promise<PublishResult> {
   const { userId, media, onPhase, onProgress, signal } = input;
   let uploadedPath = input.uploadedPath ?? null;
+  let prepared: PreparedMedia | null = null;
 
-  if (media && !uploadedPath) {
+  if (media) {
+    // Resize + hash even on a retry that skips the upload: the row needs the
+    // pixel size and ThumbHash, and the prep is a few hundred ms.
+    onPhase?.('preparing');
+    prepared = await prepareForUpload(media);
+    if (signal?.aborted) throw new PublishError('Upload cancelled.', uploadedPath, true);
+  }
+
+  if (prepared && !uploadedPath) {
     onPhase?.('uploading');
-    const path = `${userId}/${Date.now()}.${media.fileExt}`;
+    const path = `${userId}/${Date.now()}.${prepared.fileExt}`;
     try {
-      await uploadMedia(path, media, onProgress, signal);
+      await uploadMedia(path, prepared, onProgress, signal);
     } catch (e) {
       if (isAbort(e) || signal?.aborted) throw new PublishError('Upload cancelled.', null, true);
       throw new PublishError(friendly(e, "Couldn't upload your media."), null);
     }
     uploadedPath = path;
-  } else if (media) {
+  } else if (prepared) {
     onProgress?.(1);
   }
 
@@ -150,6 +162,9 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
       text: input.text,
       image_url: media ? uploadedPath : null,
       media_type: media?.type ?? null,
+      media_width: prepared?.width ?? null,
+      media_height: prepared?.height ?? null,
+      media_hash: prepared?.thumbhash ?? null,
       venue_name: input.venueName,
       venue_id: input.venueId,
       expires_at: getPostExpiry(getActiveCity()),

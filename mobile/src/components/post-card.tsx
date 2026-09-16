@@ -179,7 +179,12 @@ export function PostCard({
             <PostVideo uri={post.image_url} isVisible={isVisible} />
           ) : (
             <Image
-              source={{ uri: post.image_url }}
+              // cacheKey: signed URLs change every mint, the path never does —
+              // without it every feed refresh re-downloads every image.
+              source={{ uri: post.image_url, cacheKey: post.media_path ?? undefined }}
+              placeholder={post.media_hash ? { thumbhash: post.media_hash } : undefined}
+              placeholderContentFit="cover"
+              recyclingKey={post.id}
               className="w-full h-full"
               contentFit="cover"
               transition={150}

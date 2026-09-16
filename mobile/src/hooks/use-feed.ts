@@ -5,7 +5,13 @@ import { notifyPostLike } from '@/lib/notifications';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
-import { onCommentAdded, onFeedInvalidated, resolvePostImageUrl } from '@/lib/posts';
+import {
+  onCommentAdded,
+  onFeedInvalidated,
+  postImageStoragePath,
+  resolvePostImageUrl,
+  resolvePostImageUrls,
+} from '@/lib/posts';
 import { useFriendIds } from './use-friend-ids';
 import { useSession } from './use-session';
 
@@ -16,7 +22,13 @@ export interface FeedPost {
   user_id: string;
   text: string;
   image_url: string | null;
+  /** Stable storage path (expo-image cache key); null for external URLs. */
+  media_path: string | null;
   media_type: string | null;
+  media_width: number | null;
+  media_height: number | null;
+  /** ThumbHash placeholder, base64. */
+  media_hash: string | null;
   venue_name: string | null;
   venue_id: string | null;
   created_at: string;
@@ -114,17 +126,20 @@ export function useFeed() {
       }
 
       // Uploaded posts store a private-bucket path in image_url — swap for a
-      // signed URL. Full http URLs (demo content) pass through untouched.
-      const imageUrls = await Promise.all(
-        (rows ?? []).map((p) => resolvePostImageUrl(p.image_url))
-      );
+      // signed URL, one Storage call for the whole page. Full http URLs
+      // (demo content) pass through untouched.
+      const imageUrls = await resolvePostImageUrls((rows ?? []).map((p) => p.image_url));
 
-      const page: FeedPost[] = (rows ?? []).map((p, i) => ({
+      const page: FeedPost[] = (rows ?? []).map((p) => ({
         id: p.id,
         user_id: p.user_id,
         text: p.text ?? '',
-        image_url: imageUrls[i],
+        image_url: p.image_url ? (imageUrls.get(p.image_url) ?? null) : null,
+        media_path: postImageStoragePath(p.image_url),
         media_type: p.media_type,
+        media_width: p.media_width,
+        media_height: p.media_height,
+        media_hash: p.media_hash,
         venue_name: p.venue_name,
         venue_id: p.venue_id,
         created_at: p.created_at ?? new Date().toISOString(),
@@ -245,7 +260,11 @@ export function useFeed() {
             user_id: p.user_id,
             text: p.text ?? '',
             image_url: imageUrl,
+            media_path: postImageStoragePath(p.image_url ?? null),
             media_type: p.media_type ?? null,
+            media_width: p.media_width ?? null,
+            media_height: p.media_height ?? null,
+            media_hash: p.media_hash ?? null,
             venue_name: p.venue_name ?? null,
             venue_id: p.venue_id ?? null,
             created_at: p.created_at ?? new Date().toISOString(),

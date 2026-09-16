@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, Pressable, Text, View } from 'react-native';
 import {
   Camera,
+  CommonResolutions,
   useCameraDevice,
   useCameraPermission,
   useMicrophonePermission,
@@ -527,11 +528,20 @@ export function SpottedCamera({
 
   // Audio is part of the session configuration: on only once the mic is granted
   const audio = micPermission.hasPermission;
-  const photoOutput = usePhotoOutput({ qualityPrioritization: 'balanced', quality: 0.9 });
+  // Feed-sized capture: the feed never draws more than ~1200 px wide, and
+  // lib/media-prep.ts caps uploads at 1920 on the long edge anyway. Asking
+  // the sensor for 12 MP only makes capture and prep slower.
+  const photoOutput = usePhotoOutput({
+    qualityPrioritization: 'balanced',
+    quality: 0.9,
+    targetResolution: CommonResolutions.FHD_4_3,
+  });
   const videoOutput = useVideoOutput({
     enableAudio: audio,
     enablePersistentRecorder: true, // keeps a recording alive across a lens flip
     fileType: 'mov',
+    targetResolution: CommonResolutions.FHD_16_9,
+    targetBitRate: 6_000_000, // ~10 MB for a 14 s clip instead of ~20 MB at the encoder default
   });
 
   const recorderRef = useRef<Recorder | null>(null);

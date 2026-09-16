@@ -15,20 +15,57 @@ export function getPostExpiry(city?: string | null): string {
  * URL to render. Demo/seed posts store full http URLs and pass through as-is.
  * Port of the web resolvePostImageUrl (storage-utils.ts).
  */
+const SIGNED_URL_TTL = 6 * 3600;
+const PUBLIC_PREFIX = '/storage/v1/object/public/post-images/';
+
+/**
+ * Storage path behind an image_url value, or null for external http URLs.
+ * Also the stable cache key: signed URLs carry a fresh token every time
+ * they are minted, so caching by URL would re-download on every feed load.
+ */
+export function postImageStoragePath(imageUrl: string | null): string | null {
+  if (!imageUrl) return null;
+  if (imageUrl.includes(PUBLIC_PREFIX)) return imageUrl.split(PUBLIC_PREFIX)[1] || null;
+  if (!imageUrl.startsWith('http')) return imageUrl;
+  return null;
+}
+
 export async function resolvePostImageUrl(imageUrl: string | null): Promise<string | null> {
   if (!imageUrl) return null;
-  if (imageUrl.includes('/storage/v1/object/public/post-images/')) {
-    const path = imageUrl.split('/storage/v1/object/public/post-images/')[1];
-    if (path) {
-      const { data } = await supabase.storage.from('post-images').createSignedUrl(path, 3600);
-      return data?.signedUrl ?? null;
+  const path = postImageStoragePath(imageUrl);
+  if (!path) return imageUrl;
+  const { data } = await supabase.storage.from('post-images').createSignedUrl(path, SIGNED_URL_TTL);
+  return data?.signedUrl ?? null;
+}
+
+/**
+ * Batch form for lists: one Storage request for a whole feed page instead
+ * of one per post. Returns a map keyed by the original image_url value.
+ */
+export async function resolvePostImageUrls(
+  imageUrls: ReadonlyArray<string | null>
+): Promise<Map<string, string | null>> {
+  const result = new Map<string, string | null>();
+  const paths: string[] = [];
+  for (const url of imageUrls) {
+    if (!url || result.has(url)) continue;
+    const path = postImageStoragePath(url);
+    if (!path) {
+      result.set(url, url);
+      continue;
     }
+    result.set(url, null);
+    paths.push(path);
   }
-  if (!imageUrl.startsWith('http')) {
-    const { data } = await supabase.storage.from('post-images').createSignedUrl(imageUrl, 3600);
-    return data?.signedUrl ?? null;
+  if (paths.length === 0) return result;
+  const { data } = await supabase.storage.from('post-images').createSignedUrls(paths, SIGNED_URL_TTL);
+  const byPath = new Map((data ?? []).map((row) => [row.path, row.signedUrl ?? null]));
+  for (const url of imageUrls) {
+    if (!url) continue;
+    const path = postImageStoragePath(url);
+    if (path) result.set(url, byPath.get(path) ?? null);
   }
-  return imageUrl;
+  return result;
 }
 
 /**

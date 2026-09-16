@@ -1023,7 +1023,10 @@ export type Database = {
           image_url: string | null
           is_demo: boolean | null
           likes_count: number | null
+          media_hash: string | null
+          media_height: number | null
           media_type: string | null
+          media_width: number | null
           text: string
           user_id: string
           venue_id: string | null
@@ -1039,7 +1042,10 @@ export type Database = {
           image_url?: string | null
           is_demo?: boolean | null
           likes_count?: number | null
+          media_hash?: string | null
+          media_height?: number | null
           media_type?: string | null
+          media_width?: number | null
           text: string
           user_id: string
           venue_id?: string | null
@@ -1055,7 +1061,10 @@ export type Database = {
           image_url?: string | null
           is_demo?: boolean | null
           likes_count?: number | null
+          media_hash?: string | null
+          media_height?: number | null
           media_type?: string | null
+          media_width?: number | null
           text?: string
           user_id?: string
           venue_id?: string | null

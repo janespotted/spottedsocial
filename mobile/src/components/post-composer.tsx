@@ -158,7 +158,7 @@ export function PostComposer({
     abortRef.current = controller;
     setError(null);
     setProgress(0);
-    setPhase(media ? 'uploading' : 'publishing');
+    setPhase(media ? 'preparing' : 'publishing');
     // Reuse the uploaded file only if the media is still the same capture
     const reusable = uploadedRef.current?.uri === media?.uri ? uploadedRef.current?.path : null;
     try {
@@ -203,7 +203,9 @@ export function PostComposer({
   const cityLabel = getCityLabel(getActiveCity() ?? 'nyc');
   const percent = Math.round(progress * 100);
   const statusLine =
-    phase === 'uploading'
+    phase === 'preparing'
+      ? 'Preparing…'
+      : phase === 'uploading'
       ? `Uploading ${media?.type === 'video' ? 'video' : 'photo'} · ${percent}%`
       : phase === 'publishing'
         ? 'Publishing…'
