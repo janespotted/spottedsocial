@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { deleteMuxAssets, muxConfigured } from '../_shared/mux.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -204,6 +205,33 @@ Deno.serve(async (req) => {
       console.log(`✅ Cleared ${clearedStatuses?.length || 0} expired night statuses`)
     }
 
+    // 5a. Video posts live on Mux: drop the assets before the rows go, or
+    // they would keep streaming (and billing) with nothing pointing at them.
+    // Best effort — a Mux outage must not stop the row cleanup; the asset
+    // ids are logged so they can be swept by hand.
+    let deletedMuxAssets = 0
+    {
+      const { data: videoPosts, error: videoErr } = await supabase
+        .from('posts')
+        .select('id, mux_asset_id')
+        .lt('expires_at', now.toISOString())
+        .not('mux_asset_id', 'is', null)
+      if (videoErr) {
+        console.error('Error fetching expired video posts:', videoErr)
+      } else if (videoPosts && videoPosts.length > 0) {
+        const assetIds = videoPosts.map(p => p.mux_asset_id as string)
+        if (muxConfigured()) {
+          deletedMuxAssets = await deleteMuxAssets(assetIds)
+          if (deletedMuxAssets < assetIds.length) {
+            console.error(`⚠️ ${assetIds.length - deletedMuxAssets} Mux assets not deleted:`, assetIds)
+          }
+          console.log(`✅ Deleted ${deletedMuxAssets} Mux assets`)
+        } else {
+          console.error('⚠️ Mux not configured; expired assets left behind:', assetIds)
+        }
+      }
+    }
+
     // 5. Delete expired posts (their own city-zoned expiry, not the ET cutoff)
     const { data: deletedPosts, error: postsError } = await supabase
       .from('posts')
@@ -287,6 +315,7 @@ Deno.serve(async (req) => {
         deleted_dms: deletedDMs?.length || 0,
         cleared_statuses: clearedStatuses?.length || 0,
         deleted_posts: deletedPosts?.length || 0,
+        deleted_mux_assets: deletedMuxAssets,
         deleted_yaps: deletedYaps?.length || 0,
         cleared_planning: clearedPlanning?.length || 0,
         deleted_plans: deletedPlans?.length || 0,

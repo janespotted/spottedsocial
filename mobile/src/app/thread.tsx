@@ -28,6 +28,7 @@ import {
   type DmMessage,
 } from '@/lib/dm';
 import { fetchProfilesSafe } from '@/lib/profiles';
+import { muxThumbnailUrl } from '@/lib/mux';
 import { resolvePostImageUrl } from '@/lib/posts';
 import { isFromTonight } from '@/lib/time-context';
 import { useSession } from '@/hooks/use-session';
@@ -308,13 +309,23 @@ export default function ThreadScreen() {
     if (ids.length === 0) return;
     (async () => {
       const [{ data: posts }, profiles] = await Promise.all([
-        supabase.from('posts').select('id, text, image_url, venue_name, user_id').in('id', ids),
+        supabase
+          .from('posts')
+          .select('id, text, image_url, media_type, mux_playback_id, venue_name, user_id')
+          .in('id', ids),
         fetchProfilesSafe(),
       ]);
       if (!posts) return;
       const profileMap = new Map(profiles.map((p) => [p.id, p]));
+      // Mux videos have no storage object — preview with the poster frame
       const resolved = await Promise.all(
-        posts.map(async (p) => ({ ...p, image_url: await resolvePostImageUrl(p.image_url) }))
+        posts.map(async (p) => ({
+          ...p,
+          image_url:
+            p.media_type === 'video' && !p.image_url && p.mux_playback_id
+              ? muxThumbnailUrl(p.mux_playback_id, { width: 480 })
+              : await resolvePostImageUrl(p.image_url),
+        }))
       );
       setSharedPosts((prev) => {
         const next = new Map(prev);

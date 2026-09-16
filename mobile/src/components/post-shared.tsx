@@ -132,6 +132,7 @@ export function PostShared({
           <Text className="text-white text-[26px] font-sans-bold tracking-tight">Posted</Text>
           <Text className="text-white/55 text-sm font-sans text-center leading-5">
             Visible to {audienceLabel(post.visibility)} until 5:00 AM {cityLabel}.
+            {post.media?.type === 'video' ? ' Your video is processing and will play in the feed in a moment.' : ''}
           </Text>
         </Animated.View>
 

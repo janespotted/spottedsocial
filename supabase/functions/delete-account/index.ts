@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { deleteMuxAssets, muxConfigured } from '../_shared/mux.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -121,6 +122,24 @@ Deno.serve(async (req) => {
       // Delete profile last
       { table: 'profiles', column: 'id' },
     ];
+
+    // Video posts live on Mux — drop the assets before the rows go.
+    {
+      const { data: videoPosts } = await supabaseAdmin
+        .from('posts')
+        .select('mux_asset_id')
+        .eq('user_id', userId)
+        .not('mux_asset_id', 'is', null);
+      const assetIds = (videoPosts ?? []).map((p) => p.mux_asset_id as string);
+      if (assetIds.length > 0) {
+        if (muxConfigured()) {
+          const gone = await deleteMuxAssets(assetIds);
+          console.log(`🗑️ Deleted ${gone}/${assetIds.length} Mux assets`);
+        } else {
+          console.log('⚠️ Mux not configured; assets left behind:', assetIds);
+        }
+      }
+    }
 
     for (const { table, column } of deletionOrder) {
       console.log(`🗑️ Deleting from ${table} where ${column} = ${userId}`);

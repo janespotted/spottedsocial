@@ -18,6 +18,8 @@ export interface Post {
   text: string;
   image_url: string | null;
   media_type: string | null;
+  /** Mobile video posts: Mux playback id, resolved to an HLS URL in image_url. */
+  mux_playback_id?: string | null;
   venue_name: string | null;
   venue_id: string | null;
   created_at: string;

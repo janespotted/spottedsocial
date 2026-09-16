@@ -34,11 +34,16 @@ export async function resolvePostImageUrl(imageUrl: string | null): Promise<stri
 /**
  * Resolve image URLs for an array of posts
  */
-export async function resolvePostImageUrls<T extends { image_url?: string | null }>(
-  posts: T[]
-): Promise<T[]> {
+export async function resolvePostImageUrls<
+  T extends { image_url?: string | null; media_type?: string | null; mux_playback_id?: string | null },
+>(posts: T[]): Promise<T[]> {
   return Promise.all(
     posts.map(async (post) => {
+      // Mobile video posts live on Mux (no storage object): hand the <video>
+      // the HLS manifest, which WKWebView and Safari play natively.
+      if (!post.image_url && post.media_type === 'video' && post.mux_playback_id) {
+        return { ...post, image_url: `https://stream.mux.com/${post.mux_playback_id}.m3u8` };
+      }
       if (!post.image_url) return post;
       const resolvedUrl = await resolvePostImageUrl(post.image_url);
       return { ...post, image_url: resolvedUrl };

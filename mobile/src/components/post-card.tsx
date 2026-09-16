@@ -1,23 +1,40 @@
 import { useEffect, useState } from 'react';
-import { ActionSheetIOS, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { ActionSheetIOS, ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from '@/components/styled';
+import { useEvent } from 'expo';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { getTimeAgo, type FeedPost } from '@/hooks/use-feed';
 import { blockUser, reportContent } from '@/lib/moderation';
 import { openFriendCard } from '@/lib/friend-card';
+import { muxHlsUrl, muxPlaybackState, muxThumbnailUrl } from '@/lib/mux';
 import { supabase } from '@/lib/supabase';
 
 const NEON = '#d4ff00';
 
-function PostVideo({ uri, isVisible }: { uri: string; isVisible: boolean }) {
+/**
+ * Feed video. Mux posts stream HLS with the Mux poster frame underneath
+ * until the player reports it is ready, so the tile is never black while
+ * the manifest loads; legacy Storage videos play from their signed URL.
+ */
+function PostVideo({
+  uri,
+  poster,
+  isVisible,
+}: {
+  uri: string;
+  poster?: string | null;
+  isVisible: boolean;
+}) {
   const [muted, setMuted] = useState(true);
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.muted = true;
     p.play();
   });
+  const { status } = useEvent(player, 'statusChange', { status: player.status });
+  const showPoster = !!poster && status !== 'readyToPlay';
 
   // Viewport-based pause: only the on-screen video plays (web parity —
   // saves battery and stops off-screen audio when unmuted)
@@ -36,8 +53,17 @@ function PostVideo({ uri, isVisible }: { uri: string; isVisible: boolean }) {
   };
 
   return (
-    <View className="w-full h-full">
+    <View className="w-full h-full bg-black">
       <VideoView player={player} style={{ width: '100%', height: '100%' }} contentFit="cover" nativeControls={false} />
+      {showPoster ? (
+        <Image
+          pointerEvents="none"
+          source={{ uri: poster }}
+          className="absolute inset-0"
+          contentFit="cover"
+          transition={0}
+        />
+      ) : null}
       <Pressable
         onPress={toggleMute}
         hitSlop={8}
@@ -49,6 +75,22 @@ function PostVideo({ uri, isVisible }: { uri: string; isVisible: boolean }) {
           tintColor="#ffffff"
         />
       </Pressable>
+    </View>
+  );
+}
+
+/** Mux still encoding (a few seconds for a 14 s clip) or gave up. */
+function VideoPending({ errored }: { errored: boolean }) {
+  return (
+    <View className="w-full h-full items-center justify-center gap-3 bg-[#0b0618]">
+      {errored ? (
+        <SymbolView name="video.slash" size={28} tintColor="rgba(255,255,255,0.45)" />
+      ) : (
+        <ActivityIndicator color={NEON} />
+      )}
+      <Text className="text-white/55 text-xs font-sans-medium">
+        {errored ? "This video couldn't be processed" : 'Video is processing…'}
+      </Text>
     </View>
   );
 }
@@ -93,6 +135,10 @@ export function PostCard({
 }: PostCardProps) {
   const { width } = useWindowDimensions();
   const isOwner = post.user_id === currentUserId;
+  // Mux video rows have no image_url; the playback id arrives via webhook
+  const isMuxVideo = post.media_type === 'video' && !post.image_url && (post.mux_status != null || !!post.mux_playback_id);
+  const muxState = muxPlaybackState(post.mux_status, post.mux_playback_id);
+  const hasMedia = isMuxVideo || !!post.image_url;
 
   const openMenu = () => {
     if (isOwner) {
@@ -173,7 +219,19 @@ export function PostCard({
       </View>
 
       {/* Media — full bleed, 4:5 */}
-      {post.image_url ? (
+      {isMuxVideo ? (
+        <View style={{ width, height: width * 1.25 }} className="overflow-hidden">
+          {muxState === 'ready' && post.mux_playback_id ? (
+            <PostVideo
+              uri={muxHlsUrl(post.mux_playback_id)}
+              poster={muxThumbnailUrl(post.mux_playback_id)}
+              isVisible={isVisible}
+            />
+          ) : (
+            <VideoPending errored={muxState === 'errored'} />
+          )}
+        </View>
+      ) : post.image_url ? (
         <View style={{ width, height: width * 1.25 }} className="overflow-hidden">
           {post.media_type === 'video' ? (
             <PostVideo uri={post.image_url} isVisible={isVisible} />
@@ -195,7 +253,7 @@ export function PostCard({
 
       {/* Action row + like count + caption */}
       <View className="px-4 pt-2 pb-3">
-        {!post.image_url && post.text ? (
+        {!hasMedia && post.text ? (
           <Text className="text-white text-[15px] font-sans leading-snug mb-2">{post.text}</Text>
         ) : null}
 
@@ -226,7 +284,7 @@ export function PostCard({
           </Pressable>
         ) : null}
 
-        {post.image_url && post.text ? (
+        {hasMedia && post.text ? (
           <Text className="text-white text-sm font-sans mt-1" numberOfLines={3}>
             <Text className="font-sans-semibold">{post.display_name}</Text> {post.text}
           </Text>

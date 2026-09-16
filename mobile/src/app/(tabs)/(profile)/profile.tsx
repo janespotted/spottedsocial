@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
 import { getVenuePhotoUrl } from '@/lib/venues';
+import { muxThumbnailUrl } from '@/lib/mux';
 import { stopSharing } from '@/lib/night-status';
 import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
@@ -44,6 +45,7 @@ interface ProfileData {
     id: string;
     image_url: string | null;
     media_type: string | null;
+    mux_playback_id: string | null;
     text: string;
     likes_count: number | null;
     comments_count: number | null;
@@ -70,7 +72,7 @@ async function fetchProfileData(userId: string): Promise<ProfileData> {
       .order('created_at', { ascending: false }),
     supabase
       .from('posts')
-      .select('id, image_url, media_type, text, likes_count, comments_count')
+      .select('id, image_url, media_type, mux_playback_id, text, likes_count, comments_count')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(12),
@@ -487,7 +489,13 @@ export default function ProfileScreen() {
                 <GridTile
                   key={post.id}
                   label={`♥ ${post.likes_count ?? 0} · 💬 ${post.comments_count ?? 0}`}
-                  imageUrl={post.media_type !== 'video' ? post.image_url : null}
+                  imageUrl={
+                    post.media_type === 'video'
+                      ? post.mux_playback_id
+                        ? muxThumbnailUrl(post.mux_playback_id, { width: 480 })
+                        : null
+                      : post.image_url
+                  }
                 />
               ))}
             </View>

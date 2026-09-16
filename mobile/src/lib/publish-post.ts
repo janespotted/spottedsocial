@@ -29,8 +29,11 @@ export interface PublishInput {
   venueName: string | null;
   venueId: string | null;
   visibility: Audience;
-  /** Storage path from a previous attempt whose upload succeeded — skips re-upload. */
-  uploadedPath?: string | null;
+  /**
+   * From a previous attempt whose upload succeeded — skips re-upload.
+   * Storage path for photos, Mux upload id for videos.
+   */
+  uploadedKey?: string | null;
   onPhase?: (phase: PublishPhase) => void;
   /** 0..1, upload bytes only. */
   onProgress?: (fraction: number) => void;
@@ -39,14 +42,14 @@ export interface PublishInput {
 
 export interface PublishResult {
   post: PublishedPost;
-  uploadedPath: string | null;
+  uploadedKey: string | null;
 }
 
 export class PublishError extends Error {
   constructor(
     message: string,
-    /** Set when the media reached storage before the failure, so a retry can skip it. */
-    readonly uploadedPath: string | null,
+    /** Set when the media was fully uploaded before the failure, so a retry can skip it. */
+    readonly uploadedKey: string | null,
     readonly cancelled = false
   ) {
     super(message);
@@ -122,37 +125,77 @@ async function uploadMedia(
 }
 
 /**
+ * Videos go to Mux, not Storage: the mux-create-upload function mints a
+ * one-hour direct-upload URL for the signed-in user, the file streams there
+ * with the same native task, and the post row carries the upload id until
+ * the mux-webhook function fills in the playback id.
+ */
+async function uploadVideoToMux(
+  media: CapturedMedia,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal
+): Promise<string> {
+  const { data, error } = await supabase.functions.invoke<{ uploadId: string; url: string; error?: string }>(
+    'mux-create-upload',
+    { method: 'POST' }
+  );
+  if (error || !data?.url || !data.uploadId) {
+    throw new Error(data?.error ?? "Couldn't start the video upload.");
+  }
+  if (signal?.aborted) throw new Error('AbortError');
+
+  const result = await new File(media.uri).upload(data.url, {
+    httpMethod: 'PUT',
+    headers: { 'Content-Type': media.mimeType },
+    onProgress: ({ bytesSent, totalBytes }) => {
+      if (totalBytes > 0) onProgress?.(Math.min(1, bytesSent / totalBytes));
+    },
+    signal,
+  });
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error(`Video upload failed (${result.status}).`);
+  }
+  onProgress?.(1);
+  return data.uploadId;
+}
+
+/**
  * Upload (if needed) → insert → feed refresh. Throws PublishError carrying
  * the uploaded path so the caller can retry without re-sending the file.
  */
 export async function publishPost(input: PublishInput): Promise<PublishResult> {
   const { userId, media, onPhase, onProgress, signal } = input;
-  let uploadedPath = input.uploadedPath ?? null;
+  let uploadedKey = input.uploadedKey ?? null;
   let prepared: PreparedMedia | null = null;
+  const isVideo = media?.type === 'video';
 
   if (media) {
     // Resize + hash even on a retry that skips the upload: the row needs the
     // pixel size and ThumbHash, and the prep is a few hundred ms.
     onPhase?.('preparing');
     prepared = await prepareForUpload(media);
-    if (signal?.aborted) throw new PublishError('Upload cancelled.', uploadedPath, true);
+    if (signal?.aborted) throw new PublishError('Upload cancelled.', uploadedKey, true);
   }
 
-  if (prepared && !uploadedPath) {
+  if (prepared && !uploadedKey) {
     onPhase?.('uploading');
-    const path = `${userId}/${Date.now()}.${prepared.fileExt}`;
     try {
-      await uploadMedia(path, prepared, onProgress, signal);
+      if (isVideo) {
+        uploadedKey = await uploadVideoToMux(prepared, onProgress, signal);
+      } else {
+        const path = `${userId}/${Date.now()}.${prepared.fileExt}`;
+        await uploadMedia(path, prepared, onProgress, signal);
+        uploadedKey = path;
+      }
     } catch (e) {
       if (isAbort(e) || signal?.aborted) throw new PublishError('Upload cancelled.', null, true);
       throw new PublishError(friendly(e, "Couldn't upload your media."), null);
     }
-    uploadedPath = path;
   } else if (prepared) {
     onProgress?.(1);
   }
 
-  if (signal?.aborted) throw new PublishError('Upload cancelled.', uploadedPath, true);
+  if (signal?.aborted) throw new PublishError('Upload cancelled.', uploadedKey, true);
 
   onPhase?.('publishing');
   const { data, error } = await supabase
@@ -160,11 +203,13 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
     .insert({
       user_id: userId,
       text: input.text,
-      image_url: media ? uploadedPath : null,
+      image_url: media && !isVideo ? uploadedKey : null,
       media_type: media?.type ?? null,
       media_width: prepared?.width ?? null,
       media_height: prepared?.height ?? null,
       media_hash: prepared?.thumbhash ?? null,
+      mux_upload_id: isVideo ? uploadedKey : null,
+      mux_status: isVideo ? 'preparing' : null,
       venue_name: input.venueName,
       venue_id: input.venueId,
       expires_at: getPostExpiry(getActiveCity()),
@@ -175,13 +220,13 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
   if (error || !data) {
     throw new PublishError(
       friendly(error ? new Error(error.message) : null, "Couldn't share your post."),
-      uploadedPath
+      uploadedKey
     );
   }
 
   invalidateFeed();
   return {
-    uploadedPath,
+    uploadedKey,
     post: {
       id: data.id,
       created_at: data.created_at ?? new Date().toISOString(),

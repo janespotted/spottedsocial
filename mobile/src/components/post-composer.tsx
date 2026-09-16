@@ -111,7 +111,8 @@ export function PostComposer({
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // A failed attempt whose upload got through: the retry skips the file
-  const uploadedRef = useRef<{ uri: string; path: string } | null>(null);
+  // (key = storage path for photos, Mux upload id for videos)
+  const uploadedRef = useRef<{ uri: string; key: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const { caption, venueName, venueId, visibility } = draft;
   const posting = phase !== null;
@@ -160,7 +161,7 @@ export function PostComposer({
     setProgress(0);
     setPhase(media ? 'preparing' : 'publishing');
     // Reuse the uploaded file only if the media is still the same capture
-    const reusable = uploadedRef.current?.uri === media?.uri ? uploadedRef.current?.path : null;
+    const reusable = uploadedRef.current?.uri === media?.uri ? uploadedRef.current?.key : null;
     try {
       const { post } = await publishPost({
         userId: session.user.id,
@@ -169,7 +170,7 @@ export function PostComposer({
         venueName: venueCheck.data || null,
         venueId,
         visibility,
-        uploadedPath: reusable,
+        uploadedKey: reusable,
         onPhase: setPhase,
         onProgress: setProgress,
         signal: controller.signal,
@@ -179,7 +180,7 @@ export function PostComposer({
       onShared(post);
     } catch (e) {
       if (e instanceof PublishError) {
-        if (e.uploadedPath && media) uploadedRef.current = { uri: media.uri, path: e.uploadedPath };
+        if (e.uploadedKey && media) uploadedRef.current = { uri: media.uri, key: e.uploadedKey };
         if (!e.cancelled) setError({ message: e.message, retryable: true });
       } else {
         setError({ message: e instanceof Error ? e.message : "Couldn't share your post.", retryable: true });

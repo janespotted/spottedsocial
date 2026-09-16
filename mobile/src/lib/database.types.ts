@@ -1027,6 +1027,10 @@ export type Database = {
           media_height: number | null
           media_type: string | null
           media_width: number | null
+          mux_asset_id: string | null
+          mux_playback_id: string | null
+          mux_status: string | null
+          mux_upload_id: string | null
           text: string
           user_id: string
           venue_id: string | null
@@ -1046,6 +1050,10 @@ export type Database = {
           media_height?: number | null
           media_type?: string | null
           media_width?: number | null
+          mux_asset_id?: string | null
+          mux_playback_id?: string | null
+          mux_status?: string | null
+          mux_upload_id?: string | null
           text: string
           user_id: string
           venue_id?: string | null
@@ -1065,6 +1073,10 @@ export type Database = {
           media_height?: number | null
           media_type?: string | null
           media_width?: number | null
+          mux_asset_id?: string | null
+          mux_playback_id?: string | null
+          mux_status?: string | null
+          mux_upload_id?: string | null
           text?: string
           user_id?: string
           venue_id?: string | null

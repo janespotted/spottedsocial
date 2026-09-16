@@ -29,6 +29,9 @@ export interface FeedPost {
   media_height: number | null;
   /** ThumbHash placeholder, base64. */
   media_hash: string | null;
+  /** Mux video: playback id once encoded; status preparing | ready | errored. */
+  mux_playback_id: string | null;
+  mux_status: string | null;
   venue_name: string | null;
   venue_id: string | null;
   created_at: string;
@@ -140,6 +143,8 @@ export function useFeed() {
         media_width: p.media_width,
         media_height: p.media_height,
         media_hash: p.media_hash,
+        mux_playback_id: p.mux_playback_id,
+        mux_status: p.mux_status,
         venue_name: p.venue_name,
         venue_id: p.venue_id,
         created_at: p.created_at ?? new Date().toISOString(),
@@ -265,6 +270,8 @@ export function useFeed() {
             media_width: p.media_width ?? null,
             media_height: p.media_height ?? null,
             media_hash: p.media_hash ?? null,
+            mux_playback_id: p.mux_playback_id ?? null,
+            mux_status: p.mux_status ?? null,
             venue_name: p.venue_name ?? null,
             venue_id: p.venue_id ?? null,
             created_at: p.created_at ?? new Date().toISOString(),
@@ -282,6 +289,29 @@ export function useFeed() {
           (payload) => {
             const id = (payload.old as Record<string, any>)?.id;
             if (id) setPosts((prev) => prev.filter((x) => x.id !== id));
+          }
+        )
+        // Mux finishing an encode: the webhook updates the row and the
+        // processing tile becomes a player without a refresh.
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'posts' },
+          (payload) => {
+            const p = payload.new as Record<string, any>;
+            if (!p?.id) return;
+            setPosts((prev) =>
+              prev.map((x) =>
+                x.id === p.id
+                  ? {
+                      ...x,
+                      mux_playback_id: p.mux_playback_id ?? null,
+                      mux_status: p.mux_status ?? null,
+                      media_width: p.media_width ?? x.media_width,
+                      media_height: p.media_height ?? x.media_height,
+                    }
+                  : x
+              )
+            );
           }
         ),
     });
