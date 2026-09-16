@@ -114,6 +114,18 @@ async function fetchFriendCounts(friendIds: string[]): Promise<{ out: number; pl
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** Never leave the user on a spinner: reject with a 'timeout' error after `ms`. */
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
+
+// One GPS attempt (the SDK samples for up to 15s) plus the venue lookup
+const GPS_ATTEMPT_TIMEOUT_MS = 20_000;
+// Reading permission state should be instant; a hang means the plugin is broken
+const PERMISSION_CHECK_TIMEOUT_MS = 8_000;
 const isAre = (n: number) => (n === 1 ? 'is' : 'are');
 
 /* ────────────────────────── UI pieces ────────────────────────── */
@@ -410,7 +422,11 @@ export default function CheckInSheet() {
      Yes explains before asking, asks for When In Use only, and never
      treats a permission outcome as a check-in outcome. */
   const startYes = async () => {
-    const permission = await getLocationPermission().catch(() => 'denied' as const);
+    // A hung plugin must not freeze the sheet: treat it as "no location",
+    // which still offers Pick a venue.
+    const permission = await withTimeout(getLocationPermission(), PERMISSION_CHECK_TIMEOUT_MS).catch(
+      () => 'denied' as const
+    );
     if (permission === 'not_determined') setStep('location-intro');
     else if (permission === 'denied') setStep('gps-denied');
     else detectVenue();
@@ -461,12 +477,15 @@ export default function CheckInSheet() {
     try {
       let data: LocationData;
       try {
-        data = await captureLocationWithVenue(DEMO_MODE ? GPS_ACCURACY_THRESHOLD_DEMO : undefined);
+        data = await withTimeout(
+          captureLocationWithVenue(DEMO_MODE ? GPS_ACCURACY_THRESHOLD_DEMO : undefined),
+          GPS_ATTEMPT_TIMEOUT_MS
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message.toLowerCase() : '';
         if (msg.includes('accuracy too low') || msg.includes('timeout')) {
           await new Promise((r) => setTimeout(r, 2000));
-          data = await captureLocationWithVenue(200);
+          data = await withTimeout(captureLocationWithVenue(200), GPS_ATTEMPT_TIMEOUT_MS);
         } else {
           throw err;
         }
@@ -664,7 +683,10 @@ export default function CheckInSheet() {
   const finish = () => router.back();
   const finishToMap = () => {
     router.back();
-    router.navigate('/map');
+    // Let the sheet finish dismissing first. Navigating while it is still
+    // presented makes iOS present the tabs as a NEW modal card on top of
+    // the sheet (every tab then renders inset with rounded corners).
+    setTimeout(() => router.navigate('/map'), 400);
   };
 
   const currentLine = own?.status

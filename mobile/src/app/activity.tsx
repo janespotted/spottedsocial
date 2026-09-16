@@ -191,9 +191,12 @@ export default function ActivityScreen() {
     }
   };
 
+  // Navigating while this modal is still dismissing makes iOS present the
+  // destination as a new modal card on top (the tabs end up inset with
+  // rounded corners). Same delay as openThreadWith.
   const goToFriends = () => {
     router.back();
-    router.push('/friends');
+    setTimeout(() => router.push('/friends'), 250);
   };
 
   const all = notifications ?? [];
@@ -360,7 +363,7 @@ export default function ActivityScreen() {
                     label: 'View',
                     onPress: () => {
                       router.back();
-                      router.push('/messages');
+                      setTimeout(() => router.push('/messages'), 250);
                     },
                   }}
                 />

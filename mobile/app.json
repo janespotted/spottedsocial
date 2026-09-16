@@ -17,6 +17,8 @@
         "NSLocationWhenInUseUsageDescription": "Spotted uses your location to show which friends are nearby and detect when you arrive at venues.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Spotted uses background location to notify you when friends arrive at venues and auto-detect your check-ins, even when the app is closed. Your location is only shared with friends you choose.",
         "NSMotionUsageDescription": "Spotted uses motion detection to save battery while tracking your venue.",
+        "NSCameraUsageDescription": "Spotted uses the camera so you can capture and share moments from your night.",
+        "NSMicrophoneUsageDescription": "Spotted uses the microphone to record sound in your videos. Without it, videos are silent.",
         "UIBackgroundModes": [
           "location",
           "fetch",
@@ -26,7 +28,8 @@
           "com.transistorsoft.fetch",
           "com.transistorsoft.customtask"
         ]
-      }
+      },
+      "appleTeamId": "WAG8BQTW69"
     },
     "android": {
       "adaptiveIcon": {
@@ -36,7 +39,19 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.janereynolds.spotted"
+      "package": "com.janereynolds.spotted",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
+      ]
     },
     "web": {
       "output": "static",
@@ -57,6 +72,13 @@
       "expo-font",
       "expo-video",
       "expo-notifications",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Spotted shows your latest photo as a shortcut to your library. Photos you don't share never leave your device.",
+          "savePhotosPermission": "Spotted can save captured photos and videos to your library."
+        }
+      ],
       [
         "expo-image-picker",
         {

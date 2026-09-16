@@ -50,7 +50,12 @@ function RootNavigator() {
       <Stack.Screen name="thread" options={{ contentStyle: gradientStyle }} />
       <Stack.Screen name="yap-thread" options={{ contentStyle: gradientStyle }} />
       <Stack.Screen name="comments" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="create-post" options={{ presentation: 'modal' }} />
+      {/* Camera-first composer: full screen, no swipe-dismiss (the sheet
+          guards populated drafts itself) */}
+      <Stack.Screen
+        name="create-post"
+        options={{ presentation: 'fullScreenModal', gestureEnabled: false }}
+      />
       <Stack.Screen name="create-plan" options={{ presentation: 'modal' }} />
       <Stack.Screen name="edit-plan" options={{ presentation: 'modal' }} />
       <Stack.Screen name="post-likes" options={{ presentation: 'modal' }} />

@@ -1,300 +1,100 @@
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Image } from '@/components/styled';
+import { useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import { router } from 'expo-router';
-import { SymbolView, type SFSymbol } from 'expo-symbols';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import * as ImagePicker from 'expo-image-picker';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { supabase } from '@/lib/supabase';
-import { getPostExpiry, invalidateFeed } from '@/lib/posts';
-import { validatePostText, validateVenueName } from '@/lib/validation';
-import { DEFAULT_AUDIENCE, loadPostAudience, savePostAudience, type Audience } from '@/lib/audience';
-import { useSession } from '@/hooks/use-session';
-import { AudienceRow } from '@/components/audience-row';
+import { DEFAULT_AUDIENCE, loadPostAudience } from '@/lib/audience';
+import { useOwnNightStatus } from '@/hooks/use-own-night-status';
+import type { CapturedMedia } from '@/lib/post-media';
+import { SpottedCamera } from '@/components/spotted-camera';
+import { PostComposer, type PostDraft } from '@/components/post-composer';
 
-const NEON = '#d4ff00';
+type Mode = 'camera' | 'compose';
 
-interface PickedMedia {
-  uri: string;
-  type: 'image' | 'video';
-  mimeType: string;
-  fileExt: string;
-}
-
-interface VenueSuggestion {
-  id: string;
-  name: string;
-}
-
-
-async function pickMedia(source: 'library' | 'camera'): Promise<PickedMedia | null> {
-  const options: ImagePicker.ImagePickerOptions = {
-    mediaTypes: ['images', 'videos'],
-    quality: 0.8,
-    videoMaxDuration: 14, // matches the native camera's hold-to-record cap
-    allowsEditing: false,
-  };
-  const result =
-    source === 'camera'
-      ? await ImagePicker.launchCameraAsync(options)
-      : await ImagePicker.launchImageLibraryAsync(options);
-  const asset = result.assets?.[0];
-  if (result.canceled || !asset) return null;
-  const isVideo = asset.type === 'video';
-  const mimeType = asset.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg');
-  return {
-    uri: asset.uri,
-    type: isVideo ? 'video' : 'image',
-    mimeType,
-    fileExt: isVideo ? 'mp4' : mimeType === 'image/png' ? 'png' : 'jpg',
-  };
-}
-
-function VideoPreview({ uri }: { uri: string }) {
-  const player = useVideoPlayer(uri, (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
-  return <VideoView player={player} style={{ width: '100%', height: '100%' }} contentFit="cover" nativeControls={false} />;
-}
-
-/** Create-post composer — modal from the feed. Port of the web camera→caption flow. */
+/**
+ * Camera → capture/select → preview + caption → share (client feedback §4).
+ *
+ * One full-screen route with two modes so the draft (caption, venue,
+ * audience) survives Retake: the camera never knows about the form, and the
+ * form never loses what was typed when the media is replaced.
+ */
 export default function CreatePostScreen() {
-  const { session } = useSession();
-  const { width } = useWindowDimensions();
-  const [media, setMedia] = useState<PickedMedia | null>(null);
-  const [caption, setCaption] = useState('');
-  const [venueName, setVenueName] = useState('');
-  const [venueId, setVenueId] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<VenueSuggestion[]>([]);
-  // Post audience is remembered per device, separately from the live-status
-  // audience; the saved value is the default so it is never silently broadened.
-  const [visibility, setVisibility] = useState<Audience>(DEFAULT_AUDIENCE);
+  const { data: ownNight } = useOwnNightStatus();
+  const [mode, setMode] = useState<Mode>('camera');
+  const [media, setMedia] = useState<CapturedMedia | null>(null);
+  const [draft, setDraft] = useState<PostDraft>({
+    caption: '',
+    venueName: '',
+    venueId: null,
+    visibility: DEFAULT_AUDIENCE,
+  });
+  const [venuePrefilled, setVenuePrefilled] = useState(false);
+
+  const patchDraft = (patch: Partial<PostDraft>) => setDraft((d) => ({ ...d, ...patch }));
+
+  // Remembered post audience (separate from the live-status audience)
   useEffect(() => {
     let cancelled = false;
     loadPostAudience().then((saved) => {
-      if (!cancelled) setVisibility(saved);
+      if (!cancelled) patchDraft({ visibility: saved });
     });
     return () => {
       cancelled = true;
     };
   }, []);
-  const [posting, setPosting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // If checked in right now, pre-fill the venue (port of the web
-  // fetchActiveCheckInOrCaptureLocation, minus raw GPS capture).
+  // Suggest the current check-in venue once; the user can change or clear it
   useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    supabase
-      .from('night_statuses')
-      .select('venue_id, venue_name')
-      .eq('user_id', session.user.id)
-      .eq('status', 'out')
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle()
-      .then(({ data }) => {
-        if (cancelled || !data?.venue_name) return;
-        setVenueName(data.venue_name);
-        setVenueId(data.venue_id ?? null);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user.id]);
-
-  // Venue autocomplete against the venues table (mirrors the web composer)
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    const term = venueName.trim();
-    if (term.length < 2 || venueId) {
-      setSuggestions([]);
-      return;
+    if (venuePrefilled) return;
+    const s = ownNight?.status;
+    if (s?.status === 'out' && s.venue_name) {
+      patchDraft({ venueName: s.venue_name, venueId: s.venue_id ?? null });
+      setVenuePrefilled(true);
     }
-    debounceRef.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('venues')
-        .select('id, name')
-        .ilike('name', `%${term}%`)
-        .limit(4);
-      setSuggestions(data ?? []);
-    }, 250);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [venueName, venueId]);
+  }, [ownNight, venuePrefilled]);
 
-  const choose = async (source: 'library' | 'camera') => {
-    const picked = await pickMedia(source);
-    if (picked) setMedia(picked);
+  const hasDraft = !!media || draft.caption.trim().length > 0;
+
+  const capture = (m: CapturedMedia) => {
+    setMedia(m);
+    setMode('compose');
   };
 
-  const share = async () => {
-    if (!session || posting) return;
-    const textCheck = validatePostText(caption);
-    const venueCheck = validateVenueName(venueName);
-    if (!textCheck.success || !venueCheck.success) {
-      setError(textCheck.error ?? venueCheck.error ?? 'invalid post');
-      return;
-    }
-    const text = textCheck.data!;
-    if (!text && !media) {
-      setError('add a photo or write something');
-      return;
-    }
-    setPosting(true);
-    setError(null);
-    try {
-      let imagePath: string | null = null;
-      if (media) {
-        imagePath = `${session.user.id}/${Date.now()}.${media.fileExt}`;
-        const body = await fetch(media.uri).then((r) => r.arrayBuffer());
-        const { error: uploadErr } = await supabase.storage
-          .from('post-images')
-          .upload(imagePath, body, { contentType: media.mimeType, upsert: true });
-        if (uploadErr) throw uploadErr;
-      }
-      const { error: insertErr } = await supabase.from('posts').insert({
-        user_id: session.user.id,
-        text,
-        image_url: imagePath,
-        media_type: media?.type ?? null,
-        venue_name: venueCheck.data || null,
-        venue_id: venueId,
-        expires_at: getPostExpiry(),
-        visibility,
-      });
-      if (insertErr) throw insertErr;
-      savePostAudience(visibility);
-      invalidateFeed();
+  // Closing the camera: back to the draft if there is one, else dismiss
+  const closeCamera = () => {
+    if (hasDraft) setMode('compose');
+    else router.back();
+  };
+
+  // Closing the composer: never discard typed work without asking
+  const closeComposer = () => {
+    if (!hasDraft) {
       router.back();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'failed to share post');
-      setPosting(false);
+      return;
     }
+    Alert.alert('Discard this post?', 'Your photo and caption will be lost.', [
+      { text: 'Keep editing', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: () => router.back() },
+    ]);
   };
 
-  const previewHeight = Math.min(width * 1.25, 380);
+  if (mode === 'camera') {
+    return (
+      <SpottedCamera
+        onCapture={capture}
+        onClose={closeCamera}
+        closeLabel={hasDraft ? 'Back to post' : 'Close'}
+        onTextPost={() => setMode('compose')}
+      />
+    );
+  }
 
   return (
-    <View className="flex-1 bg-[#110a24]">
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-white/10">
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <SymbolView name="xmark" size={18} tintColor="rgba(255,255,255,0.6)" />
-        </Pressable>
-        <Text className="text-white text-base font-sans-semibold">New Post</Text>
-        <Pressable onPress={share} disabled={posting} hitSlop={8}>
-          {posting ? (
-            <ActivityIndicator size="small" color={NEON} />
-          ) : (
-            <Text className="text-base font-sans-semibold" style={{ color: NEON }}>
-              Share
-            </Text>
-          )}
-        </Pressable>
-      </View>
-
-      <KeyboardAwareScrollView
-        contentContainerClassName="p-4 gap-4 pb-safe-offset-6"
-        keyboardShouldPersistTaps="handled"
-        bottomOffset={24}
-      >
-        {/* Media picker / preview */}
-        {media ? (
-          <View className="rounded-2xl overflow-hidden" style={{ height: previewHeight }}>
-            {media.type === 'video' ? (
-              <VideoPreview uri={media.uri} />
-            ) : (
-              <Image source={{ uri: media.uri }} className="w-full h-full" contentFit="cover" />
-            )}
-            <Pressable
-              onPress={() => setMedia(null)}
-              hitSlop={8}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 items-center justify-center"
-            >
-              <SymbolView name="xmark" size={14} tintColor="#ffffff" />
-            </Pressable>
-          </View>
-        ) : (
-          <View className="flex-row gap-3">
-            {(
-              [
-                { source: 'camera', icon: 'camera.fill', label: 'Camera' },
-                { source: 'library', icon: 'photo.on.rectangle', label: 'Library' },
-              ] as const
-            ).map((opt) => (
-              <Pressable
-                key={opt.source}
-                onPress={() => choose(opt.source)}
-                className="flex-1 h-28 rounded-2xl bg-white/5 border border-white/15 items-center justify-center gap-2 active:bg-white/10"
-              >
-                <SymbolView name={opt.icon} size={26} tintColor={NEON} />
-                <Text className="text-white/70 text-sm font-sans">{opt.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-
-        {/* Caption */}
-        <TextInput
-          value={caption}
-          onChangeText={setCaption}
-          placeholder="What's the vibe tonight?"
-          placeholderTextColorClassName="accent-white/30"
-          multiline
-          maxLength={500}
-          className="min-h-24 rounded-2xl bg-white/5 border border-white/15 px-4 py-3 text-white text-[16px] font-sans"
-        />
-
-        {/* Venue */}
-        <View className="gap-2">
-          <View className="flex-row items-center gap-2 rounded-2xl bg-white/5 border border-white/15 px-4">
-            <SymbolView name="mappin" size={16} tintColor={NEON} />
-            <TextInput
-              value={venueName}
-              onChangeText={(t) => {
-                setVenueName(t);
-                setVenueId(null);
-              }}
-              placeholder="Add a venue (optional)"
-              placeholderTextColorClassName="accent-white/30"
-              className="flex-1 h-12 py-0 text-white text-[15px] font-sans"
-            />
-          </View>
-          {suggestions.map((v) => (
-            <Pressable
-              key={v.id}
-              onPress={() => {
-                setVenueName(v.name);
-                setVenueId(v.id);
-                setSuggestions([]);
-              }}
-              className="px-4 py-2.5 rounded-xl bg-white/5 active:bg-white/10"
-            >
-              <Text className="text-white/80 text-sm font-sans">{v.name}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Audience — same names and selector as live statuses, separate preference */}
-        <AudienceRow value={visibility} onChange={setVisibility} context="post" />
-
-        {error ? (
-          <Text selectable className="text-sm text-red-400 font-sans">
-            {error}
-          </Text>
-        ) : null}
-
-        <Text className="text-xs text-white/30 font-sans">
-          Posts disappear at 5am — fun for the night, gone by sunrise.
-        </Text>
-      </KeyboardAwareScrollView>
-    </View>
+    <PostComposer
+      media={media}
+      draft={draft}
+      onDraftChange={patchDraft}
+      onRetake={() => setMode('camera')}
+      onClose={closeComposer}
+      onShared={() => router.back()}
+    />
   );
 }

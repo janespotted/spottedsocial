@@ -73,6 +73,12 @@ export function useOwnNightStatus(opts: { refetchInterval?: number } = {}) {
     enabled: !!session,
     staleTime: 0,
     refetchInterval: opts.refetchInterval,
+    // The opening-prompt gate covers the app until this resolves. If the
+    // network monitor mis-reports "offline" at cold start, a paused query
+    // would leave that cover up forever — so never pause: let it fail and
+    // the gate fails open.
+    networkMode: 'always',
+    retry: 1,
     queryFn: () => fetchOwnNightData(session!.user.id),
   });
 }

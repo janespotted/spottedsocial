@@ -79,7 +79,10 @@ export function NightStatusGate() {
   // Fail open if "unknown" drags on (query paused offline, never resolving)
   useEffect(() => {
     if (!gated || gateState !== 'unknown') return;
-    const timer = setTimeout(() => setNightGateState('answered'), UNKNOWN_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      console.warn('[NightGate] status query did not resolve in time — failing open');
+      setNightGateState('answered');
+    }, UNKNOWN_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [gated, gateState]);
 

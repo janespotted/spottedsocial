@@ -25,6 +25,10 @@ Camera is a **native UIKit fullscreen modal** (`SpottedCameraPlugin.swift` + `.m
 - `WebViewTransparencyPlugin` — removed, was only needed for webview-overlay approach
 - `CameraTest.tsx` / `/camera-test` route — removed, was the old camera page
 
+### React Native app (`mobile/`)
+
+The RN app has its own camera, unrelated to the Capacitor plugin above: `mobile/src/components/spotted-camera.tsx` on **react-native-vision-camera 5** (Nitro; peers `react-native-nitro-modules`, `react-native-nitro-image`). One session with a photo output and a video output (`enablePersistentRecorder: true` so a lens flip mid-recording keeps recording); photo via `capturePhotoToFile`, video via `createRecorder({ maxDuration: 14 })`. VisionCamera 5 has no Expo config plugin — camera/microphone strings live in `app.json` → `ios.infoPlist` and `android.permissions`. `/create-post` is one full-screen route with two modes (camera → composer) so Retake keeps the draft; `lib/post-media.ts` holds the shared media type and the system library picker. `expo-media-library/legacy` provides the last-item thumbnail only when photo access was already granted (it never prompts). Do not reintroduce `expo-camera`.
+
 ## Header Patterns
 
 - **Newsfeed & Plans**: Both have a collapsing header. The page title and tagline collapse on scroll. The "Spotted" wordmark, city pill, search, notification bell, and S logo are anchored and do not animate. The Newsfeed/Plans tab toggle is inside the sticky header.
