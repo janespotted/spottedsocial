@@ -25,8 +25,9 @@ export function useMyNightStatus() {
         .select('status, planning_neighborhood, planning_visibility, expires_at')
         .eq('user_id', session!.user.id)
         .maybeSingle();
-      // expires_at null means "home" (stopSharing clears it); expired rows are stale
-      if (!data || (data.expires_at && new Date(data.expires_at) <= new Date())) {
+      // Every answer (out / planning / home) carries tonight's expiry; an
+      // expired or missing row means the night reset — nothing to show.
+      if (!data || !data.expires_at || new Date(data.expires_at) <= new Date()) {
         return { status: null, planning_neighborhood: null, planning_visibility: null };
       }
       return {

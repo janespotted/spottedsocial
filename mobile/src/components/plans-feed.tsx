@@ -19,6 +19,7 @@ import { type Plan, type EventWithFriends } from '@/lib/plans';
 import { useSession } from '@/hooks/use-session';
 import { useFriendsOut, type FriendNightStatus } from '@/hooks/use-friends-out';
 import { useMyNightStatus, usePlanEvents, usePlans, usePlansRealtime } from '@/hooks/use-plans';
+import { OWN_NIGHT_STATUS_KEY } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
 import { PlanCard } from '@/components/plan-card';
 import { EventCard } from '@/components/event-card';
@@ -105,6 +106,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
 
   const invalidateStatus = () => {
     queryClient.invalidateQueries({ queryKey: ['my-night-status'] });
+    queryClient.invalidateQueries({ queryKey: [OWN_NIGHT_STATUS_KEY] });
     queryClient.invalidateQueries({ queryKey: ['friends-out'] });
   };
 
@@ -127,7 +129,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
 
   const handleLeavePlanning = async () => {
     try {
-      await stopSharing(userId);
+      await stopSharing(userId, { city });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       invalidateStatus();
     } catch (e) {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   Linking,
   Pressable,
   ScrollView,
@@ -8,8 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
-import { ActionSheetIOS } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
@@ -19,38 +19,43 @@ import { DEMO_MODE } from '@/lib/demo-mode';
 import { CITY_NEIGHBORHOODS, getCityLabel } from '@/lib/city-neighborhoods';
 import {
   captureLocationWithVenue,
-  detectNeighborhoodFromGPS,
   GPS_ACCURACY_THRESHOLD_DEMO,
+  neighborhoodFromCoords,
   type LocationData,
   type VenueMatch,
 } from '@/lib/location-service';
-import { goOutAtVenue, goPlanning, stopSharing } from '@/lib/night-status';
+import { goOutAtVenue, goPlanning, stayIn } from '@/lib/night-status';
 import { getCurrentPosition, startBackgroundLocation } from '@/lib/background-location';
 import { notifyFriendArrived, notifyFriendsPlanning } from '@/lib/notifications';
+import { markNightAnswered } from '@/lib/night-gate';
 import { useSession } from '@/hooks/use-session';
+import { useFriendIds } from '@/hooks/use-friend-ids';
+import { OWN_NIGHT_STATUS_KEY, useOwnNightStatus } from '@/hooks/use-own-night-status';
 
 const NEON = '#d4ff00';
+const PURPLE = '#a855f7';
 
 type Audience = 'close_friends' | 'all_friends' | 'mutual_friends';
-type Step = 'status' | 'detecting' | 'venue' | 'planning' | 'party' | 'gps-denied';
+type Step = 'ask' | 'detecting' | 'gps-denied' | 'venue' | 'party' | 'planning' | 'done';
 
-const AUDIENCES: Array<{ value: Audience; label: string }> = [
-  { value: 'close_friends', label: 'Close Friends' },
-  { value: 'all_friends', label: 'All Friends' },
-  { value: 'mutual_friends', label: 'Mutual Friends' },
+const AUDIENCES: Array<{ value: Audience; label: string; desc: string }> = [
+  { value: 'close_friends', label: 'Close Friends', desc: "Only people you've starred" },
+  { value: 'all_friends', label: 'Friends', desc: "Everyone you're friends with" },
+  { value: 'mutual_friends', label: 'Friends + Mutuals', desc: 'Friends, plus friends of friends' },
 ];
 
-const STATUS_OPTIONS: Array<{
-  key: 'out' | 'planning' | 'private_party' | 'home';
-  label: string;
-  desc: string;
-  icon: SFSymbol;
-}> = [
-  { key: 'out', label: "I'm Out", desc: 'Share your spot with friends', icon: 'mappin.and.ellipse' },
-  { key: 'planning', label: 'Planning Tonight', desc: "TBD — let friends know you're deciding", icon: 'target' },
-  { key: 'private_party', label: 'Private Party', desc: 'House party — exact spot for close friends only', icon: 'house' },
-  { key: 'home', label: 'Staying In', desc: "You won't appear on tonight's list", icon: 'moon.zzz' },
+const ANSWERS: Array<{ key: 'yes' | 'tbd' | 'no'; label: string; desc: string; icon: SFSymbol }> = [
+  { key: 'yes', label: "Yes, I'm out", desc: 'Share your spot with friends', icon: 'mappin.and.ellipse' },
+  { key: 'tbd', label: 'TBD', desc: "Thinking about it — let friends know", icon: 'target' },
+  { key: 'no', label: 'No, staying in', desc: 'Browse without sharing your location', icon: 'moon.zzz' },
 ];
+
+interface Payoff {
+  kind: 'out' | 'planning';
+  venueName: string | null;
+  out: number;
+  planning: number;
+}
 
 /** Schedule the 10am morning-after recap (web scheduleMorningAfterNotification). */
 async function scheduleMorningAfter(): Promise<void> {
@@ -72,92 +77,383 @@ async function scheduleMorningAfter(): Promise<void> {
   }
 }
 
-function AudiencePicker({
-  value,
-  onChange,
+/** Friends out / deciding right now — the immediate payoff after sharing. */
+async function fetchFriendCounts(friendIds: string[]): Promise<{ out: number; planning: number }> {
+  if (friendIds.length === 0) return { out: 0, planning: 0 };
+  const { data } = await supabase
+    .from('night_statuses')
+    .select('status')
+    .in('user_id', friendIds)
+    .in('status', ['out', 'planning'])
+    .gt('expires_at', new Date().toISOString());
+  let out = 0;
+  let planning = 0;
+  for (const row of data ?? []) {
+    if (row.status === 'out') out += 1;
+    else planning += 1;
+  }
+  return { out, planning };
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const isAre = (n: number) => (n === 1 ? 'is' : 'are');
+
+/* ────────────────────────── UI pieces ────────────────────────── */
+
+function SheetHeader({
+  title,
+  subtitle,
+  onBack,
+  onClose,
 }: {
-  value: Audience;
-  onChange: (a: Audience) => void;
+  title: string;
+  subtitle?: string | null;
+  onBack?: () => void;
+  onClose?: () => void;
 }) {
   return (
-    <View className="gap-2">
-      <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">
-        Who can see you
-      </Text>
-      <View className="flex-row gap-2">
-        {AUDIENCES.map((opt) => (
+    <View className="gap-1">
+      <View className="flex-row items-center gap-2">
+        {onBack ? (
           <Pressable
-            key={opt.value}
-            onPress={() => onChange(opt.value)}
-            className={`flex-1 px-2 py-2.5 rounded-xl border items-center ${
-              value === opt.value
-                ? 'bg-[#a855f7]/25 border-[#a855f7]/40'
-                : 'bg-[#2d1b4e]/50 border-transparent'
-            }`}
+            onPress={onBack}
+            hitSlop={8}
+            accessibilityLabel="Back"
+            className="w-8 h-8 -ml-2 rounded-full items-center justify-center active:bg-white/10"
           >
-            <Text
-              className={`text-xs text-center ${
-                value === opt.value ? 'text-[#d4ff00] font-sans-semibold' : 'text-white/70 font-sans'
-              }`}
-            >
-              {opt.label}
-            </Text>
+            <SymbolView name="chevron.left" size={16} tintColor="#ffffff" />
           </Pressable>
-        ))}
+        ) : null}
+        <Text className="text-white text-xl font-sans-semibold flex-1">{title}</Text>
+        {onClose ? (
+          <Pressable
+            onPress={onClose}
+            hitSlop={8}
+            accessibilityLabel="Close"
+            className="w-8 h-8 rounded-full items-center justify-center bg-white/10 active:bg-white/20"
+          >
+            <SymbolView name="xmark" size={13} tintColor="#ffffff" />
+          </Pressable>
+        ) : null}
       </View>
+      {subtitle ? <Text className="text-white/50 text-sm font-sans">{subtitle}</Text> : null}
     </View>
   );
 }
 
+function PrimaryButton({
+  label,
+  onPress,
+  disabled,
+  loading,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || loading}
+      className="rounded-full py-3.5 items-center active:opacity-90 disabled:opacity-30"
+      style={{ backgroundColor: NEON, boxShadow: '0 0 16px rgba(212,255,0,0.25)' }}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color="#1a0f2e" />
+      ) : (
+        <Text className="text-[#1a0f2e] text-base font-sans-semibold">{label}</Text>
+      )}
+    </Pressable>
+  );
+}
+
+function SecondaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="rounded-full py-3 items-center border border-white/15 active:bg-white/5"
+    >
+      <Text className="text-white text-sm font-sans-medium">{label}</Text>
+    </Pressable>
+  );
+}
+
+/** Compact "Visible to Friends ▾" row that expands into stacked choices. */
+function AudienceRow({ value, onChange }: { value: Audience; onChange: (a: Audience) => void }) {
+  const [open, setOpen] = useState(false);
+  const current = AUDIENCES.find((a) => a.value === value) ?? AUDIENCES[1];
+  return (
+    <View className="rounded-xl bg-[#2d1b4e]/50 border border-white/[0.06] overflow-hidden">
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        accessibilityLabel={`Visible to ${current.label}. Change audience`}
+        className="flex-row items-center gap-2 px-4 py-3 active:bg-white/5"
+      >
+        <SymbolView name="eye" size={14} tintColor="rgba(255,255,255,0.5)" />
+        <Text className="text-white/60 text-sm font-sans">Visible to</Text>
+        <Text className="text-white text-sm font-sans-semibold flex-1">{current.label}</Text>
+        <SymbolView
+          name={open ? 'chevron.up' : 'chevron.down'}
+          size={12}
+          tintColor="rgba(255,255,255,0.4)"
+        />
+      </Pressable>
+      {open
+        ? AUDIENCES.map((opt) => {
+            const selected = opt.value === value;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className="flex-row items-center gap-3 px-4 py-3 border-t border-white/[0.06] active:bg-white/5"
+              >
+                <View className="flex-1">
+                  <Text
+                    className={`text-sm ${
+                      selected ? 'text-[#d4ff00] font-sans-semibold' : 'text-white font-sans-medium'
+                    }`}
+                  >
+                    {opt.label}
+                  </Text>
+                  <Text className="text-white/40 text-xs font-sans">{opt.desc}</Text>
+                </View>
+                {selected ? <SymbolView name="checkmark" size={14} tintColor={NEON} /> : null}
+              </Pressable>
+            );
+          })
+        : null}
+    </View>
+  );
+}
+
+function VenueRow({
+  name,
+  distance,
+  icon = 'mappin',
+  onPress,
+}: {
+  name: string;
+  distance?: number;
+  icon?: SFSymbol;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="flex-row items-center gap-2 px-3 py-2.5 rounded-xl bg-[#2d1b4e]/50 active:bg-[#a855f7]/20"
+    >
+      <SymbolView name={icon} size={13} tintColor="rgba(255,255,255,0.5)" />
+      <Text className="text-white text-sm font-sans flex-1" numberOfLines={1}>
+        {name}
+      </Text>
+      {distance && distance > 0 ? (
+        <Text className="text-white/30 text-xs font-sans">{Math.round(distance)}m</Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
+/** Neighborhood: detected/selected value with "Change", or the chip grid. */
+function NeighborhoodPicker({
+  city,
+  value,
+  onChange,
+  detecting,
+  allowAnywhere,
+}: {
+  city: string;
+  value: string | null;
+  onChange: (hood: string | null) => void;
+  detecting?: boolean;
+  allowAnywhere?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const chip = (label: string, selected: boolean, onPress: () => void) => (
+    <Pressable
+      key={label}
+      onPress={onPress}
+      className={`px-3 py-2 rounded-xl border ${
+        selected ? 'bg-[#a855f7]/25 border-[#a855f7]/40' : 'bg-[#2d1b4e]/50 border-transparent'
+      }`}
+    >
+      <Text className={`text-xs font-sans ${selected ? 'text-[#d4ff00]' : 'text-white/70'}`}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+  const hasChoice = value !== null || allowAnywhere;
+
+  return (
+    <View className="gap-2">
+      <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">
+        Neighborhood
+      </Text>
+      {detecting ? (
+        <View className="flex-row items-center gap-2 py-2">
+          <ActivityIndicator size="small" color={NEON} />
+          <Text className="text-white/50 text-sm font-sans">Detecting...</Text>
+        </View>
+      ) : hasChoice && !expanded ? (
+        <View className="flex-row items-center gap-2">
+          <View className="rounded-xl px-4 py-2.5 bg-[#a855f7]/20 border border-[#a855f7]/40">
+            <Text className="text-[#d4ff00] text-sm font-sans-semibold">
+              {value ?? `Anywhere in ${getCityLabel(city)}`}
+            </Text>
+          </View>
+          <Pressable onPress={() => setExpanded(true)} hitSlop={6}>
+            <Text className="text-white/50 text-sm font-sans underline">Change</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <ScrollView style={{ maxHeight: 180 }}>
+          <View className="flex-row flex-wrap gap-2">
+            {allowAnywhere
+              ? chip(`Anywhere in ${getCityLabel(city)}`, value === null, () => {
+                  onChange(null);
+                  setExpanded(false);
+                })
+              : null}
+            {(CITY_NEIGHBORHOODS[city] ?? []).map((hood) =>
+              chip(hood, value === hood, () => {
+                onChange(hood);
+                setExpanded(false);
+              })
+            )}
+          </View>
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+/* ────────────────────────── Sheet ────────────────────────── */
+
 /**
- * Check-in flow — native form sheet. Port of the web CheckInModal core:
- * Out (GPS → venue confirm → audience → go live), Planning (audience →
- * neighborhood), Staying In. Private party, reminders, and heading-out
- * defer to a later pass.
+ * "Are you out tonight?" — Yes / TBD / No.
+ *
+ * Presented two ways:
+ * - Gate mode (`?gate=1`, from NightStatusGate): required opening prompt.
+ *   Non-dismissible (layout options), no close/skip, hardware back swallowed.
+ * - Update status (no param): same sheet, dismissible, with a close button.
+ *
+ * Nothing is written until a final action: "Share my spot" (Yes), "Share TBD
+ * status" (TBD) or the No button. Yes runs GPS venue detection only; TBD
+ * touches no location APIs at all.
  */
 export default function CheckInSheet() {
+  const { gate } = useLocalSearchParams<{ gate?: string }>();
+  const isGate = gate === '1';
   const { session } = useSession();
   const queryClient = useQueryClient();
   const userId = session?.user.id;
+  const { data: own } = useOwnNightStatus();
+  const { data: friendIds } = useFriendIds(userId);
 
-  const [step, setStep] = useState<Step>('status');
-  const [audience, setAudience] = useState<Audience>('close_friends');
+  const { data: profile } = useQuery({
+    queryKey: ['check-in-profile', userId],
+    enabled: !!userId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('city, location_sharing_level, display_name')
+        .eq('id', userId!)
+        .maybeSingle<{
+          city: string | null;
+          location_sharing_level: string | null;
+          display_name: string | null;
+        }>();
+      const level = data?.location_sharing_level;
+      return {
+        city: data?.city ?? 'nyc',
+        level: AUDIENCES.some((a) => a.value === level) ? (level as Audience) : null,
+        displayName: data?.display_name ?? null,
+      };
+    },
+  });
+  const city = profile?.city ?? own?.city ?? 'nyc';
+
+  // Audience: the saved level is the default (new users → Friends). Only an
+  // explicit change is persisted, so a saved narrower choice is never
+  // silently broadened.
+  const savedAudience: Audience = profile?.level ?? 'all_friends';
+  const [audienceOverride, setAudienceOverride] = useState<Audience | null>(null);
+  const audience = audienceOverride ?? savedAudience;
+
+  const [step, setStep] = useState<Step>('ask');
   const [location, setLocation] = useState<LocationData | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<VenueMatch | null>(null);
+  const [guessedVenueId, setGuessedVenueId] = useState<string | null>(null);
+  const [venueExpanded, setVenueExpanded] = useState(false);
   const [customVenue, setCustomVenue] = useState('');
   const [searchResults, setSearchResults] = useState<VenueMatch[]>([]);
   const [neighborhood, setNeighborhood] = useState<string | null>(null);
   const [detectingHood, setDetectingHood] = useState(false);
-  const [showHoodPicker, setShowHoodPicker] = useState(false);
-  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [payoff, setPayoff] = useState<Payoff | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const detectSeq = useRef(0);
 
-  const { data: city } = useQuery({
-    queryKey: ['home-city', userId],
-    enabled: !!session,
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('city')
-        .eq('id', userId!)
-        .maybeSingle<{ city: string | null }>();
-      return data?.city ?? 'nyc';
+  // Gate mode: Android hardware back must not dismiss the question
+  useEffect(() => {
+    if (!isGate) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => sub.remove();
+  }, [isGate]);
+
+  useEffect(
+    () => () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     },
-  });
+    []
+  );
 
+  /** After any successful Yes / TBD / No write: tell the gate, then refresh. */
   const refreshStatusQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['my-night-status'] });
-    queryClient.invalidateQueries({ queryKey: ['map-data'] });
-    queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
-    queryClient.invalidateQueries({ queryKey: ['friends-out'] });
+    markNightAnswered();
+    for (const key of [
+      OWN_NIGHT_STATUS_KEY,
+      'my-night-status',
+      'map-data',
+      'leaderboard',
+      'friends-out',
+      'profile-page',
+    ]) {
+      queryClient.invalidateQueries({ queryKey: [key] });
+    }
   };
 
-  /* ── Out: GPS → venue candidates (auto-retry with relaxed threshold) ── */
+  const persistAudience = async () => {
+    if (!userId || !audienceOverride || audienceOverride === savedAudience) return;
+    await supabase
+      .from('profiles')
+      .update({ location_sharing_level: audienceOverride })
+      .eq('id', userId);
+    queryClient.invalidateQueries({ queryKey: ['check-in-profile'] });
+  };
+
+  const showPayoff = async (kind: Payoff['kind'], venueName: string | null) => {
+    const counts = await fetchFriendCounts(friendIds ?? []).catch(() => ({ out: 0, planning: 0 }));
+    setPayoff({ kind, venueName, ...counts });
+    setStep('done');
+  };
+
+  const backToAsk = () => {
+    detectSeq.current += 1; // abandon any in-flight GPS fix
+    setError(null);
+    setStep('ask');
+  };
+
+  /* ── Yes: GPS → best venue guess (auto-retry with relaxed accuracy) ── */
   const detectVenue = async () => {
+    const seq = ++detectSeq.current;
     setStep('detecting');
-    setGpsError(null);
+    setError(null);
     try {
       let data: LocationData;
       try {
@@ -171,77 +467,64 @@ export default function CheckInSheet() {
           throw err;
         }
       }
+      if (seq !== detectSeq.current) return; // user went back
       setLocation(data);
-      setSelectedVenue(data.venueId ? { id: data.venueId, name: data.venueName!, distance: 0 } : null);
+      const guess = data.venueId ? { id: data.venueId, name: data.venueName!, distance: 0 } : null;
+      setSelectedVenue(guess);
+      setGuessedVenueId(guess?.id ?? null);
+      setVenueExpanded(!guess);
       setStep('venue');
     } catch (err) {
+      if (seq !== detectSeq.current) return;
       // Transistorsoft error code 1 = permission denied
       if (typeof err === 'number' ? err === 1 : (err as { code?: number })?.code === 1) {
         setStep('gps-denied');
       } else {
-        setGpsError(err instanceof Error ? err.message : 'Could not get your location.');
+        setError(err instanceof Error ? err.message : 'Could not get your location.');
         setLocation(null);
         setSelectedVenue(null);
+        setVenueExpanded(true);
         setStep('venue'); // manual venue entry still works without GPS
       }
     }
   };
 
-  const handleStatus = async (key: 'out' | 'planning' | 'private_party' | 'home') => {
+  const pickVenueManually = () => {
+    setError(null);
+    setLocation(null);
+    setSelectedVenue(null);
+    setVenueExpanded(true);
+    setStep('venue');
+  };
+
+  const handleAnswer = (key: 'yes' | 'tbd' | 'no') => {
     if (!userId) return;
-    if (key === 'out') {
+    setError(null);
+    if (key === 'yes') {
       detectVenue();
-    } else if (key === 'planning' || key === 'private_party') {
-      setStep(key === 'planning' ? 'planning' : 'party');
-      setShowHoodPicker(false);
+    } else if (key === 'tbd') {
+      // TBD never asks for location — neighborhood is optional and manual
       setNeighborhood(null);
-      if (key === 'private_party') setAudience('close_friends');
-      setDetectingHood(true);
-      const detected = await detectNeighborhoodFromGPS(city ?? 'nyc');
-      setDetectingHood(false);
-      if (detected) setNeighborhood(detected);
-      else setShowHoodPicker(true);
+      setStep('planning');
     } else {
-      setSubmitting(true);
-      try {
-        await stopSharing(userId);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        refreshStatusQueries();
-        router.back();
-      } finally {
-        setSubmitting(false);
-      }
+      answerNo();
     }
   };
 
-  /** "Remind me later" — local notification deep-linking back to check-in. */
-  const scheduleReminder = () => {
-    const options = ['In 30 minutes', 'In 1 hour', 'In 2 hours', 'Cancel'];
-    const minutes = [30, 60, 120];
-    ActionSheetIOS.showActionSheetWithOptions(
-      { title: 'Remind me to go live', options, cancelButtonIndex: 3 },
-      async (index) => {
-        if (index >= minutes.length) return;
-        try {
-          await Notifications.scheduleNotificationAsync({
-            identifier: 'checkin-reminder', // same id → replaces prior reminder
-            content: {
-              title: 'Going out tonight? 🌃',
-              body: 'Go live so friends can find you.',
-              data: { url: '/check-in' },
-            },
-            trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-              seconds: minutes[index] * 60,
-            },
-          });
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.back();
-        } catch {
-          /* notifications denied */
-        }
-      }
-    );
+  /* ── No: record "home" for tonight and get out of the way ── */
+  const answerNo = async () => {
+    if (!userId || submitting) return;
+    setSubmitting(true);
+    try {
+      await stayIn(userId, { city });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      refreshStatusQueries();
+      router.back();
+    } catch {
+      setError("Couldn't save that. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   /* ── Venue search (curated venues table; free text allowed) ── */
@@ -256,176 +539,234 @@ export default function CheckInSheet() {
       const { data } = await supabase
         .from('venues')
         .select('id, name')
-        .eq('city', city ?? 'nyc')
+        .eq('city', city)
         .eq('is_demo', false)
         .ilike('name', `%${query.trim()}%`)
         .limit(8);
-      setSearchResults(((data ?? []) as Array<{ id: string; name: string }>).map((v) => ({
-        id: v.id,
-        name: v.name,
-        distance: 0,
-      })));
+      setSearchResults(
+        ((data ?? []) as Array<{ id: string; name: string }>).map((v) => ({
+          id: v.id,
+          name: v.name,
+          distance: 0,
+        }))
+      );
     }, 250);
   };
 
-  const goLive = async () => {
+  const chooseVenue = (venue: VenueMatch) => {
+    setSelectedVenue(venue);
+    setCustomVenue('');
+    setSearchResults([]);
+    setVenueExpanded(false);
+  };
+
+  /* ── Share my spot (the only point where "Yes" writes anything) ── */
+  const shareSpot = async () => {
     if (!userId || submitting) return;
     const venueName = selectedVenue?.name ?? customVenue.trim();
     if (!venueName) return;
     setSubmitting(true);
+    setError(null);
     try {
       await goOutAtVenue(userId, {
         venue: { id: selectedVenue?.id ?? null, name: venueName },
         coords: location ? { lat: location.lat, lng: location.lng } : null,
         city,
       });
-      // The check-in picker IS the sharing control (web parity)
-      await supabase.from('profiles').update({ location_sharing_level: audience }).eq('id', userId);
-      await startBackgroundLocation(userId);
+      await persistAudience();
+      // The check-in is saved; automatic updates are best-effort and must
+      // not turn a successful share into an error.
+      startBackgroundLocation(userId).catch(() => {});
       scheduleMorningAfter();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
       if (selectedVenue?.id) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('display_name')
-          .eq('id', userId)
-          .maybeSingle();
         notifyFriendArrived(
           userId,
-          profile?.display_name?.split(' ')[0] ?? 'A friend',
+          profile?.displayName?.split(' ')[0] ?? 'A friend',
           selectedVenue.id,
           venueName
         );
       }
       refreshStatusQueries();
-      router.back();
+      await showPayoff('out', venueName);
     } catch {
-      setGpsError('Could not check in. Try again.');
+      setError('Could not share your spot. Try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const confirmParty = async () => {
+  /* ── Private party (a location type inside Yes) ── */
+  const enterParty = async () => {
+    setError(null);
+    setNeighborhood(null);
+    setStep('party');
+    if (!location) return; // no fix → pick from the list, no new prompt
+    setDetectingHood(true);
+    const detected = await neighborhoodFromCoords(location.lat, location.lng, city);
+    setDetectingHood(false);
+    if (detected) setNeighborhood(detected);
+  };
+
+  const shareParty = async () => {
     if (!userId || !neighborhood || submitting) return;
     setSubmitting(true);
+    setError(null);
     try {
       // Exact GPS goes to close/direct friends only (mutuals get no pin)
-      const coords = await getCurrentPosition();
+      const coords = location
+        ? { lat: location.lat, lng: location.lng }
+        : await getCurrentPosition();
+      const venueName = `Private Party (${neighborhood})`;
       await goOutAtVenue(userId, {
-        venue: { id: null, name: `Private Party (${neighborhood})` },
+        venue: { id: null, name: venueName },
         coords,
         city,
         privateParty: { neighborhood },
       });
-      await supabase.from('profiles').update({ location_sharing_level: audience }).eq('id', userId);
-      await startBackgroundLocation(userId);
+      await persistAudience();
+      startBackgroundLocation(userId).catch(() => {});
       scheduleMorningAfter();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refreshStatusQueries();
-      router.back();
+      await showPayoff('out', venueName);
     } catch {
-      setGpsError('Could not start your party. Try again.');
+      setError('Could not start your party. Try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const confirmPlanning = async () => {
+  /* ── TBD ── */
+  const sharePlanning = async () => {
     if (!userId || submitting) return;
     setSubmitting(true);
+    setError(null);
     try {
       await goPlanning(userId, { city, neighborhood, visibility: audience });
-      await supabase.from('profiles').update({ location_sharing_level: audience }).eq('id', userId);
+      await persistAudience();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       notifyFriendsPlanning(userId, audience);
       refreshStatusQueries();
-      router.back();
+      await showPayoff('planning', null);
     } catch {
-      setGpsError('Could not update your status. Try again.');
+      setError('Could not update your status. Try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  useEffect(
-    () => () => {
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    },
-    []
-  );
+  const finish = () => router.back();
+  const finishToMap = () => {
+    router.back();
+    router.navigate('/map');
+  };
+
+  const currentLine = own?.status
+    ? own.status.status === 'out'
+      ? `Right now: out at ${own.status.venue_name ?? 'a spot'}`
+      : own.status.status === 'planning'
+        ? 'Right now: TBD'
+        : 'Right now: staying in'
+    : null;
+
+  const nearbyCandidates = (location?.nearbyVenues ?? [])
+    .filter((v) => v.id !== selectedVenue?.id)
+    .slice(0, 4);
+  const canShare = !!profile && (!!selectedVenue || customVenue.trim().length > 0);
+
+  const payoffLine = payoff
+    ? payoff.kind === 'out'
+      ? payoff.out > 0
+        ? `${plural(payoff.out, 'friend')} ${isAre(payoff.out)} nearby.`
+        : "You're the first one out tonight."
+      : payoff.out > 0
+        ? `${plural(payoff.out, 'friend')} ${isAre(payoff.out)} out tonight.`
+        : payoff.planning > 0
+          ? `${plural(payoff.planning, 'friend')} ${isAre(payoff.planning)} also deciding.`
+          : "Nobody's out yet — you'll see friends here as they head out."
+    : '';
 
   return (
-    <View className="pt-6 pb-8 px-5" style={{ minHeight: 320 }}>
-      {/* ── Status selection ── */}
-      {step === 'status' ? (
-        <View className="gap-3">
-          <Text className="text-white text-lg font-sans-semibold mb-1">Go Live</Text>
-          {STATUS_OPTIONS.map((opt) => (
-            <Pressable
-              key={opt.key}
-              onPress={() => handleStatus(opt.key)}
-              disabled={submitting}
-              className="flex-row items-center gap-3 rounded-xl px-4 py-3.5 bg-[#2d1b4e]/50 border border-white/[0.06] active:bg-[#a855f7]/20"
-            >
-              <View className="w-10 h-10 rounded-full bg-[#a855f7]/15 items-center justify-center">
-                <SymbolView name={opt.icon} size={18} tintColor="#a855f7" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-white text-base font-sans-medium">{opt.label}</Text>
-                <Text className="text-white/40 text-xs font-sans">{opt.desc}</Text>
-              </View>
-              <SymbolView name="chevron.right" size={14} tintColor="rgba(255,255,255,0.3)" />
-            </Pressable>
-          ))}
-          <Pressable
-            onPress={scheduleReminder}
-            className="flex-row items-center justify-center gap-2 py-2.5 active:opacity-70"
-          >
-            <SymbolView name="clock" size={13} tintColor="rgba(255,255,255,0.4)" />
-            <Text className="text-white/40 text-sm font-sans">Remind me later</Text>
-          </Pressable>
-        </View>
+    <View className="pt-6 pb-8 px-5 gap-4" style={{ minHeight: 320 }}>
+      {/* ── Are you out tonight? ── */}
+      {step === 'ask' ? (
+        <>
+          <SheetHeader
+            title="Are you out tonight?"
+            subtitle={currentLine ?? 'Let friends know. You can change this anytime.'}
+            onClose={isGate ? undefined : finish}
+          />
+          {error ? <Text className="text-amber-400/90 text-xs font-sans">{error}</Text> : null}
+          <View className="gap-3">
+            {ANSWERS.map((opt) => (
+              <Pressable
+                key={opt.key}
+                onPress={() => handleAnswer(opt.key)}
+                disabled={submitting}
+                className="flex-row items-center gap-3 rounded-xl px-4 py-3.5 bg-[#2d1b4e]/50 border border-white/[0.06] active:bg-[#a855f7]/20 disabled:opacity-60"
+              >
+                <View className="w-10 h-10 rounded-full bg-[#a855f7]/15 items-center justify-center">
+                  {submitting && opt.key === 'no' ? (
+                    <ActivityIndicator size="small" color={PURPLE} />
+                  ) : (
+                    <SymbolView name={opt.icon} size={18} tintColor={PURPLE} />
+                  )}
+                </View>
+                <View className="flex-1">
+                  <Text className="text-white text-base font-sans-medium">{opt.label}</Text>
+                  <Text className="text-white/40 text-xs font-sans">{opt.desc}</Text>
+                </View>
+                <SymbolView name="chevron.right" size={14} tintColor="rgba(255,255,255,0.3)" />
+              </Pressable>
+            ))}
+          </View>
+          <Text className="text-white/30 text-xs font-sans text-center">
+            Statuses reset at 5:00 AM {getCityLabel(city)} time
+          </Text>
+        </>
       ) : null}
 
       {/* ── Detecting ── */}
       {step === 'detecting' ? (
-        <View className="items-center py-16 gap-4">
-          <ActivityIndicator color={NEON} size="large" />
-          <Text className="text-white/60 text-sm font-sans">Finding your spot...</Text>
-        </View>
+        <>
+          <SheetHeader title="Finding your spot" onBack={backToAsk} />
+          <View className="items-center py-12 gap-4">
+            <ActivityIndicator color={NEON} size="large" />
+            <Text className="text-white/60 text-sm font-sans">Checking nearby venues...</Text>
+          </View>
+        </>
       ) : null}
 
       {/* ── GPS permission denied ── */}
       {step === 'gps-denied' ? (
-        <View className="items-center py-10 gap-4">
-          <SymbolView name="location.slash" size={36} tintColor="rgba(168,85,247,0.6)" />
-          <Text className="text-white text-base font-sans-semibold text-center">
-            Location access is off
-          </Text>
-          <Text className="text-white/50 text-sm font-sans text-center">
-            Spotted needs your location to detect the venue you&apos;re at.
-          </Text>
-          <Pressable
-            onPress={() => Linking.openSettings()}
-            className="rounded-full px-6 py-2.5 active:opacity-90"
-            style={{ backgroundColor: NEON }}
-          >
-            <Text className="text-[#1a0f2e] font-sans-medium">Open Settings</Text>
-          </Pressable>
-        </View>
+        <>
+          <SheetHeader title="Location access is off" onBack={backToAsk} />
+          <View className="items-center py-4 gap-4">
+            <SymbolView name="location.slash" size={36} tintColor="rgba(168,85,247,0.6)" />
+            <Text className="text-white/50 text-sm font-sans text-center">
+              Turn it on in Settings to auto-detect your venue, or pick one yourself.
+            </Text>
+          </View>
+          <PrimaryButton label="Open Settings" onPress={() => Linking.openSettings()} />
+          <SecondaryButton label="Pick a venue" onPress={pickVenueManually} />
+        </>
       ) : null}
 
-      {/* ── Venue confirm ── */}
+      {/* ── Venue confirm / pick ── */}
       {step === 'venue' ? (
-        <View className="gap-4">
-          <Text className="text-white text-lg font-sans-semibold">
-            {selectedVenue ? "Looks like you're at" : 'Where are you?'}
-          </Text>
-          {gpsError ? (
-            <Text className="text-amber-400/90 text-xs font-sans">{gpsError}</Text>
-          ) : null}
+        <>
+          <SheetHeader
+            title={
+              selectedVenue && !venueExpanded
+                ? selectedVenue.id === guessedVenueId
+                  ? "Looks like you're at"
+                  : "You're at"
+                : 'Where are you?'
+            }
+            onBack={backToAsk}
+          />
+          {error ? <Text className="text-amber-400/90 text-xs font-sans">{error}</Text> : null}
 
           {selectedVenue ? (
             <View className="rounded-xl px-4 py-3.5 bg-[#a855f7]/20 border border-[#a855f7]/40">
@@ -433,243 +774,132 @@ export default function CheckInSheet() {
             </View>
           ) : null}
 
-          {/* Nearby candidates */}
-          {(location?.nearbyVenues ?? []).filter((v) => v.id !== selectedVenue?.id).slice(0, 4)
-            .length > 0 ? (
-            <View className="gap-1.5">
-              <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">
-                Nearby
-              </Text>
-              {(location?.nearbyVenues ?? [])
-                .filter((v) => v.id !== selectedVenue?.id)
-                .slice(0, 4)
-                .map((venue) => (
-                  <Pressable
-                    key={venue.id}
-                    onPress={() => {
-                      setSelectedVenue(venue);
-                      setCustomVenue('');
-                      setSearchResults([]);
-                    }}
-                    className="flex-row items-center gap-2 px-3 py-2.5 rounded-xl bg-[#2d1b4e]/50 active:bg-[#a855f7]/20"
-                  >
-                    <SymbolView name="mappin" size={13} tintColor="rgba(255,255,255,0.5)" />
-                    <Text className="text-white text-sm font-sans flex-1" numberOfLines={1}>
-                      {venue.name}
-                    </Text>
-                    {venue.distance > 0 ? (
-                      <Text className="text-white/30 text-xs font-sans">
-                        {Math.round(venue.distance)}m
-                      </Text>
-                    ) : null}
-                  </Pressable>
+          {venueExpanded ? (
+            <View className="gap-3">
+              {nearbyCandidates.length > 0 ? (
+                <View className="gap-1.5">
+                  <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">
+                    Nearby
+                  </Text>
+                  {nearbyCandidates.map((venue) => (
+                    <VenueRow
+                      key={venue.id}
+                      name={venue.name}
+                      distance={venue.distance}
+                      onPress={() => chooseVenue(venue)}
+                    />
+                  ))}
+                </View>
+              ) : null}
+
+              <View className="gap-1.5">
+                <TextInput
+                  value={customVenue}
+                  onChangeText={searchVenues}
+                  placeholder="Search or type a venue..."
+                  placeholderTextColorClassName="accent-white/30"
+                  className="rounded-xl bg-white/5 border border-white/15 px-4 py-3 text-white text-[15px] font-sans"
+                />
+                {searchResults.map((venue) => (
+                  <VenueRow key={venue.id} name={venue.name} onPress={() => chooseVenue(venue)} />
                 ))}
+              </View>
+
+              <VenueRow name="Private party / house party" icon="house" onPress={enterParty} />
             </View>
           ) : null}
 
-          {/* Somewhere else */}
-          <View className="gap-1.5">
-            <TextInput
-              value={customVenue}
-              onChangeText={searchVenues}
-              placeholder="Somewhere else..."
-              placeholderTextColorClassName="accent-white/30"
-              className="rounded-xl bg-white/5 border border-white/15 px-4 py-3 text-white text-[15px] font-sans"
-            />
-            {searchResults.map((venue) => (
-              <Pressable
-                key={venue.id}
-                onPress={() => {
-                  setSelectedVenue(venue);
-                  setCustomVenue('');
-                  setSearchResults([]);
-                }}
-                className="flex-row items-center gap-2 px-3 py-2.5 rounded-xl bg-[#2d1b4e]/50 active:bg-[#a855f7]/20"
-              >
-                <SymbolView name="mappin" size={13} tintColor="rgba(255,255,255,0.5)" />
-                <Text className="text-white text-sm font-sans flex-1" numberOfLines={1}>
-                  {venue.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <AudienceRow value={audience} onChange={setAudienceOverride} />
 
-          <AudiencePicker value={audience} onChange={setAudience} />
-
-          <Pressable
-            onPress={goLive}
-            disabled={submitting || (!selectedVenue && !customVenue.trim())}
-            className="rounded-full py-3.5 items-center active:opacity-90 disabled:opacity-30"
-            style={{ backgroundColor: NEON, boxShadow: '0 0 16px rgba(212,255,0,0.25)' }}
-          >
-            {submitting ? (
-              <ActivityIndicator size="small" color="#1a0f2e" />
-            ) : (
-              <Text className="text-[#1a0f2e] text-base font-sans-semibold">Go Live</Text>
-            )}
-          </Pressable>
-        </View>
+          <PrimaryButton
+            label="Share my spot"
+            onPress={shareSpot}
+            disabled={!canShare}
+            loading={submitting}
+          />
+          {!venueExpanded ? (
+            <SecondaryButton label="Not here" onPress={() => setVenueExpanded(true)} />
+          ) : null}
+        </>
       ) : null}
 
       {/* ── Private party ── */}
       {step === 'party' ? (
-        <View className="gap-4">
-          <Text className="text-white text-lg font-sans-semibold">Private Party</Text>
-          {gpsError ? <Text className="text-amber-400/90 text-xs font-sans">{gpsError}</Text> : null}
-
-          <View className="gap-2">
-            <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">
-              Neighborhood
-            </Text>
-            {detectingHood ? (
-              <View className="flex-row items-center gap-2 py-2">
-                <ActivityIndicator size="small" color={NEON} />
-                <Text className="text-white/50 text-sm font-sans">Detecting...</Text>
-              </View>
-            ) : neighborhood && !showHoodPicker ? (
-              <View className="flex-row items-center gap-2">
-                <View className="rounded-xl px-4 py-2.5 bg-[#a855f7]/20 border border-[#a855f7]/40">
-                  <Text className="text-[#d4ff00] text-sm font-sans-semibold">{neighborhood}</Text>
-                </View>
-                <Pressable onPress={() => setShowHoodPicker(true)} hitSlop={6}>
-                  <Text className="text-white/50 text-sm font-sans underline">Change</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <ScrollView style={{ maxHeight: 180 }}>
-                <View className="flex-row flex-wrap gap-2">
-                  {(CITY_NEIGHBORHOODS[city ?? 'nyc'] ?? []).map((hood) => (
-                    <Pressable
-                      key={hood}
-                      onPress={() => {
-                        setNeighborhood(hood);
-                        setShowHoodPicker(false);
-                      }}
-                      className={`px-3 py-2 rounded-xl border ${
-                        neighborhood === hood
-                          ? 'bg-[#a855f7]/25 border-[#a855f7]/40'
-                          : 'bg-[#2d1b4e]/50 border-transparent'
-                      }`}
-                    >
-                      <Text
-                        className={`text-xs font-sans ${
-                          neighborhood === hood ? 'text-[#d4ff00]' : 'text-white/70'
-                        }`}
-                      >
-                        {hood}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
-            )}
-          </View>
-
-          <AudiencePicker value={audience} onChange={setAudience} />
+        <>
+          <SheetHeader
+            title="Private party"
+            subtitle="Friends see a house icon in your neighborhood."
+            onBack={() => {
+              setError(null);
+              setStep('venue');
+            }}
+          />
+          {error ? <Text className="text-amber-400/90 text-xs font-sans">{error}</Text> : null}
+          <NeighborhoodPicker
+            city={city}
+            value={neighborhood}
+            onChange={setNeighborhood}
+            detecting={detectingHood}
+          />
+          <AudienceRow value={audience} onChange={setAudienceOverride} />
           <Text className="text-white/40 text-xs font-sans">
             Close and direct friends see your exact spot. Mutuals only see the neighborhood — no
             map pin.
           </Text>
-
-          <Pressable
-            onPress={confirmParty}
-            disabled={submitting || !neighborhood}
-            className="rounded-full py-3.5 items-center active:opacity-90 disabled:opacity-30"
-            style={{ backgroundColor: NEON }}
-          >
-            {submitting ? (
-              <ActivityIndicator size="small" color="#1a0f2e" />
-            ) : (
-              <Text className="text-[#1a0f2e] text-base font-sans-semibold">Start the Party</Text>
-            )}
-          </Pressable>
-        </View>
+          <PrimaryButton
+            label="Share my spot"
+            onPress={shareParty}
+            disabled={!profile || !neighborhood}
+            loading={submitting}
+          />
+        </>
       ) : null}
 
-      {/* ── Planning ── */}
+      {/* ── TBD ── */}
       {step === 'planning' ? (
-        <View className="gap-4">
-          <Text className="text-white text-lg font-sans-semibold">Planning tonight</Text>
+        <>
+          <SheetHeader
+            title="Thinking about going out?"
+            subtitle="Friends will see you're TBD. No location needed."
+            onBack={backToAsk}
+          />
+          {error ? <Text className="text-amber-400/90 text-xs font-sans">{error}</Text> : null}
+          <NeighborhoodPicker city={city} value={neighborhood} onChange={setNeighborhood} allowAnywhere />
+          <AudienceRow value={audience} onChange={setAudienceOverride} />
+          <PrimaryButton
+            label="Share TBD status"
+            onPress={sharePlanning}
+            disabled={!profile}
+            loading={submitting}
+          />
+        </>
+      ) : null}
 
-          <View className="gap-2">
-            <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">
-              Neighborhood
+      {/* ── Payoff ── */}
+      {step === 'done' && payoff ? (
+        <View className="items-center gap-3 py-2">
+          <View className="w-16 h-16 rounded-full bg-[#d4ff00]/15 items-center justify-center">
+            <SymbolView name="checkmark" size={28} tintColor={NEON} />
+          </View>
+          <Text className="text-white text-2xl font-sans-semibold">
+            {payoff.kind === 'out' ? "You're out." : "You're TBD."}
+          </Text>
+          <Text className="text-white/70 text-base font-sans text-center">{payoffLine}</Text>
+          {payoff.venueName ? (
+            <Text className="text-white/40 text-xs font-sans text-center">
+              Friends can see you at {payoff.venueName}.
             </Text>
-            {detectingHood ? (
-              <View className="flex-row items-center gap-2 py-2">
-                <ActivityIndicator size="small" color={NEON} />
-                <Text className="text-white/50 text-sm font-sans">Detecting...</Text>
-              </View>
-            ) : neighborhood && !showHoodPicker ? (
-              <View className="flex-row items-center gap-2">
-                <View className="rounded-xl px-4 py-2.5 bg-[#a855f7]/20 border border-[#a855f7]/40">
-                  <Text className="text-[#d4ff00] text-sm font-sans-semibold">{neighborhood}</Text>
-                </View>
-                <Pressable onPress={() => setShowHoodPicker(true)} hitSlop={6}>
-                  <Text className="text-white/50 text-sm font-sans underline">Change</Text>
-                </Pressable>
-              </View>
+          ) : null}
+          <View className="self-stretch gap-2 pt-2">
+            {payoff.out > 0 ? (
+              <>
+                <PrimaryButton label="See who's out" onPress={finishToMap} />
+                <SecondaryButton label="Done" onPress={finish} />
+              </>
             ) : (
-              <ScrollView style={{ maxHeight: 180 }}>
-                <View className="flex-row flex-wrap gap-2">
-                  <Pressable
-                    onPress={() => {
-                      setNeighborhood(null);
-                      setShowHoodPicker(false);
-                    }}
-                    className={`px-3 py-2 rounded-xl border ${
-                      neighborhood === null
-                        ? 'bg-[#a855f7]/25 border-[#a855f7]/40'
-                        : 'bg-[#2d1b4e]/50 border-transparent'
-                    }`}
-                  >
-                    <Text className="text-white/70 text-xs font-sans">
-                      Anywhere in {getCityLabel(city ?? 'nyc')}
-                    </Text>
-                  </Pressable>
-                  {(CITY_NEIGHBORHOODS[city ?? 'nyc'] ?? []).map((hood) => (
-                    <Pressable
-                      key={hood}
-                      onPress={() => {
-                        setNeighborhood(hood);
-                        setShowHoodPicker(false);
-                      }}
-                      className={`px-3 py-2 rounded-xl border ${
-                        neighborhood === hood
-                          ? 'bg-[#a855f7]/25 border-[#a855f7]/40'
-                          : 'bg-[#2d1b4e]/50 border-transparent'
-                      }`}
-                    >
-                      <Text
-                        className={`text-xs font-sans ${
-                          neighborhood === hood ? 'text-[#d4ff00]' : 'text-white/70'
-                        }`}
-                      >
-                        {hood}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
+              <PrimaryButton label="Done" onPress={finish} />
             )}
           </View>
-
-          <AudiencePicker value={audience} onChange={setAudience} />
-
-          <Pressable
-            onPress={confirmPlanning}
-            disabled={submitting}
-            className="rounded-full py-3.5 items-center active:opacity-90 disabled:opacity-30"
-            style={{ backgroundColor: NEON }}
-          >
-            {submitting ? (
-              <ActivityIndicator size="small" color="#1a0f2e" />
-            ) : (
-              <Text className="text-[#1a0f2e] text-base font-sans-semibold">
-                I&apos;m Planning Tonight
-              </Text>
-            )}
-          </Pressable>
         </View>
       ) : null}
     </View>

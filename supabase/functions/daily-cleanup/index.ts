@@ -53,8 +53,32 @@ Deno.serve(async (req) => {
       fiveAmUTC.setTime(fiveAmUTC.getTime() - 86400000)
     }
 
+    // "Tonight" is per city (5 AM in the city's own zone — mobile/src/lib/tonight.ts).
+    // Rows that carry their own expires_at were stamped by the client in the
+    // right zone, so they are judged against now(). Rows without one (profile
+    // GPS, DMs, notifications) use the EARLIEST supported reset — 5 AM Eastern —
+    // which is the conservative cutoff: it can never delete something still
+    // "tonight" in a later zone. The cron therefore runs after EACH city's
+    // reset (10:10 and 13:10 UTC) and every step here is idempotent.
     const cutoff = fiveAmUTC.toISOString()
     console.log(`🧹 5am cleanup running. Cutoff: ${cutoff}`)
+
+    // Users who are legitimately still out anywhere: status='out' with an
+    // unexpired, city-zoned expiry. Everything "live" hangs off this set.
+    const { data: validOut, error: validOutErr } = await supabase
+      .from('night_statuses')
+      .select('user_id')
+      .eq('status', 'out')
+      .gt('expires_at', now.toISOString())
+    if (validOutErr) console.error('Error fetching valid out statuses:', validOutErr)
+    const validUserIds = new Set((validOut || []).map(s => s.user_id))
+
+    // PostgREST filters travel in the URL — keep id lists to a bounded size.
+    const chunk = <T,>(arr: T[], size = 200): T[][] => {
+      const out: T[][] = []
+      for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+      return out
+    }
 
     // 1. Clear stale locations on profiles
     const { data: clearedProfiles, error: profilesError } = await supabase
@@ -87,57 +111,60 @@ Deno.serve(async (req) => {
 
       if (outProfErr) {
         console.error('Error fetching out profiles for backstop:', outProfErr)
-      } else if (outProfiles && outProfiles.length > 0) {
-        const outProfileIds = outProfiles.map(p => p.id)
+      } else if (outProfiles && outProfiles.length > 0 && !validOutErr) {
+        const orphanedIds = outProfiles.map(p => p.id).filter(id => !validUserIds.has(id))
 
-        // Find which of those profiles have a valid out status
-        const { data: validStatuses, error: validErr } = await supabase
-          .from('night_statuses')
-          .select('user_id')
-          .in('user_id', outProfileIds)
-          .eq('status', 'out')
-          .gt('expires_at', now.toISOString())
-
-        if (validErr) {
-          console.error('Error checking valid statuses for backstop:', validErr)
-        } else {
-          const validUserIds = new Set((validStatuses || []).map(s => s.user_id))
-          const orphanedIds = outProfileIds.filter(id => !validUserIds.has(id))
-
-          if (orphanedIds.length > 0) {
-            const { data: backstopCleared, error: backstopErr } = await supabase
-              .from('profiles')
-              .update({
-                is_out: false,
-                last_known_lat: null,
-                last_known_lng: null,
-                last_location_at: null,
-              })
-              .in('id', orphanedIds)
-              .select('id')
-
-            if (backstopErr) {
-              console.error('Error in is_out backstop clear:', backstopErr)
-            } else {
-              console.log(`✅ Backstop cleared ${backstopCleared?.length || 0} orphaned is_out profiles`)
-            }
-          }
+        let backstopCleared = 0
+        for (const ids of chunk(orphanedIds)) {
+          const { data: cleared, error: backstopErr } = await supabase
+            .from('profiles')
+            .update({
+              is_out: false,
+              last_known_lat: null,
+              last_known_lng: null,
+              last_location_at: null,
+            })
+            .in('id', ids)
+            .select('id')
+          if (backstopErr) console.error('Error in is_out backstop clear:', backstopErr)
+          else backstopCleared += cleared?.length || 0
+        }
+        if (orphanedIds.length > 0) {
+          console.log(`✅ Backstop cleared ${backstopCleared} orphaned is_out profiles`)
         }
       }
     }
 
-    // 2. End stale check-ins
-    const { data: endedCheckins, error: checkinsError } = await supabase
-      .from('checkins')
-      .update({ ended_at: now.toISOString() })
-      .is('ended_at', null)
-      .lt('started_at', cutoff)
-      .select('id')
+    // 2. End stale check-ins: a check-in is open only while its user is still
+    // out (city-zoned expiry), so end every open one whose user is not.
+    // Skipped if the valid-out lookup failed — ending everyone's check-in on
+    // a transient read error would be worse than a late cleanup.
+    let endedCheckins = 0
+    let checkinsError: unknown = validOutErr
+    if (!validOutErr) {
+      const { data: openCheckins, error: openErr } = await supabase
+        .from('checkins')
+        .select('id, user_id')
+        .is('ended_at', null)
+      checkinsError = openErr
+      const staleIds = (openCheckins || [])
+        .filter(c => !validUserIds.has(c.user_id))
+        .map(c => c.id)
+      for (const ids of chunk(staleIds)) {
+        const { data: ended, error: endErr } = await supabase
+          .from('checkins')
+          .update({ ended_at: now.toISOString() })
+          .in('id', ids)
+          .select('id')
+        if (endErr) checkinsError = endErr
+        else endedCheckins += ended?.length || 0
+      }
+    }
 
     if (checkinsError) {
       console.error('Error ending stale checkins:', checkinsError)
     } else {
-      console.log(`✅ Ended ${endedCheckins?.length || 0} stale check-ins`)
+      console.log(`✅ Ended ${endedCheckins} stale check-ins`)
     }
 
     // 3. Delete expired DMs (created before 5am cutoff)
@@ -177,11 +204,11 @@ Deno.serve(async (req) => {
       console.log(`✅ Cleared ${clearedStatuses?.length || 0} expired night statuses`)
     }
 
-    // 5. Delete expired posts
+    // 5. Delete expired posts (their own city-zoned expiry, not the ET cutoff)
     const { data: deletedPosts, error: postsError } = await supabase
       .from('posts')
       .delete()
-      .lt('expires_at', cutoff)
+      .lt('expires_at', now.toISOString())
       .select('id')
 
     if (postsError) {
@@ -190,11 +217,11 @@ Deno.serve(async (req) => {
       console.log(`✅ Deleted ${deletedPosts?.length || 0} expired posts`)
     }
 
-    // 6. Delete expired yap messages
+    // 6. Delete expired yap messages (their own city-zoned expiry)
     const { data: deletedYaps, error: yapsError } = await supabase
       .from('yap_messages')
       .delete()
-      .lt('expires_at', cutoff)
+      .lt('expires_at', now.toISOString())
       .select('id')
 
     if (yapsError) {
@@ -256,7 +283,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         cleared_locations: clearedProfiles?.length || 0,
-        ended_checkins: endedCheckins?.length || 0,
+        ended_checkins: endedCheckins,
         deleted_dms: deletedDMs?.length || 0,
         cleared_statuses: clearedStatuses?.length || 0,
         deleted_posts: deletedPosts?.length || 0,

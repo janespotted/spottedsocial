@@ -26,6 +26,7 @@ import { useSession } from '@/hooks/use-session';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useMapData, type MapFriend } from '@/hooks/use-map-data';
 import { useArrivalPrompts } from '@/hooks/use-arrival-prompts';
+import { OWN_NIGHT_STATUS_KEY, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
 import { FriendIdCard } from '@/components/friend-id-card';
 import { useMapFilters } from '@/lib/map-filters';
@@ -242,6 +243,10 @@ export default function MapScreen() {
   const { data } = useMapData(city ?? null);
   const friends = data?.friends ?? [];
   const venues = data?.venues ?? [];
+  // "No" tonight: precise pins are withheld (see useMapData); show the count + CTA
+  const { data: ownNight } = useOwnNightStatus();
+  const stayingIn = ownNight?.status?.status === 'home';
+  const hiddenFriendCount = data?.hiddenFriendCount ?? 0;
 
   const [selectedFriend, setSelectedFriend] = useState<MapFriend | null>(null);
   const [friendCardOpen, setFriendCardOpen] = useState(false);
@@ -561,6 +566,29 @@ export default function MapScreen() {
         </View>
       ) : null}
 
+      {/* Staying in: aggregate cue instead of pins, with the way back in */}
+      {!focusMode && stayingIn ? (
+        <View className="absolute top-safe-offset-3 left-4 right-16">
+          <View className="rounded-2xl px-4 py-3 bg-[#1a0f2e]/95 border border-white/10 gap-2">
+            <Text className="text-white text-sm font-sans-semibold">
+              {hiddenFriendCount > 0
+                ? `${hiddenFriendCount} ${hiddenFriendCount === 1 ? 'friend is' : 'friends are'} out right now`
+                : 'No friends out yet'}
+            </Text>
+            <Text className="text-white/50 text-xs font-sans">
+              Going out after all? Update your status to see who&apos;s where.
+            </Text>
+            <Pressable
+              onPress={() => router.push('/check-in')}
+              className="self-start rounded-full px-4 py-2 active:opacity-90"
+              style={{ backgroundColor: '#d4ff00' }}
+            >
+              <Text className="text-[#1a0f2e] text-xs font-sans-semibold">Update status</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
       {/* Arrival prompts — top banners */}
       {!focusMode && (smartPrompt || moveBanner) ? (
         <View className="absolute top-safe-offset-3 left-4 right-16 gap-2">
@@ -594,8 +622,9 @@ export default function MapScreen() {
                 onPress={async () => {
                   if (!session) return;
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  await stopSharing(session.user.id);
+                  await stopSharing(session.user.id, { city });
                   queryClient.invalidateQueries({ queryKey: ['my-night-status'] });
+                  queryClient.invalidateQueries({ queryKey: [OWN_NIGHT_STATUS_KEY] });
                   queryClient.invalidateQueries({ queryKey: ['map-data'] });
                 }}
                 hitSlop={6}

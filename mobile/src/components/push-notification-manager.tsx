@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
+import { deferDeepLink, getNightGateState } from '@/lib/night-gate';
 import { useSession } from '@/hooks/use-session';
 
 // Show pushes that arrive while the app is foregrounded (banner + list).
@@ -68,11 +69,20 @@ export function PushNotificationManager() {
     };
   }, [session, onboardingNeeded]);
 
-  // Tapping a push routes by payload (venue-shift → check-in), else Activity
+  // Tapping a push routes by payload (venue-shift → check-in), else Activity.
+  // While the opening "Are you out tonight?" question is unanswered (or not
+  // yet known on a cold start) the link is parked and replayed by
+  // NightStatusGate once the user answers — a notification never bypasses it.
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const url = response.notification.request.content.data?.url;
-      router.push(typeof url === 'string' && url.startsWith('/') ? (url as '/activity') : '/activity');
+      const target = typeof url === 'string' && url.startsWith('/') ? url : '/activity';
+      if (getNightGateState() !== 'answered') {
+        // The gate is already presenting the check-in sheet — nothing to replay
+        if (!target.startsWith('/check-in')) deferDeepLink(target as '/activity');
+        return;
+      }
+      router.push(target as '/activity');
     });
     return () => sub.remove();
   }, []);

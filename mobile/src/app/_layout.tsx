@@ -17,6 +17,7 @@ import { Uniwind, useResolveClassNames } from 'uniwind';
 import { SessionProvider, useSession } from '@/hooks/use-session';
 import { SCREEN_GRADIENT } from '@/lib/theme';
 import { BackgroundLocationManager } from '@/components/background-location-manager';
+import { NightStatusGate } from '@/components/night-status-gate';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import { queryClient } from '@/lib/query-client';
 
@@ -94,11 +95,19 @@ function RootNavigator() {
       />
       <Stack.Screen
         name="check-in"
-        options={{
-          presentation: 'formSheet',
-          sheetAllowedDetents: 'fitToContents',
-          sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+        options={({ route }) => {
+          // Opening prompt (?gate=1): required answer — no grabber and no
+          // swipe/tap-outside dismiss. gestureEnabled:false maps to iOS
+          // modalInPresentation on a formSheet. "Update status" opens the
+          // same sheet without the flag and stays dismissible.
+          const gate = (route.params as { gate?: string } | undefined)?.gate === '1';
+          return {
+            presentation: 'formSheet',
+            sheetAllowedDetents: 'fitToContents',
+            sheetGrabberVisible: !gate,
+            gestureEnabled: !gate,
+            contentStyle: { backgroundColor: 'transparent' },
+          };
         }}
       />
       <Stack.Screen
@@ -155,6 +164,7 @@ export default function RootLayout() {
               <SessionProvider>
                 <QueryClientProvider client={queryClient}>
                   <RootNavigator />
+                  <NightStatusGate />
                   <BackgroundLocationManager />
                   <PushNotificationManager />
                   <StatusBar style="light" />

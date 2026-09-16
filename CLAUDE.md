@@ -63,6 +63,14 @@ This bug has been "fixed" multiple times in this codebase. The underlying issue 
 - **Easing/duration:** iOS keyboard motion ≈ easeOutExpo, `cubic-bezier(0.16, 1, 0.3, 1)` over **400ms**. A shorter/snappier curve makes the sheet race ahead of the keyboard (~80% of travel in 2 frames) — this reads as the "keyboard jump" bug.
 - **Lift target:** the input bar's `max(env(safe-area-inset-bottom), 12px)` padding collapses 34pt → 12pt at the exact frame the webview resizes (env() → 0). The lift math must bake in that 22pt shrink, or the swap frame shows a 12pt snap.
 
+## "Tonight" and the 5 AM reset (mobile)
+
+A night runs 5:00 AM → 5:00 AM **in the profile city's time zone** (NYC = America/New_York, LA = America/Los_Angeles). Never the device zone. Everyone in a city shares one night, so content expires at the same moment for all of them and travel or a wrong device clock cannot split a user from their friends.
+
+- **Client:** `mobile/src/lib/tonight.ts` is the only place that computes the boundary. Every expiry (`night_statuses`, `checkins`, `posts`, `yap_messages`) and every "is this from tonight" check goes through it. `time-context.ts` is re-exports only. Do not add a `getHours() < 5` anywhere.
+- **Server:** `supabase/functions/daily-cleanup` trusts a row's own `expires_at` (stamped by the client in the right zone) and judges it against `now()`. Rows without an expiry use the earliest supported reset (5 AM Eastern) as a conservative cutoff. The cron runs after each city's reset (10:10 and 13:10 UTC) and every step is idempotent.
+- **Answered tonight:** the opening "Are you out tonight?" prompt treats any unexpired `night_statuses` row as answered, including `status='home'`. `stopSharing`/`stayIn` therefore write a real `expires_at`. Never revert `home` rows to `expires_at: null` — that reads as "never asked" and re-prompts.
+
 ## Demo Mode (CRITICAL SAFETY RULES)
 
 Demo mode seeds 24 fake users + content for testing. Real and demo data coexist in the same tables, distinguished by `is_demo` column.

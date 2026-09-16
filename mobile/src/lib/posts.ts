@@ -1,15 +1,12 @@
 import { supabase } from './supabase';
+import { getNightResetIso } from './tonight';
 
 /**
- * Posts (like stories) die at 5am: expiry is the next 5:00 local time.
- * The web app computes this in the user's city timezone; device-local time
- * is equivalent in practice since you post from the city you're in.
+ * Posts (like stories) die at the nightly reset — the same 5 AM
+ * profile-city boundary as statuses and check-ins (see lib/tonight.ts).
  */
-export function getPostExpiry(): string {
-  const expiry = new Date();
-  if (expiry.getHours() >= 5) expiry.setDate(expiry.getDate() + 1);
-  expiry.setHours(5, 0, 0, 0);
-  return expiry.toISOString();
+export function getPostExpiry(city?: string | null): string {
+  return getNightResetIso(city);
 }
 
 /**

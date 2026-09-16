@@ -152,6 +152,28 @@ export async function reverseGeocodeNeighborhood(
   }
 }
 
+/** Map a geocoded neighborhood name onto the city's curated list (fuzzy contains-match). */
+export function matchNeighborhood(raw: string | null, city: string): string | null {
+  if (!raw) return null;
+  const options = CITY_NEIGHBORHOODS[city] ?? [];
+  const lower = raw.toLowerCase();
+  const exact = options.find((n) => n.toLowerCase() === lower);
+  if (exact) return exact;
+  const partial = options.find(
+    (n) => n.toLowerCase().includes(lower) || lower.includes(n.toLowerCase())
+  );
+  return partial ?? null;
+}
+
+/** Neighborhood for known coordinates — no new GPS fix, no permission prompt. */
+export async function neighborhoodFromCoords(
+  lat: number,
+  lng: number,
+  city: string
+): Promise<string | null> {
+  return matchNeighborhood(await reverseGeocodeNeighborhood(lat, lng), city);
+}
+
 /**
  * Detect the user's current neighborhood, mapped onto the city's curated
  * list (fuzzy contains-match like the web port).
@@ -159,16 +181,7 @@ export async function reverseGeocodeNeighborhood(
 export async function detectNeighborhoodFromGPS(city: string): Promise<string | null> {
   try {
     const coords = await getAccurateLocation();
-    const raw = await reverseGeocodeNeighborhood(coords.lat, coords.lng);
-    if (!raw) return null;
-    const options = CITY_NEIGHBORHOODS[city] ?? [];
-    const lower = raw.toLowerCase();
-    const exact = options.find((n) => n.toLowerCase() === lower);
-    if (exact) return exact;
-    const partial = options.find(
-      (n) => n.toLowerCase().includes(lower) || lower.includes(n.toLowerCase())
-    );
-    return partial ?? null;
+    return await neighborhoodFromCoords(coords.lat, coords.lng, city);
   } catch {
     return null;
   }

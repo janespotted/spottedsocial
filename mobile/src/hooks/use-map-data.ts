@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { DEMO_MODE } from '@/lib/demo-mode';
 import { fetchProfilesSafe, type SafeProfile } from '@/lib/profiles';
-import { isFreshLocation } from '@/lib/time-context';
+import { isFreshLocation } from '@/lib/tonight';
 import { useFriendIds } from './use-friend-ids';
+import { useOwnNightStatus } from './use-own-night-status';
 import { useSession } from './use-session';
 
 export type RelationshipType = 'close' | 'direct' | 'mutual';
@@ -37,6 +38,12 @@ export interface MapVenue {
 export interface MapData {
   friends: MapFriend[];
   venues: MapVenue[];
+  /**
+   * Friends with a live pin that are NOT in `friends` because the viewer
+   * answered "No" tonight. Precise pins are gated until they update their
+   * status; the count powers the aggregate cue + CTA instead.
+   */
+  hiddenFriendCount: number;
 }
 
 /**
@@ -214,13 +221,15 @@ async function fetchMapData(
     })
     .sort((a, b) => b.heatScore - a.heatScore);
 
-  return { friends, venues };
+  return { friends, venues, hiddenFriendCount: 0 };
 }
 
 export function useMapData(city: string | null) {
   const { session } = useSession();
   const queryClient = useQueryClient();
   const { data: friendIds } = useFriendIds(session?.user.id);
+  const { data: own } = useOwnNightStatus();
+  const viewerStayingIn = own?.status?.status === 'home';
 
   const query = useQuery({
     queryKey: ['map-data', city, friendIds ?? []],
@@ -228,6 +237,14 @@ export function useMapData(city: string | null) {
     staleTime: 30_000,
     queryFn: () => fetchMapData(session!.user.id, city!, friendIds ?? []),
   });
+
+  // "No" tonight: keep venues (browsing still works) but withhold precise
+  // friend pins; surface only how many there are. Memoized so the friends
+  // array identity is stable for the map's clustering memo.
+  const data = useMemo<MapData | undefined>(() => {
+    if (!query.data || !viewerStayingIn) return query.data;
+    return { ...query.data, friends: [], hiddenFriendCount: query.data.friends.length };
+  }, [query.data, viewerStayingIn]);
 
   // Realtime: night-status changes move pins, debounced (web map parity)
   useEffect(() => {
@@ -251,5 +268,5 @@ export function useMapData(city: string | null) {
     };
   }, [session, queryClient]);
 
-  return query;
+  return { ...query, data };
 }

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getNightResetIso, isUnexpired } from './tonight';
 import { markManualCheckin } from './venue-arrival-engine';
 
 const STATUS_CACHE_TTL_MS = 60_000;
@@ -52,49 +53,79 @@ function must<T>(result: { data: T; error: unknown }): T {
   return result.data;
 }
 
-function cityToTimezone(city: string | null | undefined): string {
-  return city === 'la' ? 'America/Los_Angeles' : 'America/New_York';
+/**
+ * Expiry for every tonight-scoped status row: the next 5 AM in the user's
+ * profile-city time zone. Delegates to the single "tonight" definition.
+ */
+export function getStatusExpiry(city?: string | null): string {
+  return getNightResetIso(city);
+}
+
+/** The three answers to "Are you out tonight?" plus the legacy heading_out. */
+export type NightStatusKind = 'out' | 'planning' | 'home' | 'heading_out';
+
+export interface OwnNightStatus {
+  status: NightStatusKind;
+  venue_id: string | null;
+  venue_name: string | null;
+  lat: number | null;
+  lng: number | null;
+  is_private_party: boolean;
+  party_neighborhood: string | null;
+  planning_neighborhood: string | null;
+  planning_visibility: string | null;
+  expires_at: string;
 }
 
 /**
- * Next 5 AM in the user's city timezone as a UTC ISO string. Port of the web
- * getStatusExpiry; the web reads the cached detected city, here callers pass
- * the profile's city (defaults to NY time).
- * DST-safe: derives the UTC offset via Intl at call time.
+ * The user's own status row for TONIGHT, or null when they have not answered
+ * the opening prompt yet (no row, or the row expired at the last reset).
+ * A `home` row ("No") counts as answered — that is what stops the prompt
+ * from repeating the same night.
  */
-export function getStatusExpiry(city?: string | null): string {
-  const tz = cityToTimezone(city);
-  const now = new Date();
+export async function fetchOwnNightStatus(userId: string): Promise<OwnNightStatus | null> {
+  const { data, error } = await supabase
+    .from('night_statuses')
+    .select(
+      'status, venue_id, venue_name, lat, lng, is_private_party, party_neighborhood, planning_neighborhood, planning_visibility, expires_at'
+    )
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data || !isUnexpired(data.expires_at)) return null;
+  return {
+    status: data.status as NightStatusKind,
+    venue_id: data.venue_id,
+    venue_name: data.venue_name,
+    lat: data.lat,
+    lng: data.lng,
+    is_private_party: !!data.is_private_party,
+    party_neighborhood: data.party_neighborhood,
+    planning_neighborhood: data.planning_neighborhood,
+    planning_visibility: data.planning_visibility,
+    expires_at: data.expires_at!,
+  };
+}
 
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).formatToParts(now);
-  const get = (type: string) => parts.find((p) => p.type === type)!.value;
-  const hour = parseInt(get('hour'), 10) % 24; // Intl can emit "24" at midnight
-
-  // Build the local "now" as a naive Date, then diff against real UTC to get offset
-  const localNow = new Date(
-    `${get('year')}-${get('month')}-${get('day')}T${String(hour).padStart(2, '0')}:${get('minute')}:${get('second')}`
+/**
+ * Nightly reset, client side. Called when the app notices the user's last
+ * status has expired: stops background GPS, clears the profile pin and
+ * closes any open check-in so nobody looks live the next morning. Leaves
+ * the expired night_statuses row alone — the opening prompt treats an
+ * expired row as "not answered", which is exactly what a new night needs.
+ */
+export async function endNightLocally(userId: string): Promise<void> {
+  invalidateOutStatusCache();
+  const { stopBackgroundLocation } = await import('./background-location');
+  await stopBackgroundLocation();
+  await clearUserLocation(userId);
+  must(
+    await supabase
+      .from('checkins')
+      .update({ ended_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .is('ended_at', null)
   );
-  const offsetMs = now.getTime() - localNow.getTime();
-
-  // Build 5:00 AM local (naive), convert to UTC
-  const fiveAmLocal = new Date(`${get('year')}-${get('month')}-${get('day')}T05:00:00`);
-  let fiveAmUTC = new Date(fiveAmLocal.getTime() + offsetMs);
-
-  // If already past 5 AM local, target tomorrow
-  if (now >= fiveAmUTC) {
-    fiveAmUTC = new Date(fiveAmUTC.getTime() + 86400000);
-  }
-
-  return fiveAmUTC.toISOString();
 }
 
 /**
@@ -167,11 +198,20 @@ export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): 
   must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
 }
 
+export interface StopSharingOptions {
+  /** Profile city — sets the row's expiry to tonight's reset in that zone. */
+  city?: string | null;
+}
+
 /**
- * The ONE way to stop sharing ("Staying In"). Kills background GPS, clears
- * location, ends check-ins, and resets every night_statuses field.
+ * The ONE way to stop sharing / answer "No". Kills background GPS, clears
+ * location, ends check-ins, and writes a `home` row that EXPIRES AT THE
+ * NEXT RESET. The real expiry is what makes "No" a recorded answer for
+ * tonight (the opening prompt does not repeat) while still reading as
+ * "not sharing" everywhere else — every reader keys on status/venue, never
+ * on the mere presence of an unexpired row.
  */
-export async function stopSharing(userId: string): Promise<void> {
+export async function stopSharing(userId: string, opts: StopSharingOptions = {}): Promise<void> {
   const now = new Date().toISOString();
   invalidateOutStatusCache();
 
@@ -198,7 +238,7 @@ export async function stopSharing(userId: string): Promise<void> {
         venue_id: null,
         lat: null,
         lng: null,
-        expires_at: null,
+        expires_at: getStatusExpiry(opts.city),
         planning_neighborhood: null,
         planning_venue_id: null,
         planning_venue_name: null,
@@ -213,6 +253,14 @@ export async function stopSharing(userId: string): Promise<void> {
 
   must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
 }
+
+/**
+ * "No, I'm staying in" from the opening prompt. Today identical to
+ * stopSharing; kept as its own entry point so "Stop sharing" (keep status,
+ * hide location) can diverge from "No" (home for the night) without
+ * touching call sites.
+ */
+export const stayIn = stopSharing;
 
 export interface GoOutOptions {
   venue: { id: string | null; name: string };
