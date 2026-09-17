@@ -159,7 +159,7 @@ export default function UsernameScreen() {
             {usernameChecking ? (
               <ActivityIndicator size="small" color={NEON} />
             ) : usernameAvailable === true ? (
-              <SymbolView name="checkmark" size={20} tintColor="#22c55e" />
+              <SymbolView name="checkmark" size={20} tintColor={NEON} />
             ) : null}
           </View>
         ) : null}

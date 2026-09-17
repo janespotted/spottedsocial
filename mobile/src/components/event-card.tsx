@@ -11,7 +11,7 @@ import {
   type EventWithFriends,
 } from '@/lib/plans';
 import { Avatar } from '@/components/avatar';
-import { PURPLE } from '@/lib/theme';
+import { PURPLE, VIOLET_FILL } from '@/lib/theme';
 
 /** Tonight / Tomorrow / weekday / "Fri, Jan 3" — events use the weekday form. */
 function getSmartEventDateLabel(dateStr: string): string {
@@ -176,7 +176,7 @@ export function EventCard({ event, currentUserId }: EventCardProps) {
           className={`w-full py-2.5 rounded-xl items-center active:opacity-80 ${
             isDown ? 'bg-[#a855f7]/20 border border-[#a855f7]/30' : ''
           }`}
-          style={isDown ? undefined : { backgroundColor: PURPLE }}
+          style={isDown ? undefined : { backgroundColor: VIOLET_FILL }}
         >
           <Text
             className={`text-sm font-sans-semibold ${isDown ? 'text-[#a855f7]' : 'text-white'}`}

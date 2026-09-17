@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { supabase } from '@/lib/supabase';
+import { NEON } from '@/lib/theme';
 import { useSession } from '@/hooks/use-session';
 
 const PRIMARY = 'hsl(270, 100%, 65%)';
@@ -73,7 +74,7 @@ export function ClaimVenueForm() {
   if (submitted) {
     return (
       <View className="bg-white/5 border border-white/10 rounded-xl py-8 px-4 items-center">
-        <SymbolView name="checkmark.circle" size={48} tintColor="#4ade80" />
+        <SymbolView name="checkmark.circle" size={48} tintColor={NEON} />
         <Text className="text-white font-sans-semibold text-lg mt-4 mb-2">Claim Submitted!</Text>
         <Text className="text-white/60 text-sm font-sans text-center">
           We&apos;ll review your claim and get back to you within 24-48 hours.

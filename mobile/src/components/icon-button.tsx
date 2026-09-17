@@ -48,7 +48,7 @@ export function IconButton({
           className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full items-center justify-center"
           style={{ backgroundColor: NEON }}
         >
-          <Text className="text-[#1a0f2e] text-[9px] font-sans-bold">{count > 9 ? '9+' : count}</Text>
+          <Text className="text-[#1a0f2e] text-[9px] font-sans-semibold">{count > 9 ? '9+' : count}</Text>
         </View>
       ) : dot ? (
         <View

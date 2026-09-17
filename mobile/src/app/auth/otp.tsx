@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { InputOTP } from 'heroui-native';
 import { supabase } from '@/lib/supabase';
-import spottedLogo from '../../../assets/images/spotted-s-logo.png';
+import { SpottedMark } from '@/components/spotted-mark';
 import { NEON } from '@/lib/theme';
 
 const RESEND_COOLDOWN_S = 30;
@@ -63,11 +62,9 @@ export default function OtpScreen() {
           <SymbolView name="arrow.left" size={20} tintColor="rgba(255,255,255,0.6)" />
         </Pressable>
 
-        <Image
-          source={spottedLogo}
-          style={{ width: 48, height: 48, marginBottom: 16 }}
-          contentFit="contain"
-        />
+        <View style={{ marginBottom: 16 }}>
+          <SpottedMark size={48} />
+        </View>
         <Text className="text-white text-2xl font-sans-light mb-2">enter your code</Text>
         <Text className="text-sm text-white/50 font-sans mb-8">we sent it to {phone}</Text>
 

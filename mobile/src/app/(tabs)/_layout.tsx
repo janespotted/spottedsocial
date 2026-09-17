@@ -1,14 +1,10 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useCSSVariable } from 'uniwind';
+import { LAVENDER, MIST } from '@/lib/theme';
 
 export default function TabsLayout() {
-  const [accent, muted] = useCSSVariable(['--color-accent', '--color-muted']) as [
-    string,
-    string,
-  ];
-
+  // Brand bible: Lavender marks the active tab; inactive tabs stay muted
   return (
-    <NativeTabs tintColor={accent} iconColor={muted}>
+    <NativeTabs tintColor={LAVENDER} iconColor={MIST}>
       <NativeTabs.Trigger name="(home)">
         <NativeTabs.Trigger.Icon sf="house.fill" />
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>

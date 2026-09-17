@@ -1,10 +1,9 @@
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { Image } from '@/components/styled';
 import { IconButton } from '@/components/icon-button';
+import { SpottedMark } from '@/components/spotted-mark';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { NEON } from '@/lib/theme';
-import spottedLogo from '../../assets/images/spotted-s-logo.png';
 
 /** Short word for the user's own answer tonight, or the call to give one. */
 function statusWord(status: string | null | undefined): { label: string; answered: boolean } {
@@ -38,13 +37,13 @@ export function StatusPill() {
       hitSlop={4}
       accessibilityRole="button"
       accessibilityLabel={answered ? `Update status. Tonight: ${label}` : 'Set your status for tonight'}
-      className="h-9 pl-0.5 pr-3 rounded-full flex-row items-center gap-1 border active:opacity-80"
+      className="h-9 pl-2.5 pr-3 rounded-full flex-row items-center gap-1.5 border active:opacity-80"
       style={{
         backgroundColor: answered ? 'rgba(212,255,0,0.12)' : 'rgba(255,255,255,0.10)',
         borderColor: answered ? 'rgba(212,255,0,0.45)' : 'rgba(255,255,255,0.12)',
       }}
     >
-      <Image source={spottedLogo} className="h-8 w-8" contentFit="contain" />
+      <SpottedMark size={18} />
       <Text
         className="text-xs font-sans-semibold"
         style={{ color: answered ? NEON : 'rgba(255,255,255,0.85)' }}

@@ -661,7 +661,7 @@ export default function MapScreen() {
         <View className="absolute bottom-safe-offset-28 left-4 right-4 items-center">
           {myStatus?.status === 'out' ? (
             <View className="flex-row items-center gap-1 pl-4 pr-1 py-1 rounded-full bg-[#1a0f2e]/95 border border-[#d4ff00]/30">
-              <View className="w-2 h-2 rounded-full bg-[#22c55e]" />
+              <View className="w-2 h-2 rounded-full bg-[#d4ff00]" />
               <Pressable
                 onPress={() => router.push('/check-in')}
                 accessibilityLabel="Update status"

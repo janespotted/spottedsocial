@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -8,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
 import { ClaimVenueForm } from '@/components/claim-venue-form';
-import spottedLogo from '../../assets/images/spotted-s-logo.png';
+import { SpottedMark } from '@/components/spotted-mark';
 
 const PRIMARY = 'hsl(270, 100%, 65%)';
 
@@ -186,11 +185,7 @@ export default function BusinessScreen() {
             <SymbolView name="arrow.left" size={20} tintColor="#ffffff" />
           </Pressable>
           <View className="flex-row items-center gap-2">
-            <Image
-              source={spottedLogo}
-              style={{ width: 32, height: 32 }}
-              contentFit="contain"
-            />
+            <SpottedMark size={28} />
             <Text className="text-xl font-sans-semibold text-white">
               {session ? 'Claim Your Venue' : 'Business Sign In'}
             </Text>

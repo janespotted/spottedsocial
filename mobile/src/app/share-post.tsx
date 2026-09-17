@@ -136,7 +136,7 @@ export default function SharePostSheet() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}>
         {(friends ?? []).map((friend) => (
           <View key={friend.id} className="flex-row items-center gap-3 py-2.5">
-            <View className={friend.is_out ? 'rounded-full border-2 border-[#22c55e]' : ''}>
+            <View className={friend.is_out ? 'rounded-full border-2 border-[#d4ff00]' : ''}>
               <Avatar name={friend.display_name} url={friend.avatar_url} size="md" />
             </View>
             <View className="flex-1 min-w-0">
@@ -144,7 +144,7 @@ export default function SharePostSheet() {
                 {friend.display_name}
               </Text>
               {friend.is_out ? (
-                <Text className="text-[#22c55e] text-xs font-sans">Out tonight</Text>
+                <Text className="text-[#d4ff00] text-xs font-sans">Out tonight</Text>
               ) : null}
             </View>
             <Pressable

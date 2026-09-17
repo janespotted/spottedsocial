@@ -6,7 +6,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOrCreateInviteCode, getInviteUrl, regenerateInviteCode } from '@/lib/invites';
 import { useSession } from '@/hooks/use-session';
-import { NEON, PURPLE } from '@/lib/theme';
+import { NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
 
 /**
  * Invite friends — native form sheet. Port of the web InviteFriendsSection +
@@ -82,7 +82,7 @@ export default function InviteFriendsSheet() {
             <Pressable
               onPress={share}
               className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-full active:opacity-90"
-              style={{ backgroundColor: PURPLE, boxShadow: '0 0 15px rgba(168,85,247,0.4)' }}
+              style={{ backgroundColor: VIOLET_FILL, boxShadow: '0 0 15px rgba(168,85,247,0.4)' }}
             >
               <SymbolView name="square.and.arrow.up" size={16} tintColor="#ffffff" />
               <Text className="text-white text-sm font-sans-semibold">Share Link</Text>

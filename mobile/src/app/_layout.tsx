@@ -1,4 +1,5 @@
 import '../../global.css';
+import { useEffect } from 'react';
 import {
   Montserrat_300Light,
   Montserrat_400Regular,
@@ -16,10 +17,25 @@ import { SafeAreaListener, SafeAreaProvider } from 'react-native-safe-area-conte
 import { Uniwind, useResolveClassNames } from 'uniwind';
 import { SessionProvider, useSession } from '@/hooks/use-session';
 import { INK_LIGHT, SCREEN_GRADIENT } from '@/lib/theme';
+import * as SplashScreen from 'expo-splash-screen';
 import { BackgroundLocationManager } from '@/components/background-location-manager';
 import { NightStatusGate } from '@/components/night-status-gate';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import { queryClient } from '@/lib/query-client';
+
+// Native splash only: the lime S on midnight stays up until fonts and the
+// session are known, then fades out over the real first screen.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+SplashScreen.setOptions({ fade: true, duration: 500 });
+
+/** Hides the native splash once there is a real screen to reveal. */
+function SplashController() {
+  const { loading } = useSession();
+  useEffect(() => {
+    if (!loading) SplashScreen.hideAsync().catch(() => {});
+  }, [loading]);
+  return null;
+}
 
 /**
  * Every form sheet is opaque (client feedback §9). They used to be
@@ -200,6 +216,7 @@ export default function RootLayout() {
                   <BackgroundLocationManager />
                   <PushNotificationManager />
                   <StatusBar style="light" />
+                  <SplashController />
                 </QueryClientProvider>
               </SessionProvider>
             </HeroUINativeProvider>

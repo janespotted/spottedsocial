@@ -12,6 +12,16 @@ export const INK = '#110a24';
 /** Header / floating-control background. */
 export const INK_LIGHT = '#1a0f2e';
 export const RECORD_RED = '#ff3b5c';
+/**
+ * Brand bible (Sept 2026) "Action Violet": the fill for violet controls
+ * that carry white text. PURPLE (#a855f7) is the accent for icons, rings
+ * and outlines, but white on it measures 3.96:1; on this it is 6.5:1.
+ */
+export const VIOLET_FILL = '#8040aa';
+/** Brand bible "Active Lavender": the selected tab in the native tab bar. */
+export const LAVENDER = '#dac2ff';
+/** Brand bible "Secondary Mist": inactive tab icons / secondary copy. */
+export const MIST = '#b6adbf';
 
 /**
  * Shared screen background: a soft purple bloom at the top fading into the

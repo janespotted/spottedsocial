@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { supabase } from '@/lib/supabase';
-import spottedLogo from '../../../assets/images/spotted-s-logo.png';
+import { SpottedMark } from '@/components/spotted-mark';
 import { NEON } from '@/lib/theme';
 
 /** Same as the web app: keep digits and "+" only — no country mask,
@@ -98,11 +97,9 @@ export default function PhoneScreen() {
         keyboardShouldPersistTaps="handled"
         bottomOffset={32}
       >
-        <Image
-          source={spottedLogo}
-          style={{ width: 64, height: 64, marginBottom: 16 }}
-          contentFit="contain"
-        />
+        <View style={{ marginBottom: 16 }}>
+          <SpottedMark size={64} />
+        </View>
         <Text
           className="text-white text-4xl font-sans-light mb-2"
           style={{ letterSpacing: 9 }}

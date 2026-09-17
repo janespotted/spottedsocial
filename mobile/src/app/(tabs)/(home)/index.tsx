@@ -73,7 +73,7 @@ function OutTonightCard({
           key={friend.user_id}
           className="flex-row items-center gap-3 p-2.5 rounded-xl bg-white/5"
         >
-          <View className="rounded-full border-2 border-[#22c55e]">
+          <View className="rounded-full border-2 border-[#d4ff00]">
             <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
           </View>
           <View className="flex-1 min-w-0">
@@ -86,9 +86,10 @@ function OutTonightCard({
           </View>
           <Pressable
             onPress={() => onMeetUp(friend)}
-            className="h-8 px-3 rounded-full items-center justify-center bg-[#22c55e] active:opacity-80"
+            accessibilityRole="button"
+            className="min-h-9 px-3.5 rounded-full items-center justify-center bg-[#d4ff00] active:opacity-80"
           >
-            <Text className="text-white text-xs font-sans-medium">Meet Up</Text>
+            <Text className="text-[#1a0f2e] text-xs font-sans-semibold">Meet Up</Text>
           </Pressable>
         </View>
       ))}

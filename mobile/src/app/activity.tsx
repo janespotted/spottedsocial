@@ -13,7 +13,7 @@ import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
-import { NEON, PURPLE } from '@/lib/theme';
+import { NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
 
 const CARD = 'bg-[#1a0a2e]/80 rounded-2xl p-3.5';
 
@@ -286,9 +286,9 @@ export default function ActivityScreen() {
                   <Pressable
                     onPress={() => openThreadWith(f.user_id, f.display_name, f.avatar_url)}
                     className="h-8 px-4 rounded-full items-center justify-center active:opacity-90"
-                    style={{ backgroundColor: PURPLE, boxShadow: '0 0 12px rgba(168,85,247,0.5)' }}
+                    style={{ backgroundColor: VIOLET_FILL, boxShadow: '0 0 12px rgba(168,85,247,0.5)' }}
                   >
-                    <Text className="text-white text-xs font-sans-medium">Make plans</Text>
+                    <Text className="text-white text-xs font-sans-semibold">Make plans</Text>
                   </Pressable>
                 </View>
               ))}

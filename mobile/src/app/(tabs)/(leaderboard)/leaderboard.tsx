@@ -18,7 +18,7 @@ import {
 } from '@/hooks/use-leaderboard';
 import { Avatar } from '@/components/avatar';
 import { HeaderActions } from '@/components/header-actions';
-import { NEON, PURPLE } from '@/lib/theme';
+import { NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
 
 function openVenue(venueName: string, venueId?: string | null) {
   if (venueId) {
@@ -393,10 +393,10 @@ export default function LeaderboardScreen() {
               </Text>
               <Pressable
                 onPress={() => router.push('/check-in')}
-                className="rounded-full px-6 py-2.5 active:opacity-90"
-                style={{ backgroundColor: PURPLE }}
+                className="rounded-full px-6 min-h-11 justify-center active:opacity-90"
+                style={{ backgroundColor: VIOLET_FILL }}
               >
-                <Text className="text-white font-sans-medium">Be the First</Text>
+                <Text className="text-white font-sans-semibold">Be the First</Text>
               </Pressable>
             </View>
           )

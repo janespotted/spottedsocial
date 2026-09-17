@@ -9,7 +9,6 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#110a24",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.janereynolds.spotted",
       "buildNumber": "46",
       "infoPlist": {
@@ -33,9 +32,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#110a24",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -64,7 +62,7 @@
         {
           "backgroundColor": "#110a24",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 96
         }
       ],
       "react-native-background-geolocation",
