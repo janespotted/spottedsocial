@@ -6,10 +6,12 @@ import { supabase } from '@/lib/supabase';
 import { getPlanExpiry } from '@/lib/plans';
 import { notifyPlanInvites } from '@/lib/notifications';
 import { useSession } from '@/hooks/use-session';
+import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { PlanForm, type PlanFormValues } from '@/components/plan-form';
 
 /** New-plan composer — modal from the Plans tab. Port of the web CreatePlanDialog. */
 export default function CreatePlanScreen() {
+  useDismissKeyboardOnLeave();
   const { session } = useSession();
   const queryClient = useQueryClient();
 

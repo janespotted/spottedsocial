@@ -1,10 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { DEMO_MODE } from '@/lib/demo-mode';
 import { fetchProfilesSafe, type SafeProfile } from '@/lib/profiles';
-import { isFreshLocation } from '@/lib/tonight';
+import { isFromTonight } from '@/lib/tonight';
 import { useFriendIds } from './use-friend-ids';
 import { useOwnNightStatus } from './use-own-night-status';
 import { useSession } from './use-session';
@@ -47,8 +47,28 @@ export interface MapData {
 }
 
 /**
+ * Presence rule (addendum v3 §8.4): a friend is on the map while they are
+ * out tonight with a shared spot — `is_out`, coordinates, and a location
+ * stamp from tonight. Freshness is NOT an existence test: the watcher only
+ * writes after 100 m of movement, so a friend standing in a venue with a
+ * locked phone used to vanish after two hours while still checked in. A pin
+ * leaves only for a real reason (Stop sharing, status change, the 5 AM
+ * reset — all of which clear the profile spot server- or client-side).
+ * Staleness is shown instead: the marker fades at 15 min and the friend
+ * card says when they were last seen.
+ */
+function hasSharedSpot(p: SafeProfile): boolean {
+  return (
+    p.is_out === true &&
+    p.last_known_lat !== null &&
+    p.last_known_lng !== null &&
+    isFromTonight(p.last_location_at)
+  );
+}
+
+/**
  * Port of the web Map's data layer (src/pages/Map.tsx): friends who are out
- * with fresh (tonight + <2h) server-masked locations, expanded with
+ * with a shared spot from tonight (server-masked per viewer), expanded with
  * friends-of-friends who share to mutuals, relationship ring types, private
  * party handling, and city venues with popularity-based heat scores.
  */
@@ -61,15 +81,10 @@ async function fetchMapData(
   const friendIds = [...directFriendIds];
   const profiles = await fetchProfilesSafe();
 
-  // Friends who are out with valid, fresh location data. Coordinates always
-  // come from get_profiles_safe — the server masks them per viewer (SOW §4).
+  // Friends who are out with a shared spot. Coordinates always come from
+  // get_profiles_safe — the server masks them per viewer (SOW §4).
   const friendProfiles: SafeProfile[] = profiles.filter(
-    (p) =>
-      friendIds.includes(p.id) &&
-      p.is_out === true &&
-      p.last_known_lat !== null &&
-      p.last_known_lng !== null &&
-      isFreshLocation(p.last_location_at)
+    (p) => friendIds.includes(p.id) && hasSharedSpot(p)
   );
 
   // Expand with friends-of-friends who share location with mutuals
@@ -89,10 +104,8 @@ async function fetchMapData(
       .gt('expires_at', nowIso);
     const outMutuals = new Set((mutualStatuses ?? []).map((s) => s.user_id));
     for (const p of profiles) {
-      if (!outMutuals.has(p.id) || p.is_out !== true) continue;
+      if (!outMutuals.has(p.id) || !hasSharedSpot(p)) continue;
       if (p.location_sharing_level !== 'mutual_friends') continue;
-      if (p.last_known_lat === null || p.last_known_lng === null) continue;
-      if (!isFreshLocation(p.last_location_at)) continue;
       if (!friendProfiles.some((fp) => fp.id === p.id)) friendProfiles.push(p);
       if (!friendIds.includes(p.id)) friendIds.push(p.id);
     }
@@ -107,7 +120,7 @@ async function fetchMapData(
     string,
     { party_neighborhood: string | null; lat: number | null; lng: number | null }
   > = {};
-  let demoOutStatuses: Array<Record<string, any>> = [];
+  const demoOutStatuses: Array<{ user_id: string; venue_name: string | null; lat: number; lng: number }> = [];
   if (friendIds.length > 0 || DEMO_MODE) {
     let statusQuery = supabase
       .from('night_statuses')
@@ -133,7 +146,7 @@ async function fetchMapData(
         };
       }
       if (DEMO_MODE && s.is_demo && s.status === 'out' && s.lat && s.lng) {
-        demoOutStatuses.push(s);
+        demoOutStatuses.push({ user_id: s.user_id, venue_name: s.venue_name, lat: s.lat, lng: s.lng });
       }
     }
   }
@@ -281,7 +294,18 @@ export function useMapData(city: string | null) {
     return { ...query.data, friends: [], hiddenFriendCount: query.data.friends.length };
   }, [query.data, viewerStayingIn]);
 
-  // Realtime: night-status changes move pins, debounced (web map parity)
+  // Ids whose profile updates matter: direct friends plus whoever is pinned
+  // now (mutuals). Kept in a ref so the channel never has to resubscribe.
+  const watchedIds = useRef<Set<string>>(new Set());
+  watchedIds.current = new Set([
+    ...(friendIds ?? []),
+    ...(query.data?.friends.map((f) => f.user_id) ?? []),
+  ]);
+
+  // Realtime, debounced (web map parity): night-status changes move pins,
+  // and a friend's profile update is their first pin of the night or a
+  // fresh fix — without this the viewer waited for the 30 s stale window
+  // or a tab switch to see a friend appear (addendum v3 §8.4).
   useEffect(() => {
     if (!session) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -295,7 +319,19 @@ export function useMapData(city: string | null) {
       name: 'map-realtime',
       onReconnect: refresh,
       configure: (ch) =>
-        ch.on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh),
+        ch
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'night_statuses' }, refresh)
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'profiles' },
+            (payload) => {
+              // `old` carries only the primary key (no REPLICA IDENTITY FULL),
+              // so any update to a watched friend refreshes — the debounce
+              // absorbs the rare profile edit.
+              const row = payload.new as { id?: string } | null;
+              if (row?.id && watchedIds.current.has(row.id)) refresh();
+            }
+          ),
     });
     return () => {
       clearTimeout(timer);

@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import { DEFAULT_AUDIENCE, loadPostAudience } from '@/lib/audience';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import type { CapturedMedia } from '@/lib/post-media';
 import type { PublishedPost } from '@/lib/publish-post';
 import { SpottedCamera } from '@/components/spotted-camera';
@@ -19,6 +20,7 @@ type Mode = 'camera' | 'compose' | 'shared';
  * form never loses what was typed when the media is replaced.
  */
 export default function CreatePostScreen() {
+  useDismissKeyboardOnLeave();
   const { data: ownNight } = useOwnNightStatus();
   const [mode, setMode] = useState<Mode>('camera');
   const [media, setMedia] = useState<CapturedMedia | null>(null);

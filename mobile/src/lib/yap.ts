@@ -182,49 +182,27 @@ export async function fetchPinnedVenueMessages(venueName: string): Promise<Pinne
 }
 
 /**
- * Vote with the web's optimistic delta math: toggle off ±1, switch ±2,
- * fresh vote ±1. Returns the applied delta and the resulting vote state
- * (null when toggled off); throws on DB failure so callers can revert.
+ * Vote through the `vote_on_yap` RPC (toggle off / switch / fresh vote,
+ * the web's delta math) — one transaction that writes the vote row AND the
+ * score, and returns the server's score and the resulting vote state. The
+ * old two-request version (vote row, then increment_yap_score with its error
+ * dropped) could leave a saved vote with an unchanged count for good
+ * (addendum v3 §8.5). Throws on failure so callers can revert.
  */
 export async function voteOnYap(
   yapId: string,
-  userId: string,
-  voteType: 'up' | 'down',
-  existingVote: 'up' | 'down' | null
-): Promise<{ delta: number; vote: 'up' | 'down' | null }> {
-  let delta: number;
-  let vote: 'up' | 'down' | null;
-  if (existingVote === voteType) {
-    delta = voteType === 'up' ? -1 : 1;
-    vote = null;
-    const { error } = await supabase
-      .from('yap_votes')
-      .delete()
-      .eq('yap_id', yapId)
-      .eq('user_id', userId);
-    if (error) throw error;
-  } else if (existingVote) {
-    delta = voteType === 'up' ? 2 : -2;
-    vote = voteType;
-    const { error } = await supabase
-      .from('yap_votes')
-      .update({ vote_type: voteType })
-      .eq('yap_id', yapId)
-      .eq('user_id', userId);
-    if (error) throw error;
-  } else {
-    delta = voteType === 'up' ? 1 : -1;
-    vote = voteType;
-    const { error } = await supabase
-      .from('yap_votes')
-      .insert({ yap_id: yapId, user_id: userId, vote_type: voteType });
-    if (error) throw error;
-  }
-  await (supabase.rpc as (fn: string, args: object) => PromiseLike<unknown>)(
-    'increment_yap_score',
-    { p_yap_id: yapId, p_delta: delta }
-  );
-  return { delta, vote };
+  voteType: 'up' | 'down'
+): Promise<{ score: number; vote: 'up' | 'down' | null }> {
+  const { data, error } = await supabase.rpc('vote_on_yap', {
+    p_yap_id: yapId,
+    p_vote_type: voteType,
+  });
+  if (error) throw error;
+  const row = data?.[0];
+  return {
+    score: row?.score ?? 0,
+    vote: row?.user_vote === 'up' || row?.user_vote === 'down' ? row.user_vote : null,
+  };
 }
 
 export interface YapPartyContext {
@@ -277,16 +255,6 @@ export async function postYapComment(yapId: string, userId: string, text: string
     author_handle: randomHandle(),
   } as never);
   if (error) throw error;
-  // Best-effort comment count bump (web relies on refetch; keep counts fresh)
-  const { data: yap } = await supabase
-    .from('yap_messages')
-    .select('comments_count')
-    .eq('id', yapId)
-    .maybeSingle();
-  if (yap) {
-    await supabase
-      .from('yap_messages')
-      .update({ comments_count: (yap.comments_count ?? 0) + 1 })
-      .eq('id', yapId);
-  }
+  // comments_count is maintained by a trigger on yap_comments (migration
+  // 20260917110000) — no client read-modify-write.
 }

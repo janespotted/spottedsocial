@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { fetchPlanParticipants, getPlanExpiry } from '@/lib/plans';
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { useSession } from '@/hooks/use-session';
+import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { PlanForm, type PlanFormValues, type PlanFriend } from '@/components/plan-form';
 
 /**
@@ -14,6 +15,7 @@ import { PlanForm, type PlanFormValues, type PlanFriend } from '@/components/pla
  * EditPlanDialog receives); existing participants load here.
  */
 export default function EditPlanScreen() {
+  useDismissKeyboardOnLeave();
   const { session } = useSession();
   const queryClient = useQueryClient();
   const params = useLocalSearchParams<{

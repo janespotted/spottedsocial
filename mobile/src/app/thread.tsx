@@ -3,11 +3,13 @@ import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  Keyboard,
   Pressable,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { Image } from '@/components/styled';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -72,8 +74,13 @@ export default function ThreadScreen() {
   const insets = useSafeAreaInsets();
   const userId = session?.user.id;
 
+  // Leaving the thread (back, swipe, tab) closes the keyboard — it used to
+  // stay pinned over the Messages list (addendum v3 §8.2).
+  useDismissKeyboardOnLeave();
+
   // Push deep links / restored routes can land here with no history
   const goBack = () => {
+    Keyboard.dismiss();
     if (router.canGoBack()) router.back();
     else router.replace('/');
   };

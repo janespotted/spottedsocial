@@ -224,3 +224,37 @@ export async function stopBackgroundLocation(): Promise<void> {
     console.error('[BgLocation] Failed to stop:', err);
   }
 }
+
+/**
+ * Presence heartbeat (addendum v3 §8.4). The watcher writes a fix only
+ * after 100 m of movement, so a user standing in a venue writes nothing and
+ * their pin reads as stale. While the app is in the foreground and the
+ * user is out at a venue, refresh `last_location_at` every few minutes —
+ * with a fresh fix when one is available, otherwise stamp only, which keeps
+ * the last shared spot and proves the session is alive. Never prompts;
+ * a no-op (false) when the user isn't out at a venue.
+ */
+export async function recordPresenceHeartbeat(userId: string): Promise<boolean> {
+  try {
+    if (!(await shouldTrackLiveLocation(userId))) return false;
+    const now = new Date().toISOString();
+    const fix = await getCurrentPosition();
+    const profile: Record<string, unknown> = { last_location_at: now };
+    if (fix) {
+      profile.last_known_lat = fix.lat;
+      profile.last_known_lng = fix.lng;
+    }
+    await Promise.all([
+      supabase.from('profiles').update(profile as never).eq('id', userId),
+      supabase
+        .from('checkins')
+        .update({ last_updated_at: now })
+        .eq('user_id', userId)
+        .is('ended_at', null),
+    ]);
+    return true;
+  } catch (err) {
+    console.warn('[BgLocation] Heartbeat failed:', err);
+    return true; // transient — keep trying
+  }
+}

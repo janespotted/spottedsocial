@@ -38,6 +38,10 @@ verify_jwt = true
 
 [functions.mux-webhook]
 verify_jwt = false
+# Drains mux_asset_deletions (assets of deleted posts); invoked by pg_cron via
+# pg_net, so no JWT — it can only delete assets already queued for removal.
+[functions.mux-cleanup]
+verify_jwt = false
 
 # Test phone numbers for phone/OTP login. No SMS is sent; the fixed code below
 # is accepted for these numbers only. Applies to local dev, and to the hosted

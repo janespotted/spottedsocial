@@ -653,6 +653,27 @@ export type Database = {
           },
         ]
       }
+      mux_asset_deletions: {
+        Row: {
+          asset_id: string
+          attempts: number
+          last_error: string | null
+          queued_at: string
+        }
+        Insert: {
+          asset_id: string
+          attempts?: number
+          last_error?: string | null
+          queued_at?: string
+        }
+        Update: {
+          asset_id?: string
+          attempts?: number
+          last_error?: string | null
+          queued_at?: string
+        }
+        Relationships: []
+      }
       night_statuses: {
         Row: {
           expires_at: string | null
@@ -1404,6 +1425,38 @@ export type Database = {
         }
         Relationships: []
       }
+      venue_aliases: {
+        Row: {
+          alias: string
+          alias_type: string
+          created_at: string
+          id: string
+          venue_id: string
+        }
+        Insert: {
+          alias: string
+          alias_type?: string
+          created_at?: string
+          id?: string
+          venue_id: string
+        }
+        Update: {
+          alias?: string
+          alias_type?: string
+          created_at?: string
+          id?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_aliases_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venue_auto_corrections: {
         Row: {
           created_at: string | null
@@ -1529,6 +1582,59 @@ export type Database = {
           verification_notes?: string | null
         }
         Relationships: []
+      }
+      venue_leaderboard_scores: {
+        Row: {
+          checkin_score: number
+          city: string
+          computed_at: string
+          final_score: number
+          internet_confidence: number
+          internet_score: number
+          source_breakdown: Json
+          source_count: number
+          trend_label: string | null
+          unique_checkins_24h: number
+          unique_checkins_7d: number
+          venue_id: string
+        }
+        Insert: {
+          checkin_score?: number
+          city: string
+          computed_at?: string
+          final_score?: number
+          internet_confidence?: number
+          internet_score?: number
+          source_breakdown?: Json
+          source_count?: number
+          trend_label?: string | null
+          unique_checkins_24h?: number
+          unique_checkins_7d?: number
+          venue_id: string
+        }
+        Update: {
+          checkin_score?: number
+          city?: string
+          computed_at?: string
+          final_score?: number
+          internet_confidence?: number
+          internet_score?: number
+          source_breakdown?: Json
+          source_count?: number
+          trend_label?: string | null
+          unique_checkins_24h?: number
+          unique_checkins_7d?: number
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_leaderboard_scores_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: true
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       venue_location_reports: {
         Row: {
@@ -1721,6 +1827,100 @@ export type Database = {
           venue_id?: string
         }
         Relationships: []
+      }
+      venue_signal_events: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          external_id: string | null
+          id: string
+          mention_count: number
+          metadata: Json
+          observed_at: string
+          score: number
+          signal_kind: string
+          source: string
+          source_title: string | null
+          source_url: string | null
+          venue_id: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          external_id?: string | null
+          id?: string
+          mention_count?: number
+          metadata?: Json
+          observed_at?: string
+          score: number
+          signal_kind?: string
+          source: string
+          source_title?: string | null
+          source_url?: string | null
+          venue_id: string
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          external_id?: string | null
+          id?: string
+          mention_count?: number
+          metadata?: Json
+          observed_at?: string
+          score?: number
+          signal_kind?: string
+          source?: string
+          source_title?: string | null
+          source_url?: string | null
+          venue_id?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_signal_events_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venue_signal_scan_state: {
+        Row: {
+          last_error: string | null
+          last_result_count: number
+          last_scanned_at: string | null
+          source: string
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          last_error?: string | null
+          last_result_count?: number
+          last_scanned_at?: string | null
+          source: string
+          updated_at?: string
+          venue_id: string
+        }
+        Update: {
+          last_error?: string | null
+          last_result_count?: number
+          last_scanned_at?: string | null
+          source?: string
+          updated_at?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_signal_scan_state_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       venue_yap_messages: {
         Row: {
@@ -2177,6 +2377,27 @@ export type Database = {
           username: string
         }[]
       }
+      get_venue_leaderboard: {
+        Args: { p_city?: string; p_limit?: number }
+        Returns: {
+          checkin_score: number
+          computed_at: string
+          final_score: number
+          google_rating: number
+          google_user_ratings_total: number
+          internet_score: number
+          lat: number
+          lng: number
+          name: string
+          neighborhood: string
+          source_count: number
+          trend_label: string
+          unique_checkins_24h: number
+          unique_checkins_7d: number
+          venue_id: string
+          venue_type: string
+        }[]
+      }
       get_visible_recipients: {
         Args: { candidate_ids: string[] }
         Returns: string[]
@@ -2185,6 +2406,7 @@ export type Database = {
         Args: { role: Database["public"]["Enums"]["app_role"]; user_id: string }
         Returns: boolean
       }
+      invoke_mux_cleanup: { Args: never; Returns: undefined }
       is_close_friend: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
@@ -2235,6 +2457,17 @@ export type Database = {
       }
       user_is_thread_member: { Args: { thread_uuid: string }; Returns: boolean }
       validate_invite_code: { Args: { code_to_check: string }; Returns: Json }
+      verify_venue_collector_secret: {
+        Args: { p_secret: string }
+        Returns: boolean
+      }
+      vote_on_yap: {
+        Args: { p_vote_type: string; p_yap_id: string }
+        Returns: {
+          score: number
+          user_vote: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"

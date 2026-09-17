@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LegendList } from '@legendapp/list/react-native';
@@ -12,6 +12,7 @@ import { notifyCommentAdded } from '@/lib/posts';
 import { openFriendCard } from '@/lib/friend-card';
 import { validateCommentText } from '@/lib/validation';
 import { useSession } from '@/hooks/use-session';
+import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
 import { NEON } from '@/lib/theme';
@@ -31,6 +32,7 @@ interface Comment {
 
 /** Comments for one post — presented as a modal sheet from the feed. */
 export default function CommentsScreen() {
+  useDismissKeyboardOnLeave();
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const { session } = useSession();
   const queryClient = useQueryClient();
@@ -103,6 +105,7 @@ export default function CommentsScreen() {
       return;
     }
     if (!raw) setDraft('');
+    Keyboard.dismiss(); // a sent comment ends the input (addendum v3 §8.2)
     notifyCommentAdded(postId);
     queryClient.invalidateQueries({ queryKey });
   };
@@ -153,6 +156,8 @@ export default function CommentsScreen() {
           data={comments ?? []}
           keyExtractor={(c) => c.id}
           contentContainerStyle={{ padding: 16, gap: 16 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           ListEmptyComponent={
             <Text className="text-white/55 text-sm font-sans text-center py-12">
               No comments yet — say something first.

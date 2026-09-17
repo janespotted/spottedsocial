@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
@@ -142,11 +143,12 @@ export default function ProfileScreen() {
   const { data: friendIds } = useFriendIds(session?.user.id);
   const [spotsView, setSpotsView] = useState<SpotsView>('recent');
 
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['profile-page', session?.user.id],
     enabled: !!session,
     queryFn: () => fetchProfileData(session!.user.id),
   });
+  const { refreshing, onRefresh } = usePullToRefresh(refetch);
   // pb clears the native tab bar + home indicator so Log Out is reachable
   const contentContainerStyle = useResolveClassNames('px-4 pb-32 gap-5');
 
@@ -242,8 +244,8 @@ export default function ProfileScreen() {
         contentContainerStyle={contentContainerStyle}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
             tintColorClassName="accent-[#d4ff00]"
           />
         }

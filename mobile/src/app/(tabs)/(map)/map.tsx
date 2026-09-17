@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActionSheetIOS, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { ActionSheetIOS, Alert, Linking, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -31,6 +31,7 @@ import { Avatar } from '@/components/avatar';
 import { FriendIdCard } from '@/components/friend-id-card';
 import { isDefaultMapFilters, peopleFilterIncludes, resetMapFilters, useMapFilters } from '@/lib/map-filters';
 import { getCurrentPosition } from '@/lib/background-location';
+import { getLocationPermission, hasLocationAccess } from '@/lib/location-ready';
 import { IconButton } from '@/components/icon-button';
 import { SmartArrivalPrompt, VenueMoveBanner } from '@/components/venue-move-banner';
 
@@ -453,6 +454,8 @@ export default function MapScreen() {
   // Recenter on the user, not the city (client feedback §6). Keeps the
   // current zoom and never touches filters; falls back to the city centre
   // only when there is no location permission or no fix.
+  // Recenter goes to the user's own fix or nowhere (addendum v3 §8.3): the
+  // old fallback panned to the city centre, which read as "the wrong place".
   const recenter = async () => {
     if (locating) return;
     setLocating(true);
@@ -461,8 +464,19 @@ export default function MapScreen() {
       if (me) {
         cameraRef.current?.setCamera({ centerCoordinate: [me.lng, me.lat], animationDuration: 800 });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        return;
+      }
+      if (!hasLocationAccess(await getLocationPermission())) {
+        Alert.alert(
+          'Location is off',
+          'Turn on location for Spotted in Settings to center the map on you.',
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+          ]
+        );
       } else {
-        cameraRef.current?.setCamera({ centerCoordinate: [center.lng, center.lat], animationDuration: 800 });
+        Alert.alert('Still locating', "Couldn't get a fix yet — try again in a moment.");
       }
     } finally {
       setLocating(false);

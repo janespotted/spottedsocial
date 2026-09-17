@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
+import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
@@ -21,6 +22,7 @@ interface VenueResult {
 
 /** People + venues search — simplified port of the web UnifiedSearch. */
 export default function SearchScreen() {
+  useDismissKeyboardOnLeave();
   const { session } = useSession();
   const { data: friendIds } = useFriendIds(session?.user.id);
   const [term, setTerm] = useState('');
@@ -81,7 +83,13 @@ export default function SearchScreen() {
           />
           {isFetching ? <ActivityIndicator size="small" color={NEON} /> : null}
         </View>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
+        <Pressable
+          onPress={() => {
+            Keyboard.dismiss();
+            router.back();
+          }}
+          hitSlop={8}
+        >
           <Text className="text-white/60 text-sm font-sans">Cancel</Text>
         </Pressable>
       </View>

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Pressable,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -20,6 +22,7 @@ const USERNAME_REGEX = /^[a-z0-9_.]{3,20}$/;
 
 /** Edit profile — native form sheet. Port of the web EditProfile page. */
 export default function EditProfileSheet() {
+  useDismissKeyboardOnLeave();
   const { session } = useSession();
   const queryClient = useQueryClient();
   const userId = session?.user.id;
@@ -125,6 +128,7 @@ export default function EditProfileSheet() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['profile-page'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
+      Keyboard.dismiss();
       router.back();
     } finally {
       setSaving(false);

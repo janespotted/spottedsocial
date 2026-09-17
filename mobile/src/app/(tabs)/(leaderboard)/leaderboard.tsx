@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { ActionSheetIOS, Pressable, RefreshControl, Text, View } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
@@ -340,7 +341,8 @@ export default function LeaderboardScreen() {
     setNeighborhood(null);
   }, [city]);
 
-  const { data, isLoading, refetch, isRefetching } = useLeaderboard(city ?? null, neighborhood);
+  const { data, isLoading, refetch } = useLeaderboard(city ?? null, neighborhood);
+  const { refreshing, onRefresh } = usePullToRefresh(refetch);
   const venues = data?.venues ?? [];
   const biggestMover = data?.biggestMover ?? null;
 
@@ -372,8 +374,8 @@ export default function LeaderboardScreen() {
         contentContainerStyle={contentContainerStyle}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
             tintColorClassName="accent-[#d4ff00]"
           />
         }

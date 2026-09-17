@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import { supabase } from '@/lib/supabase';
 import { deferDeepLink, getNightGateState } from '@/lib/night-gate';
+import { registerPushToken, routeForNotification } from '@/lib/push';
 import { useSession } from '@/hooks/use-session';
 
 // Show pushes that arrive while the app is foregrounded (banner + list).
@@ -16,73 +17,51 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * Registers this device's raw APNs token onto the signed-in user's profile —
- * the RN counterpart of the web usePushNotifications subscribeNative flow.
- * The send-push edge function reads profiles.apns_device_token and talks to
- * APNs directly, so a plain device token (not an Expo push token) is required.
- *
- * Runs after onboarding so the permission prompt doesn't stack on top of the
- * location prompt in the welcome flow. Simulators can't issue APNs tokens —
- * the try/catch makes that a silent no-op.
+ * Push lifecycle: registers the APNs token after onboarding (so the prompt
+ * doesn't stack on the location prompt in the welcome flow), re-registers
+ * on every return to the foreground without prompting — that is how a user
+ * who enabled notifications in iOS Settings gets a token (addendum v3 §8.6)
+ * — and routes taps.
  */
 export function PushNotificationManager() {
   const { session, onboardingNeeded } = useSession();
+  const userId = session?.user.id;
+  const registered = useRef(false);
 
   useEffect(() => {
-    if (!session || onboardingNeeded) return;
+    registered.current = false;
+    if (!userId || onboardingNeeded) return;
     let cancelled = false;
-
-    (async () => {
-      try {
-        let { status } = await Notifications.getPermissionsAsync();
-        if (status !== 'granted') {
-          ({ status } = await Notifications.requestPermissionsAsync());
-        }
-        if (status !== 'granted' || cancelled) return;
-
-        const token = (await Notifications.getDevicePushTokenAsync()).data as string;
-        if (!token || cancelled) return;
-
-        // Detach this token from any other account first (SECURITY DEFINER
-        // RPC — RLS blocks touching other users' profiles directly).
-        // Casts: database.types.ts predates the push columns/RPC; both are
-        // verified present in the production schema.
-        await (supabase.rpc as (fn: string, args: object) => PromiseLike<unknown>)(
-          'clear_stale_push_token',
-          { p_token: token, p_keep_user_id: session.user.id }
-        );
-        await supabase
-          .from('profiles')
-          .update({
-            push_token: token,
-            apns_device_token: token,
-            push_enabled: true,
-          } as never)
-          .eq('id', session.user.id);
-      } catch {
-        /* denied, simulator, or offline — in-app notifications still work */
-      }
-    })();
-
+    const register = async (prompt: boolean) => {
+      if (registered.current) return;
+      const result = await registerPushToken(userId, { prompt });
+      if (!cancelled && result === 'granted') registered.current = true;
+    };
+    void register(true);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void register(false);
+    });
     return () => {
       cancelled = true;
+      sub.remove();
     };
-  }, [session, onboardingNeeded]);
+  }, [userId, onboardingNeeded]);
 
-  // Tapping a push routes by payload (venue-shift → check-in), else Activity.
-  // While the opening "Are you out tonight?" question is unanswered (or not
-  // yet known on a cold start) the link is parked and replayed by
-  // NightStatusGate once the user answers — a notification never bypasses it.
+  // Tapping a push routes by type. While the opening "Are you out tonight?"
+  // question is unanswered (or not yet known on a cold start) the link is
+  // parked and replayed by NightStatusGate once the user answers — a
+  // notification never bypasses it.
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const url = response.notification.request.content.data?.url;
-      const target = typeof url === 'string' && url.startsWith('/') ? url : '/activity';
+      const target = routeForNotification(
+        response.notification.request.content.data as Record<string, unknown> | undefined
+      );
       if (getNightGateState() !== 'answered') {
         // The gate is already presenting the check-in sheet — nothing to replay
-        if (!target.startsWith('/check-in')) deferDeepLink(target as '/activity');
+        if (!String(target).startsWith('/check-in')) deferDeepLink(target);
         return;
       }
-      router.push(target as '/activity');
+      router.push(target);
     });
     return () => sub.remove();
   }, []);

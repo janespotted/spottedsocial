@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
+  Keyboard,
   Pressable,
   Text,
   TextInput,
@@ -17,6 +18,7 @@ import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
+import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import {
@@ -80,6 +82,7 @@ function VoteColumn({
 
 /** Anonymous venue chat room. Port of the web VenueYapThread (media deferred). */
 export default function YapThreadScreen() {
+  useDismissKeyboardOnLeave();
   const { venueName } = useLocalSearchParams<{ venueName: string }>();
   const { session } = useSession();
   const insets = useSafeAreaInsets();
@@ -177,11 +180,15 @@ export default function YapThreadScreen() {
     return () => clearInterval(timer);
   }, [cooldownLeft > 0]);
 
+  // One vote in flight per yap: a double-tap used to fire two requests
+  // (addendum v3 §8.5). Optimistic delta first, then the server's score.
+  const votingRef = useRef<Set<string>>(new Set());
   const handleVote = async (yap: YapMessage, type: 'up' | 'down') => {
-    if (!userId) return;
+    if (!userId || votingRef.current.has(yap.id)) return;
+    votingRef.current.add(yap.id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Optimistic update
-    queryClient.setQueryData<YapMessage[]>(['venue-yaps', venueName, userId], (prev) =>
+    const key = ['venue-yaps', venueName, userId];
+    queryClient.setQueryData<YapMessage[]>(key, (prev) =>
       (prev ?? []).map((m) => {
         if (m.id !== yap.id) return m;
         const delta =
@@ -190,9 +197,14 @@ export default function YapThreadScreen() {
       })
     );
     try {
-      await voteOnYap(yap.id, userId, type, yap.user_vote);
+      const { score, vote } = await voteOnYap(yap.id, type);
+      queryClient.setQueryData<YapMessage[]>(key, (prev) =>
+        (prev ?? []).map((m) => (m.id === yap.id ? { ...m, score, user_vote: vote } : m))
+      );
     } catch {
       refetch(); // revert to server truth
+    } finally {
+      votingRef.current.delete(yap.id);
     }
   };
 
@@ -231,6 +243,7 @@ export default function YapThreadScreen() {
       setCooldownLeft(YAP_COOLDOWN_MS);
       setDraft('');
       setPendingImage(null);
+      Keyboard.dismiss(); // a posted yap ends the input (addendum v3 §8.2)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refetch();
       queryClient.invalidateQueries({ queryKey: ['yap-directory'] });
@@ -311,7 +324,8 @@ export default function YapThreadScreen() {
           </Text>
           <Text className="text-white/55 text-xs font-sans">Anonymous · resets 5am</Text>
         </View>
-        <SymbolView name="mic.fill" size={18} tintColor="rgba(168,85,247,0.7)" />
+        {/* The decorative mic that sat here read as a record button that did
+            nothing ("What's the mic?", addendum v3 §8.9) — removed. */}
       </View>
 
       <LegendList
@@ -322,6 +336,10 @@ export default function YapThreadScreen() {
         // sections. Remount-on-reuse until that state is wired to extraData.
         recycleItems={false}
         contentContainerStyle={contentContainerStyle}
+        // Taps on a row (vote, comments) land on the first tap while the
+        // keyboard is up; dragging the list closes it (addendum v3 §8.2)
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         ListHeaderComponent={
           (pinned ?? []).length > 0 ? (
             <View className="px-4 pt-3 gap-2">

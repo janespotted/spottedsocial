@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { ActionSheetIOS, ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -123,6 +124,7 @@ export default function FriendsScreen() {
     enabled: !!session,
     queryFn: () => fetchFriendsData(userId!),
   });
+  const { refreshing, onRefresh } = usePullToRefresh(refetch);
   const hasFriends = (data?.rows ?? []).some((r) => r.kind === 'friend');
 
   const invalidate = () => {
@@ -259,8 +261,8 @@ export default function FriendsScreen() {
         contentContainerStyle={contentContainerStyle}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
             tintColorClassName="accent-[#d4ff00]"
           />
         }

@@ -1,11 +1,13 @@
-import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Alert, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
+import { getPushPermission, registerPushToken, type PushPermission } from '@/lib/push';
 import { PURPLE } from '@/lib/theme';
 
 function SettingsRow({
@@ -64,6 +66,47 @@ export default function SettingsScreen() {
       return data ?? null;
     },
   });
+
+  // Push row reflects the OS permission, not our push_enabled flag, and
+  // re-reads it every time the screen is focused (the user may have just
+  // come back from iOS Settings). Addendum v3 §8.6.
+  const [pushPermission, setPushPermission] = useState<PushPermission | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getPushPermission().then((p) => {
+        if (active) setPushPermission(p);
+      });
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+  const onPushRow = async () => {
+    if (!userId) return;
+    if (pushPermission === 'undetermined') {
+      setPushPermission(await registerPushToken(userId, { prompt: true }));
+      return;
+    }
+    if (pushPermission === 'denied') {
+      Alert.alert(
+        'Notifications are off',
+        'Turn on notifications for Spotted in iOS Settings to hear about meet ups, invites and messages.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+        ]
+      );
+    }
+  };
+  const pushSubtitle =
+    pushPermission === 'granted'
+      ? 'On'
+      : pushPermission === 'denied'
+        ? 'Off in iOS Settings — tap to enable'
+        : pushPermission === 'undetermined'
+          ? 'Tap to enable'
+          : ' ';
 
   const toggleReadReceipts = async (value: boolean) => {
     if (!userId) return;
@@ -138,7 +181,8 @@ export default function SettingsScreen() {
         <SettingsRow
           icon="bell"
           title="Push Notifications"
-          subtitle={prefs?.push_enabled ? 'Enabled' : 'Enable when going live'}
+          subtitle={pushSubtitle}
+          onPress={pushPermission === 'granted' ? undefined : onPushRow}
         />
         <SettingsRow
           icon="eye.slash"
