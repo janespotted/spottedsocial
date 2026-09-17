@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { fetchDmThreads, previewText, threadTitle, type DmThreadPreview } from '@/lib/dm';
 import { fetchYapDirectory, type YapQuote } from '@/lib/yap';
 import { useSession } from '@/hooks/use-session';
+import { useNoKeyboardOnFocus } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { useFriendIds } from '@/hooks/use-friend-ids';
@@ -146,6 +147,7 @@ function RowSkeleton() {
 }
 
 export default function MessagesScreen() {
+  useNoKeyboardOnFocus(); // back from a thread must never leave the keyboard up
   const { session } = useSession();
   const { unreadCount } = useNotifications();
   const queryClient = useQueryClient();
@@ -280,12 +282,13 @@ export default function MessagesScreen() {
           <HeaderActions unreadCount={unreadCount} />
         </View>
 
-        {/* Yap | Messages tabs (web parity) + new chat */}
+        {/* Yap | DMs tabs (web parity — the original says "DMs", addendum v3
+            §11.8) + new chat */}
         <View className="flex-row items-center px-4 pt-2 pb-3">
           {(
             [
               ['yap', 'Yap'],
-              ['messages', 'Messages'],
+              ['messages', 'DMs'],
             ] as const
           ).map(([tab, label]) => (
             <Pressable key={tab} onPress={() => setActiveTab(tab)} className="mr-6">

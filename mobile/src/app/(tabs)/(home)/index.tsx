@@ -16,6 +16,7 @@ import { SymbolView } from 'expo-symbols';
 import { LegendList } from '@legendapp/list/react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
+import { useNoKeyboardOnFocus } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { supabase } from '@/lib/supabase';
 import { sendMeetUp } from '@/lib/meet-up';
 import { useSession } from '@/hooks/use-session';
@@ -267,6 +268,7 @@ function HomeHeader({
 /* ── Screen ── */
 
 export default function HomeScreen() {
+  useNoKeyboardOnFocus(); // back from comments / search must never leave the keyboard up
   const { session } = useSession();
   const [feedMode, setFeedMode] = useState<FeedMode>('newsfeed');
   const [scrollProgress, setScrollProgress] = useState(0);

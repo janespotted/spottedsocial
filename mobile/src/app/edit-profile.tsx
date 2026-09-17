@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
+import { dismissKeyboardNow, useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -136,7 +136,10 @@ export default function EditProfileSheet() {
   };
 
   return (
-    <View className="pt-6 pb-10 px-5 gap-5">
+    // Tapping anywhere outside a field closes the keyboard (addendum v3
+    // §8.2). A Pressable root is still a content-sized View, so the
+    // fitToContents sheet measures it the same way.
+    <Pressable onPress={dismissKeyboardNow} accessible={false} className="pt-6 pb-10 px-5 gap-5">
       <Text className="text-white text-lg font-sans-semibold">Edit Profile</Text>
 
       {/* Avatar */}
@@ -207,6 +210,6 @@ export default function EditProfileSheet() {
           <Text className="text-[#1a0f2e] text-base font-sans-semibold">Save</Text>
         )}
       </Pressable>
-    </View>
+    </Pressable>
   );
 }
