@@ -272,7 +272,7 @@ export default function FriendsScreen() {
             {hasFriends ? (
               <View className="flex-row items-center gap-1.5">
                 <SymbolView name="star.fill" size={11} tintColor={NEON} />
-                <Text className="text-white/45 text-xs font-sans">
+                <Text className="text-white/60 text-xs font-sans">
                   Tap the star to add someone to Close Friends — your most private audience.
                 </Text>
               </View>
@@ -313,7 +313,7 @@ export default function FriendsScreen() {
                 <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
                   {item.display_name}
                 </Text>
-                <Text className="text-white/40 text-xs font-sans" numberOfLines={1}>
+                <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>
                   @{item.username}
                 </Text>
               </View>
@@ -339,7 +339,7 @@ export default function FriendsScreen() {
                 <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
                   {item.display_name}
                 </Text>
-                <Text className="text-white/40 text-xs font-sans" numberOfLines={1}>
+                <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>
                   {item.mutualCount && item.mutualCount > 0
                     ? `${item.mutualCount} mutual friend${item.mutualCount !== 1 ? 's' : ''}`
                     : `@${item.username}`}
@@ -352,7 +352,7 @@ export default function FriendsScreen() {
               >
                 <Text
                   className={`text-xs font-sans-semibold ${
-                    requestedIds.has(item.userId ?? '') ? 'text-white/40' : 'text-[#a855f7]'
+                    requestedIds.has(item.userId ?? '') ? 'text-white/55' : 'text-[#a855f7]'
                   }`}
                 >
                   {requestedIds.has(item.userId ?? '') ? 'Requested' : 'Add Friend'}
@@ -369,7 +369,7 @@ export default function FriendsScreen() {
                 <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
                   {item.display_name}
                 </Text>
-                <Text className="text-white/40 text-xs font-sans" numberOfLines={1}>
+                <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>
                   @{item.username}
                 </Text>
               </View>

@@ -20,8 +20,7 @@ import { notifyDmRecipients } from '@/lib/dm';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 interface ShareFriend {
   id: string;

@@ -6,8 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
-
-const PURPLE = '#a855f7';
+import { PURPLE } from '@/lib/theme';
 
 function SettingsRow({
   icon,
@@ -34,7 +33,7 @@ function SettingsRow({
       <View className="flex-1 min-w-0">
         <Text className="text-white text-sm font-sans-medium">{title}</Text>
         {subtitle ? (
-          <Text className="text-white/30 text-xs font-sans" numberOfLines={1}>
+          <Text className="text-white/45 text-xs font-sans" numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}

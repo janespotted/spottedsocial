@@ -5,8 +5,7 @@ import { SymbolView } from 'expo-symbols';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
 import { ProgressDots } from '@/components/progress-dots';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 // Everything city-scoped (leaderboard, map camera, venue search, plan feeds)
 // keys off profiles.city — without this step new users silently land in NYC.
@@ -55,7 +54,7 @@ export default function CityScreen() {
         <Text className="text-[28px] font-sans-light text-white leading-tight">
           where do you go out?
         </Text>
-        <Text className="text-sm text-white/40 font-sans mt-2">
+        <Text className="text-sm text-white/55 font-sans mt-2">
           your leaderboard, map, and venues are all local. you can switch cities later.
         </Text>
       </View>
@@ -75,7 +74,7 @@ export default function CityScreen() {
             >
               <View>
                 <Text className="text-lg font-sans-medium text-white">{city.label}</Text>
-                <Text className="text-xs text-white/40 font-sans mt-0.5">{city.sublabel}</Text>
+                <Text className="text-xs text-white/55 font-sans mt-0.5">{city.sublabel}</Text>
               </View>
               {isSelected ? <SymbolView name="checkmark.circle.fill" size={22} tintColor={NEON} /> : null}
             </Pressable>
@@ -93,7 +92,7 @@ export default function CityScreen() {
         <Pressable
           onPress={handleContinue}
           disabled={loading || !selected}
-          className="w-full h-12 rounded-2xl items-center justify-center active:opacity-90 disabled:opacity-30"
+          className="w-full min-h-12 rounded-2xl items-center justify-center active:opacity-90 disabled:opacity-30"
           style={{ backgroundColor: NEON }}
         >
           <Text className="text-black text-base font-sans-semibold">

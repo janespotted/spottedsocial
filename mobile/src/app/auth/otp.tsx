@@ -6,8 +6,8 @@ import { SymbolView } from 'expo-symbols';
 import { InputOTP } from 'heroui-native';
 import { supabase } from '@/lib/supabase';
 import spottedLogo from '../../../assets/images/spotted-s-logo.png';
+import { NEON } from '@/lib/theme';
 
-const NEON = '#d4ff00';
 const RESEND_COOLDOWN_S = 30;
 
 export default function OtpScreen() {
@@ -97,7 +97,7 @@ export default function OtpScreen() {
         <Pressable
           onPress={() => verifyCode(code)}
           disabled={busy || code.trim().length < 6}
-          className="w-full h-12 rounded-2xl items-center justify-center active:opacity-90 disabled:opacity-50 mt-6"
+          className="w-full min-h-12 rounded-2xl items-center justify-center active:opacity-90 disabled:opacity-50 mt-6"
           style={{ backgroundColor: NEON }}
         >
           <Text className="text-black text-base font-sans-semibold">
@@ -106,7 +106,7 @@ export default function OtpScreen() {
         </Pressable>
 
         <Pressable onPress={resend} disabled={busy || cooldown > 0} className="mt-4">
-          <Text className="text-sm text-white/40 font-sans">
+          <Text className="text-sm text-white/55 font-sans">
             {cooldown > 0 ? `didn't get it? resend in ${cooldown}s` : "didn't get it? resend"}
           </Text>
         </Pressable>

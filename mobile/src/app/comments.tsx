@@ -14,8 +14,8 @@ import { validateCommentText } from '@/lib/validation';
 import { useSession } from '@/hooks/use-session';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
+import { NEON } from '@/lib/theme';
 
-const NEON = '#d4ff00';
 const QUICK_EMOJIS = ['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'];
 
 interface Comment {
@@ -154,7 +154,7 @@ export default function CommentsScreen() {
           keyExtractor={(c) => c.id}
           contentContainerStyle={{ padding: 16, gap: 16 }}
           ListEmptyComponent={
-            <Text className="text-white/40 text-sm font-sans text-center py-12">
+            <Text className="text-white/55 text-sm font-sans text-center py-12">
               No comments yet — say something first.
             </Text>
           }
@@ -171,7 +171,7 @@ export default function CommentsScreen() {
                   >
                     {item.display_name}
                   </Text>{' '}
-                  <Text className="text-white/40 text-xs">{getTimeAgo(item.created_at)}</Text>
+                  <Text className="text-white/55 text-xs">{getTimeAgo(item.created_at)}</Text>
                 </Text>
                 <Text className="text-white/90 text-sm font-sans leading-snug mt-0.5">
                   {item.text}
@@ -188,7 +188,7 @@ export default function CommentsScreen() {
                   tintColor={item.liked_by_me ? NEON : 'rgba(255,255,255,0.4)'}
                 />
                 {item.likes_count > 0 ? (
-                  <Text className="text-white/40 text-[11px] font-sans">{item.likes_count}</Text>
+                  <Text className="text-white/55 text-[11px] font-sans">{item.likes_count}</Text>
                 ) : null}
               </Pressable>
             </View>

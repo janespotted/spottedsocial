@@ -29,8 +29,7 @@ import { notifyPlanDown } from '@/lib/notifications';
 import { validateCommentText } from '@/lib/validation';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 /** Overlapping avatar strip ("going with" / "N down"). */
 function AvatarStack({
@@ -275,13 +274,13 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
       {/* Going with */}
       {participants.length > 0 ? (
         <View className="flex-row items-center gap-2 mb-3">
-          <Text className="text-white/40 text-xs font-sans">Going with</Text>
+          <Text className="text-white/55 text-xs font-sans">Going with</Text>
           <AvatarStack people={participants} />
         </View>
       ) : null}
 
       {participants.length === 0 && downs.length === 0 ? (
-        <Text className="text-white/30 text-xs font-sans mb-3">Nobody&apos;s joined yet</Text>
+        <Text className="text-white/45 text-xs font-sans mb-3">Nobody&apos;s joined yet</Text>
       ) : null}
 
       {/* I'm down pill + down count */}
@@ -385,7 +384,7 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
           {comments === null ? (
             <ActivityIndicator color={NEON} />
           ) : comments.length === 0 ? (
-            <Text className="text-white/40 text-sm font-sans text-center py-1">
+            <Text className="text-white/55 text-sm font-sans text-center py-1">
               No comments yet
             </Text>
           ) : (
@@ -397,7 +396,7 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
                     <Text className="text-white text-sm font-sans-medium">
                       {comment.display_name}
                     </Text>
-                    <Text className="text-white/40 text-xs font-sans">
+                    <Text className="text-white/55 text-xs font-sans">
                       {getTimeAgo(comment.created_at)}
                     </Text>
                   </View>

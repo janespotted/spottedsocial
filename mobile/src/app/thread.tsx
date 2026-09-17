@@ -34,8 +34,7 @@ import { isFromTonight } from '@/lib/time-context';
 import { useSession } from '@/hooks/use-session';
 import { useTypingIndicator } from '@/hooks/use-typing-indicator';
 import { Avatar } from '@/components/avatar';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 interface SharedPostData {
   id: string;
@@ -675,7 +674,7 @@ export default function ThreadScreen() {
             >
             <View className="mb-2.5">
               {needsTimestamp(messages[index - 1], item) ? (
-                <Text className="text-white/40 text-xs font-sans text-center py-2">
+                <Text className="text-white/55 text-xs font-sans text-center py-2">
                   {timeLabel(item.created_at)}
                 </Text>
               ) : null}
@@ -768,7 +767,7 @@ export default function ThreadScreen() {
                 </View>
               </View>
               {showSeen ? (
-                <Text className="text-white/40 text-xs font-sans text-right mt-1 mr-1">Seen</Text>
+                <Text className="text-white/55 text-xs font-sans text-right mt-1 mr-1">Seen</Text>
               ) : null}
             </View>
             </Animated.View>

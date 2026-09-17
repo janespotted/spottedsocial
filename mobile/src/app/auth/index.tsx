@@ -5,8 +5,7 @@ import { router } from 'expo-router';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { supabase } from '@/lib/supabase';
 import spottedLogo from '../../../assets/images/spotted-s-logo.png';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 /** Same as the web app: keep digits and "+" only — no country mask,
  * so international numbers (+92, +44, …) pass through untouched. */
@@ -170,7 +169,7 @@ export default function PhoneScreen() {
           <Pressable
             onPress={mode === 'phone' ? sendCode : signInWithEmail}
             disabled={busy}
-            className="w-full h-12 rounded-2xl items-center justify-center active:opacity-90"
+            className="w-full min-h-12 rounded-2xl items-center justify-center active:opacity-90"
             style={{ backgroundColor: NEON }}
           >
             <Text className="text-black text-base font-sans-semibold">
@@ -182,13 +181,13 @@ export default function PhoneScreen() {
               NOTE: with Twilio still suspended, fresh sign-ins are impossible
               while this is hidden — existing sessions are unaffected.
           <Text
-            className="text-sm text-center text-white/40 font-sans underline"
+            className="text-sm text-center text-white/55 font-sans underline"
             onPress={() => switchMode(mode === 'phone' ? 'email' : 'phone')}
           >
             {mode === 'phone' ? 'sign in with email instead' : 'sign in with phone instead'}
           </Text>
           */}
-          <Text className="text-xs text-center text-white/40 font-sans">
+          <Text className="text-xs text-center text-white/55 font-sans">
             by continuing, you agree to our{' '}
             <Text
               className="text-white/60 underline"
@@ -208,7 +207,7 @@ export default function PhoneScreen() {
 
         <View className="mt-8">
           <Text
-            className="text-sm text-white/40 font-sans"
+            className="text-sm text-white/55 font-sans"
             onPress={() => router.push('/business')}
           >
             own a venue? <Text className="underline">sign in for business</Text>

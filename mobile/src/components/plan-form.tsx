@@ -17,8 +17,7 @@ import { PLAN_TYPES, toLocalDateString } from '@/lib/plans';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 export interface PlanVenue {
   id: string;
@@ -106,10 +105,10 @@ function PickerRow({
 }) {
   return (
     <View className="flex-1 min-w-0">
-      <Text className="text-white/40 text-xs font-sans mb-1.5">{label}</Text>
+      <Text className="text-white/55 text-xs font-sans mb-1.5">{label}</Text>
       <Pressable
         onPress={onPress}
-        className="h-11 px-3 rounded-xl bg-[#1a1230] border border-white/10 flex-row items-center justify-between active:opacity-70"
+        className="min-h-11 px-3 rounded-xl bg-[#1a1230] border border-white/10 flex-row items-center justify-between active:opacity-70"
       >
         <Text className="text-white text-sm font-sans" numberOfLines={1}>
           {value}
@@ -273,7 +272,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
             <View className="flex-1">
               <Text className="text-white font-sans-medium">{selectedVenue.name}</Text>
               {selectedVenue.neighborhood ? (
-                <Text className="text-white/40 text-xs font-sans">
+                <Text className="text-white/55 text-xs font-sans">
                   {selectedVenue.neighborhood}
                 </Text>
               ) : null}
@@ -282,7 +281,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
           </Pressable>
         ) : (
           <>
-            <View className="flex-row items-center h-12 px-3.5 rounded-2xl bg-[#1a1230] border border-white/10">
+            <View className="flex-row items-center min-h-12 px-3.5 rounded-2xl bg-[#1a1230] border border-white/10">
               <SymbolView name="magnifyingglass" size={16} tintColor="rgba(255,255,255,0.25)" />
               <TextInput
                 placeholder="Where are you going?"
@@ -304,7 +303,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
                   className="py-3 px-1 rounded-xl active:bg-white/5"
                 >
                   <Text className="text-white text-[15px] font-sans">{venue.name}</Text>
-                  <Text className="text-white/35 text-xs font-sans">{venue.neighborhood}</Text>
+                  <Text className="text-white/50 text-xs font-sans">{venue.neighborhood}</Text>
                 </Pressable>
               ))}
             </View>
@@ -347,7 +346,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
             />
 
             <View>
-              <Text className="text-white/40 text-xs font-sans mb-1.5">Note</Text>
+              <Text className="text-white/55 text-xs font-sans mb-1.5">Note</Text>
               <TextInput
                 placeholder="What's the plan?"
                 placeholderTextColor="rgba(255,255,255,0.25)"
@@ -362,7 +361,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
 
             {/* Invite friends */}
             <View>
-              <Text className="text-white/40 text-xs font-sans mb-1.5">Invite friends</Text>
+              <Text className="text-white/55 text-xs font-sans mb-1.5">Invite friends</Text>
 
               {selectedFriends.length > 0 ? (
                 <View className="flex-row flex-wrap gap-2 mb-2">
@@ -382,7 +381,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
                 </View>
               ) : null}
 
-              <View className="flex-row items-center h-10 px-3.5 rounded-xl bg-[#1a1230] border border-white/10">
+              <View className="flex-row items-center min-h-10 px-3.5 rounded-xl bg-[#1a1230] border border-white/10">
                 <SymbolView name="magnifyingglass" size={14} tintColor="rgba(255,255,255,0.25)" />
                 <TextInput
                   placeholder="Search friends..."
@@ -417,7 +416,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
                           <Text className="text-white text-sm font-sans" numberOfLines={1}>
                             {friend.display_name}
                           </Text>
-                          <Text className="text-white/30 text-xs font-sans" numberOfLines={1}>
+                          <Text className="text-white/45 text-xs font-sans" numberOfLines={1}>
                             @{friend.username}
                           </Text>
                         </View>
@@ -433,7 +432,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
 
             {/* Visibility */}
             <View>
-              <Text className="text-white/40 text-xs font-sans mb-1.5">Who can see this</Text>
+              <Text className="text-white/55 text-xs font-sans mb-1.5">Who can see this</Text>
               <View className="flex-row gap-2">
                 {(
                   [
@@ -466,7 +465,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
             <Pressable
               onPress={handleSubmit}
               disabled={isSubmitting}
-              className={`h-12 rounded-2xl items-center justify-center mt-2 ${
+              className={`min-h-12 rounded-2xl items-center justify-center mt-2 ${
                 isSubmitting ? 'opacity-40' : 'active:opacity-90'
               }`}
               style={{ backgroundColor: NEON }}

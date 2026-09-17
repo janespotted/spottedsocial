@@ -31,8 +31,7 @@ import {
   type YapMessage,
 } from '@/lib/yap';
 import { useSession } from '@/hooks/use-session';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 const relativeTime = (dateStr: string) => {
   const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
@@ -310,7 +309,7 @@ export default function YapThreadScreen() {
           <Text className="text-white font-sans-semibold text-base" numberOfLines={1}>
             {venueName}
           </Text>
-          <Text className="text-white/40 text-xs font-sans">Anonymous · resets 5am</Text>
+          <Text className="text-white/55 text-xs font-sans">Anonymous · resets 5am</Text>
         </View>
         <SymbolView name="mic.fill" size={18} tintColor="rgba(168,85,247,0.7)" />
       </View>
@@ -362,7 +361,7 @@ export default function YapThreadScreen() {
                 ) : null}
                 <Text className="text-white text-[15px] font-sans leading-snug">{item.text}</Text>
                 <View className="flex-row items-center gap-2 mt-1.5">
-                  <Text className="text-white/30 text-xs font-sans">
+                  <Text className="text-white/45 text-xs font-sans">
                     {item.author_handle ?? 'Anonymous'} · {relativeTime(item.created_at)}
                   </Text>
                   <Pressable
@@ -371,7 +370,7 @@ export default function YapThreadScreen() {
                     className="flex-row items-center gap-1 ml-auto active:opacity-70"
                   >
                     <SymbolView name="bubble.left" size={12} tintColor="rgba(255,255,255,0.4)" />
-                    <Text className="text-white/40 text-xs font-sans">
+                    <Text className="text-white/55 text-xs font-sans">
                       {item.comments_count > 0 ? item.comments_count : ''}
                     </Text>
                   </Pressable>
@@ -383,7 +382,7 @@ export default function YapThreadScreen() {
                     {(comments[item.id] ?? []).map((c) => (
                       <View key={c.id}>
                         <Text className="text-white/80 text-sm font-sans">{c.text}</Text>
-                        <Text className="text-white/25 text-[11px] font-sans">
+                        <Text className="text-white/40 text-[11px] font-sans">
                           {c.author_handle ?? 'Anonymous'} · {relativeTime(c.created_at)}
                         </Text>
                       </View>
@@ -455,7 +454,7 @@ export default function YapThreadScreen() {
                 onPress={handlePost}
                 disabled={(!draft.trim() && !pendingImage) || posting || cooldownLeft > 0}
                 hitSlop={8}
-                className="min-w-10 h-10 px-2 rounded-full items-center justify-center disabled:opacity-30"
+                className="min-w-10 min-h-10 px-2 rounded-full items-center justify-center disabled:opacity-30"
                 style={{ backgroundColor: NEON }}
               >
                 {posting ? (

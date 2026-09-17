@@ -50,7 +50,7 @@ export default function MapFiltersSheet() {
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1 gap-0.5">
           <Text className="text-white text-lg font-sans-semibold">Show on Map</Text>
-          <Text className="text-white/45 text-xs font-sans leading-4">
+          <Text className="text-white/60 text-xs font-sans leading-4">
             Changes what you see, not who can see you. Your sharing audience is set from your status.
           </Text>
         </View>
@@ -81,7 +81,7 @@ export default function MapFiltersSheet() {
             >
               <View className="flex-1 gap-0.5">
                 <Text className="text-white text-sm font-sans-medium">{opt.label}</Text>
-                <Text className="text-white/45 text-xs font-sans">{opt.desc}</Text>
+                <Text className="text-white/60 text-xs font-sans">{opt.desc}</Text>
               </View>
               {selected ? <SymbolView name="checkmark" size={14} weight="semibold" tintColor={NEON} /> : null}
             </Pressable>
@@ -95,7 +95,7 @@ export default function MapFiltersSheet() {
         <View className={`flex-row items-center justify-between rounded-xl px-3.5 py-2.5 ${control.ordinary}`}>
           <View className="flex-1 gap-0.5">
             <Text className="text-white text-sm font-sans-medium">Show venues</Text>
-            <Text className="text-white/45 text-xs font-sans">Venue pins and hot spots.</Text>
+            <Text className="text-white/60 text-xs font-sans">Venue pins and hot spots.</Text>
           </View>
           <Switch
             value={filters.showVenues}
@@ -131,7 +131,7 @@ export default function MapFiltersSheet() {
       <Pressable
         onPress={() => router.back()}
         accessibilityRole="button"
-        className={`h-12 rounded-full items-center justify-center active:opacity-90 ${primaryControl}`}
+        className={`min-h-12 rounded-full items-center justify-center active:opacity-90 ${primaryControl}`}
       >
         <Text className={`text-[15px] font-sans-semibold ${primaryControlText}`}>Done</Text>
       </Pressable>

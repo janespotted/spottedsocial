@@ -11,8 +11,7 @@ import { openFriendCard } from '@/lib/friend-card';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 interface VenueResult {
   id: string;
@@ -89,14 +88,14 @@ export default function SearchScreen() {
 
       <ScrollView contentContainerClassName="p-4 gap-6" keyboardShouldPersistTaps="handled">
         {trimmed.length < 2 ? (
-          <Text className="text-white/30 text-sm font-sans text-center py-10">
+          <Text className="text-white/45 text-sm font-sans text-center py-10">
             Search for friends or spots.
           </Text>
         ) : (
           <>
             {data?.people.length ? (
               <View className="gap-3">
-                <Text className="text-white/40 text-xs font-sans-medium uppercase tracking-wide">
+                <Text className="text-white/55 text-xs font-sans-medium uppercase tracking-wide">
                   People
                 </Text>
                 {data.people.map((p) => {
@@ -113,7 +112,7 @@ export default function SearchScreen() {
                           <Text className="text-white font-sans-medium text-sm" numberOfLines={1}>
                             {p.display_name}
                           </Text>
-                          <Text className="text-white/40 text-xs font-sans" numberOfLines={1}>
+                          <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>
                             @{p.username}
                           </Text>
                         </View>
@@ -121,7 +120,7 @@ export default function SearchScreen() {
                       {isFriend ? (
                         <View className="flex-row items-center gap-1 px-3 py-1.5">
                           <SymbolView name="checkmark" size={12} tintColor="rgba(255,255,255,0.4)" />
-                          <Text className="text-white/40 text-xs font-sans-medium">Friends</Text>
+                          <Text className="text-white/55 text-xs font-sans-medium">Friends</Text>
                         </View>
                       ) : (
                         <Pressable
@@ -148,7 +147,7 @@ export default function SearchScreen() {
 
             {data?.venues.length ? (
               <View className="gap-3">
-                <Text className="text-white/40 text-xs font-sans-medium uppercase tracking-wide">
+                <Text className="text-white/55 text-xs font-sans-medium uppercase tracking-wide">
                   Venues
                 </Text>
                 {data.venues.map((v) => (
@@ -167,7 +166,7 @@ export default function SearchScreen() {
                         {v.name}
                       </Text>
                       {v.neighborhood ? (
-                        <Text className="text-white/40 text-xs font-sans" numberOfLines={1}>
+                        <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>
                           {v.neighborhood}
                         </Text>
                       ) : null}
@@ -179,7 +178,7 @@ export default function SearchScreen() {
             ) : null}
 
             {data && !data.people.length && !data.venues.length && !isFetching ? (
-              <Text className="text-white/40 text-sm font-sans text-center py-10">
+              <Text className="text-white/55 text-sm font-sans text-center py-10">
                 No results for &ldquo;{term.trim()}&rdquo;
               </Text>
             ) : null}

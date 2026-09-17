@@ -6,8 +6,8 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
 import { ProgressDots } from '@/components/progress-dots';
+import { NEON } from '@/lib/theme';
 
-const NEON = '#d4ff00';
 const USERNAME_REGEX = /^[a-z0-9_.]{3,20}$/;
 const RESERVED_USERNAMES = new Set([
   'admin', 'support', 'spotted', 'anthropic', 'help', 'official',
@@ -134,13 +134,13 @@ export default function UsernameScreen() {
         <Text className="text-[28px] font-sans-light text-white leading-tight">
           pick a username
         </Text>
-        <Text className="text-sm text-white/40 font-sans mt-2">
+        <Text className="text-sm text-white/55 font-sans mt-2">
           lowercase letters, numbers, underscores, and periods. 3-20 characters.
         </Text>
       </View>
 
       <View className="flex-row items-center border-b border-white/15" style={focused ? { borderBottomColor: 'rgba(212,255,0,0.5)' } : undefined}>
-        <Text className="text-[28px] font-sans-light text-white/30 pb-3">@</Text>
+        <Text className="text-[28px] font-sans-light text-white/45 pb-3">@</Text>
         <TextInput
           value={username}
           onChangeText={handleUsernameChange}
@@ -166,7 +166,7 @@ export default function UsernameScreen() {
       </View>
 
       {usernameError ? (
-        <Text className="text-sm text-white/40 font-sans mt-2">{usernameError}</Text>
+        <Text className="text-sm text-white/55 font-sans mt-2">{usernameError}</Text>
       ) : null}
 
       {suggestions.length > 0 ? (
@@ -199,7 +199,7 @@ export default function UsernameScreen() {
         >
           {agreedToTerms ? <SymbolView name="checkmark" size={10} tintColor="#000" /> : null}
         </View>
-        <Text className="text-xs text-white/40 font-sans flex-1">
+        <Text className="text-xs text-white/55 font-sans flex-1">
           i agree to the{' '}
           <Text className="text-white/60 underline" onPress={() => router.push('/terms')}>
             terms of service
@@ -221,7 +221,7 @@ export default function UsernameScreen() {
         <Pressable
           onPress={handleCreateProfile}
           disabled={loading || !usernameAvailable || !agreedToTerms}
-          className="w-full h-12 rounded-2xl items-center justify-center active:opacity-90 disabled:opacity-30"
+          className="w-full min-h-12 rounded-2xl items-center justify-center active:opacity-90 disabled:opacity-30"
           style={{ backgroundColor: NEON }}
         >
           <Text className="text-black text-base font-sans-semibold">

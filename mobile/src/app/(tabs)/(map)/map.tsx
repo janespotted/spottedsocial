@@ -699,7 +699,7 @@ export default function MapScreen() {
               <Text className="text-white text-sm font-sans-medium">
                 {myStatus.status === 'planning' ? 'TBD tonight' : 'Out · location hidden'}
               </Text>
-              <Text className="text-white/40 text-xs font-sans">Update</Text>
+              <Text className="text-white/55 text-xs font-sans">Update</Text>
             </Pressable>
           ) : (
             <Pressable

@@ -71,7 +71,7 @@ function ThreadRow({ thread, onPress }: { thread: DmThreadPreview; onPress: () =
             </Text>
           ) : null}
           <Text
-            className={`text-sm shrink font-sans ${thread.unread ? 'text-white/90' : 'text-white/40'}`}
+            className={`text-sm shrink font-sans ${thread.unread ? 'text-white/90' : 'text-white/55'}`}
             numberOfLines={1}
           >
             {subtitle}
@@ -79,7 +79,7 @@ function ThreadRow({ thread, onPress }: { thread: DmThreadPreview; onPress: () =
         </View>
       </View>
       <View className="items-end gap-1.5">
-        <Text className="text-white/30 text-xs font-sans">
+        <Text className="text-white/45 text-xs font-sans">
           {formatWhen(thread.last_message?.created_at ?? null)}
         </Text>
         {thread.unread ? (
@@ -116,17 +116,17 @@ function YapRow({ quote, index, onPress }: { quote: YapQuote; index: number; onP
         {quote.pinned_count > 0 ? (
           <View className="flex-row items-center gap-0.5">
             <SymbolView name="pin.fill" size={10} tintColor={NEON} />
-            <Text className="text-white/30 text-[11px] font-sans">{quote.pinned_count}</Text>
+            <Text className="text-white/45 text-[11px] font-sans">{quote.pinned_count}</Text>
           </View>
         ) : null}
-        <Text className="text-white/25 text-xs font-sans ml-auto">
+        <Text className="text-white/40 text-xs font-sans ml-auto">
           {relativeTime(quote.created_at)}
         </Text>
       </View>
       {quote.score > 0 ? (
         <View className="flex-row items-center gap-1 mt-1">
           <SymbolView name="arrowtriangle.up.fill" size={10} tintColor="rgba(255,255,255,0.3)" />
-          <Text className="text-white/40 text-xs font-sans-medium">{quote.score}</Text>
+          <Text className="text-white/55 text-xs font-sans-medium">{quote.score}</Text>
         </View>
       ) : null}
     </Pressable>
@@ -151,8 +151,9 @@ export default function MessagesScreen() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('yap');
   const [yapSort, setYapSort] = useState<'hot' | 'new'>('hot');
-  const contentContainerStyle = useResolveClassNames('px-4 pb-6');
-  const yapContentStyle = useResolveClassNames('pb-6');
+  // pb clears the native tab bar + home indicator so the last row is reachable
+  const contentContainerStyle = useResolveClassNames('px-4 pb-28');
+  const yapContentStyle = useResolveClassNames('pb-28');
 
   const { data: city } = useQuery({
     queryKey: ['home-city', session?.user.id],
@@ -367,7 +368,7 @@ export default function MessagesScreen() {
                     ) : null}
                   </Pressable>
                 ))}
-                <Text className="text-white/25 text-[11px] font-sans ml-auto">resets 5am</Text>
+                <Text className="text-white/40 text-[11px] font-sans ml-auto">resets 5am</Text>
               </View>
             </View>
           }

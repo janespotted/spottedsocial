@@ -458,7 +458,7 @@ export default function VenueScreen() {
         </View>
         <ScrollView contentContainerClassName="p-4 gap-3">
           {inviteFriends.length === 0 ? (
-            <Text className="text-white/40 text-sm font-sans text-center py-10">
+            <Text className="text-white/55 text-sm font-sans text-center py-10">
               Add some friends first.
             </Text>
           ) : (
@@ -501,7 +501,7 @@ export default function VenueScreen() {
           <Pressable
             onPress={submitInvites}
             disabled={selectedInvitees.size === 0 || sendingInvites}
-            className="w-full h-11 rounded-xl items-center justify-center active:opacity-90 disabled:opacity-30"
+            className="w-full min-h-11 rounded-xl items-center justify-center active:opacity-90 disabled:opacity-30"
             style={{ backgroundColor: NEON }}
           >
             {sendingInvites ? (
@@ -598,7 +598,7 @@ export default function VenueScreen() {
               onPress={() => refetch()}
               disabled={isRefetching}
               accessibilityRole="button"
-              className="mt-1 h-10 px-5 rounded-full items-center justify-center active:opacity-90 disabled:opacity-50"
+              className="mt-1 min-h-10 px-5 rounded-full items-center justify-center active:opacity-90 disabled:opacity-50"
               style={{ backgroundColor: NEON }}
             >
               {isRefetching ? (
@@ -620,7 +620,7 @@ export default function VenueScreen() {
         ) : (
         <View className="px-5 pt-2 pb-5">
           {metaParts.length > 0 ? (
-            <Text className="text-xs text-white/45 font-sans mb-3">{metaParts.join(' · ')}</Text>
+            <Text className="text-xs text-white/60 font-sans mb-3">{metaParts.join(' · ')}</Text>
           ) : null}
 
           {/* ── ZONE 2: Social — who's here leads the card ── */}
@@ -642,7 +642,7 @@ export default function VenueScreen() {
           <Pressable
             onPress={() => setInvitePickerOpen(true)}
             accessibilityRole="button"
-            className={`w-full h-11 mb-3 rounded-xl flex-row items-center justify-center gap-2 active:opacity-90 ${friendsHere.length > 0 ? outlineControl : ''}`}
+            className={`w-full min-h-11 mb-3 rounded-xl flex-row items-center justify-center gap-2 active:opacity-90 ${friendsHere.length > 0 ? outlineControl : ''}`}
             style={friendsHere.length > 0 ? undefined : { backgroundColor: NEON }}
           >
             <SymbolView name="person.badge.plus" size={16} tintColor={friendsHere.length > 0 ? '#ffffff' : '#000000'} />
@@ -656,7 +656,7 @@ export default function VenueScreen() {
             <Pressable
               onPress={openDirections}
               accessibilityRole="button"
-              className={`flex-row items-center gap-1.5 h-10 px-3 rounded-lg active:opacity-70 ${control.ordinary}`}
+              className={`flex-row items-center gap-1.5 min-h-10 px-3 rounded-lg active:opacity-70 ${control.ordinary}`}
             >
               <SymbolView name="mappin" size={13} tintColor="rgba(255,255,255,0.7)" />
               <Text className="text-white/80 text-xs font-sans-medium">Directions</Text>
@@ -664,7 +664,7 @@ export default function VenueScreen() {
             <Pressable
               onPress={shareVenue}
               accessibilityRole="button"
-              className={`flex-row items-center gap-1.5 h-10 px-3 rounded-lg active:opacity-70 ${control.ordinary}`}
+              className={`flex-row items-center gap-1.5 min-h-10 px-3 rounded-lg active:opacity-70 ${control.ordinary}`}
             >
               <SymbolView name="square.and.arrow.up" size={13} tintColor="rgba(255,255,255,0.7)" />
               <Text className="text-white/80 text-xs font-sans-medium">Share</Text>
@@ -674,7 +674,7 @@ export default function VenueScreen() {
               accessibilityRole="button"
               accessibilityLabel={isInWishlist ? 'Saved. Remove from wishlist' : 'Save to wishlist'}
               accessibilityState={{ selected: isInWishlist }}
-              className={`flex-row items-center gap-1.5 h-10 px-3 rounded-lg active:opacity-70 ${isInWishlist ? control.selected : control.ordinary}`}
+              className={`flex-row items-center gap-1.5 min-h-10 px-3 rounded-lg active:opacity-70 ${isInWishlist ? control.selected : control.ordinary}`}
             >
               <SymbolView
                 name={isInWishlist ? 'bookmark.fill' : 'bookmark'}
@@ -692,7 +692,7 @@ export default function VenueScreen() {
             onPress={() => setMoreInfoOpen((v) => !v)}
             className="flex-row items-center justify-between py-2"
           >
-            <Text className="text-white/40 text-xs font-sans">More Info</Text>
+            <Text className="text-white/55 text-xs font-sans">More Info</Text>
             <SymbolView
               name={moreInfoOpen ? 'chevron.up' : 'chevron.down'}
               size={12}
@@ -708,7 +708,7 @@ export default function VenueScreen() {
               <VenueEventsSection venueId={venue.id} />
 
               {hoursData?.hours ? (
-                <Text className="text-xs text-white/40 font-sans">
+                <Text className="text-xs text-white/55 font-sans">
                   {hoursData.hours.isOpen ? 'Open now' : 'Closed'}
                   {hoursData.hours.displayText ? ` · ${hoursData.hours.displayText}` : ''}
                 </Text>
@@ -731,7 +731,7 @@ export default function VenueScreen() {
                       >
                         <Text className="text-white text-sm font-sans-medium">{sv.name}</Text>
                         {sv.neighborhood ? (
-                          <Text className="text-[10px] text-white/40 font-sans">
+                          <Text className="text-[10px] text-white/55 font-sans">
                             {sv.neighborhood}
                           </Text>
                         ) : null}
@@ -742,7 +742,7 @@ export default function VenueScreen() {
               ) : null}
 
               {hoursData?.rating ? (
-                <Text className="text-[10px] text-white/30 font-sans text-center pb-1">
+                <Text className="text-[10px] text-white/45 font-sans text-center pb-1">
                   {hoursData.rating.toFixed(1)} on Google (
                   {(hoursData.ratingsCount ?? 0).toLocaleString()})
                 </Text>

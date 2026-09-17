@@ -11,8 +11,7 @@ import {
   type EventWithFriends,
 } from '@/lib/plans';
 import { Avatar } from '@/components/avatar';
-
-const PURPLE = '#a855f7';
+import { PURPLE } from '@/lib/theme';
 
 /** Tonight / Tomorrow / weekday / "Fri, Jan 3" — events use the weekday form. */
 function getSmartEventDateLabel(dateStr: string): string {

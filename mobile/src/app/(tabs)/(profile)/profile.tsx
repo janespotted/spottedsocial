@@ -147,7 +147,8 @@ export default function ProfileScreen() {
     enabled: !!session,
     queryFn: () => fetchProfileData(session!.user.id),
   });
-  const contentContainerStyle = useResolveClassNames('px-4 pb-10 gap-5');
+  // pb clears the native tab bar + home indicator so Log Out is reachable
+  const contentContainerStyle = useResolveClassNames('px-4 pb-32 gap-5');
 
   const profile = data?.profile;
   // The card reads the ONE shared status query so it can never lag Plans/Map
@@ -271,15 +272,17 @@ export default function ProfileScreen() {
         {/* Stats row */}
         <View className="flex-row items-center gap-2">
           <Text className="text-sm text-white/65 font-sans">
-            <Text className="text-white font-sans-medium">{data?.placesCount ?? 0}</Text> spots
+            <Text className="text-white font-sans-medium">{data?.placesCount ?? 0}</Text>{' '}
+            {(data?.placesCount ?? 0) === 1 ? 'spot' : 'spots'}
           </Text>
-          <Text className="text-white/25">·</Text>
+          <Text className="text-white/40">·</Text>
           <Pressable onPress={() => router.push('/friends')} hitSlop={4}>
             <Text className="text-sm text-white/65 font-sans">
-              <Text className="text-white font-sans-medium">{friendIds?.length ?? 0}</Text> friends
+              <Text className="text-white font-sans-medium">{friendIds?.length ?? 0}</Text>{' '}
+              {(friendIds?.length ?? 0) === 1 ? 'friend' : 'friends'}
             </Text>
           </Pressable>
-          <Text className="text-white/25">·</Text>
+          <Text className="text-white/40">·</Text>
           <Text className="text-sm text-white/65 font-sans">
             <Text className="text-white font-sans-medium">{data?.weeklyCount ?? 0}</Text> this week
           </Text>
@@ -322,7 +325,7 @@ export default function ProfileScreen() {
           </View>
           <View className="flex-1">
             <Text className="text-white text-sm font-sans-medium">Friends</Text>
-            <Text className="text-white/30 text-xs font-sans">
+            <Text className="text-white/45 text-xs font-sans">
               See everyone you&apos;re connected with
             </Text>
           </View>
@@ -339,7 +342,7 @@ export default function ProfileScreen() {
           </View>
           <View className="flex-1">
             <Text className="text-white text-sm font-sans-medium">Find Friends from Contacts</Text>
-            <Text className="text-white/30 text-xs font-sans">
+            <Text className="text-white/45 text-xs font-sans">
               See who&apos;s already on Spotted
             </Text>
           </View>
@@ -359,7 +362,7 @@ export default function ProfileScreen() {
           </View>
           <View className="flex-1">
             <Text className="text-white text-sm font-sans-medium">Invite Friends</Text>
-            <Text className="text-white/30 text-xs font-sans">
+            <Text className="text-white/45 text-xs font-sans">
               Share your link or QR code to add friends instantly
             </Text>
           </View>

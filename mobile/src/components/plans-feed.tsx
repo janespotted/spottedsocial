@@ -27,8 +27,7 @@ import { EventCard } from '@/components/event-card';
 import { EmptyState, ErrorState, type EmptyAction } from '@/components/empty-state';
 import { addFriendsActions } from '@/lib/add-friends';
 import { FriendsOutBanner } from '@/components/friends-out-banner';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 const AROUND_TONIGHT_COLLAPSE = 4;
 
@@ -239,7 +238,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
     >
       {/* 1. Quiet status control */}
       <View className="flex-row items-center gap-3">
-        <Text className="text-white/40 text-sm font-sans">You&apos;re</Text>
+        <Text className="text-white/55 text-sm font-sans">You&apos;re</Text>
         <View className="flex-1 flex-row items-center bg-white/[0.04] rounded-full p-1">
           {(
             [
@@ -262,7 +261,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
               className={`flex-1 py-2 rounded-full items-center ${seg.active ? 'bg-[#d4ff00]' : ''}`}
             >
               <Text
-                className={`text-xs font-sans-semibold ${seg.active ? 'text-black' : 'text-white/40'}`}
+                className={`text-xs font-sans-semibold ${seg.active ? 'text-black' : 'text-white/55'}`}
               >
                 {seg.label}
               </Text>
@@ -312,17 +311,17 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
               <View className="flex-row items-baseline justify-between mb-1">
                 <Text className="text-white font-sans-semibold text-xl">
                   Around tonight{' '}
-                  <Text className="text-white/40 font-sans">· {aroundTonight.length}</Text>
+                  <Text className="text-white/55 font-sans">· {aroundTonight.length}</Text>
                 </Text>
                 {aroundTonight.length > AROUND_TONIGHT_COLLAPSE ? (
                   <Pressable onPress={() => setAroundExpanded(!aroundExpanded)} hitSlop={6}>
-                    <Text className="text-white/40 text-sm font-sans">
+                    <Text className="text-white/55 text-sm font-sans">
                       {aroundExpanded ? 'Show less' : 'See all'}
                     </Text>
                   </Pressable>
                 ) : null}
               </View>
-              <Text className="text-white/30 text-sm font-sans mb-2">
+              <Text className="text-white/45 text-sm font-sans mb-2">
                 Friends who are out or down to go
               </Text>
 
@@ -399,7 +398,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
               </View>
               <View className="flex-1">
                 <Text className="text-white font-sans-medium text-[15px]">Share a plan</Text>
-                <Text className="text-white/30 text-xs font-sans mt-0.5">
+                <Text className="text-white/45 text-xs font-sans mt-0.5">
                   Post when & where — see who&apos;s down
                 </Text>
               </View>

@@ -88,8 +88,14 @@ function PromotedCard({ venue }: { venue: LeaderboardVenue }) {
   const subLine = [venue.neighborhood, venue.count > 0 ? `${venue.count} here now` : null]
     .filter(Boolean)
     .join(' · ');
+  // Whole row opens the venue (client feedback §9), not just the name
   return (
-    <View className="rounded-2xl p-4 mb-3 bg-[#1e1338] border border-white/[0.06]">
+    <Pressable
+      onPress={() => openVenue(venue.venue_name, venue.venue_id)}
+      accessibilityRole="button"
+      accessibilityLabel={`${venue.venue_name}, promoted. Open venue`}
+      className="rounded-2xl p-4 mb-3 bg-[#1e1338] border border-white/[0.06] active:opacity-80"
+    >
       <View className="flex-row items-center gap-3">
         <View className="px-2.5 py-1 bg-[#a855f7]/15 rounded-full">
           <Text className="text-[10px] text-[#a855f7] font-sans-semibold uppercase tracking-wide">
@@ -97,13 +103,11 @@ function PromotedCard({ venue }: { venue: LeaderboardVenue }) {
           </Text>
         </View>
         <View className="flex-1 min-w-0">
-          <Pressable onPress={() => openVenue(venue.venue_name, venue.venue_id)} hitSlop={4}>
-            <Text className="text-base font-sans-semibold text-white" numberOfLines={1}>
-              {venue.venue_name}
-            </Text>
-          </Pressable>
+          <Text className="text-base font-sans-semibold text-white" numberOfLines={1}>
+            {venue.venue_name}
+          </Text>
           {subLine ? (
-            <Text className="text-white/40 text-xs mt-0.5 font-sans" numberOfLines={1}>
+            <Text className="text-white/55 text-xs mt-0.5 font-sans" numberOfLines={1}>
               {subLine}
             </Text>
           ) : null}
@@ -115,7 +119,7 @@ function PromotedCard({ venue }: { venue: LeaderboardVenue }) {
         ) : null}
         <FriendStack venueName={venue.venue_name} friends={venue.friends} />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -128,9 +132,13 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
   if (venue.count > 0) subParts.push(`${venue.count} here now`);
   const subLine = subParts.join(' · ');
 
+  // Whole row opens the venue (client feedback §9), not just the name
   return (
-    <View
-      className={`relative overflow-hidden rounded-2xl mb-3 ${
+    <Pressable
+      onPress={() => openVenue(venue.venue_name, venue.venue_id)}
+      accessibilityRole="button"
+      accessibilityLabel={`Number ${venue.rank}, ${venue.venue_name}. Open venue`}
+      className={`relative overflow-hidden rounded-2xl mb-3 active:opacity-80 ${
         isTop1
           ? 'bg-[#221540] p-5 border border-[#d4ff00]/20'
           : isTop3
@@ -162,18 +170,12 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
         {/* Venue Info */}
         <View className="flex-1 min-w-0">
           <View className="flex-row items-center gap-2">
-            <Pressable
-              onPress={() => openVenue(venue.venue_name, venue.venue_id)}
-              hitSlop={4}
-              className="shrink"
+            <Text
+              className={`shrink font-sans-semibold text-white ${isTop1 ? 'text-lg' : 'text-base'}`}
+              numberOfLines={1}
             >
-              <Text
-                className={`font-sans-semibold text-white ${isTop1 ? 'text-lg' : 'text-base'}`}
-                numberOfLines={1}
-              >
-                {venue.venue_name}
-              </Text>
-            </Pressable>
+              {venue.venue_name}
+            </Text>
             {venue.isNewlyOpened ? (
               <View className="px-2 py-0.5 bg-[#d4ff00]/15 rounded-full">
                 <Text className="text-[10px] text-[#d4ff00] font-sans-semibold">NEW</Text>
@@ -187,7 +189,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
             ) : null}
           </View>
           {subLine ? (
-            <Text className="text-white/40 text-xs mt-0.5 font-sans" numberOfLines={1}>
+            <Text className="text-white/55 text-xs mt-0.5 font-sans" numberOfLines={1}>
               {subLine}
             </Text>
           ) : null}
@@ -195,7 +197,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
 
         <FriendStack venueName={venue.venue_name} friends={venue.friends} />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -282,30 +284,31 @@ function LeaderboardHeader({
   );
 }
 
-/* ── Biggest Mover — fixed above the tab bar ── */
+/* ── Biggest Mover — a list item, not a float over the last rows (§9) ── */
 
 function BiggestMoverCard({ mover }: { mover: BiggestMover }) {
   return (
-    <View className="absolute bottom-safe-offset-16 left-4 right-4">
-      <View
-        className="bg-[#1e1338] border border-white/[0.06] rounded-2xl p-3.5"
-        style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}
-      >
-        <View className="flex-row items-center gap-3">
-          <View className="flex-1 min-w-0">
-            <Text className="text-[#a855f7] text-xs font-sans-semibold uppercase tracking-wide mb-0.5">
-              Biggest Mover
-            </Text>
-            <Pressable onPress={() => openVenue(mover.venue_name, mover.venue_id)} hitSlop={4}>
-              <Text className="text-base font-sans-semibold text-white" numberOfLines={1}>
-                {mover.venue_name}
-              </Text>
-            </Pressable>
-          </View>
-          <FriendStack venueName={mover.venue_name} friends={mover.friends} />
+    <Pressable
+      onPress={() => openVenue(mover.venue_name, mover.venue_id)}
+      accessibilityRole="button"
+      accessibilityLabel={`Biggest mover, ${mover.venue_name}. Open venue`}
+      className="mt-1 bg-[#1e1338] border border-[#a855f7]/30 rounded-2xl p-3.5 active:opacity-80"
+    >
+      <View className="flex-row items-center gap-3">
+        <View className="w-9 h-9 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(168,85,247,0.18)' }}>
+          <SymbolView name="arrow.up.right" size={15} tintColor={PURPLE} weight="semibold" />
         </View>
+        <View className="flex-1 min-w-0">
+          <Text className="text-[#c084fc] text-xs font-sans-semibold uppercase tracking-wide mb-0.5">
+            Biggest Mover
+          </Text>
+          <Text className="text-base font-sans-semibold text-white" numberOfLines={1}>
+            {mover.venue_name}
+          </Text>
+        </View>
+        <FriendStack venueName={mover.venue_name} friends={mover.friends} />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -315,7 +318,8 @@ export default function LeaderboardScreen() {
   const { session } = useSession();
   const { unreadCount } = useNotifications();
   const [neighborhood, setNeighborhood] = useState<string | null>(null);
-  const contentContainerStyle = useResolveClassNames('px-4 py-4 pb-36');
+  // pb clears the native tab bar + home indicator with a visible gap
+  const contentContainerStyle = useResolveClassNames('px-4 py-4 pb-28');
 
   const { data: city } = useQuery({
     queryKey: ['home-city', session?.user.id],
@@ -400,9 +404,8 @@ export default function LeaderboardScreen() {
         renderItem={({ item }) =>
           item.isPromoted ? <PromotedCard venue={item} /> : <VenueCard venue={item} />
         }
+        ListFooterComponent={biggestMover ? <BiggestMoverCard mover={biggestMover} /> : null}
       />
-
-      {biggestMover ? <BiggestMoverCard mover={biggestMover} /> : null}
     </View>
   );
 }

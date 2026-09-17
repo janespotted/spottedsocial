@@ -6,9 +6,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOrCreateInviteCode, getInviteUrl, regenerateInviteCode } from '@/lib/invites';
 import { useSession } from '@/hooks/use-session';
-
-const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
+import { NEON, PURPLE } from '@/lib/theme';
 
 /**
  * Invite friends — native form sheet. Port of the web InviteFriendsSection +

@@ -20,9 +20,8 @@ import { supabase } from '@/lib/supabase';
 import { getActiveCity } from '@/lib/tonight';
 import type { PublishedPost } from '@/lib/publish-post';
 import { useSession } from '@/hooks/use-session';
+import { NEON, INK } from '@/lib/theme';
 
-const NEON = '#d4ff00';
-const INK = '#110a24';
 const GLASS_BG = 'rgba(255,255,255,0.05)';
 const GLASS_BORDER = 'rgba(255,255,255,0.12)';
 
@@ -159,7 +158,7 @@ export function PostShared({
                   </Text>
                 ) : null}
               </View>
-              <Text className="text-white/35 text-xs font-sans">now</Text>
+              <Text className="text-white/50 text-xs font-sans">now</Text>
             </View>
 
             {post.media ? (
@@ -177,7 +176,7 @@ export function PostShared({
               ) : null}
               <View className="flex-row items-center gap-1.5">
                 <SymbolView name="eye" size={12} tintColor="rgba(255,255,255,0.45)" />
-                <Text className="text-white/45 text-[11px] font-sans">
+                <Text className="text-white/60 text-[11px] font-sans">
                   {audienceLabel(post.visibility)} · gone at 5:00 AM
                 </Text>
               </View>
@@ -192,7 +191,7 @@ export function PostShared({
           <Pressable
             onPress={onViewFeed}
             accessibilityLabel="View in feed"
-            className="h-13 rounded-full items-center justify-center active:opacity-90"
+            className="min-h-13 rounded-full items-center justify-center active:opacity-90"
             style={{ backgroundColor: NEON, boxShadow: '0 8px 24px rgba(212,255,0,0.3)' }}
           >
             <Text className="text-[#110a24] text-base font-sans-semibold">View in feed</Text>
@@ -200,7 +199,7 @@ export function PostShared({
           <Pressable
             onPress={onDone}
             accessibilityLabel="Done"
-            className="h-13 rounded-full items-center justify-center active:opacity-70"
+            className="min-h-13 rounded-full items-center justify-center active:opacity-70"
             style={{ backgroundColor: GLASS_BG, borderWidth: 1, borderColor: GLASS_BORDER }}
           >
             <Text className="text-white text-base font-sans-semibold">Done</Text>

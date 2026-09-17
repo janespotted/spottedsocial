@@ -69,9 +69,9 @@ export default function BlockedHiddenScreen() {
       <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider">
         {title}
       </Text>
-      <Text className="text-white/30 text-xs font-sans -mt-1">{subtitle}</Text>
+      <Text className="text-white/45 text-xs font-sans -mt-1">{subtitle}</Text>
       {rows.length === 0 ? (
-        <Text className="text-white/40 text-sm font-sans py-2">No one here</Text>
+        <Text className="text-white/55 text-sm font-sans py-2">No one here</Text>
       ) : (
         rows.map((row) => (
           <View key={row.rowId} className="flex-row items-center gap-3 py-2">

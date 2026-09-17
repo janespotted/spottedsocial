@@ -8,8 +8,7 @@ import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { openFriendCard } from '@/lib/friend-card';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 interface Liker {
   user_id: string;
@@ -65,7 +64,7 @@ export default function PostLikesScreen() {
           keyExtractor={(l) => l.user_id}
           contentContainerStyle={{ padding: 16, gap: 14 }}
           ListEmptyComponent={
-            <Text className="text-white/40 text-sm font-sans text-center py-12">
+            <Text className="text-white/55 text-sm font-sans text-center py-12">
               No likes yet.
             </Text>
           }
@@ -80,7 +79,7 @@ export default function PostLikesScreen() {
                   {item.display_name}
                 </Text>
                 {item.username ? (
-                  <Text className="text-white/40 text-xs font-sans" numberOfLines={1}>
+                  <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>
                     @{item.username}
                   </Text>
                 ) : null}

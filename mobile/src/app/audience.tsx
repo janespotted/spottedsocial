@@ -11,8 +11,7 @@ import {
 } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
 import { audienceIsEmpty, useAudienceCounts } from '@/hooks/use-audience-counts';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 const EMPTY_HINTS: Record<Audience, string> = {
   close_friends: 'Nobody is on your Close Friends list yet. Star friends to add them.',
@@ -68,7 +67,7 @@ export default function AudienceSheet() {
                 >
                   {opt.label}
                   {counts ? (
-                    <Text className="text-white/35 font-sans text-sm">  · {counts[opt.value]}</Text>
+                    <Text className="text-white/50 font-sans text-sm">  · {counts[opt.value]}</Text>
                   ) : null}
                 </Text>
                 <Text className="text-white/50 text-xs font-sans">{opt.desc}</Text>
@@ -102,7 +101,7 @@ export default function AudienceSheet() {
       >
         <Text className="text-[#1a0f2e] text-base font-sans-semibold">Confirm audience</Text>
       </Pressable>
-      <Text className="text-white/30 text-xs font-sans text-center">
+      <Text className="text-white/45 text-xs font-sans text-center">
         Confirming only sets the audience — nothing is shared until you do.
       </Text>
     </View>

@@ -6,8 +6,7 @@ import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
-
-const PURPLE = '#a855f7';
+import { PURPLE } from '@/lib/theme';
 
 interface VenueEvent {
   id: string;

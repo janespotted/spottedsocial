@@ -10,8 +10,7 @@ import { blockUser, reportContent } from '@/lib/moderation';
 import { openFriendCard } from '@/lib/friend-card';
 import { muxHlsUrl, muxPlaybackState, muxThumbnailUrl } from '@/lib/mux';
 import { supabase } from '@/lib/supabase';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 /**
  * Feed video. Mux posts stream HLS with the Mux poster frame underneath
@@ -212,7 +211,7 @@ export function PostCard({
             </Pressable>
           ) : null}
         </View>
-        <Text className="text-white/35 text-xs font-sans">{getTimeAgo(post.created_at)}</Text>
+        <Text className="text-white/50 text-xs font-sans">{getTimeAgo(post.created_at)}</Text>
         <Pressable onPress={openMenu} hitSlop={8} className="ml-3 opacity-60">
           <SymbolView name="ellipsis" size={18} tintColor="rgba(255,255,255,0.8)" />
         </Pressable>
@@ -292,7 +291,7 @@ export function PostCard({
 
         {post.comments_count > 0 ? (
           <Pressable onPress={openComments} hitSlop={4}>
-            <Text className="text-white/40 text-sm font-sans mt-1">
+            <Text className="text-white/55 text-sm font-sans mt-1">
               View all {post.comments_count} comments
             </Text>
           </Pressable>

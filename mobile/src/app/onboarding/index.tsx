@@ -3,8 +3,7 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { ProgressDots } from '@/components/progress-dots';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 export default function NameScreen() {
   const [displayName, setDisplayName] = useState('');
@@ -28,7 +27,7 @@ export default function NameScreen() {
         <Text className="text-[28px] font-sans-light text-white leading-tight">
           what should we call you?
         </Text>
-        <Text className="text-sm text-white/40 font-sans mt-2">
+        <Text className="text-sm text-white/55 font-sans mt-2">
           this is how you&apos;ll show up to friends
         </Text>
       </View>
@@ -50,7 +49,7 @@ export default function NameScreen() {
         <Pressable
           onPress={handleContinue}
           disabled={!displayName.trim()}
-          className="w-full h-12 rounded-2xl items-center justify-center active:opacity-90 disabled:opacity-30"
+          className="w-full min-h-12 rounded-2xl items-center justify-center active:opacity-90 disabled:opacity-30"
           style={{ backgroundColor: NEON }}
         >
           <Text className="text-black text-base font-sans-semibold">continue</Text>

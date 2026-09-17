@@ -14,9 +14,8 @@ import { PublishError, publishPost, type PublishPhase, type PublishedPost } from
 import { useSession } from '@/hooks/use-session';
 import { AudienceRow } from '@/components/audience-row';
 import type { CapturedMedia } from '@/lib/post-media';
+import { NEON, INK } from '@/lib/theme';
 
-const NEON = '#d4ff00';
-const INK = '#110a24';
 const GLASS_BG = 'rgba(255,255,255,0.05)';
 const GLASS_BORDER = 'rgba(255,255,255,0.12)';
 
@@ -228,7 +227,7 @@ export function PostComposer({
         <View className="items-center">
           <Text className="text-white text-base font-sans-semibold">New post</Text>
           <Text
-            className={`text-[11px] font-sans ${posting ? 'text-[#d4ff00]/90' : 'text-white/40'}`}
+            className={`text-[11px] font-sans ${posting ? 'text-[#d4ff00]/90' : 'text-white/55'}`}
             style={{ fontVariant: ['tabular-nums'] }}
           >
             {statusLine}
@@ -239,7 +238,7 @@ export function PostComposer({
           disabled={!canShare}
           hitSlop={6}
           accessibilityLabel="Share post"
-          className="h-10 min-w-21 px-5 rounded-full items-center justify-center active:opacity-90 disabled:opacity-40"
+          className="min-h-10 min-w-21 px-5 rounded-full items-center justify-center active:opacity-90 disabled:opacity-40"
           style={{ backgroundColor: NEON, boxShadow: canShare ? '0 6px 20px rgba(212,255,0,0.3)' : undefined }}
         >
           {phase === 'uploading' && media ? (
@@ -325,7 +324,7 @@ export function PostComposer({
             className="min-h-20 text-white text-[16px] font-sans leading-6"
             style={{ textAlignVertical: 'top' }}
           />
-          <Text className="text-white/25 text-[11px] font-sans text-right">
+          <Text className="text-white/40 text-[11px] font-sans text-right">
             {caption.length}/{CAPTION_MAX}
           </Text>
         </Card>
@@ -369,7 +368,7 @@ export function PostComposer({
               ))}
             </View>
           ) : null}
-          <Text className="text-white/35 text-[11px] font-sans px-4 pb-3">
+          <Text className="text-white/50 text-[11px] font-sans px-4 pb-3">
             Tagging a venue here doesn&apos;t change where you&apos;re checked in.
           </Text>
         </Card>

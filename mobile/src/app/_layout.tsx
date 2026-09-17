@@ -15,11 +15,18 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaListener, SafeAreaProvider } from 'react-native-safe-area-context';
 import { Uniwind, useResolveClassNames } from 'uniwind';
 import { SessionProvider, useSession } from '@/hooks/use-session';
-import { SCREEN_GRADIENT } from '@/lib/theme';
+import { INK_LIGHT, SCREEN_GRADIENT } from '@/lib/theme';
 import { BackgroundLocationManager } from '@/components/background-location-manager';
 import { NightStatusGate } from '@/components/night-status-gate';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import { queryClient } from '@/lib/query-client';
+
+/**
+ * Every form sheet is opaque (client feedback §9). They used to be
+ * transparent to show the native sheet material, but with no background
+ * of their own the neon glows behind them bled through the card.
+ */
+const SHEET_CONTENT_STYLE = { backgroundColor: INK_LIGHT } as const;
 
 function RootNavigator() {
   const { session, loading, onboardingNeeded } = useSession();
@@ -81,7 +88,7 @@ function RootNavigator() {
           presentation: 'formSheet',
           sheetAllowedDetents: 'fitToContents',
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: SHEET_CONTENT_STYLE,
         }}
       />
       <Stack.Screen
@@ -90,7 +97,7 @@ function RootNavigator() {
           presentation: 'formSheet',
           sheetAllowedDetents: 'fitToContents',
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: SHEET_CONTENT_STYLE,
         }}
       />
       <Stack.Screen
@@ -99,7 +106,7 @@ function RootNavigator() {
           presentation: 'formSheet',
           sheetAllowedDetents: 'fitToContents',
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: SHEET_CONTENT_STYLE,
         }}
       />
       <Stack.Screen
@@ -108,7 +115,7 @@ function RootNavigator() {
           presentation: 'formSheet',
           sheetAllowedDetents: 'fitToContents',
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: SHEET_CONTENT_STYLE,
         }}
       />
       <Stack.Screen
@@ -124,7 +131,7 @@ function RootNavigator() {
             sheetAllowedDetents: 'fitToContents',
             sheetGrabberVisible: !gate,
             gestureEnabled: !gate,
-            contentStyle: { backgroundColor: 'transparent' },
+            contentStyle: SHEET_CONTENT_STYLE,
           };
         }}
       />
@@ -134,7 +141,7 @@ function RootNavigator() {
           presentation: 'formSheet',
           sheetAllowedDetents: 'fitToContents',
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: SHEET_CONTENT_STYLE,
         }}
       />
       <Stack.Screen
@@ -143,7 +150,7 @@ function RootNavigator() {
           presentation: 'formSheet',
           sheetAllowedDetents: 'fitToContents',
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: SHEET_CONTENT_STYLE,
         }}
       />
       <Stack.Screen
@@ -152,7 +159,7 @@ function RootNavigator() {
           presentation: 'formSheet',
           sheetAllowedDetents: 'fitToContents',
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: SHEET_CONTENT_STYLE,
         }}
       />
       <Stack.Screen
@@ -161,9 +168,7 @@ function RootNavigator() {
           presentation: 'formSheet',
           sheetAllowedDetents: 'fitToContents',
           sheetGrabberVisible: true,
-          // Transparent so the native sheet material (liquid glass on iOS 26)
-          // shows instead of the app's solid contentStyle
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: SHEET_CONTENT_STYLE,
         }}
       />
       </Stack.Protected>

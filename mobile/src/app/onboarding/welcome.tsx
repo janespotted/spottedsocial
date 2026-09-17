@@ -4,9 +4,7 @@ import { SymbolView, type SFSymbol } from 'expo-symbols';
 import BackgroundGeolocation from 'react-native-background-geolocation';
 import { ensureLocationReady } from '@/lib/location-ready';
 import { useSession } from '@/hooks/use-session';
-
-const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
+import { NEON, PURPLE } from '@/lib/theme';
 
 interface Slide {
   icon: SFSymbol;
@@ -141,7 +139,7 @@ export default function WelcomeScreen() {
         </Pressable>
 
         <Pressable onPress={finish} disabled={finishing}>
-          <Text className="text-center text-white/40 text-sm font-sans">Skip</Text>
+          <Text className="text-center text-white/55 text-sm font-sans">Skip</Text>
         </Pressable>
       </View>
     </View>

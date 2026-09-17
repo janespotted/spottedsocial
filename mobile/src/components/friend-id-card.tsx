@@ -9,8 +9,7 @@ import { sendMeetUp } from '@/lib/meet-up';
 import { blockUser, reportContent } from '@/lib/moderation';
 import { Avatar } from '@/components/avatar';
 import type { MapFriend } from '@/hooks/use-map-data';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 // Gradient ring classes by relationship (web FriendIdCard parity)
 const RING_GRADIENTS: Record<string, string> = {
@@ -175,7 +174,7 @@ export function FriendCardBody({
                 </Text>
               </View>
               {lastSeen ? (
-                <Text className="text-white/30 text-xs font-sans mt-0.5">{lastSeen}</Text>
+                <Text className="text-white/45 text-xs font-sans mt-0.5">{lastSeen}</Text>
               ) : null}
             </View>
           </View>

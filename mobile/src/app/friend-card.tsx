@@ -7,8 +7,7 @@ import { FriendCardBody } from '@/components/friend-id-card';
 import { useSession } from '@/hooks/use-session';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import type { MapFriend, RelationshipType } from '@/hooks/use-map-data';
-
-const NEON = '#d4ff00';
+import { NEON } from '@/lib/theme';
 
 /**
  * App-wide Friend ID card as a native form sheet (SOW §14 — every

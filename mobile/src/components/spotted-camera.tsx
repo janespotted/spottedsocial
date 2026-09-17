@@ -38,12 +38,9 @@ import {
   toFileUri,
   type CapturedMedia,
 } from '@/lib/post-media';
+import { NEON, PURPLE, INK, RECORD_RED } from '@/lib/theme';
 
 /* ── Visual tokens (nightlife: deep purple, neon lime, glass) ── */
-const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
-const INK = '#110a24';
-const RECORD_RED = '#ff3b5c';
 const GLASS_BG = 'rgba(17, 10, 36, 0.55)';
 const GLASS_BORDER = 'rgba(255, 255, 255, 0.14)';
 
@@ -317,7 +314,7 @@ function StatusMark({ state }: { state: 'pending' | 'granted' | 'denied' }) {
     );
   }
   if (state === 'denied') {
-    return <Text className="text-white/35 text-[12px] font-sans">Off</Text>;
+    return <Text className="text-white/50 text-[12px] font-sans">Off</Text>;
   }
   return null;
 }
@@ -375,7 +372,7 @@ function PermissionsIntro({
           <Pressable
             onPress={onAllow}
             disabled={requesting}
-            className="h-12 rounded-full items-center justify-center active:opacity-90 disabled:opacity-60"
+            className="min-h-12 rounded-full items-center justify-center active:opacity-90 disabled:opacity-60"
             style={{ backgroundColor: NEON }}
           >
             {requesting ? (
@@ -424,7 +421,7 @@ function PermissionsIntro({
             </View>
             <View className="flex-1">
               <Text className="text-white text-[15px] font-sans-medium">{row.title}</Text>
-              <Text className="text-white/45 text-[12px] font-sans" numberOfLines={1}>
+              <Text className="text-white/60 text-[12px] font-sans" numberOfLines={1}>
                 {row.why}
               </Text>
             </View>
@@ -444,7 +441,7 @@ function CameraDenied({ onLibrary, onClose }: { onLibrary: () => void; onClose: 
         <View className="gap-1">
           <Pressable
             onPress={onLibrary}
-            className="h-12 rounded-full items-center justify-center active:opacity-90"
+            className="min-h-12 rounded-full items-center justify-center active:opacity-90"
             style={{ backgroundColor: NEON }}
           >
             <Text className="text-[#110a24] text-[15px] font-sans-semibold">Choose from library</Text>
@@ -870,7 +867,7 @@ export function SpottedCamera({
             <Text className="text-white text-sm font-sans-semibold" style={{ fontVariant: ['tabular-nums'] }}>
               {fmt(elapsed)}
             </Text>
-            <Text className="text-white/45 text-xs font-sans">/ 0:{MAX_VIDEO_SECONDS}</Text>
+            <Text className="text-white/60 text-xs font-sans">/ 0:{MAX_VIDEO_SECONDS}</Text>
             {mutedVideo ? <SymbolView name="mic.slash" size={12} tintColor="rgba(255,255,255,0.6)" /> : null}
           </View>
         ) : zoomLabel ? (

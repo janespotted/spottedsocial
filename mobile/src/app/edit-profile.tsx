@@ -14,8 +14,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
+import { NEON } from '@/lib/theme';
 
-const NEON = '#d4ff00';
 const USERNAME_REGEX = /^[a-z0-9_.]{3,20}$/;
 
 /** Edit profile — native form sheet. Port of the web EditProfile page. */

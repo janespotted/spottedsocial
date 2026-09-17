@@ -16,9 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { sendFriendRequest } from '@/lib/friends';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
-
-const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
+import { NEON, PURPLE } from '@/lib/theme';
 
 interface ContactMatch {
   user_id: string;
@@ -219,7 +217,7 @@ export default function ContactsSyncSheet() {
             On Spotted ({matches.length})
           </Text>
           {matches.length === 0 ? (
-            <Text className="text-white/40 text-sm font-sans">No contacts on Spotted yet.</Text>
+            <Text className="text-white/55 text-sm font-sans">No contacts on Spotted yet.</Text>
           ) : (
             matches.map((match) => (
               <View key={match.user_id} className="flex-row items-center gap-3 py-2.5">
@@ -228,7 +226,7 @@ export default function ContactsSyncSheet() {
                   <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
                     {match.display_name}
                   </Text>
-                  <Text className="text-white/40 text-xs font-sans" numberOfLines={1}>
+                  <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>
                     {match.contactName} in your contacts
                   </Text>
                 </View>

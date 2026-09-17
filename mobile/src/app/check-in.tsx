@@ -40,9 +40,7 @@ import { useSession } from '@/hooks/use-session';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { AudienceRow } from '@/components/audience-row';
-
-const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
+import { NEON, PURPLE } from '@/lib/theme';
 
 type Step =
   | 'ask'
@@ -230,7 +228,7 @@ function VenueRow({
         {name}
       </Text>
       {distance && distance > 0 ? (
-        <Text className="text-white/30 text-xs font-sans">{Math.round(distance)}m</Text>
+        <Text className="text-white/45 text-xs font-sans">{Math.round(distance)}m</Text>
       ) : null}
     </Pressable>
   );
@@ -744,13 +742,13 @@ export default function CheckInSheet() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-white text-base font-sans-medium">{opt.label}</Text>
-                  <Text className="text-white/40 text-xs font-sans">{opt.desc}</Text>
+                  <Text className="text-white/55 text-xs font-sans">{opt.desc}</Text>
                 </View>
                 <SymbolView name="chevron.right" size={14} tintColor="rgba(255,255,255,0.3)" />
               </Pressable>
             ))}
           </View>
-          <Text className="text-white/30 text-xs font-sans text-center">
+          <Text className="text-white/45 text-xs font-sans text-center">
             Statuses reset at 5:00 AM {getCityLabel(city)} time
           </Text>
         </>
@@ -767,7 +765,7 @@ export default function CheckInSheet() {
               until you tap &ldquo;Share my spot&rdquo;, and only the friends you choose can see
               it.
             </Text>
-            <Text className="text-white/40 text-xs font-sans text-center">
+            <Text className="text-white/55 text-xs font-sans text-center">
               iOS will ask for &ldquo;While Using the App&rdquo; access next.
             </Text>
           </View>
@@ -797,7 +795,7 @@ export default function CheckInSheet() {
               Everything still works: pick your venue yourself, share it, and see who&apos;s out.
               Location only lets Spotted guess the venue for you.
             </Text>
-            <Text className="text-white/40 text-xs font-sans text-center">
+            <Text className="text-white/55 text-xs font-sans text-center">
               Allow &ldquo;While Using the App&rdquo; in Settings and come back — this screen
               updates on its own.
             </Text>
@@ -896,7 +894,7 @@ export default function CheckInSheet() {
             detecting={detectingHood}
           />
           <AudienceRow value={audience} onChange={setAudienceOverride} />
-          <Text className="text-white/40 text-xs font-sans">
+          <Text className="text-white/55 text-xs font-sans">
             Only Close Friends see your exact spot on the map. Everyone else in your audience sees
             just the neighborhood — no pin.
           </Text>
@@ -940,7 +938,7 @@ export default function CheckInSheet() {
           </Text>
           <Text className="text-white/70 text-base font-sans text-center">{payoffLine}</Text>
           {payoff.venueName ? (
-            <Text className="text-white/40 text-xs font-sans text-center">
+            <Text className="text-white/55 text-xs font-sans text-center">
               Friends can see you at {payoff.venueName}.
             </Text>
           ) : null}

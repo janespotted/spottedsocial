@@ -13,9 +13,8 @@ import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
+import { NEON, PURPLE } from '@/lib/theme';
 
-const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
 const CARD = 'bg-[#1a0a2e]/80 rounded-2xl p-3.5';
 
 interface PlanningFriend {
@@ -67,7 +66,7 @@ function ActivityCard({
           <Text className="text-white text-sm font-sans-semibold" numberOfLines={1}>
             {n.sender_name ?? 'Spotted'}
           </Text>
-          <Text className="text-white/40 text-xs font-sans">{getTimeAgo(n.created_at)}</Text>
+          <Text className="text-white/55 text-xs font-sans">{getTimeAgo(n.created_at)}</Text>
         </View>
         <Text className={`text-xs font-sans mt-0.5 ${subtitleClass}`} numberOfLines={2}>
           {subtitleFor(n)}
@@ -261,7 +260,7 @@ export default function ActivityScreen() {
                 <Text className="text-white text-sm font-sans-semibold">
                   Friends Planning / PGing
                 </Text>
-                <Text className="text-white/40 text-xs font-sans">
+                <Text className="text-white/55 text-xs font-sans">
                   {planningFriends.length} deciding
                 </Text>
               </View>
@@ -313,7 +312,7 @@ export default function ActivityScreen() {
               />
             ))
           ) : (
-            <Text className="text-white/35 text-sm font-sans py-2">
+            <Text className="text-white/50 text-sm font-sans py-2">
               No invites yet — they&apos;ll land here.
             </Text>
           )}
@@ -392,7 +391,7 @@ export default function ActivityScreen() {
           {all.length === 0 && !planningFriends?.length ? (
             <View className="items-center py-16 gap-3">
               <SymbolView name="bell" size={32} tintColor="rgba(255,255,255,0.2)" />
-              <Text className="text-white/40 text-sm font-sans">
+              <Text className="text-white/55 text-sm font-sans">
                 Nothing yet — go make some noise.
               </Text>
             </View>

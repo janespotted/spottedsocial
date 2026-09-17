@@ -53,7 +53,7 @@ function OutTonightCard({
       <View className="flex-row items-center gap-2">
         <SymbolView name="mappin" size={16} tintColor={NEON} />
         <Text className="text-white font-sans-semibold text-sm">Out Tonight</Text>
-        <Text className="text-white/40 text-xs font-sans">({friends.length})</Text>
+        <Text className="text-white/55 text-xs font-sans">({friends.length})</Text>
       </View>
       {venuesWithheld ? (
         <Pressable
@@ -103,7 +103,7 @@ function PlanningTonightCard({ friends }: { friends: FriendNightStatus[] }) {
       <View className="flex-row items-center gap-2">
         <SymbolView name="target" size={16} tintColor={PURPLE} />
         <Text className="text-white font-sans-semibold text-sm">TBD Tonight</Text>
-        <Text className="text-white/40 text-xs font-sans">({friends.length})</Text>
+        <Text className="text-white/55 text-xs font-sans">({friends.length})</Text>
       </View>
       {friends.map((friend) => (
         <View
@@ -209,9 +209,12 @@ function HomeHeader({
     >
       {/* Top bar — fixed size */}
       <View className="flex-row items-center justify-between px-4 h-10">
+        {/* Wordmark is anchored: same size on every tab, never animates */}
         <Text
           className="text-white font-sans-light"
-          style={{ fontSize: 20 - p * 2, letterSpacing: (20 - p * 2) * 0.28 }}
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.3}
+          style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
         >
           Spotted
         </Text>
@@ -272,7 +275,8 @@ export default function HomeScreen() {
   const { data: ownNight } = useOwnNightStatus();
   const isPlanning = ownNight?.status?.status === 'planning';
   const { unreadCount } = useNotifications();
-  const contentContainerStyle = useResolveClassNames('pb-6');
+  // pb clears the native tab bar, home indicator and the Post FAB
+  const contentContainerStyle = useResolveClassNames('pb-36');
 
   const { data: city } = useQuery({
     queryKey: ['home-city', session?.user.id],
@@ -380,7 +384,7 @@ export default function HomeScreen() {
                 <ActivityIndicator color={NEON} />
               </View>
             ) : (
-              <Text className="text-white/30 text-xs font-sans text-center py-6">
+              <Text className="text-white/45 text-xs font-sans text-center py-6">
                 you&apos;re all caught up
               </Text>
             )
