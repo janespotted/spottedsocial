@@ -18,6 +18,7 @@ import {
   type LeaderboardVenue,
 } from '@/hooks/use-leaderboard';
 import { Avatar } from '@/components/avatar';
+import { DropdownMenu } from '@/components/dropdown-menu';
 import { HeaderActions } from '@/components/header-actions';
 import { NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
 
@@ -230,18 +231,24 @@ function LeaderboardSkeleton() {
 
 /* ── Header (static — port of the web PageHeader; no collapse per app rules) ── */
 
+const ALL_KEY = '__all__';
+
 function LeaderboardHeader({
   city,
   neighborhood,
   unreadCount,
-  onPickNeighborhood,
+  onSelectNeighborhood,
 }: {
   city: string | null;
   neighborhood: string | null;
   unreadCount: number;
-  onPickNeighborhood: () => void;
+  onSelectNeighborhood: (neighborhood: string | null) => void;
 }) {
   const cityLabel = getCityLabel(city ?? 'nyc');
+  const neighborhoodOptions = [
+    { key: ALL_KEY, label: `All ${cityLabel}` },
+    ...(CITY_NEIGHBORHOODS[city ?? 'nyc'] ?? []).map((hood) => ({ key: hood, label: hood })),
+  ];
   return (
     <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
       {/* Top bar — same compact layout as the home header, fixed height */}
@@ -269,17 +276,22 @@ function LeaderboardHeader({
         <Text className="text-white/50 text-sm mt-0.5 font-sans">Top spots tonight</Text>
       </View>
 
-      {/* Neighborhood filter */}
+      {/* Neighborhood filter — the original build's Spotted dropdown, not
+          the system action sheet (addendum v3 §8.8) */}
       <View className="px-4 pt-3 pb-3 flex-row">
-        <Pressable
-          onPress={onPickNeighborhood}
-          className="flex-row items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/15 active:bg-white/10"
+        <DropdownMenu
+          options={neighborhoodOptions}
+          selectedKey={neighborhood ?? ALL_KEY}
+          onSelect={(key) => onSelectNeighborhood(key === ALL_KEY ? null : key)}
+          accessibilityLabel="Filter by neighborhood"
         >
-          <Text className="text-white font-sans-medium text-sm">
-            {neighborhood || `All ${cityLabel}`}
-          </Text>
-          <SymbolView name="chevron.down" size={12} tintColor="rgba(255,255,255,0.6)" />
-        </Pressable>
+          <View className="flex-row items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/15">
+            <Text className="text-white font-sans-medium text-sm">
+              {neighborhood || `All ${cityLabel}`}
+            </Text>
+            <SymbolView name="chevron.down" size={12} tintColor="rgba(255,255,255,0.6)" />
+          </View>
+        </DropdownMenu>
       </View>
     </View>
   );
@@ -346,25 +358,13 @@ export default function LeaderboardScreen() {
   const venues = data?.venues ?? [];
   const biggestMover = data?.biggestMover ?? null;
 
-  const pickNeighborhood = () => {
-    const hoods = CITY_NEIGHBORHOODS[city ?? 'nyc'] ?? [];
-    const options = [`All ${getCityLabel(city ?? 'nyc')}`, ...hoods, 'Cancel'];
-    ActionSheetIOS.showActionSheetWithOptions(
-      { title: 'Neighborhood', options, cancelButtonIndex: options.length - 1 },
-      (index) => {
-        if (index === options.length - 1) return;
-        setNeighborhood(index === 0 ? null : hoods[index - 1]);
-      }
-    );
-  };
-
   return (
     <View className="flex-1">
       <LeaderboardHeader
         city={city ?? null}
         neighborhood={neighborhood}
         unreadCount={unreadCount}
-        onPickNeighborhood={pickNeighborhood}
+        onSelectNeighborhood={setNeighborhood}
       />
 
       <LegendList

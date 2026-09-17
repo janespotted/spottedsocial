@@ -128,6 +128,25 @@ export async function getLocationPermission(): Promise<LocationPermission> {
 export const hasLocationAccess = (p: LocationPermission) => p === 'always' || p === 'when_in_use';
 
 /**
+ * The standard "While Using the App" prompt, for a control the user just
+ * tapped that needs a fix (map recenter). Only meaningful while permission
+ * is not_determined — once iOS has an answer the prompt never shows again
+ * and the caller should point at Settings instead. Never waits forever.
+ */
+export async function requestWhenInUse(): Promise<LocationPermission> {
+  await ensureLocationReady();
+  try {
+    await Promise.race([
+      BackgroundGeolocation.requestPermission(),
+      new Promise((resolve) => setTimeout(resolve, 10000)),
+    ]);
+  } catch {
+    /* declined — the status below says what we actually have */
+  }
+  return getLocationPermission();
+}
+
+/**
  * The "automatic updates" step: upgrade to Always and enable motion
  * activity. Shows the iOS background-location upgrade prompt (and Motion &
  * Fitness). Call only after the user has been told why and has tapped a

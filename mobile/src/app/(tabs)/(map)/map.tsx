@@ -31,7 +31,7 @@ import { Avatar } from '@/components/avatar';
 import { FriendIdCard } from '@/components/friend-id-card';
 import { isDefaultMapFilters, peopleFilterIncludes, resetMapFilters, useMapFilters } from '@/lib/map-filters';
 import { getCurrentPosition } from '@/lib/background-location';
-import { getLocationPermission, hasLocationAccess } from '@/lib/location-ready';
+import { getLocationPermission, hasLocationAccess, requestWhenInUse } from '@/lib/location-ready';
 import { IconButton } from '@/components/icon-button';
 import { SmartArrivalPrompt, VenueMoveBanner } from '@/components/venue-move-banner';
 
@@ -456,20 +456,27 @@ export default function MapScreen() {
   // only when there is no location permission or no fix.
   // Recenter goes to the user's own fix or nowhere (addendum v3 §8.3): the
   // old fallback panned to the city centre, which read as "the wrong place".
+  // Never asked yet (skipped in onboarding) → this tap is the ask; iOS shows
+  // the standard prompt. Denied → Settings, where the row now exists.
   const recenter = async () => {
     if (locating) return;
     setLocating(true);
     try {
-      const me = await getCurrentPosition();
+      let permission = await getLocationPermission();
+      if (permission === 'not_determined') permission = await requestWhenInUse();
+      const me = hasLocationAccess(permission) ? await getCurrentPosition() : null;
       if (me) {
         cameraRef.current?.setCamera({ centerCoordinate: [me.lng, me.lat], animationDuration: 800 });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         return;
       }
-      if (!hasLocationAccess(await getLocationPermission())) {
+      if (!hasLocationAccess(permission)) {
+        // iOS can only open the app's own Settings page (Settings › Spotted);
+        // there is no public link to the Location Services screen, so the
+        // copy names the row to tap.
         Alert.alert(
           'Location is off',
-          'Turn on location for Spotted in Settings to center the map on you.',
+          'In Settings, open Spotted › Location and choose “While Using the App” to center the map on you.',
           [
             { text: 'Not now', style: 'cancel' },
             { text: 'Open Settings', onPress: () => void Linking.openSettings() },
