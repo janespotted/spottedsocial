@@ -13,8 +13,11 @@ import { fetchYapDirectory, type YapQuote } from '@/lib/yap';
 import { useSession } from '@/hooks/use-session';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { useFriendIds } from '@/hooks/use-friend-ids';
 import { Avatar } from '@/components/avatar';
 import { HeaderActions } from '@/components/header-actions';
+import { EmptyState, ErrorState } from '@/components/empty-state';
+import { addFriendsActions } from '@/lib/add-friends';
 import { NEON, PURPLE } from '@/lib/theme';
 
 type TabType = 'yap' | 'messages';
@@ -168,6 +171,8 @@ export default function MessagesScreen() {
   const {
     data: threads,
     isLoading,
+    isError: threadsError,
+    isRefetching: threadsRefetching,
     refetch,
   } = useQuery({
     queryKey: ['dm-threads', session?.user.id],
@@ -175,6 +180,8 @@ export default function MessagesScreen() {
     staleTime: 15_000,
     queryFn: () => fetchDmThreads(session!.user.id),
   });
+  const { data: friendIds } = useFriendIds(session?.user.id);
+  const hasFriends = (friendIds?.length ?? 0) > 0;
 
   // Yap directory + own venue for the "You're At" row
   const {
@@ -409,25 +416,25 @@ export default function MessagesScreen() {
                 <RowSkeleton />
                 <RowSkeleton />
               </View>
+            ) : threadsError ? (
+              <ErrorState title="Couldn't load your messages" onRetry={() => refetch()} retrying={threadsRefetching} />
+            ) : !hasFriends ? (
+              // No friends means nobody to chat with: grow the graph first
+              <EmptyState
+                icon="person.2"
+                title="Add friends to start chatting"
+                body="Messages on Spotted are between friends. Find people you know and the chat opens up."
+                actions={addFriendsActions()}
+              />
             ) : (
-              <View className="items-center justify-center py-20 px-8">
-                <View className="w-20 h-20 rounded-full bg-white/5 items-center justify-center mb-6">
-                  <SymbolView name="bubble.left" size={36} tintColor="rgba(168,85,247,0.6)" />
-                </View>
-                <Text className="text-xl font-sans-semibold text-white mb-2">No messages yet</Text>
-                <Text className="text-white/50 text-sm font-sans text-center mb-6">
-                  Start a conversation with a friend.
-                </Text>
-                <Pressable
-                  onPress={() => router.push('/new-chat')}
-                  accessibilityRole="button"
-                  className="flex-row items-center gap-2 rounded-full pl-4 pr-5 min-h-11 active:opacity-90"
-                  style={{ backgroundColor: NEON }}
-                >
-                  <SymbolView name="square.and.pencil" size={15} tintColor="#1a0f2e" weight="semibold" />
-                  <Text className="text-[#1a0f2e] font-sans-semibold">New chat</Text>
-                </Pressable>
-              </View>
+              <EmptyState
+                icon="bubble.left"
+                title="No messages yet"
+                body="Start a conversation with a friend, or meet up with someone who's out."
+                actions={[
+                  { label: 'New chat', icon: 'square.and.pencil', primary: true, onPress: () => router.push('/new-chat') },
+                ]}
+              />
             )
           }
           renderItem={({ item }) => <ThreadRow thread={item} onPress={() => openThread(item)} />}

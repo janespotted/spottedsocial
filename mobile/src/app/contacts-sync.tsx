@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Linking,
   Pressable,
   ScrollView,
   Text,
   View,
 } from 'react-native';
+import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Contacts from 'expo-contacts';
 import * as Haptics from 'expo-haptics';
@@ -44,6 +46,19 @@ export default function ContactsSyncSheet() {
   const [matches, setMatches] = useState<ContactMatch[]>([]);
   const [inviteable, setInviteable] = useState<Inviteable[]>([]);
   const [requested, setRequested] = useState<Set<string>>(new Set());
+
+  // Back from Settings with access now granted → run the match without
+  // making the user tap again
+  useEffect(() => {
+    if (step !== 'denied') return;
+    const sub = AppState.addEventListener('change', async (state) => {
+      if (state !== 'active') return;
+      const { status } = await Contacts.getPermissionsAsync();
+      if (status === 'granted') sync();
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const sync = async () => {
     if (!userId) return;
@@ -154,18 +169,47 @@ export default function ContactsSyncSheet() {
       ) : null}
 
       {step === 'denied' ? (
-        <View className="items-center py-10 gap-4">
+        // Declining contacts must not be a dead end (client feedback §8):
+        // the other two ways to find friends sit right here, and coming
+        // back from Settings with access granted re-runs the match.
+        <View className="items-center py-8 gap-4">
           <SymbolView name="person.crop.circle.badge.xmark" size={34} tintColor="rgba(168,85,247,0.6)" />
-          <Text className="text-white/50 text-sm font-sans text-center">
-            Contacts access is off. Enable it in Settings to find friends.
+          <Text className="text-white text-base font-sans-semibold text-center">Contacts access is off</Text>
+          <Text className="text-white/55 text-sm font-sans text-center leading-5">
+            Turn it on in Settings to match your contacts, or find friends another way.
           </Text>
           <Pressable
             onPress={() => Linking.openSettings()}
-            className="rounded-full px-6 py-2.5 active:opacity-90"
+            accessibilityRole="button"
+            className="rounded-full px-6 min-h-11 justify-center active:opacity-90"
             style={{ backgroundColor: NEON }}
           >
-            <Text className="text-[#1a0f2e] font-sans-medium">Open Settings</Text>
+            <Text className="text-[#1a0f2e] font-sans-semibold">Open Settings</Text>
           </Pressable>
+          <View className="flex-row gap-2 w-full pt-1">
+            <Pressable
+              onPress={() => {
+                router.back();
+                setTimeout(() => router.push('/search'), 300);
+              }}
+              accessibilityRole="button"
+              className="flex-1 flex-row items-center justify-center gap-2 min-h-11 rounded-full border border-white/20 active:bg-white/5"
+            >
+              <SymbolView name="magnifyingglass" size={14} tintColor="#ffffff" />
+              <Text className="text-white text-sm font-sans-semibold">Search people</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                router.back();
+                setTimeout(() => router.push('/invite-friends'), 300);
+              }}
+              accessibilityRole="button"
+              className="flex-1 flex-row items-center justify-center gap-2 min-h-11 rounded-full border border-white/20 active:bg-white/5"
+            >
+              <SymbolView name="paperplane" size={14} tintColor="#ffffff" />
+              <Text className="text-white text-sm font-sans-semibold">Invite friends</Text>
+            </Pressable>
+          </View>
         </View>
       ) : null}
 

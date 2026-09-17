@@ -60,6 +60,8 @@ export function useFeed() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // A failed page-one load: the screen shows an error, never an empty feed
+  const [isError, setIsError] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const loadingMoreRef = useRef(false);
   const refreshInFlight = useRef<Promise<void> | null>(null);
@@ -179,8 +181,10 @@ export function useFeed() {
           const page = await fetchPage(null);
           setPosts(page);
           setHasMore(page.length === POSTS_PER_PAGE);
+          setIsError(false);
         } catch (e) {
           console.warn('[feed] refresh failed', e);
+          setIsError(true);
         } finally {
           refreshInFlight.current = null;
           setIsRefreshing(false);
@@ -385,7 +389,7 @@ export function useFeed() {
     [session, refresh]
   );
 
-  return { posts, likedPosts, isLoading, isRefreshing, hasMore, refresh, loadMore, toggleLike, deletePost };
+  return { posts, likedPosts, isLoading, isRefreshing, isError, hasMore, refresh, loadMore, toggleLike, deletePost };
 }
 
 export function getTimeAgo(iso: string): string {

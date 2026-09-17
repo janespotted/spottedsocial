@@ -4,6 +4,7 @@ import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { useFriendIds } from './use-friend-ids';
+import { useOwnNightStatus } from './use-own-night-status';
 import { useSession } from './use-session';
 
 export interface FriendNightStatus {
@@ -16,14 +17,28 @@ export interface FriendNightStatus {
   avatar_url: string | null;
 }
 
+export interface FriendsOutData {
+  outFriends: FriendNightStatus[];
+  planningFriends: FriendNightStatus[];
+  /**
+   * True when the viewer answered "No" tonight: friends are listed, but
+   * their venues are withheld (aggregate cues only, like the map) until
+   * the viewer updates their status.
+   */
+  venuesWithheld: boolean;
+}
+
 /**
  * Friends who are out or planning tonight. Visibility (sharing level, hide,
  * block) is enforced server-side by RLS on night_statuses — this hook only
- * shapes the data.
+ * shapes the data, plus the one client-side rule that a viewer who is
+ * staying in does not see precise venues (client feedback §8).
  */
 export function useFriendsOut() {
   const { session } = useSession();
   const { data: friendIds } = useFriendIds(session?.user.id);
+  const { data: own } = useOwnNightStatus();
+  const viewerStayingIn = own?.status?.status === 'home';
   const queryClient = useQueryClient();
 
   // Realtime: refetch Out/Planning cards whenever any night status changes.
@@ -43,12 +58,12 @@ export function useFriendsOut() {
   }, [session, queryClient]);
 
   return useQuery({
-    queryKey: ['friends-out', session?.user.id, friendIds],
+    queryKey: ['friends-out', session?.user.id, friendIds, viewerStayingIn],
     enabled: !!session && !!friendIds,
     staleTime: 30_000,
-    queryFn: async () => {
+    queryFn: async (): Promise<FriendsOutData> => {
       if (!friendIds || friendIds.length === 0) {
-        return { outFriends: [], planningFriends: [] };
+        return { outFriends: [], planningFriends: [], venuesWithheld: false };
       }
 
       const [{ data: statuses }, profiles] = await Promise.all([
@@ -67,9 +82,9 @@ export function useFriendsOut() {
         .map((s) => ({
           user_id: s.user_id,
           status: s.status as 'out' | 'planning',
-          venue_name: s.venue_name,
-          planning_neighborhood: s.planning_neighborhood,
-          planning_venue_name: s.planning_venue_name,
+          venue_name: viewerStayingIn ? null : s.venue_name,
+          planning_neighborhood: viewerStayingIn ? null : s.planning_neighborhood,
+          planning_venue_name: viewerStayingIn ? null : s.planning_venue_name,
           display_name: profileMap.get(s.user_id)!.display_name,
           avatar_url: profileMap.get(s.user_id)!.avatar_url,
         }));
@@ -77,6 +92,7 @@ export function useFriendsOut() {
       return {
         outFriends: rows.filter((r) => r.status === 'out'),
         planningFriends: rows.filter((r) => r.status === 'planning'),
+        venuesWithheld: viewerStayingIn,
       };
     },
   });

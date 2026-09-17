@@ -21,7 +21,12 @@ import { sendMeetUp } from '@/lib/meet-up';
 import { useSession } from '@/hooks/use-session';
 import { useFeed } from '@/hooks/use-feed';
 import { useFriendsOut, type FriendNightStatus } from '@/hooks/use-friends-out';
+import { useFriendIds } from '@/hooks/use-friend-ids';
+import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { useNotifications } from '@/hooks/use-notifications';
+import { EmptyState, ErrorState } from '@/components/empty-state';
+import { addFriendsActions } from '@/lib/add-friends';
+import { FriendsOutBanner } from '@/components/friends-out-banner';
 import { PostCard } from '@/components/post-card';
 import { PlansFeed } from '@/components/plans-feed';
 import { Avatar } from '@/components/avatar';
@@ -35,9 +40,12 @@ type FeedMode = 'newsfeed' | 'plans';
 function OutTonightCard({
   friends,
   onMeetUp,
+  venuesWithheld = false,
 }: {
   friends: FriendNightStatus[];
   onMeetUp: (friend: FriendNightStatus) => void;
+  /** Viewer said "No" tonight: names only, no venues, with the way back in. */
+  venuesWithheld?: boolean;
 }) {
   if (friends.length === 0) return null;
   return (
@@ -47,6 +55,19 @@ function OutTonightCard({
         <Text className="text-white font-sans-semibold text-sm">Out Tonight</Text>
         <Text className="text-white/40 text-xs font-sans">({friends.length})</Text>
       </View>
+      {venuesWithheld ? (
+        <Pressable
+          onPress={() => router.push('/check-in')}
+          accessibilityRole="button"
+          className="flex-row items-center gap-2 rounded-xl px-3 py-2.5 active:opacity-80"
+          style={{ backgroundColor: 'rgba(212,255,0,0.08)', borderWidth: 1, borderColor: 'rgba(212,255,0,0.3)' }}
+        >
+          <Text className="flex-1 text-white/75 text-xs font-sans leading-4">
+            You&apos;re staying in, so venues are hidden. Going out after all? Update your status.
+          </Text>
+          <SymbolView name="chevron.right" size={12} tintColor={NEON} />
+        </Pressable>
+      ) : null}
       {friends.map((friend) => (
         <View
           key={friend.user_id}
@@ -60,7 +81,7 @@ function OutTonightCard({
               {friend.display_name}
             </Text>
             <Text className="text-[#d4ff00] text-xs font-sans" numberOfLines={1}>
-              {friend.venue_name ?? 'out somewhere'}
+              {friend.venue_name ?? (venuesWithheld ? 'Out tonight' : 'out somewhere')}
             </Text>
           </View>
           <Pressable
@@ -111,43 +132,57 @@ function PlanningTonightCard({ friends }: { friends: FriendNightStatus[] }) {
   );
 }
 
+/**
+ * Empty feed, by situation (client feedback §8): no friends → add some;
+ * friends but nothing posted → say so and offer to post. Friends who are
+ * out or TBD still show above, so an empty feed is never a dead end.
+ */
 function EmptyFeed({
+  friendCount,
   outFriends,
   planningFriends,
+  venuesWithheld,
   onMeetUp,
 }: {
+  friendCount: number;
   outFriends: FriendNightStatus[];
   planningFriends: FriendNightStatus[];
+  venuesWithheld: boolean;
   onMeetUp: (friend: FriendNightStatus) => void;
 }) {
-  const hour = new Date().getHours();
-  const emptyTitle =
-    hour < 12 ? "Who's up?" : hour < 17 ? "What's the move?" : hour < 21 ? "Night's young" : 'Nothing here yet';
+  if (friendCount === 0) {
+    return (
+      <EmptyState
+        icon="person.2"
+        title="Add friends to see their nights"
+        body="Posts from your friends show up here until 5 AM. Find people you know to get started."
+        actions={[
+          ...addFriendsActions(),
+          { label: 'Post something', icon: 'camera.fill', onPress: () => router.push('/create-post') },
+        ]}
+      />
+    );
+  }
 
+  const nobodyAround = outFriends.length === 0 && planningFriends.length === 0;
   return (
     <View className="px-4 py-4 gap-6">
-      <View className="items-center">
-        <Pressable
-          onPress={() => router.push('/create-post')}
-          className="rounded-full px-6 py-2.5 active:opacity-90"
-          style={{ backgroundColor: NEON }}
-        >
-          <Text className="text-[#1a0f2e] font-sans-medium">Share what you&apos;re up to</Text>
-        </Pressable>
-      </View>
-
-      <OutTonightCard friends={outFriends} onMeetUp={onMeetUp} />
+      <OutTonightCard friends={outFriends} onMeetUp={onMeetUp} venuesWithheld={venuesWithheld} />
       <PlanningTonightCard friends={planningFriends} />
 
-      {outFriends.length === 0 && planningFriends.length === 0 ? (
-        <View className="items-center py-12">
-          <View className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 items-center justify-center mb-6">
-            <SymbolView name="bubble.left.and.bubble.right" size={40} tintColor="rgba(168,85,247,0.6)" />
-          </View>
-          <Text className="text-xl font-sans-semibold text-white mb-2">{emptyTitle}</Text>
-          <Text className="text-white/50 text-sm font-sans">Share what you&apos;re up to</Text>
-        </View>
-      ) : null}
+      <EmptyState
+        icon={nobodyAround ? 'moon.stars' : 'camera'}
+        title={nobodyAround ? 'Nothing from your circle yet' : 'No posts yet tonight'}
+        body={
+          nobodyAround
+            ? "None of your friends have posted or shared a plan tonight. Posts live here until 5 AM — be the first."
+            : 'Friends are around, but nobody has posted yet. Start it off.'
+        }
+        actions={[
+          { label: "Share what you're up to", icon: 'camera.fill', primary: true, onPress: () => router.push('/create-post') },
+        ]}
+        compact={!nobodyAround}
+      />
     </View>
   );
 }
@@ -233,6 +268,9 @@ export default function HomeScreen() {
   const [scrollProgress, setScrollProgress] = useState(0);
   const feed = useFeed();
   const { data: friendsData, refetch: refetchFriends } = useFriendsOut();
+  const { data: friendIds } = useFriendIds(session?.user.id);
+  const { data: ownNight } = useOwnNightStatus();
+  const isPlanning = ownNight?.status?.status === 'planning';
   const { unreadCount } = useNotifications();
   const contentContainerStyle = useResolveClassNames('pb-6');
 
@@ -347,6 +385,13 @@ export default function HomeScreen() {
               </Text>
             )
           }
+          ListHeaderComponent={
+            isPlanning && outFriends.length > 0 ? (
+              <View className="px-4 pt-4">
+                <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             feed.isLoading ? (
               <View className="px-4 py-8 gap-4">
@@ -360,10 +405,18 @@ export default function HomeScreen() {
                   </View>
                 ))}
               </View>
+            ) : feed.isError ? (
+              <ErrorState
+                title="Couldn't load your feed"
+                onRetry={() => void feed.refresh({ userInitiated: true })}
+                retrying={feed.isRefreshing}
+              />
             ) : (
               <EmptyFeed
+                friendCount={friendIds?.length ?? 0}
                 outFriends={outFriends}
                 planningFriends={planningFriends}
+                venuesWithheld={friendsData?.venuesWithheld ?? false}
                 onMeetUp={handleMeetUp}
               />
             )

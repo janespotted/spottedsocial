@@ -17,6 +17,8 @@ function statusWord(status: string | null | undefined): { label: string; answere
     case 'home':
       return { label: 'In', answered: true };
     default:
+      // No answer yet tonight (e.g. daytime, after the 5 AM reset).
+      // Wording to be confirmed with the client ("Status" vs "Set status").
       return { label: 'Status', answered: false };
   }
 }
@@ -35,7 +37,7 @@ export function StatusPill() {
       onPress={() => router.push('/check-in')}
       hitSlop={4}
       accessibilityRole="button"
-      accessibilityLabel={`Update status. Tonight: ${label}`}
+      accessibilityLabel={answered ? `Update status. Tonight: ${label}` : 'Set your status for tonight'}
       className="h-9 pl-0.5 pr-3 rounded-full flex-row items-center gap-1 border active:opacity-80"
       style={{
         backgroundColor: answered ? 'rgba(212,255,0,0.12)' : 'rgba(255,255,255,0.10)',

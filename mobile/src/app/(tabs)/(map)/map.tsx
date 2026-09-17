@@ -29,7 +29,7 @@ import { useArrivalPrompts } from '@/hooks/use-arrival-prompts';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
 import { FriendIdCard } from '@/components/friend-id-card';
-import { isDefaultMapFilters, peopleFilterIncludes, useMapFilters } from '@/lib/map-filters';
+import { isDefaultMapFilters, peopleFilterIncludes, resetMapFilters, useMapFilters } from '@/lib/map-filters';
 import { getCurrentPosition } from '@/lib/background-location';
 import { IconButton } from '@/components/icon-button';
 import { SmartArrivalPrompt, VenueMoveBanner } from '@/components/venue-move-banner';
@@ -609,6 +609,28 @@ export default function MapScreen() {
               style={{ backgroundColor: '#d4ff00' }}
             >
               <Text className="text-[#1a0f2e] text-xs font-sans-semibold">Update status</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Filters hid everything: say so, offer the way out (client feedback §8) */}
+      {!focusMode && !stayingIn && filtersActive && clusters.length === 0 && !selfSolo && typeFilteredVenues.length === 0 ? (
+        <View className="absolute top-safe-offset-3 left-4 right-16">
+          <View className="rounded-2xl px-4 py-3 bg-[#1a0f2e]/95 border border-white/10 gap-2">
+            <Text className="text-white text-sm font-sans-semibold">Nothing matches your filters</Text>
+            <Text className="text-white/50 text-xs font-sans">
+              {friends.length > 0 || venues.length > 0
+                ? 'Friends and venues are hidden by the current filters.'
+                : 'No friends are sharing yet, and venues are hidden.'}
+            </Text>
+            <Pressable
+              onPress={resetMapFilters}
+              accessibilityRole="button"
+              className="self-start rounded-full px-4 min-h-9 justify-center active:opacity-90"
+              style={{ backgroundColor: '#d4ff00' }}
+            >
+              <Text className="text-[#1a0f2e] text-xs font-sans-semibold">Clear filters</Text>
             </Pressable>
           </View>
         </View>

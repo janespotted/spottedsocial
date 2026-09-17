@@ -20,12 +20,15 @@ import { useSession } from '@/hooks/use-session';
 import { useFriendsOut, type FriendNightStatus } from '@/hooks/use-friends-out';
 import { useMyNightStatus, usePlanEvents, usePlans, usePlansRealtime } from '@/hooks/use-plans';
 import { invalidateNightStatusQueries } from '@/hooks/use-own-night-status';
+import { useFriendIds } from '@/hooks/use-friend-ids';
 import { Avatar } from '@/components/avatar';
 import { PlanCard } from '@/components/plan-card';
 import { EventCard } from '@/components/event-card';
+import { EmptyState, ErrorState, type EmptyAction } from '@/components/empty-state';
+import { addFriendsActions } from '@/lib/add-friends';
+import { FriendsOutBanner } from '@/components/friends-out-banner';
 
 const NEON = '#d4ff00';
-const PURPLE = '#a855f7';
 
 const AROUND_TONIGHT_COLLAPSE = 4;
 
@@ -84,7 +87,9 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
   const { data: myStatus } = useMyNightStatus();
   const plansQuery = usePlans();
   const { data: events = [] } = usePlanEvents(city);
-  const { data: friendsData } = useFriendsOut();
+  const friendsOutQuery = useFriendsOut();
+  const friendsData = friendsOutQuery.data;
+  const { data: friendIds } = useFriendIds(userId || undefined);
   usePlansRealtime();
 
   const [aroundExpanded, setAroundExpanded] = useState(false);
@@ -97,7 +102,9 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
   const refreshAll = async () => {
     setIsRefreshing(true);
     await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['plans'] }),
       queryClient.invalidateQueries({ queryKey: ['plan-events'] }),
+      queryClient.invalidateQueries({ queryKey: ['friends-out'] }),
       invalidateNightStatusQueries(queryClient),
     ]);
     setIsRefreshing(false);
@@ -161,6 +168,61 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
     ? aroundTonight
     : aroundTonight.slice(0, AROUND_TONIGHT_COLLAPSE);
   const hasContent = aroundTonight.length > 0 || feedItems.length > 0;
+  const loadFailed = plansQuery.isError || friendsOutQuery.isError;
+  const friendCount = friendIds?.length ?? 0;
+  const venuesWithheld = friendsData?.venuesWithheld ?? false;
+
+  // Empty Plans, by situation — never "update your status" at someone who
+  // already has (client feedback §8)
+  const emptyState = (): { icon: 'person.2' | 'moon.stars' | 'figure.walk' | 'calendar'; title: string; body: string; actions: EmptyAction[]; tone?: 'positive' } => {
+    const sharePlan: EmptyAction = { label: 'Share a plan', icon: 'calendar.badge.plus', onPress: () => router.push('/create-plan') };
+    if (friendCount === 0) {
+      return {
+        icon: 'person.2',
+        title: 'Add friends to see who\'s out',
+        body: 'Plans and tonight\'s activity come from your friends. Find people you know to get started.',
+        actions: addFriendsActions(),
+      };
+    }
+    if (isUserOut) {
+      return {
+        icon: 'figure.walk',
+        tone: 'positive',
+        title: 'You\'re out — nobody else yet',
+        body: 'None of your friends are sharing their spot yet. They\'ll show up here the moment they do.',
+        actions: [{ ...sharePlan, primary: true }],
+      };
+    }
+    if (isUserPlanning) {
+      return {
+        icon: 'moon.stars',
+        tone: 'positive',
+        title: 'You\'re down to go',
+        body: 'None of your friends are sharing their spot yet. We\'ll flag it here the moment someone heads out.',
+        actions: [{ ...sharePlan, primary: true }],
+      };
+    }
+    if (myStatus?.status === 'home') {
+      return {
+        icon: 'moon.stars',
+        title: 'Quiet night so far',
+        body: 'None of your friends are sharing their spot yet. Going out after all?',
+        actions: [
+          { label: 'Update status', icon: 'location.fill', primary: true, onPress: handleSwitchToOut },
+          sharePlan,
+        ],
+      };
+    }
+    return {
+      icon: 'calendar',
+      title: 'Nobody\'s out yet',
+      body: 'Be the first — say you\'re out, or share a plan and see who\'s down.',
+      actions: [
+        { label: 'Update status', icon: 'location.fill', primary: true, onPress: handleSwitchToOut },
+        sharePlan,
+      ],
+    };
+  };
 
   return (
     <ScrollView
@@ -209,23 +271,39 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
         </View>
       </View>
 
-      {plansQuery.isLoading ? (
+      {/* TBD: surface friends heading out the moment it happens */}
+      {isUserPlanning && outFriends.length > 0 ? (
+        <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
+      ) : null}
+
+      {/* "No" tonight: names only, venues withheld, with the way back in */}
+      {venuesWithheld && aroundTonight.length > 0 ? (
+        <Pressable
+          onPress={handleSwitchToOut}
+          accessibilityRole="button"
+          className="flex-row items-center gap-2 rounded-xl px-3 py-2.5 active:opacity-80"
+          style={{ backgroundColor: 'rgba(212,255,0,0.08)', borderWidth: 1, borderColor: 'rgba(212,255,0,0.3)' }}
+        >
+          <Text className="flex-1 text-white/75 text-xs font-sans leading-4">
+            You&apos;re staying in, so venues are hidden. Going out after all? Update your status.
+          </Text>
+          <SymbolView name="chevron.right" size={12} tintColor={NEON} />
+        </Pressable>
+      ) : null}
+
+      {plansQuery.isLoading || friendsOutQuery.isLoading ? (
         <View className="gap-5">
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
         </View>
+      ) : loadFailed && !hasContent ? (
+        <ErrorState title="Couldn't load tonight's plans" onRetry={refreshAll} retrying={isRefreshing} />
       ) : !hasContent ? (
-        /* Unified empty state */
-        <View className="items-center py-16">
-          <View className="w-20 h-20 rounded-full bg-[#2d1b4e]/60 items-center justify-center mb-5">
-            <SymbolView name="calendar" size={40} tintColor="rgba(168,85,247,0.6)" />
-          </View>
-          <Text className="text-xl font-sans-semibold text-white mb-2">Nobody&apos;s out yet</Text>
-          <Text className="text-white/40 text-sm font-sans text-center max-w-64 leading-relaxed">
-            Be the first — update your status or share a plan.
-          </Text>
-        </View>
+        (() => {
+          const s = emptyState();
+          return <EmptyState icon={s.icon} title={s.title} body={s.body} actions={s.actions} tone={s.tone} />;
+        })()
       ) : (
         <>
           {/* 2. Around tonight — weighted centerpiece */}
@@ -269,7 +347,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
                     </Text>
                     {friend.isOut ? (
                       <Text className="text-[#d4ff00] text-sm font-sans" numberOfLines={1}>
-                        ● Out{friend.venue_name ? ` · ${friend.venue_name}` : ''}
+                        ● Out{friend.venue_name ? ` · ${friend.venue_name}` : venuesWithheld ? ' · venue hidden' : ''}
                       </Text>
                     ) : (
                       <Text className="text-[#a855f7] text-sm font-sans" numberOfLines={1}>

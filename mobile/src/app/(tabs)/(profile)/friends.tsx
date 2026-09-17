@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActionSheetIOS, Pressable, RefreshControl, Text, View } from 'react-native';
+import { ActionSheetIOS, ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -11,8 +11,8 @@ import { fetchPeopleYouMayKnow, sendFriendRequest, type SuggestedFriend } from '
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
-
-const NEON = '#d4ff00';
+import { AddFriendsRow, EmptyState, ErrorState } from '@/components/empty-state';
+import { NEON } from '@/lib/theme';
 
 interface FriendRow {
   kind: 'request' | 'friend' | 'header' | 'suggestion';
@@ -118,11 +118,12 @@ export default function FriendsScreen() {
   const contentContainerStyle = useResolveClassNames('px-4 pb-10');
   const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
 
-  const { data, refetch, isRefetching } = useQuery({
+  const { data, refetch, isRefetching, isLoading, isError } = useQuery({
     queryKey: ['friends-page', userId],
     enabled: !!session,
     queryFn: () => fetchFriendsData(userId!),
   });
+  const hasFriends = (data?.rows ?? []).some((r) => r.kind === 'friend');
 
   const invalidate = () => {
     refetch();
@@ -263,18 +264,48 @@ export default function FriendsScreen() {
             tintColorClassName="accent-[#d4ff00]"
           />
         }
-        ListEmptyComponent={
-          <View className="items-center py-20 px-8">
-            <Text className="text-white/50 text-sm font-sans text-center">
-              No friends yet — find people from Search.
-            </Text>
+        // Find / Invite always one tap away (client feedback §8), and a
+        // hint for the star so Close Friends is manageable from here
+        ListHeaderComponent={
+          <View className="pt-4 gap-3">
+            <AddFriendsRow />
+            {hasFriends ? (
+              <View className="flex-row items-center gap-1.5">
+                <SymbolView name="star.fill" size={11} tintColor={NEON} />
+                <Text className="text-white/45 text-xs font-sans">
+                  Tap the star to add someone to Close Friends — your most private audience.
+                </Text>
+              </View>
+            ) : null}
           </View>
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <View className="items-center py-16">
+              <ActivityIndicator color={NEON} />
+            </View>
+          ) : isError ? (
+            <ErrorState title="Couldn't load your friends" onRetry={() => refetch()} retrying={isRefetching} />
+          ) : (
+            <EmptyState
+              icon="person.2"
+              title="No friends yet"
+              body="Find people you know from your contacts, search by username, or send an invite."
+              actions={[
+                { label: 'Search people', icon: 'magnifyingglass', onPress: () => router.push('/search') },
+              ]}
+              compact
+            />
+          )
         }
         renderItem={({ item }) =>
           item.kind === 'header' ? (
+            // The "Friends (0)" header is noise on an empty list
+            item.key === 'h-friends' && !hasFriends ? null : (
             <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider pt-5 pb-2">
               {item.title}
             </Text>
+            )
           ) : item.kind === 'request' ? (
             <View className="flex-row items-center gap-3 py-2.5">
               <Avatar name={item.display_name ?? '?'} url={item.avatar_url ?? null} size="md" />
@@ -342,12 +373,27 @@ export default function FriendsScreen() {
                   @{item.username}
                 </Text>
               </View>
-              <Pressable onPress={() => toggleClose(item)} hitSlop={8} className="active:scale-125">
+              <Pressable
+                onPress={() => toggleClose(item)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={item.isClose ? 'Remove from Close Friends' : 'Add to Close Friends'}
+                accessibilityState={{ selected: !!item.isClose }}
+                className={`flex-row items-center gap-1.5 min-h-9 rounded-full active:opacity-70 ${item.isClose ? 'pl-2.5 pr-3' : 'px-2.5'}`}
+                style={
+                  item.isClose
+                    ? { backgroundColor: 'rgba(212,255,0,0.12)', borderWidth: 1, borderColor: 'rgba(212,255,0,0.4)' }
+                    : undefined
+                }
+              >
                 <SymbolView
                   name={item.isClose ? 'star.fill' : 'star'}
-                  size={18}
-                  tintColor={item.isClose ? NEON : 'rgba(255,255,255,0.3)'}
+                  size={16}
+                  tintColor={item.isClose ? NEON : 'rgba(255,255,255,0.35)'}
                 />
+                {item.isClose ? (
+                  <Text className="text-[11px] font-sans-semibold" style={{ color: NEON }}>Close</Text>
+                ) : null}
               </Pressable>
             </Pressable>
           )
