@@ -32,7 +32,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#110a24",
+        "backgroundColor": "#3E244F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
@@ -62,7 +62,7 @@
         {
           "backgroundColor": "#110a24",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 96
+          "imageWidth": 200
         }
       ],
       "react-native-background-geolocation",
