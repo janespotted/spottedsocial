@@ -34,6 +34,7 @@ const VALID_NOTIFICATION_TYPES = [
   "rally",
   "plan_down",
   "plan_invite",
+  "post_tag",
   "address_request",
   "private_party_invite",
   "venue_yap",
@@ -682,6 +683,8 @@ function getNotificationContent(
       return { title: "👀 Friend Just Arrived!", body: message, url: "/" };
     case "friends_at_venue":
       return { title: "🔥 Friends Spotted!", body: message, url: "/" };
+    case "post_tag":
+      return { title: "📸 Tagged You", body: message, url: "/feed" };
     case "plan_invite":
       return { title: "📅 Plan Invite!", body: message, url: "/messages?tab=activity" };
     case "plan_down":

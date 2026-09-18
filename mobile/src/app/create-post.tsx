@@ -30,6 +30,7 @@ export default function CreatePostScreen() {
     venueName: '',
     venueId: null,
     visibility: DEFAULT_AUDIENCE,
+    taggedFriends: [],
   });
   const [venuePrefilled, setVenuePrefilled] = useState(false);
 

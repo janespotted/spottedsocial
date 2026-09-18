@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { useDemoMode } from '@/lib/demo-mode';
+import { DEMO_CITIES } from '@/lib/city-neighborhoods';
 import { SymbolView } from 'expo-symbols';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
@@ -14,9 +16,15 @@ const CITIES: { id: string; label: string; sublabel: string }[] = [
   { id: 'nyc', label: 'New York', sublabel: 'Manhattan + Brooklyn + Queens' },
   { id: 'la', label: 'Los Angeles', sublabel: 'WeHo + Hollywood + Downtown' },
   { id: 'pb', label: 'Palm Beach', sublabel: 'Worth Ave + Clematis + CityPlace' },
+  // Dev/QA only — hidden unless demo mode is on (lib/demo-mode.ts)
+  { id: 'lhr', label: 'Lahore', sublabel: 'Gulberg + MM Alam + DHA' },
 ];
 
 export default function CityScreen() {
+  // Lahore is a demo city: shown only when demo mode is on, so a real
+  // user never sees a city we have no venues for.
+  const demoOn = useDemoMode();
+  const visibleCities = CITIES.filter((c) => demoOn || !DEMO_CITIES.has(c.id));
   const { session } = useSession();
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,7 +68,7 @@ export default function CityScreen() {
       </View>
 
       <View className="gap-3">
-        {CITIES.map((city) => {
+        {visibleCities.map((city) => {
           const isSelected = selected === city.id;
           return (
             <Pressable

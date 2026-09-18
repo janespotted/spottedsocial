@@ -12,7 +12,7 @@ import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { DEMO_MODE } from '@/lib/demo-mode';
+import { isDemoMode } from '@/lib/demo-mode';
 import { createDmThread } from '@/lib/dm';
 import { APP_BASE_URL } from '@/lib/invites';
 import { fetchProfilesSafe } from '@/lib/profiles';
@@ -84,7 +84,7 @@ export default function SharePostSheet() {
       const outIds = new Set((statuses ?? []).map((s2) => s2.user_id));
 
       return profiles
-        .filter((p) => eligible.has(p.id) && (DEMO_MODE || !p.is_demo))
+        .filter((p) => eligible.has(p.id) && (isDemoMode() || !p.is_demo))
         .map((p) => ({
           id: p.id,
           display_name: p.display_name,

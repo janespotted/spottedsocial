@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { DEMO_MODE } from '@/lib/demo-mode';
+import { isDemoMode } from '@/lib/demo-mode';
 import { createDmThread } from '@/lib/dm';
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { useFriendIds } from '@/hooks/use-friend-ids';
@@ -60,7 +60,7 @@ export default function NewChatSheet() {
     try {
       let threadId: string | null = null;
       // Demo users have no auth rows — find their seeded thread instead
-      if (friend.is_demo && DEMO_MODE && session) {
+      if (friend.is_demo && isDemoMode() && session) {
         const [{ data: theirThreads }, { data: myThreads }] = await Promise.all([
           supabase.from('dm_thread_members').select('thread_id').eq('user_id', friend.id),
           supabase.from('dm_thread_members').select('thread_id').eq('user_id', session.user.id),

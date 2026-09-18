@@ -1,4 +1,4 @@
-import { DEMO_MODE } from './demo-mode';
+import { isDemoMode } from './demo-mode';
 import { supabase } from './supabase';
 
 /**
@@ -22,9 +22,9 @@ export interface SafeProfile {
 export async function fetchProfilesSafe(): Promise<SafeProfile[]> {
   const { data, error } = await supabase.rpc('get_profiles_safe');
   if (error) throw error;
-  // Demo content must never reach the launched app (SOW §15); DEMO_MODE is
+  // Demo content must never reach the launched app (SOW §15); isDemoMode() is
   // dev-only, so release builds always filter demo profiles out.
-  return ((data ?? []) as SafeProfile[]).filter((p) => DEMO_MODE || !p.is_demo);
+  return ((data ?? []) as SafeProfile[]).filter((p) => isDemoMode() || !p.is_demo);
 }
 
 export function buildProfileMap(profiles: SafeProfile[]): Map<string, SafeProfile> {

@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { buildProfileMap, fetchProfilesSafe, type SafeProfile } from './profiles';
-import { DEMO_MODE } from './demo-mode';
+import { isDemoMode } from './demo-mode';
 import { nightResetAfterDate } from './tonight';
 
 export interface Plan {
@@ -114,7 +114,7 @@ export async function fetchPlans(): Promise<Plan[]> {
     .gte('expires_at', new Date().toISOString())
     .order('score', { ascending: false })
     .order('created_at', { ascending: false });
-  if (!DEMO_MODE) query = query.eq('is_demo', false);
+  if (!isDemoMode()) query = query.eq('is_demo', false);
 
   const [{ data: plans, error }, profiles] = await Promise.all([query, fetchProfilesSafe()]);
   if (error) throw error;
@@ -250,7 +250,7 @@ export async function fetchEventsWithFriends(
     .gt('expires_at', new Date().toISOString())
     .eq('city', city)
     .order('event_date', { ascending: true });
-  if (!DEMO_MODE) eventsQuery = eventsQuery.eq('is_demo', false);
+  if (!isDemoMode()) eventsQuery = eventsQuery.eq('is_demo', false);
 
   const { data: events } = await eventsQuery;
   if (!events?.length) return [];

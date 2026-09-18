@@ -8,6 +8,8 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { supabase } from '@/lib/supabase';
 import { validatePostText, validateVenueName } from '@/lib/validation';
 import { savePostAudience, type Audience } from '@/lib/audience';
+import { notifyTagged, savePostTags, tagLine, type TaggedFriend } from '@/lib/post-tags';
+import { openTagPicker } from '@/lib/tag-picker';
 import { RESET_COPY, RESET_TITLE } from '@/lib/reset-copy';
 import { PublishError, publishPost, type PublishPhase, type PublishedPost } from '@/lib/publish-post';
 import { useSession } from '@/hooks/use-session';
@@ -31,6 +33,8 @@ export interface PostDraft {
   venueName: string;
   venueId: string | null;
   visibility: Audience;
+  /** Friends tagged in this post (addendum v3 §9.3). Never widens the audience. */
+  taggedFriends: TaggedFriend[];
 }
 
 function VideoPreview({ uri }: { uri: string }) {
@@ -112,7 +116,7 @@ export function PostComposer({
   // (key = storage path for photos, Mux upload id for videos)
   const uploadedRef = useRef<{ uri: string; key: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const { caption, venueName, venueId, visibility } = draft;
+  const { caption, venueName, venueId, visibility, taggedFriends } = draft;
   const posting = phase !== null;
 
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -174,6 +178,14 @@ export function PostComposer({
         signal: controller.signal,
       });
       savePostAudience(visibility);
+      // Tags are a child of the post: written after it exists, and they
+      // cascade with it at the 5 AM reset.
+      if (taggedFriends.length > 0) {
+        const ids = taggedFriends.map((f) => f.id);
+        void savePostTags(post.id, ids).then(() =>
+          notifyTagged(post.id, session.user.id, ids, venueCheck.data || null)
+        );
+      }
       uploadedRef.current = null;
       onShared(post);
     } catch (e) {
@@ -369,6 +381,42 @@ export function PostComposer({
           <Text className="text-white/50 text-[11px] font-sans px-4 pb-3">
             Tagging a venue here doesn&apos;t change where you&apos;re checked in.
           </Text>
+        </Card>
+
+        {/* Tag friends (addendum v3 §9.3) — after media, before Share */}
+        <Card>
+          <Pressable
+            onPress={() =>
+              openTagPicker({
+                selected: taggedFriends.map((f) => f.id),
+                onConfirm: (friends) => onDraftChange({ taggedFriends: friends }),
+              })
+            }
+            disabled={posting}
+            accessibilityRole="button"
+            accessibilityLabel="Tag friends"
+            className="flex-row items-center gap-3 px-4 min-h-13 active:opacity-80"
+          >
+            <SymbolView name="person.2" size={16} tintColor={NEON} />
+            <Text
+              className="flex-1 text-[15px] font-sans"
+              style={{ color: taggedFriends.length ? '#ffffff' : 'rgba(255,255,255,0.3)' }}
+              numberOfLines={1}
+            >
+              {taggedFriends.length ? tagLine(taggedFriends) : 'Tag friends (optional)'}
+            </Text>
+            {taggedFriends.length ? (
+              <Pressable
+                onPress={() => onDraftChange({ taggedFriends: [] })}
+                hitSlop={8}
+                accessibilityLabel="Remove tags"
+              >
+                <SymbolView name="xmark.circle.fill" size={18} tintColor="rgba(255,255,255,0.35)" />
+              </Pressable>
+            ) : (
+              <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.3)" />
+            )}
+          </Pressable>
         </Card>
 
         {/* Audience — same names and selector as live statuses, separate preference */}

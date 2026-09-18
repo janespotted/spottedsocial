@@ -18,13 +18,14 @@ import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe, type SafeProfile } from '@/lib/profiles';
-import { DEMO_MODE } from '@/lib/demo-mode';
+import { isDemoMode } from '@/lib/demo-mode';
 import { reportContent } from '@/lib/moderation';
 import { getHoursDisplayString, type VenueHours, type VenueHoursDisplay } from '@/lib/venue-hours';
 import { calculateDistanceMiles, getVenuePhotoUrl, getVenueTypeDisplay } from '@/lib/venues';
 import { sendVenueInvites, type InviteFriend } from '@/lib/venue-invites';
 import { APP_BASE_URL, fetchOrCreateInviteCode, getInviteUrl } from '@/lib/invites';
 import { NEON, control, outlineControl } from '@/lib/theme';
+import { RESET_COPY } from '@/lib/reset-copy';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useFriendsOut } from '@/hooks/use-friends-out';
 import { useSession } from '@/hooks/use-session';
@@ -261,7 +262,7 @@ export default function VenueScreen() {
             friendSet.has(id) &&
             !atVenueIds.has(id) &&
             profileMap.has(id) &&
-            (DEMO_MODE || !profileMap.get(id)!.is_demo)
+            (isDemoMode() || !profileMap.get(id)!.is_demo)
         );
         friendsPlanning = interested.map((id) => toFriend(profileMap.get(id)!));
       }
@@ -570,7 +571,10 @@ export default function VenueScreen() {
             ))
           )}
         </ScrollView>
-        <View className="px-4 pb-safe-offset-4 pt-2">
+        <View className="px-4 pb-safe-offset-4 pt-2 gap-2">
+          <Text className="text-white/45 text-xs font-sans text-center">
+            {RESET_COPY.inviteCompose}
+          </Text>
           <Pressable
             onPress={submitInvites}
             disabled={selectedInvitees.size === 0 || sendingInvites}

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { ActionSheetIOS, Alert, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +9,10 @@ import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
 import { getPushPermission, registerPushToken, type PushPermission } from '@/lib/push';
 import { RESET_BODY, RESET_COPY, RESET_KEPT, RESET_TITLE } from '@/lib/reset-copy';
+import { setDemoMode, useDemoMode } from '@/lib/demo-mode';
+import { ALL_CITY_IDS, DEMO_CITIES, getCityLabel } from '@/lib/city-neighborhoods';
+import { setActiveCity } from '@/lib/tonight';
+import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { PURPLE } from '@/lib/theme';
 
 function SettingsRow({
@@ -109,6 +113,36 @@ export default function SettingsScreen() {
           ? 'Tap to enable'
           : ' ';
 
+  // Demo mode + the city it unlocks. Switching either re-reads everything
+  // that filters on is_demo or city.
+  const demoOn = useDemoMode();
+  const { data: own } = useOwnNightStatus();
+  const ownCity = own?.city ?? null;
+  const toggleDemo = async (value: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await setDemoMode(value);
+    await queryClient.invalidateQueries();
+  };
+
+  const changeCity = () => {
+    const cities = demoOn ? ALL_CITY_IDS : ALL_CITY_IDS.filter((c) => !DEMO_CITIES.has(c));
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: 'Your city',
+        message: 'Changes which venues, leaderboard and map you see.',
+        options: [...cities.map((c) => getCityLabel(c)), 'Cancel'],
+        cancelButtonIndex: cities.length,
+      },
+      async (index) => {
+        const city = cities[index];
+        if (!city || !userId || city === ownCity) return;
+        await supabase.from('profiles').update({ city }).eq('id', userId);
+        setActiveCity(city);
+        await queryClient.invalidateQueries();
+      }
+    );
+  };
+
   const toggleReadReceipts = async (value: boolean) => {
     if (!userId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -185,6 +219,31 @@ export default function SettingsScreen() {
           subtitle={pushSubtitle}
           onPress={pushPermission === 'granted' ? undefined : onPushRow}
         />
+        {/* Demo mode — seeded content and the Lahore test city. OFF by
+            default in every build (SOW §15); this switch is how the
+            Lahore-based developer tests against venues they can reach,
+            while everyone else's app is untouched. */}
+        <SettingsRow
+          icon="wrench.and.screwdriver"
+          title="Demo Mode"
+          subtitle={demoOn ? 'On — demo venues, users and Lahore' : 'Off — real content only'}
+          right={
+            <Switch
+              value={demoOn}
+              onValueChange={toggleDemo}
+              trackColorOnClassName="accent-[#a855f7]"
+            />
+          }
+        />
+        {demoOn ? (
+          <SettingsRow
+            icon="building.2"
+            title="City"
+            subtitle={`${getCityLabel(ownCity ?? 'nyc')} — tap to change`}
+            onPress={changeCity}
+          />
+        ) : null}
+
         {/* The permanent explanation the client asked for (addendum v3 §3):
             what clears, what stays, in the same words as onboarding. */}
         <SettingsRow

@@ -691,6 +691,17 @@ export default function ThreadScreen() {
         // would replay or skip that animation against the wrong message.
         recycleItems={false}
         contentContainerStyle={contentContainerStyle}
+        ListEmptyComponent={
+          <View className="items-center py-16 px-8 gap-2">
+            <SymbolView name="bubble.left.and.bubble.right" size={28} tintColor="rgba(168,85,247,0.6)" />
+            <Text className="text-white/55 text-sm font-sans text-center">
+              Say something — the night&apos;s just started.
+            </Text>
+            <Text className="text-white/40 text-xs font-sans text-center">
+              {RESET_COPY.dmEmpty}
+            </Text>
+          </View>
+        }
         alignItemsAtEnd
         maintainScrollAtEnd
         maintainScrollAtEndThreshold={0.2}

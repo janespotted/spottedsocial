@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
-import { DEMO_MODE } from '@/lib/demo-mode';
+import { isDemoMode } from '@/lib/demo-mode';
 import { fetchProfilesSafe, type SafeProfile } from '@/lib/profiles';
 import { isFromTonight } from '@/lib/tonight';
 import { useFriendIds } from './use-friend-ids';
@@ -121,7 +121,7 @@ async function fetchMapData(
     { party_neighborhood: string | null; lat: number | null; lng: number | null }
   > = {};
   const demoOutStatuses: Array<{ user_id: string; venue_name: string | null; lat: number; lng: number }> = [];
-  if (friendIds.length > 0 || DEMO_MODE) {
+  if (friendIds.length > 0 || isDemoMode()) {
     let statusQuery = supabase
       .from('night_statuses')
       .select(
@@ -130,7 +130,7 @@ async function fetchMapData(
       .not('expires_at', 'is', null)
       .gt('expires_at', nowIso);
     // In dev, demo statuses are visible beyond the friend set (web demo mode)
-    if (!DEMO_MODE) statusQuery = statusQuery.in('user_id', friendIds);
+    if (!isDemoMode()) statusQuery = statusQuery.in('user_id', friendIds);
     const { data: statuses } = await statusQuery;
     for (const s of statuses ?? []) {
       if (s.status === 'planning') {
@@ -145,7 +145,7 @@ async function fetchMapData(
           lng: null,
         };
       }
-      if (DEMO_MODE && s.is_demo && s.status === 'out' && s.lat && s.lng) {
+      if (isDemoMode() && s.is_demo && s.status === 'out' && s.lat && s.lng) {
         demoOutStatuses.push({ user_id: s.user_id, venue_name: s.venue_name, lat: s.lat, lng: s.lng });
       }
     }
@@ -223,7 +223,7 @@ async function fetchMapData(
 
   // Dev only: demo users pin from their night_statuses GPS (their profiles
   // don't carry live coords). Ring types cycle like the web demo branch.
-  if (DEMO_MODE && demoOutStatuses.length > 0) {
+  if (isDemoMode() && demoOutStatuses.length > 0) {
     const relCycle: RelationshipType[] = ['close', 'direct', 'mutual'];
     demoOutStatuses.forEach((s, i) => {
       if (friends.some((f) => f.user_id === s.user_id)) return;

@@ -14,6 +14,7 @@ import { useSession } from '@/hooks/use-session';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
 import { NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
+import { RESET_COPY } from '@/lib/reset-copy';
 
 const CARD = 'bg-[#1a0a2e]/80 rounded-2xl p-3.5';
 
@@ -66,7 +67,10 @@ function ActivityCard({
           <Text className="text-white text-sm font-sans-semibold" numberOfLines={1}>
             {n.sender_name ?? 'Spotted'}
           </Text>
-          <Text className="text-white/55 text-xs font-sans">{getTimeAgo(n.created_at)}</Text>
+          <Text className="text-white/55 text-xs font-sans">
+            {getTimeAgo(n.created_at)}
+            {EXPIRING_TYPES.has(n.type) ? ` · ${RESET_COPY.activityExpires}` : ''}
+          </Text>
         </View>
         <Text className={`text-xs font-sans mt-0.5 ${subtitleClass}`} numberOfLines={2}>
           {subtitleFor(n)}
@@ -94,6 +98,16 @@ function ActivityCard({
 }
 
 /** Sectioned Activity — port of the web messages/ActivityTab. */
+/** Rows that die with the night — the rest (friend requests) survive it. */
+const EXPIRING_TYPES = new Set([
+  'meetup_request',
+  'venue_invite',
+  'plan_invite',
+  'meetup_accepted',
+  'venue_invite_accepted',
+  'plan_down',
+]);
+
 export default function ActivityScreen() {
   const { session } = useSession();
   const userId = session?.user.id;

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import { DEMO_MODE } from '@/lib/demo-mode';
+import { isDemoMode } from '@/lib/demo-mode';
 import { notifyPostLike } from '@/lib/notifications';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
+import { fetchTagsForPosts, type TaggedFriend } from '@/lib/post-tags';
 import {
   onCommentAdded,
   onFeedInvalidated,
@@ -39,12 +40,14 @@ export interface FeedPost {
   likes_count: number;
   display_name: string;
   avatar_url: string | null;
+  /** Friends tagged in the post (addendum v3 §9.3); RLS keeps these inside the audience. */
+  tags: TaggedFriend[];
 }
 
 /**
  * Newsfeed posts: own + friends', unexpired (posts die at 5am like stories),
  * newest first, cursor-paginated. Port of the web useFeed core. Demo posts
- * are excluded except in dev builds (see DEMO_MODE).
+ * are excluded except in dev builds (see isDemoMode()).
  */
 // Stable fallback so a failed friend-ids query can't hand the effects a fresh
 // [] every render (a new reference would re-run the feed fetch each time).
@@ -80,7 +83,7 @@ export function useFeed() {
         .limit(POSTS_PER_PAGE);
       // Dev-only: demo mode shows all demo posts alongside the real feed,
       // mirroring the web useFeed. Release builds never take this branch.
-      if (DEMO_MODE) {
+      if (isDemoMode()) {
         query = query.or(`user_id.in.(${userIds.join(',')}),is_demo.eq.true`);
       } else {
         // Friends' posts (any visibility) + friends-of-friends' posts marked
@@ -133,7 +136,10 @@ export function useFeed() {
       // Uploaded posts store a private-bucket path in image_url — swap for a
       // signed URL, one Storage call for the whole page. Full http URLs
       // (demo content) pass through untouched.
-      const imageUrls = await resolvePostImageUrls((rows ?? []).map((p) => p.image_url));
+      const [imageUrls, tagsByPost] = await Promise.all([
+        resolvePostImageUrls((rows ?? []).map((p) => p.image_url)),
+        fetchTagsForPosts((rows ?? []).map((p) => p.id)),
+      ]);
 
       const page: FeedPost[] = (rows ?? []).map((p) => ({
         id: p.id,
@@ -154,6 +160,7 @@ export function useFeed() {
         likes_count: (p.likes_count ?? 0) + (likeCounts.get(p.id) ?? 0),
         display_name: profileMap.get(p.user_id)?.display_name ?? 'Friend',
         avatar_url: profileMap.get(p.user_id)?.avatar_url ?? null,
+        tags: tagsByPost.get(p.id) ?? [],
       }));
       return page;
     },
@@ -256,9 +263,9 @@ export function useFeed() {
           const visible =
             p.user_id === userId ||
             friendSet.has(p.user_id) ||
-            (DEMO_MODE && p.is_demo);
+            (isDemoMode() && p.is_demo);
           if (!visible) return;
-          if (p.is_demo && !DEMO_MODE) return;
+          if (p.is_demo && !isDemoMode()) return;
           const [profiles, imageUrl] = await Promise.all([
             fetchProfilesSafe(),
             resolvePostImageUrl(p.image_url ?? null),
@@ -283,6 +290,9 @@ export function useFeed() {
             likes_count: 0,
             display_name: profileMap.get(p.user_id)?.display_name ?? 'Friend',
             avatar_url: profileMap.get(p.user_id)?.avatar_url ?? null,
+            // Tags are written just after the post row; the next refresh
+            // picks them up.
+            tags: [],
           };
           setPosts((prev) => (prev.some((x) => x.id === post.id) ? prev : [post, ...prev]));
         }

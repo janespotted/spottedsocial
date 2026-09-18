@@ -17,6 +17,7 @@ import { PLAN_TYPES, toLocalDateString } from '@/lib/plans';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
+import { RESET_COPY } from '@/lib/reset-copy';
 import { NEON } from '@/lib/theme';
 
 export interface PlanVenue {
@@ -474,6 +475,9 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
                 {isSubmitting ? submittingLabel : submitLabel}
               </Text>
             </Pressable>
+            <Text className="text-white/45 text-xs font-sans text-center mt-2">
+              {RESET_COPY.planCompose}
+            </Text>
           </View>
         ) : null}
         </Pressable>

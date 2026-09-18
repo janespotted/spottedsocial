@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { DEMO_MODE } from './demo-mode';
+import { isDemoMode } from './demo-mode';
 import { getStatusExpiry } from './night-status';
 import { resolvePostImageUrl } from './posts';
 import { isFromTonight } from './time-context';
@@ -59,7 +59,7 @@ export async function fetchYapDirectory(city: string): Promise<YapQuote[]> {
     .select('id, text, score, venue_name, created_at')
     .gt('expires_at', new Date().toISOString())
     .eq('is_private_party', false);
-  if (!DEMO_MODE) query = query.eq('is_demo', false);
+  if (!isDemoMode()) query = query.eq('is_demo', false);
   const { data: yaps } = await query;
   const regular = (yaps ?? []).filter((y) => isFromTonight(y.created_at));
   if (regular.length === 0) return [];
@@ -116,7 +116,7 @@ export async function fetchVenueYaps(venueName: string, userId: string): Promise
     .select('id, text, created_at, author_handle, image_url, user_id, score, comments_count')
     .eq('venue_name', venueName)
     .gt('expires_at', new Date().toISOString());
-  if (!DEMO_MODE) query = query.eq('is_demo', false);
+  if (!isDemoMode()) query = query.eq('is_demo', false);
   const [{ data: yaps }, { data: blocked }] = await Promise.all([
     query,
     supabase.from('blocked_users').select('blocked_id').eq('blocker_id', userId),

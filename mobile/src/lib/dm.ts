@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { DEMO_MODE } from './demo-mode';
+import { isDemoMode } from './demo-mode';
 import { fetchProfilesSafe } from './profiles';
 import { isFromTonight } from './time-context';
 import { nightStartAt } from './tonight';
@@ -94,7 +94,7 @@ export async function fetchDmThreads(userId: string): Promise<DmThreadPreview[]>
   // fetchProfilesSafe filters demo in release; fall back for any not covered
   const profileMap = new Map(profiles.map((p) => [p.id, p]));
   const missingIds = otherIds.filter((id) => !profileMap.has(id));
-  if (missingIds.length > 0 && DEMO_MODE) {
+  if (missingIds.length > 0 && isDemoMode()) {
     const { data: fallback } = await supabase
       .from('profiles')
       .select('id, display_name, username, avatar_url')

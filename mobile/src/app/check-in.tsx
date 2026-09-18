@@ -17,7 +17,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { DEMO_MODE } from '@/lib/demo-mode';
+import { isDemoMode } from '@/lib/demo-mode';
 import { CITY_NEIGHBORHOODS, getCityLabel } from '@/lib/city-neighborhoods';
 import {
   captureLocationWithVenue,
@@ -489,7 +489,7 @@ export default function CheckInSheet() {
       let data: LocationData;
       try {
         data = await withTimeout(
-          captureLocationWithVenue(DEMO_MODE ? GPS_ACCURACY_THRESHOLD_DEMO : undefined),
+          captureLocationWithVenue(isDemoMode() ? GPS_ACCURACY_THRESHOLD_DEMO : undefined),
           GPS_ATTEMPT_TIMEOUT_MS
         );
       } catch (err) {

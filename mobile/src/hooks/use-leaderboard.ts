@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
-import { DEMO_MODE } from '@/lib/demo-mode';
+import { isDemoMode } from '@/lib/demo-mode';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { isVenueOpen, type VenueHours } from '@/lib/venue-hours';
 import { isNightlifeHours } from '@/lib/time-context';
@@ -92,7 +92,7 @@ async function fetchLeaderboard(
     .gt('expires_at', new Date().toISOString());
   if (neighborhood) statusQuery = statusQuery.eq('venues.neighborhood', neighborhood);
   // Demo content must never reach the launched app (SOW §15)
-  if (!DEMO_MODE) statusQuery = statusQuery.eq('is_demo', false);
+  if (!isDemoMode()) statusQuery = statusQuery.eq('is_demo', false);
 
   // Promoted venues ordered by leaderboard_promo_order (active spots are order 1-2)
   let promotedQuery = supabase

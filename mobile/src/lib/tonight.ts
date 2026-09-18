@@ -29,7 +29,11 @@ export function getActiveCity(): string | null {
 
 export function cityToTimezone(city?: string | null): string {
   const c = city ?? activeCity;
-  return c === 'la' ? 'America/Los_Angeles' : 'America/New_York';
+  if (c === 'la') return 'America/Los_Angeles';
+  // Lahore is a dev/QA demo city (UTC+5, no daylight saving) so the
+  // developer can test against venues they can actually walk to.
+  if (c === 'lhr') return 'Asia/Karachi';
+  return 'America/New_York';
 }
 
 interface ZonedParts {

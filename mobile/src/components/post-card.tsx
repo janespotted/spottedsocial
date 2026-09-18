@@ -10,7 +10,7 @@ import { blockUser, reportContent } from '@/lib/moderation';
 import { openFriendCard } from '@/lib/friend-card';
 import { muxHlsUrl, muxPlaybackState, muxThumbnailUrl } from '@/lib/mux';
 import { supabase } from '@/lib/supabase';
-import { NEON } from '@/lib/theme';
+import { NEON, PURPLE } from '@/lib/theme';
 
 /**
  * Feed video. Mux posts stream HLS with the Mux poster frame underneath
@@ -190,34 +190,64 @@ export function PostCard({
 
   return (
     <View className="border-b border-white/[0.06]">
-      {/* Header — compact single row */}
+      {/* Header — name and venue flow in a WRAPPING row: both are shown in
+          full, and the venue drops to its own line only when it doesn't fit
+          beside the name. Truncating either one hid information people
+          posted on purpose. */}
       <View className="flex-row items-center px-4 py-3">
-        <View className="flex-row items-center gap-2.5 min-w-0 flex-1">
+        <Pressable
+          onPress={() => openFriendCard(post.user_id, currentUserId)}
+          hitSlop={4}
+          className="active:opacity-70"
+        >
+          <GradientRingAvatar name={post.display_name} url={post.avatar_url} />
+        </Pressable>
+        <View className="flex-1 min-w-0 ml-2.5 flex-row flex-wrap items-center gap-x-2 gap-y-0.5">
           <Pressable
             onPress={() => openFriendCard(post.user_id, currentUserId)}
             hitSlop={4}
-            className="flex-row items-center gap-2.5 shrink active:opacity-70"
+            className="active:opacity-70"
           >
-            <GradientRingAvatar name={post.display_name} url={post.avatar_url} />
-            <Text className="font-sans-semibold text-white text-sm" numberOfLines={1}>
-              {post.display_name}
-            </Text>
+            <Text className="font-sans-semibold text-white text-sm">{post.display_name}</Text>
           </Pressable>
           {post.venue_name ? (
-            <Pressable onPress={openVenue} hitSlop={4} className="shrink">
-              <Text className="text-[#d4ff00] text-xs font-sans-medium" numberOfLines={1}>
-                @{post.venue_name}
-              </Text>
+            <Pressable onPress={openVenue} hitSlop={4}>
+              <Text className="text-[#d4ff00] text-xs font-sans-medium">@{post.venue_name}</Text>
             </Pressable>
           ) : null}
         </View>
-        <Text className="text-white/50 text-xs font-sans">
+        <Text className="text-white/50 text-xs font-sans shrink-0 ml-2" numberOfLines={1}>
           {getTimeAgo(post.created_at)} · until 5am
         </Text>
         <Pressable onPress={openMenu} hitSlop={8} className="ml-3 opacity-60">
           <SymbolView name="ellipsis" size={18} tintColor="rgba(255,255,255,0.8)" />
         </Pressable>
       </View>
+
+      {/* Tagged friends — a pointer to people, never a change of audience
+          (addendum v3 §9.3). Tapping a name opens their card. */}
+      {post.tags.length > 0 ? (
+        <View className="flex-row flex-wrap items-center px-4 pb-2 -mt-1">
+          <SymbolView name="person.2.fill" size={11} tintColor="rgba(255,255,255,0.4)" />
+          <Text className="text-white/45 text-xs font-sans ml-1.5">with </Text>
+          {post.tags.map((t, i) => (
+            <Text key={t.id}>
+              <Text
+                className="text-xs font-sans-medium"
+                style={{ color: PURPLE }}
+                onPress={() => openFriendCard(t.id, currentUserId)}
+              >
+                {t.display_name.split(' ')[0]}
+              </Text>
+              {i < post.tags.length - 1 ? (
+                <Text className="text-white/45 text-xs font-sans">
+                  {i === post.tags.length - 2 ? ' and ' : ', '}
+                </Text>
+              ) : null}
+            </Text>
+          ))}
+        </View>
+      ) : null}
 
       {/* Media — full bleed, 4:5 */}
       {isMuxVideo ? (

@@ -22,11 +22,15 @@ import { BackgroundLocationManager } from '@/components/background-location-mana
 import { NightStatusGate } from '@/components/night-status-gate';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import { ToastHost } from '@/components/toast-host';
+import { hydrateDemoMode } from '@/lib/demo-mode';
 import { queryClient } from '@/lib/query-client';
 
 // Native splash only: the lime S on midnight stays up until fonts and the
 // session are known, then fades out over the real first screen.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+// Demo mode is a saved per-device preference (off by default) — read it
+// before anything queries, so a demo session survives a restart.
+void hydrateDemoMode();
 SplashScreen.setOptions({ fade: true, duration: 500 });
 
 /** Hides the native splash once there is a real screen to reveal. */
@@ -166,6 +170,15 @@ function RootNavigator() {
       />
       <Stack.Screen
         name="audience"
+        options={{
+          presentation: 'formSheet',
+          sheetAllowedDetents: 'fitToContents',
+          sheetGrabberVisible: true,
+          contentStyle: SHEET_CONTENT_STYLE,
+        }}
+      />
+      <Stack.Screen
+        name="tag-friends"
         options={{
           presentation: 'formSheet',
           sheetAllowedDetents: 'fitToContents',
