@@ -318,8 +318,10 @@ export default function MapScreen() {
   });
 
   const {data} = useMapData(city ?? null);
-  const friends = data?.friends ?? [];
-  const venues = data?.venues ?? [];
+  // `?? []` would be a NEW array each render, so the clustering memo below
+  // would recompute every time and re-animate every marker.
+  const friends = useMemo(() => data?.friends ?? [], [data?.friends]);
+  const venues = useMemo(() => data?.venues ?? [], [data?.venues]);
   // "No" tonight: precise pins are withheld (see useMapData); show the count + CTA
   const {data: ownNight} = useOwnNightStatus();
   const stayingIn = ownNight?.status?.status === 'home';
@@ -544,7 +546,7 @@ export default function MapScreen() {
   const handleVenuePress = async (event: {features?: GeoJSON.Feature[]}) => {
     const feature = event.features?.[0];
     if (!feature) return;
-    const props = feature.properties as Record<string, any> | null;
+    const props = feature.properties as { cluster?: boolean; venueId?: string } | null;
     const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
     if (props?.cluster) {
       const currentZoom = await mapRef.current?.getZoom();
