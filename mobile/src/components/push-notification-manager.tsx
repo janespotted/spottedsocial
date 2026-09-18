@@ -24,13 +24,16 @@ Notifications.setNotificationHandler({
  * — and routes taps.
  */
 export function PushNotificationManager() {
-  const { session, onboardingNeeded } = useSession();
+  const { session, onboardingNeeded, onboardingResolved } = useSession();
   const userId = session?.user.id;
   const registered = useRef(false);
 
   useEffect(() => {
     registered.current = false;
-    if (!userId || onboardingNeeded) return;
+    // Wait for the profile check to ANSWER: `onboardingNeeded` reads false
+    // while it is still unknown, which would prompt for notifications during
+    // signup — exactly the prompt stacking this component exists to avoid.
+    if (!userId || !onboardingResolved || onboardingNeeded) return;
     let cancelled = false;
     const register = async (prompt: boolean) => {
       if (registered.current) return;
@@ -45,7 +48,7 @@ export function PushNotificationManager() {
       cancelled = true;
       sub.remove();
     };
-  }, [userId, onboardingNeeded]);
+  }, [userId, onboardingNeeded, onboardingResolved]);
 
   // Tapping a push routes by type. While the opening "Are you out tonight?"
   // question is unanswered (or not yet known on a cold start) the link is

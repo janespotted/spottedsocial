@@ -112,14 +112,20 @@ export function ensureLocationReady(): Promise<void> {
 export async function getLocationPermission(): Promise<LocationPermission> {
   await ensureLocationReady();
   const state = await BackgroundGeolocation.getProviderState();
-  if (!state.enabled) return 'denied';
+  // `status` is the APP's authorization; `enabled` is whether the DEVICE's
+  // Location Services are switched on. Read status first: a granted app on
+  // a phone with location services off is still granted, and reporting it
+  // as `denied`/`not_determined` made the map re-prompt someone who had
+  // already said yes (and can't be prompted again by iOS anyway).
   switch (state.status) {
     case AuthorizationStatus.Always:
       return 'always';
     case AuthorizationStatus.WhenInUse:
       return 'when_in_use';
     case AuthorizationStatus.NotDetermined:
-      return 'not_determined';
+      // Never asked — unless the device itself has location off, in which
+      // case prompting would do nothing and Settings is the only way.
+      return state.enabled ? 'not_determined' : 'denied';
     default:
       return 'denied';
   }

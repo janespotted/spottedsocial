@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { LegendList } from '@legendapp/list/react-native';
+import { KeyboardAwareLegendList } from '@legendapp/list/keyboard';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,7 +12,7 @@ import { notifyCommentAdded } from '@/lib/posts';
 import { openFriendCard } from '@/lib/friend-card';
 import { validateCommentText } from '@/lib/validation';
 import { useSession } from '@/hooks/use-session';
-import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
+import { dismissKeyboardNow, useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
 import { ExpiredState } from '@/components/empty-state';
@@ -167,20 +167,34 @@ export default function CommentsScreen() {
       ) : postExists === false ? (
         <ExpiredState what="This post" onDismiss={() => router.back()} dismissLabel="Close" />
       ) : (
-        <LegendList
+        <KeyboardAwareLegendList
           recycleItems
           data={comments ?? []}
           keyExtractor={(c) => c.id}
           contentContainerStyle={{ padding: 16, gap: 16 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          keyboardOffset={insets.bottom}
+          // Tapping empty space closes the keyboard: keyboardShouldPersistTaps
+          // only covers taps that hit list CONTENT, so the background needs
+          // its own handler (addendum v3 §8.2).
+          onScrollBeginDrag={dismissKeyboardNow}
+          ListFooterComponent={
+            <Pressable
+              onPress={dismissKeyboardNow}
+              accessible={false}
+              style={{ height: 120 }}
+            />
+          }
           ListEmptyComponent={
             <Text className="text-white/55 text-sm font-sans text-center py-12">
               No comments yet — say something first.
             </Text>
           }
           renderItem={({ item }) => (
-            <View className="flex-row gap-3">
+            // A tap on the row closes the keyboard; the avatar, name and
+            // like button keep their own handlers.
+            <Pressable onPress={dismissKeyboardNow} accessible={false} className="flex-row gap-3">
               <Pressable onPress={() => openFriendCard(item.user_id, session?.user.id)} hitSlop={4}>
                 <Avatar name={item.display_name} url={item.avatar_url} size="sm" />
               </Pressable>
@@ -212,7 +226,7 @@ export default function CommentsScreen() {
                   <Text className="text-white/55 text-[11px] font-sans">{item.likes_count}</Text>
                 ) : null}
               </Pressable>
-            </View>
+            </Pressable>
           )}
         />
       )}

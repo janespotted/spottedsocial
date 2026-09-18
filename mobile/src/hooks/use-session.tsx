@@ -7,6 +7,13 @@ interface SessionState {
   loading: boolean;
   /** True when the signed-in user still needs name/username/welcome onboarding. */
   onboardingNeeded: boolean;
+  /**
+   * False until onboarding status is known for the current user. Anything
+   * mounted OUTSIDE the root navigator (which unmounts while `loading`) must
+   * check this: `onboardingNeeded` reads false while it is still unknown, so
+   * treating that as "onboarded" activates gates during signup.
+   */
+  onboardingResolved: boolean;
   /** Re-check profile completeness (call after profile writes during onboarding). */
   refreshOnboardingStatus: () => Promise<void>;
 }
@@ -15,6 +22,7 @@ const SessionContext = createContext<SessionState>({
   session: null,
   loading: true,
   onboardingNeeded: false,
+  onboardingResolved: false,
   refreshOnboardingStatus: async () => {},
 });
 
@@ -96,6 +104,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         session,
         loading: sessionLoading || (!!session && onboardingNeeded === null),
         onboardingNeeded: onboardingNeeded ?? false,
+        onboardingResolved: !!session && onboardingNeeded !== null,
         refreshOnboardingStatus,
       }}
     >

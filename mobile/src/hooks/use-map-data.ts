@@ -269,7 +269,25 @@ async function fetchMapData(
     })
     .sort((a, b) => b.heatScore - a.heatScore);
 
-  return { friends, venues, hiddenFriendCount: 0 };
+  // One pin per person, whatever produced them. The three push loops above
+  // (venue check-in, private party, demo) each guard their own source, but
+  // a person who appears in two of them — a party host who also has a live
+  // profile pin, say — used to yield two markers with the same key, which
+  // React reports as a duplicate-key error and the cluster renders twice.
+  // A party pin is the more specific truth, so it wins.
+  const byUser = new Map<string, MapFriend>();
+  for (const f of friends) {
+    // The viewer is drawn by the map's own self marker; in demo mode the
+    // status query isn't limited to friendIds, so they can otherwise land
+    // in their own friends list and be rendered twice.
+    if (f.user_id === userId) continue;
+    const existing = byUser.get(f.user_id);
+    if (!existing || (f.is_private_party && !existing.is_private_party)) {
+      byUser.set(f.user_id, f);
+    }
+  }
+
+  return { friends: [...byUser.values()], venues, hiddenFriendCount: 0 };
 }
 
 export function useMapData(city: string | null) {

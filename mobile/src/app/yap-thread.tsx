@@ -13,12 +13,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { LegendList } from '@legendapp/list/react-native';
+import { KeyboardAwareLegendList } from '@legendapp/list/keyboard';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
-import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
+import { dismissKeyboardNow, useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import {
@@ -254,6 +254,14 @@ export default function YapThreadScreen() {
     }
   };
 
+  // Bumped whenever comment content changes, so extraData differs and the
+  // rows re-render (the Sets/Records themselves are replaced, but the list
+  // compares by value).
+  const commentsVersion =
+    Object.keys(comments).length +
+    Object.values(comments).reduce((n, list) => n + list.length, 0) +
+    Object.values(commentDrafts).join('').length;
+
   const toggleComments = async (yapId: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -328,18 +336,28 @@ export default function YapThreadScreen() {
             nothing ("What's the mic?", addendum v3 §8.9) — removed. */}
       </View>
 
-      <LegendList
+      <KeyboardAwareLegendList
         data={messages ?? []}
         keyExtractor={(y) => y.id}
-        // Rows read expanded/comments/commentDrafts from component state and
-        // pass no extraData, so recycled rows would show stale comment
-        // sections. Remount-on-reuse until that state is wired to extraData.
+        // Rows read expanded/comments/commentDrafts from component state, so
+        // the list has to be told when that state changes — without
+        // extraData, tapping the comment bubble re-rendered nothing and
+        // looked like a dead button. recycleItems stays off so a reused row
+        // can't show another yap's comment section.
         recycleItems={false}
+        extraData={`${[...expanded].sort().join(',')}|${commentsVersion}`}
         contentContainerStyle={contentContainerStyle}
         // Taps on a row (vote, comments) land on the first tap while the
         // keyboard is up; dragging the list closes it (addendum v3 §8.2)
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        keyboardOffset={insets.bottom}
+        // Tapping empty space closes the keyboard: keyboardShouldPersistTaps
+        // only covers taps that hit list CONTENT, so the background gets its
+        // own handler via the footer (addendum v3 §8.2).
+        ListFooterComponent={
+          <Pressable onPress={dismissKeyboardNow} accessible={false} style={{ height: 160 }} />
+        }
         ListHeaderComponent={
           (pinned ?? []).length > 0 ? (
             <View className="px-4 pt-3 gap-2">
@@ -356,15 +374,17 @@ export default function YapThreadScreen() {
           ) : null
         }
         ListEmptyComponent={
-          <View className="items-center py-20 px-8">
+          <Pressable onPress={dismissKeyboardNow} accessible={false} className="items-center py-20 px-8">
             <Text className="text-white/50 text-sm font-sans text-center">
               No yaps here yet tonight. {canPost ? 'Start it off.' : ''}
             </Text>
-          </View>
+          </Pressable>
         }
         renderItem={({ item, index }) => (
           <Pressable
+            onPress={dismissKeyboardNow}
             onLongPress={() => showModeration(item)}
+            accessible={false}
             className={`px-4 py-3 ${index > 0 ? 'border-t border-white/[0.06]' : ''}`}
           >
             <View className="flex-row gap-3">

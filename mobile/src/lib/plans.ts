@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { buildProfileMap, fetchProfilesSafe, type SafeProfile } from './profiles';
 import { isDemoMode } from './demo-mode';
-import { nightResetAfterDate } from './tonight';
+import { nightResetAfterDate, nightStartAt } from './tonight';
 
 export interface Plan {
   id: string;
@@ -229,6 +229,15 @@ export async function postPlanComment(planId: string, userId: string, text: stri
 export async function deletePlan(planId: string, userId: string): Promise<void> {
   const { error } = await supabase.from('plans').delete().eq('id', planId).eq('user_id', userId);
   if (error) throw error;
+  // The invites the plan sent are not children of the plan row (they are
+  // `notifications`), so deleting the plan used to leave them pointing at
+  // something that no longer exists — an invite you can still tap.
+  await supabase
+    .from('notifications')
+    .delete()
+    .eq('sender_id', userId)
+    .in('type', ['plan_invite', 'plan_down'])
+    .gte('created_at', nightStartAt().toISOString());
 }
 
 /**

@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { useNoKeyboardOnFocus } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { supabase } from '@/lib/supabase';
+import { showToast } from '@/lib/toast';
 import { sendMeetUp } from '@/lib/meet-up';
 import { useSession } from '@/hooks/use-session';
 import { useFeed } from '@/hooks/use-feed';
@@ -311,9 +312,29 @@ export default function HomeScreen() {
     setScrollProgress((prev) => (Math.abs(prev - next) > 0.02 ? next : prev));
   };
 
-  const handleMeetUp = (friend: FriendNightStatus) => {
+  /**
+   * Shared outcome handling: `sent` shows the confirmation card, and the
+   * blocked cases say why instead of silently doing nothing.
+   */
+  const handleMeetUp = async (friend: { user_id: string; display_name: string; avatar_url?: string | null }) => {
     if (!session) return;
-    sendMeetUp(session.user.id, friend);
+    const result = await sendMeetUp(session.user.id, friend);
+    const firstName = friend.display_name.split(' ')[0];
+    if (result.status === 'sent') {
+      router.push({
+        pathname: '/sent-confirmation',
+        params: {
+          kind: 'meetup',
+          friends: JSON.stringify([
+            { id: friend.user_id, display_name: friend.display_name, avatar_url: friend.avatar_url ?? null },
+          ]),
+          notificationIds: JSON.stringify(result.notificationId ? [result.notificationId] : []),
+        },
+      });
+      return;
+    }
+    if (result.status === 'already_met') showToast(`You and ${firstName} are already meeting up tonight`);
+    else if (result.status === 'duplicate') showToast(`A meet up with ${firstName} is already waiting`);
   };
 
   // Hide the FAB while the keyboard is up (parity with the web CreatePostFab)

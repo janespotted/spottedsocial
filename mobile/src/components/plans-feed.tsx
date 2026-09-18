@@ -14,6 +14,7 @@ import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
 import { stayIn } from '@/lib/night-status';
+import { showToast } from '@/lib/toast';
 import { sendMeetUp } from '@/lib/meet-up';
 import { type Plan, type EventWithFriends } from '@/lib/plans';
 import { useSession } from '@/hooks/use-session';
@@ -126,9 +127,29 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
     }
   };
 
-  const handleMeetUp = (friend: { user_id: string; display_name: string }) => {
+  /**
+   * Shared outcome handling: `sent` shows the confirmation card, and the
+   * blocked cases say why instead of silently doing nothing.
+   */
+  const handleMeetUp = async (friend: { user_id: string; display_name: string; avatar_url?: string | null }) => {
     if (!session) return;
-    sendMeetUp(session.user.id, friend);
+    const result = await sendMeetUp(session.user.id, friend);
+    const firstName = friend.display_name.split(' ')[0];
+    if (result.status === 'sent') {
+      router.push({
+        pathname: '/sent-confirmation',
+        params: {
+          kind: 'meetup',
+          friends: JSON.stringify([
+            { id: friend.user_id, display_name: friend.display_name, avatar_url: friend.avatar_url ?? null },
+          ]),
+          notificationIds: JSON.stringify(result.notificationId ? [result.notificationId] : []),
+        },
+      });
+      return;
+    }
+    if (result.status === 'already_met') showToast(`You and ${firstName} are already meeting up tonight`);
+    else if (result.status === 'duplicate') showToast(`A meet up with ${firstName} is already waiting`);
   };
 
   const handleEditPlan = (plan: Plan) => {

@@ -217,6 +217,23 @@ export default function ActivityScreen() {
     setTimeout(() => router.push('/messages'), 250);
   };
 
+  /**
+   * "Make plans" opens the plan composer with that friend already tagged.
+   * It used to open a DM — a faithful port of the web build, which had no
+   * plan composer to open, but wrong now that one exists.
+   */
+  const makePlansWith = (userId: string, name: string, avatarUrl: string | null) => {
+    router.back();
+    setTimeout(
+      () =>
+        router.push({
+          pathname: '/create-plan',
+          params: { withId: userId, withName: name, withAvatar: avatarUrl ?? '' },
+        }),
+      250
+    );
+  };
+
   /** Plan invites: the plan card carries "I'm down", so land on Plans. */
   const goToPlans = () => {
     router.back();
@@ -314,7 +331,7 @@ export default function ActivityScreen() {
                     </Text>
                   </View>
                   <Pressable
-                    onPress={() => openThreadWith(f.user_id, f.display_name, f.avatar_url)}
+                    onPress={() => makePlansWith(f.user_id, f.display_name, f.avatar_url)}
                     className="h-8 px-4 rounded-full items-center justify-center active:opacity-90"
                     style={{ backgroundColor: VIOLET_FILL, boxShadow: '0 0 12px rgba(168,85,247,0.5)' }}
                   >

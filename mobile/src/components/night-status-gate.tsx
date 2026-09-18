@@ -49,18 +49,26 @@ const REPLAY_DELAY_MS = 400;
  * app is never usable before the question has been asked.
  */
 export function NightStatusGate() {
-  const { session, onboardingNeeded } = useSession();
+  const { session, onboardingNeeded, onboardingResolved } = useSession();
   const queryClient = useQueryClient();
   const rootState = useRootNavigationState();
   const navReady = !!rootState?.key;
   const { data, isError } = useOwnNightStatus();
   const gateState = useNightGateState();
   const lastNavRef = useRef(0);
-  const gated = !!session && !onboardingNeeded;
+  const failedOpenRef = useRef(false);
+  // This component lives OUTSIDE the root navigator, so it renders while that
+  // navigator is blank (`loading`) — including the whole signup window. Waiting
+  // for onboarding to RESOLVE is what keeps the cover screen below from
+  // appearing over a new user right after OTP: `onboardingNeeded` reads false
+  // until the profile check answers, which used to read as "onboarded" and
+  // covered the app with a spinner the navigator had nothing to reveal behind.
+  const gated = !!session && onboardingResolved && !onboardingNeeded;
 
   // Resolve the gate state from the query
   useEffect(() => {
     if (!gated) {
+      failedOpenRef.current = false;
       setNightGateState('unknown');
       return;
     }
@@ -70,10 +78,13 @@ export function NightStatusGate() {
       return;
     }
     if (!data) {
-      // New user id (fresh query key) or first load — not known yet
-      setNightGateState('unknown');
+      // New user id (fresh query key) or first load — not known yet. Once the
+      // failsafe below has given up waiting, stay open: re-asserting 'unknown'
+      // on every re-render would undo it and re-arm the timer forever.
+      if (!failedOpenRef.current) setNightGateState('unknown');
       return;
     }
+    failedOpenRef.current = false;
     setNightGateState(data.status ? 'answered' : 'open');
   }, [gated, data, isError]);
 
@@ -82,6 +93,7 @@ export function NightStatusGate() {
     if (!gated || gateState !== 'unknown') return;
     const timer = setTimeout(() => {
       console.warn('[NightGate] status query did not resolve in time — failing open');
+      failedOpenRef.current = true;
       setNightGateState('answered');
     }, UNKNOWN_TIMEOUT_MS);
     return () => clearTimeout(timer);

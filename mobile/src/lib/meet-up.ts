@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { supabase } from './supabase';
 import { createDmThread } from './dm';
 import { fetchProfilesSafe } from './profiles';
+import { nightStartAt } from './tonight';
 
 /**
  * Send a "wants to meet up" notification. Lean port of the web
@@ -12,7 +13,10 @@ import { fetchProfilesSafe } from './profiles';
  */
 export type SendMeetUpResult =
   | { status: 'sent'; notificationId: string | null }
+  /** A request from either side is still waiting for an answer tonight. */
   | { status: 'duplicate' }
+  /** They already accepted tonight — there is nothing left to ask. */
+  | { status: 'already_met' }
   | { status: 'failed'; message: string };
 
 /**
@@ -33,17 +37,26 @@ export async function sendMeetUp(
       return { status: 'sent', notificationId: null };
     }
 
-    // Anti-spam: one unread meetup_request per recipient per 5 minutes
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data: recent } = await supabase
+    // One meet-up per pair per night, in EITHER direction, and none once
+    // they have already agreed. The old guard only caught an *unread*
+    // request under five minutes old, so accepting it (which deletes the
+    // row) or simply opening Activity (which marks it read) let the sender
+    // fire again immediately — unlimited meet ups between the same two
+    // people. Everything here dies at the 5 AM reset with the rest of the
+    // night, so tomorrow starts fresh.
+    const nightStart = nightStartAt().toISOString();
+    const pair = `and(sender_id.eq.${senderId},receiver_id.eq.${target.user_id}),and(sender_id.eq.${target.user_id},receiver_id.eq.${senderId})`;
+    const { data: existing } = await supabase
       .from('notifications')
-      .select('id')
-      .eq('sender_id', senderId)
-      .eq('receiver_id', target.user_id)
-      .eq('type', 'meetup_request')
-      .eq('is_read', false)
-      .gte('created_at', fiveMinutesAgo);
-    if (recent?.length) return { status: 'duplicate' };
+      .select('id, type, sender_id')
+      .or(pair)
+      .in('type', ['meetup_request', 'meetup_accepted'])
+      .gte('created_at', nightStart);
+    if (existing?.length) {
+      // Already on together, or a request is still waiting for an answer.
+      const accepted = existing.some((n) => n.type === 'meetup_accepted');
+      return { status: accepted ? 'already_met' : 'duplicate' };
+    }
 
     const senderName = profiles.find((p) => p.id === senderId)?.display_name ?? 'Someone';
     const message = `${senderName.split(' ')[0]} wants to meet up with you`;
@@ -77,6 +90,38 @@ export async function sendMeetUp(
     Alert.alert('Could not send meet up', message);
     return { status: 'failed', message };
   }
+}
+
+/**
+ * Undo tonight's meet up with someone — the request, their acceptance, or
+ * both. Without this the once-per-night rule was a trap: a mistaken tap,
+ * or plans that changed, left the pair locked out until 5 AM with nothing
+ * to undo it. Deletes in both directions so either person can clear it.
+ */
+export async function cancelMeetUp(currentUserId: string, otherUserId: string): Promise<void> {
+  const pair = `and(sender_id.eq.${currentUserId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${currentUserId})`;
+  await supabase
+    .from('notifications')
+    .delete()
+    .or(pair)
+    .in('type', ['meetup_request', 'meetup_accepted'])
+    .gte('created_at', nightStartAt().toISOString());
+}
+
+/** Is there a meet up between these two tonight, and has it been accepted? */
+export async function fetchMeetUpState(
+  currentUserId: string,
+  otherUserId: string
+): Promise<'none' | 'pending' | 'accepted'> {
+  const pair = `and(sender_id.eq.${currentUserId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${currentUserId})`;
+  const { data } = await supabase
+    .from('notifications')
+    .select('type')
+    .or(pair)
+    .in('type', ['meetup_request', 'meetup_accepted'])
+    .gte('created_at', nightStartAt().toISOString());
+  if (!data?.length) return 'none';
+  return data.some((n) => n.type === 'meetup_accepted') ? 'accepted' : 'pending';
 }
 
 /**
