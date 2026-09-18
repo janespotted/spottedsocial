@@ -22,6 +22,7 @@ import { Avatar } from '@/components/avatar';
 import { DropdownMenu } from '@/components/dropdown-menu';
 import type { MapFriend, RelationshipType } from '@/hooks/use-map-data';
 import { NEON, PURPLE } from '@/lib/theme';
+import { RESET_COPY } from '@/lib/reset-copy';
 
 export type FriendStatusKind = 'out' | 'party' | 'planning' | 'home' | 'unknown';
 
@@ -302,14 +303,14 @@ export function FriendCardBody({
                   @{data.venue_name}
                 </Text>
               </Pressable>
-              <Text className="text-white/45 text-[11px] font-sans">Shared for tonight · clears at 5am</Text>
+              <Text className="text-white/45 text-[11px] font-sans">{RESET_COPY.friendCard}</Text>
             </>
           ) : data.statusKind === 'party' ? (
             <>
               <Text className="text-[#d4ff00] text-sm font-sans-medium" numberOfLines={1}>
                 Private Party{data.party_neighborhood ? ` (${data.party_neighborhood})` : ''}
               </Text>
-              <Text className="text-white/45 text-[11px] font-sans">Shared for tonight · clears at 5am</Text>
+              <Text className="text-white/45 text-[11px] font-sans">{RESET_COPY.friendCard}</Text>
             </>
           ) : data.statusLine ? (
             <Text className="text-white/60 text-sm font-sans" numberOfLines={1}>

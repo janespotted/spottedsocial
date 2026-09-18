@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { router, useRootNavigationState, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
+import { handleNightBoundary } from '@/lib/night-boundary';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import {
   deferDeepLink,
@@ -122,14 +123,20 @@ export function NightStatusGate() {
     return () => clearTimeout(timer);
   }, [gateState]);
 
-  // Re-arm at the nightly reset while the app stays open
+  // Re-arm at the nightly reset while the app stays open, and roll the rest
+  // of tonight's content over with it — the feed, threads, yaps and the
+  // activity inbox used to keep last night's content until a manual refresh
+  // (addendum v3 §4).
   useEffect(() => {
     if (!data) return;
     const target = data.status
       ? new Date(data.status.expires_at).getTime()
       : nightResetAt(new Date(), data.city).getTime();
     const delay = Math.min(Math.max(target - Date.now(), 1_000) + 500, MAX_TIMEOUT_MS);
-    const timer = setTimeout(() => invalidateNightStatusQueries(queryClient), delay);
+    const timer = setTimeout(() => {
+      invalidateNightStatusQueries(queryClient);
+      handleNightBoundary(queryClient);
+    }, delay);
     return () => clearTimeout(timer);
   }, [data, queryClient]);
 

@@ -10,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
+import { onNightBoundary } from '@/lib/night-boundary';
+import { RESET_COPY } from '@/lib/reset-copy';
 import { Image } from '@/components/styled';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -234,6 +236,11 @@ export default function ThreadScreen() {
       }
     }
   }, [threadId]);
+
+  // At 5 AM the night's messages are gone — re-read rather than keep
+  // showing them (addendum v3 §4). Messages live in local state, so the
+  // query invalidation in handleNightBoundary cannot reach them.
+  useEffect(() => onNightBoundary(() => void fetchMessages()), [fetchMessages]);
 
   useEffect(() => {
     if (!threadId || !userId) return;
@@ -635,6 +642,14 @@ export default function ThreadScreen() {
             ) : null}
           </View>
         </Pressable>
+      </View>
+
+      {/* A slim system row under the name: the thread survives the reset,
+          the messages don't (addendum v3 §3) */}
+      <View className="px-4 py-1.5 border-b border-white/[0.06] bg-white/[0.02]">
+        <Text className="text-white/45 text-[11px] font-sans text-center">
+          {RESET_COPY.dmThread}
+        </Text>
       </View>
 
       {/* Messages — KeyboardAwareLegendList is LegendList wired to

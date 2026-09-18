@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { buildProfileMap, fetchProfilesSafe, type SafeProfile } from './profiles';
 import { DEMO_MODE } from './demo-mode';
+import { nightResetAfterDate } from './tonight';
 
 export interface Plan {
   id: string;
@@ -95,12 +96,14 @@ export function toLocalDateString(date: Date): string {
 }
 
 /**
- * Plans expire at 5am the day AFTER the plan date (nightlife rollover).
- * Local-time constructor avoids the UTC midnight parsing bug.
+ * Plans expire at 5am the day AFTER the plan date (nightlife rollover) in
+ * the PROFILE CITY's zone, like every other expiry (lib/tonight.ts). It
+ * used to use a local-time constructor, so a New York user creating a plan
+ * while in Los Angeles got one that outlived their own reset by three
+ * hours (addendum v3 §2).
  */
-export function getPlanExpiry(planDate: string): string {
-  const [year, month, day] = planDate.split('-').map(Number);
-  return new Date(year, month - 1, day + 1, 5, 0, 0, 0).toISOString();
+export function getPlanExpiry(planDate: string, city?: string | null): string {
+  return nightResetAfterDate(planDate, city).toISOString();
 }
 
 /** Unexpired plans, highest score first, with author profiles attached. */

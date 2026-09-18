@@ -45,6 +45,7 @@ import { getLocationPermission, hasLocationAccess, requestWhenInUse } from '@/li
 import { IconButton } from '@/components/icon-button';
 import { SmartArrivalPrompt, VenueMoveBanner } from '@/components/venue-move-banner';
 import { NEON } from '@/lib/theme';
+import { RESET_COPY } from '@/lib/reset-copy';
 import venuePinImage from '../../../../assets/images/venue-pin.png';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_PUBLIC_TOKEN ?? null);
@@ -806,6 +807,8 @@ export default function MapScreen() {
                 <Text className="text-white text-sm font-sans-medium" numberOfLines={1}>
                   {myStatus.venue_name ? `@ ${myStatus.venue_name}` : "You're out"}
                 </Text>
+                {/* The rule, where the user can see their own sharing (addendum v3 §3) */}
+                <Text className="text-white/50 text-[11px] font-sans">{RESET_COPY.liveUntil}</Text>
               </Pressable>
               <Pressable
                 onPress={async () => {

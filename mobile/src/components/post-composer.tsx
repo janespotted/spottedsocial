@@ -8,8 +8,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { supabase } from '@/lib/supabase';
 import { validatePostText, validateVenueName } from '@/lib/validation';
 import { savePostAudience, type Audience } from '@/lib/audience';
-import { getCityLabel } from '@/lib/city-neighborhoods';
-import { getActiveCity } from '@/lib/tonight';
+import { RESET_COPY, RESET_TITLE } from '@/lib/reset-copy';
 import { PublishError, publishPost, type PublishPhase, type PublishedPost } from '@/lib/publish-post';
 import { useSession } from '@/hooks/use-session';
 import { AudienceRow } from '@/components/audience-row';
@@ -200,7 +199,6 @@ export function PostComposer({
   };
 
   const previewHeight = Math.min(width * 1.3, 460);
-  const cityLabel = getCityLabel(getActiveCity() ?? 'nyc');
   const percent = Math.round(progress * 100);
   const statusLine =
     phase === 'preparing'
@@ -209,7 +207,7 @@ export function PostComposer({
       ? `Uploading ${media?.type === 'video' ? 'video' : 'photo'} · ${percent}%`
       : phase === 'publishing'
         ? 'Publishing…'
-        : `Gone at 5:00 AM ${cityLabel}`;
+        : RESET_COPY.postPreview;
 
   return (
     <View className="flex-1 bg-linear-to-b from-[#34215c] via-[#1d1240] to-[#110a24]">
@@ -410,7 +408,8 @@ export function PostComposer({
         <View className="flex-row items-center gap-2 px-1">
           <SymbolView name="moon.stars" size={13} tintColor="rgba(255,255,255,0.5)" />
           <Text className="text-white/55 text-xs font-sans flex-1">
-            Posts disappear at 5:00 AM {cityLabel} time — fun for the night, gone by sunrise.
+            {RESET_TITLE} Posts, Yaps, DMs, meetups and invites from tonight disappear — fun for
+            the night, gone by sunrise.
           </Text>
         </View>
       </KeyboardAwareScrollView>

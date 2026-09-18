@@ -8,6 +8,7 @@ import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/use-session';
 import { getPushPermission, registerPushToken, type PushPermission } from '@/lib/push';
+import { RESET_BODY, RESET_COPY, RESET_KEPT, RESET_TITLE } from '@/lib/reset-copy';
 import { PURPLE } from '@/lib/theme';
 
 function SettingsRow({
@@ -183,6 +184,14 @@ export default function SettingsScreen() {
           title="Push Notifications"
           subtitle={pushSubtitle}
           onPress={pushPermission === 'granted' ? undefined : onPushRow}
+        />
+        {/* The permanent explanation the client asked for (addendum v3 §3):
+            what clears, what stays, in the same words as onboarding. */}
+        <SettingsRow
+          icon="moon.stars"
+          title={RESET_COPY.settingsRow}
+          subtitle="What clears at 5am, and what stays"
+          onPress={() => Alert.alert(RESET_TITLE, `${RESET_BODY}\n\n${RESET_KEPT}`)}
         />
         <SettingsRow
           icon="eye.slash"

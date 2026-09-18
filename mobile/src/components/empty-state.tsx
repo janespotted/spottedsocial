@@ -108,6 +108,49 @@ export function ErrorState({
   );
 }
 
+/**
+ * The 5 AM reset, seen from a link (addendum v3 §4): a post, thread, yap,
+ * meet-up or invite that expired before the user got here. Never a blank
+ * list and never a server error — the content is gone for a reason the
+ * product explains. `what` names it: "This post", "These messages".
+ */
+export function ExpiredState({
+  what = 'This',
+  onDismiss,
+  dismissLabel = 'Back',
+}: {
+  what?: string;
+  onDismiss?: () => void;
+  dismissLabel?: string;
+}) {
+  return (
+    <View className="items-center px-8 py-14">
+      <View
+        className="w-20 h-20 rounded-full items-center justify-center mb-5"
+        style={{ backgroundColor: 'rgba(45,27,78,0.6)' }}
+      >
+        <SymbolView name="moon.stars" size={36} tintColor="rgba(168,85,247,0.7)" />
+      </View>
+      <Text className="text-xl font-sans-semibold text-white text-center mb-2">
+        {what} expired at 5am
+      </Text>
+      <Text className="text-white/55 text-sm font-sans text-center leading-5 max-w-72">
+        Tonight resets at 5am — posts, Yaps, messages, meetups and invites from that night
+        disappear. Your profile and friends stay.
+      </Text>
+      {onDismiss ? (
+        <Pressable
+          onPress={onDismiss}
+          accessibilityRole="button"
+          className={`mt-6 min-h-11 px-6 rounded-full items-center justify-center active:opacity-90 ${primaryControl}`}
+        >
+          <Text className={`text-sm font-sans-semibold ${primaryControlText}`}>{dismissLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 /** Compact inline row: "Find friends · Invite" for screens that have content. */
 export function AddFriendsRow() {
   return (

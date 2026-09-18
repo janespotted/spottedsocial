@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { DEMO_MODE } from './demo-mode';
 import { fetchProfilesSafe } from './profiles';
 import { isFromTonight } from './time-context';
+import { nightStartAt } from './tonight';
 
 /** Messages containing `[shared_post:<id>]` render as shared-post cards. */
 export const SHARED_POST_REGEX = /^\[shared_post:([a-f0-9-]+)\]$/;
@@ -69,10 +70,13 @@ export async function fetchDmThreads(userId: string): Promise<DmThreadPreview[]>
       .select('thread_id, user_id')
       .in('thread_id', threadIds)
       .neq('user_id', userId),
+    // Tonight's messages only — the same boundary the thread applies, moved
+    // into the query so a late cron can't surface last night's previews
     supabase
       .from('dm_messages')
       .select('thread_id, text, created_at, sender_id')
       .in('thread_id', threadIds)
+      .gte('created_at', nightStartAt().toISOString())
       .order('created_at', { ascending: false }),
     supabase
       .from('dm_read_receipts')

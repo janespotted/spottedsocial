@@ -15,6 +15,7 @@ import { useSession } from '@/hooks/use-session';
 import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
+import { ExpiredState } from '@/components/empty-state';
 import { NEON } from '@/lib/theme';
 
 const QUICK_EMOJIS = ['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'];
@@ -42,6 +43,19 @@ export default function CommentsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const queryKey = ['comments', postId];
+
+  // A push or link can land here after the post expired at 5am. Without
+  // this the screen showed an empty comment list with no explanation
+  // (addendum v3 §4).
+  const { data: postExists, isLoading: checkingPost } = useQuery({
+    queryKey: ['comments-post-exists', postId],
+    enabled: !!postId && !!session,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data } = await supabase.from('posts').select('id').eq('id', postId!).maybeSingle();
+      return !!data;
+    },
+  });
 
   const { data: comments, isLoading } = useQuery({
     queryKey,
@@ -146,10 +160,12 @@ export default function CommentsScreen() {
         </Pressable>
       </View>
 
-      {isLoading ? (
+      {isLoading || checkingPost ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={NEON} />
         </View>
+      ) : postExists === false ? (
+        <ExpiredState what="This post" onDismiss={() => router.back()} dismissLabel="Close" />
       ) : (
         <LegendList
           recycleItems
@@ -201,10 +217,11 @@ export default function CommentsScreen() {
         />
       )}
 
-      {/* Composer — KeyboardStickyView reads global keyboard values, so it
+      {/* Composer — hidden once the post is gone; KeyboardStickyView reads global keyboard values, so it
           tracks the keyboard even inside this native modal (where
           KeyboardAvoidingView needs manual offsets). The opened offset gives
           back the safe-area padding so only 12px rides above the keyboard. */}
+      {postExists === false ? null : (
       <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
         <View className="border-t border-white/10 bg-[#110a24]">
           {/* Quick-emoji react row (posts the emoji as a comment, like web) */}
@@ -248,6 +265,7 @@ export default function CommentsScreen() {
           </View>
         </View>
       </KeyboardStickyView>
+      )}
     </View>
   );
 }

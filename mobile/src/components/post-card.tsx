@@ -211,7 +211,9 @@ export function PostCard({
             </Pressable>
           ) : null}
         </View>
-        <Text className="text-white/50 text-xs font-sans">{getTimeAgo(post.created_at)}</Text>
+        <Text className="text-white/50 text-xs font-sans">
+          {getTimeAgo(post.created_at)} · until 5am
+        </Text>
         <Pressable onPress={openMenu} hitSlop={8} className="ml-3 opacity-60">
           <SymbolView name="ellipsis" size={18} tintColor="rgba(255,255,255,0.8)" />
         </Pressable>

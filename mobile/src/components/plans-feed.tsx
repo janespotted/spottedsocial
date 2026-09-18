@@ -27,6 +27,7 @@ import { EventCard } from '@/components/event-card';
 import { EmptyState, ErrorState, type EmptyAction } from '@/components/empty-state';
 import { addFriendsActions } from '@/lib/add-friends';
 import { FriendsOutBanner } from '@/components/friends-out-banner';
+import { RESET_COPY } from '@/lib/reset-copy';
 import { NEON } from '@/lib/theme';
 
 const AROUND_TONIGHT_COLLAPSE = 4;
@@ -236,6 +237,13 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
         />
       }
     >
+      {/* Persistent, compact — meetups and invites go with the night
+          (addendum v3 §3). Not a modal, not dismissible. */}
+      <View className="flex-row items-center gap-2 px-1">
+        <SymbolView name="moon.stars" size={12} tintColor="rgba(255,255,255,0.45)" />
+        <Text className="text-white/45 text-xs font-sans flex-1">{RESET_COPY.plansHeader}</Text>
+      </View>
+
       {/* 1. Quiet status control */}
       <View className="flex-row items-center gap-3">
         <Text className="text-white/55 text-sm font-sans">You&apos;re</Text>

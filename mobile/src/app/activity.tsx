@@ -198,11 +198,22 @@ export default function ActivityScreen() {
     setTimeout(() => router.push('/friends'), 250);
   };
 
+  /** Plan invites: the plan card carries "I'm down", so land on Plans. */
+  const goToPlans = () => {
+    router.back();
+    setTimeout(() => router.navigate('/'), 250);
+  };
+
   const all = notifications ?? [];
-  const invites = all.filter((n) => n.type === 'meetup_request' || n.type === 'venue_invite');
+  const invites = all.filter(
+    (n) => n.type === 'meetup_request' || n.type === 'venue_invite' || n.type === 'plan_invite'
+  );
   const friendRows = all.filter((n) => n.type === 'friend_request' || n.type === 'friend_accepted');
   const accepted = all.filter(
-    (n) => n.type === 'meetup_accepted' || n.type === 'venue_invite_accepted'
+    (n) =>
+      n.type === 'meetup_accepted' ||
+      n.type === 'venue_invite_accepted' ||
+      n.type === 'plan_down'
   );
   const dms = all.filter((n) => n.type === 'dm');
   const engagement = all.filter(
@@ -304,11 +315,21 @@ export default function ActivityScreen() {
               <ActivityCard
                 key={n.id}
                 n={n}
-                subtitleClass={n.type === 'venue_invite' ? 'text-[#d4ff00]' : 'text-white/70'}
-                action={{
-                  label: busyId === n.id ? '...' : "I'm down!",
-                  onPress: () => handleAccept(n),
-                }}
+                subtitleClass={
+                  n.type === 'venue_invite' || n.type === 'plan_invite'
+                    ? 'text-[#d4ff00]'
+                    : 'text-white/70'
+                }
+                action={
+                  // A plan invite has nothing to accept here — "I'm down"
+                  // lives on the plan card itself, so open Plans.
+                  n.type === 'plan_invite'
+                    ? { label: 'See plan', onPress: goToPlans }
+                    : {
+                        label: busyId === n.id ? '...' : "I'm down!",
+                        onPress: () => handleAccept(n),
+                      }
+                }
               />
             ))
           ) : (

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
+import { nightStartAt } from '@/lib/tonight';
 import { queryClient as sharedQueryClient } from '@/lib/query-client';
 import { useSession } from './use-session';
 
@@ -77,10 +78,15 @@ export function useNotifications() {
     staleTime: 15_000,
     queryFn: async (): Promise<AppNotification[]> => {
       const [{ data: rows }, profiles] = await Promise.all([
+        // From tonight only. Notifications carry no expires_at of their own
+        // and are deleted by the nightly cron — which is an hour late in
+        // daylight time — so the boundary is enforced at read time too, or
+        // last night's invites stay actionable (addendum v3 §2/§4).
         supabase
           .from('notifications')
           .select('id, sender_id, type, message, is_read, created_at')
           .eq('receiver_id', session!.user.id)
+          .gte('created_at', nightStartAt().toISOString())
           .order('created_at', { ascending: false })
           .limit(50),
         fetchProfilesSafe(),

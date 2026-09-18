@@ -100,6 +100,20 @@ export function nightStartAt(now: Date = new Date(), city?: string | null): Date
   return zonedToUtc(p.year, p.month, p.day + dayShift, NIGHT_RESET_HOUR, tz);
 }
 
+/**
+ * The 5 AM that ends the night of a given calendar date (YYYY-MM-DD) in the
+ * city's zone — i.e. 5 AM the following morning. Plans are stamped with
+ * this so they expire with the night they belong to, wherever the user's
+ * device happens to be (addendum v3 §2).
+ */
+export function nightResetAfterDate(planDate: string, city?: string | null): Date {
+  const [year, month, day] = planDate.split('-').map(Number);
+  const tz = cityToTimezone(city);
+  // Noon on the plan date sits safely inside that day in any zone, so the
+  // NEXT 5 AM is the end of that night.
+  return nightResetAt(zonedToUtc(year, month, day, 12, tz), city);
+}
+
 /** The next 5 AM — when tonight's statuses, check-ins and posts all expire. */
 export function nightResetAt(now: Date = new Date(), city?: string | null): Date {
   const tz = cityToTimezone(city);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
+import { RESET_COPY } from '@/lib/reset-copy';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
@@ -391,9 +392,16 @@ export default function ProfileScreen() {
           </Text>
 
           {statusKind === 'out' ? (
-            <AudienceRow value={sharingLevel} onChange={setSharingLevel} compact />
+            <>
+              <AudienceRow value={sharingLevel} onChange={setSharingLevel} compact />
+              {/* The rule, next to the audience it applies to (addendum v3 §3) */}
+              <Text className="text-xs text-white/55 font-sans">{RESET_COPY.sharedUntil}</Text>
+            </>
           ) : statusKind === 'planning' ? (
-            <AudienceRow value={planningLevel} onChange={setPlanningVisibility} compact />
+            <>
+              <AudienceRow value={planningLevel} onChange={setPlanningVisibility} compact />
+              <Text className="text-xs text-white/55 font-sans">{RESET_COPY.tbdStatus}</Text>
+            </>
           ) : statusKind === 'off' ? (
             <Text className="text-xs text-white/55 font-sans">
               Friends can&apos;t see you right now. Update your status to share again.

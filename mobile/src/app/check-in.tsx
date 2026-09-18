@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   BackHandler,
   Linking,
@@ -37,6 +38,7 @@ import { notifyFriendArrived, notifyFriendsPlanning } from '@/lib/notifications'
 import { markNightAnswered } from '@/lib/night-gate';
 import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
+import { RESET_BODY, RESET_COPY, RESET_TITLE, resetTimeWithCity } from '@/lib/reset-copy';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { AudienceRow } from '@/components/audience-row';
@@ -748,9 +750,21 @@ export default function CheckInSheet() {
               </Pressable>
             ))}
           </View>
-          <Text className="text-white/45 text-xs font-sans text-center">
-            Statuses reset at 5:00 AM {getCityLabel(city)} time
-          </Text>
+          {/* Footer + info (addendum v3 §3): the rule, with the full
+              explanation one tap away — never another required tap. */}
+          <Pressable
+            onPress={() =>
+              Alert.alert(RESET_TITLE, `${RESET_BODY}\n\n${resetTimeWithCity(city)}.`)
+            }
+            accessibilityRole="button"
+            accessibilityLabel="What resets at 5am"
+            className="flex-row items-center justify-center gap-1.5 active:opacity-70"
+          >
+            <Text className="text-white/45 text-xs font-sans text-center">
+              {RESET_COPY.statusFooter}
+            </Text>
+            <SymbolView name="info.circle" size={12} tintColor="rgba(255,255,255,0.45)" />
+          </Pressable>
         </>
       ) : null}
 
@@ -863,6 +877,7 @@ export default function CheckInSheet() {
 
           <AudienceRow value={audience} onChange={setAudienceOverride} />
 
+          <Text className="text-white/55 text-xs font-sans">{RESET_COPY.venueConfirm}</Text>
           <PrimaryButton
             label="Share my spot"
             onPress={shareSpot}
@@ -898,6 +913,7 @@ export default function CheckInSheet() {
             Only Close Friends see your exact spot on the map. Everyone else in your audience sees
             just the neighborhood — no pin.
           </Text>
+          <Text className="text-white/55 text-xs font-sans">{RESET_COPY.venueConfirm}</Text>
           <PrimaryButton
             label="Share my spot"
             onPress={shareParty}
@@ -918,6 +934,7 @@ export default function CheckInSheet() {
           {error ? <Text className="text-amber-400/90 text-xs font-sans">{error}</Text> : null}
           <NeighborhoodPicker city={city} value={neighborhood} onChange={setNeighborhood} allowAnywhere />
           <AudienceRow value={audience} onChange={setAudienceOverride} />
+          <Text className="text-white/55 text-xs font-sans">{RESET_COPY.tbdStatus}</Text>
           <PrimaryButton
             label="Share TBD status"
             onPress={sharePlanning}
