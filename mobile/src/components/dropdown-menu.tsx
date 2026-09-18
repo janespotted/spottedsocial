@@ -3,11 +3,14 @@ import { Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'r
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { Avatar } from '@/components/avatar';
 import { INK_LIGHT, NEON } from '@/lib/theme';
 
 export interface DropdownOption {
   key: string;
   label: string;
+  /** Optional avatar rendered before the label (people lists). */
+  avatar?: { name: string; url: string | null };
 }
 
 /**
@@ -25,6 +28,7 @@ export function DropdownMenu({
   onSelect,
   children,
   accessibilityLabel,
+  title,
   maxHeight = 288,
 }: {
   options: DropdownOption[];
@@ -33,6 +37,8 @@ export function DropdownMenu({
   /** The trigger content (pill); pressed state is handled here. */
   children: ReactNode;
   accessibilityLabel: string;
+  /** Small heading above the options ("Friends at Le Bain"). */
+  title?: string;
   maxHeight?: number;
 }) {
   const triggerRef = useRef<View>(null);
@@ -87,6 +93,11 @@ export function DropdownMenu({
               }}
             >
               <ScrollView bounces={false} contentContainerClassName="py-1.5">
+                {title ? (
+                  <Text className="text-white/45 text-[10px] font-sans-medium uppercase tracking-wider px-4 pt-1.5 pb-1">
+                    {title}
+                  </Text>
+                ) : null}
                 {options.map((option) => {
                   const selected = option.key === selectedKey;
                   return (
@@ -98,10 +109,13 @@ export function DropdownMenu({
                       }}
                       accessibilityRole="menuitem"
                       accessibilityState={{ selected }}
-                      className="flex-row items-center justify-between gap-3 px-4 py-3 active:bg-white/10"
+                      className="flex-row items-center gap-3 px-4 py-3 active:bg-white/10"
                     >
+                      {option.avatar ? (
+                        <Avatar name={option.avatar.name} url={option.avatar.url} size="sm" />
+                      ) : null}
                       <Text
-                        className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+                        className={`flex-1 text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
                         style={{ color: selected ? NEON : '#ffffff' }}
                         numberOfLines={1}
                       >

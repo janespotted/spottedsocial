@@ -26,6 +26,7 @@ import { sendVenueInvites, type InviteFriend } from '@/lib/venue-invites';
 import { APP_BASE_URL, fetchOrCreateInviteCode, getInviteUrl } from '@/lib/invites';
 import { NEON, control, outlineControl } from '@/lib/theme';
 import { useFriendIds } from '@/hooks/use-friend-ids';
+import { useFriendsOut } from '@/hooks/use-friends-out';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
 import { VenueEventsSection } from '@/components/venue-events-section';
@@ -162,7 +163,9 @@ export default function VenueScreen() {
   const { data: friendIds } = useFriendIds(session?.user.id);
   const queryClient = useQueryClient();
   const { height: windowHeight } = useWindowDimensions();
-  const [moreInfoOpen, setMoreInfoOpen] = useState(false);
+  // Open by default: hours, events and Trending Nearby are the reason to
+  // open a venue, and the sheet sizes to its content either way.
+  const [moreInfoOpen, setMoreInfoOpen] = useState(true);
   // Keyed by venueId so Trending Nearby swaps retry the new venue's photo
   const [photoFailedFor, setPhotoFailedFor] = useState<string | null>(null);
   const photoFailed = photoFailedFor === venueId;
@@ -418,20 +421,69 @@ export default function VenueScreen() {
     .filter((p): p is SafeProfile => !!p)
     .map((p) => ({ id: p.id, display_name: p.display_name, avatar_url: p.avatar_url }));
 
+  // Grouped like the original InviteFriendsModal (addendum v3 §11.6):
+  // Friends Out Now (with their venue), TBD Tonight (with their plan),
+  // Staying in. A viewer who is in tonight sees names but not venues.
+  const { data: friendsOut } = useFriendsOut();
+  const inviteGroups = (() => {
+    const outRows = (friendsOut?.outFriends ?? []).map((f) => ({
+      id: f.user_id,
+      display_name: f.display_name,
+      avatar_url: f.avatar_url,
+      line: friendsOut?.venuesWithheld ? 'Out tonight' : f.venue_name ? `At ${f.venue_name}` : 'Out tonight',
+      lineColor: NEON,
+    }));
+    const tbdRows = (friendsOut?.planningFriends ?? []).map((f) => ({
+      id: f.user_id,
+      display_name: f.display_name,
+      avatar_url: f.avatar_url,
+      line: f.planning_venue_name
+        ? `thinking ${f.planning_venue_name}`
+        : f.planning_neighborhood
+          ? `TBD · ${f.planning_neighborhood}`
+          : 'TBD · down for anything',
+      lineColor: 'rgba(255,255,255,0.55)',
+    }));
+    const taken = new Set([...outRows, ...tbdRows].map((r) => r.id));
+    const homeRows = inviteFriends
+      .filter((f) => !taken.has(f.id))
+      .map((f) => ({ ...f, line: 'Home', lineColor: 'rgba(255,255,255,0.4)' }));
+    return [
+      { key: 'out', title: 'Friends Out Now', icon: 'flame.fill' as const, rows: outRows },
+      { key: 'tbd', title: 'TBD Tonight', icon: 'target' as const, rows: tbdRows },
+      { key: 'home', title: 'Staying in', icon: 'house.fill' as const, rows: homeRows },
+    ].filter((g) => g.rows.length > 0);
+  })();
+  const inviteRowsById = new Map(inviteGroups.flatMap((g) => g.rows).map((r) => [r.id, r]));
+
+  // Sent → close the sheet and show the "Invites Sent!" card (confetti,
+  // Undo, Chat) — the original build's success state (addendum v3 §1).
   const submitInvites = async () => {
     if (!venue || !session || sendingInvites) return;
-    const selected = inviteFriends.filter((f) => selectedInvitees.has(f.id));
+    const selected = [...selectedInvitees]
+      .map((id) => inviteRowsById.get(id))
+      .filter((r): r is NonNullable<typeof r> => !!r)
+      .map((r) => ({ id: r.id, display_name: r.display_name, avatar_url: r.avatar_url }));
     if (selected.length === 0) return;
     setSendingInvites(true);
-    const ok = await sendVenueInvites(session.user.id, venue.name, selected);
+    const result = await sendVenueInvites(session.user.id, venue.name, selected);
     setSendingInvites(false);
+    if (!result.ok) {
+      Alert.alert('Could not send invites', 'Please try again.');
+      return;
+    }
     setInvitePickerOpen(false);
     setSelectedInvitees(new Set());
-    Alert.alert(
-      ok ? 'Invites sent! 🎉' : 'Could not send invites',
-      ok
-        ? `${selected.length} friend${selected.length > 1 ? 's' : ''} invited to ${venue.name}.`
-        : 'Please try again.'
+    const friends = JSON.stringify(selected);
+    const notificationIds = JSON.stringify(result.notificationIds);
+    router.back();
+    setTimeout(
+      () =>
+        router.push({
+          pathname: '/sent-confirmation',
+          params: { kind: 'invites', friends, venueName: venue.name, notificationIds },
+        }),
+      350
     );
   };
 
@@ -456,45 +508,66 @@ export default function VenueScreen() {
             <SymbolView name="xmark" size={18} tintColor="rgba(255,255,255,0.6)" />
           </Pressable>
         </View>
-        <ScrollView contentContainerClassName="p-4 gap-3">
-          {inviteFriends.length === 0 ? (
+        <ScrollView contentContainerClassName="px-4 pt-2 pb-4 gap-4">
+          {inviteGroups.length === 0 ? (
             <Text className="text-white/55 text-sm font-sans text-center py-10">
               Add some friends first.
             </Text>
           ) : (
-            inviteFriends.map((friend) => {
-              const selected = selectedInvitees.has(friend.id);
-              return (
-                <Pressable
-                  key={friend.id}
-                  onPress={() =>
-                    setSelectedInvitees((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(friend.id)) next.delete(friend.id);
-                      else next.add(friend.id);
-                      return next;
-                    })
-                  }
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selected }}
-                  className="flex-row items-center gap-3 p-2 rounded-xl active:bg-white/5"
-                >
-                  <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
-                  <Text className="flex-1 text-white text-sm font-sans-medium" numberOfLines={1}>
-                    {friend.display_name}
+            inviteGroups.map((group) => (
+              <View key={group.key} className="gap-1">
+                <View className="flex-row items-center gap-1.5 px-2 pb-1">
+                  <SymbolView
+                    name={group.icon}
+                    size={11}
+                    tintColor={group.key === 'out' ? NEON : 'rgba(255,255,255,0.5)'}
+                  />
+                  <Text className="text-white/55 text-[11px] font-sans-semibold uppercase tracking-wider">
+                    {group.title} ({group.rows.length})
                   </Text>
-                  <View
-                    className="w-5 h-5 rounded-full border items-center justify-center"
-                    style={{
-                      borderColor: selected ? NEON : 'rgba(255,255,255,0.3)',
-                      backgroundColor: selected ? NEON : 'transparent',
-                    }}
-                  >
-                    {selected ? <SymbolView name="checkmark" size={11} tintColor="#000000" /> : null}
-                  </View>
-                </Pressable>
-              );
-            })
+                </View>
+                {group.rows.map((friend) => {
+                  const selected = selectedInvitees.has(friend.id);
+                  return (
+                    <Pressable
+                      key={friend.id}
+                      onPress={() =>
+                        setSelectedInvitees((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(friend.id)) next.delete(friend.id);
+                          else next.add(friend.id);
+                          return next;
+                        })
+                      }
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      className={`flex-row items-center gap-3 p-2 rounded-xl active:bg-white/5 ${
+                        selected ? 'bg-[#d4ff00]/8' : ''
+                      }`}
+                    >
+                      <View
+                        className="w-5 h-5 rounded-md border items-center justify-center"
+                        style={{
+                          borderColor: selected ? NEON : 'rgba(255,255,255,0.3)',
+                          backgroundColor: selected ? NEON : 'transparent',
+                        }}
+                      >
+                        {selected ? <SymbolView name="checkmark" size={11} tintColor="#000000" weight="bold" /> : null}
+                      </View>
+                      <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+                      <View className="flex-1 min-w-0">
+                        <Text className="text-white text-sm font-sans-medium" numberOfLines={1}>
+                          {friend.display_name}
+                        </Text>
+                        <Text className="text-xs font-sans" style={{ color: friend.lineColor }} numberOfLines={1}>
+                          {friend.line}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))
           )}
         </ScrollView>
         <View className="px-4 pb-safe-offset-4 pt-2">
@@ -687,7 +760,7 @@ export default function VenueScreen() {
             </Pressable>
           </View>
 
-          {/* More Info — collapsed by default */}
+          {/* More Info — open by default */}
           <Pressable
             onPress={() => setMoreInfoOpen((v) => !v)}
             className="flex-row items-center justify-between py-2"
@@ -700,11 +773,11 @@ export default function VenueScreen() {
             />
           </Pressable>
           {moreInfoOpen ? (
-            <ScrollView
-              style={{ maxHeight: Math.round(windowHeight * 0.32) }}
-              contentContainerClassName="pt-2 gap-3"
-              showsVerticalScrollIndicator={false}
-            >
+            // A plain View, NOT a ScrollView: under fitToContents the sheet
+            // measures once, and a nested scroller that fills after its data
+            // arrives (hours, Trending Nearby) overflows the measured height
+            // and paints over the card. Sized content grows the sheet instead.
+            <View className="pt-2 pb-1 gap-3">
               <VenueEventsSection venueId={venue.id} />
 
               {hoursData?.hours ? (
@@ -747,7 +820,7 @@ export default function VenueScreen() {
                   {(hoursData.ratingsCount ?? 0).toLocaleString()})
                 </Text>
               ) : null}
-            </ScrollView>
+            </View>
           ) : null}
         </View>
         )}

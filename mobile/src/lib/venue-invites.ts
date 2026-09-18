@@ -8,18 +8,23 @@ export interface InviteFriend {
   avatar_url: string | null;
 }
 
+export interface SendInvitesResult {
+  ok: boolean;
+  /** Notification ids created — Undo deletes exactly these (web parity). */
+  notificationIds: string[];
+}
+
 /**
  * Send "X invited you to <venue>" notifications — port of the web
  * VenueInviteContext.sendInvites: batch RPC insert + best-effort push per
  * recipient. Demo friends are silently skipped (not in auth.users).
- * Returns true when the invites were recorded.
  */
 export async function sendVenueInvites(
   senderId: string,
   venueName: string,
   friends: InviteFriend[]
-): Promise<boolean> {
-  if (friends.length === 0) return false;
+): Promise<SendInvitesResult> {
+  if (friends.length === 0) return { ok: false, notificationIds: [] };
 
   try {
     const profiles = await fetchProfilesSafe();
@@ -31,7 +36,7 @@ export async function sendVenueInvites(
     if (realFriends.length === 0) {
       // All-demo selection (dev testing) — treat as success, nothing to write
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      return true;
+      return { ok: true, notificationIds: [] };
     }
 
     const message = `${senderFirstName} invited you to ${venueName}. Want to go?`;
@@ -59,8 +64,19 @@ export async function sendVenueInvites(
     }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    return true;
+    return { ok: true, notificationIds: (inserted ?? []).map((n) => n.id) };
   } catch {
-    return false;
+    return { ok: false, notificationIds: [] };
   }
+}
+
+/**
+ * Undo from the "Invites Sent!" card: delete the notification rows the send
+ * created. A push that already left the phone cannot be recalled, but the
+ * invite disappears from the recipient's Activity, as in the original build.
+ */
+export async function undoNotifications(notificationIds: string[]): Promise<boolean> {
+  if (notificationIds.length === 0) return true;
+  const { error } = await supabase.from('notifications').delete().in('id', notificationIds);
+  return !error;
 }

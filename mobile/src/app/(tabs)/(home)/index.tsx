@@ -32,6 +32,7 @@ import { PostCard } from '@/components/post-card';
 import { PlansFeed } from '@/components/plans-feed';
 import { Avatar } from '@/components/avatar';
 import { HeaderActions } from '@/components/header-actions';
+import { FriendsOutPill } from '@/components/friends-out-pill';
 import { NEON, PURPLE } from '@/lib/theme';
 
 type FeedMode = 'newsfeed' | 'plans';
@@ -440,6 +441,15 @@ export default function HomeScreen() {
           )}
         />
       )}
+
+      {/* "N out · M TBD" roster pill — lower left, as in the original build
+          (addendum v3 §11.1); the roster used to live only in the empty
+          state, so it vanished the moment one post existed */}
+      {!keyboardOpen ? (
+        <View className="absolute bottom-safe-offset-16 left-4">
+          <FriendsOutPill />
+        </View>
+      ) : null}
 
       {/* Compose FAB — bottom-safe-offset-16 clears the native tab bar
           (49pt) plus the home indicator, with a visible gap above it.

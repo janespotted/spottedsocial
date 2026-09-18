@@ -10,10 +10,19 @@ import { fetchProfilesSafe } from './profiles';
  * RPC, push via send-push. (Web also refreshes GPS here; that rides on the
  * location-service port and is best-effort there too.)
  */
+export type SendMeetUpResult =
+  | { status: 'sent'; notificationId: string | null }
+  | { status: 'duplicate' }
+  | { status: 'failed'; message: string };
+
+/**
+ * Callers show the confirmation card (/sent-confirmation) on `sent`; this
+ * only alerts on failure. `notificationId` is what Undo deletes.
+ */
 export async function sendMeetUp(
   senderId: string,
   target: { user_id: string; display_name: string }
-): Promise<void> {
+): Promise<SendMeetUpResult> {
   try {
     const profiles = await fetchProfilesSafe();
     const targetProfile = profiles.find((p) => p.id === target.user_id);
@@ -21,8 +30,7 @@ export async function sendMeetUp(
     // Demo friends can't receive anything real — confirm optimistically in dev
     if (targetProfile?.is_demo) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Meet up sent!', `${target.display_name} will get a ping. (demo)`);
-      return;
+      return { status: 'sent', notificationId: null };
     }
 
     // Anti-spam: one unread meetup_request per recipient per 5 minutes
@@ -35,10 +43,7 @@ export async function sendMeetUp(
       .eq('type', 'meetup_request')
       .eq('is_read', false)
       .gte('created_at', fiveMinutesAgo);
-    if (recent?.length) {
-      Alert.alert('Already sent', `You just sent a meet up to ${target.display_name}.`);
-      return;
-    }
+    if (recent?.length) return { status: 'duplicate' };
 
     const senderName = profiles.find((p) => p.id === senderId)?.display_name ?? 'Someone';
     const message = `${senderName.split(' ')[0]} wants to meet up with you`;
@@ -66,9 +71,11 @@ export async function sendMeetUp(
     }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Meet up sent!', `${target.display_name} will get a ping.`);
+    return { status: 'sent', notificationId: notif?.id ?? null };
   } catch (e) {
-    Alert.alert('Could not send meet up', e instanceof Error ? e.message : 'try again');
+    const message = e instanceof Error ? e.message : 'try again';
+    Alert.alert('Could not send meet up', message);
+    return { status: 'failed', message };
   }
 }
 

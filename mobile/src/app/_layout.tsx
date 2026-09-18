@@ -21,6 +21,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { BackgroundLocationManager } from '@/components/background-location-manager';
 import { NightStatusGate } from '@/components/night-status-gate';
 import { PushNotificationManager } from '@/components/push-notification-manager';
+import { ToastHost } from '@/components/toast-host';
 import { queryClient } from '@/lib/query-client';
 
 // Native splash only: the lime S on midnight stays up until fonts and the
@@ -78,6 +79,18 @@ function RootNavigator() {
       <Stack.Screen
         name="create-post"
         options={{ presentation: 'fullScreenModal', gestureEnabled: false }}
+      />
+      {/* "Invites Sent!" / Meet Up confirmation card: a transparent modal
+          with no native animation — the screen fades itself in and out
+          (addendum v3 §1) */}
+      <Stack.Screen
+        name="sent-confirmation"
+        options={{
+          presentation: 'transparentModal',
+          animation: 'none',
+          gestureEnabled: false,
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
       />
       <Stack.Screen name="create-plan" options={{ presentation: 'modal' }} />
       <Stack.Screen name="edit-plan" options={{ presentation: 'modal' }} />
@@ -217,6 +230,7 @@ export default function RootLayout() {
                   <PushNotificationManager />
                   <StatusBar style="light" />
                   <SplashController />
+                  <ToastHost />
                 </QueryClientProvider>
               </SessionProvider>
             </HeroUINativeProvider>

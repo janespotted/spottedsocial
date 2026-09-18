@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActionSheetIOS, Alert, Linking, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Linking, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -13,6 +13,7 @@ import Animated, {
 import Mapbox, {
   Camera,
   CircleLayer,
+  Images,
   MapView,
   MarkerView,
   ShapeSource,
@@ -28,12 +29,23 @@ import { useMapData, type MapFriend } from '@/hooks/use-map-data';
 import { useArrivalPrompts } from '@/hooks/use-arrival-prompts';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
-import { FriendIdCard } from '@/components/friend-id-card';
-import { isDefaultMapFilters, peopleFilterIncludes, resetMapFilters, useMapFilters } from '@/lib/map-filters';
+import { openFriendCard } from '@/lib/friend-card';
+import { DropdownMenu } from '@/components/dropdown-menu';
+import {
+  isDefaultMapFilters,
+  peopleFilterIncludes,
+  resetMapFilters,
+  setMapFilters,
+  useMapFilters,
+} from '@/lib/map-filters';
+import { StatusPill } from '@/components/header-actions';
+import { FriendsOutPill } from '@/components/friends-out-pill';
 import { getCurrentPosition } from '@/lib/background-location';
 import { getLocationPermission, hasLocationAccess, requestWhenInUse } from '@/lib/location-ready';
 import { IconButton } from '@/components/icon-button';
 import { SmartArrivalPrompt, VenueMoveBanner } from '@/components/venue-move-banner';
+import { NEON } from '@/lib/theme';
+import venuePinImage from '../../../../assets/images/venue-pin.png';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_PUBLIC_TOKEN ?? null);
 
@@ -72,13 +84,28 @@ function PulseRing({ color }: { color: string }) {
   );
 }
 
-/** Ringed avatar circle (or house icon for private parties) */
-function PersonCircle({ friend, isSelf }: { friend: MapFriend; isSelf?: boolean }) {
+/** Ringed avatar circle (or house icon for private parties). `selected`
+ *  = the friend whose card is open: a wider lime halo ties pin and card
+ *  together (addendum v3 §1). */
+function PersonCircle({
+  friend,
+  isSelf,
+  selected,
+}: {
+  friend: MapFriend;
+  isSelf?: boolean;
+  selected?: boolean;
+}) {
   const ring = RELATIONSHIP_COLORS[friend.relationshipType] ?? RELATIONSHIP_COLORS.direct;
   return (
     <View
       className="rounded-full p-px"
-      style={{ borderWidth: 3, borderColor: ring, boxShadow: `0 0 8px ${ring}66` }}
+      style={{
+        borderWidth: 3,
+        borderColor: ring,
+        boxShadow: selected ? `0 0 0 3px ${NEON}, 0 0 18px ${NEON}aa` : `0 0 8px ${ring}66`,
+        transform: [{ scale: selected ? 1.15 : 1 }],
+      }}
     >
       {friend.is_private_party ? (
         <View className="w-8 h-8 rounded-full bg-[#1a0f2e]/90 items-center justify-center">
@@ -95,11 +122,13 @@ function FriendMarker({
   friend,
   index,
   isSelf,
+  selected,
   onPress,
 }: {
   friend: MapFriend;
   index: number;
   isSelf?: boolean;
+  selected?: boolean;
   onPress: (friend: MapFriend) => void;
 }) {
   const stale = stalenessMins(friend) >= 15;
@@ -107,28 +136,30 @@ function FriendMarker({
     <MarkerView coordinate={[friend.lng, friend.lat]} allowOverlap>
       <Animated.View
         entering={ZoomIn.springify().damping(14).delay(index * 60)}
-        style={stale ? { opacity: 0.5 } : undefined}
+        style={stale && !selected ? { opacity: 0.5 } : undefined}
       >
         {friend.relationshipType === 'close' ? (
           <PulseRing color={RELATIONSHIP_COLORS.close} />
         ) : null}
-        <Pressable onPress={() => onPress(friend)} hitSlop={6}>
-          <PersonCircle friend={friend} isSelf={isSelf} />
+        <Pressable onPress={() => onPress(friend)} hitSlop={6} accessibilityLabel={friend.display_name}>
+          <PersonCircle friend={friend} isSelf={isSelf} selected={selected} />
         </Pressable>
       </Animated.View>
     </MarkerView>
   );
 }
 
-/** Group marker: up to 3 member circles, +N badge when more (web parity) */
+/** Group marker: up to 3 member circles, +N badge when more (web parity).
+ *  Tapping opens the "Friends at [Venue]" list — avatars + names, anchored
+ *  to the pin — before any card (addendum v3 §11.4). */
 function FriendGroupMarker({
   cluster,
   index,
-  onPress,
+  onSelectMember,
 }: {
   cluster: MapFriend[];
   index: number;
-  onPress: (cluster: MapFriend[]) => void;
+  onSelectMember: (friend: MapFriend) => void;
 }) {
   const order: Record<string, number> = { close: 0, direct: 1, mutual: 2 };
   const sorted = [...cluster].sort(
@@ -153,22 +184,38 @@ function FriendGroupMarker({
           ]
         : [{ top: size / 2 - 19, left: size / 2 - 19 }];
 
+  const venueName = cluster[0].venue_name;
   return (
     <MarkerView coordinate={[cluster[0].lng, cluster[0].lat]} allowOverlap>
       <Animated.View entering={ZoomIn.springify().damping(14).delay(index * 60)}>
-        <Pressable onPress={() => onPress(cluster)} style={{ width: size, height: size }}>
-          <View className="absolute inset-0 rounded-full border border-white/15" />
-          {shown.map((member, i) => (
-            <View key={member.user_id} style={{ position: 'absolute', ...positions[i] }}>
-              <PersonCircle friend={member} />
-            </View>
-          ))}
-          {extra > 0 ? (
-            <View className="absolute -bottom-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#1a0f2e] border border-white/30 items-center justify-center">
-              <Text className="text-white text-[11px] font-sans-semibold">+{extra}</Text>
-            </View>
-          ) : null}
-        </Pressable>
+        <DropdownMenu
+          title={venueName ? `Friends at ${venueName}` : 'Friends here'}
+          options={sorted.map((f) => ({
+            key: f.user_id,
+            label: f.display_name,
+            avatar: { name: f.display_name, url: f.avatar_url },
+          }))}
+          selectedKey={null}
+          onSelect={(key) => {
+            const member = cluster.find((f) => f.user_id === key);
+            if (member) onSelectMember(member);
+          }}
+          accessibilityLabel={`${cluster.length} friends${venueName ? ` at ${venueName}` : ' here'}`}
+        >
+          <View style={{ width: size, height: size }}>
+            <View className="absolute inset-0 rounded-full border border-white/15" />
+            {shown.map((member, i) => (
+              <View key={member.user_id} style={{ position: 'absolute', ...positions[i] }}>
+                <PersonCircle friend={member} />
+              </View>
+            ))}
+            {extra > 0 ? (
+              <View className="absolute -bottom-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#1a0f2e] border border-white/30 items-center justify-center">
+                <Text className="text-white text-[11px] font-sans-semibold">+{extra}</Text>
+              </View>
+            ) : null}
+          </View>
+        </DropdownMenu>
       </Animated.View>
     </MarkerView>
   );
@@ -250,10 +297,18 @@ export default function MapScreen() {
   const stayingIn = ownNight?.status?.status === 'home';
   const hiddenFriendCount = data?.hiddenFriendCount ?? 0;
 
-  const [selectedFriend, setSelectedFriend] = useState<MapFriend | null>(null);
-  const [friendCardOpen, setFriendCardOpen] = useState(false);
+  // The friend whose card sheet is open — their pin gets the lime halo
+  const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
   const mapFilters = useMapFilters();
   const { people: peopleFilter, showVenues, venueType: venueFilter } = mapFilters;
+  // The original build's "Friends" chip: my friends only — no venues, no
+  // mutuals. A viewing shortcut over the same filter store as the sheet.
+  const friendsOnly = !showVenues && peopleFilter !== 'mutual_friends';
+  const toggleFriendsOnly = () => {
+    Haptics.selectionAsync();
+    if (friendsOnly) setMapFilters({ showVenues: true, people: 'mutual_friends' });
+    else setMapFilters({ showVenues: false, people: 'all_friends' });
+  };
   const filtersActive = !isDefaultMapFilters(mapFilters);
   const [locating, setLocating] = useState(false);
   const [shouldCluster, setShouldCluster] = useState(true);
@@ -367,31 +422,55 @@ export default function MapScreen() {
     });
   };
 
-  // Opening a venue pans (same zoom) so the pin sits above the half-height
+  // Opening a venue or a friend pans (same zoom) so the pin sits above the
   // sheet, and remembers where the map was; dismissing the sheet puts the
-  // map back exactly there (client feedback §7).
-  const cameraBeforeVenue = useRef<{ center: [number, number]; zoom: number } | null>(null);
-  const openVenue = async (venueId: string, lng: number, lat: number) => {
+  // map back exactly there (client feedback §7, addendum v3 §1).
+  const cameraBeforeSheet = useRef<{ center: [number, number]; zoom: number } | null>(null);
+  const rememberCamera = async () => {
     try {
       const [[east, north], [west, south]] = await mapRef.current!.getVisibleBounds();
       const zoom = await mapRef.current!.getZoom();
-      cameraBeforeVenue.current = { center: [(east + west) / 2, (north + south) / 2], zoom };
+      cameraBeforeSheet.current = { center: [(east + west) / 2, (north + south) / 2], zoom };
     } catch {
-      cameraBeforeVenue.current = null;
+      cameraBeforeSheet.current = null;
     }
+  };
+  const panAboveSheet = (lng: number, lat: number, sheetFraction: number) => {
     cameraRef.current?.setCamera({
       centerCoordinate: [lng, lat],
-      padding: { paddingTop: 0, paddingLeft: 0, paddingRight: 0, paddingBottom: Math.round(windowHeight * 0.5) },
+      padding: {
+        paddingTop: 0,
+        paddingLeft: 0,
+        paddingRight: 0,
+        paddingBottom: Math.round(windowHeight * sheetFraction),
+      },
       animationDuration: 500,
     });
+  };
+  const openVenue = async (venueId: string, lng: number, lat: number) => {
+    await rememberCamera();
+    panAboveSheet(lng, lat, 0.5);
     router.push({ pathname: '/venue', params: { venueId } });
+  };
+
+  // Tapping a person opens their card over the map (the same /friend-card
+  // sheet every other surface uses) with the pin highlighted; the card is
+  // content-sized, so the pan is shallower than for the venue sheet.
+  const handleFriendPress = async (friend: MapFriend) => {
+    if (!session || friend.user_id === session.user.id) return; // self — no card
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await rememberCamera();
+    panAboveSheet(friend.lng, friend.lat, 0.35);
+    setSelectedFriendId(friend.user_id);
+    openFriendCard(friend.user_id, session.user.id);
   };
 
   useFocusEffect(
     useCallback(() => {
-      const saved = cameraBeforeVenue.current;
+      setSelectedFriendId(null);
+      const saved = cameraBeforeSheet.current;
       if (!saved) return;
-      cameraBeforeVenue.current = null;
+      cameraBeforeSheet.current = null;
       cameraRef.current?.setCamera({
         centerCoordinate: saved.center,
         zoomLevel: saved.zoom,
@@ -412,43 +491,6 @@ export default function MapScreen() {
       return;
     }
     if (props?.venueId) openVenue(props.venueId, lng, lat);
-  };
-
-  // Web parity: clicking a person flies to them (zoom 15) + opens card
-  const handleFriendPress = (friend: MapFriend) => {
-    if (session && friend.user_id === session.user.id) return; // self — no card
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    flyTo(friend.lng, friend.lat, 15, 1200);
-    setSelectedFriend(friend);
-    setFriendCardOpen(true);
-  };
-
-  const handleClusterPress = (cluster: MapFriend[]) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    flyTo(cluster[0].lng, cluster[0].lat, 15, 800);
-    const venueName = cluster[0].venue_name;
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: venueName || 'Friends here',
-        options: [...cluster.map((f) => f.display_name), 'Cancel'],
-        cancelButtonIndex: cluster.length,
-      },
-      (index) => {
-        if (index < cluster.length) handleFriendPress(cluster[index]);
-      }
-    );
-  };
-
-  const openVenueByName = async (venueName: string) => {
-    const { data: venue } = await supabase
-      .from('venues')
-      .select('id, lat, lng')
-      .eq('name', venueName)
-      .maybeSingle();
-    if (venue?.id) {
-      setFriendCardOpen(false);
-      router.push({ pathname: '/venue', params: { venueId: venue.id } });
-    }
   };
 
   // Recenter on the user, not the city (client feedback §6). Keeps the
@@ -497,7 +539,7 @@ export default function MapScreen() {
         style={{ flex: 1 }}
         styleURL="mapbox://styles/mapbox/dark-v11"
         logoEnabled={false}
-        attributionPosition={{ bottom: 100, left: 8 }}
+        attributionPosition={{ bottom: 150, left: 8 }}
         scaleBarEnabled={false}
         onPress={() => setFocusMode((prev) => !prev)}
         onCameraChanged={(e) => {
@@ -514,11 +556,15 @@ export default function MapScreen() {
         />
 
         {/* Venue dots + clusters — muted purple so friends dominate */}
+        {/* Teardrop venue pin (original build parity) — a symbol image, so
+            hundreds of venues stay one layer, not hundreds of views */}
+        <Images images={{ 'venue-pin': venuePinImage }} />
         <ShapeSource
           id="venues"
           shape={venueGeoJSON}
           cluster
           clusterRadius={50}
+          clusterMaxZoomLevel={14}
           onPress={handleVenuePress}
         >
           <CircleLayer
@@ -541,14 +587,15 @@ export default function MapScreen() {
               textAllowOverlap: true,
             }}
           />
-          <CircleLayer
+          <SymbolLayer
             id="venue-points"
             filter={['!', ['has', 'point_count']]}
             style={{
-              circleColor: 'rgba(168, 85, 247, 0.8)',
-              circleRadius: 6,
-              circleStrokeWidth: 1.5,
-              circleStrokeColor: 'rgba(255,255,255,0.6)',
+              iconImage: 'venue-pin',
+              iconSize: 0.34,
+              iconAnchor: 'bottom',
+              iconAllowOverlap: true,
+              iconIgnorePlacement: true,
             }}
           />
         </ShapeSource>
@@ -568,7 +615,7 @@ export default function MapScreen() {
                 .join('-')}`}
               cluster={cluster}
               index={index}
-              onPress={handleClusterPress}
+              onSelectMember={handleFriendPress}
             />
           ) : (
             cluster.map((friend) => (
@@ -576,6 +623,7 @@ export default function MapScreen() {
                 key={friend.user_id}
                 friend={friend}
                 index={index}
+                selected={selectedFriendId === friend.user_id}
                 onPress={handleFriendPress}
               />
             ))
@@ -588,20 +636,80 @@ export default function MapScreen() {
         ) : null}
       </MapView>
 
-      {/* Floating controls — one control style; the filter button turns
-          "selected" with a dot while a filter narrows the map */}
+      {/* Map shell (addendum v3 §11.3 — the original build's hierarchy):
+          wordmark + city badge with the bell and status pill on the top
+          row; the search bar, Friends chip and filter control beneath. */}
       {!focusMode ? (
-        <View className="absolute top-safe-offset-3 right-4 gap-2">
-          <IconButton icon="magnifyingglass" label="Search" size={40} onPress={() => router.push('/search')} />
-          <IconButton icon="bell" label="Notifications" size={40} badge={unreadCount} onPress={() => router.push('/activity')} />
-          <IconButton
-            icon="slider.horizontal.3"
-            label={filtersActive ? 'Map filters, active' : 'Map filters'}
-            size={40}
-            state={filtersActive ? 'selected' : 'ordinary'}
-            badge={filtersActive}
-            onPress={() => router.push('/map-filters')}
-          />
+        <View className="absolute top-safe-offset-3 left-4 right-4 gap-3" pointerEvents="box-none">
+          <View className="flex-row items-center justify-between h-10" pointerEvents="box-none">
+            <View className="flex-row items-center gap-2 flex-1 min-w-0" pointerEvents="box-none">
+              <Text
+                className="text-white font-sans-light"
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.3}
+                style={{
+                  fontSize: 20,
+                  letterSpacing: 20 * 0.28,
+                  textShadowColor: 'rgba(0,0,0,0.6)',
+                  textShadowRadius: 8,
+                }}
+              >
+                Spotted
+              </Text>
+              {city ? (
+                <View className="px-2.5 py-1 rounded-full bg-[#1a0f2e]/85 border border-white/10">
+                  <Text className="text-white/70 text-xs font-sans-medium uppercase">{city}</Text>
+                </View>
+              ) : null}
+            </View>
+            <View className="flex-row items-center gap-2">
+              <IconButton icon="bell" label="Notifications" size={40} badge={unreadCount} onPress={() => router.push('/activity')} />
+              <StatusPill />
+            </View>
+          </View>
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={() => router.push('/search')}
+              accessibilityRole="search"
+              accessibilityLabel="Search people, venues"
+              className="flex-1 max-w-[260px] h-10 rounded-full px-3 flex-row items-center gap-2 border border-white/15 active:opacity-90"
+              style={{ backgroundColor: 'rgba(26, 15, 46, 0.88)' }}
+            >
+              <SymbolView name="magnifyingglass" size={13} tintColor="rgba(255,255,255,0.5)" />
+              <Text className="text-white/50 text-xs font-sans flex-1" numberOfLines={1}>
+                Search people, venues…
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={toggleFriendsOnly}
+              accessibilityRole="button"
+              accessibilityLabel="Friends only"
+              accessibilityState={{ selected: friendsOnly }}
+              className={`h-10 rounded-full px-3 flex-row items-center gap-1.5 border active:opacity-90 ${
+                friendsOnly ? 'border-[#a855f7]/50' : 'border-white/15'
+              }`}
+              style={{ backgroundColor: friendsOnly ? 'rgba(168,85,247,0.3)' : 'rgba(26, 15, 46, 0.88)' }}
+            >
+              <SymbolView name="person.2.fill" size={13} tintColor={friendsOnly ? NEON : 'rgba(255,255,255,0.7)'} />
+              <Text className="text-xs font-sans-medium" style={{ color: friendsOnly ? NEON : 'rgba(255,255,255,0.7)' }}>
+                Friends
+              </Text>
+            </Pressable>
+            <IconButton
+              icon="slider.horizontal.3"
+              label={filtersActive ? 'Map filters, active' : 'Map filters'}
+              size={40}
+              state={filtersActive ? 'selected' : 'ordinary'}
+              badge={filtersActive}
+              onPress={() => router.push('/map-filters')}
+            />
+          </View>
+        </View>
+      ) : null}
+
+      {/* My Location — bottom right, above the legend (original placement) */}
+      {!focusMode ? (
+        <View className="absolute bottom-safe-offset-28 right-4">
           <IconButton
             icon={locating ? 'location.fill' : 'location'}
             label="Recenter on me"
@@ -612,9 +720,16 @@ export default function MapScreen() {
         </View>
       ) : null}
 
+      {/* "N out · M TBD" roster pill — bottom left (original placement) */}
+      {!focusMode ? (
+        <View className="absolute bottom-safe-offset-16 left-4">
+          <FriendsOutPill />
+        </View>
+      ) : null}
+
       {/* Staying in: aggregate cue instead of pins, with the way back in */}
       {!focusMode && stayingIn ? (
-        <View className="absolute top-safe-offset-3 left-4 right-16">
+        <View className="absolute top-safe-offset-28 left-4 right-4">
           <View className="rounded-2xl px-4 py-3 bg-[#1a0f2e]/95 border border-white/10 gap-2">
             <Text className="text-white text-sm font-sans-semibold">
               {hiddenFriendCount > 0
@@ -637,7 +752,7 @@ export default function MapScreen() {
 
       {/* Filters hid everything: say so, offer the way out (client feedback §8) */}
       {!focusMode && !stayingIn && filtersActive && clusters.length === 0 && !selfSolo && typeFilteredVenues.length === 0 ? (
-        <View className="absolute top-safe-offset-3 left-4 right-16">
+        <View className="absolute top-safe-offset-28 left-4 right-4">
           <View className="rounded-2xl px-4 py-3 bg-[#1a0f2e]/95 border border-white/10 gap-2">
             <Text className="text-white text-sm font-sans-semibold">Nothing matches your filters</Text>
             <Text className="text-white/50 text-xs font-sans">
@@ -659,7 +774,7 @@ export default function MapScreen() {
 
       {/* Arrival prompts — top banners */}
       {!focusMode && (smartPrompt || moveBanner) ? (
-        <View className="absolute top-safe-offset-3 left-4 right-16 gap-2">
+        <View className="absolute top-safe-offset-28 left-4 right-4 gap-2">
           {smartPrompt ? (
             <SmartArrivalPrompt
               venueName={smartPrompt.venue.name}
@@ -679,7 +794,7 @@ export default function MapScreen() {
 
       {/* Status pill — current status, Update status, Stop sharing */}
       {!focusMode ? (
-        <View className="absolute bottom-safe-offset-28 left-4 right-4 items-center">
+        <View className="absolute bottom-safe-offset-28 left-16 right-16 items-center" pointerEvents="box-none">
           {myStatus?.status === 'out' ? (
             <View className="flex-row items-center gap-1 pl-4 pr-1 py-1 rounded-full bg-[#1a0f2e]/95 border border-[#d4ff00]/30">
               <View className="w-2 h-2 rounded-full bg-[#d4ff00]" />
@@ -736,7 +851,7 @@ export default function MapScreen() {
 
       {/* Relationship legend — bottom-left above the tab bar */}
       {!focusMode ? (
-        <View className="absolute bottom-safe-offset-16 left-4 flex-row gap-3 px-3 py-2 rounded-full bg-[#1a0f2e]/90 border border-white/10">
+        <View className="absolute bottom-safe-offset-16 right-4 flex-row gap-3 px-3 py-2 rounded-full bg-[#1a0f2e]/90 border border-white/10">
           {(
             [
               ['close', 'Close Friend'],
@@ -755,30 +870,6 @@ export default function MapScreen() {
         </View>
       ) : null}
 
-      {/* Friend ID card */}
-      {session ? (
-        <FriendIdCard
-          friend={selectedFriend}
-          isOpen={friendCardOpen}
-          onOpenChange={setFriendCardOpen}
-          friendsAtVenue={
-            selectedFriend
-              ? friends.filter(
-                  (f) =>
-                    f.user_id !== selectedFriend.user_id &&
-                    !!selectedFriend.venue_name &&
-                    f.venue_name.toLowerCase() === selectedFriend.venue_name.toLowerCase()
-                )
-              : []
-          }
-          currentUserId={session.user.id}
-          onSelectFriend={(f) => {
-            setFriendCardOpen(false);
-            setTimeout(() => handleFriendPress(f), 250);
-          }}
-          onOpenVenue={openVenueByName}
-        />
-      ) : null}
     </View>
   );
 }
