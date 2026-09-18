@@ -10,6 +10,8 @@ import { useSession } from '@/hooks/use-session';
 import { getPushPermission, registerPushToken, type PushPermission } from '@/lib/push';
 import { RESET_BODY, RESET_COPY, RESET_KEPT, RESET_TITLE } from '@/lib/reset-copy';
 import { setDemoMode, useDemoMode } from '@/lib/demo-mode';
+import { enableAutomaticUpdates } from '@/lib/background-location';
+import { getLocationPermission, type LocationPermission } from '@/lib/location-ready';
 import { ALL_CITY_IDS, DEMO_CITIES, getCityLabel } from '@/lib/city-neighborhoods';
 import { setActiveCity } from '@/lib/tonight';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
@@ -143,6 +145,76 @@ export default function SettingsScreen() {
     );
   };
 
+  // Background location ("Always"). It was only ever offered on the payoff
+  // screen after a successful check-in, so anyone who dismissed that had no
+  // way back to it — and no way to see what they'd granted.
+  const [locationPermission, setLocationPermission] = useState<LocationPermission | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getLocationPermission().then((p) => {
+        if (active) setLocationPermission(p);
+      });
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+  const [upgradingLocation, setUpgradingLocation] = useState(false);
+  const onLocationRow = async () => {
+    if (!userId || upgradingLocation) return;
+    if (locationPermission === 'always') {
+      Alert.alert(
+        'Automatic updates are on',
+        'Your spot updates as you move, even with Spotted closed. To turn this off, open Settings › Spotted › Location.',
+        [
+          { text: 'Done', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+        ]
+      );
+      return;
+    }
+    if (locationPermission === 'denied') {
+      Alert.alert(
+        'Location is off',
+        'In Settings, open Spotted › Location to let friends see where you are tonight.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+        ]
+      );
+      return;
+    }
+    // when_in_use or not_determined → iOS can still be asked.
+    setUpgradingLocation(true);
+    try {
+      const result = await enableAutomaticUpdates(userId);
+      setLocationPermission(result.permission);
+      if (result.permission !== 'always') {
+        Alert.alert(
+          'Still "While Using the App"',
+          'iOS only asks once. To switch it on, open Settings › Spotted › Location and choose "Always".',
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+          ]
+        );
+      }
+    } finally {
+      setUpgradingLocation(false);
+    }
+  };
+  const locationSubtitle =
+    locationPermission === 'always'
+      ? 'Always — your spot updates as you move'
+      : locationPermission === 'when_in_use'
+        ? 'While using the app — tap for automatic updates'
+        : locationPermission === 'denied'
+          ? 'Off in iOS Settings — tap to enable'
+          : locationPermission === 'not_determined'
+            ? 'Not set — tap to allow'
+            : ' ';
+
   const toggleReadReceipts = async (value: boolean) => {
     if (!userId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -219,6 +291,13 @@ export default function SettingsScreen() {
           subtitle={pushSubtitle}
           onPress={pushPermission === 'granted' ? undefined : onPushRow}
         />
+        <SettingsRow
+          icon="location"
+          title="Location"
+          subtitle={upgradingLocation ? 'Asking…' : locationSubtitle}
+          onPress={onLocationRow}
+        />
+
         {/* Demo mode — seeded content and the Lahore test city. OFF by
             default in every build (SOW §15); this switch is how the
             Lahore-based developer tests against venues they can reach,

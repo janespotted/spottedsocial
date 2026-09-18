@@ -727,6 +727,20 @@ export default function CheckInSheet() {
           : "Nobody's out yet — you'll see friends here as they head out."
     : '';
 
+  /**
+   * Is the Always upgrade on offer right now? Only after a real venue
+   * check-in (never a private party — its exact spot is close-friends-only
+   * and must not start background GPS), and only while iOS would still
+   * honour the prompt: `when_in_use` means the background upgrade alert can
+   * still be shown. `asked` flips after the user answers either way, so the
+   * payoff screen returns to its normal buttons.
+   */
+  const offerAlways =
+    payoff?.kind === 'out' &&
+    !payoff.isParty &&
+    auto?.permission === 'when_in_use' &&
+    !auto.asked;
+
   return (
     <View className="pt-6 pb-8 px-5 gap-4" style={{ minHeight: 320 }}>
       {/* ── Are you out tonight? ── */}
@@ -999,27 +1013,8 @@ export default function CheckInSheet() {
                       : 'Your check-in is active. With background access, moving to a new spot updates automatically — iOS will ask for "Always" and Motion & Fitness.'
                     : 'Your check-in is active. Without location access you update your spot manually.'}
               </Text>
-              {auto.permission === 'when_in_use' && !auto.asked ? (
-                <View className="flex-row gap-2 pt-1">
-                  <Pressable
-                    onPress={turnOnAutomaticUpdates}
-                    disabled={autoBusy}
-                    className="flex-1 rounded-full py-2 items-center border border-[#d4ff00]/50 active:bg-[#d4ff00]/10 disabled:opacity-50"
-                  >
-                    {autoBusy ? (
-                      <ActivityIndicator size="small" color={NEON} />
-                    ) : (
-                      <Text className="text-[#d4ff00] text-sm font-sans-medium">Turn on</Text>
-                    )}
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setAuto({ ...auto, asked: true })}
-                    className="flex-1 rounded-full py-2 items-center active:opacity-70"
-                  >
-                    <Text className="text-white/50 text-sm font-sans-medium">Not now</Text>
-                  </Pressable>
-                </View>
-              ) : null}
+              {/* The Turn on / Not now pair lives in the button stack below,
+                  where it is the screen's primary action (see offerAlways). */}
               {auto.permission === 'denied' ? (
                 <Pressable
                   onPress={() => Linking.openSettings()}
@@ -1032,7 +1027,24 @@ export default function CheckInSheet() {
           ) : null}
 
           <View className="self-stretch gap-2 pt-2">
-            {payoff.out > 0 ? (
+            {offerAlways ? (
+              /* While the Always upgrade is on offer it IS the primary
+                 action. Previously it was a bordered link inside the card
+                 above, below a filled "See who's out" — everyone tapped the
+                 filled button and iOS never asked for background location
+                 again. Leaving is still one tap away, just not the loud one. */
+              <>
+                <PrimaryButton
+                  label="Turn on automatic updates"
+                  onPress={turnOnAutomaticUpdates}
+                  loading={autoBusy}
+                />
+                <SecondaryButton
+                  label={payoff.out > 0 ? "Not now — see who's out" : 'Not now'}
+                  onPress={payoff.out > 0 ? finishToMap : finish}
+                />
+              </>
+            ) : payoff.out > 0 ? (
               <>
                 <PrimaryButton label="See who's out" onPress={finishToMap} />
                 <SecondaryButton label="Done" onPress={finish} />
