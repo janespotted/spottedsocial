@@ -412,46 +412,67 @@ export default function ProfileScreen() {
             </Text>
           )}
 
-          <View className="flex-row gap-2 mt-1">
-            {/* Already out → moving spots is one tap, not the whole flow
-                again (addendum v3 §11.10). `off` is the same shape: the
-                night is already answered "out", so the only thing wanted is
-                the spot back — not "Are you out tonight?" a second time. */}
-            {statusKind === 'out' || statusKind === 'off' ? (
-              <Pressable
-                onPress={() => router.push({ pathname: '/check-in', params: { step: 'venue' } })}
-                className="flex-1 py-2.5 rounded-full items-center active:opacity-90"
-                style={{ backgroundColor: NEON }}
-              >
-                <Text className="text-[#15102E] text-sm font-sans-medium">
-                  {statusKind === 'off' ? 'Share again' : 'Change venue'}
-                </Text>
-              </Pressable>
-            ) : null}
-            <Pressable
-              onPress={() => router.push('/check-in')}
-              className={`flex-1 py-2.5 rounded-full items-center active:opacity-90 ${
-                statusKind === 'out' ? 'border border-white/20' : ''
-              }`}
-              style={statusKind === 'out' ? undefined : { backgroundColor: NEON }}
-            >
-              <Text
-                className={`text-sm font-sans-medium ${
-                  statusKind === 'out' ? 'text-white' : 'text-[#15102E]'
-                }`}
-              >
-                Update status
-              </Text>
-            </Pressable>
-            {statusKind === 'out' || statusKind === 'planning' ? (
-              <Pressable
-                onPress={handleStopSharing}
-                className="flex-1 py-2.5 rounded-full items-center border border-red-400/40 active:bg-red-500/10"
-              >
-                <Text className="text-red-300 text-sm font-sans-medium">Stop sharing</Text>
-              </Pressable>
-            ) : null}
-          </View>
+          {/* Primary action on its own row, the quieter pair below it.
+              Three flex-1 pills on one row gave each about a third of the
+              card — too narrow for "Change venue" and "Stop sharing" at
+              14pt, so both wrapped to two lines and spilled past their
+              rounded edge. Splitting the rows also matches the hierarchy:
+              moving spots is the common action, the other two are not. */}
+          {(() => {
+            const hasPrimary = statusKind === 'out' || statusKind === 'off';
+            const canStop = statusKind === 'out' || statusKind === 'planning';
+            return (
+              <View className="gap-2 mt-1">
+                {hasPrimary ? (
+                  <Pressable
+                    onPress={() =>
+                      router.push({ pathname: '/check-in', params: { step: 'venue' } })
+                    }
+                    className="py-2.5 rounded-full items-center active:opacity-90"
+                    style={{ backgroundColor: NEON }}
+                  >
+                    <Text
+                      className="text-[#15102E] text-sm font-sans-medium"
+                      numberOfLines={1}
+                    >
+                      {statusKind === 'off' ? 'Share again' : 'Change venue'}
+                    </Text>
+                  </Pressable>
+                ) : null}
+                <View className="flex-row gap-2">
+                  <Pressable
+                    onPress={() => router.push('/check-in')}
+                    className={`flex-1 py-2.5 rounded-full items-center active:opacity-90 ${
+                      hasPrimary ? 'border border-white/20' : ''
+                    }`}
+                    style={hasPrimary ? undefined : { backgroundColor: NEON }}
+                  >
+                    <Text
+                      className={`text-sm font-sans-medium ${
+                        hasPrimary ? 'text-white' : 'text-[#15102E]'
+                      }`}
+                      numberOfLines={1}
+                    >
+                      Update status
+                    </Text>
+                  </Pressable>
+                  {canStop ? (
+                    <Pressable
+                      onPress={handleStopSharing}
+                      className="flex-1 py-2.5 rounded-full items-center border border-red-400/40 active:bg-red-500/10"
+                    >
+                      <Text
+                        className="text-red-300 text-sm font-sans-medium"
+                        numberOfLines={1}
+                      >
+                        Stop sharing
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })()}
         </View>
 
         {/* Spots section */}
