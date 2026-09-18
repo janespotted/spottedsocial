@@ -318,7 +318,8 @@ function NeighborhoodPicker({
  * - Gate mode (`?gate=1`, from NightStatusGate): required opening prompt.
  *   Non-dismissible (layout options), no close/skip, hardware back swallowed.
  * - Update status (no param): same sheet, dismissible, with a close button.
- *   `?step=tbd` opens straight on the TBD setup (Plans segment control).
+ *   `?step=tbd` opens straight on the TBD setup (Plans segment control),
+ *   `?step=venue` straight into venue detection ("Change venue").
  *
  * Nothing is written until a final action: "Share my spot" (Yes), "Share TBD
  * status" (TBD) or the No button. Yes runs GPS venue detection only; TBD
@@ -365,6 +366,16 @@ export default function CheckInSheet() {
   const audience = audienceOverride ?? savedAudience;
 
   const [step, setStep] = useState<Step>(initialStep === 'tbd' ? 'planning' : 'ask');
+  // ?step=venue — "Change venue" from Profile for someone already out: skip
+  // the Yes/TBD/No question and go straight to picking a spot (addendum
+  // v3 §11.10). Runs once; startYes handles permission itself.
+  const jumpedToVenue = useRef(false);
+  useEffect(() => {
+    if (initialStep !== 'venue' || jumpedToVenue.current) return;
+    jumpedToVenue.current = true;
+    void startYes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialStep]);
   const [location, setLocation] = useState<LocationData | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<VenueMatch | null>(null);
   const [guessedVenueId, setGuessedVenueId] = useState<string | null>(null);

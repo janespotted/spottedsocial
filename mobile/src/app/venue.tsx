@@ -742,6 +742,23 @@ export default function VenueScreen() {
               <SymbolView name="square.and.arrow.up" size={13} tintColor="rgba(255,255,255,0.7)" />
               <Text className="text-white/80 text-xs font-sans-medium">Share</Text>
             </Pressable>
+            {/* Yap shortcut — the original card had it (addendum v3 §11.5) */}
+            <Pressable
+              onPress={() => {
+                if (!venue) return;
+                router.back();
+                setTimeout(
+                  () => router.push({ pathname: '/yap-thread', params: { venueName: venue.name } }),
+                  250
+                );
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Yap at ${venue?.name ?? 'this venue'}`}
+              className={`flex-row items-center gap-1.5 min-h-10 px-3 rounded-lg active:opacity-70 ${control.ordinary}`}
+            >
+              <SymbolView name="bubble.left.and.bubble.right" size={13} tintColor="rgba(255,255,255,0.7)" />
+              <Text className="text-white/80 text-xs font-sans-medium">Yap</Text>
+            </Pressable>
             <Pressable
               onPress={toggleWishlist}
               accessibilityRole="button"

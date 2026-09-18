@@ -198,6 +198,11 @@ export default function ActivityScreen() {
     setTimeout(() => router.push('/friends'), 250);
   };
 
+  const goToMessages = () => {
+    router.back();
+    setTimeout(() => router.push('/messages'), 250);
+  };
+
   /** Plan invites: the plan card carries "I'm down", so land on Plans. */
   const goToPlans = () => {
     router.back();
@@ -381,10 +386,12 @@ export default function ActivityScreen() {
                   n={n}
                   action={{
                     label: 'View',
-                    onPress: () => {
-                      router.back();
-                      setTimeout(() => router.push('/messages'), 250);
-                    },
+                    // Open the conversation itself, not the inbox
+                    // (addendum v3 §11.9)
+                    onPress: () =>
+                      n.sender_id
+                        ? openThreadWith(n.sender_id, n.sender_name ?? 'Chat', n.sender_avatar_url)
+                        : goToMessages(),
                   }}
                 />
               ))}

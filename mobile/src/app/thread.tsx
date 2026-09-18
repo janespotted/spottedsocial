@@ -5,6 +5,7 @@ import {
   Alert,
   Keyboard,
   Pressable,
+  StyleSheet,
   Text,
   TextInput,
   View,
@@ -38,6 +39,7 @@ import { isFromTonight } from '@/lib/time-context';
 import { useSession } from '@/hooks/use-session';
 import { useTypingIndicator } from '@/hooks/use-typing-indicator';
 import { Avatar } from '@/components/avatar';
+import { SpottedCamera } from '@/components/spotted-camera';
 import { NEON } from '@/lib/theme';
 
 interface SharedPostData {
@@ -98,6 +100,7 @@ export default function ThreadScreen() {
   const [bothShowReceipts, setBothShowReceipts] = useState(false);
   const [draft, setDraft] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
   // Ids already on screen — only messages arriving AFTER a fetch animate in
   const seenIdsRef = useRef<Set<string>>(new Set());
@@ -392,15 +395,10 @@ export default function ThreadScreen() {
     notifyDmRecipients(userId, myName.split(' ')[0], recipientIds, text);
   }, [draft, userId, threadId, myName, recipientIds]);
 
-  const sendImage = useCallback(async () => {
+  /** Upload + send one image, whatever produced it (camera or library). */
+  const sendImageAsset = useCallback(
+    async (asset: { uri: string; mimeType?: string | null }) => {
     if (!userId || !threadId) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-    const asset = result.assets?.[0];
-    if (result.canceled || !asset) return;
-
     setUploading(true);
     const optimisticId = `optimistic-img-${Date.now()}`;
     setMessages((prev) => [
@@ -440,7 +438,33 @@ export default function ThreadScreen() {
     } finally {
       setUploading(false);
     }
-  }, [userId, threadId, myName, recipientIds]);
+    },
+    [userId, threadId, myName, recipientIds]
+  );
+
+  /**
+   * Attach: the Spotted camera or the library (addendum v3 §11.8 — the
+   * original composer had a camera affordance, not just a picker).
+   */
+  const attachImage = useCallback(() => {
+    Keyboard.dismiss();
+    ActionSheetIOS.showActionSheetWithOptions(
+      { options: ['Take a photo', 'Choose from library', 'Cancel'], cancelButtonIndex: 2 },
+      async (index) => {
+        if (index === 0) {
+          setCameraOpen(true);
+          return;
+        }
+        if (index !== 1) return;
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          quality: 0.8,
+        });
+        const asset = result.assets?.[0];
+        if (!result.canceled && asset) void sendImageAsset(asset);
+      }
+    );
+  }, [sendImageAsset]);
 
   /* ── Reactions: double-tap to heart ── */
   const toggleHeart = useCallback(
@@ -814,7 +838,7 @@ export default function ThreadScreen() {
         <View className="border-t border-white/10 bg-[#110a24]">
           <View className="flex-row items-center gap-3 px-4 py-3 pb-safe-offset-3">
             <Pressable
-              onPress={sendImage}
+              onPress={attachImage}
               disabled={uploading}
               hitSlop={6}
               className="w-9 h-9 rounded-full items-center justify-center bg-white/5 border border-white/15 active:opacity-70 disabled:opacity-30"
@@ -850,6 +874,22 @@ export default function ThreadScreen() {
           </View>
         </View>
       </KeyboardStickyView>
+
+      {/* Spotted camera over the thread — same capture UI as the composer */}
+      {cameraOpen ? (
+        <View style={StyleSheet.absoluteFill}>
+          <SpottedCamera
+            closeLabel="Cancel"
+            onClose={() => setCameraOpen(false)}
+            onCapture={(media) => {
+              setCameraOpen(false);
+              // Videos aren't supported in DMs yet — photos only
+              if (media.type !== 'image') return;
+              void sendImageAsset({ uri: media.uri, mimeType: media.mimeType });
+            }}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }

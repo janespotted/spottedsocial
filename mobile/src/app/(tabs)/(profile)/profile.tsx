@@ -413,12 +413,31 @@ export default function ProfileScreen() {
           )}
 
           <View className="flex-row gap-2 mt-1">
+            {/* Already out → moving spots is one tap, not the whole flow
+                again (addendum v3 §11.10) */}
+            {statusKind === 'out' ? (
+              <Pressable
+                onPress={() => router.push({ pathname: '/check-in', params: { step: 'venue' } })}
+                className="flex-1 py-2.5 rounded-full items-center active:opacity-90"
+                style={{ backgroundColor: NEON }}
+              >
+                <Text className="text-[#15102E] text-sm font-sans-medium">Change venue</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => router.push('/check-in')}
-              className="flex-1 py-2.5 rounded-full items-center active:opacity-90"
-              style={{ backgroundColor: NEON }}
+              className={`flex-1 py-2.5 rounded-full items-center active:opacity-90 ${
+                statusKind === 'out' ? 'border border-white/20' : ''
+              }`}
+              style={statusKind === 'out' ? undefined : { backgroundColor: NEON }}
             >
-              <Text className="text-[#15102E] text-sm font-sans-medium">Update status</Text>
+              <Text
+                className={`text-sm font-sans-medium ${
+                  statusKind === 'out' ? 'text-white' : 'text-[#15102E]'
+                }`}
+              >
+                Update status
+              </Text>
             </Pressable>
             {statusKind === 'out' || statusKind === 'planning' ? (
               <Pressable
