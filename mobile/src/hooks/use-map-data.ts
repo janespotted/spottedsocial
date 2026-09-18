@@ -301,6 +301,14 @@ export function useMapData(city: string | null) {
     queryKey: ['map-data', city, friendIds ?? []],
     enabled: !!session && !!city && friendIds !== undefined,
     staleTime: 30_000,
+    // A stale pin is worse than a late one: a friend who pressed "Stop
+    // sharing" must disappear, and the realtime subscription below was the
+    // ONLY thing that made that happen. One dropped frame on the socket and
+    // the viewer kept seeing them at a venue they had left, indefinitely,
+    // until a manual pull-to-refresh. Realtime stays the fast path; this is
+    // the floor under it.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
     queryFn: () => fetchMapData(session!.user.id, city!, friendIds ?? []),
   });
 

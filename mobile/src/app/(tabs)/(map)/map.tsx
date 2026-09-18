@@ -942,8 +942,16 @@ export default function MapScreen() {
             </View>
           ) : myStatus?.status === 'planning' || myStatus?.status === 'off' ? (
             <Pressable
-              onPress={() => router.push('/check-in')}
-              accessibilityLabel='Update status'
+              /* `off` means the user already answered "out" tonight and then
+                 hid themselves. Sending them back to "Are you out tonight?"
+                 asked a question they had answered; the one thing they want
+                 is their spot back, so go straight to venue detection. */
+              onPress={() =>
+                router.push(myStatus.status === 'off' ? '/check-in?step=venue' : '/check-in')
+              }
+              accessibilityLabel={
+                myStatus.status === 'off' ? 'Share my location again' : 'Update status'
+              }
               className='flex-row items-center gap-2 px-4 min-h-11 rounded-full bg-[#1a0f2e]/95 border border-[#a855f7]/40 active:opacity-90'
             >
               <SymbolView
@@ -952,9 +960,11 @@ export default function MapScreen() {
                 tintColor='#a855f7'
               />
               <Text className='text-white text-sm font-sans-medium'>
-                {myStatus.status === 'planning' ? 'TBD tonight' : 'Out · location hidden'}
+                {myStatus.status === 'planning' ? 'TBD tonight' : 'Location hidden'}
               </Text>
-              <Text className='text-white/55 text-xs font-sans'>Update</Text>
+              <Text className='text-white/55 text-xs font-sans'>
+                {myStatus.status === 'off' ? 'Share again' : 'Update'}
+              </Text>
             </Pressable>
           ) : (
             <Pressable
