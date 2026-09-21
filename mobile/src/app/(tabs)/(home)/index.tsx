@@ -13,7 +13,8 @@ import {
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { LegendList } from '@legendapp/list/react-native';
+import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
+import { registerFeedScroller, usePostDetail } from '@/lib/post-detail';
 import { useQuery } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { useNoKeyboardOnFocus } from '@/hooks/use-dismiss-keyboard-on-leave';
@@ -369,6 +370,24 @@ export default function HomeScreen() {
   ).current;
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
+  // While a post detail is open one card's media lives on that screen; a
+  // scroll here could recycle that row out from under it (POST-DETAIL-PLAN.md §4.5).
+  const postDetailActive = usePostDetail((s) => s.phase !== 'idle');
+
+  // Comment sheet over the feed: bring the post to the top of the list so
+  // it sits above the sheet, as Instagram does. Programmatic scrolling still
+  // works while user scrolling is locked.
+  const listRef = useRef<LegendListRef>(null);
+  const postsRef = useRef(feed.posts);
+  postsRef.current = feed.posts;
+  useEffect(() => {
+    registerFeedScroller((postId) => {
+      const index = postsRef.current.findIndex((p) => p.id === postId);
+      if (index >= 0) listRef.current?.scrollToIndex({ index, animated: true });
+    });
+    return () => registerFeedScroller(null);
+  }, []);
+
   return (
     <View className="flex-1 bg-[#110a24]">
       <HomeHeader
@@ -383,9 +402,11 @@ export default function HomeScreen() {
         <PlansFeed city={city ?? null} onScroll={onScroll} />
       ) : (
         <LegendList
+          ref={listRef}
           data={feed.posts}
           keyExtractor={(p) => p.id}
           recycleItems
+          scrollEnabled={!postDetailActive}
           contentContainerStyle={contentContainerStyle}
           onScroll={onScroll}
           scrollEventThrottle={16}

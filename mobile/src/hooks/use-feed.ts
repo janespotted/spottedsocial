@@ -5,44 +5,23 @@ import { notifyPostLike } from '@/lib/notifications';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
-import { fetchTagsForPosts, type TaggedFriend } from '@/lib/post-tags';
+import { isPostDetailActive, onPostDetailClosed } from '@/lib/post-detail';
 import {
+  hydratePosts,
   onCommentAdded,
   onFeedInvalidated,
   postImageStoragePath,
   resolvePostImageUrl,
-  resolvePostImageUrls,
+  type FeedPost,
 } from '@/lib/posts';
 import { useFriendIds } from './use-friend-ids';
 import { useSession } from './use-session';
 
 const POSTS_PER_PAGE = 10;
 
-export interface FeedPost {
-  id: string;
-  user_id: string;
-  text: string;
-  image_url: string | null;
-  /** Stable storage path (expo-image cache key); null for external URLs. */
-  media_path: string | null;
-  media_type: string | null;
-  media_width: number | null;
-  media_height: number | null;
-  /** ThumbHash placeholder, base64. */
-  media_hash: string | null;
-  /** Mux video: playback id once encoded; status preparing | ready | errored. */
-  mux_playback_id: string | null;
-  mux_status: string | null;
-  venue_name: string | null;
-  venue_id: string | null;
-  created_at: string;
-  comments_count: number;
-  likes_count: number;
-  display_name: string;
-  avatar_url: string | null;
-  /** Friends tagged in the post (addendum v3 §9.3); RLS keeps these inside the audience. */
-  tags: TaggedFriend[];
-}
+// The post shape lives with its hydration in lib/posts.ts; re-exported so
+// every existing `import type { FeedPost } from '@/hooks/use-feed'` holds.
+export type { FeedPost } from '@/lib/posts';
 
 /**
  * Newsfeed posts: own + friends', unexpired (posts die at 5am like stories),
@@ -102,69 +81,39 @@ export function useFeed() {
       }
       if (cursor) query = query.lt('created_at', cursor);
 
-      const [{ data: rows }, profiles] = await Promise.all([query, fetchProfilesSafe()]);
-      const profileMap = buildProfileMap(profiles);
-
-      // The likes_count/comments_count columns are NOT maintained by triggers
-      // in the production DB (the trigger migration was never applied), so we
-      // count the actual rows and add them to the column value. The column is
-      // only nonzero for seeded demo posts; live activity exists solely as
-      // post_likes/post_comments rows.
-      const postIds = (rows ?? []).map((p) => p.id);
-      const likeCounts = new Map<string, number>();
-      const commentCounts = new Map<string, number>();
-      if (postIds.length > 0) {
-        const [{ data: likeRows }, { data: commentRows }] = await Promise.all([
-          supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds),
-          supabase.from('post_comments').select('post_id').in('post_id', postIds),
-        ]);
-        const mine = new Set<string>();
-        for (const l of likeRows ?? []) {
-          likeCounts.set(l.post_id, (likeCounts.get(l.post_id) ?? 0) + 1);
-          if (l.user_id === userId) mine.add(l.post_id);
-        }
-        for (const c of commentRows ?? []) {
-          commentCounts.set(c.post_id, (commentCounts.get(c.post_id) ?? 0) + 1);
-        }
+      const { data: rows } = await query;
+      const { posts: page, likedByMe } = await hydratePosts(rows ?? [], userId);
+      if (likedByMe.size > 0) {
         setLikedPosts((prev) => {
           const next = new Set(prev);
-          for (const id of mine) next.add(id);
+          for (const id of likedByMe) next.add(id);
           return next;
         });
       }
-
-      // Uploaded posts store a private-bucket path in image_url — swap for a
-      // signed URL, one Storage call for the whole page. Full http URLs
-      // (demo content) pass through untouched.
-      const [imageUrls, tagsByPost] = await Promise.all([
-        resolvePostImageUrls((rows ?? []).map((p) => p.image_url)),
-        fetchTagsForPosts((rows ?? []).map((p) => p.id)),
-      ]);
-
-      const page: FeedPost[] = (rows ?? []).map((p) => ({
-        id: p.id,
-        user_id: p.user_id,
-        text: p.text ?? '',
-        image_url: p.image_url ? (imageUrls.get(p.image_url) ?? null) : null,
-        media_path: postImageStoragePath(p.image_url),
-        media_type: p.media_type,
-        media_width: p.media_width,
-        media_height: p.media_height,
-        media_hash: p.media_hash,
-        mux_playback_id: p.mux_playback_id,
-        mux_status: p.mux_status,
-        venue_name: p.venue_name,
-        venue_id: p.venue_id,
-        created_at: p.created_at ?? new Date().toISOString(),
-        comments_count: (p.comments_count ?? 0) + (commentCounts.get(p.id) ?? 0),
-        likes_count: (p.likes_count ?? 0) + (likeCounts.get(p.id) ?? 0),
-        display_name: profileMap.get(p.user_id)?.display_name ?? 'Friend',
-        avatar_url: profileMap.get(p.user_id)?.avatar_url ?? null,
-        tags: tagsByPost.get(p.id) ?? [],
-      }));
       return page;
     },
     [userId, friendIds]
+  );
+
+  // While a post detail is open, one feed card's media is teleported into
+  // it and the list is scroll-locked. LegendList recycles row components,
+  // so a data change now (a realtime prepend, a refresh) could hand that
+  // row a different post and swap the video on the detail screen. Data
+  // changes are queued here and replayed the moment the detail closes
+  // (POST-DETAIL-PLAN.md §4.5).
+  const deferred = useRef<Array<() => void>>([]);
+  const runOrDefer = useCallback((fn: () => void) => {
+    if (isPostDetailActive()) deferred.current.push(fn);
+    else fn();
+  }, []);
+  useEffect(
+    () =>
+      onPostDetailClosed(() => {
+        const queue = deferred.current;
+        deferred.current = [];
+        for (const fn of queue) fn();
+      }),
+    []
   );
 
   /**
@@ -178,6 +127,12 @@ export function useFeed() {
    */
   const refresh = useCallback(
     (opts?: { userInitiated?: boolean }): Promise<void> => {
+      if (isPostDetailActive()) {
+        // Replayed when the detail closes; a pull can't happen while the
+        // list is scroll-locked, so there is no spinner to honour here.
+        deferred.current.push(() => void refresh(opts));
+        return Promise.resolve();
+      }
       if (opts?.userInitiated) setIsRefreshing(true);
       if (refreshInFlight.current) {
         refreshQueued.current = true;
@@ -209,7 +164,7 @@ export function useFeed() {
   );
 
   const loadMore = useCallback(async () => {
-    if (!hasMore || loadingMoreRef.current || posts.length === 0) return;
+    if (!hasMore || loadingMoreRef.current || posts.length === 0 || isPostDetailActive()) return;
     loadingMoreRef.current = true;
     try {
       const page = await fetchPage(posts[posts.length - 1].created_at);
@@ -294,7 +249,9 @@ export function useFeed() {
             // picks them up.
             tags: [],
           };
-          setPosts((prev) => (prev.some((x) => x.id === post.id) ? prev : [post, ...prev]));
+          runOrDefer(() =>
+            setPosts((prev) => (prev.some((x) => x.id === post.id) ? prev : [post, ...prev]))
+          );
         }
       )
         .on(
@@ -302,7 +259,7 @@ export function useFeed() {
           { event: 'DELETE', schema: 'public', table: 'posts' },
           (payload) => {
             const id = (payload.old as Record<string, any>)?.id;
-            if (id) setPosts((prev) => prev.filter((x) => x.id !== id));
+            if (id) runOrDefer(() => setPosts((prev) => prev.filter((x) => x.id !== id)));
           }
         )
         // Mux finishing an encode: the webhook updates the row and the
@@ -313,23 +270,25 @@ export function useFeed() {
           (payload) => {
             const p = payload.new as Record<string, any>;
             if (!p?.id) return;
-            setPosts((prev) =>
-              prev.map((x) =>
-                x.id === p.id
-                  ? {
-                      ...x,
-                      mux_playback_id: p.mux_playback_id ?? null,
-                      mux_status: p.mux_status ?? null,
-                      media_width: p.media_width ?? x.media_width,
-                      media_height: p.media_height ?? x.media_height,
-                    }
-                  : x
+            runOrDefer(() =>
+              setPosts((prev) =>
+                prev.map((x) =>
+                  x.id === p.id
+                    ? {
+                        ...x,
+                        mux_playback_id: p.mux_playback_id ?? null,
+                        mux_status: p.mux_status ?? null,
+                        media_width: p.media_width ?? x.media_width,
+                        media_height: p.media_height ?? x.media_height,
+                      }
+                    : x
+                )
               )
             );
           }
         ),
     });
-  }, [userId, friendIds, refresh]);
+  }, [userId, friendIds, refresh, runOrDefer]);
 
   const toggleLike = useCallback(
     async (postId: string) => {

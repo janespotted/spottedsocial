@@ -157,6 +157,36 @@ practical one is to change the device clock.
 - [ ] Venue card → **Yap** → opens that venue's thread.
 - [ ] DM composer → attach → **Take a photo** opens the Spotted camera.
 
+## 10. Post detail (reel) and comments — POST-DETAIL-PLAN.md
+
+Needs a dev build that includes `react-native-teleport` and
+`@lodev09/react-native-true-sheet` (build 48 on TestFlight has neither).
+Feed with at least three video posts.
+
+- [ ] Tap a video while it is playing → it grows into a full-screen reel
+      **without restarting** and without a black frame; the feed fades away
+      behind it. Sound state (muted/unmuted) is unchanged.
+- [ ] Back chevron → it shrinks back into its feed card, still playing; the
+      feed scrolls again.
+- [ ] On the reel, tap the comment icon on the rail → a native sheet rises
+      and the video tucks into a small 4:5 box above it. Drag the sheet up
+      and down slowly: the box tracks the sheet edge continuously and never
+      jumps. Tap the box's mute button — it must still respond.
+- [ ] Tap into the composer on the reel → the keyboard pushes the sheet up
+      and the box shrinks further; dismiss the keyboard → both settle back.
+- [ ] Comment icon on a **photo** post in the feed → a native sheet over the
+      feed, feed dimmed behind, the post scrolled up above the sheet. Tap
+      the dim → sheet closes and you are back on the feed.
+- [ ] Type a comment, send → appears in the list, the count on the feed card
+      goes up, the keyboard dismisses.
+- [ ] Like on the reel → heart and count on the feed card match after back.
+- [ ] Open/close ten times fast, then scroll the feed: no black tiles, no
+      duplicated videos, no crash.
+- [ ] Post detail opened from a link for a post that has expired →
+      "This post expired at 5am".
+- [ ] Android hardware back (if tested there) reverses the fly rather than
+      popping under it.
+
 ---
 
 ## What to send back

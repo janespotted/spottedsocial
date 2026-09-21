@@ -14,6 +14,7 @@ import { HeroUINativeProvider } from 'heroui-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaListener, SafeAreaProvider } from 'react-native-safe-area-context';
+import { PortalProvider } from 'react-native-teleport';
 import { Uniwind, useResolveClassNames } from 'uniwind';
 import { SessionProvider, useSession } from '@/hooks/use-session';
 import { INK_LIGHT, SCREEN_GRADIENT } from '@/lib/theme';
@@ -77,7 +78,6 @@ function RootNavigator() {
           bar (per-screen tab-bar hiding pops visibly with native tabs) */}
       <Stack.Screen name="thread" options={{ contentStyle: gradientStyle }} />
       <Stack.Screen name="yap-thread" options={{ contentStyle: gradientStyle }} />
-      <Stack.Screen name="comments" options={{ presentation: 'modal' }} />
       {/* Camera-first composer: full screen, no swipe-dismiss (the sheet
           guards populated drafts itself) */}
       <Stack.Screen
@@ -89,6 +89,19 @@ function RootNavigator() {
           (addendum v3 §1) */}
       <Stack.Screen
         name="sent-confirmation"
+        options={{
+          presentation: 'transparentModal',
+          animation: 'none',
+          gestureEnabled: false,
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
+      {/* Post detail (reel): a transparent modal with no native animation.
+          The tapped card's media is teleported in and flown to full screen
+          by the screen itself; the feed stays visible underneath while it
+          does (POST-DETAIL-PLAN.md §3). */}
+      <Stack.Screen
+        name="post-detail"
         options={{
           presentation: 'transparentModal',
           animation: 'none',
@@ -237,7 +250,11 @@ export default function RootLayout() {
             <HeroUINativeProvider>
               <SessionProvider>
                 <QueryClientProvider client={queryClient}>
-                  <RootNavigator />
+                  {/* react-native-teleport: a feed post's media is re-parented
+                      into the post detail screen (POST-DETAIL-PLAN.md) */}
+                  <PortalProvider>
+                    <RootNavigator />
+                  </PortalProvider>
                   <NightStatusGate />
                   <BackgroundLocationManager />
                   <PushNotificationManager />

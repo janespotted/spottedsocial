@@ -37,21 +37,39 @@ Ours is different, and the two-hop layout has a trap on iOS: a `transparentModal
 
 So: **the feed Portal teleports straight into a full-screen `PortalHost` inside the detail screen.** The detail's JSX order is background (fades in with `progress`) → media host (absolute fill, the video flies inside it) → chrome (header, actions, caption; fade in) → comment sheet. Everything layers correctly on both platforms with no platform branching. If the host mounts a frame after `hostName` changes, the media renders locally for that frame, which is exactly where it already is, so nothing visible happens.
 
-### 3.2 The detail media is 4:5 under a header, not a full-screen reel
+### 3.2 Two surfaces, matching Instagram's reference screenshots (Sept 21)
 
-The client said "details screen", not "reel viewer", and our clips are shot 4:5. The fly-in is therefore a pure vertical translate at constant size, which is the most robust transition there is (no size animation of a live `AVPlayer` layer). Full-bleed is listed as an open question in §10; the scale plumbing built for the sheet makes it a small change later.
+The client's screenshots show two distinct comment surfaces, and one route serves both (`mode` in the store):
 
-### 3.3 The sheet is `@gorhom/bottom-sheet`, driving the media scale via `animatedPosition`
+- **Reel** — tapping a **video** in the feed. Full-screen media (`contentFit: cover`, black behind it) with the chrome overlaid: back chevron top-left; author avatar, name, `@venue`, caption and tags bottom-left over a gradient scrim; the like / comment / share rail bottom-right with counts. The comment sheet rises over the reel and the reel tucks into a small 4:5 box above it (§3.4). One post per screen (see §10 for paging).
+- **Sheet** — the **comment icon** or "View all comments" on *any* feed post. Only the comment sheet, over the feed: nothing is teleported, the feed stays visible through the transparent modal (dimmed by the sheet's backdrop, tap outside closes) and the feed scrolls the post up so it sits above the sheet, as Instagram does. Photo posts never open a reel; tapping a photo does nothing, as on Instagram.
 
-Already a dependency (v5.2.14, peer-compatible with Reanimated 4), unused until now. It gives snap points, the pan gesture, a scrollable list that hands off to the pan correctly, keyboard behaviour, and two shared values (`animatedPosition` = sheet top in px, `animatedIndex`) that we read on the UI thread to scale the media. Hand-rolling this is the higher-risk path.
+The fly-in therefore grows the media from its feed frame (`width × width·1.25` at the measured `y`) to the full window: `top: origin.y → 0`, `height: origin.height → windowHeight`, width unchanged. This is exactly the recipe's animation. The visible crop changes during the grow because the media is `cover` in both frames; that is how Instagram's transition reads too.
 
-Media scale = clamp((sheetTop − mediaTop − gap) / mediaHeight, MIN_SCALE, 1), anchored top-centre (RN scales about the centre, so translateY is corrected by −mediaHeight·(1−scale)/2). At the collapsed snap the media is full size; at the top snap it is a small thumbnail above the comments. Continuous during the drag.
+### 3.3 The detail animates its host, never the media
 
-### 3.4 State lives in a tiny external store, not Zustand
+The card's media child is always `{ width: '100%', height: '100%' }` of whatever contains it, and the card's placeholder is the fixed feed frame. On the detail, the `PortalHost` sits inside an `Animated.View` wrapper that starts at **exactly the origin frame** and is what the fly (and later the sheet-driven scale) animates. So the media's own style never changes between the card and the host, and the two coordinate systems agree at `progress = 0`. Whichever frame the native migration lands on, nothing jumps. The card knows nothing about the animation; it only points its Portal at the host.
+
+The recipe instead animates the media's own frame and compensates with a `top: y` offset inside it, which is visibly off for a frame at the start. We avoid that by construction.
+
+### 3.4 The sheet is `@lodev09/react-native-true-sheet` (native), driving the media scale via `animatedPosition`
+
+Decided Sept 21 (replacing `@gorhom/bottom-sheet`, which was tried first and rejected on feel): the comment sheet is a **native** `UISheetPresentationController` via True Sheet 3.11. It brings native detents, the native grabber and drag physics, built-in keyboard avoidance (the footer composer rises above the keyboard; `footerOptions.keyboardOffset: -insets.bottom` tucks the safe-area padding behind it), a `scrollable` mode that pins a FlatList inside the sheet, and a Reanimated integration: `ReanimatedTrueSheet` inside `ReanimatedTrueSheetProvider` writes `animatedPosition` (sheet top, screen coordinates) on the UI thread with real-time values during drags and keyboard moves. That is the value the reel tuck reads, so the maths in this section is unchanged.
+
+Two rules the native presentation imposes:
+
+- **Dismiss the sheet before the route.** The sheet is a view controller presented on top of the `transparentModal` route; popping the route underneath a presented sheet leaves iOS in an inconsistent state (documented in True Sheet's troubleshooting). `close()` therefore awaits `sheet.dismiss()` first, then runs the fly back and `router.back()`.
+- **Reel mode presents with `dimmed={false}`** so the reel above the sheet stays visible and tappable (mute). Sheet mode over the feed keeps the native dim; tapping it dismisses, and `onDidDismiss` closes the route.
+
+Requires a native rebuild (Fabric-only, RN 0.81+, Xcode 26.1+; we are on RN 0.86 / Xcode 26.6). Not in TestFlight build 48.
+
+With the sheet down the media is the full window. As the sheet rises the host wrapper shrinks into a **box at the media's own 4:5 aspect** (not a scaled-down window), as tall as the room above the sheet allows, never wider than the window minus a margin, centred, with rounded corners on black — the reference screenshots exactly. The wrapper's `top/left/width/height` are animated layout values on the UI thread: `box = f(sheetTop)`, blended with the full frame by `k = clamp((H − sheetTop) / 0.35H, 0, 1)` so the box has formed by the time the sheet reaches its first snap and then tracks the sheet edge continuously, including when the keyboard pushes the sheet higher (`keyboardBehavior: 'interactive'`). The rail and caption fade out over the first 20% of sheet travel. Because the media is `cover` inside a 4:5 box, the whole clip is visible there.
+
+### 3.5 State lives in a tiny external store, not Zustand
 
 Same granular subscriptions the recipe wants (each feed row subscribes only to "am I the active post?"), via `useSyncExternalStore` with a selector. Matches the codebase's existing request-store pattern (`lib/tag-picker.ts`, `lib/friend-card.ts`) and adds no dependency. `progress` is a module-level `makeMutable(0)`.
 
-### 3.5 The feed hands its post to the detail; deep links fetch
+### 3.6 The feed hands its post to the detail; deep links fetch
 
 Tapping a card passes the `FeedPost`, its like state, and the feed's `toggleLike`/`deletePost` callbacks through the store, so likes on the detail update the feed instantly and nothing is refetched. While active, the card keeps pushing its latest `post`/`isLiked` into the store on each render so the two views can never disagree.
 
@@ -92,11 +110,11 @@ Close sequence: `phase: 'closing'` → sheet collapses → spring `progress` 1�
 
 ```tsx
 <Portal hostName={isActive ? hostName : undefined}>
-  <Animated.View style={[{ width, height: mediaH }, flyStyle]}>{media}</Animated.View>
+  <View style={{ width: '100%', height: '100%' }}>{media}</View>
 </Portal>
 ```
 
-`flyStyle` is the identity unless `isActive`, then `top: interpolate(progress, [0,1], [origin.y, detailMediaTop])` inside the detail host's absolute-fill coordinate space (window coords, since the modal covers the full window). The Portal is **always** present on every card: switching from "no Portal" to "Portal" would remount the video and restart it.
+That inner view fills its container wherever it lives (§3.3); the card never animates anything. The Portal is **always** present on every card: switching from "no Portal" to "Portal" would remount the video and restart it. Cost: one native portal view per row, which the reference app also pays.
 
 Tap wiring: media tap on a **video** → `openPostDetail({ openComments: false })`. Comment icon / "View all N comments" on **any** post → `openPostDetail({ openComments: true })` (photos teleport by the same mechanism; expo-image is a plain native view). Media tap on a photo stays a no-op, as on Instagram.
 
@@ -113,23 +131,23 @@ Registered in `app/_layout.tsx` inside the session-protected group, like `sent-c
 
 Layout (JSX order is z-order):
 
-1. `Animated.View` absolute fill, `backgroundColor: INK`, `opacity: progress`.
-2. `<PortalHost name="post-detail" style={absoluteFill} />` — the media host. In fallback mode (no teleported card) an inline `PostMedia` is rendered here instead.
-3. Chrome, `opacity: progress`: header (back chevron, avatar, name, `@venue`, time · until 5am, overflow menu) at the top; actions row + likes + caption + tags positioned at `top = mediaTop + mediaH·scale + gap` (animated), fading out as scale drops below ~0.7.
+1. `Animated.View` absolute fill, `backgroundColor: '#000'`, `opacity: progress`.
+2. The **host wrapper**: `Animated.View` positioned absolutely at `top: origin.y → 0`, `left: 0`, `width`, `height: origin.height → windowHeight` (interpolated on `progress`), with the sheet-driven `scale`/`translateY` on top and `borderRadius` growing as it shrinks. Inside it `<PortalHost name="post-detail" style={{ flex: 1 }} />`. In fallback mode (no teleported card) an inline `PostMedia` is rendered in the wrapper instead.
+3. Chrome overlaid on the media, `opacity: progress` (and fading further as the sheet scale drops): top bar with back chevron; bottom gradient scrim; bottom-left author block (avatar, name, `@venue`, time · until 5am, caption, tags); bottom-right rail (like with count, comment with count, share, overflow for delete/report/block). Mute toggle stays inside the teleported media where it already lives.
 4. `CommentSheet` (below).
 
 Back: header chevron and Android hardware back both call `closePostDetail()`. `useDismissKeyboardOnLeave()` as on every input screen.
 
 ### 4.4 Comment sheet — `components/comment-sheet.tsx`
 
-`BottomSheet` (inline, not modal) with:
+`ReanimatedTrueSheet` with:
 
-- `snapPoints = [COLLAPSED, '55%', '88%']`, `index = openComments ? 1 : 0`, `enablePanDownToClose={false}`, `animatedPosition` passed in from the detail for the media scale.
-- Collapsed state shows the handle plus one line "N comments · Add a comment…"; tapping it snaps to 1.
-- Content: `BottomSheetFlatList` of `CommentRow` (extracted from `comments.tsx`; avatar/name open the friend card, heart toggles a like with rollback). Comment lists are short; FlatList is fine and hands its scroll to the sheet's pan correctly.
-- `footerComponent`: the composer — quick-emoji row (posts the emoji as a comment, as today), `BottomSheetTextInput`, send button. `keyboardBehavior="interactive"`, `keyboardBlurBehavior="restore"`, `android_keyboardInputMode="adjustResize"`. A sent comment dismisses the keyboard (`dismissKeyboardNow`, addendum v3 §8.2) and bumps the count via `notifyCommentAdded`.
+- `detents = [0.55, 0.9]`, `scrollable` with `scrollingExpandsSheet: false` (only the grabber expands it, like YouTube's comments), native grabber, `cornerRadius 20`, flat `INK_LIGHT` background (`glass={false}`).
+- Reel mode: `dimmed={false}`; presented from the rail's comment button via `present(0)`. Sheet mode: dimmed, `initialDetentIndex={0}`, `onDidDismiss` closes the route.
+- `header`: a centred "Comments" title. Content: a `FlatList` of `CommentRow` (avatar/name open the friend card, heart toggles a like with rollback).
+- `footer`: the composer — quick-emoji row (posts the emoji as a comment, as today), the viewer's avatar, a plain `TextInput` with "Add a comment for {first name}…", send button; `footerOptions.keyboardOffset: -insets.bottom`. Keyboard handling is native. A sent comment dismisses the keyboard (`dismissKeyboardNow`, addendum v3 §8.2) and bumps the count via `notifyCommentAdded`.
 - Data/actions in `hooks/use-post-comments.ts` (the query, send, like toggle, validation), lifted verbatim from `comments.tsx`.
-- Wrapped in an `Animated.View` with `opacity: progress` and `pointerEvents` none until `phase === 'open'`, so it fades with the rest of the chrome and can't be grabbed mid-flight.
+- The detail reads `useReanimatedTrueSheet().animatedPosition` for the reel tuck; the whole detail is wrapped in `ReanimatedTrueSheetProvider`.
 
 ### 4.5 Feed integration — `(home)/index.tsx`, `hooks/use-feed.ts`
 
@@ -190,7 +208,8 @@ Total ≈ 4 days. Phase 0 is a hard gate: nothing else starts until the spike pa
 | expo-video's iOS view (an `AVPlayerViewController` view) misbehaves when its superview changes: black frame, playback pause, or a UIKit warning. | Medium — the recipe uses react-native-video with a texture view; expo-video is untested with re-parenting. | **Spike gate.** Fallback A: teleport the container but mount a *second* `VideoView` on the *same* `player` in the detail (expo-video explicitly supports one player in several views) and crossfade. Fallback B: no teleport — the detail creates its own player, seeks to `player.currentTime`, and a poster snapshot flies then crossfades to the live view. Both keep the "moves without restarting" feel. |
 | `LegendList` recycling hands the teleported row a different item. | Medium if data changes; near zero once refresh is deferred and scroll is locked. | §4.5. If it still bites, `recycleItems={false}` on the feed (rows unmount instead of being reused; the window is 3–5 large cards, cost is negligible). |
 | The post is deleted or expires while the detail is open. | Low | Deferred handlers apply on close; the detail keeps showing what it has. Deep-link path shows `ExpiredState`. |
-| gorhom sheet keyboard handling vs `react-native-keyboard-controller`'s `KeyboardProvider`. | Low–medium | They coexist in many apps; gorhom listens to RN `Keyboard` events. If the footer misplaces under the keyboard on device, drive the footer offset from keyboard-controller's `useReanimatedKeyboardAnimation` instead of gorhom's `keyboardBehavior`. |
+| A native sheet presented on top of a `transparentModal` route. | Low–medium | Documented trap: popping the route under a presented sheet blanks the screen — `close()` awaits `dismiss()` first. In sheet mode at the 0.9 detent iOS may apply its stacked-card scale to the presenting view (the feed); that is native behaviour and acceptable, but check it reads well. |
+| The sheet's `animatedPosition` not returning to the window height after dismissal, leaving the reel tucked. | Low | `ReanimatedTrueSheet` animates the value to the reported position on every change; if a dismissal ever fails to report, reset the value in `onDidDismiss`. |
 | Modal over native tabs. | Low | `sent-confirmation` already presents a `transparentModal` over `NativeTabs` with `animation: 'none'`; same options. |
 | Typed routes don't know `/post-detail` until regenerated. | Certain, trivial | `npx expo customize` isn't needed; typegen runs on `expo start`/`tsc` via the router plugin — run it before typecheck. |
 | Android | Deferred | Branch is iOS-only (`feat/ios-native`). The design has no iOS-only branch, but Android is not tested in this work. |
@@ -220,6 +239,6 @@ TestFlight build 48 does not contain the native module; the feature is invisible
 
 ## 10. Open questions for the client (none block the build)
 
-1. **Full-bleed video on the detail?** Current plan: same 4:5 as the feed under a header. A full-screen reel-style viewer is a different screen; say so if that is what was meant.
-2. **Photo posts:** tapping the photo itself does nothing (Instagram). Comments open the same detail with the sheet up. Confirm.
-3. **Detail as a pager** (swipe to the next post, like Reels)? Not planned; "details screen" reads as one post.
+1. ~~Full-bleed video on the detail?~~ **Decided Sept 21: full-screen reel** (§3.2).
+2. ~~Photo posts~~ **Settled by the Sept 21 screenshots:** tapping a photo does nothing; the comment icon on any post opens the sheet over the feed (§3.2).
+3. **Detail as a pager** (swipe up to the next post, like Reels)? Not in this build: one post per screen. The teleported post could become the first page of a pager later, as in the reference; other pages would use their own players.
