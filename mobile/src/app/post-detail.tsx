@@ -245,6 +245,13 @@ function PostDetail() {
 
   const chromeInteractive = phase === 'open' || !teleported;
 
+  // Height reserved for the "Add comment…" bar at the bottom edge, which
+  // the scrim, the author block and the rail all sit above. The bar is
+  // parked (see below), so nothing is reserved and the chrome clears the
+  // home indicator itself. With the bar back this is
+  // `16 + 20 + insets.bottom + 16` — pt-4, one 15pt line, its padding.
+  const commentBarHeight = insets.bottom;
+
   return (
     <View className="flex-1">
       {/* 1. Black behind the reel, fading in with the fly */}
@@ -296,23 +303,24 @@ function PostDetail() {
 
         {post ? (
           <>
-            {/* Bottom scrim */}
+            {/* Bottom scrim, carrying the author block and the rail. It
+                runs to the bottom edge while the comment bar is parked; with
+                the bar back it should stop at `commentBarHeight` and land on
+                INK_LIGHT instead of black, or it bands against the bar. */}
             <View
               pointerEvents="none"
               className="absolute left-0 right-0 bottom-0"
               style={{
-                // Tall enough to carry the comment bar, the author block
-                // above it and the rail beside them.
-                height: 320 + insets.bottom,
+                height: 260 + insets.bottom,
                 experimental_backgroundImage:
-                  'linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0))',
+                  'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0))',
               }}
             />
 
-            {/* Author + caption, bottom-left, above the comment bar */}
+            {/* Author + caption, bottom-left */}
             <View
               className="absolute left-0 gap-2 pl-4 pr-20"
-              style={{ bottom: insets.bottom + 76 }}
+              style={{ bottom: commentBarHeight + 16 }}
               pointerEvents="box-none"
             >
               <View className="flex-row items-center gap-2.5">
@@ -370,10 +378,10 @@ function PostDetail() {
               ) : null}
             </View>
 
-            {/* Action rail, bottom-right, above the comment bar */}
+            {/* Action rail, bottom-right */}
             <View
               className="absolute right-3 items-center gap-5"
-              style={{ bottom: insets.bottom + 84 }}
+              style={{ bottom: commentBarHeight + 16 }}
               pointerEvents="box-none"
             >
               <RailButton
@@ -393,22 +401,27 @@ function PostDetail() {
               <RailButton icon="ellipsis" accessibilityLabel="More" onPress={onMenu} />
             </View>
 
-            {/* "Add comment…" bar — a full-width strip flush to the bottom
-                edge, not a floating pill (Instagram reel reference). Opens
-                the sheet with the composer focused. */}
+            {/* "Add comment…" bar — PARKED, not deleted (Sept 2026). The
+                reel's comment rail already opens the sheet; the bar is here
+                for when we want Instagram's always-visible composer entry.
+                Restoring it: uncomment this, re-import INK_LIGHT, and set
+                commentBarHeight back to a real height — that re-seats the
+                scrim, the author block and the rail above it.
+
             <Pressable
               onPress={() => sheetRef.current?.open({ focus: true })}
               accessibilityLabel="Add comment"
               className="absolute left-0 right-0 bottom-0 px-5 pt-4 active:opacity-80"
               style={{
                 paddingBottom: insets.bottom + 16,
-                backgroundColor: 'rgba(0,0,0,0.55)',
+                backgroundColor: INK_LIGHT,
                 borderTopWidth: 1,
-                borderTopColor: 'rgba(255,255,255,0.08)',
+                borderTopColor: 'rgba(255,255,255,0.12)',
               }}
             >
               <Text className="text-white/60 text-[15px] font-sans">Add comment…</Text>
             </Pressable>
+            */}
           </>
         ) : null}
       </Animated.View>

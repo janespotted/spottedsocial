@@ -33,17 +33,21 @@ function PostVideo({
   uri,
   poster,
   isVisible,
+  showMuteButton,
   muteTop,
 }: {
   uri: string;
   poster?: string | null;
   isVisible: boolean;
+  showMuteButton: boolean;
   muteTop: number;
 }) {
-  const [muted, setMuted] = useState(true);
+  // Videos play WITH sound (client, Sept 2026). The mute control is kept
+  // behind `showMuteButton` — currently off everywhere — because it is
+  // likely to come back; the player state below is what it needs.
+  const [muted, setMuted] = useState(false);
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
-    p.muted = true;
     p.play();
   });
   const { status } = useEvent(player, 'statusChange', { status: player.status });
@@ -82,22 +86,25 @@ function PostVideo({
           transition={0}
         />
       ) : null}
-      {/* Top-right, mirroring the reel's back chevron (top bar, 40pt circle,
-          12pt from the edge) so the two line up when this media is the reel.
-          In the feed card it sits in the same corner of the 4:5 tile. */}
-      <Pressable
-        onPress={toggleMute}
-        hitSlop={12}
-        accessibilityLabel={muted ? 'Unmute' : 'Mute'}
-        className="absolute right-3 w-10 h-10 rounded-full bg-black/40 items-center justify-center active:opacity-70"
-        style={{ top: muteTop }}
-      >
-        <SymbolView
-          name={muted ? 'speaker.slash.fill' : 'speaker.wave.2.fill'}
-          size={16}
-          tintColor="#ffffff"
-        />
-      </Pressable>
+      {/* Parked. When shown it sits top-right, mirroring the reel's back
+          chevron (40pt circle, 12pt from the edge) so the two line up while
+          this media is the reel; in the feed card it takes the same corner
+          of the 4:5 tile. */}
+      {showMuteButton ? (
+        <Pressable
+          onPress={toggleMute}
+          hitSlop={12}
+          accessibilityLabel={muted ? 'Unmute' : 'Mute'}
+          className="absolute right-3 w-10 h-10 rounded-full bg-black/40 items-center justify-center active:opacity-70"
+          style={{ top: muteTop }}
+        >
+          <SymbolView
+            name={muted ? 'speaker.slash.fill' : 'speaker.wave.2.fill'}
+            size={16}
+            tintColor="#ffffff"
+          />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -128,10 +135,16 @@ function VideoPending({ errored }: { errored: boolean }) {
 export function PostMedia({
   post,
   isVisible = true,
+  showMuteButton = false,
   muteTop = 12,
 }: {
   post: FeedPost;
   isVisible?: boolean;
+  /**
+   * Off everywhere today: the client wants video posts to play with sound
+   * and no control over it. Kept because the control is likely to return.
+   */
+  showMuteButton?: boolean;
   /**
    * Distance from the media's top edge to the mute button. The reel passes
    * the safe-area inset so the button lines up with the back chevron; the
@@ -146,6 +159,7 @@ export function PostMedia({
         uri={muxHlsUrl(post.mux_playback_id)}
         poster={muxThumbnailUrl(post.mux_playback_id)}
         isVisible={isVisible}
+        showMuteButton={showMuteButton}
         muteTop={muteTop}
       />
     ) : (
@@ -154,7 +168,14 @@ export function PostMedia({
   }
   if (!post.image_url) return null;
   if (post.media_type === 'video')
-    return <PostVideo uri={post.image_url} isVisible={isVisible} muteTop={muteTop} />;
+    return (
+      <PostVideo
+        uri={post.image_url}
+        isVisible={isVisible}
+        showMuteButton={showMuteButton}
+        muteTop={muteTop}
+      />
+    );
   return (
     <Image
       // cacheKey: signed URLs change every mint, the path never does —

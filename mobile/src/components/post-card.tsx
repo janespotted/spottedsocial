@@ -213,8 +213,10 @@ export function PostCard({
               parent the 100% child would resolve to nothing. */}
           <Portal hostName={hostName} style={{ width: '100%', height: '100%' }}>
             <View style={{ width: '100%', height: '100%' }}>
-              {/* Teleported to the reel while active: the mute button drops
-                  below the status bar so it lines up with the back chevron. */}
+              {/* No mute control: video posts play with sound. If it comes
+                  back, `muteTop` already drops the button below the status
+                  bar while this media is teleported into the reel, so it
+                  lines up with the back chevron. */}
               <PostMedia
                 post={post}
                 isVisible={isVisible}
