@@ -23,6 +23,11 @@ Copy/paste this section when asking:
 3. **Twilio account** — the account behind phone-number login is suspended
    (error 20003). Either reactivate it (billing) or confirm we launch with
    email/password sign-in only.
+   **If reactivating, read `supabase/SMS-OTP-COST-AND-FRAUD.md` first** — it
+   covers A2P 10DLC registration (days of lead time, gates US delivery),
+   provider choice (Messaging ≈$0.013/code, not Verify ≈$0.05), and the
+   SMS-pumping controls to set before real SMS goes live. Test OTPs are
+   currently what makes this safe; that ends the moment a provider is wired in.
 4. **App Store assets** — app name ("Spotted"?), subtitle, description,
    keywords, support URL/email, privacy policy URL (the in-app one exists),
    and marketing screenshots preference (we can generate from the simulator).

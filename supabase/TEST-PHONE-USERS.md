@@ -1,5 +1,10 @@
 # Test phone users for OTP login
 
+> Test numbers skip the SMS provider entirely, so they cost nothing and carry no
+> fraud exposure. Before switching to **real** SMS, read
+> [SMS-OTP-COST-AND-FRAUD.md](./SMS-OTP-COST-AND-FRAUD.md) — Twilio pricing,
+> A2P 10DLC registration, and SMS pumping controls.
+
 Phone login in the app (`src/pages/Auth.tsx` and `mobile/src/app/auth/index.tsx`) calls
 `supabase.auth.signInWithOtp({ phone })` with the number stripped to digits and `+`.
 Supabase lets you register **test phone numbers** that skip the SMS provider and accept a
