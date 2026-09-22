@@ -5,6 +5,7 @@ import { SymbolView } from 'expo-symbols';
 import { InputOTP } from 'heroui-native';
 import { supabase } from '@/lib/supabase';
 import { SpottedMark } from '@/components/spotted-mark';
+import { formatE164 } from '@/lib/country-codes';
 import { NEON } from '@/lib/theme';
 
 const RESEND_COOLDOWN_S = 30;
@@ -66,7 +67,9 @@ export default function OtpScreen() {
           <SpottedMark size={48} />
         </View>
         <Text className="text-white text-2xl font-sans-light mb-2">enter your code</Text>
-        <Text className="text-sm text-white/50 font-sans mb-8">we sent it to {phone}</Text>
+        <Text className="text-sm text-white/50 font-sans mb-8">
+          we sent it to {phone ? formatE164(phone) : ''}
+        </Text>
 
         <InputOTP
           maxLength={6}
