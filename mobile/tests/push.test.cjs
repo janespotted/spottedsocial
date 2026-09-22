@@ -137,3 +137,10 @@ test('APNs retry identity and metadata are stable and badge is not hardcoded',as
  const payload=JSON.parse(h.sent[0].body);
  assert.equal(h.sent[0].headers['apns-collapse-id'],'one');assert.equal(payload.data.thread_id,'thread');assert.equal(payload.aps.badge,undefined);
 });
+
+test('nightlife and private-party notifications route to usable screens',()=>{
+ const h=harness();const id='11111111-1111-4111-8111-111111111111';
+ for(const type of ['friend_out','friend_planning','friend_arrived_venue']) assert.equal(h.api.routeForNotification({type}),'/map');
+ for(const type of ['private_party_invite','address_request','party_invite_accepted','party_address_approved']) assert.equal(h.api.routeForNotification({type,data:{host_id:id}}),`/party?hostId=${id}`);
+ assert.equal(h.api.routeForNotification({type:'address_request',data:{host_id:'invalid'}}),'/activity');
+});

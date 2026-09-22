@@ -28,6 +28,9 @@ const VALID_NOTIFICATION_TYPES = [
   "daily_nudge_first",
   "daily_nudge_second",
   "weekend_rally",
+  "friend_out",
+  "party_invite_accepted",
+  "party_address_approved",
   "meetup_request",
   "venue_invite",
   "friend_request",
@@ -822,6 +825,32 @@ function getNotificationContent(
         title: "Your weekend starts here",
         body: message,
         url: "/messages?tab=plans",
+      };
+    case "friend_out":
+      return { title: "Your friend is out", body: message, url: "/" };
+    case "private_party_invite":
+      return {
+        title: "Private party invitation",
+        body: message,
+        url: "/messages?tab=activity",
+      };
+    case "address_request":
+      return {
+        title: "Party address requested",
+        body: message,
+        url: "/messages?tab=activity",
+      };
+    case "party_invite_accepted":
+      return {
+        title: "Party invitation accepted",
+        body: message,
+        url: "/messages?tab=activity",
+      };
+    case "party_address_approved":
+      return {
+        title: "Party address shared",
+        body: message,
+        url: "/messages?tab=activity",
       };
     case "meetup_request":
       return {

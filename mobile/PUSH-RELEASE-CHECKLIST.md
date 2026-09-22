@@ -1,5 +1,11 @@
 # Notifications release — September 22, 2026
 
+For the latest nightlife coverage, also read NIGHTLIFE-NOTIFICATIONS.md. Apply
+`20260922213920_nightlife_notification_coverage.sql` after the queue migration.
+It replaces the client arrival/TBD fanout with source triggers, removes the
+20-person cap, adds notification preferences and private-party consent flows.
+The latest full suite is 37 Node + 45 base SQL + 35 nightlife SQL checks.
+
 This supersedes the earlier notification checklist. The earlier live send-push
 version 14 is NOT this queue-based release. No new production deployment or real
 push test was performed for this release.

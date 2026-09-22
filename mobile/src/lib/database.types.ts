@@ -809,6 +809,7 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string | null
+          data?: Json
           id: string
           is_demo: boolean | null
           is_read: boolean | null
@@ -819,6 +820,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          data?: Json
           id?: string
           is_demo?: boolean | null
           is_read?: boolean | null
@@ -829,6 +831,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          data?: Json
           id?: string
           is_demo?: boolean | null
           is_read?: boolean | null

@@ -1,3 +1,4 @@
+import { routeForNotification } from '@/lib/push';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -256,6 +257,8 @@ export default function ActivityScreen() {
     (n) => n.type.startsWith('post_') || n.type.includes('comment') || n.type === 'like'
   );
   const known = new Set([...invites, ...friendRows, ...accepted, ...dms, ...engagement]);
+  const parties = all.filter(n => ['private_party_invite','address_request','party_invite_accepted','party_address_approved'].includes(n.type));
+  parties.forEach(n => known.add(n));
   const recent = all.filter((n) => !known.has(n));
 
   return (
@@ -273,6 +276,7 @@ export default function ActivityScreen() {
         </View>
       ) : (
         <ScrollView contentContainerClassName="px-4 pt-4 pb-safe-offset-6">
+          {parties.length ? <><SectionHeader title="Private parties" />{parties.map(n => <ActivityCard key={n.id} n={n} action={{label:'View',onPress:()=>router.push(routeForNotification({type:n.type,data:n.data}))}} />)}</> : null}
           {/* Friend Requests — always at top (web parity) */}
           <Pressable
             onPress={goToFriends}

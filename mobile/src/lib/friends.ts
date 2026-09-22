@@ -34,33 +34,6 @@ export async function sendFriendRequest(senderId: string, receiverId: string): P
     .insert({ user_id: senderId, friend_id: receiverId, status: 'pending' });
   if (error) return false;
 
-  const { data: me } = await supabase
-    .from('profiles')
-    .select('display_name')
-    .eq('id', senderId)
-    .maybeSingle();
-  const senderName = me?.display_name?.split(' ')[0] ?? 'Someone';
-  const message = `${senderName} sent you a friend request`;
-  supabase
-    .rpc('create_notification', {
-      p_receiver_id: receiverId,
-      p_type: 'friend_request',
-      p_message: message,
-    })
-    .then(({ data }) => {
-      const notif = Array.isArray(data) ? data[0] : data;
-      if (!notif?.id) return;
-      supabase.functions
-        .invoke('send-push', {
-          body: {
-            notification_id: notif.id,
-            receiver_id: receiverId,
-            sender_id: senderId,
-            type: 'friend_request',
-            message,
-          },
-        })
-        .then(() => {});
-    });
+  // The database creates the notification in the relationship transaction.
   return true;
 }

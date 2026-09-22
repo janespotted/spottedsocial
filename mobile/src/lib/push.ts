@@ -36,6 +36,13 @@ export function routeForNotification(data: Record<string, unknown> | undefined):
     case 'plan_down':
       return '/messages?tab=plans' as Href;
 
+    case 'private_party_invite':
+    case 'address_request':
+    case 'party_invite_accepted':
+    case 'party_address_approved':
+      return uuid(details.host_id) ? `/party?hostId=${details.host_id}` as Href : '/activity';
+    case 'friend_out':
+    case 'friend_planning':
     case 'friend_arrived':
     case 'friend_checkin':
     case 'friend_arrived_venue':

@@ -55,6 +55,7 @@ function retainNotificationsChannel(userId: string): () => void {
 
 export interface AppNotification {
   id: string;
+  data?: Record<string, unknown>;
   sender_id: string | null;
   type: string;
   message: string;
@@ -84,7 +85,7 @@ export function useNotifications() {
         // last night's invites stay actionable (addendum v3 §2/§4).
         supabase
           .from('notifications')
-          .select('id, sender_id, type, message, is_read, created_at')
+          .select('id, sender_id, type, message, is_read, created_at, data')
           .eq('receiver_id', session!.user.id)
           .gte('created_at', nightStartAt().toISOString())
           .order('created_at', { ascending: false })
@@ -94,6 +95,7 @@ export function useNotifications() {
       const profileMap = buildProfileMap(profiles);
       return (rows ?? []).map((n) => ({
         id: n.id,
+        data: (n as unknown as {data: Record<string,unknown>}).data,
         sender_id: n.sender_id,
         type: n.type,
         message: n.message,

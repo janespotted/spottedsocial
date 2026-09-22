@@ -416,10 +416,11 @@ export default function CheckInSheet() {
 
   const persistAudience = async () => {
     if (!userId || !audienceOverride || audienceOverride === savedAudience) return;
-    await supabase
+    const { error } = await supabase
       .from('profiles')
       .update({ location_sharing_level: audienceOverride })
       .eq('id', userId);
+    if (error) throw error;
     queryClient.invalidateQueries({ queryKey: ['check-in-profile'] });
   };
 
@@ -602,12 +603,12 @@ export default function CheckInSheet() {
     setSubmitting(true);
     setError(null);
     try {
+      await persistAudience();
       await goOutAtVenue(userId, {
         venue: { id: selectedVenue?.id ?? null, name: venueName },
         coords: location ? { lat: location.lat, lng: location.lng, accuracy: location.accuracy, recordedAt: location.timestamp } : null,
         city,
       });
-      await persistAudience();
       // The check-in is saved. Automatic updates are a separate outcome,
       // reported on the payoff screen — never as a check-in failure.
       settleAutomaticUpdates(userId);
@@ -652,13 +653,13 @@ export default function CheckInSheet() {
         ? { lat: location.lat, lng: location.lng }
         : await getCurrentPosition();
       const venueName = `Private Party (${neighborhood})`;
+      await persistAudience();
       await goOutAtVenue(userId, {
         venue: { id: null, name: venueName },
         coords,
         city,
         privateParty: { neighborhood },
       });
-      await persistAudience();
       // No background tracking at a private party: the exact spot is for
       // close friends only and a house party does not move.
       void scheduleMorningAfter(city, userId);
@@ -678,8 +679,8 @@ export default function CheckInSheet() {
     setSubmitting(true);
     setError(null);
     try {
-      await goPlanning(userId, { city, neighborhood, visibility: audience });
       await persistAudience();
+      await goPlanning(userId, { city, neighborhood, visibility: audience });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       notifyFriendsPlanning(userId, audience);
       refreshStatusQueries();
@@ -979,6 +980,7 @@ export default function CheckInSheet() {
             {payoff.kind === 'out' ? "You're out." : "You're TBD."}
           </Text>
           <Text className="text-white/70 text-base font-sans text-center">{payoffLine}</Text>
+          {payoff.isParty ? <PrimaryButton label="Party invitations & address" onPress={() => router.push(`/party?hostId=${userId}` as never)} /> : null}
           {payoff.venueName ? (
             <Text className="text-white/55 text-xs font-sans text-center">
               Friends can see you at {payoff.venueName}.

@@ -272,6 +272,7 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={contentContainerStyle}>
+      <SettingsRow icon="bell" title="Friend activity alerts" subtitle="Who's out and bar changes" onPress={()=>router.push('/notification-settings' as never)} />
         <SettingsRow
           icon="person"
           title="Account"

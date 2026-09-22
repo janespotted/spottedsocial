@@ -17,7 +17,7 @@ create table post_comments(id uuid primary key default gen_random_uuid(),post_id
 create table post_tags(id uuid primary key default gen_random_uuid(),post_id uuid,tagged_user_id uuid);
 create table dm_thread_members(thread_id uuid,user_id uuid);
 create table dm_messages(id uuid primary key default gen_random_uuid(),thread_id uuid,sender_id uuid,text text,image_url text);
-create table night_statuses(user_id uuid,venue_id uuid,status text,expires_at timestamptz,is_private_party boolean default false);
+create table night_statuses(id uuid default gen_random_uuid(),user_id uuid,venue_id uuid,venue_name text,party_address text,is_demo boolean default false,status text,expires_at timestamptz,is_private_party boolean default false);
 create table notifications(id uuid primary key default gen_random_uuid(),sender_id uuid,receiver_id uuid,type text,message text,is_read boolean default false,created_at timestamptz default now(),is_demo boolean default false);
 create function public.notify_post_liked() returns trigger language plpgsql as $$ begin return new; end $$;
 create function public.notify_post_commented() returns trigger language plpgsql as $$ begin return new; end $$;
