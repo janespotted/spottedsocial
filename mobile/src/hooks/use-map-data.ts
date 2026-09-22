@@ -4,7 +4,7 @@ import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { isDemoMode } from '@/lib/demo-mode';
 import { fetchProfilesSafe, type SafeProfile } from '@/lib/profiles';
-import { isFromTonight } from '@/lib/tonight';
+import { locationAge, STALE_AFTER_MS } from '@/lib/location-quality';
 import { useFriendIds } from './use-friend-ids';
 import { useOwnNightStatus } from './use-own-night-status';
 import { useSession } from './use-session';
@@ -13,6 +13,8 @@ export type RelationshipType = 'close' | 'direct' | 'mutual';
 
 export interface MapFriend {
   user_id: string;
+  venue_id?: string | null;
+  expires_at?: string;
   lat: number;
   lng: number;
   venue_name: string;
@@ -36,6 +38,7 @@ export interface MapVenue {
 }
 
 export interface MapData {
+  selfPosition: { lat: number; lng: number; last_location_at: string | null } | null;
   friends: MapFriend[];
   venues: MapVenue[];
   /**
@@ -62,7 +65,7 @@ function hasSharedSpot(p: SafeProfile): boolean {
     p.is_out === true &&
     p.last_known_lat !== null &&
     p.last_known_lng !== null &&
-    isFromTonight(p.last_location_at)
+    !!p.last_location_at && Number.isFinite(Date.parse(p.last_location_at))
   );
 }
 
@@ -113,6 +116,9 @@ async function fetchMapData(
 
   // Night statuses → venue names, planning exclusion, private parties
   const venueNameByUser: Record<string, string> = {};
+  const venueIdByUser: Record<string, string | null> = {};
+  const expiresByUser: Record<string, string> = {};
+  const outUserIds = new Set<string>();
   const planningUserIds = new Set<string>();
   // Party rows carry only the neighborhood; the exact spot is filled in
   // below from party_locations, which RLS serves to close friends only.
@@ -125,14 +131,20 @@ async function fetchMapData(
     let statusQuery = supabase
       .from('night_statuses')
       .select(
-        'user_id, venue_name, status, is_private_party, party_neighborhood, is_demo, lat, lng'
+        'user_id, venue_id, venue_name, status, expires_at, is_private_party, party_neighborhood, is_demo, lat, lng'
       )
       .not('expires_at', 'is', null)
       .gt('expires_at', nowIso);
     // In dev, demo statuses are visible beyond the friend set (web demo mode)
     if (!isDemoMode()) statusQuery = statusQuery.in('user_id', friendIds);
-    const { data: statuses } = await statusQuery;
+    const { data: statuses, error: statusError } = await statusQuery;
+    if (statusError) throw statusError;
     for (const s of statuses ?? []) {
+      if (s.status === 'out') {
+        outUserIds.add(s.user_id);
+        venueIdByUser[s.user_id] = s.venue_id;
+        expiresByUser[s.user_id] = s.expires_at!;
+      }
       if (s.status === 'planning') {
         planningUserIds.add(s.user_id);
       } else if (s.venue_name) {
@@ -183,10 +195,12 @@ async function fetchMapData(
 
   // Venue check-ins: live profile pin (server-masked per viewer, freshness-gated)
   for (const p of friendProfiles) {
-    if (planningUserIds.has(p.id)) continue; // planning ≠ out
+    if (!outUserIds.has(p.id) || planningUserIds.has(p.id)) continue; // planning ≠ out
     if (privateParty[p.id]) continue; // parties are pinned below, from party_locations
     friends.push({
       user_id: p.id,
+      venue_id: venueIdByUser[p.id] ?? null,
+      expires_at: expiresByUser[p.id],
       lat: p.last_known_lat!,
       lng: p.last_known_lng!,
       venue_name: venueNameByUser[p.id] || '',
@@ -209,6 +223,7 @@ async function fetchMapData(
     if (!p) continue;
     friends.push({
       user_id: hostId,
+      expires_at: expiresByUser[hostId],
       lat: pp.lat,
       lng: pp.lng,
       venue_name: `Private Party${pp.party_neighborhood ? ` (${pp.party_neighborhood})` : ''}`,
@@ -254,7 +269,7 @@ async function fetchMapData(
     .filter((v) => v.lat !== null && v.lng !== null)
     .map((v) => {
       const friendsAtVenue = friends.filter(
-        (f) => f.venue_name.toLowerCase() === v.name.toLowerCase()
+        (f) => f.venue_id === v.id && locationAge(f.last_location_at) < STALE_AFTER_MS
       ).length;
       return {
         id: v.id,
@@ -287,7 +302,11 @@ async function fetchMapData(
     }
   }
 
-  return { friends: [...byUser.values()], venues, hiddenFriendCount: 0 };
+  const me = profileById.get(userId);
+  const selfPosition = me && hasSharedSpot(me) ? {
+    lat: me.last_known_lat!, lng: me.last_known_lng!, last_location_at: me.last_location_at,
+  } : null;
+  return { friends: [...byUser.values()], venues, selfPosition, hiddenFriendCount: 0 };
 }
 
 export function useMapData(city: string | null) {
@@ -298,7 +317,7 @@ export function useMapData(city: string | null) {
   const viewerStayingIn = own?.status?.status === 'home';
 
   const query = useQuery({
-    queryKey: ['map-data', city, friendIds ?? []],
+    queryKey: ['map-data', session?.user.id, city, friendIds ?? []],
     enabled: !!session && !!city && friendIds !== undefined,
     staleTime: 30_000,
     // A stale pin is worse than a late one: a friend who pressed "Stop
@@ -324,6 +343,7 @@ export function useMapData(city: string | null) {
   // now (mutuals). Kept in a ref so the channel never has to resubscribe.
   const watchedIds = useRef<Set<string>>(new Set());
   watchedIds.current = new Set([
+    ...(session?.user.id ? [session.user.id] : []),
     ...(friendIds ?? []),
     ...(query.data?.friends.map((f) => f.user_id) ?? []),
   ]);

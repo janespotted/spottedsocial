@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      live_location_state: {
+        Row: {
+          candidate_id: string | null
+          candidate_last_at: string | null
+          candidate_samples: number
+          candidate_since: string | null
+          departure_since: string | null
+          expires_at: string
+          last_recorded_at: string | null
+          status_revision: string
+          user_id: string
+        }
+        Insert: {
+          candidate_id?: string | null
+          candidate_last_at?: string | null
+          candidate_samples?: number
+          candidate_since?: string | null
+          departure_since?: string | null
+          expires_at: string
+          last_recorded_at?: string | null
+          status_revision: string
+          user_id: string
+        }
+        Update: {
+          candidate_id?: string | null
+          candidate_last_at?: string | null
+          candidate_samples?: number
+          candidate_since?: string | null
+          departure_since?: string | null
+          expires_at?: string
+          last_recorded_at?: string | null
+          status_revision?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_location_state_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_location_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blocked_users: {
         Row: {
           blocked_id: string
@@ -676,6 +727,7 @@ export type Database = {
       }
       night_statuses: {
         Row: {
+          automatic_venue_updates: boolean
           expires_at: string | null
           id: string
           is_demo: boolean | null
@@ -696,6 +748,7 @@ export type Database = {
           venue_name: string | null
         }
         Insert: {
+          automatic_venue_updates?: boolean
           expires_at?: string | null
           id?: string
           is_demo?: boolean | null
@@ -716,6 +769,7 @@ export type Database = {
           venue_name?: string | null
         }
         Update: {
+          automatic_venue_updates?: boolean
           expires_at?: string | null
           id?: string
           is_demo?: boolean | null
@@ -2239,6 +2293,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      live_distance_m: {
+        Args: { a_lat: number; a_lng: number; b_lat: number; b_lng: number }
+        Returns: number
+      }
+      record_live_location: {
+        Args: {
+          p_accuracy: number
+          p_lat: number
+          p_lng: number
+          p_recorded_at: string
+          p_speed?: number
+          p_status_updated_at: string
+        }
+        Returns: Json
+      }
       _can_see_location_unchecked: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getNightKey } from './tonight';
 
 /**
  * Port of the web venue-arrival-nudge trigger engine (src/lib/
@@ -60,11 +61,7 @@ let lastSnapshot: { lat: number; lng: number; timestamp: number } | null = null;
 const dismissedAt = new Map<string, number>();
 const suppressedTonight = new Set<string>();
 
-function tonightKey(): string {
-  const d = new Date();
-  if (d.getHours() < 5) d.setDate(d.getDate() - 1);
-  return d.toISOString().split('T')[0];
-}
+function tonightKey(): string { return getNightKey(); }
 
 const SUPPRESS_STORAGE_KEY = 'venue_suppressed';
 const MANUAL_CHECKIN_STORAGE_KEY = 'manual_checkin_at';

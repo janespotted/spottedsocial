@@ -604,7 +604,7 @@ export default function CheckInSheet() {
     try {
       await goOutAtVenue(userId, {
         venue: { id: selectedVenue?.id ?? null, name: venueName },
-        coords: location ? { lat: location.lat, lng: location.lng } : null,
+        coords: location ? { lat: location.lat, lng: location.lng, accuracy: location.accuracy, recordedAt: location.timestamp } : null,
         city,
       });
       await persistAudience();
@@ -996,7 +996,7 @@ export default function CheckInSheet() {
                 />
                 <Text className="text-white text-sm font-sans-semibold flex-1">
                   {auto.permission === 'always'
-                    ? 'Automatic updates on'
+                    ? auto.tracking ? 'Automatic updates on' : 'Location updates unavailable'
                     : auto.permission === 'when_in_use'
                       ? auto.asked
                         ? 'Updates only while Spotted is open'
@@ -1006,11 +1006,11 @@ export default function CheckInSheet() {
               </View>
               <Text className="text-white/50 text-xs font-sans">
                 {auto.permission === 'always'
-                  ? "If you move to another spot, friends see it even when Spotted is closed."
+                  ? auto.tracking ? "Your spot follows you between bars while your screen is locked. Sharing ends at 5am. Force-quitting stops updates." : 'Your check-in is saved. Check your connection and Location Services to resume updates.'
                   : auto.permission === 'when_in_use'
                     ? auto.asked
                       ? 'Your check-in is active. Move to a new spot and you can update it here.'
-                      : 'Your check-in is active. With background access, moving to a new spot updates automatically — iOS will ask for "Always" and Motion & Fitness.'
+                      : 'Automatically update your venue as you move between bars, until 5am. iOS will ask for "Always" and Motion & Fitness.'
                     : 'Your check-in is active. Without location access you update your spot manually.'}
               </Text>
               {/* The Turn on / Not now pair lives in the button stack below,

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { supabase } from '@/lib/supabase';
+import { findNearbyVenues } from '@/lib/location-service';
+import { ARRIVAL_ACCURACY_M, type LocationFix } from '@/lib/location-quality';
 import { goOutAtVenue, type OwnNightStatus } from '@/lib/night-status';
 import { getCurrentPosition, startBackgroundLocation } from '@/lib/background-location';
 import { dismissVenuePrompt, markToastShown } from '@/lib/venue-arrival-engine';
@@ -17,15 +19,15 @@ export interface NearbyVenue {
 
 interface PromptState {
   venue: NearbyVenue;
-  coords: { lat: number; lng: number };
+  coords: LocationFix;
   hasMultipleNearby: boolean;
 }
 
 /**
- * Simplified port of the web map's arrival prompts (the full dwell/cooldown
- * decision engine lands with the check-in flow):
- * - planning + GPS near a venue (200m)  → smart prompt "Go live?"
- * - out + GPS nearest venue ≠ current   → venue-move banner
+ * Foreground prompts for user-confirmed check-ins:
+ * - planning + accurate GPS near a venue (100m) → smart prompt "Go live?"
+ * - out without automatic updates + a different venue → venue-move banner
+ * Automatic transitions use the server's dwell/accuracy checks instead.
  * Session-scoped dismissal per venue so neither prompt nags.
  */
 export function useArrivalPrompts() {
@@ -36,50 +38,48 @@ export function useArrivalPrompts() {
   const smartDismissed = useRef(new Set<string>());
   const moveDismissed = useRef(new Set<string>());
 
-  // Shared status query; the 2-minute interval is what re-runs the GPS
-  // arrival check while the map is open.
+  // Shared status query; the independent one-minute timer below samples GPS
+  // even when the fetched status has not changed.
   const { data: own } = useOwnNightStatus({ refetchInterval: 120_000 });
   const myStatus: MyNightStatus | null = own?.status ?? null;
 
   useEffect(() => {
-    if (!session || !myStatus || (myStatus.status !== 'planning' && myStatus.status !== 'out')) {
+    if (!session || !myStatus || (myStatus.status !== 'planning' && myStatus.status !== 'out') || myStatus?.is_private_party) {
       setSmartPrompt(null);
       setMoveBanner(null);
       return;
     }
     let cancelled = false;
-    (async () => {
-      const pos = await getCurrentPosition();
-      if (!pos || cancelled) return;
-      const { data } = await (
-        supabase.rpc as (fn: string, args: object) => PromiseLike<{ data: unknown }>
-      )('find_nearest_venue', {
-        user_lat: pos.lat,
-        user_lng: pos.lng,
-        radius_meters: 200,
-      });
-      if (cancelled) return;
-      const rows = (data ?? []) as Array<{ venue_id: string; venue_name: string }>;
-      const nearest = rows[0];
-      if (!nearest?.venue_id || !nearest.venue_name) return;
-      const prompt: PromptState = {
-        venue: { id: nearest.venue_id, name: nearest.venue_name },
-        coords: pos,
-        hasMultipleNearby: rows.length > 1,
-      };
-      if (myStatus.status === 'planning' && !smartDismissed.current.has(nearest.venue_id)) {
-        setSmartPrompt(prompt);
-      } else if (
-        myStatus.status === 'out' &&
-        nearest.venue_id !== myStatus.venue_id &&
-        !moveDismissed.current.has(nearest.venue_id)
-      ) {
-        setMoveBanner(prompt);
-      }
-    })();
-    return () => {
-      cancelled = true;
+    let busy = false;
+    const check = async () => {
+      if (cancelled || busy || AppState.currentState !== 'active') return;
+      busy = true;
+      try {
+        const pos = await getCurrentPosition();
+        if (!pos || cancelled || pos.accuracy > ARRIVAL_ACCURACY_M) return;
+        const rows = await findNearbyVenues(pos.lat, pos.lng, 100, 3);
+        if (cancelled) return;
+        const nearest = rows[0];
+        if (!nearest) { setSmartPrompt(null); setMoveBanner(null); return; }
+        const prompt: PromptState = {
+          venue: { id: nearest.id, name: nearest.name }, coords: pos,
+          hasMultipleNearby: rows.length > 1,
+        };
+        if (myStatus.status === 'planning' && !smartDismissed.current.has(nearest.id)) {
+          setSmartPrompt(prompt);
+        } else if (myStatus.status === 'out' && !myStatus.automatic_venue_updates &&
+                   !myStatus.is_private_party && nearest.id !== myStatus.venue_id &&
+                   !moveDismissed.current.has(nearest.id)) {
+          setMoveBanner(prompt);
+        } else { setMoveBanner(null); }
+      } finally { busy = false; }
     };
+    void check();
+    // A real polling callback: unchanged query objects must not suppress GPS checks.
+    const timer = setInterval(() => void check(), 60_000);
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') void check(); });
+    return () => { cancelled = true; clearInterval(timer); sub.remove(); };
+
   }, [session, myStatus]);
 
   const refresh = useCallback(() => invalidateNightStatusQueries(queryClient), [queryClient]);
@@ -109,6 +109,7 @@ export function useArrivalPrompts() {
       venue: moveBanner.venue,
       coords: moveBanner.coords,
     });
+    await startBackgroundLocation(session.user.id);
     refresh();
   }, [session, moveBanner, refresh]);
 

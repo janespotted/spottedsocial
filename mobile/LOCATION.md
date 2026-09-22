@@ -1,125 +1,121 @@
-# Location Architecture
+# Location architecture
 
-Location is the most critical feature of Spotted — the map, leaderboard, check-ins,
-arrival nudges, and friend visibility all run on it. It is also the most
-privacy-sensitive surface in the app. Read this before touching anything that
-imports `react-native-background-geolocation`.
+Location follows the user's explicit Out session until the profile city's 5am
+reset. It never starts sharing for TBD, No, Stop sharing, or a private party.
 
-## The ready-once contract
+## Native lifecycle and permissions
 
-The Transistorsoft SDK must be configured with `BackgroundGeolocation.ready()`
-**exactly once per app launch, before any other SDK call**.
+`location-ready.ts` owns the single-flight `BackgroundGeolocation.ready()` and
+configuration. First access asks When In Use only. The check-in payoff explains
+and offers Automatic updates, which requests Always and Motion & Fitness.
+Previously accepted automatic updates are remembered. Each new check-in stores
+`night_statuses.automatic_venue_updates`; old rows default to false. Enabling the
+feature after check-in explicitly updates that flag.
 
-- [`src/lib/location-ready.ts`](src/lib/location-ready.ts) is the **single owner**
-  of `.ready()`. It exposes `ensureLocationReady()` — a single-flight promise, so
-  concurrent callers share one in-flight configuration and `.ready()` can never
-  run twice. A failed `.ready()` resets the promise so the next call retries.
-- **Every** function that asks the SDK for a position awaits
-  `ensureLocationReady()` first:
-  - `getAccurateLocation()` in `location-service.ts` (check-in venue detection,
-    neighborhood detection)
-  - `getCurrentPosition()` in `background-location.ts` (arrival prompts)
-  - `startBackgroundLocation()` in `background-location.ts` (tracking)
-- Never call `BackgroundGeolocation.ready()`, or pass config to the plugin,
-  anywhere else. Never call `getCurrentPosition`/`start` directly from feature
-  code — go through the wrappers above.
-- `location-ready.ts` also owns the single permanent `onLocation` dispatcher
-  (registered alongside `.ready()`), because one-shot fixes emit `location`
-  events too — with no listener the SDK logs "Sending `location` with no
-  listeners registered". `background-location.ts` plugs the actual fix
-  pipeline in via `setLocationHandler()`; the handler is fully guarded
-  (no signed-in user or not "out" → no-op).
+Motion-based GPS uses a 25m distance filter (SDK speed elasticity retained),
+pauses after five minutes still, and wakes on confident walking activity as well
+as the SDK's motion/geofence events. This avoids relying only on iOS's roughly
+200m stationary-geofence exit for a short walk between bars. Native lifecycle
+behavior must be verified on real devices; the OS may delay events.
 
-## Permission staging (client feedback §3)
+When an accepted fix needs arrival/departure confirmation, a bounded native
+watch collects fixes about every 10s for at most two minutes. It is removed on
+confirmation, timeout, stop, permission loss, status change, or expiry. A timeout
+has a one-minute backoff. This is deliberately not an all-night continuous watch.
+The SDK docs allow an iOS watch to run in the background but warn about battery
+usage; the bounded lifetime is essential. The app also obtains an accurate fix
+on foreground/reconnect and every minute while foregrounded. It never substitutes
+an app-alive timestamp for an actual GPS reading.
 
-Permissions are asked in two explained steps, never as a side effect:
+`stopOnTerminate: true` and `startOnBoot: false` remain. Force quit or power-off
+stops new updates. A server-checked expiry rejects all writes after the night;
+`stopAfterElapsedMinutes` and an active JS deadline stop native collection.
+A powered-off phone cannot deliver new GPS. A locked phone with Always permission
+can continue delivering motion updates.
 
-1. **When In Use** — asked once, after an in-app explanation: the onboarding
-   "Share Your Location" slide, or the check-in sheet's "Find your spot" step
-   when the user taps **Yes** with permission not yet determined. `ready()` is
-   configured with `locationAuthorizationRequest: 'WhenInUse'` and
-   `disableMotionActivityUpdates: true`, so this first prompt is only the
-   standard location dialog — no Motion & Fitness, no background upgrade.
-2. **Automatic updates** (Always + Motion & Fitness) — offered on the payoff
-   screen **after a venue check-in has already succeeded**, as its own card
-   with its own outcome copy. `requestAutomaticUpdates()` upgrades the config
-   and prompts; the grant is remembered (`spotted.automatic-updates`) so later
-   launches configure Always from the start. Never offered for private parties.
+## Atomic server update
 
-Rules that follow from this:
+Migration `20260922173438_reliable_live_location.sql` installs
+`record_live_location`, a SECURITY INVOKER RPC restricted to authenticated users.
+It derives the user from `auth.uid()` and locks their night-status row before
+checking status, party mode, expiry and `updated_at`. That timestamp is the
+explicit user status revision; automatic location/venue writes preserve it.
+Delayed samples from an earlier manual check-in cannot overwrite a newer choice.
+All profile, status, check-in and candidate changes commit together.
 
-- Only the check-in **Yes** path may trigger a permission prompt.
-  `getCurrentPosition()` (arrival prompts, party fallback) and
-  `startBackgroundLocation()` (launch resume, post-check-in) check
-  `getLocationPermission()` first and return without prompting.
-- A check-in's success and the watcher's availability are separate results:
-  `goOutAtVenue` resolves first; `startBackgroundLocation` returns
-  `{ tracking, permission }` and the sheet describes it. A watcher failure can
-  never surface as "Could not check in".
-- Denied: the sheet explains what still works and leads with **Pick a venue**;
-  **Open Settings** is secondary. An `AppState` listener re-checks permission
-  when the app returns to the foreground and continues automatically.
-- The SDK's own "location disabled" alert is off
-  (`disableLocationAuthorizationAlert: true`); the sheet owns that UI.
+`live_location_state` holds one owner-only RLS row with candidate/dwell state.
+There is no location-history table. Explicit status edits and nightly reset clear
+it. SDK SQLite persistence is disabled; the app keeps at most the latest pending
+sample in AsyncStorage, keyed by user and revision. Reconnect retries preserve
+its original capture time. Samples older than two minutes are discarded.
 
-## Who uses location, and how
+| Rule | Value |
+| --- | --- |
+| Map GPS accuracy | At most 65m uncertainty |
+| Sample age / future tolerance | At most 2 minutes old / 15 seconds future |
+| Duplicate / out-of-order sample | Ignored |
+| Implausible movement | Reject short-interval jumps above 90m/s, with 200m noise floor |
+| Arrival accuracy | At most 35m uncertainty |
+| New venue radius | Within 80m |
+| Nearest-vs-next venue margin | At least max(25m, reported uncertainty) |
+| Arrival dwell | At least 75s across 3+ distinct fixes; gap at most 60s |
+| Speed for arrival | At most 2.5m/s when available |
+| Preserve nearby manual venue | Do not replace while within max(60m, 2× uncertainty) |
+| Departure | More than 150m + uncertainty from current spot across 30s |
+| Check-in presence refresh | Accurate fix within 120m of the current venue |
 
-| Consumer | File | GPS use | Writes |
-|---|---|---|---|
-| Check-in flow (Yes) | `app/check-in.tsx` → `location-service.ts` | One-shot, 3-sample fix, accuracy-gated (150m; 200m demo/retry) → nearby venues via `find_nearby_venues` RPC. The only path that may prompt. | `night_statuses` (lat/lng via `goOutAtVenue`), `checkins`, `profiles.is_out` + coords |
-| Private party neighborhood | `app/check-in.tsx` → `neighborhoodFromCoords` | Reuses the Yes fix; no new GPS call | none (neighborhood string only); exact spot → `party_locations` via DB trigger |
-| TBD | `app/check-in.tsx` | **none** — never touches location | `night_statuses` planning fields |
-| Arrival prompts (foreground) | `hooks/use-arrival-prompts.ts` | One-shot fix on map open / every 2 min → `find_nearest_venue` (200m) | none until user accepts |
-| Background tracking | `lib/background-location.ts` | Continuous while **out** (100m distance filter, stop after 5 min stationary) | `profiles.last_known_lat/lng/last_location_at`, `checkins.last_updated_at` |
-| Auto-venue-tracker engine | `lib/venue-arrival-engine.ts` | Consumes background fixes (no GPS calls of its own) | none — emits a local notification deep-linking to `/check-in` |
-| Map friend pins | `hooks/use-map-data.ts` | none — **never reads raw GPS of others** | reads `get_profiles_safe` only |
+Arrival searches only real bar/club/lounge/rooftop/members-club types in the
+profile city. Restaurants/stadiums are excluded. Ambiguous adjacent venues keep
+the last confirmed venue or Out; the user can choose the venue in the check-in
+sheet. GPS cannot reliably distinguish every neighboring room or floor.
 
-## Privacy invariants (SOW §4) — do not break these
+Confirmed departure closes the old check-in and clears its venue label; the map
+keeps showing accepted GPS while between spots. Confirmed arrival, with automatic
+updates enabled, opens exactly one new check-in and changes the status venue in
+the same transaction. A background notification says where the spot changed and
+links to the existing correction sheet. Notification denial does not block GPS.
 
-1. **Server-side masking**: other users' coordinates are ONLY read through the
-   `get_profiles_safe()` RPC, which masks per-viewer based on
-   `location_sharing_level`, friendship, and `location_hidden`. Never select
-   `last_known_lat/lng` from `profiles` for anyone but the signed-in user.
-2. **Status gate**: background fixes are written only while the user is `out`
-   **at a venue** with an unexpired `night_statuses` row. The watcher
-   self-stops otherwise (`shouldTrackLiveLocation`, fail-closed, 60s cache) —
-   including at a private party, whose exact spot is close-friends-only.
-3. **`stopOnTerminate: true`** — force-quitting the app stops tracking; a pin
-   must never follow a user after they kill the app.
-4. **`startOnBoot: false`** — tracking never resurrects on device reboot.
-5. **Stop sharing clears everything**: `stopSharing()` stops the watcher, nulls
-   `profiles` GPS, ends open `checkins`, and writes `status='off'` (still
-   "answered tonight", invisible to friends). `stayIn()` does the same with
-   `home` ("No").
-6. **`party_address` is never in an upsert payload** — only set via a separate
-   constant UPDATE (WP6). A private party's exact spot lives in
-   `party_locations` (RLS: self or close friend); DB triggers strip it from
-   `night_statuses` and from `profiles` for every writer. Close friends get
-   the pin; everyone else only the neighborhood.
-7. **Freshness**: pins render only for locations from *tonight* (5 AM in the
-   profile city's zone, `lib/tonight.ts`) and less than 2 hours old
-   (`isFreshLocation`). Markers dim at 15 min, drop at 60 min. The nightly
-   reset (pg_cron `nightly_reset()` at 10:10 and 13:10 UTC) and
-   `endNightLocally()` on next open clear anything that outlives its night.
-8. **Audience**: the check-in picker writes `profiles.location_sharing_level`
-   (`close_friends` / `all_friends` / `mutual_friends`) — it is THE sharing
-   control. Push fan-out re-checks visibility via `get_visible_recipients`.
+## Stop and privacy
 
-## Accuracy thresholds
+Status changes synchronously cancel the local tracking generation, stop the SDK,
+remove arrival watches, drain any in-flight upload, and clear the pending sample.
+An explicit stop also persists a local pause latch: an offline server still saying
+Out cannot silently restart GPS. Only a successful user-confirmed venue check-in
+clears that latch. Writes are bounded by a 15s request timeout.
+If the status write itself fails while offline, the user must retry it after
+reconnecting to remove the last saved pin from other devices. The local latch
+prevents further GPS uploads meanwhile; it does not queue status mutations.
 
-| Threshold | Value | Where |
-|---|---|---|
-| Check-in venue detection | ≤150m (retry relaxes to 200m; demo 200m) | `location-service.ts` |
-| One-shot desired accuracy | 40m | `getCurrentPosition`, `getAccurateLocation` |
-| Arrival-engine hard gate | ≤35m | `venue-arrival-engine.ts` |
-| Engine trigger radius | ≤200m to venue (reject >500m) | `venue-arrival-engine.ts` |
-| Engine dwell | 45s at the same venue across fixes | `venue-arrival-engine.ts` |
-| Engine cooldowns | 15 min dismiss/toast; re-entry 20 min + 300m | `venue-arrival-engine.ts` |
-| Manual check-in cooldown | 30 min engine silence after any `goOutAtVenue` (persisted; protects manual venue corrections from GPS re-nudges) | `venue-arrival-engine.ts` |
+Other people's coordinates still come ONLY from `get_profiles_safe` and private
+party coordinates from `party_locations`. Existing audiences, blocked/hidden
+users, party RLS, force-quit behavior, and city-time-zone expiry are preserved.
+Private party coordinates are not inserted into audience-readable checkins.
+Manual check-ins with no usable GPS clear old profile coordinates instead of
+re-stamping an old spot; the first accepted fix supplies the live pin.
 
-## Licensing
+## Map and labels
 
-The Transistorsoft SDK runs on a **30-day iOS trial license that expires
-Oct 7 2026** (`app.json` → `TSLocationManagerLicense`). Release builds need the
-paid key (~$399) before launch; Android will need its own key via the plugin's
-`license` prop. Debug/simulator builds work unlicensed.
+Friends require an unexpired Out status. Their last known pin stays through that
+session instead of disappearing after 60 minutes. After 15 minutes it fades,
+stops pulsing, says Last known, and does not cluster with live people. The friend
+card gives the actual update age. A 30s UI clock advances age even when data is
+unchanged. Stop sharing and the 5am expiry remove the pin.
+
+Self and friend markers use the same profile coordinates/timestamps. Clusters
+require physical proximity: 5m, or the same venue ID and within 60m. Venue names
+alone never group people. Venue heat counts require a recent sample. Realtime
+updates refresh the map, with a 30s foreground polling fallback. Own updates are
+included in the subscription. Cross-user raw profile GPS remains inaccessible.
+
+## Verification and release
+
+Run `npm run test:location` and `npm run typecheck` from `mobile/`.
+Run `supabase/tests/reliable_live_location.sql` after applying the migration.
+It wraps itself in a rolled-back transaction, inserts synthetic fixtures only, runs
+as authenticated with RLS, and covers travel, departure, consent, stale/poor GPS,
+duplicates, session conflicts, ambiguity, observation gaps, parties and expiry.
+
+Before shipping, complete `LOCATION-RELEASE-CHECKLIST.md` on two real iPhones.
+A Linux code test cannot certify iOS background delivery, battery use, or the
+currently installed TestFlight binary. The existing iOS SDK license is a trial
+through October 7, 2026; replace it with a valid production key before expiry.

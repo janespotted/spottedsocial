@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { getNightResetIso, isUnexpired } from './tonight';
 import { markManualCheckin } from './venue-arrival-engine';
+import { automaticUpdatesEnabled, getLocationPermission } from './location-ready';
+import { validFix } from './location-quality';
 
 const STATUS_CACHE_TTL_MS = 60_000;
 let _cachedOutResult: {
@@ -89,6 +91,8 @@ export function getStatusExpiry(city?: string | null): string {
 export type NightStatusKind = 'out' | 'planning' | 'home' | 'off' | 'heading_out';
 
 export interface OwnNightStatus {
+  updated_at: string;
+  automatic_venue_updates: boolean;
   /** night_statuses.id — the party identifier for party yaps. */
   id: string;
   status: NightStatusKind;
@@ -113,7 +117,7 @@ export async function fetchOwnNightStatus(userId: string): Promise<OwnNightStatu
   const { data, error } = await supabase
     .from('night_statuses')
     .select(
-      'id, status, venue_id, venue_name, lat, lng, is_private_party, party_neighborhood, planning_neighborhood, planning_visibility, expires_at'
+      'id, status, venue_id, venue_name, lat, lng, is_private_party, party_neighborhood, planning_neighborhood, planning_visibility, expires_at, updated_at, automatic_venue_updates'
     )
     .eq('user_id', userId)
     .maybeSingle();
@@ -135,6 +139,8 @@ export async function fetchOwnNightStatus(userId: string): Promise<OwnNightStatu
   }
   return {
     id: data.id,
+    updated_at: data.updated_at ?? '',
+    automatic_venue_updates: data.automatic_venue_updates,
     status: data.status as NightStatusKind,
     venue_id: data.venue_id,
     venue_name: data.venue_name,
@@ -157,8 +163,8 @@ export async function fetchOwnNightStatus(userId: string): Promise<OwnNightStatu
  */
 export async function endNightLocally(userId: string): Promise<void> {
   invalidateOutStatusCache();
-  const { stopBackgroundLocation } = await import('./background-location');
-  await stopBackgroundLocation();
+  const { pauseLocationForStatusChange } = await import('./background-location');
+  await pauseLocationForStatusChange(userId);
   await clearUserLocation(userId);
   must(
     await supabase
@@ -196,23 +202,15 @@ export interface GoPlanningOptions {
 }
 
 /**
- * The ONE way to enter planning mode ("TBD"). Ends open check-ins and clears
- * location, then full-field night_statuses upsert. party_address is never in
+ * The ONE way to enter planning mode ("TBD"). Stops GPS, writes the status,
+ * then ends open check-ins and clears location. party_address is never in
  * the upsert payload (WP6) — it's nulled via a separate constant UPDATE.
  */
 export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): Promise<void> {
+  const { pauseLocationForStatusChange } = await import('./background-location');
+  await pauseLocationForStatusChange(userId);
   const now = new Date().toISOString();
   invalidateOutStatusCache();
-
-  must(
-    await supabase
-      .from('checkins')
-      .update({ ended_at: now })
-      .eq('user_id', userId)
-      .is('ended_at', null)
-  );
-
-  await clearUserLocation(userId);
 
   must(
     await supabase.from('night_statuses').upsert(
@@ -237,6 +235,15 @@ export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): 
   );
 
   must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
+  must(
+    await supabase
+      .from('checkins')
+      .update({ ended_at: now })
+      .eq('user_id', userId)
+      .is('ended_at', null)
+  );
+
+  await clearUserLocation(userId);
 }
 
 export interface StopSharingOptions {
@@ -245,8 +252,8 @@ export interface StopSharingOptions {
 }
 
 /**
- * Shared tail of "Stop sharing" and "No": kill background GPS, clear the
- * profile pin, end open check-ins, then write the given status with
+ * Shared tail of "Stop sharing" and "No": stop background GPS, write the
+ * status, then clear the profile pin and end open check-ins. The status uses
  * TONIGHT'S EXPIRY. The real expiry is what makes either a recorded answer
  * (the opening prompt does not repeat) while reading as "not sharing"
  * everywhere else — readers key on status/venue, never on row presence.
@@ -259,20 +266,10 @@ async function endLiveSharing(
   const now = new Date().toISOString();
   invalidateOutStatusCache();
 
-  // Lazy import: background-location imports isUserCurrentlyOut from this
+  // Lazy import: background-location imports fetchOwnNightStatus from this
   // module, so a top-level import here would be a require cycle.
-  const { stopBackgroundLocation } = await import('./background-location');
-  await stopBackgroundLocation();
-  await clearUserLocation(userId);
-
-  must(
-    await supabase
-      .from('checkins')
-      .update({ ended_at: now })
-      .eq('user_id', userId)
-      .is('ended_at', null)
-  );
-
+  const { pauseLocationForStatusChange } = await import('./background-location');
+  await pauseLocationForStatusChange(userId);
   must(
     await supabase.from('night_statuses').upsert(
       {
@@ -296,6 +293,15 @@ async function endLiveSharing(
   );
 
   must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
+  await clearUserLocation(userId);
+
+  must(
+    await supabase
+      .from('checkins')
+      .update({ ended_at: now })
+      .eq('user_id', userId)
+      .is('ended_at', null)
+  );
 }
 
 /**
@@ -314,7 +320,7 @@ export function stayIn(userId: string, opts: StopSharingOptions = {}): Promise<v
 
 export interface GoOutOptions {
   venue: { id: string | null; name: string };
-  coords?: { lat: number; lng: number } | null;
+  coords?: { lat: number; lng: number; accuracy?: number; recordedAt?: string } | null;
   city?: string | null;
   privateParty?: { neighborhood: string | null; address?: string | null } | null;
 }
@@ -332,6 +338,10 @@ export interface GoOutOptions {
  * profile coordinates are readable by the whole audience.
  */
 export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<void> {
+  const { pauseLocationForStatusChange } = await import('./background-location');
+  await pauseLocationForStatusChange(userId);
+  const automatic = !opts.privateParty && await automaticUpdatesEnabled() &&
+    await getLocationPermission() === 'always';
   const now = new Date().toISOString();
   invalidateOutStatusCache();
   // Every goOutAtVenue call is a user-confirmed venue (sheet, arrival prompt,
@@ -340,12 +350,16 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
   markManualCheckin();
   const lat = opts.coords?.lat ?? null;
   const lng = opts.coords?.lng ?? null;
+  const liveFix = opts.coords && opts.coords.recordedAt && opts.coords.accuracy != null
+    ? { ...opts.coords, recordedAt: opts.coords.recordedAt, accuracy: opts.coords.accuracy, speed: null } : null;
+  const shareGps = !!liveFix && validFix(liveFix);
 
   must(
     await supabase.from('night_statuses').upsert(
       {
         user_id: userId,
         status: 'out' as const,
+        automatic_venue_updates: automatic,
         venue_id: opts.venue.id,
         venue_name: opts.venue.name,
         lat,
@@ -390,20 +404,26 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
     checkin.lat = lat;
     checkin.lng = lng;
   }
-  must(await supabase.from('checkins').insert(checkin as never));
+  // A manual venue without GPS is a check-in intention, not fabricated coordinates.
+  if (!opts.privateParty && lat !== null && lng !== null) must(await supabase.from('checkins').insert(checkin as never));
 
   // Profile: this is what friends' maps read (via get_profiles_safe). The
   // web client has always written it; without it a check-in never pins.
-  const profile: Record<string, unknown> = { is_out: true, last_location_at: now };
+  const profile: Record<string, unknown> = { is_out: true, last_location_at: shareGps ? liveFix!.recordedAt : null,
+    last_known_lat: null, last_known_lng: null };
   if (opts.privateParty) {
     // Exact spot is close-friends-only → never on the audience-readable profile
     profile.last_known_lat = null;
     profile.last_known_lng = null;
     const { stopBackgroundLocation } = await import('./background-location');
     await stopBackgroundLocation();
-  } else if (lat !== null && lng !== null) {
+  } else if (shareGps) {
     profile.last_known_lat = lat;
     profile.last_known_lng = lng;
   }
   must(await supabase.from('profiles').update(profile as never).eq('id', userId));
+  if (!opts.privateParty) {
+    const { allowLocationAfterCheckin } = await import('./background-location');
+    await allowLocationAfterCheckin(userId);
+  }
 }

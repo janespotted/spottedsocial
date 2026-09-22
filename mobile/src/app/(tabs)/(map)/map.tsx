@@ -52,6 +52,8 @@ import {
 import {IconButton} from '@/components/icon-button';
 import {SmartArrivalPrompt, VenueMoveBanner} from '@/components/venue-move-banner';
 import {NEON} from '@/lib/theme';
+import {canGroupSpots, locationAge, locationLabel, STALE_AFTER_MS} from '@/lib/location-quality';
+import {useLocationClock} from '@/hooks/use-location-clock';
 import {RESET_COPY} from '@/lib/reset-copy';
 import venuePinImage from '../../../../assets/images/venue-pin.png';
 
@@ -65,13 +67,7 @@ const RELATIONSHIP_COLORS: Record<string, string> = {
 };
 
 // Same-spot grouping threshold (~5m) and zoom above which clustering stops
-const CLUSTER_THRESHOLD = 0.000045;
 const NO_CLUSTER_ZOOM = 18;
-
-const stalenessMins = (f: MapFriend): number =>
-  f.last_location_at
-    ? (Date.now() - new Date(f.last_location_at).getTime()) / 60000
-    : 999;
 
 /** Soft expanding pulse behind close-friend markers (web self-marker pulse) */
 function PulseRing({color}: {color: string}) {
@@ -135,6 +131,7 @@ function PersonCircle({
 }
 
 function FriendMarker({
+  now,
   friend,
   index,
   isSelf,
@@ -146,8 +143,9 @@ function FriendMarker({
   isSelf?: boolean;
   selected?: boolean;
   onPress: (friend: MapFriend) => void;
+  now: number;
 }) {
-  const stale = stalenessMins(friend) >= 15;
+  const stale = !friend.is_private_party && locationAge(friend.last_location_at, now) >= STALE_AFTER_MS;
   return (
     <MarkerView coordinate={[friend.lng, friend.lat]} allowOverlap>
       <Animated.View
@@ -156,15 +154,16 @@ function FriendMarker({
           .delay(index * 60)}
         style={stale && !selected ? {opacity: 0.5} : undefined}
       >
-        {friend.relationshipType === 'close' ? (
+        {friend.relationshipType === 'close' && !stale ? (
           <PulseRing color={RELATIONSHIP_COLORS.close} />
         ) : null}
         <Pressable
           onPress={() => onPress(friend)}
           hitSlop={6}
-          accessibilityLabel={friend.display_name}
+          accessibilityLabel={`${friend.display_name}. ${locationLabel(friend.last_location_at, now)}`}
         >
           <PersonCircle friend={friend} isSelf={isSelf} selected={selected} />
+          {stale ? <Text className='text-white/70 text-[10px] font-sans text-center mt-1'>Last known</Text> : null}
         </Pressable>
       </Animated.View>
     </MarkerView>
@@ -318,6 +317,7 @@ export default function MapScreen() {
   });
 
   const {data} = useMapData(city ?? null);
+  const now = useLocationClock();
   // `?? []` would be a NEW array each render, so the clustering memo below
   // would recompute every time and re-animate every marker.
   const friends = useMemo(() => data?.friends ?? [], [data?.friends]);
@@ -386,23 +386,21 @@ export default function MapScreen() {
     let filtered = friends.filter((f) =>
       peopleFilterIncludes(peopleFilter, f.relationshipType),
     );
-    filtered = filtered.filter((f) => stalenessMins(f) < 60);
+    filtered = filtered.filter((f) => !f.expires_at || Date.parse(f.expires_at) > now);
 
-    const self: MapFriend | null =
-      session && selfProfile && myStatus?.status === 'out' && myStatus.lat && myStatus.lng
-        ? {
-            user_id: session.user.id,
-            lat: myStatus.lat,
-            lng: myStatus.lng,
-            venue_name: myStatus.venue_name ?? '',
-            display_name: selfProfile.display_name ?? 'Me',
-            avatar_url: selfProfile.avatar_url,
-            relationshipType: 'close', // self gets highest priority ring
-            is_private_party: false,
-            party_neighborhood: null,
-            last_location_at: new Date().toISOString(),
-          }
-        : null;
+    const ownPosition = myStatus?.is_private_party && myStatus.lat != null && myStatus.lng != null
+      ? {lat: myStatus.lat, lng: myStatus.lng, last_location_at: null}
+      : data?.selfPosition;
+    const self: MapFriend | null = session && selfProfile && myStatus?.status === 'out' &&
+      Date.parse(myStatus.expires_at) > now && ownPosition
+      ? {
+          user_id: session.user.id, ...ownPosition,
+          venue_id: myStatus.venue_id, venue_name: myStatus.venue_name ?? '',
+          display_name: selfProfile.display_name ?? 'Me', avatar_url: selfProfile.avatar_url,
+          relationshipType: 'close', is_private_party: myStatus.is_private_party,
+          party_neighborhood: myStatus.party_neighborhood,
+        }
+      : null;
 
     const groups: MapFriend[][] = [];
     const assigned = new Set<string>();
@@ -413,14 +411,7 @@ export default function MapScreen() {
       if (shouldCluster) {
         for (const other of filtered) {
           if (assigned.has(other.user_id)) continue;
-          const sameVenue =
-            !!friend.venue_name &&
-            !!other.venue_name &&
-            friend.venue_name.toLowerCase() === other.venue_name.toLowerCase();
-          const closeGps =
-            Math.abs(friend.lat - other.lat) < CLUSTER_THRESHOLD &&
-            Math.abs(friend.lng - other.lng) < CLUSTER_THRESHOLD;
-          if (sameVenue || closeGps) {
+          if (canGroupSpots(friend, other, now)) {
             cluster.push(other);
             assigned.add(other.user_id);
           }
@@ -433,14 +424,7 @@ export default function MapScreen() {
     let selfMerged = false;
     if (self && shouldCluster) {
       for (const cluster of groups) {
-        const sameVenue =
-          !!self.venue_name &&
-          !!cluster[0].venue_name &&
-          self.venue_name.toLowerCase() === cluster[0].venue_name.toLowerCase();
-        const closeGps =
-          Math.abs(cluster[0].lat - self.lat) < CLUSTER_THRESHOLD &&
-          Math.abs(cluster[0].lng - self.lng) < CLUSTER_THRESHOLD;
-        if (sameVenue || closeGps) {
+        if (canGroupSpots(cluster[0], self, now)) {
           // Guard: if self somehow already sits in this cluster, replacing
           // beats unshifting — two entries with one id is a duplicate key.
           const existing = cluster.findIndex((f) => f.user_id === self.user_id);
@@ -453,7 +437,7 @@ export default function MapScreen() {
     }
 
     return {clusters: groups, selfSolo: self && !selfMerged ? self : null};
-  }, [friends, shouldCluster, peopleFilter, session, selfProfile, myStatus]);
+  }, [friends, shouldCluster, peopleFilter, session, selfProfile, myStatus, data?.selfPosition, now]);
 
   // ── Venues: independent on/off switch, then type filter, promoted split ──
   const typeFilteredVenues = !showVenues
@@ -687,6 +671,7 @@ export default function MapScreen() {
           ) : (
             cluster.map((friend) => (
               <FriendMarker
+                now={now}
                 key={friend.user_id}
                 friend={friend}
                 index={index}
@@ -699,7 +684,7 @@ export default function MapScreen() {
 
         {/* Self marker (when out and not merged into a cluster) */}
         {selfSolo ? (
-          <FriendMarker friend={selfSolo} index={0} isSelf onPress={() => {}} />
+          <FriendMarker now={now} friend={selfSolo} index={0} isSelf onPress={() => {}} />
         ) : null}
       </MapView>
 

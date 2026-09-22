@@ -5,6 +5,7 @@ import {
   AuthorizationStatus,
   DesiredAccuracy,
   LogLevel,
+  PersistMode,
 } from '@transistorsoft/background-geolocation-types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -53,7 +54,7 @@ export function setLocationHandler(handler: (location: Location) => void): void 
   locationHandler = handler;
 }
 
-async function automaticUpdatesEnabled(): Promise<boolean> {
+export async function automaticUpdatesEnabled(): Promise<boolean> {
   try {
     return (await AsyncStorage.getItem(AUTO_UPDATES_KEY)) === '1';
   } catch {
@@ -75,7 +76,7 @@ export function ensureLocationReady(): Promise<void> {
         BackgroundGeolocation.ready({
           geolocation: {
             desiredAccuracy: DesiredAccuracy.High,
-            distanceFilter: 100, // metres — parity with the Capacitor watcher
+            distanceFilter: 25, // walking-scale movement; SDK elasticity saves battery in cars
             stopTimeout: 5, // minutes stationary before motion tracking pauses
             // Staged: When In Use until the user opts into automatic updates
             locationAuthorizationRequest: auto ? 'Always' : 'WhenInUse',
@@ -90,6 +91,7 @@ export function ensureLocationReady(): Promise<void> {
             stopOnTerminate: true, // privacy invariant — see header comment
             startOnBoot: false, // privacy invariant — see header comment
           },
+          persistence: { persistMode: PersistMode.None },
           logger: {
             debug: false,
             logLevel: __DEV__ ? LogLevel.Verbose : LogLevel.Error,
@@ -177,4 +179,12 @@ export async function requestAutomaticUpdates(): Promise<LocationPermission> {
     /* best effort */
   }
   return permission;
+}
+
+/** Bound native tracking to this night's server-checked expiry, including while suspended. */
+export async function configureTrackingDeadline(expiresAt: string): Promise<void> {
+  await ensureLocationReady();
+  const minutes = (Date.parse(expiresAt) - Date.now()) / 60_000;
+  if (!Number.isFinite(minutes) || minutes <= 0) throw new Error('Night expired');
+  await BackgroundGeolocation.setConfig({ geolocation: { stopAfterElapsedMinutes: minutes } });
 }

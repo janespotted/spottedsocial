@@ -2,6 +2,7 @@ import BackgroundGeolocation from 'react-native-background-geolocation';
 import { supabase } from './supabase';
 import { CITY_NEIGHBORHOODS } from './city-neighborhoods';
 import { ensureLocationReady } from './location-ready';
+import { normalizeVenueMatch } from './location-quality';
 
 /**
  * Port of the web src/lib/location-service.ts core: accurate GPS capture,
@@ -39,11 +40,13 @@ export async function getAccurateLocation(): Promise<{
   lat: number;
   lng: number;
   accuracy: number;
+  recordedAt: string;
 }> {
   await ensureLocationReady();
   const location = await BackgroundGeolocation.getCurrentPosition({
     timeout: 15,
     samples: 3,
+    maximumAge: 0,
     desiredAccuracy: 40,
     persist: false,
   });
@@ -51,6 +54,7 @@ export async function getAccurateLocation(): Promise<{
     lat: location.coords.latitude,
     lng: location.coords.longitude,
     accuracy: location.coords.accuracy,
+    recordedAt: new Date(location.timestamp).toISOString(),
   };
 }
 
@@ -64,13 +68,8 @@ export async function findNearestVenue(
       supabase.rpc as (fn: string, args: object) => PromiseLike<{ data: unknown; error: unknown }>
     )('find_nearest_venue', { user_lat: lat, user_lng: lng, radius_meters: radiusMeters });
     if (error) throw error;
-    const rows = (data ?? []) as Array<{
-      venue_id: string;
-      venue_name: string;
-      distance_meters: number;
-    }>;
-    if (rows.length === 0) return null;
-    return { id: rows[0].venue_id, name: rows[0].venue_name, distance: rows[0].distance_meters };
+    const rows = (data ?? []) as Array<Record<string, unknown>>;
+    return rows.length ? normalizeVenueMatch(rows[0]) : null;
   } catch {
     return null;
   }
@@ -92,11 +91,8 @@ export async function findNearbyVenues(
       max_results: maxResults,
     });
     if (error) throw error;
-    return ((data ?? []) as Array<Record<string, any>>).map((v) => ({
-      id: v.venue_id ?? v.id,
-      name: v.venue_name ?? v.name,
-      distance: v.distance_meters ?? v.distance,
-    }));
+    return ((data ?? []) as Array<Record<string, unknown>>)
+      .map(normalizeVenueMatch).filter((v): v is VenueMatch => v !== null);
   } catch {
     return [];
   }
@@ -122,7 +118,7 @@ export async function captureLocationWithVenue(
     lat: coords.lat,
     lng: coords.lng,
     accuracy: coords.accuracy,
-    timestamp: new Date().toISOString(),
+    timestamp: coords.recordedAt,
     venueId: nearest?.id ?? null,
     venueName: nearest?.name ?? null,
     nearbyVenues,

@@ -1,3 +1,5 @@
+import { locationLabel, locationAge, STALE_AFTER_MS } from '@/lib/location-quality';
+import { useLocationClock } from '@/hooks/use-location-clock';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -60,13 +62,6 @@ const BADGE: Record<RelationshipType, { bg: string; text: string; label: string 
   mutual: { bg: 'bg-[#6366f1]/15', text: 'text-[#818cf8]', label: 'Mutual' },
 };
 
-const formatLastSeen = (lastLocationAt: string | null): string => {
-  if (!lastLocationAt) return '';
-  const mins = (Date.now() - new Date(lastLocationAt).getTime()) / 60000;
-  if (mins < 5) return 'Now';
-  if (mins < 60) return `${Math.round(mins)} min ago`;
-  return `${Math.round(mins / 60)}h ago`;
-};
 
 /**
  * The Friend ID card (addendum v3 §1 / §11.4 — the original build's card,
@@ -122,7 +117,9 @@ export function FriendCardBody({
 
   const ring = RING_GRADIENTS[relationship] ?? RING_GRADIENTS.direct;
   const badge = BADGE[relationship];
-  const lastSeen = formatLastSeen(data.last_location_at);
+  const now = useLocationClock();
+  const lastSeen = data.is_private_party ? '' : locationLabel(data.last_location_at, now);
+  const stale = locationAge(data.last_location_at, now) >= STALE_AFTER_MS;
   const isOut = data.statusKind === 'out' || data.statusKind === 'party';
 
   /** Open another person's card: close this sheet first, then push theirs. */
@@ -354,11 +351,13 @@ export function FriendCardBody({
             <>
               <Pressable onPress={() => onOpenVenue?.(data.venue_name)} hitSlop={4}>
                 <Text className="text-[#d4ff00] text-sm font-sans-medium" numberOfLines={1}>
-                  @{data.venue_name}
+                  {stale ? 'Last at ' : '@'}{data.venue_name}
                 </Text>
               </Pressable>
               <Text className="text-white/45 text-[11px] font-sans">{RESET_COPY.friendCard}</Text>
             </>
+          ) : data.statusKind === 'out' ? (
+            <Text className="text-white/70 text-sm font-sans">Out — between spots</Text>
           ) : data.statusKind === 'party' ? (
             <>
               <Text className="text-[#d4ff00] text-sm font-sans-medium" numberOfLines={1}>

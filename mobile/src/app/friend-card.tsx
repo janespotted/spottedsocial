@@ -37,6 +37,8 @@ export default function FriendCardScreen() {
     queryKey: ['friend-card', userId],
     enabled: !!userId && !!currentUserId && friendIds !== undefined,
     staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
     queryFn: async (): Promise<FriendCardData | null> => {
       const me = currentUserId!;
       const [profiles, { data: close }, { data: status }, locationHidden, myFix] = await Promise.all([
