@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Alert,
+  // Alert — with the parked handleStayIn below
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import * as Haptics from 'expo-haptics';
+// import * as Haptics from 'expo-haptics'; — with the parked handleStayIn below
 import { useQueryClient } from '@tanstack/react-query';
-import { stayIn } from '@/lib/night-status';
+// import { stayIn } from '@/lib/night-status'; — with the parked handleStayIn below
 import { showToast } from '@/lib/toast';
 import { sendMeetUp } from '@/lib/meet-up';
 import { type Plan, type EventWithFriends } from '@/lib/plans';
@@ -114,6 +114,10 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
   // Out and TBD go through the same Yes/TBD setup as everywhere else (venue,
   // audience, final "Share…" action); No needs no setup and applies directly.
   const handleSwitchToOut = () => router.push('/check-in');
+
+  /* The segmented status control was removed (client change, Sept 2026), so
+     these two lost their only callers. Kept for its return:
+
   const handleJoinPlanning = () => router.push({ pathname: '/check-in', params: { step: 'tbd' } });
 
   const handleStayIn = async () => {
@@ -126,6 +130,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
       Alert.alert('Something went wrong', "Couldn't update your status. Try again.");
     }
   };
+  */
 
   /**
    * Shared outcome handling: `sent` shows the confirmation card, and the
@@ -265,39 +270,10 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
         <Text className="text-white/45 text-xs font-sans flex-1">{RESET_COPY.plansHeader}</Text>
       </View>
 
-      {/* 1. Quiet status control */}
-      <View className="flex-row items-center gap-3">
-        <Text className="text-white/55 text-sm font-sans">You&apos;re</Text>
-        <View className="flex-1 flex-row items-center bg-white/[0.04] rounded-full p-1">
-          {(
-            [
-              { label: 'Out', active: isUserOut, onPress: () => !isUserOut && handleSwitchToOut() },
-              {
-                label: 'TBD',
-                active: isUserPlanning,
-                onPress: () => !isUserPlanning && handleJoinPlanning(),
-              },
-              {
-                label: 'Staying In',
-                active: !isUserPlanning && !isUserOut,
-                onPress: () => (isUserPlanning || isUserOut) && handleStayIn(),
-              },
-            ] as const
-          ).map((seg) => (
-            <Pressable
-              key={seg.label}
-              onPress={seg.onPress}
-              className={`flex-1 py-2 rounded-full items-center ${seg.active ? 'bg-[#d4ff00]' : ''}`}
-            >
-              <Text
-                className={`text-xs font-sans-semibold ${seg.active ? 'text-black' : 'text-white/55'}`}
-              >
-                {seg.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
+      {/* The Out / TBD / Staying In segmented control used to sit here
+          (client change, Sept 2026). Setting a status is the StatusPill's
+          job in the header, so Plans no longer duplicates it — the status
+          is still READ below for the banner and the empty states. */}
 
       {/* TBD: surface friends heading out the moment it happens */}
       {isUserPlanning && outFriends.length > 0 ? (

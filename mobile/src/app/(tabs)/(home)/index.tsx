@@ -6,8 +6,6 @@ import {
   RefreshControl,
   Text,
   View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   type ViewToken,
 } from 'react-native';
 import { Image } from '@/components/styled';
@@ -31,13 +29,16 @@ import { EmptyState, ErrorState } from '@/components/empty-state';
 import { addFriendsActions } from '@/lib/add-friends';
 import { FriendsOutBanner } from '@/components/friends-out-banner';
 import { PostCard } from '@/components/post-card';
-import { PlansFeed } from '@/components/plans-feed';
+// Plans moved out of Home into the Chat tab (client change, Sept 2026).
+// Kept imported nowhere here on purpose — see app/(tabs)/(messages)/messages.tsx.
+// import { PlansFeed } from '@/components/plans-feed';
 import { Avatar } from '@/components/avatar';
 import { HeaderActions } from '@/components/header-actions';
 import { FriendsOutPill } from '@/components/friends-out-pill';
 import { NEON, PURPLE } from '@/lib/theme';
 
-type FeedMode = 'newsfeed' | 'plans';
+// `FeedMode` and the Newsfeed/Plans toggle were removed when Plans moved to
+// the Chat tab (client change, Sept 2026). Home is the Newsfeed only.
 
 /* ── Out Tonight / Planning Tonight cards (shared: empty state + Plans) ── */
 
@@ -192,28 +193,26 @@ function EmptyFeed({
   );
 }
 
-/* ── Collapsing header ── */
+/* ── Header ── */
 
-function HomeHeader({
-  scrollProgress: p,
-  feedMode,
-  onModeChange,
-  city,
-  unreadCount,
-}: {
-  scrollProgress: number;
-  feedMode: FeedMode;
-  onModeChange: (m: FeedMode) => void;
-  city: string | null;
-  unreadCount: number;
-}) {
+/**
+ * Static, like Map / Profile / Leaderboard. Home used to collapse a
+ * "Newsfeed | Plans" title on scroll; with Plans moved to the Chat tab the
+ * title named the only screen it could be, so it went and the collapse went
+ * with it (there was nothing left worth animating). The wordmark, city pill
+ * and actions were always anchored — they are unchanged.
+ */
+function HomeHeader({ city, unreadCount }: { city: string | null; unreadCount: number }) {
   return (
     <View
       className="pt-safe-offset-3 z-10"
-      style={{ backgroundColor: `rgba(26, 15, 46, ${0.92 + p * 0.08})` }}
+      style={{
+        backgroundColor: 'rgba(26, 15, 46, 0.95)',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+      }}
     >
-      {/* Top bar — fixed size */}
-      <View className="flex-row items-center justify-between px-4 h-10">
+      <View className="flex-row items-center justify-between px-4 h-10 mb-3">
         {/* Wordmark is anchored: same size on every tab, never animates */}
         <Text
           className="text-white font-sans-light"
@@ -232,38 +231,6 @@ function HomeHeader({
           <HeaderActions unreadCount={unreadCount} />
         </View>
       </View>
-
-      {/* Tabs — large title that collapses on scroll */}
-      <View
-        className="flex-row items-end px-4"
-        style={{
-          paddingTop: 12 - p * 6,
-          paddingBottom: 12 - p * 6,
-          borderBottomWidth: 1,
-          borderBottomColor: `rgba(255, 255, 255, ${0.04 + p * 0.04})`,
-        }}
-      >
-        {(['newsfeed', 'plans'] as const).map((mode) => (
-          <Pressable key={mode} onPress={() => onModeChange(mode)} className="mr-6">
-            <Text
-              className="font-sans-semibold text-white"
-              style={{
-                fontSize: 24 - p * 11,
-                lineHeight: (24 - p * 11) * 1.2,
-                opacity: feedMode === mode ? 1 : 0.4 + p * 0.1,
-              }}
-            >
-              {mode === 'newsfeed' ? 'Newsfeed' : 'Plans'}
-            </Text>
-            {feedMode === mode ? (
-              <View
-                className="rounded-full"
-                style={{ height: 2.5 - p * 0.5, backgroundColor: NEON, marginTop: 2 }}
-              />
-            ) : null}
-          </Pressable>
-        ))}
-      </View>
     </View>
   );
 }
@@ -273,8 +240,6 @@ function HomeHeader({
 export default function HomeScreen() {
   useNoKeyboardOnFocus(); // back from comments / search must never leave the keyboard up
   const { session } = useSession();
-  const [feedMode, setFeedMode] = useState<FeedMode>('newsfeed');
-  const [scrollProgress, setScrollProgress] = useState(0);
   const feed = useFeed();
   const { data: friendsData, refetch: refetchFriends } = useFriendsOut();
   const { data: friendIds } = useFriendIds(session?.user.id);
@@ -297,21 +262,6 @@ export default function HomeScreen() {
       return data?.city ?? 'nyc';
     },
   });
-
-  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    // Short content can't fund the collapse: shrinking the header grows the
-    // viewport, iOS clamps the offset back, the header re-expands — a jitter
-    // loop. Only collapse when there's comfortably more scroll room than the
-    // 40px threshold plus the ~26px the header gives up.
-    const scrollable = contentSize.height - layoutMeasurement.height;
-    if (scrollable < 80) {
-      setScrollProgress((prev) => (prev === 0 ? prev : 0));
-      return;
-    }
-    const next = Math.min(1, Math.max(0, contentOffset.y / 40));
-    setScrollProgress((prev) => (Math.abs(prev - next) > 0.02 ? next : prev));
-  };
 
   /**
    * Shared outcome handling: `sent` shows the confirmation card, and the
@@ -390,99 +340,87 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-[#110a24]">
-      <HomeHeader
-        scrollProgress={scrollProgress}
-        feedMode={feedMode}
-        onModeChange={setFeedMode}
-        city={city ?? null}
-        unreadCount={unreadCount}
-      />
+      <HomeHeader city={city ?? null} unreadCount={unreadCount} />
 
-      {feedMode === 'plans' ? (
-        <PlansFeed city={city ?? null} onScroll={onScroll} />
-      ) : (
-        <LegendList
-          ref={listRef}
-          data={feed.posts}
-          keyExtractor={(p) => p.id}
-          recycleItems
-          scrollEnabled={!postDetailActive}
-          contentContainerStyle={contentContainerStyle}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-          onEndReached={feed.loadMore}
-          onEndReachedThreshold={0.5}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-          refreshControl={
-            <RefreshControl
-              refreshing={feed.isRefreshing}
-              onRefresh={() => {
-                feed.refresh({ userInitiated: true });
-                refetchFriends();
-              }}
-              tintColorClassName="accent-[#d4ff00]"
-            />
-          }
-          ListFooterComponent={
-            feed.posts.length === 0 ? null : feed.hasMore ? (
-              <View className="py-6 items-center">
-                <ActivityIndicator color={NEON} />
-              </View>
-            ) : (
-              <Text className="text-white/45 text-xs font-sans text-center py-6">
-                you&apos;re all caught up
-              </Text>
-            )
-          }
-          ListHeaderComponent={
-            isPlanning && outFriends.length > 0 ? (
-              <View className="px-4 pt-4">
-                <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
-              </View>
-            ) : null
-          }
-          ListEmptyComponent={
-            feed.isLoading ? (
-              <View className="px-4 py-8 gap-4">
-                {[0, 1].map((i) => (
-                  <View key={i} className="gap-3">
-                    <View className="flex-row items-center gap-2.5">
-                      <View className="w-8 h-8 rounded-full bg-white/10" />
-                      <View className="h-3 w-28 rounded bg-white/10" />
-                    </View>
-                    <View className="h-64 rounded-xl bg-white/5" />
+      <LegendList
+        ref={listRef}
+        data={feed.posts}
+        keyExtractor={(p) => p.id}
+        recycleItems
+        scrollEnabled={!postDetailActive}
+        contentContainerStyle={contentContainerStyle}
+        onEndReached={feed.loadMore}
+        onEndReachedThreshold={0.5}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        refreshControl={
+          <RefreshControl
+            refreshing={feed.isRefreshing}
+            onRefresh={() => {
+              feed.refresh({ userInitiated: true });
+              refetchFriends();
+            }}
+            tintColorClassName="accent-[#d4ff00]"
+          />
+        }
+        ListFooterComponent={
+          feed.posts.length === 0 ? null : feed.hasMore ? (
+            <View className="py-6 items-center">
+              <ActivityIndicator color={NEON} />
+            </View>
+          ) : (
+            <Text className="text-white/45 text-xs font-sans text-center py-6">
+              you&apos;re all caught up
+            </Text>
+          )
+        }
+        ListHeaderComponent={
+          isPlanning && outFriends.length > 0 ? (
+            <View className="px-4 pt-4">
+              <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
+            </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          feed.isLoading ? (
+            <View className="px-4 py-8 gap-4">
+              {[0, 1].map((i) => (
+                <View key={i} className="gap-3">
+                  <View className="flex-row items-center gap-2.5">
+                    <View className="w-8 h-8 rounded-full bg-white/10" />
+                    <View className="h-3 w-28 rounded bg-white/10" />
                   </View>
-                ))}
-              </View>
-            ) : feed.isError ? (
-              <ErrorState
-                title="Couldn't load your feed"
-                onRetry={() => void feed.refresh({ userInitiated: true })}
-                retrying={feed.isRefreshing}
-              />
-            ) : (
-              <EmptyFeed
-                friendCount={friendIds?.length ?? 0}
-                outFriends={outFriends}
-                planningFriends={planningFriends}
-                venuesWithheld={friendsData?.venuesWithheld ?? false}
-                onMeetUp={handleMeetUp}
-              />
-            )
-          }
-          renderItem={({ item }) => (
-            <PostCard
-              post={item}
-              isLiked={feed.likedPosts.has(item.id)}
-              currentUserId={session?.user.id ?? ''}
-              onToggleLike={feed.toggleLike}
-              onDelete={feed.deletePost}
-              isVisible={item.media_type !== 'video' || visibleVideoIds.has(item.id)}
+                  <View className="h-64 rounded-xl bg-white/5" />
+                </View>
+              ))}
+            </View>
+          ) : feed.isError ? (
+            <ErrorState
+              title="Couldn't load your feed"
+              onRetry={() => void feed.refresh({ userInitiated: true })}
+              retrying={feed.isRefreshing}
             />
-          )}
-        />
-      )}
+          ) : (
+            <EmptyFeed
+              friendCount={friendIds?.length ?? 0}
+              outFriends={outFriends}
+              planningFriends={planningFriends}
+              venuesWithheld={friendsData?.venuesWithheld ?? false}
+              onMeetUp={handleMeetUp}
+            />
+          )
+        }
+        renderItem={({ item }) => (
+          <PostCard
+            post={item}
+            isLiked={feed.likedPosts.has(item.id)}
+            currentUserId={session?.user.id ?? ''}
+            onToggleLike={feed.toggleLike}
+            onDelete={feed.deletePost}
+            isVisible={item.media_type !== 'video' || visibleVideoIds.has(item.id)}
+          />
+        )}
+      />
 
       {/* "N out · M TBD" roster pill — lower left, as in the original build
           (addendum v3 §11.1); the roster used to live only in the empty
@@ -495,29 +433,22 @@ export default function HomeScreen() {
 
       {/* Compose FAB — bottom-safe-offset-16 clears the native tab bar
           (49pt) plus the home indicator, with a visible gap above it.
-          Labelled per view (client feedback §6): a bare "+" over Plans used
-          to open the photo composer. */}
+          Home is the Newsfeed only now, so the FAB is always "Post"; the
+          Plan FAB moved to the Chat tab's Plans view. */}
       {keyboardOpen ? null : (
-      <Pressable
-        onPress={() => router.push(feedMode === 'plans' ? '/create-plan' : '/create-post')}
-        accessibilityRole="button"
-        accessibilityLabel={feedMode === 'plans' ? 'Share a plan' : 'New post'}
-        className="absolute bottom-safe-offset-16 right-4 h-14 pl-4 pr-5 rounded-full flex-row items-center gap-2 active:opacity-90"
-        style={{
-          backgroundColor: NEON,
-          boxShadow: '0 4px 20px rgba(212, 255, 0, 0.35)',
-        }}
-      >
-        <SymbolView
-          name={feedMode === 'plans' ? 'calendar.badge.plus' : 'camera.fill'}
-          size={20}
-          tintColor="#1a0f2e"
-          weight="semibold"
-        />
-        <Text className="text-[#1a0f2e] text-[15px] font-sans-semibold">
-          {feedMode === 'plans' ? 'Plan' : 'Post'}
-        </Text>
-      </Pressable>
+        <Pressable
+          onPress={() => router.push('/create-post')}
+          accessibilityRole="button"
+          accessibilityLabel="New post"
+          className="absolute bottom-safe-offset-16 right-4 h-14 pl-4 pr-5 rounded-full flex-row items-center gap-2 active:opacity-90"
+          style={{
+            backgroundColor: NEON,
+            boxShadow: '0 4px 20px rgba(212, 255, 0, 0.35)',
+          }}
+        >
+          <SymbolView name="camera.fill" size={20} tintColor="#1a0f2e" weight="semibold" />
+          <Text className="text-[#1a0f2e] text-[15px] font-sans-semibold">Post</Text>
+        </Pressable>
       )}
     </View>
   );

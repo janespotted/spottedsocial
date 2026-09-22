@@ -19,9 +19,17 @@ import { Avatar } from '@/components/avatar';
 import { HeaderActions } from '@/components/header-actions';
 import { EmptyState, ErrorState } from '@/components/empty-state';
 import { addFriendsActions } from '@/lib/add-friends';
+import { PlansFeed } from '@/components/plans-feed';
 import { NEON, PURPLE } from '@/lib/theme';
 
-type TabType = 'yap' | 'messages';
+/**
+ * Yap is parked (client change, Sept 2026): the Chat tab now pairs Plans —
+ * moved off Home — with DMs. Nothing Yap was deleted; flip this to true and
+ * the Yap tab, its directory query and its realtime subscription come back.
+ */
+const YAP_ENABLED = false;
+
+type TabType = 'yap' | 'plans' | 'messages';
 
 function formatWhen(iso: string | null): string {
   if (!iso) return '';
@@ -151,7 +159,7 @@ export default function MessagesScreen() {
   const { session } = useSession();
   const { unreadCount } = useNotifications();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TabType>('yap');
+  const [activeTab, setActiveTab] = useState<TabType>(YAP_ENABLED ? 'yap' : 'plans');
   const [yapSort, setYapSort] = useState<'hot' | 'new'>('hot');
   // pb clears the native tab bar + home indicator so the last row is reachable
   const contentContainerStyle = useResolveClassNames('px-4 pb-28');
@@ -193,7 +201,7 @@ export default function MessagesScreen() {
     refetch: refetchYaps,
   } = useQuery({
     queryKey: ['yap-directory', city],
-    enabled: !!session && !!city && activeTab === 'yap',
+    enabled: YAP_ENABLED && !!session && !!city && activeTab === 'yap',
     staleTime: 15_000,
     queryFn: () => fetchYapDirectory(city!),
   });
@@ -207,20 +215,23 @@ export default function MessagesScreen() {
       name: 'dm-list-realtime',
       onReconnect: () => {
         queryClient.invalidateQueries({ queryKey: ['dm-threads'] });
-        queryClient.invalidateQueries({ queryKey: ['yap-directory'] });
+        if (YAP_ENABLED) queryClient.invalidateQueries({ queryKey: ['yap-directory'] });
       },
-      configure: (ch) =>
-        ch
-          .on(
-            'postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'dm_messages' },
-            () => queryClient.invalidateQueries({ queryKey: ['dm-threads'] })
-          )
-          .on(
+      configure: (ch) => {
+        ch.on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'dm_messages' },
+          () => queryClient.invalidateQueries({ queryKey: ['dm-threads'] })
+        );
+        if (YAP_ENABLED) {
+          ch.on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'yap_messages' },
             () => queryClient.invalidateQueries({ queryKey: ['yap-directory'] })
-          ),
+          );
+        }
+        return ch;
+      },
     });
   }, [session, queryClient]);
 
@@ -282,14 +293,16 @@ export default function MessagesScreen() {
           <HeaderActions unreadCount={unreadCount} />
         </View>
 
-        {/* Yap | DMs tabs (web parity — the original says "DMs", addendum v3
-            §11.8) + new chat */}
+        {/* Plans | DMs tabs + new chat. Yap sat where Plans is now; the tab
+            comes back with YAP_ENABLED. ("DMs" is the original's word,
+            addendum v3 §11.8.) */}
         <View className="flex-row items-center px-4 pt-2 pb-3">
           {(
             [
-              ['yap', 'Yap'],
+              ...(YAP_ENABLED ? ([['yap', 'Yap']] as const) : []),
+              ['plans', 'Plans'],
               ['messages', 'DMs'],
-            ] as const
+            ] as [TabType, string][]
           ).map(([tab, label]) => (
             <Pressable key={tab} onPress={() => setActiveTab(tab)} className="mr-6">
               <Text
@@ -323,7 +336,11 @@ export default function MessagesScreen() {
         </View>
       </View>
 
-      {activeTab === 'yap' ? (
+      {activeTab === 'plans' ? (
+        // Plans moved here from Home. This header is static, so the feed's
+        // collapse callback has nothing to drive.
+        <PlansFeed city={city ?? null} onScroll={() => {}} />
+      ) : activeTab === 'yap' ? (
         <LegendList
           data={sortedYaps}
           keyExtractor={(q) => q.id}

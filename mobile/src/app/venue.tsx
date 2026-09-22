@@ -746,7 +746,9 @@ export default function VenueScreen() {
               <SymbolView name="square.and.arrow.up" size={13} tintColor="rgba(255,255,255,0.7)" />
               <Text className="text-white/80 text-xs font-sans-medium">Share</Text>
             </Pressable>
-            {/* Yap shortcut — the original card had it (addendum v3 §11.5) */}
+            {/* Yap shortcut — the original card had it (addendum v3 §11.5).
+                Parked with the rest of Yap (client change, Sept 2026);
+                restore this block when Yap comes back.
             <Pressable
               onPress={() => {
                 if (!venue) return;
@@ -763,6 +765,7 @@ export default function VenueScreen() {
               <SymbolView name="bubble.left.and.bubble.right" size={13} tintColor="rgba(255,255,255,0.7)" />
               <Text className="text-white/80 text-xs font-sans-medium">Yap</Text>
             </Pressable>
+            */}
             <Pressable
               onPress={toggleWishlist}
               accessibilityRole="button"
