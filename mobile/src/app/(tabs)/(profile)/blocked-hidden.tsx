@@ -19,7 +19,8 @@ interface PersonRow {
 export default function BlockedHiddenScreen() {
   const { session } = useSession();
   const userId = session?.user.id;
-  const contentContainerStyle = useResolveClassNames('px-4 py-5 gap-5');
+  // pb-32 clears the native tab bar + home indicator (see settings.tsx)
+  const contentContainerStyle = useResolveClassNames('px-4 pt-5 pb-32 gap-5');
 
   const { data, refetch } = useQuery({
     queryKey: ['blocked-hidden', userId],

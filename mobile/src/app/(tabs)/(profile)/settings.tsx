@@ -59,7 +59,10 @@ export default function SettingsScreen() {
   const { session } = useSession();
   const queryClient = useQueryClient();
   const userId = session?.user.id;
-  const contentContainerStyle = useResolveClassNames('px-4 py-5 gap-3');
+  // pb clears the native tab bar + home indicator: this screen lives inside
+  // the (profile) tab, so without it the last row (Delete Account) renders
+  // under the tab bar and can't be seen or tapped.
+  const contentContainerStyle = useResolveClassNames('px-4 pt-5 pb-32 gap-3');
 
   const { data: prefs, refetch } = useQuery({
     queryKey: ['settings-prefs', userId],

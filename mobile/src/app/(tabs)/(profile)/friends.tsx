@@ -116,7 +116,8 @@ export default function FriendsScreen() {
   const { session } = useSession();
   const queryClient = useQueryClient();
   const userId = session?.user.id;
-  const contentContainerStyle = useResolveClassNames('px-4 pb-10');
+  // pb-32 clears the native tab bar + home indicator (see settings.tsx)
+  const contentContainerStyle = useResolveClassNames('px-4 pb-32');
   const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
 
   const { data, refetch, isRefetching, isLoading, isError } = useQuery({
