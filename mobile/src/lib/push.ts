@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import type { Href } from 'expo-router';
 import { supabase } from './supabase';
@@ -17,6 +19,7 @@ export function routeForNotification(data: Record<string, unknown> | undefined):
     case 'dm':
     case 'venue_yap':
       return '/messages';
+    case 'friend_arrived':
     case 'friend_checkin':
     case 'friend_arrived_venue':
     case 'friends_at_venue':
@@ -41,43 +44,100 @@ export async function getPushPermission(): Promise<PushPermission> {
   }
 }
 
-/**
- * Registers this device's raw APNs token onto the signed-in user's profile —
- * the RN counterpart of the web usePushNotifications subscribeNative flow.
- * The send-push edge function reads profiles.apns_device_token and talks to
- * APNs directly, so a plain device token (not an Expo push token) is required.
- * Prompts only when permission is undetermined. Simulators can't issue APNs
- * tokens — failures are silent; in-app notifications still work.
- */
-export async function registerPushToken(
-  userId: string,
-  opts: { prompt: boolean }
-): Promise<PushPermission> {
-  try {
+/** Serialize registration and logout so a late registration cannot reattach a
+ * signed-out account. Permission and successful server registration are separate. */
+let operations: Promise<unknown> = Promise.resolve();
+let loggingOut = false;
+const deviceKey = 'spotted.push.device.v1';
+async function bounded<T>(request: { abortSignal: (signal: AbortSignal) => PromiseLike<T> }): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try { return await request.abortSignal(controller.signal); }
+  finally { clearTimeout(timer); }
+}
+function serial<T>(work: () => Promise<T>): Promise<T> {
+  const next = operations.then(work);
+  operations = next.catch(() => {});
+  return next;
+}
+async function assertUser(userId: string): Promise<void> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error || data.session?.user.id !== userId) throw new Error('Push session changed');
+}
+
+/** Resolves granted ONLY after the token is saved. Transport failures throw
+ * so callers retry instead of confusing a network failure with denied permission. */
+export function registerPushToken(userId: string, opts: { prompt: boolean; token?: string }): Promise<PushPermission> {
+  if (loggingOut) return Promise.reject(new Error('Signing out'));
+  return serial(async () => {
+    if (loggingOut) throw new Error('Signing out');
+    await assertUser(userId);
     let permission = await getPushPermission();
     if (permission === 'undetermined' && opts.prompt) {
       const { status } = await Notifications.requestPermissionsAsync();
       permission = status === 'granted' ? 'granted' : 'denied';
     }
     if (permission !== 'granted') return permission;
-
-    const token = (await Notifications.getDevicePushTokenAsync()).data as string;
-    if (!token) return permission;
-
-    // Detach this token from any other account first (SECURITY DEFINER
-    // RPC — RLS blocks touching other users' profiles directly).
-    // Casts: database.types.ts predates the push columns/RPC; both are
-    // verified present in the production schema.
-    await (supabase.rpc as (fn: string, args: object) => PromiseLike<unknown>)(
-      'clear_stale_push_token',
-      { p_token: token, p_keep_user_id: userId }
-    );
-    await supabase
-      .from('profiles')
-      .update({ push_token: token, apns_device_token: token, push_enabled: true } as never)
-      .eq('id', userId);
+    const token = opts.token ?? (await Notifications.getDevicePushTokenAsync()).data;
+    if (typeof token !== 'string' || !token) throw new Error('No device token');
+    if (loggingOut) throw new Error('Signing out');
+    await assertUser(userId);
+    // Keep the token before the network write: even a timed-out response may
+    // have committed and must be detached on logout.
+    await AsyncStorage.setItem(deviceKey, JSON.stringify({ userId, token }));
+    const detach = await bounded(supabase.rpc('clear_stale_push_token', { p_token: token, p_keep_user_id: userId }));
+    if (detach.error) throw detach.error;
+    if (loggingOut) throw new Error('Signing out');
+    const saved = await bounded(supabase.from('profiles')
+      .update({ push_token: token, apns_device_token: token, push_enabled: true })
+      .eq('id', userId).select('id'));
+    if (saved.error) throw saved.error;
+    if (saved.data?.length !== 1) throw new Error('Device registration was not saved');
     return permission;
+  });
+}
+
+/** Detach while authenticated, then sign out this device. On network failure
+ * leave the session intact and show a retry message rather than falsely claim
+ * that logout also stopped pushes. Other devices/web subscriptions are retained. */
+export async function signOutWithPushCleanup(): Promise<void> {
+  if (loggingOut) return;
+  loggingOut = true;
+  try {
+    await serial(async () => {
+      const { data: auth, error: authError } = await supabase.auth.getSession();
+      if (authError) throw authError;
+      const uid = auth.session?.user.id;
+      if (uid) {
+        let token: string | undefined;
+        const raw = await AsyncStorage.getItem(deviceKey);
+        if (raw) {
+          try { const saved = JSON.parse(raw); if (saved.userId === uid) token = saved.token; } catch { /* recover from native */ }
+        }
+        if (!token) {
+          try { const native = (await Notifications.getDevicePushTokenAsync()).data; if (typeof native === 'string') token = native; } catch { /* check server below */ }
+        }
+        if (token) {
+          const { error } = await bounded(supabase.from('profiles')
+            .update({ apns_device_token: null, push_token: null })
+            .eq('id', uid).eq('apns_device_token', token));
+          if (error) throw error;
+        } else {
+          const { data, error } = await bounded(supabase.from('profiles').select('apns_device_token').eq('id', uid));
+          if (error || data?.[0]?.apns_device_token) throw new Error('Cannot verify notification cleanup');
+        }
+      }
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) throw error;
+      await AsyncStorage.removeItem(deviceKey);
+      await Promise.allSettled([
+        Notifications.dismissAllNotificationsAsync(),
+        Notifications.cancelAllScheduledNotificationsAsync(),
+        Notifications.clearLastNotificationResponseAsync(),
+        Notifications.setBadgeCountAsync(0),
+      ]);
+    });
   } catch {
-    return 'denied';
-  }
+    Alert.alert('Could not log out', 'Connect to the internet and try again so we can stop notifications for this account on this phone.');
+  } finally { loggingOut = false; }
 }

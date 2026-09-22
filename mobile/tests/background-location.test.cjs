@@ -16,7 +16,8 @@ function loadModule(file, dependencies) {
 }
 const quality=loadModule('location-quality.ts',{});
 function harness() {
-  const memory=new Map(); const requests=[]; const listeners={};
+  const memory=new Map(); const requests=[]; const listeners={}; const arrivals=[];
+  let reply={status:'accepted',needs_sample:false};
   let handler; let starts=0; let stops=0; let permission='always'; let failure=false; let hold=null;
   let nativeFix=null;
   let own={status:'out',is_private_party:false,updated_at:new Date(Date.now()-60000).toISOString(),
@@ -40,11 +41,12 @@ function harness() {
     'expo-notifications':{scheduleNotificationAsync:async()=>{}},
     './supabase':{supabase:{rpc:(name,args)=>{
       requests.push({name,args});
-      return {abortSignal:()=>hold??Promise.resolve(failure?{error:new Error('offline')}:{data:{status:'accepted',needs_sample:false},error:null})};
-    }}},
+      return {abortSignal:()=>hold??Promise.resolve(failure?{error:new Error('offline')}:{data:reply,error:null})};
+    },from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:{display_name:'Alice'}})})})})}},
     './night-status':{fetchOwnNightStatus:async()=>own},
     './query-client':{queryClient:{invalidateQueries:async()=>{}}},
     './location-quality':quality,
+    './notifications':{notifyFriendArrived:async(...args)=>arrivals.push(args)},
     './location-ready':{
       automaticUpdatesEnabled:async()=>true, configureTrackingDeadline:async()=>{}, ensureLocationReady:async()=>{},
       getLocationPermission:async()=>permission, hasLocationAccess:p=>['always','when_in_use'].includes(p),
@@ -52,7 +54,7 @@ function harness() {
     },
   });
   const fix=(patch={})=>({timestamp:new Date().toISOString(),coords:{latitude:40.72,longitude:-73.99,accuracy:10,speed:0},...patch});
-  return {api,memory,requests,listeners,fix,emit:value=>handler(value),
+  return {api,memory,requests,listeners,fix,arrivals,setReply:value=>{reply=value;},emit:value=>handler(value),
     setFix:v=>{nativeFix=v;},setFailure:v=>{failure=v;},setHold:v=>{hold=v;},setOwn:v=>{own=v;},
     get starts(){return starts;},get stops(){return stops;},get own(){return own;}};
 }
@@ -105,5 +107,12 @@ test('expired nights and private parties never start native GPS',async()=>{
     const h=harness();h.setOwn({...h.own,...patch});
     assert.equal((await h.api.startBackgroundLocation('a')).tracking,false);assert.equal(h.starts,0);
     await h.api.stopBackgroundLocation();
+  }
+});
+
+test('only confirmed automatic arrivals notify friends, not departure or ambiguous fixes',async t=>{
+  for(const reply of [{status:'accepted',departed:true},{status:'accepted',needs_sample:true},{status:'accepted',venue_changed:true,venue_id:'bar-b',venue_name:'Bar B'}]){
+    const h=harness();await h.api.startBackgroundLocation('a');h.setReply(reply);h.emit(h.fix());await h.api.retryPendingLocation();await new Promise(r=>setImmediate(r));
+    assert.equal(h.arrivals.length,reply.venue_changed?1:0);await h.api.stopBackgroundLocation();
   }
 });

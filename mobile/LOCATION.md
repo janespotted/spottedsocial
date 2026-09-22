@@ -74,6 +74,10 @@ keeps showing accepted GPS while between spots. Confirmed arrival, with automati
 updates enabled, opens exactly one new check-in and changes the status venue in
 the same transaction. A background notification says where the spot changed and
 links to the existing correction sheet. Notification denial does not block GPS.
+Confirmed automatic arrivals also call the existing privacy-filtered friend
+arrival notifier, capped at 20 recipients and once per sender/recipient/venue
+per 30 minutes within an app session. Departures and uncertain fixes do not.
+This fan-out is best effort, not a durable background delivery queue.
 
 ## Stop and privacy
 

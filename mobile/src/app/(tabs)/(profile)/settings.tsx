@@ -1,3 +1,4 @@
+import { signOutWithPushCleanup } from '@/lib/push';
 import { useCallback, useState } from 'react';
 import { ActionSheetIOS, Alert, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -95,7 +96,8 @@ export default function SettingsScreen() {
   const onPushRow = async () => {
     if (!userId) return;
     if (pushPermission === 'undetermined') {
-      setPushPermission(await registerPushToken(userId, { prompt: true }));
+      try { setPushPermission(await registerPushToken(userId, { prompt: true })); }
+      catch { Alert.alert('Notifications not connected', 'We could not finish setting up notifications. Reconnect and reopen Spotted to retry.'); }
       return;
     }
     if (pushPermission === 'denied') {
@@ -352,7 +354,7 @@ export default function SettingsScreen() {
         />
 
         <Pressable
-          onPress={() => supabase.auth.signOut()}
+          onPress={() => void signOutWithPushCleanup()}
           className="flex-row items-center justify-center gap-2 py-3 mt-3 rounded-full border border-red-500/40 active:bg-red-500/10"
         >
           <SymbolView name="rectangle.portrait.and.arrow.right" size={15} tintColor="#f87171" />

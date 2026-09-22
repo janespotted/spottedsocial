@@ -181,8 +181,8 @@ export async function notifyFriendArrived(
     const atVenue = new Set((friendsAtVenue ?? []).map((f) => f.user_id));
 
     for (const friendId of friendIds.filter((id) => !atVenue.has(id)).slice(0, 20)) {
-      if (rateLimited(`fomo_arrived_${friendId}_${venueId}`, 30 * 60 * 1000)) continue;
-      await createAndPush(friendId, userId, 'friend_arrived', message);
+      if (rateLimited(`fomo_arrived_${userId}_${friendId}_${venueId}`, 30 * 60 * 1000)) continue;
+      await createAndPush(friendId, userId, 'friend_arrived_venue', message);
     }
   } catch {
     /* never let notification failures surface */

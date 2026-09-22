@@ -1,3 +1,4 @@
+import { signOutWithPushCleanup } from '@/lib/push';
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { RESET_COPY } from '@/lib/reset-copy';
@@ -544,7 +545,7 @@ export default function ProfileScreen() {
 
         {/* Log out */}
         <Pressable
-          onPress={() => supabase.auth.signOut()}
+          onPress={() => void signOutWithPushCleanup()}
           className="flex-row items-center justify-center gap-2 py-3 rounded-full border border-red-500/40 active:bg-red-500/10"
         >
           <SymbolView name="rectangle.portrait.and.arrow.right" size={15} tintColor="#f87171" />

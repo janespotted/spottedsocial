@@ -1,73 +1,104 @@
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import { deferDeepLink, getNightGateState } from '@/lib/night-gate';
+import { deferDeepLink, getNightGateState, takePendingDeepLink } from '@/lib/night-gate';
 import { registerPushToken, routeForNotification } from '@/lib/push';
 import { useSession } from '@/hooks/use-session';
 
-// Show pushes that arrive while the app is foregrounded (banner + list).
+let foregroundUser: string | undefined;
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    const receiver = notification.request.content.data?.receiver_id;
+    const allowed = !!foregroundUser && (typeof receiver !== 'string' || receiver === foregroundUser);
+    return {
+      shouldShowBanner: allowed, shouldShowList: allowed,
+      shouldPlaySound: allowed, shouldSetBadge: allowed,
+    };
+  },
 });
 
-/**
- * Push lifecycle: registers the APNs token after onboarding (so the prompt
- * doesn't stack on the location prompt in the welcome flow), re-registers
- * on every return to the foreground without prompting — that is how a user
- * who enabled notifications in iOS Settings gets a token (addendum v3 §8.6)
- * — and routes taps.
- */
+/** Retry registration on foreground, connectivity and token rotation.
+ * Failed writes never latch registration as successful. */
 export function PushNotificationManager() {
   const { session, onboardingNeeded, onboardingResolved } = useSession();
   const userId = session?.user.id;
-  const registered = useRef(false);
-
+  const seen = useRef(new Set<string>());
+  const previousUser = useRef<string | undefined>(undefined);
   useEffect(() => {
-    registered.current = false;
-    // Wait for the profile check to ANSWER: `onboardingNeeded` reads false
-    // while it is still unknown, which would prompt for notifications during
-    // signup — exactly the prompt stacking this component exists to avoid.
+    foregroundUser = userId;
+    if (previousUser.current && previousUser.current !== userId) {
+      takePendingDeepLink();
+      seen.current.clear();
+      void Notifications.clearLastNotificationResponseAsync().catch(() => {});
+    }
+    previousUser.current = userId;
     if (!userId || !onboardingResolved || onboardingNeeded) return;
     let cancelled = false;
+    let busy = false;
+    let again = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0;
+    let rotatedToken: string | undefined;
     const register = async (prompt: boolean) => {
-      if (registered.current) return;
-      const result = await registerPushToken(userId, { prompt });
-      if (!cancelled && result === 'granted') registered.current = true;
+      if (cancelled) return;
+      if (busy) { again = true; return; }
+      busy = true;
+      if (retry) clearTimeout(retry);
+      retry = undefined;
+      try {
+        const token = rotatedToken;
+        rotatedToken = undefined;
+        await registerPushToken(userId, { prompt, token });
+        failures = 0;
+      } catch {
+        failures += 1;
+        if (!cancelled && AppState.currentState === 'active')
+          retry = setTimeout(() => void register(false), Math.min(60_000, 5_000 * 2 ** Math.min(failures - 1, 4)));
+      } finally {
+        busy = false;
+        if (again && !cancelled) { again = false; void register(false); }
+      }
     };
     void register(true);
-    const sub = AppState.addEventListener('change', (state) => {
+    const app = AppState.addEventListener('change', (state) => {
       if (state === 'active') void register(false);
+      else if (retry) { clearTimeout(retry); retry = undefined; }
     });
-    return () => {
-      cancelled = true;
-      sub.remove();
-    };
+    const network = NetInfo.addEventListener((state) => {
+      if (state.isConnected && state.isInternetReachable !== false && AppState.currentState === 'active') void register(false);
+    });
+    const tokens = Notifications.addPushTokenListener((token) => {
+      if (typeof token.data === 'string') rotatedToken = token.data;
+      void register(false);
+    });
+    return () => { cancelled = true; if (retry) clearTimeout(retry); app.remove(); network(); tokens.remove(); };
   }, [userId, onboardingNeeded, onboardingResolved]);
 
-  // Tapping a push routes by type. While the opening "Are you out tonight?"
-  // question is unanswered (or not yet known on a cold start) the link is
-  // parked and replayed by NightStatusGate once the user answers — a
-  // notification never bypasses it.
+  // Listen AND consume the initial response after auth resolves, deduplicating
+  // the same cold-start tap delivered through both paths.
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const target = routeForNotification(
-        response.notification.request.content.data as Record<string, unknown> | undefined
-      );
+    if (!userId || !onboardingResolved || onboardingNeeded) return;
+    let cancelled = false;
+    const handle = (response: Notifications.NotificationResponse | null) => {
+      if (cancelled || !response || response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
+      const notification = response.notification;
+      const key = `${notification.request.identifier}:${response.actionIdentifier}`;
+      if (seen.current.has(key)) return;
+      const data = notification.request.content.data;
+      seen.current.add(key);
+      if (seen.current.size > 100) seen.current.delete(seen.current.values().next().value!);
+      void Notifications.clearLastNotificationResponseAsync().catch(() => {});
+      if (typeof data?.receiver_id === 'string' && data.receiver_id !== userId) return;
+      const target = routeForNotification(data);
       if (getNightGateState() !== 'answered') {
-        // The gate is already presenting the check-in sheet — nothing to replay
         if (!String(target).startsWith('/check-in')) deferDeepLink(target);
-        return;
-      }
-      router.push(target);
-    });
-    return () => sub.remove();
-  }, []);
-
+      } else router.push(target);
+    };
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
+    void Notifications.getLastNotificationResponseAsync().then(handle).catch(() => {});
+    return () => { cancelled = true; sub.remove(); };
+  }, [userId, onboardingNeeded, onboardingResolved]);
   return null;
 }

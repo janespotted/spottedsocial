@@ -43,6 +43,7 @@ const VALID_NOTIFICATION_TYPES = [
   "post_like",
   "post_comment",
   "venue_arrival_planning",
+  "friend_arrived", // Compatibility with existing mobile builds
   "friend_arrived_venue",
   "friends_at_venue",
 ] as const;
@@ -490,7 +491,7 @@ function isValidApnsToken(token: string): boolean {
 
 async function sendApnsPushToHost(
   deviceToken: string,
-  notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string },
+  notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string; receiver_id?: string; notification_id?: string },
   apnsHost: string,
   jwt: string,
   bundleId: string,
@@ -507,6 +508,8 @@ async function sendApnsPushToHost(
     },
     url: notificationPayload.url,
     type: notificationPayload.type,
+    receiver_id: notificationPayload.receiver_id,
+    notification_id: notificationPayload.notification_id,
   };
 
   console.log(`APNs attempt → host: ${apnsHost}, token: ${deviceToken.substring(0, 8)}…, topic: ${bundleId}`);
@@ -548,7 +551,7 @@ const LEGACY_BUNDLE_ID = "com.spotted.app";
 
 async function sendApnsPush(
   deviceToken: string,
-  notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string },
+  notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string; receiver_id?: string; notification_id?: string },
 ): Promise<{ success: boolean; terminalFailure: boolean }> {
   const teamId = Deno.env.get("APNS_TEAM_ID");
   const bundleId = Deno.env.get("APNS_BUNDLE_ID");
@@ -679,6 +682,7 @@ function getNotificationContent(
       return { title: "💬 New Comment", body: message, url: "/feed" };
     case "venue_arrival_planning":
       return { title: "📍 You've arrived!", body: message, url: "/?checkin=true" };
+    case "friend_arrived":
     case "friend_arrived_venue":
       return { title: "👀 Friend Just Arrived!", body: message, url: "/" };
     case "friends_at_venue":
@@ -816,6 +820,8 @@ Deno.serve(async (req) => {
     const notificationPayload = {
       ...content,
       tag: `${type}-${payload.notification_id}`,
+      receiver_id,
+      notification_id: payload.notification_id,
       type,
     };
 

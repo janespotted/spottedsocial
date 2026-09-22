@@ -7,6 +7,7 @@ import { supabase } from './supabase';
 import { fetchOwnNightStatus, type OwnNightStatus } from './night-status';
 import { queryClient } from './query-client';
 import { validFix, type LocationFix } from './location-quality';
+import { notifyFriendArrived } from './notifications';
 import {
   automaticUpdatesEnabled, configureTrackingDeadline, ensureLocationReady,
   getLocationPermission, hasLocationAccess, requestAutomaticUpdates,
@@ -20,6 +21,7 @@ interface WriteResult {
   venue_changed?: boolean;
   departed?: boolean;
   venue_name?: string | null;
+  venue_id?: string | null;
 }
 export interface TrackingResult { tracking: boolean; permission: LocationPermission }
 const pendingKey = (uid: string) => `spotted.location.pending.v1.${uid}`;
@@ -125,6 +127,16 @@ async function deliver(pending: PendingFix, version: number): Promise<void> {
         content: { title: `Now at ${result.venue_name}`, body: 'Your spot updated. Tap to change it.', data: { url: '/check-in' } },
         trigger: null,
       }).catch(() => {});
+    }
+    if (result.venue_changed && result.venue_id && result.venue_name) {
+      const venueId = result.venue_id;
+      const venueName = result.venue_name;
+      // Only confirmed arrivals alert the existing privacy-filtered audience.
+      void (async () => {
+        const { data, error } = await supabase.from('profiles').select('display_name').eq('id', pending.userId).maybeSingle();
+        if (error || version !== generation || !active(status)) return;
+        await notifyFriendArrived(pending.userId, data?.display_name?.split(' ')[0] || 'A friend', venueId, venueName);
+      })().catch(() => {});
     }
   }
   if (result.needs_sample) void sampleArrival();
