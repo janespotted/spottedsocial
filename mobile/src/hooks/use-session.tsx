@@ -1,6 +1,7 @@
 import { createContext, use, useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { hasSeenTour } from '@/lib/tour-seen';
 
 interface SessionState {
   session: Session | null;
@@ -26,17 +27,35 @@ const SessionContext = createContext<SessionState>({
   refreshOnboardingStatus: async () => {},
 });
 
-/** A complete profile (name + username) marks onboarding as done.
+/** Ship date of the tour-seen flag (2026-09-22). See fetchOnboardingNeeded. */
+const TOUR_FLAG_SHIPPED_AT = Date.parse('2026-09-22T00:00:00Z');
+
+/** Onboarding is done when the profile is complete (name + username) AND
+ * the tour has been finished.
+ *
+ * The tour needs its own flag because it runs AFTER the username step has
+ * already written both fields: without it the gate flips to "done" while
+ * the tour is still on screen, so quitting mid-tour dropped the user into
+ * the tabs for good — no rest of the tour, and no location prompt (the
+ * tour is where it is asked for). See lib/tour-seen.ts.
+ *
  * NOTE: do not gate on a profiles column like `has_onboarded` — it does not
  * exist in the production schema, and a failed select here silently locks
  * users inside onboarding forever. */
 async function fetchOnboardingNeeded(userId: string): Promise<boolean> {
   const { data } = await supabase
     .from('profiles')
-    .select('display_name, username')
+    .select('display_name, username, created_at')
     .eq('id', userId)
     .maybeSingle();
-  return !(data?.display_name && data?.username);
+  if (!(data?.display_name && data?.username)) return true;
+  if (await hasSeenTour(userId)) return false;
+  // Accounts that finished onboarding before the tour flag shipped have a
+  // complete profile and no flag; without this they would all be sent back
+  // through the tour on update. Only accounts created after the cutoff can
+  // legitimately be mid-tour.
+  const createdAt = data.created_at ? Date.parse(data.created_at) : NaN;
+  return Number.isNaN(createdAt) ? false : createdAt >= TOUR_FLAG_SHIPPED_AT;
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
