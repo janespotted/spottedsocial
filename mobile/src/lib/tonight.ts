@@ -177,3 +177,10 @@ export function isUnexpired(expiresAt: string | null | undefined): boolean {
   const t = new Date(expiresAt).getTime();
   return !Number.isNaN(t) && t > Date.now();
 }
+
+/** 10 AM following this nightlife session, in the profile city. */
+export function morningAfterAt(now: Date = new Date(), city?: string | null): Date {
+  const tz = cityToTimezone(city);
+  const p = zonedParts(nightResetAt(now, city), tz);
+  return zonedToUtc(p.year, p.month, p.day, 10, tz);
+}

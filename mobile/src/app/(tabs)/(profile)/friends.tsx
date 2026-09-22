@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { ActionSheetIOS, ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-native';
@@ -140,22 +141,7 @@ export default function FriendsScreen() {
       .from('friendships')
       .update({ status: 'accepted' })
       .eq('id', row.requestId!);
-    if (!error && row.userId) {
-      // Notify the requester (web parity)
-      const { data: me } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', userId!)
-        .maybeSingle();
-      const myName = me?.display_name?.split(' ')[0] ?? 'Someone';
-      supabase
-        .rpc('create_notification', {
-          p_receiver_id: row.userId,
-          p_type: 'friend_accepted',
-          p_message: `${myName} accepted your friend request!`,
-        })
-        .then(() => {});
-    }
+    if (error) { Alert.alert('Could not accept request', 'Please try again.'); return; }
     invalidate();
   };
 

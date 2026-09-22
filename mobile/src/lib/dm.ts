@@ -183,39 +183,3 @@ export async function markThreadRead(threadId: string, userId: string): Promise<
       { onConflict: 'thread_id,user_id' }
     );
 }
-
-/**
- * In-app notification rows + APNs pushes for DM recipients. Fire-and-forget
- * (same contract as lib/notifications.ts helpers).
- */
-export async function notifyDmRecipients(
-  senderId: string,
-  senderName: string,
-  recipientIds: string[],
-  text: string
-): Promise<void> {
-  const preview = text.length > 100 ? `${text.slice(0, 100)}...` : text;
-  const message = `${senderName}: ${previewText(preview)}`;
-  for (const receiverId of recipientIds) {
-    try {
-      const { data } = await supabase.rpc('create_notification', {
-        p_receiver_id: receiverId,
-        p_type: 'dm',
-        p_message: message,
-      });
-      const notif = Array.isArray(data) ? data[0] : data;
-      if (!notif?.id) continue;
-      await supabase.functions.invoke('send-push', {
-        body: {
-          notification_id: notif.id,
-          receiver_id: receiverId,
-          sender_id: senderId,
-          type: 'dm',
-          message,
-        },
-      });
-    } catch {
-      /* never let notification failures surface */
-    }
-  }
-}

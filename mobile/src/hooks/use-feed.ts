@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { isDemoMode } from '@/lib/demo-mode';
-import { notifyPostLike } from '@/lib/notifications';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
@@ -318,11 +317,6 @@ export function useFeed() {
             .eq('post_id', postId)
             .eq('user_id', session.user.id)
         : await supabase.from('post_likes').insert({ post_id: postId, user_id: session.user.id });
-
-      if (!error && !isLiked) {
-        const post = posts.find((p) => p.id === postId);
-        if (post) notifyPostLike(post, session.user.id); // fire-and-forget
-      }
 
       if (error) {
         // Roll back on failure

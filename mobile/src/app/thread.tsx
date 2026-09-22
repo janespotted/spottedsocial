@@ -27,7 +27,6 @@ import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import {
   markThreadRead,
-  notifyDmRecipients,
   SHARED_POST_REGEX,
   type DmMember,
   type DmMessage,
@@ -392,7 +391,6 @@ export default function ThreadScreen() {
     setMessages((prev) =>
       prev.map((m) => (m.id === optimistic.id ? (inserted as DmMessage) : m))
     );
-    notifyDmRecipients(userId, myName.split(' ')[0], recipientIds, text);
   }, [draft, userId, threadId, myName, recipientIds]);
 
   /** Upload + send one image, whatever produced it (camera or library). */
@@ -432,7 +430,6 @@ export default function ThreadScreen() {
           m.id === optimisticId ? { ...(inserted as DmMessage), image_url: asset.uri } : m
         )
       );
-      notifyDmRecipients(userId, myName.split(' ')[0], recipientIds, '📷 Photo');
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
     } finally {

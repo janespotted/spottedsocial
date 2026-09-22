@@ -17,9 +17,10 @@ export interface TaggedFriend {
 /** Write the tag rows for a freshly published post. Best effort. */
 export async function savePostTags(postId: string, friendIds: string[]): Promise<void> {
   if (friendIds.length === 0) return;
-  await supabase
+  const { error } = await supabase
     .from('post_tags')
     .insert(friendIds.map((id) => ({ post_id: postId, tagged_user_id: id })));
+  if (error) throw error;
 }
 
 /** Who is tagged in these posts, for the feed. */
@@ -46,52 +47,6 @@ export async function fetchTagsForPosts(postIds: string[]): Promise<Map<string, 
     byPost.set(row.post_id, list);
   }
   return byPost;
-}
-
-/**
- * "X tagged you in a post" — same shape as the other notifications, and
- * the row dies with the post at 5 AM like every other nightly object.
- */
-export async function notifyTagged(
-  postId: string,
-  authorId: string,
-  friendIds: string[],
-  venueName: string | null
-): Promise<void> {
-  try {
-    if (friendIds.length === 0) return;
-    const profiles = await fetchProfilesSafe();
-    const author = profiles.find((p) => p.id === authorId);
-    const authorName = author?.display_name?.split(' ')[0] || 'Someone';
-    const demoIds = new Set(profiles.filter((p) => p.is_demo).map((p) => p.id));
-    const recipients = friendIds.filter((id) => id !== authorId && !demoIds.has(id));
-    if (recipients.length === 0) return;
-
-    const message = `${authorName} tagged you in a post${venueName ? ` at ${venueName}` : ''}`;
-    const { data: inserted } = await supabase.rpc('create_notifications_batch', {
-      p_notifications: recipients.map((id) => ({
-        receiver_id: id,
-        type: 'post_tag',
-        message,
-      })),
-    });
-
-    for (const notification of inserted ?? []) {
-      supabase.functions
-        .invoke('send-push', {
-          body: {
-            notification_id: notification.id,
-            receiver_id: notification.receiver_id,
-            sender_id: authorId,
-            type: 'post_tag',
-            message,
-          },
-        })
-        .catch(() => {});
-    }
-  } catch {
-    /* never let notification failures surface */
-  }
 }
 
 /** Names as a sentence for the post card: "with Ava, Ben and 2 others". */

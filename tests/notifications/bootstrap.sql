@@ -1,0 +1,25 @@
+-- Isolated PostgreSQL fixture. Never execute this file against a real project.
+create role anon;
+create role authenticated;
+create role service_role;
+create schema auth;
+create function auth.uid() returns uuid language sql as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+create schema cron;
+create function cron.schedule(text,text,text) returns bigint language sql as $$select 1::bigint$$;
+create table profiles(id uuid primary key,display_name text,city text default 'nyc',is_demo boolean default false,location_sharing_level text default 'all_friends',push_enabled boolean default true,apns_device_token text,push_subscription jsonb);
+create table friendships(id uuid primary key default gen_random_uuid(),user_id uuid,friend_id uuid,status text);
+create table close_friends(user_id uuid,close_friend_id uuid);
+create table blocked_users(blocker_id uuid,blocked_id uuid);
+create table location_hidden(user_id uuid,hidden_from_id uuid);
+create table posts(id uuid primary key default gen_random_uuid(),user_id uuid,visibility text default 'all_friends',expires_at timestamptz default now()+interval '1 day');
+create table post_likes(id uuid primary key default gen_random_uuid(),post_id uuid,user_id uuid);
+create table post_comments(id uuid primary key default gen_random_uuid(),post_id uuid,user_id uuid,text text);
+create table post_tags(id uuid primary key default gen_random_uuid(),post_id uuid,tagged_user_id uuid);
+create table dm_thread_members(thread_id uuid,user_id uuid);
+create table dm_messages(id uuid primary key default gen_random_uuid(),thread_id uuid,sender_id uuid,text text,image_url text);
+create table night_statuses(user_id uuid,venue_id uuid,status text,expires_at timestamptz,is_private_party boolean default false);
+create table notifications(id uuid primary key default gen_random_uuid(),sender_id uuid,receiver_id uuid,type text,message text,is_read boolean default false,created_at timestamptz default now(),is_demo boolean default false);
+create function public.notify_post_liked() returns trigger language plpgsql as $$ begin return new; end $$;
+create function public.notify_post_commented() returns trigger language plpgsql as $$ begin return new; end $$;
+create trigger notify_post_like after insert on post_likes for each row execute function notify_post_liked();
+create trigger notify_post_comment after insert on post_comments for each row execute function notify_post_commented();

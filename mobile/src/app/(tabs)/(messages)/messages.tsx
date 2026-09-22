@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, RefreshControl, Text, View } from 'react-native';
 import { Image } from '@/components/styled';
-import { router } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LegendList } from '@legendapp/list/react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -159,7 +159,9 @@ export default function MessagesScreen() {
   const { session } = useSession();
   const { unreadCount } = useNotifications();
   const queryClient = useQueryClient();
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<TabType>(YAP_ENABLED ? 'yap' : 'plans');
+  useEffect(() => { if (tab === 'plans' || tab === 'dms') setActiveTab(tab === 'dms' ? 'messages' : 'plans'); }, [tab]);
   const [yapSort, setYapSort] = useState<'hot' | 'new'>('hot');
   // pb clears the native tab bar + home indicator so the last row is reachable
   const contentContainerStyle = useResolveClassNames('px-4 pb-28');

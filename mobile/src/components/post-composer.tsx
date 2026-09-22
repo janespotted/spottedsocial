@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -8,7 +9,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { supabase } from '@/lib/supabase';
 import { validatePostText, validateVenueName } from '@/lib/validation';
 import { savePostAudience, type Audience } from '@/lib/audience';
-import { notifyTagged, savePostTags, tagLine, type TaggedFriend } from '@/lib/post-tags';
+import { savePostTags, tagLine, type TaggedFriend } from '@/lib/post-tags';
 import { openTagPicker } from '@/lib/tag-picker';
 import { RESET_COPY, RESET_TITLE } from '@/lib/reset-copy';
 import { PublishError, publishPost, type PublishPhase, type PublishedPost } from '@/lib/publish-post';
@@ -182,9 +183,9 @@ export function PostComposer({
       // cascade with it at the 5 AM reset.
       if (taggedFriends.length > 0) {
         const ids = taggedFriends.map((f) => f.id);
-        void savePostTags(post.id, ids).then(() =>
-          notifyTagged(post.id, session.user.id, ids, venueCheck.data || null)
-        );
+        void savePostTags(post.id, ids).catch(() => {
+          Alert.alert('Post shared', 'Your friends could not be tagged. Please try again.');
+        });
       }
       uploadedRef.current = null;
       onShared(post);

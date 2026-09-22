@@ -57,3 +57,6 @@ verify_jwt = false
 15550000008 = "123456"
 15550000009 = "123456"
 15550000010 = "123456"
+
+[functions.process-push-queue]
+verify_jwt = true

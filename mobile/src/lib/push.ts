@@ -13,12 +13,29 @@ import { supabase } from './supabase';
  * and are honoured as-is.
  */
 export function routeForNotification(data: Record<string, unknown> | undefined): Href {
+  const details = (data?.data && typeof data.data === 'object' ? data.data : {}) as Record<string, unknown>;
+  const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value);
   const url = typeof data?.url === 'string' ? data.url : '';
   if (url.startsWith('/check-in')) return url as Href;
   switch (data?.type) {
     case 'dm':
+      return uuid(details.thread_id) ? `/thread?threadId=${details.thread_id}` as Href : '/messages?tab=dms' as Href;
     case 'venue_yap':
       return '/messages';
+    case 'post_tag':
+    case 'post_like':
+    case 'post_comment':
+      return uuid(details.post_id) ? `/post-detail?postId=${details.post_id}` as Href : '/activity';
+    case 'morning_after':
+      return '/morning-after' as Href;
+    case 'daily_nudge_first':
+    case 'daily_nudge_second':
+      return '/check-in';
+    case 'weekend_rally':
+    case 'plan_invite':
+    case 'plan_down':
+      return '/messages?tab=plans' as Href;
+
     case 'friend_arrived':
     case 'friend_checkin':
     case 'friend_arrived_venue':

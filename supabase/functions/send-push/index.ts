@@ -1,8 +1,9 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.112.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 interface PushPayload {
@@ -11,6 +12,7 @@ interface PushPayload {
   sender_id: string;
   type: string;
   message: string;
+  lease_id?: string;
 }
 
 interface PushSubscription {
@@ -23,6 +25,9 @@ interface PushSubscription {
 
 // Valid notification types - must be one of these
 const VALID_NOTIFICATION_TYPES = [
+  "daily_nudge_first",
+  "daily_nudge_second",
+  "weekend_rally",
   "meetup_request",
   "venue_invite",
   "friend_request",
@@ -49,7 +54,8 @@ const VALID_NOTIFICATION_TYPES = [
 ] as const;
 
 // UUID v4 regex pattern
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // Input validation constants
 const MAX_MESSAGE_LENGTH = 500;
@@ -64,7 +70,9 @@ function sanitizeMessage(message: string): string {
   return message.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
 }
 
-function validatePayload(payload: unknown): { valid: boolean; error?: string; sanitizedMessage?: string } {
+function validatePayload(
+  payload: unknown,
+): { valid: boolean; error?: string; sanitizedMessage?: string } {
   if (!payload || typeof payload !== "object") {
     return { valid: false, error: "Invalid payload format" };
   }
@@ -93,14 +101,27 @@ function validatePayload(payload: unknown): { valid: boolean; error?: string; sa
   // Validate type is one of allowed values
   if (
     typeof p.type !== "string" ||
-    !VALID_NOTIFICATION_TYPES.includes(p.type as (typeof VALID_NOTIFICATION_TYPES)[number])
+    !VALID_NOTIFICATION_TYPES.includes(
+      p.type as (typeof VALID_NOTIFICATION_TYPES)[number],
+    )
   ) {
-    return { valid: false, error: `Invalid notification type. Must be one of: ${VALID_NOTIFICATION_TYPES.join(", ")}` };
+    return {
+      valid: false,
+      error: `Invalid notification type. Must be one of: ${
+        VALID_NOTIFICATION_TYPES.join(", ")
+      }`,
+    };
   }
 
   // Validate message length
-  if (typeof p.message !== "string" || p.message.length === 0 || p.message.length > MAX_MESSAGE_LENGTH) {
-    return { valid: false, error: `Message must be between 1 and ${MAX_MESSAGE_LENGTH} characters` };
+  if (
+    typeof p.message !== "string" || p.message.length === 0 ||
+    p.message.length > MAX_MESSAGE_LENGTH
+  ) {
+    return {
+      valid: false,
+      error: `Message must be between 1 and ${MAX_MESSAGE_LENGTH} characters`,
+    };
   }
 
   // Sanitize message content to prevent XSS/injection
@@ -180,15 +201,25 @@ async function createVapidJwt(
     sub: subject,
   };
 
-  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, "").replace(
+    /\+/g,
+    "-",
+  ).replace(/\//g, "_");
+  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(
+    /\+/g,
+    "-",
+  ).replace(/\//g, "_");
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
   // Import private key for signing
-  const privateKeyBytes = base64ToUint8Array(urlBase64ToBase64(vapidPrivateKeyBase64));
+  const privateKeyBytes = base64ToUint8Array(
+    urlBase64ToBase64(vapidPrivateKeyBase64),
+  );
 
   // Get public key bytes
-  const publicKeyBytes = base64ToUint8Array(urlBase64ToBase64(vapidPublicKeyBase64));
+  const publicKeyBytes = base64ToUint8Array(
+    urlBase64ToBase64(vapidPublicKeyBase64),
+  );
 
   // Extract x and y from uncompressed public key (starts with 0x04)
   const x = publicKeyBytes.slice(1, 33);
@@ -197,12 +228,25 @@ async function createVapidJwt(
   const jwk = {
     kty: "EC",
     crv: "P-256",
-    x: uint8ArrayToBase64(x).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"),
-    y: uint8ArrayToBase64(y).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"),
-    d: uint8ArrayToBase64(privateKeyBytes).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_"),
+    x: uint8ArrayToBase64(x).replace(/=/g, "").replace(/\+/g, "-").replace(
+      /\//g,
+      "_",
+    ),
+    y: uint8ArrayToBase64(y).replace(/=/g, "").replace(/\+/g, "-").replace(
+      /\//g,
+      "_",
+    ),
+    d: uint8ArrayToBase64(privateKeyBytes).replace(/=/g, "").replace(/\+/g, "-")
+      .replace(/\//g, "_"),
   };
 
-  const privateKey = await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const privateKey = await crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"],
+  );
 
   // Sign the token
   const signatureBuffer = await crypto.subtle.sign(
@@ -213,30 +257,52 @@ async function createVapidJwt(
 
   // Convert signature to URL-safe base64
   const signatureBytes = new Uint8Array(signatureBuffer);
-  const signatureB64 = uint8ArrayToBase64(signatureBytes).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const signatureB64 = uint8ArrayToBase64(signatureBytes).replace(/=/g, "")
+    .replace(/\+/g, "-").replace(/\//g, "_");
 
   return `${unsignedToken}.${signatureB64}`;
 }
 
 // HKDF for key derivation
-async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
+async function hkdf(
+  salt: Uint8Array,
+  ikm: Uint8Array,
+  info: Uint8Array,
+  length: number,
+): Promise<Uint8Array> {
   const saltBuffer = salt.length ? toArrayBuffer(salt) : new ArrayBuffer(32);
   const ikmBuffer = toArrayBuffer(ikm);
 
-  const key = await crypto.subtle.importKey("raw", saltBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    saltBuffer,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
 
   const prkBuffer = await crypto.subtle.sign("HMAC", key, ikmBuffer);
   const prk = new Uint8Array(prkBuffer);
 
-  const prkKey = await crypto.subtle.importKey("raw", toArrayBuffer(prk), { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-  ]);
+  const prkKey = await crypto.subtle.importKey(
+    "raw",
+    toArrayBuffer(prk),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    [
+      "sign",
+    ],
+  );
 
   const infoWithCounter = new Uint8Array(info.length + 1);
   infoWithCounter.set(info);
   infoWithCounter[info.length] = 1;
 
-  const outputBuffer = await crypto.subtle.sign("HMAC", prkKey, toArrayBuffer(infoWithCounter));
+  const outputBuffer = await crypto.subtle.sign(
+    "HMAC",
+    prkKey,
+    toArrayBuffer(infoWithCounter),
+  );
   const output = new Uint8Array(outputBuffer);
   return output.slice(0, length);
 }
@@ -255,16 +321,27 @@ function createInfo(type: string, context: Uint8Array): Uint8Array {
 async function encryptPayload(
   payload: string,
   subscription: PushSubscription,
-): Promise<{ ciphertext: Uint8Array; salt: Uint8Array; localPublicKey: Uint8Array }> {
+): Promise<
+  { ciphertext: Uint8Array; salt: Uint8Array; localPublicKey: Uint8Array }
+> {
   // Generate ephemeral key pair for ECDH
-  const localKeyPair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const localKeyPair = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveBits"],
+  );
 
   // Export local public key in uncompressed format
-  const localPublicKeyRaw = await crypto.subtle.exportKey("raw", localKeyPair.publicKey);
+  const localPublicKeyRaw = await crypto.subtle.exportKey(
+    "raw",
+    localKeyPair.publicKey,
+  );
   const localPublicKey = new Uint8Array(localPublicKeyRaw);
 
   // Import subscriber's public key
-  const p256dhBytes = base64ToUint8Array(urlBase64ToBase64(subscription.keys.p256dh));
+  const p256dhBytes = base64ToUint8Array(
+    urlBase64ToBase64(subscription.keys.p256dh),
+  );
   const subscriberPublicKey = await crypto.subtle.importKey(
     "raw",
     toArrayBuffer(p256dhBytes),
@@ -282,14 +359,18 @@ async function encryptPayload(
   const sharedSecret = new Uint8Array(sharedSecretBuffer);
 
   // Get auth secret from subscription
-  const authSecret = base64ToUint8Array(urlBase64ToBase64(subscription.keys.auth));
+  const authSecret = base64ToUint8Array(
+    urlBase64ToBase64(subscription.keys.auth),
+  );
 
   // Generate random salt
   const salt = crypto.getRandomValues(new Uint8Array(16));
 
   // Build key info
   const keyInfoData = new TextEncoder().encode("WebPush: info\0");
-  const keyInfo = new Uint8Array(keyInfoData.length + 1 + 2 + p256dhBytes.length + 2 + localPublicKey.length);
+  const keyInfo = new Uint8Array(
+    keyInfoData.length + 1 + 2 + p256dhBytes.length + 2 + localPublicKey.length,
+  );
   let offset = 0;
   keyInfo.set(keyInfoData, offset);
   offset += keyInfoData.length;
@@ -302,7 +383,12 @@ async function encryptPayload(
   keyInfo.set(localPublicKey, offset);
 
   // Derive PRK from auth secret and shared secret
-  const prk = await hkdf(authSecret, sharedSecret, new TextEncoder().encode("WebPush: info\0"), 32);
+  const prk = await hkdf(
+    authSecret,
+    sharedSecret,
+    new TextEncoder().encode("WebPush: info\0"),
+    32,
+  );
 
   // Derive content encryption key
   const cekInfo = createInfo("Content-Encoding: aes128gcm", new Uint8Array(0));
@@ -313,7 +399,13 @@ async function encryptPayload(
   const nonce = await hkdf(salt, prk, nonceInfo, 12);
 
   // Import CEK for AES-GCM
-  const aesKey = await crypto.subtle.importKey("raw", toArrayBuffer(cek), { name: "AES-GCM" }, false, ["encrypt"]);
+  const aesKey = await crypto.subtle.importKey(
+    "raw",
+    toArrayBuffer(cek),
+    { name: "AES-GCM" },
+    false,
+    ["encrypt"],
+  );
 
   // Add padding delimiter (0x02) to payload
   const payloadBytes = new TextEncoder().encode(payload);
@@ -336,7 +428,11 @@ async function encryptPayload(
 }
 
 // Build aes128gcm body
-function buildAes128GcmBody(salt: Uint8Array, localPublicKey: Uint8Array, ciphertext: Uint8Array): ArrayBuffer {
+function buildAes128GcmBody(
+  salt: Uint8Array,
+  localPublicKey: Uint8Array,
+  ciphertext: Uint8Array,
+): ArrayBuffer {
   // Header: salt (16) + rs (4) + idlen (1) + keyid (65 for P-256)
   const recordSize = 4096;
   const header = new Uint8Array(16 + 4 + 1 + localPublicKey.length);
@@ -360,7 +456,14 @@ function buildAes128GcmBody(salt: Uint8Array, localPublicKey: Uint8Array, cipher
 // Send Web Push notification with proper VAPID and encryption
 async function sendWebPush(
   subscription: PushSubscription,
-  payload: { title: string; body: string; url?: string; tag?: string; type?: string },
+  payload: {
+    title: string;
+    body: string;
+    url?: string;
+    tag?: string;
+    type?: string;
+    expires_at?: string;
+  },
 ): Promise<boolean> {
   const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
   const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
@@ -387,14 +490,18 @@ async function sendWebPush(
 
     // Encrypt the payload
     const payloadString = JSON.stringify(payload);
-    const { ciphertext, salt, localPublicKey } = await encryptPayload(payloadString, subscription);
+    const { ciphertext, salt, localPublicKey } = await encryptPayload(
+      payloadString,
+      subscription,
+    );
 
     // Build the encrypted body
     const body = buildAes128GcmBody(salt, localPublicKey, ciphertext);
 
     // Prepare VAPID public key for Crypto-Key header
     const vapidKeyBytes = base64ToUint8Array(urlBase64ToBase64(vapidPublicKey));
-    const vapidKeyB64 = uint8ArrayToBase64(vapidKeyBytes).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const vapidKeyB64 = uint8ArrayToBase64(vapidKeyBytes).replace(/=/g, "")
+      .replace(/\+/g, "-").replace(/\//g, "_");
 
     console.log("Sending web push to:", subscription.endpoint);
 
@@ -403,10 +510,19 @@ async function sendWebPush(
       headers: {
         "Content-Type": "application/octet-stream",
         "Content-Encoding": "aes128gcm",
-        TTL: "86400",
+        TTL: String(
+          Math.max(
+            0,
+            Math.floor(
+              (new Date(payload.expires_at || Date.now() + 3600000).getTime() -
+                Date.now()) / 1000,
+            ),
+          ),
+        ),
         Authorization: `vapid t=${jwt}, k=${vapidKeyB64}`,
       },
       body: body,
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!response.ok) {
@@ -448,15 +564,25 @@ function cleanPemKey(raw: string): string {
   return cleaned;
 }
 
-async function createApnsJwt(keyId: string, teamId: string, authKeyRaw: string): Promise<string> {
+async function createApnsJwt(
+  keyId: string,
+  teamId: string,
+  authKeyRaw: string,
+): Promise<string> {
   const header = { alg: "ES256", kid: keyId };
   const payload = {
     iss: teamId,
     iat: Math.floor(Date.now() / 1000),
   };
 
-  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, "").replace(
+    /\+/g,
+    "-",
+  ).replace(/\//g, "_");
+  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(
+    /\+/g,
+    "-",
+  ).replace(/\//g, "_");
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
   // Accept either raw .p8 file contents (with PEM headers) or bare base64
@@ -479,7 +605,8 @@ async function createApnsJwt(keyId: string, teamId: string, authKeyRaw: string):
   );
 
   const signatureBytes = new Uint8Array(signatureBuffer);
-  const signatureB64 = uint8ArrayToBase64(signatureBytes).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const signatureB64 = uint8ArrayToBase64(signatureBytes).replace(/=/g, "")
+    .replace(/\+/g, "-").replace(/\//g, "_");
 
   return `${unsignedToken}.${signatureB64}`;
 }
@@ -491,7 +618,17 @@ function isValidApnsToken(token: string): boolean {
 
 async function sendApnsPushToHost(
   deviceToken: string,
-  notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string; receiver_id?: string; notification_id?: string },
+  notificationPayload: {
+    title: string;
+    body: string;
+    url?: string;
+    type?: string;
+    tag?: string;
+    receiver_id?: string;
+    notification_id?: string;
+    data?: Record<string, unknown>;
+    expires_at?: string;
+  },
   apnsHost: string,
   jwt: string,
   bundleId: string,
@@ -503,16 +640,21 @@ async function sendApnsPushToHost(
         body: notificationPayload.body,
       },
       sound: "default",
-      badge: 1,
+
       "thread-id": notificationPayload.type || "default",
     },
     url: notificationPayload.url,
     type: notificationPayload.type,
     receiver_id: notificationPayload.receiver_id,
     notification_id: notificationPayload.notification_id,
+    data: notificationPayload.data,
   };
 
-  console.log(`APNs attempt → host: ${apnsHost}, token: ${deviceToken.substring(0, 8)}…, topic: ${bundleId}`);
+  console.log(
+    `APNs attempt → host: ${apnsHost}, token: ${
+      deviceToken.substring(0, 8)
+    }…, topic: ${bundleId}`,
+  );
 
   const response = await fetch(`https://${apnsHost}/3/device/${deviceToken}`, {
     method: "POST",
@@ -521,9 +663,17 @@ async function sendApnsPushToHost(
       "apns-topic": bundleId,
       "apns-push-type": "alert",
       "apns-priority": "10",
+      "apns-collapse-id": notificationPayload.notification_id || "spotted",
+      "apns-expiration": String(
+        Math.floor(
+          new Date(notificationPayload.expires_at || Date.now() + 3600000)
+            .getTime() / 1000,
+        ),
+      ),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(apnsPayload),
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!response.ok) {
@@ -544,14 +694,23 @@ async function sendApnsPushToHost(
 }
 
 // Terminal APNs errors that mean the token is dead/invalid
-const TERMINAL_TOKEN_REASONS = ["BadDeviceToken", "Unregistered", "ExpiredToken"];
 
 // Legacy bundle ID — tokens registered under old identity may still be in DB
 const LEGACY_BUNDLE_ID = "com.spotted.app";
 
 async function sendApnsPush(
   deviceToken: string,
-  notificationPayload: { title: string; body: string; url?: string; type?: string; tag?: string; receiver_id?: string; notification_id?: string },
+  notificationPayload: {
+    title: string;
+    body: string;
+    url?: string;
+    type?: string;
+    tag?: string;
+    receiver_id?: string;
+    notification_id?: string;
+    data?: Record<string, unknown>;
+    expires_at?: string;
+  },
 ): Promise<{ success: boolean; terminalFailure: boolean }> {
   const teamId = Deno.env.get("APNS_TEAM_ID");
   const bundleId = Deno.env.get("APNS_BUNDLE_ID");
@@ -559,11 +718,15 @@ async function sendApnsPush(
   const keyId = Deno.env.get("APNS_KEY_ID") || "";
 
   if (!authKey || authKey.length < 100) {
-    console.error("APNS_AUTH_KEY is missing or malformed — cannot sign APNs requests");
+    console.error(
+      "APNS_AUTH_KEY is missing or malformed — cannot sign APNs requests",
+    );
     return { success: false, terminalFailure: false };
   }
   if (!keyId || keyId.length < 8) {
-    console.error("APNS_KEY_ID is missing or malformed — cannot sign APNs requests");
+    console.error(
+      "APNS_KEY_ID is missing or malformed — cannot sign APNs requests",
+    );
     return { success: false, terminalFailure: false };
   }
 
@@ -574,71 +737,62 @@ async function sendApnsPush(
 
   // Validate token format
   if (!isValidApnsToken(deviceToken)) {
-    console.error(`APNs token has invalid format (length=${deviceToken.length}, sample=${deviceToken.substring(0, 12)}…). Expected 64 hex chars.`);
+    console.error(
+      `APNs token has invalid format (length=${deviceToken.length}, sample=${
+        deviceToken.substring(0, 12)
+      }…). Expected 64 hex chars.`,
+    );
     return { success: false, terminalFailure: true };
   }
 
   try {
     const trimmedBundleId = bundleId.trim();
-    console.log("APNs config:", { keyId, teamId, bundleId: trimmedBundleId, tokenPrefix: deviceToken.substring(0, 8) });
+    console.log("APNs config:", {
+      keyId,
+      teamId,
+      bundleId: trimmedBundleId,
+      tokenPrefix: deviceToken.substring(0, 8),
+    });
     const jwt = await createApnsJwt(keyId, teamId, authKey);
     console.log("APNs JWT created successfully, length:", jwt.length);
 
     const isSandbox = Deno.env.get("APNS_SANDBOX") === "true";
-    const primaryHost = isSandbox ? "api.development.push.apple.com" : "api.push.apple.com";
-    const fallbackHost = isSandbox ? "api.push.apple.com" : "api.development.push.apple.com";
+    const primaryHost = isSandbox
+      ? "api.development.push.apple.com"
+      : "api.push.apple.com";
+    const fallbackHost = isSandbox
+      ? "api.push.apple.com"
+      : "api.development.push.apple.com";
 
-    // Build list of (host, topic) combinations to try
-    const attempts: Array<{ host: string; topic: string; label: string }> = [
-      { host: primaryHost, topic: trimmedBundleId, label: "primary" },
-    ];
-
-    // Try all combinations, collecting results
-    for (const attempt of attempts) {
-      const result = await sendApnsPushToHost(deviceToken, notificationPayload, attempt.host, jwt, attempt.topic);
-      if (result.ok) return { success: true, terminalFailure: false };
-
-      // Environment mismatch — try fallback host with same topic
-      if (result.reason === "BadEnvironmentKeyInToken") {
-        console.log(`BadEnvironmentKeyInToken on ${attempt.host}, trying fallback host ${fallbackHost} with topic ${attempt.topic}…`);
-        const fallback = await sendApnsPushToHost(deviceToken, notificationPayload, fallbackHost, jwt, attempt.topic);
-        if (fallback.ok) return { success: true, terminalFailure: false };
-
-        // If fallback host also gives BadDeviceToken, the token was registered under a different topic
-        // Try legacy bundle ID on both hosts
-        if (trimmedBundleId !== LEGACY_BUNDLE_ID && (fallback.reason === "BadDeviceToken" || fallback.reason === "DeviceTokenNotForTopic")) {
-          console.log(`Token might be registered under legacy topic ${LEGACY_BUNDLE_ID}, trying…`);
-          const legacyPrimary = await sendApnsPushToHost(deviceToken, notificationPayload, primaryHost, jwt, LEGACY_BUNDLE_ID);
-          if (legacyPrimary.ok) return { success: true, terminalFailure: false };
-
-          if (legacyPrimary.reason === "BadEnvironmentKeyInToken") {
-            const legacyFallback = await sendApnsPushToHost(deviceToken, notificationPayload, fallbackHost, jwt, LEGACY_BUNDLE_ID);
-            if (legacyFallback.ok) return { success: true, terminalFailure: false };
-          }
+    // BadDeviceToken can also mean the wrong APNs environment. Exhaust
+    // known environment/topic combinations before invalidating registration.
+    const topics = [...new Set([trimmedBundleId, LEGACY_BUNDLE_ID])];
+    for (const topic of topics) {
+      for (const host of [primaryHost, fallbackHost]) {
+        const result = await sendApnsPushToHost(
+          deviceToken,
+          notificationPayload,
+          host,
+          jwt,
+          topic,
+        );
+        if (result.ok) return { success: true, terminalFailure: false };
+        if (
+          result.reason === "Unregistered" || result.reason === "ExpiredToken"
+        ) {
+          return { success: false, terminalFailure: true };
         }
-      }
-
-      // Topic mismatch — try legacy bundle ID
-      if ((result.reason === "DeviceTokenNotForTopic" || result.reason === "BadDeviceToken") && trimmedBundleId !== LEGACY_BUNDLE_ID) {
-        console.log(`Token/topic mismatch, trying legacy topic ${LEGACY_BUNDLE_ID} on ${attempt.host}…`);
-        const legacyResult = await sendApnsPushToHost(deviceToken, notificationPayload, attempt.host, jwt, LEGACY_BUNDLE_ID);
-        if (legacyResult.ok) return { success: true, terminalFailure: false };
-
-        // Also try legacy topic on fallback host
-        if (legacyResult.reason === "BadEnvironmentKeyInToken") {
-          const legacyFallback = await sendApnsPushToHost(deviceToken, notificationPayload, fallbackHost, jwt, LEGACY_BUNDLE_ID);
-          if (legacyFallback.ok) return { success: true, terminalFailure: false };
+        if (
+          ![
+            "BadDeviceToken",
+            "DeviceTokenNotForTopic",
+            "BadEnvironmentKeyInToken",
+          ].includes(result.reason || "")
+        ) {
+          return { success: false, terminalFailure: false }; // 429/5xx/auth/config: retain token
         }
-      }
-
-      // Terminal token error — token is dead
-      if (TERMINAL_TOKEN_REASONS.includes(result.reason || "")) {
-        console.log(`Terminal APNs error: ${result.reason}. Token should be cleared.`);
-        return { success: false, terminalFailure: true };
       }
     }
-
-    console.error("APNs push failed on all attempts");
     return { success: false, terminalFailure: true };
   } catch (err) {
     console.error("APNs push error:", err);
@@ -656,22 +810,59 @@ function getNotificationContent(
   _senderName?: string,
 ): { title: string; body: string; url: string } {
   switch (type) {
+    case "daily_nudge_first":
+    case "daily_nudge_second":
+      return {
+        title: "Going out tonight?",
+        body: message,
+        url: "/?checkin=true",
+      };
+    case "weekend_rally":
+      return {
+        title: "Your weekend starts here",
+        body: message,
+        url: "/messages?tab=plans",
+      };
     case "meetup_request":
-      return { title: "🎉 Meet Up Request!", body: message, url: "/messages?tab=activity" };
+      return {
+        title: "🎉 Meet Up Request!",
+        body: message,
+        url: "/messages?tab=activity",
+      };
     case "venue_invite":
-      return { title: "📍 Venue Invite!", body: message, url: "/messages?tab=activity" };
+      return {
+        title: "📍 Venue Invite!",
+        body: message,
+        url: "/messages?tab=activity",
+      };
     case "friend_request":
-      return { title: "👋 Friend Request", body: message, url: "/profile/friend-requests" };
+      return {
+        title: "👋 Friend Request",
+        body: message,
+        url: "/profile/friend-requests",
+      };
     case "friend_accepted":
       return { title: "🎊 Friend Accepted!", body: message, url: "/messages" };
     case "invite_accepted":
       return { title: "🎉 Invite Accepted!", body: message, url: "/profile" };
     case "dm":
-      return { title: _senderName ? `💬 ${_senderName}` : "💬 New Message", body: message, url: "/messages" };
+      return {
+        title: _senderName ? `💬 ${_senderName}` : "💬 New Message",
+        body: message,
+        url: "/messages",
+      };
     case "meetup_accepted":
-      return { title: "🎉 Meet Up Accepted!", body: message, url: "/messages?tab=activity" };
+      return {
+        title: "🎉 Meet Up Accepted!",
+        body: message,
+        url: "/messages?tab=activity",
+      };
     case "venue_invite_accepted":
-      return { title: "📍 Invite Accepted!", body: message, url: "/messages?tab=activity" };
+      return {
+        title: "📍 Invite Accepted!",
+        body: message,
+        url: "/messages?tab=activity",
+      };
     case "friend_checkin":
       return { title: "📍 Friend Checked In", body: message, url: "/" };
     case "friend_planning":
@@ -681,7 +872,11 @@ function getNotificationContent(
     case "post_comment":
       return { title: "💬 New Comment", body: message, url: "/feed" };
     case "venue_arrival_planning":
-      return { title: "📍 You've arrived!", body: message, url: "/?checkin=true" };
+      return {
+        title: "📍 You've arrived!",
+        body: message,
+        url: "/?checkin=true",
+      };
     case "friend_arrived":
     case "friend_arrived_venue":
       return { title: "👀 Friend Just Arrived!", body: message, url: "/" };
@@ -690,9 +885,17 @@ function getNotificationContent(
     case "post_tag":
       return { title: "📸 Tagged You", body: message, url: "/feed" };
     case "plan_invite":
-      return { title: "📅 Plan Invite!", body: message, url: "/messages?tab=activity" };
+      return {
+        title: "📅 Plan Invite!",
+        body: message,
+        url: "/messages?tab=activity",
+      };
     case "plan_down":
-      return { title: "🙌 They're Down!", body: message, url: "/messages?tab=activity" };
+      return {
+        title: "🙌 They're Down!",
+        body: message,
+        url: "/messages?tab=activity",
+      };
     default:
       return { title: "Spotted", body: message, url: "/" };
   }
@@ -715,90 +918,141 @@ Deno.serve(async (req) => {
     // Verify JWT
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized: Missing authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Missing authorization header" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
+    const isWorker = token === supabaseServiceKey;
+    const { data: { user }, error: authError } = isWorker
+      ? { data: { user: null }, error: null }
+      : await supabase.auth.getUser(token);
 
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!isWorker && (authError || !user)) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Invalid token" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const rawPayload = await req.json();
-    console.log('[SEND-PUSH] Invoked with payload:', JSON.stringify({ type: rawPayload.type, sender_id: rawPayload.sender_id, receiver_id: rawPayload.receiver_id, notification_id: rawPayload.notification_id }));
+    console.log(
+      "[SEND-PUSH] Invoked with payload:",
+      JSON.stringify({
+        type: rawPayload.type,
+        sender_id: rawPayload.sender_id,
+        receiver_id: rawPayload.receiver_id,
+        notification_id: rawPayload.notification_id,
+      }),
+    );
     const validation = validatePayload(rawPayload);
     if (!validation.valid) {
-      return new Response(JSON.stringify({ error: `Bad Request: ${validation.error}` }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: `Bad Request: ${validation.error}` }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const payload = rawPayload as PushPayload;
 
     // Verify sender matches authenticated user
-    if (payload.sender_id !== user.id) {
-      return new Response(JSON.stringify({ error: "Forbidden: sender_id must match authenticated user" }), {
-        status: 403,
+    if (!isWorker && payload.sender_id !== user?.id) {
+      return new Response(
+        JSON.stringify({
+          error: "Forbidden: sender_id must match authenticated user",
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Never trust client-supplied content or recipients. Only committed events
+    // can produce a push; clients merely acknowledge the queued notification.
+    const { data: stored, error: storedError } = await supabase.from(
+      "notifications",
+    )
+      .select("id,sender_id,receiver_id,type,message,data").eq(
+        "id",
+        payload.notification_id,
+      ).maybeSingle();
+    if (storedError) throw storedError;
+    if (
+      !stored || stored.sender_id !== payload.sender_id ||
+      stored.receiver_id !== payload.receiver_id || stored.type !== payload.type
+    ) {
+      return new Response(
+        JSON.stringify({ success: false, reason: "notification_mismatch" }),
+        { status: 403, headers: corsHeaders },
+      );
+    }
+    if (!isWorker) {
+      return new Response(JSON.stringify({ success: true, queued: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const { receiver_id, sender_id, type } = payload;
-    const message = validation.sanitizedMessage!;
-
-    // ── Block check: reject if either side has blocked the other ──
-    if (sender_id !== receiver_id) {
-      const { data: blockRows } = await supabase
-        .from("blocked_users")
-        .select("id")
-        .or(`and(blocker_id.eq.${sender_id},blocked_id.eq.${receiver_id}),and(blocker_id.eq.${receiver_id},blocked_id.eq.${sender_id})`)
-        .limit(1);
-
-      if (blockRows && blockRows.length > 0) {
-        console.log(`[SEND-PUSH] Blocked: ${sender_id} ↔ ${receiver_id}`);
-        return new Response(JSON.stringify({ success: false, reason: "blocked" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const { data: lease, error: leaseError } = await supabase.from(
+      "push_outbox",
+    )
+      .select("notification_id,channels,expires_at").eq(
+        "notification_id",
+        stored.id,
+      ).eq("state", "sending")
+      .eq(
+        "lease_id",
+        payload.lease_id || "00000000-0000-0000-0000-000000000000",
+      )
+      .gt("lease_until", new Date().toISOString()).maybeSingle();
+    if (leaseError) throw leaseError;
+    if (!lease) {
+      return new Response(
+        JSON.stringify({ success: false, reason: "invalid_lease" }),
+        { status: 409, headers: corsHeaders },
+      );
     }
-
-    // ── Location-bearing types: verify can_see_location server-side ──
-    const LOCATION_BEARING_TYPES = ["friend_checkin", "friend_arrived_venue", "friends_at_venue", "friend_arrived", "friend_planning"];
-    if (sender_id !== receiver_id && LOCATION_BEARING_TYPES.includes(type)) {
-      const { data: canSee } = await supabase.rpc("can_see_location", {
-        viewer_id: receiver_id,
-        target_user_id: sender_id,
-      });
-      if (canSee !== true) {
-        console.log(`[SEND-PUSH] Location not visible: receiver=${receiver_id} cannot see sender=${sender_id}`);
-        return new Response(JSON.stringify({ success: false, reason: "location_not_visible" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const { data: allowed, error: privacyError } = await supabase.rpc(
+      "push_notification_allowed",
+      { p_id: stored.id },
+    );
+    if (privacyError) throw privacyError;
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ success: false, reason: "privacy_or_expiry" }),
+        { headers: corsHeaders },
+      );
     }
+    const { receiver_id, sender_id, type } = stored;
+    const message = sanitizeMessage(stored.message);
 
     // Get receiver's push subscription AND apns token
     const { data: receiverProfile, error: profileError } = await supabase
       .from("profiles")
-      .select("push_subscription, push_enabled, display_name, apns_device_token")
+      .select(
+        "push_subscription, push_enabled, display_name, apns_device_token",
+      )
       .eq("id", receiver_id)
       .single();
 
-    if (profileError || !receiverProfile) {
-      return new Response(JSON.stringify({ success: false, reason: "receiver_not_found" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (profileError) throw profileError;
+    if (!receiverProfile) {
+      return new Response(
+        JSON.stringify({ success: false, reason: "receiver_not_found" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Check if push is enabled and at least one channel exists
@@ -806,14 +1060,22 @@ Deno.serve(async (req) => {
     const hasApns = !!receiverProfile.apns_device_token;
 
     if (!receiverProfile.push_enabled || (!hasWebPush && !hasApns)) {
-      console.log("Push not enabled or no subscription/token for user:", receiver_id);
-      return new Response(JSON.stringify({ success: false, reason: "push_not_enabled" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.log(
+        "Push not enabled or no subscription/token for user:",
+        receiver_id,
+      );
+      return new Response(
+        JSON.stringify({ success: false, reason: "push_not_enabled" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Get sender's name
-    const { data: senderProfile } = await supabase.from("profiles").select("display_name").eq("id", sender_id).single();
+    const { data: senderProfile } = await supabase.from("profiles").select(
+      "display_name",
+    ).eq("id", sender_id).single();
 
     const senderName = senderProfile?.display_name || "Someone";
     const content = getNotificationContent(type, message, senderName);
@@ -823,14 +1085,22 @@ Deno.serve(async (req) => {
       receiver_id,
       notification_id: payload.notification_id,
       type,
+      data: stored.data,
+      expires_at: lease.expires_at,
     };
 
-    const results: { web?: boolean; apns?: boolean } = {};
+    const results: { web?: boolean; apns?: boolean } = {
+      ...(lease.channels ?? {}),
+    };
 
     // Send via Web Push if subscription exists
-    if (hasWebPush) {
-      const subscription = receiverProfile.push_subscription as PushSubscription;
-      if (subscription.endpoint && validateSubscriptionEndpoint(subscription.endpoint)) {
+    if (hasWebPush && results.web !== true) {
+      const subscription = receiverProfile
+        .push_subscription as PushSubscription;
+      if (
+        subscription.endpoint &&
+        validateSubscriptionEndpoint(subscription.endpoint)
+      ) {
         results.web = await sendWebPush(subscription, notificationPayload);
       } else {
         console.error("Invalid web push subscription endpoint");
@@ -839,8 +1109,11 @@ Deno.serve(async (req) => {
     }
 
     // Send via APNs if device token exists
-    if (hasApns) {
-      const apnsResult = await sendApnsPush(receiverProfile.apns_device_token as string, notificationPayload);
+    if (hasApns && results.apns !== true) {
+      const apnsResult = await sendApnsPush(
+        receiverProfile.apns_device_token as string,
+        notificationPayload,
+      );
       results.apns = apnsResult.success;
 
       // Clear stale/dead tokens so user is prompted to re-register
@@ -849,12 +1122,20 @@ Deno.serve(async (req) => {
         await supabase
           .from("profiles")
           .update({ apns_device_token: null })
-          .eq("id", receiver_id);
+          .eq("id", receiver_id).eq(
+            "apns_device_token",
+            receiverProfile.apns_device_token,
+          );
       }
     }
 
-    const success = results.web === true || results.apns === true;
-    console.log("Push notification results:", { receiver_id, type, ...results });
+    const success = (!hasWebPush || results.web === true) &&
+      (!hasApns || results.apns === true);
+    console.log("Push notification results:", {
+      receiver_id,
+      type,
+      ...results,
+    });
 
     return new Response(JSON.stringify({ success, channels: results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -16,7 +16,6 @@ import { isDemoMode } from '@/lib/demo-mode';
 import { createDmThread } from '@/lib/dm';
 import { APP_BASE_URL } from '@/lib/invites';
 import { fetchProfilesSafe } from '@/lib/profiles';
-import { notifyDmRecipients } from '@/lib/dm';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
@@ -116,7 +115,6 @@ export default function SharePostSheet() {
         .select('display_name')
         .eq('id', userId)
         .maybeSingle();
-      notifyDmRecipients(userId, me?.display_name?.split(' ')[0] ?? 'Someone', [friend.id], 'Shared a post');
     } catch {
       /* demo users / offline */
     } finally {

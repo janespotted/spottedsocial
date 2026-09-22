@@ -1,45 +1,5 @@
 import { supabase } from './supabase';
 import { fetchProfilesSafe } from './profiles';
-import type { FeedPost } from '@/hooks/use-feed';
-
-/**
- * Notify a post's owner about a like: create_notification RPC (in-app row)
- * then the send-push edge function (APNs). Port of the web toggleLike side
- * effect. Fire-and-forget — failures must never affect the like itself.
- */
-export async function notifyPostLike(post: FeedPost, likerId: string): Promise<void> {
-  try {
-    if (post.user_id === likerId) return;
-
-    const profiles = await fetchProfilesSafe();
-    const liker = profiles.find((p) => p.id === likerId);
-    const owner = profiles.find((p) => p.id === post.user_id);
-    if (owner?.is_demo) return; // demo users don't get notifications
-
-    const likerName = liker?.display_name?.split(' ')[0] || 'Someone';
-    const message = `${likerName} liked your post${post.venue_name ? ` at ${post.venue_name}` : ''}`;
-
-    const { data } = await supabase.rpc('create_notification', {
-      p_receiver_id: post.user_id,
-      p_type: 'post_like',
-      p_message: message,
-    });
-    const notif = Array.isArray(data) ? data[0] : data;
-    if (!notif?.id) return;
-
-    await supabase.functions.invoke('send-push', {
-      body: {
-        notification_id: notif.id,
-        receiver_id: post.user_id,
-        sender_id: likerId,
-        type: 'post_like',
-        message,
-      },
-    });
-  } catch {
-    /* never let notification failures surface */
-  }
-}
 
 /** Shared "create in-app row + push" helper for the plan notifications below. */
 async function createAndPush(
@@ -209,34 +169,11 @@ export async function notifyFriendsPlanning(
       .limit(1);
     if (existing && existing.length > 0) return;
 
-    const effective = visibility ?? 'all_friends';
-    let recipientIds: string[] = [];
-    if (effective === 'close_friends') {
-      const { data: close } = await supabase
-        .from('close_friends')
-        .select('close_friend_id')
-        .eq('user_id', userId);
-      recipientIds = (close ?? []).map((c) => c.close_friend_id);
-    } else {
-      const { data: friendships } = await supabase
-        .from('friendships')
-        .select('user_id, friend_id')
-        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
-        .eq('status', 'accepted');
-      if (effective === 'all_friends') {
-        recipientIds = (friendships ?? []).map((f) =>
-          f.user_id === userId ? f.friend_id : f.user_id
-        );
-      } else {
-        const sentTo = new Set<string>();
-        const receivedFrom = new Set<string>();
-        for (const f of friendships ?? []) {
-          if (f.user_id === userId) sentTo.add(f.friend_id);
-          else receivedFrom.add(f.user_id);
-        }
-        recipientIds = [...sentTo].filter((id) => receivedFrom.has(id));
-      }
-    }
+    // The stored audience is authoritative; RLS hides friends-of-friends
+    // edges from clients, so the database resolves the recipient set.
+    const { data, error } = await (supabase.rpc as Function)('get_planning_notification_recipients');
+    if (error) throw error;
+    const recipientIds = (data ?? []) as string[];
     if (recipientIds.length === 0) return;
 
     const { data: profile } = await supabase

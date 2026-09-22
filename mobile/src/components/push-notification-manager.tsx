@@ -92,6 +92,7 @@ export function PushNotificationManager() {
       void Notifications.clearLastNotificationResponseAsync().catch(() => {});
       if (typeof data?.receiver_id === 'string' && data.receiver_id !== userId) return;
       const target = routeForNotification(data);
+      if (data?.type === 'morning_after') { router.push(target); return; }
       if (getNightGateState() !== 'answered') {
         if (!String(target).startsWith('/check-in')) deferDeepLink(target);
       } else router.push(target);

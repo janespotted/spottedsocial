@@ -1,3 +1,4 @@
+import { morningAfterAt } from '@/lib/tonight';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -76,17 +77,16 @@ interface AutoUpdates extends TrackingResult {
 }
 
 /** Schedule the 10am morning-after recap (web scheduleMorningAfterNotification). */
-async function scheduleMorningAfter(): Promise<void> {
+async function scheduleMorningAfter(city: string, userId: string): Promise<void> {
   try {
-    const next = new Date();
-    next.setDate(next.getDate() + 1);
-    next.setHours(10, 0, 0, 0);
+    const next = morningAfterAt(new Date(), city);
+    await Notifications.cancelScheduledNotificationAsync('morning-after-recap');
     await Notifications.scheduleNotificationAsync({
       identifier: 'morning-after-recap', // same id → replaces prior schedule
       content: {
         title: 'Last night on Spotted ☀️',
-        body: 'See who you crossed paths with and relive the night.',
-        data: { url: '/activity' },
+        body: 'Look back at your stops and saved posts from last night.',
+        data: { type: 'morning_after', url: '/morning-after', receiver_id: userId },
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: next },
     });
@@ -611,7 +611,7 @@ export default function CheckInSheet() {
       // The check-in is saved. Automatic updates are a separate outcome,
       // reported on the payoff screen — never as a check-in failure.
       settleAutomaticUpdates(userId);
-      scheduleMorningAfter();
+      void scheduleMorningAfter(city, userId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (selectedVenue?.id) {
         notifyFriendArrived(
@@ -661,7 +661,7 @@ export default function CheckInSheet() {
       await persistAudience();
       // No background tracking at a private party: the exact spot is for
       // close friends only and a house party does not move.
-      scheduleMorningAfter();
+      void scheduleMorningAfter(city, userId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refreshStatusQueries();
       await showPayoff('out', venueName, true);

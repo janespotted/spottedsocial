@@ -56,7 +56,7 @@ test('offline cleanup failure does not falsely sign out and can be retried',asyn
 });
 test('legacy and canonical arrival taps route to map; local arrival opens correction',()=>{
  const h=harness();for(const type of ['friend_arrived','friend_arrived_venue'])assert.equal(h.api.routeForNotification({type}),'/map');
- assert.equal(h.api.routeForNotification({url:'/check-in'}),'/check-in');assert.equal(h.api.routeForNotification({type:'dm'}),'/messages');
+ assert.equal(h.api.routeForNotification({url:'/check-in'}),'/check-in');assert.equal(h.api.routeForNotification({type:'dm'}),'/messages?tab=dms');
 });
 function managerHarness({gate='answered',initial=null,failRegistration=false}={}) {
  const effects=[];const callbacks={};const destinations=[];const parked=[];const registrations=[];const timers=new Map();let next=0;let failures=failRegistration?1:0;
@@ -111,4 +111,29 @@ test('foreground alert from another account is suppressed',async()=>{
  assert.equal((await h.callbacks.presentation(response('bob').notification)).shouldShowBanner,false);
  assert.equal((await h.callbacks.presentation(response('alice').notification)).shouldShowBanner,true);
  h.cleanup();
+});
+
+test('DM, post, plan, reminder and recap taps target supported native screens',()=>{
+ const h=harness();const id='11111111-1111-4111-8111-111111111111';
+ assert.equal(h.api.routeForNotification({type:'dm',data:{thread_id:id}}),`/thread?threadId=${id}`);
+ for(const type of ['post_tag','post_like','post_comment']) assert.equal(h.api.routeForNotification({type,data:{post_id:id}}),`/post-detail?postId=${id}`);
+ for(const type of ['plan_invite','plan_down','weekend_rally']) assert.equal(h.api.routeForNotification({type}),'/messages?tab=plans');
+ for(const type of ['daily_nudge_first','daily_nudge_second']) assert.equal(h.api.routeForNotification({type}),'/check-in');
+ assert.equal(h.api.routeForNotification({type:'morning_after'}),'/morning-after');
+ assert.equal(h.api.routeForNotification({type:'dm',data:{thread_id:'../../settings'}}),'/messages?tab=dms');
+});
+test('Morning After uses profile city, same morning after midnight, and DST',()=>{
+ const {morningAfterAt}=load('lib/tonight.ts',{});
+ for(const [now,city,want] of [
+  ['2026-09-26T01:00:00-04:00','nyc','2026-09-26T14:00:00.000Z'],
+  ['2026-09-25T22:00:00-04:00','nyc','2026-09-26T14:00:00.000Z'],
+  ['2026-09-26T01:00:00-07:00','la','2026-09-26T17:00:00.000Z'],
+  ['2026-03-08T01:00:00-05:00','nyc','2026-03-08T14:00:00.000Z'],
+  ['2026-11-01T01:00:00-04:00','nyc','2026-11-01T15:00:00.000Z'],
+ ]) assert.equal(morningAfterAt(new Date(now),city).toISOString(),want);
+});
+test('APNs retry identity and metadata are stable and badge is not hardcoded',async()=>{
+ const h=serverHarness();await h.api.sendApnsPushToHost('synthetic-token',{title:'Hi',body:'Hello',type:'dm',notification_id:'one',data:{thread_id:'thread'}},'mock.invalid','fake-jwt','test.bundle');
+ const payload=JSON.parse(h.sent[0].body);
+ assert.equal(h.sent[0].headers['apns-collapse-id'],'one');assert.equal(payload.data.thread_id,'thread');assert.equal(payload.aps.badge,undefined);
 });
