@@ -90,3 +90,7 @@ The server can retry committed events. Actions that never reach the server still
 require user retry; this does not implement an offline action queue. One native
 APNs token per profile remains a limitation. Exact-once display cannot be
 promised after provider/network failures.
+
+## Spotted notification voice
+
+Apply `20260922220927_spotted_notification_voice.sql` after the nightlife coverage migration and deploy the updated send-push function. Future venue-change alerts read "Jane Spotted at [venue]" under the title "Spotted". First-Out announcements read "Jane Spotted out tonight". TBD copy stays "Jane is deciding where to go tonight". Private locations remain absent from these alerts; existing notifications are not rewritten.

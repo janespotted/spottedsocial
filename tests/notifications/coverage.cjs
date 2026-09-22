@@ -1,7 +1,7 @@
 const {PGlite}=require(process.env.SPOTTED_PGLITE_MODULE||'@electric-sql/pglite');const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
 (async()=>{
  const db=new PGlite();await db.exec(fs.readFileSync(path.join(__dirname,'bootstrap.sql'),'utf8'));
- for(const name of ['20260922205151_reliable_notification_delivery','20260922213920_nightlife_notification_coverage'])await db.exec(fs.readFileSync(path.join(__dirname,'../../supabase/migrations',name+'.sql'),'utf8'));
+ for(const name of ['20260922205151_reliable_notification_delivery','20260922213920_nightlife_notification_coverage','20260922220927_spotted_notification_voice'])await db.exec(fs.readFileSync(path.join(__dirname,'../../supabase/migrations',name+'.sql'),'utf8'));
  const q=async sql=>(await db.query(sql)).rows;let checks=0;
  const check=async(name,sql,want)=>{assert.deepEqual(Object.values((await q(sql))[0])[0],want,name);console.log('PASS',name);checks++};
  const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;const a=id(1),b=id(3),c=id(4),v=id(100);const expiry=new Date(Date.now()+6*3600000).toISOString();

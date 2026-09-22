@@ -827,7 +827,7 @@ function getNotificationContent(
         url: "/messages?tab=plans",
       };
     case "friend_out":
-      return { title: "Your friend is out", body: message, url: "/" };
+      return { title: "Spotted", body: message, url: "/" };
     case "private_party_invite":
       return {
         title: "Private party invitation",
@@ -908,7 +908,7 @@ function getNotificationContent(
       };
     case "friend_arrived":
     case "friend_arrived_venue":
-      return { title: "👀 Friend Just Arrived!", body: message, url: "/" };
+      return { title: "Spotted", body: message, url: "/" };
     case "friends_at_venue":
       return { title: "🔥 Friends Spotted!", body: message, url: "/" };
     case "post_tag":
