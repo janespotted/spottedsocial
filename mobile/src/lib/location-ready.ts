@@ -19,14 +19,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  *   ensureLocationReady() first. Never call BackgroundGeolocation.ready()
  *   or configure the plugin anywhere else.
  *
- * Permission staging (client feedback §3):
- * - The plugin is configured for **When In Use** only. The first GPS fix
- *   (Yes → "Looks like you're at…") therefore shows just the standard
- *   location prompt — no Motion & Fitness, no background-location upgrade.
- * - "Automatic updates" (Always + motion activity) is a separate, explained
- *   step offered AFTER a check-in has already succeeded
- *   (requestAutomaticUpdates). Once granted, the choice is remembered so
+ * Permission staging:
+ * - The plugin starts configured for **When In Use**, so nothing asks for
+ *   more before the user says they are going out.
+ * - Going out (Yes → "Find your spot" → Continue) asks for **Always** plus
+ *   Motion & Fitness through requestAutomaticUpdates. A user who stopped at
+ *   While Using is offered the upgrade again after the check-in succeeds,
+ *   and in Settings. Once Always is granted, the choice is remembered so
  *   later launches configure the plugin for Always from the start.
+ * - The map's recenter button asks for When In Use only (requestWhenInUse).
  * - The SDK's own "open Settings" alert is disabled; the check-in sheet owns
  *   that UI and re-checks permission when the app returns to the foreground.
  *
@@ -167,12 +168,24 @@ export async function requestAutomaticUpdates(): Promise<LocationPermission> {
     geolocation: { locationAuthorizationRequest: 'Always' },
     activity: { disableMotionActivityUpdates: false },
   });
-  try {
-    await BackgroundGeolocation.requestPermission();
-  } catch {
-    /* declined — the status below says what we actually have */
+  // From "not determined", iOS first shows the While Using prompt and only
+  // then the "Change to Always Allow" upgrade. Ask a second time if the
+  // first answer stopped at While Using. iOS shows the upgrade prompt once
+  // per install, so a repeat request can return with no UI or never return.
+  // The timeout covers that.
+  let permission: LocationPermission = 'not_determined';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await Promise.race([
+        BackgroundGeolocation.requestPermission(),
+        new Promise((resolve) => setTimeout(resolve, 10000)),
+      ]);
+    } catch {
+      /* declined — the status below says what we actually have */
+    }
+    permission = await getLocationPermission();
+    if (permission !== 'when_in_use') break;
   }
-  const permission = await getLocationPermission();
   try {
     await AsyncStorage.setItem(AUTO_UPDATES_KEY, permission === 'always' ? '1' : '0');
   } catch {

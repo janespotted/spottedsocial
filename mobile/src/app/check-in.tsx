@@ -34,7 +34,7 @@ import {
   startBackgroundLocation,
   type TrackingResult,
 } from '@/lib/background-location';
-import { getLocationPermission, hasLocationAccess } from '@/lib/location-ready';
+import { getLocationPermission, hasLocationAccess, requestAutomaticUpdates } from '@/lib/location-ready';
 import { markNightAnswered } from '@/lib/night-gate';
 import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
@@ -429,9 +429,10 @@ export default function CheckInSheet() {
     setStep('done');
   };
 
-  /* ── Location permission (client feedback §3) ──
-     Yes explains before asking, asks for When In Use only, and never
-     treats a permission outcome as a check-in outcome. */
+  /* ── Location permission ──
+     Yes explains before asking, asks for Always (iOS shows While Using
+     first, then the upgrade), and never treats a permission outcome as a
+     check-in outcome: a denial still offers Pick a venue. */
   const startYes = async () => {
     // A hung plugin must not freeze the sheet: treat it as "no location",
     // which still offers Pick a venue.
@@ -441,6 +442,12 @@ export default function CheckInSheet() {
     if (permission === 'not_determined') setStep('location-intro');
     else if (permission === 'denied') setStep('gps-denied');
     else detectVenue();
+  };
+
+  const allowLocationAndDetect = async () => {
+    const permission = await requestAutomaticUpdates().catch(() => 'denied' as const);
+    if (hasLocationAccess(permission)) detectVenue();
+    else setStep('gps-denied');
   };
 
   // Returning from Settings: re-check and move on automatically
@@ -796,10 +803,11 @@ export default function CheckInSheet() {
               it.
             </Text>
             <Text className="text-white/55 text-xs font-sans text-center">
-              iOS will ask for &ldquo;While Using the App&rdquo; access next.
+              iOS asks twice: tap &ldquo;Allow While Using App&rdquo;, then &ldquo;Change to
+              Always Allow&rdquo; so your spot updates as you move between bars, until 5am.
             </Text>
           </View>
-          <PrimaryButton label="Continue" onPress={detectVenue} />
+          <PrimaryButton label="Continue" onPress={allowLocationAndDetect} />
           <SecondaryButton label="Pick a venue instead" onPress={pickVenueManually} />
         </>
       ) : null}
@@ -826,7 +834,7 @@ export default function CheckInSheet() {
               Location only lets Spotted guess the venue for you.
             </Text>
             <Text className="text-white/55 text-xs font-sans text-center">
-              Allow &ldquo;While Using the App&rdquo; in Settings and come back — this screen
+              In Settings, open Location and choose &ldquo;Always&rdquo;, then come back — this screen
               updates on its own.
             </Text>
           </View>
