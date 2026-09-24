@@ -67,7 +67,7 @@ State of production on 2026-09-24 (project `rwavbyvdytdegntdryll`, read-only che
 - `pg_cron`, `pg_net` and `supabase_vault` are installed. APNs, VAPID and Mux secrets are set.
 - **Missing:** the Vault secrets `spotted_push_url` and `spotted_push_service_key`. The push cron jobs don't exist yet; the migrations create them.
 
-**Deployed 2026-09-24:** the three migrations, the four edge functions and the regenerated `database.types.ts`. The advisors show no errors; the new warnings are for functions that check `auth.uid()` themselves. `delivery_enabled` and `campaigns_enabled` are both still **false**. Remaining: step 2, then step 4.
+**Deployed 2026-09-24:** the three migrations, the four edge functions and the regenerated `database.types.ts`. The advisors show no errors; the new warnings are for functions that check `auth.uid()` themselves. Vault secrets set (step 2) and **`delivery_enabled = true`** (step 4). `spotted-push-delivery` returns 200 every minute. `campaigns_enabled` stays **false** until two-phone QA passes.
 
 Steps:
 
@@ -75,7 +75,7 @@ Steps:
    1. `20260922205151_reliable_notification_delivery.sql`
    2. `20260922213920_nightlife_notification_coverage.sql`
    3. `20260922220927_spotted_notification_voice.sql`
-2. Create the Vault secrets `spotted_push_url` (`https://rwavbyvdytdegntdryll.supabase.co`) and `spotted_push_service_key` (the service-role key). `wake_push_worker()` raises an error without them, so the every-minute delivery job fails until they exist.
+2. Create the Vault secrets `spotted_push_url` (`https://rwavbyvdytdegntdryll.supabase.co`) and `spotted_push_service_key`. The key **must be the new `sb_secret_…` key, not the legacy `service_role` JWT**. Since the 2026-09-22 key migration, `SUPABASE_SERVICE_ROLE_KEY` inside edge functions is the `sb_secret_` key, and `process-push-queue` / `send-push` compare the bearer against it exactly. The legacy JWT gets a 401 from the function. The gateway accepts the `sb_secret_` key despite `verify_jwt = true`. Tested 2026-09-24: the secret key returned 200 and the legacy JWT 401. `wake_push_worker()` raises an error without them, so the every-minute delivery job fails until they exist.
 3. Deploy the edge functions `send-push`, `process-push-queue`, `send-daily-nudge` and `send-weekend-rally`, with JWT verification as set in `supabase/config.toml`.
 4. Set `update spotted_private.push_settings set delivery_enabled = true;`. **Leave `campaigns_enabled` false** until two-phone QA passes. (`push_outbox` is new, so there are no old rows to skip.)
 5. Confirm the cron jobs run: check `cron.job_run_details` for `spotted-push-delivery`, `spotted-push-campaigns` and `spotted-activity-dedupe-cleanup`.
