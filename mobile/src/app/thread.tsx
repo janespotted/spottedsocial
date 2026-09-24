@@ -3,6 +3,7 @@ import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  AppState,
   Keyboard,
   Pressable,
   StyleSheet,
@@ -14,7 +15,7 @@ import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave
 import { onNightBoundary } from '@/lib/night-boundary';
 import { RESET_COPY } from '@/lib/reset-copy';
 import { Image } from '@/components/styled';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,6 +28,7 @@ import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import {
   markThreadRead,
+  fetchPeerReadReceipt,
   SHARED_POST_REGEX,
   type DmMember,
   type DmMessage,
@@ -96,7 +98,7 @@ export default function ThreadScreen() {
   const [hearted, setHearted] = useState<Set<string>>(new Set());
   const [sharedPosts, setSharedPosts] = useState<Map<string, SharedPostData>>(new Map());
   const [otherReadAt, setOtherReadAt] = useState<string | null>(null);
-  const [bothShowReceipts, setBothShowReceipts] = useState(false);
+  const refreshReceiptRef = useRef<() => void>(() => {});
   const [draft, setDraft] = useState('');
   const [uploading, setUploading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -181,32 +183,33 @@ export default function ThreadScreen() {
       } else {
         setGroupInfo(null);
         setOtherMember(allMembers[0] ?? null);
-        // "Seen" only when BOTH users share read receipts
-        const otherId = allMembers[0]?.user_id;
-        if (otherId) {
-          const { data: privacy } = await supabase
-            .from('profiles')
-            .select('show_read_receipts')
-            .in('id', [userId, otherId]);
-          if (!cancelled) {
-            setBothShowReceipts(
-              (privacy?.length ?? 0) === 2 && (privacy ?? []).every((p) => p.show_read_receipts)
-            );
-          }
-          const { data: receipt } = await supabase
-            .from('dm_read_receipts')
-            .select('last_read_at')
-            .eq('thread_id', threadId)
-            .eq('user_id', otherId)
-            .maybeSingle();
-          if (!cancelled && receipt) setOtherReadAt(receipt.last_read_at);
-        }
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [threadId, userId]);
+
+  // RLS exposes peer receipts only when both users currently opt in. Refresh
+  // on focus/foreground and while visible so preference revocation clears Seen.
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    let generation = 0;
+    const refresh = async () => {
+      const request = ++generation;
+      setOtherReadAt(null);
+      if (!threadId || !otherMember?.user_id || !userId || groupInfo) return;
+      const receipt = await fetchPeerReadReceipt(threadId, otherMember.user_id);
+      if (active && request === generation) setOtherReadAt(receipt);
+    };
+    refreshReceiptRef.current = () => { void refresh(); };
+    void refresh();
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 15_000);
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void refresh(); else { ++generation; setOtherReadAt(null); }
+    });
+    return () => { active = false; ++generation; clearInterval(timer); subscription.remove(); refreshReceiptRef.current = () => {}; setOtherReadAt(null); };
+  }, [threadId, userId, otherMember?.user_id, groupInfo]));
 
   // After each commit, everything rendered counts as seen (entrance
   // animations only fire at row mount, so live arrivals animate once)
@@ -282,11 +285,8 @@ export default function ThreadScreen() {
           table: 'dm_read_receipts',
           filter: `thread_id=eq.${threadId}`,
         },
-        (payload) => {
-          const row = payload.new as { user_id?: string; last_read_at?: string } | null;
-          if (row?.user_id && row.user_id !== userId && row.last_read_at) {
-            setOtherReadAt(row.last_read_at);
-          }
+        () => {
+          refreshReceiptRef.current();
         }
       ),
     });
@@ -707,7 +707,7 @@ export default function ThreadScreen() {
         // The animated LegendList variant freezes mounted rows unless
         // extraData invalidates them — everything renderItem reads from
         // component state must be listed here
-        extraData={{ memberMap, otherMember, hearted, sharedPosts, otherReadAt, bothShowReceipts }}
+        extraData={{ memberMap, otherMember, hearted, sharedPosts, otherReadAt }}
         renderItem={({ item, index }: { item: DmMessage; index: number }) => {
           const isMine = item.sender_id === userId;
           const isNew = !seenIdsRef.current.has(item.id);
@@ -716,7 +716,6 @@ export default function ThreadScreen() {
             isMine &&
             item.id === lastSentByMeId &&
             !groupInfo &&
-            bothShowReceipts &&
             !!otherReadAt &&
             new Date(otherReadAt) >= new Date(item.created_at);
           const postMatch = item.text.match(SHARED_POST_REGEX);

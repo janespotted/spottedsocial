@@ -3,8 +3,7 @@ import { ActivityIndicator, Alert, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import { fetchPlanParticipants, getPlanExpiry } from '@/lib/plans';
+import { fetchPlanParticipants, savePlan } from '@/lib/plans';
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { useSession } from '@/hooks/use-session';
 import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
@@ -55,31 +54,9 @@ export default function EditPlanScreen() {
   }, [params.planId]);
 
   const handleSubmit = async (values: PlanFormValues) => {
-    if (!session) return;
+    if (!session || !params.planId) return;
     try {
-      const { error } = await supabase
-        .from('plans')
-        .update({
-          venue_id: values.venue.id,
-          venue_name: values.venue.name,
-          plan_date: values.planDate,
-          plan_time: values.planTime,
-          plan_type: values.planType,
-          description: values.description.trim() || null,
-          visibility: values.visibility,
-          expires_at: getPlanExpiry(values.planDate),
-        })
-        .eq('id', params.planId)
-        .eq('user_id', session.user.id);
-      if (error) throw error;
-
-      // Sync participants: delete old, insert new (same as web)
-      await supabase.from('plan_participants').delete().eq('plan_id', params.planId);
-      if (values.friends.length > 0) {
-        await supabase
-          .from('plan_participants')
-          .insert(values.friends.map((f) => ({ plan_id: params.planId, user_id: f.id })));
-      }
+      await savePlan(params.planId, values);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['plans'] });

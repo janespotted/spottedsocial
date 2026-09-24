@@ -9,7 +9,7 @@ async function run(fixed){
  const db=new PGlite();await db.exec(fs.readFileSync(path.join(__dirname,'audited-schema.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'audited-storage.sql'),'utf8'));
  for(const n of fs.readdirSync(root+'/supabase/migrations').filter(n=>n.startsWith('202609222')))await db.exec(fs.readFileSync(root+'/supabase/migrations/'+n,'utf8'));
- if(fixed)for(const n of fs.readdirSync(root+'/supabase/migrations').filter(n=>n.endsWith('_v1_privacy_authorization.sql')||n.endsWith('_v1_private_media.sql')))await db.exec(fs.readFileSync(root+'/supabase/migrations/'+n,'utf8'));
+ if(fixed)for(const n of fs.readdirSync(root+'/supabase/migrations').filter(n=>n.includes('_v1_')))await db.exec(fs.readFileSync(root+'/supabase/migrations/'+n,'utf8'));
  const query=async(sql,args=[])=>(await db.query(sql,args)).rows;
  const scalar=async(sql,args=[])=>Object.values((await query(sql,args))[0]||{})[0];
  async function as(user,sql,args=[]){

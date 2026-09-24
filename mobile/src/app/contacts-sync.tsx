@@ -30,17 +30,19 @@ interface Inviteable {
   phone: string;
 }
 
-type Step = 'intro' | 'loading' | 'results' | 'denied';
+type Step = 'intro' | 'loading' | 'results' | 'denied' | 'error';
 
 /**
  * Find friends from contacts — native form sheet. Port of the web
  * ContactsSync: US-normalized numbers matched via the match-contacts edge
- * function (numbers are hashed server-side, never stored raw).
+ * function with authenticated, bounded matching; address books are not retained.
  */
 export default function ContactsSyncSheet() {
   const { session } = useSession();
   const userId = session?.user.id;
   const [step, setStep] = useState<Step>('intro');
+  const [limited, setLimited] = useState(false);
+  const [syncError, setSyncError] = useState('Could not check contacts. Please try again.');
   const [matches, setMatches] = useState<ContactMatch[]>([]);
   const [inviteable, setInviteable] = useState<Inviteable[]>([]);
   const [requested, setRequested] = useState<Set<string>>(new Set());
@@ -89,10 +91,15 @@ export default function ContactsSyncSheet() {
         return;
       }
 
+      setLimited(uniquePhones.length > 500);
       const { data, error } = await supabase.functions.invoke('match-contacts', {
-        body: { phones: uniquePhones },
+        body: { phones: uniquePhones.slice(0, 500) },
       });
-      if (error) throw error;
+      if (error) {
+        const response = error.context as Response | undefined;
+        setSyncError(response?.status === 429 ? 'Contact matching limit reached. Try again later, or invite friends by link.' : 'Could not check contacts. Please try again.');
+        throw error;
+      }
 
       // Exclude existing friends/pending in either direction
       const existing = new Set<string>();
@@ -104,7 +111,7 @@ export default function ContactsSyncSheet() {
       for (const f of recv ?? []) existing.add(f.user_id);
 
       setMatches(
-        ((data?.matches ?? []) as Array<Record<string, any>>)
+        ((data?.matches ?? []) as Array<{ user_id: string; display_name: string; avatar_url: string | null; phone: string }>)
           .map((m) => ({
             user_id: m.user_id,
             display_name: m.display_name,
@@ -121,7 +128,9 @@ export default function ContactsSyncSheet() {
       );
       setStep('results');
     } catch {
-      setStep('results');
+      setMatches([]);
+      setInviteable([]);
+      setStep('error');
     }
   };
 
@@ -211,8 +220,17 @@ export default function ContactsSyncSheet() {
         </View>
       ) : null}
 
+      {step === 'error' ? (
+        <View className="gap-4 py-6">
+          <Text className="text-white/70 text-sm">{syncError}</Text>
+          <Pressable onPress={sync} className="py-3"><Text className="text-white">Try again</Text></Pressable>
+          <Pressable onPress={() => router.push('/invite-friends')} className="py-3"><Text className="text-white">Invite friends by link</Text></Pressable>
+        </View>
+      ) : null}
+
       {step === 'results' ? (
         <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
+        {limited ? <Text className="text-white/60 text-sm px-5 py-2">Checked the first 500 contacts. You can invite other friends by link.</Text> : null}
           <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider pt-3 pb-2">
             On Spotted ({matches.length})
           </Text>

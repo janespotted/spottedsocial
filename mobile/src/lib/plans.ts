@@ -229,15 +229,6 @@ export async function postPlanComment(planId: string, userId: string, text: stri
 export async function deletePlan(planId: string, userId: string): Promise<void> {
   const { error } = await supabase.from('plans').delete().eq('id', planId).eq('user_id', userId);
   if (error) throw error;
-  // The invites the plan sent are not children of the plan row (they are
-  // `notifications`), so deleting the plan used to leave them pointing at
-  // something that no longer exists — an invite you can still tap.
-  await supabase
-    .from('notifications')
-    .delete()
-    .eq('sender_id', userId)
-    .in('type', ['plan_invite', 'plan_down'])
-    .gte('created_at', nightStartAt().toISOString());
 }
 
 /**
@@ -318,4 +309,19 @@ export async function toggleEventRsvp(
       .insert({ event_id: eventId, user_id: userId, rsvp_type: 'interested' });
     if (error) throw error;
   }
+}
+
+/** Server validates audience, venue and participants, then commits them together. */
+export async function savePlan(planId: string | null, values: {
+  venue: { id: string }; planDate: string; planTime: string; planType: string | null;
+  description: string; visibility: 'friends' | 'close_friends'; friends: { id: string }[];
+}): Promise<string> {
+  const { data, error } = await supabase.rpc('save_plan', {
+    p_id: planId,
+    p_values: { venue_id: values.venue.id, plan_date: values.planDate, plan_time: values.planTime,
+      plan_type: values.planType, description: values.description.trim(), visibility: values.visibility },
+    p_participants: values.friends.map(f => f.id),
+  });
+  if (error || !data) throw error ?? new Error('Could not save plan');
+  return data;
 }

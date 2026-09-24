@@ -78,7 +78,6 @@ function RootNavigator() {
       {/* Chat threads: root-level pushes so they slide OVER the native tab
           bar (per-screen tab-bar hiding pops visibly with native tabs) */}
       <Stack.Screen name="thread" options={{ contentStyle: gradientStyle }} />
-      <Stack.Screen name="yap-thread" options={{ contentStyle: gradientStyle }} />
       {/* Camera-first composer: full screen, no swipe-dismiss (the sheet
           guards populated drafts itself) */}
       <Stack.Screen

@@ -184,3 +184,12 @@ export async function markThreadRead(threadId: string, userId: string): Promise<
       { onConflict: 'thread_id,user_id' }
     );
 }
+
+/** Server RLS decides mutual opt-in; never read another user's raw profile. */
+export async function fetchPeerReadReceipt(threadId: string, peerId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.from('dm_read_receipts').select('last_read_at')
+      .eq('thread_id', threadId).eq('user_id', peerId).maybeSingle();
+    return error ? null : data?.last_read_at ?? null;
+  } catch { return null; }
+}

@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
+import { onNightBoundary } from '@/lib/night-boundary';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
@@ -76,34 +78,41 @@ export function useNotifications() {
   const query = useQuery({
     queryKey: ['notifications', session?.user.id],
     enabled: !!session,
-    staleTime: 15_000,
+    staleTime: 0,
+    refetchInterval: 15_000,
+    refetchOnMount: 'always',
     queryFn: async (): Promise<AppNotification[]> => {
-      const [{ data: rows }, profiles] = await Promise.all([
-        // From tonight only. Notifications carry no expires_at of their own
-        // and are deleted by the nightly cron — which is an hour late in
-        // daylight time — so the boundary is enforced at read time too, or
-        // last night's invites stay actionable (addendum v3 §2/§4).
-        supabase
-          .from('notifications')
-          .select('id, sender_id, type, message, is_read, created_at, data')
-          .eq('receiver_id', session!.user.id)
-          .gte('created_at', nightStartAt().toISOString())
-          .order('created_at', { ascending: false })
-          .limit(50),
-        fetchProfilesSafe(),
-      ]);
-      const profileMap = buildProfileMap(profiles);
-      return (rows ?? []).map((n) => ({
-        id: n.id,
-        data: (n as unknown as {data: Record<string,unknown>}).data,
-        sender_id: n.sender_id,
-        type: n.type,
-        message: n.message,
-        is_read: n.is_read ?? false,
-        created_at: n.created_at ?? new Date().toISOString(),
-        sender_name: n.sender_id ? (profileMap.get(n.sender_id)?.display_name ?? null) : null,
-        sender_avatar_url: n.sender_id ? (profileMap.get(n.sender_id)?.avatar_url ?? null) : null,
-      }));
+      try {
+        const [{ data: rows, error }, profiles] = await Promise.all([
+          // From tonight only. Notifications carry no expires_at of their own
+          // and are deleted by the nightly cron — which is an hour late in
+          // daylight time — so the boundary is enforced at read time too, or
+          // last night's invites stay actionable (addendum v3 §2/§4).
+          supabase
+            .from('notifications')
+            .select('id, sender_id, type, message, is_read, created_at, data')
+            .eq('receiver_id', session!.user.id)
+            .gte('created_at', nightStartAt().toISOString())
+            .order('created_at', { ascending: false })
+            .limit(50),
+          fetchProfilesSafe(),
+        ]);
+        if (error) return []; // Never keep sensitive inbox text after a failed revalidation.
+        const profileMap = buildProfileMap(profiles);
+        return (rows ?? []).map((n) => ({
+          id: n.id,
+          data: (n as unknown as {data: Record<string,unknown>}).data,
+          sender_id: n.sender_id,
+          type: n.type,
+          message: n.message,
+          is_read: n.is_read ?? false,
+          created_at: n.created_at ?? new Date().toISOString(),
+          sender_name: n.sender_id ? (profileMap.get(n.sender_id)?.display_name ?? null) : null,
+          sender_avatar_url: n.sender_id ? (profileMap.get(n.sender_id)?.avatar_url ?? null) : null,
+        }));
+      } catch {
+        return [];
+      }
     },
   });
 
@@ -111,6 +120,16 @@ export function useNotifications() {
     if (!session) return;
     return retainNotificationsChannel(session.user.id);
   }, [session]);
+
+  useEffect(() => {
+    const clear = () => queryClient.setQueryData<AppNotification[]>(['notifications', session?.user.id], []);
+    const subscription = AppState.addEventListener('change', state => {
+      clear();
+      if (state === 'active') void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    });
+    const stop = onNightBoundary(() => { clear(); void queryClient.invalidateQueries({ queryKey: ['notifications'] }); });
+    return () => { subscription.remove(); stop(); };
+  }, [queryClient, session?.user.id]);
 
   const unreadCount = (query.data ?? []).filter((n) => !n.is_read).length;
 

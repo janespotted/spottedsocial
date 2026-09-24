@@ -25,7 +25,6 @@ import {
   type Plan,
   type PlanComment,
 } from '@/lib/plans';
-import { notifyPlanDown } from '@/lib/notifications';
 import { validateCommentText } from '@/lib/validation';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
@@ -126,9 +125,9 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
           .eq('plan_id', plan.id)
           .eq('user_id', currentUserId);
       } else {
-        await supabase.from('plan_downs').insert({ plan_id: plan.id, user_id: currentUserId });
+        const { error } = await supabase.from('plan_downs').insert({ plan_id: plan.id, user_id: currentUserId });
+        if (error) throw error;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        notifyPlanDown(plan, currentUserId);
       }
       refreshDowns();
     } catch (e) {

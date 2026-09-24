@@ -10,8 +10,6 @@ import { invalidateFeed } from './posts';
 const NIGHTLY_CONTENT_QUERY_KEYS = [
   'notifications',
   'activity',
-  'venue-yaps',
-  'yap-directory',
   'dm-threads',
   'comments',
   'post-likes',

@@ -1092,6 +1092,7 @@ export type Database = {
           is_demo: boolean | null
           plan_date: string
           plan_time: string
+          privacy_revision: string
           plan_type: string | null
           score: number | null
           user_id: string
@@ -1108,6 +1109,7 @@ export type Database = {
           is_demo?: boolean | null
           plan_date: string
           plan_time: string
+          privacy_revision?: string
           plan_type?: string | null
           score?: number | null
           user_id: string
@@ -1124,6 +1126,7 @@ export type Database = {
           is_demo?: boolean | null
           plan_date?: string
           plan_time?: string
+          privacy_revision?: string
           plan_type?: string | null
           score?: number | null
           user_id?: string
@@ -2503,6 +2506,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      save_plan: { Args: { p_id: string | null; p_values: Json; p_participants?: string[] }; Returns: string }
+      can_read_plan: { Args: { p_plan: string }; Returns: boolean }
+      can_tag_plan: { Args: { p_plan: string; p_user: string }; Returns: boolean }
+      can_read_notification: { Args: { p_id: string }; Returns: boolean }
+      can_read_receipt: { Args: { p_owner: string; p_thread: string }; Returns: boolean }
+      match_contacts: { Args: { p_phones: string[] }; Returns: { phone: string; user_id: string; display_name: string; username: string; avatar_url: string | null }[] }
+
       get_demo_status_locations: { Args: never; Returns: { user_id: string; lat: number; lng: number }[] }
       friendship_available: { Args: { p_other: string }; Returns: boolean }
       private_media_target: { Args: { p_path?: string | null; p_playback_id?: string | null }; Returns: Json }

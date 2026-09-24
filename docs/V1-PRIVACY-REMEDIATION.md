@@ -1,4 +1,6 @@
-# V1 privacy remediation — coder handoff
+# V1 privacy remediation — initial-stage coder handoff
+
+This document records the first stage at `32262ddc71d26ccbd0f1dac6cdf214a7b2c2db57`. Its remaining-findings list and test counts are historical. The cumulative current handoff is [V1-BETA-PRIVACY.md](V1-BETA-PRIVACY.md); retain the detailed media conversion instructions below.
 
 Branch: `chatgpt/v1-privacy-remediation`. Base: `chatgpt/latest-source-audit-integration`, audited commit `edd09659d1a78b2ad5678826913043b79074a983`. Work was confined to the new branch. No production database, Storage, Mux, Edge Function, app binary, configuration or deployment was changed by this task.
 
