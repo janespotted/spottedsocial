@@ -150,7 +150,8 @@ Deno.serve(async (req) => {
       
       if (error) {
         console.log(`⚠️ Error deleting from ${table}: ${error.message}`);
-        // Continue with other deletions even if one fails
+        if (table === 'profiles') throw new Error('Profile deletion failed; media cleanup was not queued');
+        // Continue independent legacy cleanup; retry failures through existing tooling.
       }
     }
 
@@ -165,47 +166,9 @@ Deno.serve(async (req) => {
     // Use raw query approach: find threads with 0 members via left join
     // Since we can't do subqueries easily, just log it — the threads are harmless without members
 
-    // Delete user's avatar from storage
-    console.log('🗑️ Deleting avatar from storage');
-    await supabaseAdmin.storage
-      .from('avatars')
-      .remove([`${userId}/avatar.jpg`, `${userId}/avatar.png`, `${userId}/avatar.webp`]);
-
-    // SECURITY FIX: Delete post images from storage
-    console.log('🗑️ Deleting post images from storage');
-    const { data: postFiles } = await supabaseAdmin.storage
-      .from('post-images')
-      .list('', { limit: 1000 });
-
-    if (postFiles?.length) {
-      const userPostFiles = postFiles
-        .filter(f => f.name.startsWith(`${userId}-`))
-        .map(f => f.name);
-      if (userPostFiles.length > 0) {
-        await supabaseAdmin.storage
-          .from('post-images')
-          .remove(userPostFiles);
-        console.log(`🗑️ Deleted ${userPostFiles.length} post images`);
-      }
-    }
-
-    // SECURITY FIX: Delete DM images from storage
-    console.log('🗑️ Deleting DM images from storage');
-    const { data: dmFiles } = await supabaseAdmin.storage
-      .from('dm-images')
-      .list('', { limit: 1000 });
-
-    if (dmFiles?.length) {
-      const userDmFiles = dmFiles
-        .filter(f => f.name.startsWith(`${userId}-`))
-        .map(f => f.name);
-      if (userDmFiles.length > 0) {
-        await supabaseAdmin.storage
-          .from('dm-images')
-          .remove(userDmFiles);
-        console.log(`🗑️ Deleted ${userDmFiles.length} DM images`);
-      }
-    }
+    // Exact nested Storage keys were durably queued by the profile-delete
+    // trigger. The private-media-cleanup worker retries Storage API deletion;
+    // authorization already denies content whose sender profile is gone.
 
     // Finally, delete the auth user
     console.log('🗑️ Deleting auth user');

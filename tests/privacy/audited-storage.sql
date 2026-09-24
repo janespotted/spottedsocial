@@ -1,0 +1,20 @@
+-- Storage metadata/policies captured for the audit at edd09659. Synthetic objects only.
+create schema storage;
+create table storage.buckets(id text primary key, public boolean not null);
+create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,created_at timestamptz default now(),unique(bucket_id,name));
+create function storage.foldername(name text) returns text[] language sql immutable as $$select string_to_array(name,'/')$$;
+alter table storage.objects enable row level security;
+grant usage on schema storage to anon,authenticated,service_role;
+grant select,insert,update,delete on storage.objects to anon,authenticated,service_role;
+grant select on storage.buckets to anon,authenticated,service_role;
+insert into storage.buckets values('post-images',true);
+insert into storage.buckets values('avatars',true);
+insert into storage.buckets values('yap-media',true);
+create policy "Anyone can view avatars" on storage.objects as PERMISSIVE for SELECT to public using((bucket_id = 'avatars'::text));
+create policy "Anyone can view post images" on storage.objects as PERMISSIVE for SELECT to public using((bucket_id = 'post-images'::text));
+create policy "Anyone can view yap media" on storage.objects as PERMISSIVE for SELECT to public using((bucket_id = 'yap-media'::text));
+create policy "Users can delete avatars" on storage.objects as PERMISSIVE for DELETE to authenticated using(((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text)));
+create policy "Users can update avatars" on storage.objects as PERMISSIVE for UPDATE to authenticated using(((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text)));
+create policy "Users can upload avatars" on storage.objects as PERMISSIVE for INSERT to authenticated with check(((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text)));
+create policy "Users can upload post images" on storage.objects as PERMISSIVE for INSERT to authenticated with check(((bucket_id = 'post-images'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text)));
+create policy "Users can upload yap media" on storage.objects as PERMISSIVE for INSERT to authenticated with check(((bucket_id = 'yap-media'::text) AND (auth.uid() IS NOT NULL)));

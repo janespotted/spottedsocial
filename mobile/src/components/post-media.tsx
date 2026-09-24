@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { getSessionAccessToken, onSessionTokenChange } from '@/lib/session-identity';
+import { privateMediaSource } from '@/lib/private-media';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Image } from '@/components/styled';
 import { useEvent } from 'expo';
@@ -45,8 +47,9 @@ function PostVideo({
   // Videos play WITH sound (client, Sept 2026). The mute control is kept
   // behind `showMuteButton` — currently off everywhere — because it is
   // likely to come back; the player state below is what it needs.
+  useSyncExternalStore(onSessionTokenChange, getSessionAccessToken, getSessionAccessToken);
   const [muted, setMuted] = useState(false);
-  const player = useVideoPlayer(uri, (p) => {
+  const player = useVideoPlayer({ ...privateMediaSource(uri), useCaching: false, contentType: uri.includes('playback_id=') && uri.includes('kind=video') ? 'hls' : 'auto' }, (p) => {
     p.loop = true;
     p.play();
   });
@@ -178,8 +181,7 @@ export function PostMedia({
     );
   return (
     <Image
-      // cacheKey: signed URLs change every mint, the path never does —
-      // without it every feed refresh re-downloads every image.
+      // SecureImage replaces private cache keys and disables native byte caching.
       source={{ uri: post.image_url, cacheKey: post.media_path ?? undefined }}
       placeholder={post.media_hash ? { thumbhash: post.media_hash } : undefined}
       placeholderContentFit="cover"

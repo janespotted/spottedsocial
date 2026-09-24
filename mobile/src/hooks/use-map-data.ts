@@ -131,13 +131,18 @@ async function fetchMapData(
     let statusQuery = supabase
       .from('night_statuses')
       .select(
-        'user_id, venue_id, venue_name, status, expires_at, is_private_party, party_neighborhood, is_demo, lat, lng'
+        'user_id, venue_id, venue_name, status, expires_at, is_private_party, party_neighborhood, is_demo'
       )
       .not('expires_at', 'is', null)
       .gt('expires_at', nowIso);
     // In dev, demo statuses are visible beyond the friend set (web demo mode)
     if (!isDemoMode()) statusQuery = statusQuery.in('user_id', friendIds);
-    const { data: statuses, error: statusError } = await statusQuery;
+    const [{ data: statuses, error: statusError }, demoSpots] = await Promise.all([
+      statusQuery,
+      isDemoMode() ? supabase.rpc('get_demo_status_locations') : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (demoSpots.error) throw demoSpots.error;
+    const demoByUser = new Map((demoSpots.data ?? []).map((s) => [s.user_id, s]));
     if (statusError) throw statusError;
     for (const s of statuses ?? []) {
       if (s.status === 'out') {
@@ -157,8 +162,9 @@ async function fetchMapData(
           lng: null,
         };
       }
-      if (isDemoMode() && s.is_demo && s.status === 'out' && s.lat && s.lng) {
-        demoOutStatuses.push({ user_id: s.user_id, venue_name: s.venue_name, lat: s.lat, lng: s.lng });
+      const demoSpot = demoByUser.get(s.user_id);
+      if (isDemoMode() && s.status === 'out' && demoSpot?.lat != null && demoSpot.lng != null) {
+        demoOutStatuses.push({ user_id: s.user_id, venue_name: s.venue_name, lat: demoSpot.lat, lng: demoSpot.lng });
       }
     }
   }

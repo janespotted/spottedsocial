@@ -60,3 +60,10 @@ verify_jwt = false
 
 [functions.process-push-queue]
 verify_jwt = true
+
+# Every byte request validates the user JWT and parent authorization itself.
+[functions.private-media]
+verify_jwt = false
+
+[functions.private-media-cleanup]
+verify_jwt = true

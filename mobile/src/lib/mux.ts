@@ -1,13 +1,10 @@
-/**
- * Mux playback URLs. Playback ids are public (unguessable) — the post row
- * itself is what RLS protects, and every asset is deleted at the 5 AM
- * cleanup, so a leaked id dies with the night.
- */
+import { privateMediaUrl } from './private-media';
+
 export type MuxStatus = 'preparing' | 'ready' | 'errored';
 
 /** HLS manifest; AVPlayer (expo-video) and ExoPlayer play it natively. */
 export function muxHlsUrl(playbackId: string): string {
-  return `https://stream.mux.com/${playbackId}.m3u8?max_resolution=1080p`;
+  return privateMediaUrl({ playback_id: playbackId, kind: 'video' });
 }
 
 /**
@@ -18,7 +15,7 @@ export function muxThumbnailUrl(
   playbackId: string,
   { width = 1080, height = Math.round(width * 1.25), time = 0.5 } = {}
 ): string {
-  return `https://image.mux.com/${playbackId}/thumbnail.jpg?time=${time}&width=${width}&height=${height}&fit_mode=smartcrop`;
+  return privateMediaUrl({ playback_id: playbackId, kind: 'thumbnail', width: String(width), height: String(height), time: String(time) });
 }
 
 /** What the feed should draw for a video post. */

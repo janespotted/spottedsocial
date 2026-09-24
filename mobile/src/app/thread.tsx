@@ -174,7 +174,7 @@ export default function ThreadScreen() {
       if (threadData?.is_group) {
         setGroupInfo({
           name: threadData.name ?? null,
-          group_avatar_url: threadData.group_avatar_url ?? null,
+          group_avatar_url: await resolvePostImageUrl(threadData.group_avatar_url ?? null),
           members: allMembers,
         });
         setOtherMember(null);
@@ -227,8 +227,8 @@ export default function ThreadScreen() {
     // Fetched history must not play entrance animations — only live arrivals
     for (const m of tonight) seenIdsRef.current.add(m.id);
     setMessages(tonight);
-    // Resolve storage paths to signed URLs (mobile uploads store paths)
-    const pathMsgs = tonight.filter((m) => m.image_url && !m.image_url.startsWith('http'));
+    // Resolve media to the authenticated gateway (including legacy public URLs)
+    const pathMsgs = tonight.filter((m) => m.image_url);
     for (const msg of pathMsgs) {
       const url = await resolvePostImageUrl(msg.image_url);
       if (url) {
@@ -265,7 +265,7 @@ export default function ThreadScreen() {
         },
         async (payload) => {
           const newMsg = payload.new as DmMessage;
-          if (newMsg.image_url && !newMsg.image_url.startsWith('http')) {
+          if (newMsg.image_url) {
             newMsg.image_url = await resolvePostImageUrl(newMsg.image_url);
           }
           setMessages((prev) =>
@@ -412,11 +412,11 @@ export default function ThreadScreen() {
     ]);
     try {
       const ext = asset.mimeType === 'image/png' ? 'png' : 'jpg';
-      const path = `${userId}/dm/${threadId}/${Date.now()}.${ext}`;
+      const path = `${userId}/private-v1/dm/${threadId}/${Date.now()}.${ext}`;
       const body = await fetch(asset.uri).then((r) => r.arrayBuffer());
       const { error: uploadErr } = await supabase.storage
         .from('post-images')
-        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: true });
+        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: false });
       if (uploadErr) throw uploadErr;
       const { data: inserted, error: insertErr } = await supabase
         .from('dm_messages')
@@ -560,19 +560,19 @@ export default function ThreadScreen() {
     if (result.canceled || !asset) return;
     try {
       const ext = asset.mimeType === 'image/png' ? 'png' : 'jpg';
-      const path = `group-avatars/${threadId}/${Date.now()}.${ext}`;
+      const path = `group-avatars/${threadId}/private-v1/${Date.now()}.${ext}`;
       const body = await fetch(asset.uri).then((r) => r.arrayBuffer());
       const { error: uploadErr } = await supabase.storage
         .from('post-images')
-        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: true });
+        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: false });
       if (uploadErr) throw uploadErr;
-      const { data: urlData } = supabase.storage.from('post-images').getPublicUrl(path);
+      const mediaUrl = await resolvePostImageUrl(path);
       const { error } = await supabase
         .from('dm_threads')
-        .update({ group_avatar_url: urlData.publicUrl })
+        .update({ group_avatar_url: path })
         .eq('id', threadId);
       if (!error) {
-        setGroupInfo((prev) => (prev ? { ...prev, group_avatar_url: urlData.publicUrl } : prev));
+        setGroupInfo((prev) => (prev ? { ...prev, group_avatar_url: mediaUrl } : prev));
       }
     } catch {
       /* upload failed — keep prior photo */

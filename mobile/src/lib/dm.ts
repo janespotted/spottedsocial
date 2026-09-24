@@ -1,3 +1,4 @@
+import { resolvePostImageUrl } from './posts';
 import { supabase } from './supabase';
 import { isDemoMode } from './demo-mode';
 import { fetchProfilesSafe } from './profiles';
@@ -153,7 +154,7 @@ export async function fetchDmThreads(userId: string): Promise<DmThreadPreview[]>
       id: threadId,
       is_group: info?.is_group ?? false,
       name: info?.name ?? null,
-      group_avatar_url: info?.group_avatar_url ?? null,
+      group_avatar_url: await resolvePostImageUrl(info?.group_avatar_url ?? null),
       members,
       venue_name: members.length === 1 ? members[0].venue_name : null,
       last_message: last ? { text: last.text, created_at: last.created_at } : null,

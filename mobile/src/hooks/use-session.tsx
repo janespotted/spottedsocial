@@ -2,6 +2,7 @@ import { createContext, use, useCallback, useEffect, useState, type ReactNode } 
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { hasSeenTour } from '@/lib/tour-seen';
+import { getSessionRevision, setSessionIdentity } from '@/lib/session-identity';
 
 interface SessionState {
   session: Session | null;
@@ -67,13 +68,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | null>(null);
 
   const refreshOnboardingStatus = useCallback(async () => {
+    const revision = getSessionRevision();
     const { data } = await supabase.auth.getSession();
     const uid = data.session?.user.id;
     if (!uid) return;
-    setOnboardingNeeded(await fetchOnboardingNeeded(uid));
+    const needed = await fetchOnboardingNeeded(uid);
+    if (revision === getSessionRevision()) setOnboardingNeeded(needed);
   }, []);
 
   useEffect(() => {
+    let disposed = false;
+    let authEventSeen = false;
     // Keep ONE session object per signed-in user. Supabase emits a fresh
     // Session on INITIAL_SESSION, SIGNED_IN echoes and every hourly
     // TOKEN_REFRESHED; every hook in the app keys effects on `session`, so a
@@ -84,6 +89,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // the identity only needs to change when the user does. USER_UPDATED
     // carries changed profile fields (email/phone) and is taken as-is.
     const applySession = (next: Session | null, event: AuthChangeEvent | 'GET_SESSION') => {
+      if (disposed) return;
+      setSessionIdentity(next?.user.id ?? null, next?.access_token ?? null);
       setSession((prev) => {
         if (prev && next && prev.user.id === next.user.id && event !== 'USER_UPDATED') return prev;
         return next;
@@ -91,13 +98,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
 
     supabase.auth.getSession().then(({ data }) => {
-      applySession(data.session, 'GET_SESSION');
+      if (!authEventSeen) applySession(data.session, 'GET_SESSION');
       setSessionLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      authEventSeen = true;
       applySession(next, event);
+      setSessionLoading(false);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => { disposed = true; sub.subscription.unsubscribe(); };
   }, []);
 
   // Re-evaluate onboarding status whenever the signed-in user changes

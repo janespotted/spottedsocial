@@ -35,13 +35,16 @@ Deno.serve(async (req) => {
   const { data: { user }, error: userError } = await supabaseUser.auth.getUser()
   if (userError || !user) return json({ error: 'Unauthorized' }, 401)
 
-  if (!muxConfigured()) {
-    console.error('mux-create-upload called but MUX_TOKEN_ID / MUX_TOKEN_SECRET are not set')
+  if (!muxConfigured() || !Deno.env.get('MUX_SIGNING_KEY_ID') || !Deno.env.get('MUX_SIGNING_PRIVATE_KEY') || !Deno.env.get('PRIVATE_MEDIA_PROXY_KEY')) {
+    console.error('Secure Mux delivery is not configured')
     return json({ error: 'Video uploads are not available right now.' }, 503)
   }
 
   try {
     const upload = await createDirectUpload(user.id)
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    const { error: registryError } = await admin.from('mux_uploads').insert({ upload_id: upload.id, user_id: user.id })
+    if (registryError) throw new Error('Upload ownership could not be recorded')
     return json({ uploadId: upload.id, url: upload.url, timeout: upload.timeout })
   } catch (e) {
     console.error('mux-create-upload failed:', e)

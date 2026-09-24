@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
-import { Image } from 'expo-image';
+import { Image } from '@/components/styled';
 import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';

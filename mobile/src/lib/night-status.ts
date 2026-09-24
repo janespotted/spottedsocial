@@ -1,3 +1,4 @@
+import { getSessionRevision } from './session-identity';
 import { supabase } from './supabase';
 import { getNightResetIso, isUnexpired } from './tonight';
 import { markManualCheckin } from './venue-arrival-engine';
@@ -14,6 +15,7 @@ let _cachedOutResult: {
 
 async function getOutState(userId: string): Promise<{ out: boolean; privateParty: boolean }> {
   const now = Date.now();
+  const revision = getSessionRevision();
   if (
     _cachedOutResult &&
     _cachedOutResult.userId === userId &&
@@ -37,6 +39,7 @@ async function getOutState(userId: string): Promise<{ out: boolean; privateParty
   } catch {
     /* fail closed */
   }
+  if (revision !== getSessionRevision()) return { out: false, privateParty: false };
   _cachedOutResult = { out, privateParty, ts: now, userId };
   return _cachedOutResult;
 }
@@ -115,14 +118,10 @@ export interface OwnNightStatus {
  */
 export async function fetchOwnNightStatus(userId: string): Promise<OwnNightStatus | null> {
   const { data, error } = await supabase
-    .from('night_statuses')
-    .select(
-      'id, status, venue_id, venue_name, lat, lng, is_private_party, party_neighborhood, planning_neighborhood, planning_visibility, expires_at, updated_at, automatic_venue_updates'
-    )
-    .eq('user_id', userId)
+    .rpc('get_own_night_status')
     .maybeSingle();
   if (error) throw error;
-  if (!data || !isUnexpired(data.expires_at)) return null;
+  if (!data || data.user_id !== userId || !isUnexpired(data.expires_at)) return null;
 
   // A private party's exact spot never rests on the status row (DB trigger
   // moves it to party_locations); the owner reads their own row back here.
@@ -203,8 +202,8 @@ export interface GoPlanningOptions {
 
 /**
  * The ONE way to enter planning mode ("TBD"). Stops GPS, writes the status,
- * then ends open check-ins and clears location. party_address is never in
- * the upsert payload (WP6) — it's nulled via a separate constant UPDATE.
+ * then ends open check-ins and clears location. The caller-bound RPC clears
+ * the address in the same transaction without granting raw column reads.
  */
 export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): Promise<void> {
   const { pauseLocationForStatusChange } = await import('./background-location');
@@ -213,8 +212,8 @@ export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): 
   invalidateOutStatusCache();
 
   must(
-    await supabase.from('night_statuses').upsert(
-      {
+    await supabase.rpc('upsert_own_night_status', {
+      p_patch: {
         user_id: userId,
         status: 'planning' as const,
         venue_name: null,
@@ -229,12 +228,11 @@ export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): 
         planning_visibility: opts.visibility ?? null,
         is_private_party: false,
         party_neighborhood: null,
+        party_address: null,
       },
-      { onConflict: 'user_id' }
-    )
+    })
   );
 
-  must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
   must(
     await supabase
       .from('checkins')
@@ -271,8 +269,8 @@ async function endLiveSharing(
   const { pauseLocationForStatusChange } = await import('./background-location');
   await pauseLocationForStatusChange(userId);
   must(
-    await supabase.from('night_statuses').upsert(
-      {
+    await supabase.rpc('upsert_own_night_status', {
+      p_patch: {
         user_id: userId,
         status,
         venue_name: null,
@@ -286,13 +284,12 @@ async function endLiveSharing(
         planning_visibility: null,
         is_private_party: false,
         party_neighborhood: null,
+        party_address: null,
         updated_at: now,
       },
-      { onConflict: 'user_id' }
-    )
+    })
   );
 
-  must(await supabase.from('night_statuses').update({ party_address: null }).eq('user_id', userId));
   await clearUserLocation(userId);
 
   must(
@@ -327,7 +324,7 @@ export interface GoOutOptions {
 
 /**
  * The ONE way to go "out" at a venue. Full-field night_statuses upsert
- * (party_address never in the payload — WP6), ends prior check-ins, opens a
+ * (including the address in the caller-bound transaction), ends prior check-ins, opens a
  * new one and marks the profile out. Port of the web goOutAtVenue. Callers
  * that flip planning→out at a VENUE must also startBackgroundLocation (see
  * BackgroundLocationManager contract).
@@ -355,8 +352,8 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
   const shareGps = !!liveFix && validFix(liveFix);
 
   must(
-    await supabase.from('night_statuses').upsert(
-      {
+    await supabase.rpc('upsert_own_night_status', {
+      p_patch: {
         user_id: userId,
         status: 'out' as const,
         automatic_venue_updates: automatic,
@@ -372,16 +369,9 @@ export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<
         planning_visibility: null,
         is_private_party: !!opts.privateParty,
         party_neighborhood: opts.privateParty?.neighborhood ?? null,
+        party_address: opts.privateParty?.address ?? null,
       },
-      { onConflict: 'user_id' }
-    )
-  );
-
-  must(
-    await supabase
-      .from('night_statuses')
-      .update({ party_address: opts.privateParty?.address ?? null })
-      .eq('user_id', userId)
+    })
   );
 
   // End prior check-ins, open a new one

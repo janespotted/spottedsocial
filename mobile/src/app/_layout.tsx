@@ -1,3 +1,4 @@
+import { AccountScope } from '@/components/account-scope';
 import '../../global.css';
 import { useEffect } from 'react';
 import {
@@ -249,19 +250,21 @@ export default function RootLayout() {
           <KeyboardProvider>
             <HeroUINativeProvider>
               <SessionProvider>
-                <QueryClientProvider client={queryClient}>
-                  {/* react-native-teleport: a feed post's media is re-parented
-                      into the post detail screen (POST-DETAIL-PLAN.md) */}
-                  <PortalProvider>
-                    <RootNavigator />
-                  </PortalProvider>
-                  <NightStatusGate />
-                  <BackgroundLocationManager />
-                  <PushNotificationManager />
-                  <StatusBar style="light" />
-                  <SplashController />
-                  <ToastHost />
-                </QueryClientProvider>
+                <AccountScope>
+                  <QueryClientProvider client={queryClient}>
+                    {/* react-native-teleport: a feed post's media is re-parented
+                        into the post detail screen (POST-DETAIL-PLAN.md) */}
+                    <PortalProvider>
+                      <RootNavigator />
+                    </PortalProvider>
+                    <NightStatusGate />
+                    <BackgroundLocationManager />
+                    <PushNotificationManager />
+                    <StatusBar style="light" />
+                    <SplashController />
+                    <ToastHost />
+                  </QueryClientProvider>
+                </AccountScope>
               </SessionProvider>
             </HeroUINativeProvider>
           </KeyboardProvider>

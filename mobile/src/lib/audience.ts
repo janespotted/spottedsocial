@@ -1,3 +1,4 @@
+import { getSessionUserId, getSessionRevision } from './session-identity';
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -70,13 +71,15 @@ export function useAudienceRequest(): AudienceRequest | null {
   );
 }
 
-/* ── Post audience preference (per device; separate from the status one) ── */
+/* ── Post audience preference (per account; separate from the status one) ── */
 
 const POST_AUDIENCE_KEY = 'spotted.post-audience';
 
 export async function loadPostAudience(): Promise<Audience> {
   try {
-    const raw = await AsyncStorage.getItem(POST_AUDIENCE_KEY);
+    const revision = getSessionRevision();
+    const raw = await AsyncStorage.getItem(`${POST_AUDIENCE_KEY}:${getSessionUserId() ?? 'signed-out'}`);
+    if (revision !== getSessionRevision()) return DEFAULT_AUDIENCE;
     return isAudience(raw) ? raw : DEFAULT_AUDIENCE;
   } catch {
     return DEFAULT_AUDIENCE;
@@ -85,7 +88,7 @@ export async function loadPostAudience(): Promise<Audience> {
 
 export async function savePostAudience(value: Audience): Promise<void> {
   try {
-    await AsyncStorage.setItem(POST_AUDIENCE_KEY, value);
+    await AsyncStorage.setItem(`${POST_AUDIENCE_KEY}:${getSessionUserId() ?? 'signed-out'}`, value);
   } catch {
     /* best effort */
   }

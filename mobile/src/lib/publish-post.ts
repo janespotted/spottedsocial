@@ -99,10 +99,9 @@ async function uploadMedia(
       Authorization: `Bearer ${token}`,
       apikey: SUPABASE_PUBLISHABLE_KEY,
       'Content-Type': media.mimeType,
-      'x-upsert': 'true',
-      // Paths are unique per upload (userId/timestamp), so the object never
-      // changes: let the CDN and every device cache it for a year.
-      'cache-control': 'max-age=31536000, immutable',
+      'x-upsert': 'false',
+      // Access is rechecked on each authenticated gateway request.
+      'cache-control': 'private, no-store',
     },
     onProgress: ({ bytesSent, totalBytes }) => {
       if (totalBytes > 0) onProgress?.(Math.min(1, bytesSent / totalBytes));
@@ -183,7 +182,7 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
       if (isVideo) {
         uploadedKey = await uploadVideoToMux(prepared, onProgress, signal);
       } else {
-        const path = `${userId}/${Date.now()}.${prepared.fileExt}`;
+        const path = `${userId}/private-v1/${Date.now()}.${prepared.fileExt}`;
         await uploadMedia(path, prepared, onProgress, signal);
         uploadedKey = path;
       }

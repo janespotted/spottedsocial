@@ -1,3 +1,4 @@
+import { privateMediaUrl } from './private-media';
 import type { Database } from './database.types';
 import { isDemoMode } from './demo-mode';
 import { fetchTagsForPosts, type TaggedFriend } from './post-tags';
@@ -43,8 +44,7 @@ type PostRow = Database['public']['Tables']['posts']['Row'];
 
 /**
  * Turn raw `posts` rows into what the feed renders: author from
- * get_profiles_safe, live like/comment counts, signed media URLs (one
- * Storage call for the batch) and tags. The feed page and the post detail's
+ * get_profiles_safe, live like/comment counts, authenticated media URLs and tags. The feed page and the post detail's
  * deep-link path both go through here, so they can never disagree.
  *
  * `likedByMe` comes back separately because the feed keeps its own liked
@@ -69,7 +69,7 @@ export async function hydratePosts(
       supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds),
       supabase.from('post_comments').select('post_id').in('post_id', postIds),
       // Uploaded posts store a private-bucket path in image_url — swap for a
-      // signed URL. Full http URLs (demo content) pass through untouched.
+      // authenticated gateway URL. External demo imagery remains public.
       resolvePostImageUrls(rows.map((p) => p.image_url)),
       fetchTagsForPosts(postIds),
     ]);
@@ -134,60 +134,31 @@ export async function fetchPostById(
 
 /**
  * The post-images bucket is private: uploaded posts store a storage path
- * (`userId/timestamp.jpg`) in image_url, which must be exchanged for a signed
- * URL to render. Demo/seed posts store full http URLs and pass through as-is.
- * Port of the web resolvePostImageUrl (storage-utils.ts).
+ * (`userId/private-v1/timestamp.jpg`) in image_url. The authenticated gateway
+ * rechecks the parent on every request. External demo imagery remains public.
  */
-const SIGNED_URL_TTL = 6 * 3600;
-const PUBLIC_PREFIX = '/storage/v1/object/public/post-images/';
 
 /**
  * Storage path behind an image_url value, or null for external http URLs.
- * Also the stable cache key: signed URLs carry a fresh token every time
- * they are minted, so caching by URL would re-download on every feed load.
+ * Legacy public/signed Storage URLs are normalized to the same protected key.
  */
 export function postImageStoragePath(imageUrl: string | null): string | null {
   if (!imageUrl) return null;
-  if (imageUrl.includes(PUBLIC_PREFIX)) return imageUrl.split(PUBLIC_PREFIX)[1] || null;
+  const match = imageUrl.match(/^https?:\/\/[^/]+\/storage\/v1\/object\/(?:public|sign|authenticated)\/post-images\/([^?]+)/);
+  if (match) return decodeURIComponent(match[1]);
   if (!imageUrl.startsWith('http')) return imageUrl;
   return null;
 }
 
+/** Returns an authenticated endpoint, never a transferable Storage signed URL. */
 export async function resolvePostImageUrl(imageUrl: string | null): Promise<string | null> {
   if (!imageUrl) return null;
   const path = postImageStoragePath(imageUrl);
-  if (!path) return imageUrl;
-  const { data } = await supabase.storage.from('post-images').createSignedUrl(path, SIGNED_URL_TTL);
-  return data?.signedUrl ?? null;
+  return path ? privateMediaUrl({ path }) : imageUrl; // External seed/demo imagery stays public.
 }
-
-/**
- * Batch form for lists: one Storage request for a whole feed page instead
- * of one per post. Returns a map keyed by the original image_url value.
- */
-export async function resolvePostImageUrls(
-  imageUrls: ReadonlyArray<string | null>
-): Promise<Map<string, string | null>> {
+export async function resolvePostImageUrls(imageUrls: ReadonlyArray<string | null>): Promise<Map<string, string | null>> {
   const result = new Map<string, string | null>();
-  const paths: string[] = [];
-  for (const url of imageUrls) {
-    if (!url || result.has(url)) continue;
-    const path = postImageStoragePath(url);
-    if (!path) {
-      result.set(url, url);
-      continue;
-    }
-    result.set(url, null);
-    paths.push(path);
-  }
-  if (paths.length === 0) return result;
-  const { data } = await supabase.storage.from('post-images').createSignedUrls(paths, SIGNED_URL_TTL);
-  const byPath = new Map((data ?? []).map((row) => [row.path, row.signedUrl ?? null]));
-  for (const url of imageUrls) {
-    if (!url) continue;
-    const path = postImageStoragePath(url);
-    if (path) result.set(url, byPath.get(path) ?? null);
-  }
+  for (const url of imageUrls) if (url && !result.has(url)) result.set(url, await resolvePostImageUrl(url));
   return result;
 }
 

@@ -728,6 +728,18 @@ export type Database = {
           },
         ]
       }
+      media_object_deletions: {
+        Row: { bucket_id: string; name: string; queued_at: string; attempts: number; last_error: string | null }
+        Insert: { bucket_id: string; name: string; queued_at?: string; attempts?: number; last_error?: string | null }
+        Update: { bucket_id?: string; name?: string; queued_at?: string; attempts?: number; last_error?: string | null }
+        Relationships: []
+      }
+      mux_uploads: {
+        Row: { upload_id: string; user_id: string; asset_id: string | null; playback_id: string | null; status: string; width: number | null; height: number | null; created_at: string }
+        Insert: { upload_id: string; user_id: string; asset_id?: string | null; playback_id?: string | null; status?: string; width?: number | null; height?: number | null; created_at?: string }
+        Update: { upload_id?: string; user_id?: string; asset_id?: string | null; playback_id?: string | null; status?: string; width?: number | null; height?: number | null; created_at?: string }
+        Relationships: [{ foreignKeyName: "mux_uploads_user_id_fkey"; columns: ["user_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] }]
+      }
       mux_asset_deletions: {
         Row: {
           asset_id: string
@@ -1241,6 +1253,7 @@ export type Database = {
           media_width: number | null
           mux_asset_id: string | null
           mux_playback_id: string | null
+          mux_signed: boolean
           mux_status: string | null
           mux_upload_id: string | null
           text: string
@@ -1264,6 +1277,7 @@ export type Database = {
           media_width?: number | null
           mux_asset_id?: string | null
           mux_playback_id?: string | null
+          mux_signed?: boolean
           mux_status?: string | null
           mux_upload_id?: string | null
           text: string
@@ -1287,6 +1301,7 @@ export type Database = {
           media_width?: number | null
           mux_asset_id?: string | null
           mux_playback_id?: string | null
+          mux_signed?: boolean
           mux_status?: string | null
           mux_upload_id?: string | null
           text?: string
@@ -2488,6 +2503,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_demo_status_locations: { Args: never; Returns: { user_id: string; lat: number; lng: number }[] }
+      friendship_available: { Args: { p_other: string }; Returns: boolean }
+      private_media_target: { Args: { p_path?: string | null; p_playback_id?: string | null }; Returns: Json }
+      can_upload_v1_media: { Args: { p_name: string }; Returns: boolean }
+      replace_private_media_path: { Args: { p_old: string; p_new: string }; Returns: undefined }
+      pending_private_media_cleanup: { Args: never; Returns: Database["public"]["Tables"]["media_object_deletions"]["Row"][] }
+      upsert_own_night_status: { Args: { p_patch: Json }; Returns: undefined }
+      get_own_night_status: { Args: never; Returns: Database["public"]["Tables"]["night_statuses"]["Row"][] }
+      remove_friendship: { Args: { p_other: string }; Returns: string | null }
+      restore_friendship: { Args: { p_token: string }; Returns: undefined }
+      can_read_post: { Args: { p_id: string }; Returns: boolean }
+
       _can_see_location_unchecked: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
