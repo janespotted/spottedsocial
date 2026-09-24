@@ -35,6 +35,8 @@ where conrelid = 'public.notifications'::regclass and contype = 'f';
 
 Both rows must say `profiles`. If either says `auth.users`, then liking, commenting on, DMing, tagging or friending a demo user fails outright (the action rolls back). In that case, repoint the FK first, or restore the guard.
 
+**Checked on production 2026-09-24: `notifications` has no foreign keys at all**, so these inserts cannot fail on a missing user. This check passes.
+
 ## Should fix before TestFlight
 
 Status 2026-09-24: #1 and #2 are fixed in the working tree (uncommitted). #3 is still open.
@@ -58,20 +60,25 @@ Status 2026-09-24: the Lahore campaign exclusion, the empty client calls and the
 
 ## Deploy order
 
-1. Run the FK check above.
-2. Confirm `pg_cron`, `pg_net` and Vault are enabled on production.
-3. Apply the migrations **in timestamp order**. `…213920` renames functions created by `…205151`, so it fails if run out of order:
-   1. `20260922173438_reliable_live_location.sql`
-   2. `20260922205151_reliable_notification_delivery.sql`
-   3. `20260922213920_nightlife_notification_coverage.sql`
-   4. `20260922220927_spotted_notification_voice.sql`
-4. Create the Vault secrets `spotted_push_url` (project base URL) and `spotted_push_service_key` (the service-role key). Without them, `wake_push_worker()` only warns and delivery falls back to cron timing.
-5. Deploy the edge functions `send-push`, `process-push-queue`, `send-daily-nudge` and `send-weekend-rally`, with JWT verification as set in `supabase/config.toml`.
-6. Confirm the APNs secrets (`APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_AUTH_KEY`, `APNS_BUNDLE_ID`) are set. Without them `send-push` sends nothing and reports no error.
-7. Mark any old `pending` rows in `push_outbox` as `skipped`, then set `update spotted_private.push_settings set delivery_enabled = true;`. **Leave `campaigns_enabled` false** until two-phone QA passes.
-8. Confirm the cron jobs exist and run: check `cron.job` and `cron.job_run_details` for `spotted-push-delivery`, `spotted-push-campaigns` and `spotted-activity-dedupe-cleanup`.
-9. Regenerate the types: `npx supabase gen types typescript --linked --schema public`.
-10. Re-run the Supabase database advisors.
+State of production on 2026-09-24 (project `rwavbyvdytdegntdryll`, read-only checks):
+
+- `20260922173438_reliable_live_location` is **already applied**, and it matches the repo file.
+- Production also had three leaderboard migrations applied directly, which were in no branch: `20260922030035_bars_and_clubs_only_leaderboard`, `20260922030430_leaderboard_read_public_aggregates` and `20260922033535_add_editorial_neighborhood_leaderboard_coverage`. They are now in `supabase/migrations/`, written from production's own migration history, so `db push` no longer refuses. They touch no function the pending migrations define.
+- `pg_cron`, `pg_net` and `supabase_vault` are installed. APNs, VAPID and Mux secrets are set.
+- **Missing:** the Vault secrets `spotted_push_url` and `spotted_push_service_key`. The push cron jobs don't exist yet; the migrations create them.
+
+Steps:
+
+1. Apply the three pending migrations with `npx supabase db push --linked`. They run in timestamp order; `…213920` renames functions created by `…205151`.
+   1. `20260922205151_reliable_notification_delivery.sql`
+   2. `20260922213920_nightlife_notification_coverage.sql`
+   3. `20260922220927_spotted_notification_voice.sql`
+2. Create the Vault secrets `spotted_push_url` (`https://rwavbyvdytdegntdryll.supabase.co`) and `spotted_push_service_key` (the service-role key). `wake_push_worker()` raises an error without them, so the every-minute delivery job fails until they exist.
+3. Deploy the edge functions `send-push`, `process-push-queue`, `send-daily-nudge` and `send-weekend-rally`, with JWT verification as set in `supabase/config.toml`.
+4. Set `update spotted_private.push_settings set delivery_enabled = true;`. **Leave `campaigns_enabled` false** until two-phone QA passes. (`push_outbox` is new, so there are no old rows to skip.)
+5. Confirm the cron jobs run: check `cron.job_run_details` for `spotted-push-delivery`, `spotted-push-campaigns` and `spotted-activity-dedupe-cleanup`.
+6. Regenerate the types: `npx supabase gen types typescript --linked --schema public > mobile/src/lib/database.types.ts`.
+7. Re-run the database advisors: `npx supabase db advisors --linked`.
 
 ## Two-iPhone / TestFlight additions
 
