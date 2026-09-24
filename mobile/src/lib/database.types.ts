@@ -14,57 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      live_location_state: {
-        Row: {
-          candidate_id: string | null
-          candidate_last_at: string | null
-          candidate_samples: number
-          candidate_since: string | null
-          departure_since: string | null
-          expires_at: string
-          last_recorded_at: string | null
-          status_revision: string
-          user_id: string
-        }
-        Insert: {
-          candidate_id?: string | null
-          candidate_last_at?: string | null
-          candidate_samples?: number
-          candidate_since?: string | null
-          departure_since?: string | null
-          expires_at: string
-          last_recorded_at?: string | null
-          status_revision: string
-          user_id: string
-        }
-        Update: {
-          candidate_id?: string | null
-          candidate_last_at?: string | null
-          candidate_samples?: number
-          candidate_since?: string | null
-          departure_since?: string | null
-          expires_at?: string
-          last_recorded_at?: string | null
-          status_revision?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "live_location_state_candidate_id_fkey"
-            columns: ["candidate_id"]
-            isOneToOne: false
-            referencedRelation: "venues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "live_location_state_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       blocked_users: {
         Row: {
           blocked_id: string
@@ -548,6 +497,81 @@ export type Database = {
         }
         Relationships: []
       }
+      leaderboard_neighborhoods: {
+        Row: {
+          center_lat: number
+          center_lng: number
+          city: string
+          included_neighborhoods: string[]
+          name: string
+        }
+        Insert: {
+          center_lat: number
+          center_lng: number
+          city: string
+          included_neighborhoods: string[]
+          name: string
+        }
+        Update: {
+          center_lat?: number
+          center_lng?: number
+          city?: string
+          included_neighborhoods?: string[]
+          name?: string
+        }
+        Relationships: []
+      }
+      live_location_state: {
+        Row: {
+          candidate_id: string | null
+          candidate_last_at: string | null
+          candidate_samples: number
+          candidate_since: string | null
+          departure_since: string | null
+          expires_at: string
+          last_recorded_at: string | null
+          status_revision: string
+          user_id: string
+        }
+        Insert: {
+          candidate_id?: string | null
+          candidate_last_at?: string | null
+          candidate_samples?: number
+          candidate_since?: string | null
+          departure_since?: string | null
+          expires_at: string
+          last_recorded_at?: string | null
+          status_revision: string
+          user_id: string
+        }
+        Update: {
+          candidate_id?: string | null
+          candidate_last_at?: string | null
+          candidate_samples?: number
+          candidate_since?: string | null
+          departure_since?: string | null
+          expires_at?: string
+          last_recorded_at?: string | null
+          status_revision?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_location_state_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_location_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       location_detection_logs: {
         Row: {
           confirmed_venue_id: string | null
@@ -806,10 +830,37 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          moves_scope: string
+          out_scope: string
+          user_id: string
+        }
+        Insert: {
+          moves_scope?: string
+          out_scope?: string
+          user_id: string
+        }
+        Update: {
+          moves_scope?: string
+          out_scope?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null
-          data?: Json
+          data: Json
+          event_key: string | null
           id: string
           is_demo: boolean | null
           is_read: boolean | null
@@ -821,6 +872,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           data?: Json
+          event_key?: string | null
           id?: string
           is_demo?: boolean | null
           is_read?: boolean | null
@@ -832,6 +884,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           data?: Json
+          event_key?: string | null
           id?: string
           is_demo?: boolean | null
           is_read?: boolean | null
@@ -869,6 +922,51 @@ export type Database = {
             foreignKeyName: "party_locations_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      party_requests: {
+        Row: {
+          expires_at: string
+          guest_id: string
+          host_id: string
+          id: string
+          kind: string
+          state: string
+          status_id: string
+        }
+        Insert: {
+          expires_at: string
+          guest_id: string
+          host_id: string
+          id?: string
+          kind: string
+          state?: string
+          status_id: string
+        }
+        Update: {
+          expires_at?: string
+          guest_id?: string
+          host_id?: string
+          id?: string
+          kind?: string
+          state?: string
+          status_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_requests_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_requests_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1326,6 +1424,53 @@ export type Database = {
         }
         Relationships: []
       }
+      push_outbox: {
+        Row: {
+          attempts: number
+          available_at: string
+          channels: Json
+          completed_at: string | null
+          expires_at: string
+          last_error: string | null
+          lease_id: string | null
+          lease_until: string | null
+          notification_id: string
+          state: string
+        }
+        Insert: {
+          attempts?: number
+          available_at?: string
+          channels?: Json
+          completed_at?: string | null
+          expires_at?: string
+          last_error?: string | null
+          lease_id?: string | null
+          lease_until?: string | null
+          notification_id: string
+          state?: string
+        }
+        Update: {
+          attempts?: number
+          available_at?: string
+          channels?: Json
+          completed_at?: string | null
+          expires_at?: string
+          last_error?: string | null
+          lease_id?: string | null
+          lease_until?: string | null
+          notification_id?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_outbox_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: true
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_throttle: {
         Row: {
           created_at: string | null
@@ -1675,6 +1820,44 @@ export type Database = {
           verification_notes?: string | null
         }
         Relationships: []
+      }
+      venue_editorial_recommendations: {
+        Row: {
+          active: boolean
+          published_at: string
+          publisher: string
+          source_title: string
+          source_url: string
+          venue_id: string
+          verified_at: string
+        }
+        Insert: {
+          active?: boolean
+          published_at: string
+          publisher: string
+          source_title: string
+          source_url: string
+          venue_id: string
+          verified_at?: string
+        }
+        Update: {
+          active?: boolean
+          published_at?: string
+          publisher?: string
+          source_title?: string
+          source_url?: string
+          venue_id?: string
+          verified_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_editorial_recommendations_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       venue_leaderboard_scores: {
         Row: {
@@ -2063,6 +2246,9 @@ export type Database = {
           is_map_promoted: boolean | null
           is_user_submitted: boolean | null
           lat: number
+          leaderboard_category: string | null
+          leaderboard_eligible: boolean | null
+          leaderboard_exclusion_reason: string | null
           leaderboard_promo_order: number | null
           lng: number
           name: string
@@ -2086,6 +2272,9 @@ export type Database = {
           is_map_promoted?: boolean | null
           is_user_submitted?: boolean | null
           lat: number
+          leaderboard_category?: string | null
+          leaderboard_eligible?: boolean | null
+          leaderboard_exclusion_reason?: string | null
           leaderboard_promo_order?: number | null
           lng: number
           name: string
@@ -2109,6 +2298,9 @@ export type Database = {
           is_map_promoted?: boolean | null
           is_user_submitted?: boolean | null
           lat?: number
+          leaderboard_category?: string | null
+          leaderboard_eligible?: boolean | null
+          leaderboard_exclusion_reason?: string | null
           leaderboard_promo_order?: number | null
           lng?: number
           name?: string
@@ -2296,25 +2488,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      live_distance_m: {
-        Args: { a_lat: number; a_lng: number; b_lat: number; b_lng: number }
-        Returns: number
-      }
-      record_live_location: {
-        Args: {
-          p_accuracy: number
-          p_lat: number
-          p_lng: number
-          p_recorded_at: string
-          p_speed?: number
-          p_status_updated_at: string
-        }
-        Returns: Json
-      }
       _can_see_location_unchecked: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
       }
+      approved_party_address: { Args: { p_host: string }; Returns: string }
       can_see_location: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
@@ -2332,6 +2510,27 @@ export type Database = {
         }
         Returns: boolean
       }
+      claim_push_batch: {
+        Args: never
+        Returns: {
+          attempts: number
+          available_at: string
+          channels: Json
+          completed_at: string | null
+          expires_at: string
+          last_error: string | null
+          lease_id: string | null
+          lease_until: string | null
+          notification_id: string
+          state: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "push_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       cleanup_old_checkins: { Args: never; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: number }
       cleanup_venue_notif_throttle: { Args: never; Returns: undefined }
@@ -2348,6 +2547,29 @@ export type Database = {
         Args: { p_message: string; p_receiver_id: string; p_type: string }
         Returns: {
           created_at: string | null
+          data: Json
+          event_key: string | null
+          id: string
+          is_demo: boolean | null
+          is_read: boolean | null
+          message: string
+          receiver_id: string
+          sender_id: string
+          type: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notifications"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      create_notification_core: {
+        Args: { p_message: string; p_receiver_id: string; p_type: string }
+        Returns: {
+          created_at: string | null
+          data: Json
+          event_key: string | null
           id: string
           is_demo: boolean | null
           is_read: boolean | null
@@ -2367,6 +2589,8 @@ export type Database = {
         Args: { p_notifications: Json }
         Returns: {
           created_at: string | null
+          data: Json
+          event_key: string | null
           id: string
           is_demo: boolean | null
           is_read: boolean | null
@@ -2394,6 +2618,7 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_scheduled_pushes: { Args: never; Returns: number }
       find_nearby_venues: {
         Args: {
           max_results: number
@@ -2414,6 +2639,16 @@ export type Database = {
           id: string
           name: string
         }[]
+      }
+      finish_push: {
+        Args: {
+          p_channels: Json
+          p_error: string
+          p_id: string
+          p_lease: string
+          p_state: string
+        }
+        Returns: undefined
       }
       get_morning_after_user_posts: {
         Args: {
@@ -2467,7 +2702,33 @@ export type Database = {
           username: string
         }[]
       }
+      get_neighborhood_venue_leaderboard: {
+        Args: { p_city: string; p_limit?: number; p_neighborhood: string }
+        Returns: {
+          checkin_score: number
+          computed_at: string
+          distance_miles: number
+          editorial_sources: Json
+          final_score: number
+          google_rating: number
+          google_user_ratings_total: number
+          internet_score: number
+          is_nearby: boolean
+          lat: number
+          lng: number
+          location_label: string
+          name: string
+          neighborhood: string
+          source_count: number
+          trend_label: string
+          unique_checkins_24h: number
+          unique_checkins_7d: number
+          venue_id: string
+          venue_type: string
+        }[]
+      }
       get_party_address: { Args: { p_status_user_id: string }; Returns: string }
+      get_planning_notification_recipients: { Args: never; Returns: string[] }
       get_profiles_safe: {
         Args: never
         Returns: {
@@ -2536,6 +2797,10 @@ export type Database = {
         Args: { user_id: string; venue_id: string }
         Returns: boolean
       }
+      live_distance_m: {
+        Args: { a_lat: number; a_lng: number; b_lat: number; b_lng: number }
+        Returns: number
+      }
       match_phones: {
         Args: { phone_list: string[] }
         Returns: {
@@ -2551,8 +2816,24 @@ export type Database = {
         Returns: string
       }
       nightly_reset: { Args: never; Returns: Json }
+      party_request: {
+        Args: { p_guest: string; p_host: string; p_kind: string }
+        Returns: string
+      }
       process_invite_code: {
         Args: { invite_code: string; new_user_id: string }
+        Returns: Json
+      }
+      push_notification_allowed: { Args: { p_id: string }; Returns: boolean }
+      record_live_location: {
+        Args: {
+          p_accuracy: number
+          p_lat: number
+          p_lng: number
+          p_recorded_at: string
+          p_speed?: number
+          p_status_updated_at: string
+        }
         Returns: Json
       }
       record_rate_limited_action: {
@@ -2562,6 +2843,10 @@ export type Database = {
           p_window_hours: number
         }
         Returns: boolean
+      }
+      respond_party_request: {
+        Args: { p_accept: boolean; p_id: string }
+        Returns: undefined
       }
       user_is_thread_member: { Args: { thread_uuid: string }; Returns: boolean }
       validate_invite_code: { Args: { code_to_check: string }; Returns: Json }

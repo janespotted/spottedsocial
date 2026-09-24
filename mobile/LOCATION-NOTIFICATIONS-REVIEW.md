@@ -67,6 +67,8 @@ State of production on 2026-09-24 (project `rwavbyvdytdegntdryll`, read-only che
 - `pg_cron`, `pg_net` and `supabase_vault` are installed. APNs, VAPID and Mux secrets are set.
 - **Missing:** the Vault secrets `spotted_push_url` and `spotted_push_service_key`. The push cron jobs don't exist yet; the migrations create them.
 
+**Deployed 2026-09-24:** the three migrations, the four edge functions and the regenerated `database.types.ts`. The advisors show no errors; the new warnings are for functions that check `auth.uid()` themselves. `delivery_enabled` and `campaigns_enabled` are both still **false**. Remaining: step 2, then step 4.
+
 Steps:
 
 1. Apply the three pending migrations with `npx supabase db push --linked`. They run in timestamp order; `…213920` renames functions created by `…205151`.
