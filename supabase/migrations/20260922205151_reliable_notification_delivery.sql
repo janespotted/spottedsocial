@@ -263,8 +263,9 @@ declare p record; wall timestamp; kind text; count_inserted integer:=0; added in
 begin
  if not (select delivery_enabled and campaigns_enabled from spotted_private.push_settings) then return 0; end if;
  for p in select id,city from public.profiles where push_enabled is true and not coalesce(is_demo,false)
-   and (apns_device_token is not null or push_subscription is not null) and city in ('nyc','la') loop
-   wall:=now() at time zone case when p.city='la' then 'America/Los_Angeles' else 'America/New_York' end;
+   and (apns_device_token is not null or push_subscription is not null) and city in ('nyc','la','lhr') loop
+   -- lhr is the hidden test city (only reachable with demo mode on); Asia/Karachi has no DST.
+   wall:=now() at time zone case p.city when 'la' then 'America/Los_Angeles' when 'lhr' then 'Asia/Karachi' else 'America/New_York' end;
    kind:=null;
    if extract(minute from wall)>=15 then continue; end if;
    if extract(hour from wall)=17 and extract(isodow from wall)=5 then kind:='weekend_rally';

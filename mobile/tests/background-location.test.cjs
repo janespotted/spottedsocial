@@ -110,9 +110,11 @@ test('expired nights and private parties never start native GPS',async()=>{
   }
 });
 
-test('only confirmed automatic arrivals notify friends, not departure or ambiguous fixes',async t=>{
+test('the client never sends arrival alerts; the database creates them with the venue change',async t=>{
   for(const reply of [{status:'accepted',departed:true},{status:'accepted',needs_sample:true},{status:'accepted',venue_changed:true,venue_id:'bar-b',venue_name:'Bar B'}]){
-    const h=harness();await h.api.startBackgroundLocation('a');h.setReply(reply);h.emit(h.fix());await h.api.retryPendingLocation();await new Promise(r=>setImmediate(r));
-    assert.equal(h.arrivals.length,reply.venue_changed?1:0);await h.api.stopBackgroundLocation();
+    const h=harness();await h.api.startBackgroundLocation('a');
+    try{h.setReply(reply);h.emit(h.fix());await h.api.retryPendingLocation();await new Promise(r=>setImmediate(r));
+      assert.equal(h.arrivals.length,0);}
+    finally{await h.api.stopBackgroundLocation();}
   }
 });

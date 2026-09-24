@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/hooks/use-session";
 import { supabase } from "@/lib/supabase";
+import { control, controlTint, INK_LIGHT } from "@/lib/theme";
 
 type Scope = "all" | "close" | "none";
 export default function NotificationSettings() {
@@ -40,15 +41,15 @@ export default function NotificationSettings() {
   };
   return (
     <ScrollView
-      className="flex-1 bg-[#1A1229]"
+      className="flex-1 bg-background"
       contentContainerStyle={{ padding: 20, gap: 20 }}
     >
       <Stack.Screen
         options={{
           title: "Friend activity alerts",
           headerShown: true,
-          headerTintColor: "#F8F5F0",
-          headerStyle: { backgroundColor: "#1A1229" },
+          headerTintColor: "#fff",
+          headerStyle: { backgroundColor: INK_LIGHT },
         }}
       />
       <Text className="text-white/70 font-sans">
@@ -79,16 +80,16 @@ export default function NotificationSettings() {
               key={value}
               disabled={!query.data}
               onPress={() => save(key, value)}
-              className="rounded-2xl p-4"
-              style={{
-                backgroundColor: query.data?.[key] === value
-                  ? "#C4F000"
-                  : "#302142",
-              }}
+              className={`rounded-2xl p-4 ${
+                control[query.data?.[key] === value ? "selected" : "ordinary"]
+              }`}
             >
               <Text
+                className="font-sans"
                 style={{
-                  color: query.data?.[key] === value ? "#1A1229" : "#F8F5F0",
+                  color: controlTint[
+                    query.data?.[key] === value ? "selected" : "ordinary"
+                  ],
                 }}
               >
                 {label}

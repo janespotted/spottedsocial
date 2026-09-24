@@ -35,7 +35,6 @@ import {
   type TrackingResult,
 } from '@/lib/background-location';
 import { getLocationPermission, hasLocationAccess } from '@/lib/location-ready';
-import { notifyFriendArrived, notifyFriendsPlanning } from '@/lib/notifications';
 import { markNightAnswered } from '@/lib/night-gate';
 import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
@@ -614,14 +613,6 @@ export default function CheckInSheet() {
       settleAutomaticUpdates(userId);
       void scheduleMorningAfter(city, userId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      if (selectedVenue?.id) {
-        notifyFriendArrived(
-          userId,
-          profile?.displayName?.split(' ')[0] ?? 'A friend',
-          selectedVenue.id,
-          venueName
-        );
-      }
       refreshStatusQueries();
       await showPayoff('out', venueName);
     } catch {
@@ -682,7 +673,6 @@ export default function CheckInSheet() {
       await persistAudience();
       await goPlanning(userId, { city, neighborhood, visibility: audience });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      notifyFriendsPlanning(userId, audience);
       refreshStatusQueries();
       await showPayoff('planning', null);
     } catch {

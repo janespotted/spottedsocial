@@ -6,6 +6,7 @@ import { useSession } from '@/hooks/use-session';
 import { supabase } from '@/lib/supabase';
 import { nightStartAt, getActiveCity } from '@/lib/tonight';
 import { resolvePostImageUrls } from '@/lib/posts';
+import { INK_LIGHT, NEON, primaryControl, primaryControlText } from '@/lib/theme';
 
 type RecapPost = { id: string; text: string; image_url: string | null; media_type: string | null; venue_name: string | null };
 
@@ -32,22 +33,22 @@ export default function MorningAfter() {
       return {visits:visits.data ?? [],posts:ownPosts.map(p=>({...p,image_url:p.image_url?urls.get(p.image_url)??null:null}))};
     },
   });
-  return <View className="flex-1 bg-[#1A1229]">
-    <Stack.Screen options={{title:'Morning After',headerShown:true,headerStyle:{backgroundColor:'#1A1229'},headerTintColor:'#F8F5F0'}} />
+  return <View className="flex-1 bg-background">
+    <Stack.Screen options={{title:'Morning After',headerShown:true,headerStyle:{backgroundColor:INK_LIGHT},headerTintColor:'#fff'}} />
     <ScrollView contentContainerStyle={{padding:20,paddingBottom:60}}>
-      <Text className="text-[#C4F000] text-sm font-sans-semibold">LAST NIGHT, YOUR WAY</Text>
-      <Text className="text-[#F8F5F0] text-3xl font-sans-bold mt-2 mb-6">Morning After ☀️</Text>
-      {query.isLoading ? <ActivityIndicator color="#C4F000" /> : query.isError ?
+      <Text className="text-[#d4ff00] text-sm font-sans-semibold">LAST NIGHT, YOUR WAY</Text>
+      <Text className="text-white text-3xl font-sans-semibold mt-2 mb-6">Morning After ☀️</Text>
+      {query.isLoading ? <ActivityIndicator color={NEON} /> : query.isError ?
         <Pressable onPress={()=>query.refetch()}><Text className="text-white">Couldn't load your recap. Tap to retry.</Text></Pressable> : <>
         <Text className="text-white text-lg font-sans-semibold mb-3">Your stops</Text>
-        {query.data?.visits.length ? query.data.visits.map(v=><View key={v.id} className="bg-[#302142] rounded-2xl p-4 mb-2"><Text className="text-white font-sans">{v.venue_name || 'Out with friends'}</Text></View>) : <Text className="text-[#B6ADBF] mb-4">No saved stops from last night.</Text>}
+        {query.data?.visits.length ? query.data.visits.map(v=><View key={v.id} className="bg-surface rounded-2xl p-4 mb-2"><Text className="text-white font-sans">{v.venue_name || 'Out with friends'}</Text></View>) : <Text className="text-white/55 mb-4">No saved stops from last night.</Text>}
         <Text className="text-white text-lg font-sans-semibold mt-5 mb-3">Your posts</Text>
-        {query.data?.posts.length ? query.data.posts.map(p=><View key={p.id} className="bg-[#302142] rounded-2xl p-4 mb-3">
+        {query.data?.posts.length ? query.data.posts.map(p=><View key={p.id} className="bg-surface rounded-2xl p-4 mb-3">
           {p.image_url && p.media_type !== 'video' ? <Image source={{uri:p.image_url}} style={{width:'100%',aspectRatio:1,borderRadius:12}} contentFit="cover" /> : null}
           <Text className="text-white font-sans mt-2">{p.text || p.venue_name || 'A moment from last night'}</Text>
-        </View>) : <Text className="text-[#B6ADBF]">No saved posts available from last night.</Text>}
+        </View>) : <Text className="text-white/55">No saved posts available from last night.</Text>}
       </>}
-      <Pressable className="rounded-full bg-[#C4F000] p-4 mt-7" onPress={()=>router.push('/messages?tab=plans')}><Text className="text-[#1A1229] text-center font-sans-semibold">Make your next plan</Text></Pressable>
+      <Pressable className={`rounded-full p-4 mt-7 ${primaryControl}`} onPress={()=>router.push('/messages?tab=plans')}><Text className={`text-center font-sans-semibold ${primaryControlText}`}>Make your next plan</Text></Pressable>
     </ScrollView>
   </View>;
 }

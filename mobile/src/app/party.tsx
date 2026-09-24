@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/hooks/use-session";
 import { supabase } from "@/lib/supabase";
 import { fetchProfilesSafe } from "@/lib/profiles";
+import { INK_LIGHT, MIST, primaryControl, primaryControlText } from "@/lib/theme";
 
 type RequestRow = {
   id: string;
@@ -105,24 +106,24 @@ export default function Party() {
     <Pressable
       disabled={busy}
       onPress={onPress}
-      className="rounded-xl bg-[#C4F000] p-3 my-1"
+      className={`rounded-xl p-3 my-1 ${primaryControl}`}
     >
-      <Text className="text-[#1A1229] font-sans-semibold">{label}</Text>
+      <Text className={`font-sans-semibold ${primaryControlText}`}>{label}</Text>
     </Pressable>
   );
   const name = (id: string) =>
     query.data?.people.find((p) => p.id === id)?.display_name ?? "A friend";
   return (
     <ScrollView
-      className="flex-1 bg-[#1A1229]"
+      className="flex-1 bg-background"
       contentContainerStyle={{ padding: 20, paddingBottom: 60, gap: 12 }}
     >
       <Stack.Screen
         options={{
           title: "Private party",
           headerShown: true,
-          headerTintColor: "#F8F5F0",
-          headerStyle: { backgroundColor: "#1A1229" },
+          headerTintColor: "#fff",
+          headerStyle: { backgroundColor: INK_LIGHT },
         }}
       />
       {query.isError
@@ -148,7 +149,7 @@ export default function Party() {
             </Text>
             {query.data.address
               ? (
-                <View className="bg-[#302142] rounded-xl p-4">
+                <View className="bg-surface rounded-xl p-4">
                   <Text selectable className="text-white">
                     {query.data.address}
                   </Text>
@@ -162,8 +163,8 @@ export default function Party() {
                     value={address}
                     onChangeText={setAddress}
                     placeholder="Save or update the party address"
-                    placeholderTextColor="#B6ADBF"
-                    className="text-white bg-[#302142] rounded-xl p-4"
+                    placeholderTextColor={MIST}
+                    className="text-white bg-surface rounded-xl p-4"
                   />
                   {button("Save address", () => {
                     if (address.trim()) {
@@ -196,7 +197,7 @@ export default function Party() {
               Invitations & requests
             </Text>
             {query.data.requests.map((r) => (
-              <View key={r.id} className="bg-[#302142] rounded-xl p-4">
+              <View key={r.id} className="bg-surface rounded-xl p-4">
                 <Text className="text-white">
                   {name(r.guest_id)} ·{" "}
                   {r.kind === "invite" ? "Invitation" : "Address request"} ·

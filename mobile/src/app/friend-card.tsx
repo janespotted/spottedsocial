@@ -148,7 +148,7 @@ export default function FriendCardScreen() {
 
   return (
     <View className="bg-[#1a0f2e] pb-safe-offset-2">
-      {friend?.is_private_party ? <Pressable className="p-4" onPress={()=>router.push(`/party?hostId=${friend.user_id}` as never)}><Text className="text-[#C4F000] text-center font-sans-semibold">View party / request address</Text></Pressable> : null}
+      {friend?.is_private_party ? <Pressable className="p-4" onPress={()=>router.push(`/party?hostId=${friend.user_id}` as never)}><Text className="text-[#d4ff00] text-center font-sans-semibold">View party / request address</Text></Pressable> : null}
       {friend ? (
         <FriendCardBody
           data={friend}

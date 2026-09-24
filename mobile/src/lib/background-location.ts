@@ -7,7 +7,6 @@ import { supabase } from './supabase';
 import { fetchOwnNightStatus, type OwnNightStatus } from './night-status';
 import { queryClient } from './query-client';
 import { validFix, type LocationFix } from './location-quality';
-import { notifyFriendArrived } from './notifications';
 import {
   automaticUpdatesEnabled, configureTrackingDeadline, ensureLocationReady,
   getLocationPermission, hasLocationAccess, requestAutomaticUpdates,
@@ -128,16 +127,8 @@ async function deliver(pending: PendingFix, version: number): Promise<void> {
         trigger: null,
       }).catch(() => {});
     }
-    if (result.venue_changed && result.venue_id && result.venue_name) {
-      const venueId = result.venue_id;
-      const venueName = result.venue_name;
-      // Only confirmed arrivals alert the existing privacy-filtered audience.
-      void (async () => {
-        const { data, error } = await supabase.from('profiles').select('display_name').eq('id', pending.userId).maybeSingle();
-        if (error || version !== generation || !active(status)) return;
-        await notifyFriendArrived(pending.userId, data?.display_name?.split(' ')[0] || 'A friend', venueId, venueName);
-      })().catch(() => {});
-    }
+    // Friends' arrival alerts are created by the database in the same
+    // transaction as the venue change (nightlife_notification_coverage).
   }
   if (result.needs_sample) void sampleArrival();
   else stopArrivalWatch();

@@ -50,7 +50,7 @@ Lahore (`lhr`) is a hidden city, **not `is_demo` data**: 20 real venues with tru
 
 ## Tagging friends in posts (mobile)
 
-`post_tags` (migration `20260918120000`) is a pointer, never a grant: its SELECT policy mirrors `posts`' own visibility rule, so tagging someone outside the audience shows them nothing, and INSERT requires the author to be tagging a direct friend. Rows cascade with the post, so the 5 AM reset takes them and there is no separate expiry. `lib/post-tags.ts` owns the writes, the feed read (`fetchTagsForPosts`, one query per page) and the `post_tag` notification; `send-push` must keep that type in `VALID_NOTIFICATION_TYPES` or the push is silently rejected. The picker is `app/tag-friends.tsx` behind `lib/tag-picker.ts` (the same request-store pattern as the audience sheet, because a form sheet is a separate screen) — and like every `fitToContents` sheet it holds NO scroll view: the list is capped at `MAX_ROWS` and search narrows it.
+`post_tags` (migration `20260918120000`) is a pointer, never a grant: its SELECT policy mirrors `posts`' own visibility rule, so tagging someone outside the audience shows them nothing, and INSERT requires the author to be tagging a direct friend. Rows cascade with the post, so the 5 AM reset takes them and there is no separate expiry. `lib/post-tags.ts` owns the writes and the feed read (`fetchTagsForPosts`, one query per page); the `post_tag` notification is created by the `push_post_tag` trigger on `post_tags` (migration `20260922205151`), in the same transaction as the tag, never by the client; `send-push` must keep that type in `VALID_NOTIFICATION_TYPES` or the push is silently rejected. The picker is `app/tag-friends.tsx` behind `lib/tag-picker.ts` (the same request-store pattern as the audience sheet, because a form sheet is a separate screen) — and like every `fitToContents` sheet it holds NO scroll view: the list is capped at `MAX_ROWS` and search narrows it.
 
 ## Controls and tokens (mobile)
 
@@ -144,6 +144,10 @@ This bug has been "fixed" multiple times in this codebase. The underlying issue 
 
 - **Easing/duration:** iOS keyboard motion ≈ easeOutExpo, `cubic-bezier(0.16, 1, 0.3, 1)` over **400ms**. A shorter/snappier curve makes the sheet race ahead of the keyboard (~80% of travel in 2 frames) — this reads as the "keyboard jump" bug.
 - **Lift target:** the input bar's `max(env(safe-area-inset-bottom), 12px)` padding collapses 34pt → 12pt at the exact frame the webview resizes (env() → 0). The lift math must bake in that 22pt shrink, or the swap frame shows a 12pt snap.
+
+## Notifications are created by the database (mobile)
+
+Friend out / TBD / arrival (including automatic GPS venue changes), friend request and accept, DM, post like / comment / tag and private-party alerts are inserted by triggers and RPCs in the same transaction as the action that causes them (migrations `20260922205151`, `20260922213920`). Rows go through `push_outbox` and are delivered by `process-push-queue`. Do not add client-side `create_notification` / `send-push` calls for these types. That is the double-send and privacy-bypass path this replaced. `mobile/NIGHTLIFE-NOTIFICATIONS.md` and `mobile/PUSH-RELEASE-CHECKLIST.md` have the details.
 
 ## "Tonight" and the 5 AM reset (mobile)
 

@@ -74,9 +74,5 @@ export async function notifyPlanInvites(
   }
 }
 
-/* ── Check-in notifications (port of web fomo-notifications + CheckInModal) ── */
-
-/** Compatibility shims. Source status writes now create these alerts in the
- * same database transaction, including automatic GPS transitions. */
-export async function notifyFriendArrived(_userId: string, _displayName: string, _venueId: string, _venueName: string): Promise<void> {}
-export async function notifyFriendsPlanning(_userId: string, _visibility: 'close_friends' | 'all_friends' | 'mutual_friends' | null): Promise<void> {}
+/* Friend out / TBD / arrival alerts are created by the database in the same
+ * transaction as the status write, including automatic GPS transitions. */
