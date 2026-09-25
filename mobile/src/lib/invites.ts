@@ -22,13 +22,14 @@ function randomCode(): string {
 }
 
 export async function fetchOrCreateInviteCode(userId: string): Promise<InviteCode | null> {
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('invite_codes')
     .select('code, uses_count')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (readError) throw readError;
   if (existing) return { code: existing.code, uses_count: existing.uses_count ?? 0 };
   return regenerateInviteCode(userId);
 }
@@ -39,6 +40,6 @@ export async function regenerateInviteCode(userId: string): Promise<InviteCode |
     .insert({ user_id: userId, code: randomCode() })
     .select('code, uses_count')
     .single();
-  if (error || !data) return null;
+  if (error || !data) throw error ?? new Error('Invite code unavailable');
   return { code: data.code, uses_count: data.uses_count ?? 0 };
 }

@@ -87,7 +87,7 @@ function FriendStack({
 /* ── Cards ── */
 
 function PromotedCard({ venue }: { venue: LeaderboardVenue }) {
-  const subLine = [venue.neighborhood, venue.count > 0 ? `${venue.count} here now` : null]
+  const subLine = [venue.neighborhood, venue.count > 0 ? `${venue.count} sharing this spot` : null]
     .filter(Boolean)
     .join(' · ');
   // Whole row opens the venue (client feedback §9), not just the name
@@ -131,7 +131,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
 
   const subParts: string[] = [];
   if (venue.neighborhood) subParts.push(venue.neighborhood);
-  if (venue.count > 0) subParts.push(`${venue.count} here now`);
+  if (venue.count > 0) subParts.push(`${venue.count} sharing this spot`);
   const subLine = subParts.join(' · ');
 
   // Whole row opens the venue (client feedback §9), not just the name
@@ -297,14 +297,14 @@ function LeaderboardHeader({
   );
 }
 
-/* ── Biggest Mover — a list item, not a float over the last rows (§9) ── */
+/* ── Active spot — a list item, not a float over the last rows (§9) ── */
 
 function BiggestMoverCard({ mover }: { mover: BiggestMover }) {
   return (
     <Pressable
       onPress={() => openVenue(mover.venue_name, mover.venue_id)}
       accessibilityRole="button"
-      accessibilityLabel={`Biggest mover, ${mover.venue_name}. Open venue`}
+      accessibilityLabel={`Active spot, ${mover.venue_name}. Open venue`}
       className="mt-1 bg-[#1e1338] border border-[#a855f7]/30 rounded-2xl p-3.5 active:opacity-80"
     >
       <View className="flex-row items-center gap-3">
@@ -313,7 +313,7 @@ function BiggestMoverCard({ mover }: { mover: BiggestMover }) {
         </View>
         <View className="flex-1 min-w-0">
           <Text className="text-[#c084fc] text-xs font-sans-semibold uppercase tracking-wide mb-0.5">
-            Biggest Mover
+            Active spot
           </Text>
           <Text className="text-base font-sans-semibold text-white" numberOfLines={1}>
             {mover.venue_name}
@@ -353,7 +353,7 @@ export default function LeaderboardScreen() {
     setNeighborhood(null);
   }, [city]);
 
-  const { data, isLoading, refetch } = useLeaderboard(city ?? null, neighborhood);
+  const { data, isLoading, isError, refetch } = useLeaderboard(city ?? null, neighborhood);
   const { refreshing, onRefresh } = usePullToRefresh(refetch);
   const venues = data?.venues ?? [];
   const biggestMover = data?.biggestMover ?? null;
@@ -379,8 +379,9 @@ export default function LeaderboardScreen() {
             tintColorClassName="accent-[#d4ff00]"
           />
         }
+        ListHeaderComponent={<Text className="text-white/50 text-xs px-1 pb-3">Activity visible to you, followed by popular venues to explore. Catalog ranking does not imply a live crowd.</Text>}
         ListEmptyComponent={
-          isLoading ? (
+          isError ? (<Pressable onPress={() => refetch()} className="p-6"><Text className="text-white">Could not load venue activity. Tap to retry.</Text></Pressable>) : isLoading ? (
             <LeaderboardSkeleton />
           ) : (
             <View className="items-center justify-center py-16 px-4">

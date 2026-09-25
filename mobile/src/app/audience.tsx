@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -30,13 +30,23 @@ export default function AudienceSheet() {
   const [value, setValue] = useState<Audience>(request?.value ?? 'all_friends');
   const { data: counts } = useAudienceCounts(session?.user.id);
 
+  const saving = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   // Clear the request when the sheet goes away for any reason (swipe, confirm)
   useEffect(() => () => clearAudienceRequest(), []);
 
-  const confirm = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    request?.onConfirm(value);
-    router.back();
+  const confirm = async () => {
+    if (!request || saving.current) return;
+    saving.current = true; setPending(true); setError(null);
+    try {
+      await request.onConfirm(value);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (router.canGoBack()) router.back(); else router.replace('/');
+    } catch {
+      setError('Audience change was not confirmed. Check your connection and try again.');
+    } finally { saving.current = false; setPending(false); }
   };
 
   const selectedEmpty = audienceIsEmpty(counts, value);
@@ -52,6 +62,7 @@ export default function AudienceSheet() {
           return (
             <Pressable
               key={opt.value}
+              disabled={pending}
               onPress={() => setValue(opt.value)}
               accessibilityRole="radio"
               accessibilityState={{ selected }}
@@ -94,15 +105,18 @@ export default function AudienceSheet() {
         </View>
       ) : null}
 
+      {error ? <Text className="text-red-300 text-sm">{error}</Text> : null}
+      {!request ? <Text className="text-white/60">This picker has expired. Close it and try again.</Text> : null}
       <Pressable
+        disabled={pending || !request}
         onPress={confirm}
         className="rounded-full py-3.5 items-center active:opacity-90"
         style={{ backgroundColor: NEON, boxShadow: '0 0 16px rgba(212,255,0,0.25)' }}
       >
-        <Text className="text-[#1a0f2e] text-base font-sans-semibold">Confirm audience</Text>
+        <Text className="text-[#1a0f2e] text-base font-sans-semibold">{pending ? 'Saving…' : request?.live ? 'Save audience' : 'Confirm audience'}</Text>
       </Pressable>
       <Text className="text-white/45 text-xs font-sans text-center">
-        Confirming only sets the audience — nothing is shared until you do.
+        {request?.live ? 'Saving changes who can see your current status immediately. Posts and Plans keep their own audiences.' : 'Confirming only sets the audience — nothing is shared until you do.'}
       </Text>
     </View>
   );

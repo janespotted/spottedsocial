@@ -96,7 +96,8 @@ export type NightStatusKind = 'out' | 'planning' | 'home' | 'off' | 'heading_out
 export interface OwnNightStatus {
   updated_at: string;
   automatic_venue_updates: boolean;
-  /** night_statuses.id — the party identifier for party yaps. */
+  manual_venue_until?: string | null;
+  /** night_statuses.id — binds party consent to this active session. */
   id: string;
   status: NightStatusKind;
   venue_id: string | null;
@@ -140,6 +141,7 @@ export async function fetchOwnNightStatus(userId: string): Promise<OwnNightStatu
     id: data.id,
     updated_at: data.updated_at ?? '',
     automatic_venue_updates: data.automatic_venue_updates,
+    manual_venue_until: data.manual_venue_until,
     status: data.status as NightStatusKind,
     venue_id: data.venue_id,
     venue_name: data.venue_name,
@@ -212,7 +214,7 @@ export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): 
   invalidateOutStatusCache();
 
   must(
-    await supabase.rpc('upsert_own_night_status', {
+    await supabase.rpc('commit_night_status', {
       p_patch: {
         user_id: userId,
         status: 'planning' as const,
@@ -232,16 +234,6 @@ export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): 
       },
     })
   );
-
-  must(
-    await supabase
-      .from('checkins')
-      .update({ ended_at: now })
-      .eq('user_id', userId)
-      .is('ended_at', null)
-  );
-
-  await clearUserLocation(userId);
 }
 
 export interface StopSharingOptions {
@@ -269,7 +261,7 @@ async function endLiveSharing(
   const { pauseLocationForStatusChange } = await import('./background-location');
   await pauseLocationForStatusChange(userId);
   must(
-    await supabase.rpc('upsert_own_night_status', {
+    await supabase.rpc('commit_night_status', {
       p_patch: {
         user_id: userId,
         status,
@@ -288,16 +280,6 @@ async function endLiveSharing(
         updated_at: now,
       },
     })
-  );
-
-  await clearUserLocation(userId);
-
-  must(
-    await supabase
-      .from('checkins')
-      .update({ ended_at: now })
-      .eq('user_id', userId)
-      .is('ended_at', null)
   );
 }
 
@@ -319,101 +301,38 @@ export interface GoOutOptions {
   venue: { id: string | null; name: string };
   coords?: { lat: number; lng: number; accuracy?: number; recordedAt?: string } | null;
   city?: string | null;
+  audience?: 'close_friends' | 'all_friends' | 'mutual_friends';
   privateParty?: { neighborhood: string | null; address?: string | null } | null;
 }
 
-/**
- * The ONE way to go "out" at a venue. Full-field night_statuses upsert
- * (including the address in the caller-bound transaction), ends prior check-ins, opens a
- * new one and marks the profile out. Port of the web goOutAtVenue. Callers
- * that flip planning→out at a VENUE must also startBackgroundLocation (see
- * BackgroundLocationManager contract).
- *
- * Private party: coordinates go on the status row as usual, but a DB trigger
- * moves them to party_locations (close friends only) and nulls them on the
- * row. The profile pin is withheld and background GPS is stopped, because
- * profile coordinates are readable by the whole audience.
+/** Commit status, audience, profile GPS and active visit in one server transaction.
+ * The server validates real fixes and controls expiry/revision. Private-party
+ * coordinates remain in the separately authorized party store; they never
+ * enter profile GPS or ordinary check-in history. Address approval stays separate.
  */
-export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<void> {
-  const { pauseLocationForStatusChange } = await import('./background-location');
+export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<{ gpsShared: boolean; trackingReady: boolean }> {
+  const { pauseLocationForStatusChange, allowLocationAfterCheckin } = await import('./background-location');
   await pauseLocationForStatusChange(userId);
-  const automatic = !opts.privateParty && await automaticUpdatesEnabled() &&
-    await getLocationPermission() === 'always';
-  const now = new Date().toISOString();
+  const automatic = !opts.privateParty && await automaticUpdatesEnabled() && await getLocationPermission() === 'always';
   invalidateOutStatusCache();
-  // Every goOutAtVenue call is a user-confirmed venue (sheet, arrival prompt,
-  // venue shift) — quiet the arrival engine so GPS disagreement can't re-nudge
-  // a venue the user just corrected away from.
-  markManualCheckin();
-  const lat = opts.coords?.lat ?? null;
-  const lng = opts.coords?.lng ?? null;
-  const liveFix = opts.coords && opts.coords.recordedAt && opts.coords.accuracy != null
+  const fix = opts.coords?.recordedAt && opts.coords.accuracy != null
     ? { ...opts.coords, recordedAt: opts.coords.recordedAt, accuracy: opts.coords.accuracy, speed: null } : null;
-  const shareGps = !!liveFix && validFix(liveFix);
-
-  must(
-    await supabase.rpc('upsert_own_night_status', {
-      p_patch: {
-        user_id: userId,
-        status: 'out' as const,
-        automatic_venue_updates: automatic,
-        venue_id: opts.venue.id,
-        venue_name: opts.venue.name,
-        lat,
-        lng,
-        updated_at: now,
-        expires_at: getStatusExpiry(opts.city),
-        planning_neighborhood: null,
-        planning_venue_id: null,
-        planning_venue_name: null,
-        planning_visibility: null,
-        is_private_party: !!opts.privateParty,
-        party_neighborhood: opts.privateParty?.neighborhood ?? null,
-        party_address: opts.privateParty?.address ?? null,
-      },
-    })
-  );
-
-  // End prior check-ins, open a new one
-  must(
-    await supabase
-      .from('checkins')
-      .update({ ended_at: now })
-      .eq('user_id', userId)
-      .is('ended_at', null)
-  );
-  const checkin: Record<string, unknown> = {
-    user_id: userId,
-    venue_id: opts.venue.id,
-    venue_name: opts.venue.name,
-    started_at: now,
-    last_updated_at: now,
-  };
-  // Omit lat/lng when coords unavailable — never write 0,0
-  if (lat !== null && lng !== null) {
-    checkin.lat = lat;
-    checkin.lng = lng;
-  }
-  // A manual venue without GPS is a check-in intention, not fabricated coordinates.
-  if (!opts.privateParty && lat !== null && lng !== null) must(await supabase.from('checkins').insert(checkin as never));
-
-  // Profile: this is what friends' maps read (via get_profiles_safe). The
-  // web client has always written it; without it a check-in never pins.
-  const profile: Record<string, unknown> = { is_out: true, last_location_at: shareGps ? liveFix!.recordedAt : null,
-    last_known_lat: null, last_known_lng: null };
-  if (opts.privateParty) {
-    // Exact spot is close-friends-only → never on the audience-readable profile
-    profile.last_known_lat = null;
-    profile.last_known_lng = null;
-    const { stopBackgroundLocation } = await import('./background-location');
-    await stopBackgroundLocation();
-  } else if (shareGps) {
-    profile.last_known_lat = lat;
-    profile.last_known_lng = lng;
-  }
-  must(await supabase.from('profiles').update(profile as never).eq('id', userId));
+  const result = must(await supabase.rpc('commit_night_status', {
+    p_patch: {
+      user_id: userId, status: 'out', automatic_venue_updates: automatic,
+      venue_id: opts.venue.id, venue_name: opts.venue.name,
+      planning_neighborhood: null, planning_venue_id: null, planning_venue_name: null, planning_visibility: null,
+      is_private_party: !!opts.privateParty, party_neighborhood: opts.privateParty?.neighborhood ?? null,
+      party_address: opts.privateParty?.address ?? null,
+    },
+    p_fix: fix && validFix(fix) ? fix : undefined,
+    p_audience: opts.audience,
+  })) as { gps_shared: boolean };
+  markManualCheckin();
+  // Server save is complete. A local tracking/storage failure is a separate outcome.
+  let trackingReady = false;
   if (!opts.privateParty) {
-    const { allowLocationAfterCheckin } = await import('./background-location');
-    await allowLocationAfterCheckin(userId);
+    try { await allowLocationAfterCheckin(userId); trackingReady = true; } catch { /* show manual status, retry automatic readiness separately */ }
   }
+  return { gpsShared: result.gps_shared, trackingReady };
 }

@@ -1,3 +1,4 @@
+import { parseConfirmationPeople, parseNotificationIds } from '@/lib/route-input';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -37,6 +38,7 @@ interface Person {
 }
 
 function joinNames(people: Person[]): string {
+  if (people.length === 0) return 'nobody';
   if (people.length === 1) return people[0].display_name;
   if (people.length === 2) return `${people[0].display_name} and ${people[1].display_name}`;
   return `${people[0].display_name}, ${people[1].display_name}, +${people.length - 2} more`;
@@ -71,20 +73,8 @@ export default function SentConfirmationScreen() {
   }));
 
   const kind = params.kind === 'meetup' ? 'meetup' : 'invites';
-  const friends: Person[] = (() => {
-    try {
-      return JSON.parse(params.friends ?? '[]');
-    } catch {
-      return [];
-    }
-  })();
-  const notificationIds: string[] = (() => {
-    try {
-      return JSON.parse(params.notificationIds ?? '[]');
-    } catch {
-      return [];
-    }
-  })();
+  const friends = parseConfirmationPeople(params.friends);
+  const notificationIds = parseNotificationIds(params.notificationIds);
   const first = friends[0];
 
   const pop = () => {
@@ -139,6 +129,11 @@ export default function SentConfirmationScreen() {
 
   const headline = kind === 'meetup' ? `You sent a Meet Up Request to ${first?.display_name ?? 'them'}!` : 'Invites Sent!';
 
+  if (!friends.length || !notificationIds.length) return <View className="flex-1 items-center justify-center bg-[#110a24] p-6 gap-4">
+    <Text className="text-white">This confirmation is unavailable. Check Activity or your conversation for the current result.</Text>
+    <Text className="text-[#d4ff00]" onPress={pop}>Back</Text>
+  </View>;
+
   return (
     <Animated.View className="flex-1" style={backdropStyle}>
     <Pressable onPress={close} className="flex-1 items-center justify-center px-5" style={gradient}>
@@ -190,7 +185,7 @@ export default function SentConfirmationScreen() {
             </Text>
           ) : (
             <Text className="text-white/80 text-[15px] font-sans text-center leading-5">
-              They&apos;ll get a ping right away.
+              Your request is in their Activity. Push delivery depends on their settings.
             </Text>
           )}
           <Text className="text-white/60 text-xs font-sans mt-2">

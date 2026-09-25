@@ -1,5 +1,6 @@
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useEffect, useMemo, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { isDemoMode } from '@/lib/demo-mode';

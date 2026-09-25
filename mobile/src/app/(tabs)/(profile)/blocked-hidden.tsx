@@ -1,7 +1,10 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { invalidatePrivateViews } from '@/lib/private-views';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
 import { fetchProfilesSafe } from '@/lib/profiles';
@@ -19,10 +22,13 @@ interface PersonRow {
 export default function BlockedHiddenScreen() {
   const { session } = useSession();
   const userId = session?.user.id;
+  const queryClient = useQueryClient();
+  const saving = useRef(false);
+  const [pending, setPending] = useState(false);
   // pb-32 clears the native tab bar + home indicator (see settings.tsx)
   const contentContainerStyle = useResolveClassNames('px-4 pt-5 pb-32 gap-5');
 
-  const { data, refetch } = useQuery({
+  const { data, refetch, isError } = useQuery({
     queryKey: ['blocked-hidden', userId],
     enabled: !!session,
     queryFn: async () => {
@@ -35,6 +41,7 @@ export default function BlockedHiddenScreen() {
           .eq('user_id', userId!),
         supabase.from('blocked_users').select('id, blocked_id').eq('blocker_id', userId!),
       ]);
+      if (hiddenRes.error || blockedRes.error) throw hiddenRes.error ?? blockedRes.error;
       const profileMap = new Map(profiles.map((p) => [p.id, p]));
       const toRow = (rowId: string, targetId: string): PersonRow => ({
         rowId,
@@ -50,14 +57,19 @@ export default function BlockedHiddenScreen() {
     },
   });
 
-  const unhide = async (row: PersonRow) => {
-    await supabase.from('location_hidden' as never).delete().eq('id', row.rowId);
-    refetch();
+  const removeRestriction = async (table: 'location_hidden' | 'blocked_users', row: PersonRow) => {
+    if (saving.current) return;
+    saving.current = true; setPending(true);
+    try {
+      const { data: removed, error } = await supabase.from(table).delete().eq('id', row.rowId).select('id');
+      if (error || !removed?.length) throw error ?? new Error('Change not confirmed');
+      invalidatePrivateViews(queryClient);
+      await refetch();
+    } catch { Alert.alert('Change not saved', 'Please try again. Your existing restriction is unchanged unless confirmed by the server.'); }
+    finally { saving.current = false; setPending(false); }
   };
-  const unblock = async (row: PersonRow) => {
-    await supabase.from('blocked_users').delete().eq('id', row.rowId);
-    refetch();
-  };
+  const unhide = (row: PersonRow) => removeRestriction('location_hidden', row);
+  const unblock = (row: PersonRow) => removeRestriction('blocked_users', row);
 
   const renderSection = (
     title: string,
@@ -81,6 +93,7 @@ export default function BlockedHiddenScreen() {
               {row.display_name}
             </Text>
             <Pressable
+              disabled={pending}
               onPress={() => onAction(row)}
               className="px-3.5 py-1.5 rounded-full border border-white/20 active:bg-white/5"
             >
@@ -105,6 +118,7 @@ export default function BlockedHiddenScreen() {
       </View>
 
       <ScrollView contentContainerStyle={contentContainerStyle}>
+        {isError ? <Text className="text-red-300" onPress={() => void refetch()}>Could not load restrictions. Tap to retry.</Text> : null}
         {renderSection(
           'Hidden From',
           "They stay your friend — they just can't see you on the map",

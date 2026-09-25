@@ -67,7 +67,7 @@ export function useArrivalPrompts() {
         };
         if (myStatus.status === 'planning' && !smartDismissed.current.has(nearest.id)) {
           setSmartPrompt(prompt);
-        } else if (myStatus.status === 'out' && !myStatus.automatic_venue_updates &&
+        } else if (myStatus.status === 'out' && (!myStatus.manual_venue_until || Date.parse(myStatus.manual_venue_until) <= Date.now()) && !myStatus.automatic_venue_updates &&
                    !myStatus.is_private_party && nearest.id !== myStatus.venue_id &&
                    !moveDismissed.current.has(nearest.id)) {
           setMoveBanner(prompt);

@@ -1,3 +1,5 @@
+import { signOutWithPushCleanup } from '@/lib/push';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { AccountScope } from '@/components/account-scope';
 import '../../global.css';
 import { useEffect } from 'react';
@@ -52,11 +54,16 @@ function SplashController() {
 const SHEET_CONTENT_STYLE = { backgroundColor: INK_LIGHT } as const;
 
 function RootNavigator() {
-  const { session, loading, onboardingNeeded } = useSession();
+  const { session, loading, onboardingNeeded, onboardingError, refreshOnboardingStatus } = useSession();
   const contentStyle = useResolveClassNames('bg-background');
   const gradientStyle = useResolveClassNames(SCREEN_GRADIENT);
 
   if (loading) return null;
+  if (onboardingError) return <View className="flex-1 bg-background items-center justify-center p-6 gap-4">
+    <Text className="text-white text-center">{onboardingError}</Text>
+    <Pressable onPress={() => void refreshOnboardingStatus().catch(() => {})}><Text className="text-[#d4ff00]">Retry loading profile</Text></Pressable>
+    <Pressable onPress={() => void signOutWithPushCleanup().catch(() => Alert.alert("Sign out not confirmed", "Reconnect and try again."))}><Text className="text-white/60">Sign out</Text></Pressable>
+  </View>;
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle }}>

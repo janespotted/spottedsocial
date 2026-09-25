@@ -1,16 +1,16 @@
+import { AppState } from 'react-native';
+import { onPrivateViewsInvalidated } from '@/lib/private-views';
+import { getSessionRevision } from '@/lib/session-identity';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { isDemoMode } from '@/lib/demo-mode';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
-import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
-import { isPostDetailActive, onPostDetailClosed } from '@/lib/post-detail';
+import { isPostDetailActive, onPostDetailClosed, resetPostDetail } from '@/lib/post-detail';
 import {
   hydratePosts,
   onCommentAdded,
   onFeedInvalidated,
-  postImageStoragePath,
-  resolvePostImageUrl,
   type FeedPost,
 } from '@/lib/posts';
 import { useFriendIds } from './use-friend-ids';
@@ -47,10 +47,16 @@ export function useFeed() {
   const loadingMoreRef = useRef(false);
   const refreshInFlight = useRef<Promise<void> | null>(null);
   const refreshQueued = useRef(false);
+  const generation = useRef(0);
+  const loadedCount = useRef(POSTS_PER_PAGE);
+  loadedCount.current = Math.max(POSTS_PER_PAGE, posts.length);
 
   const fetchPage = useCallback(
-    async (cursor: string | null): Promise<FeedPost[]> => {
+    async (cursor: string | null, limit = POSTS_PER_PAGE): Promise<FeedPost[]> => {
       if (!userId) return [];
+      if (friendQuery.isError) throw new Error("Could not load relationships");
+      const revision = getSessionRevision();
+      const started = generation.current;
       const userIds = [userId, ...(friendIds ?? [])];
 
       let query = supabase
@@ -58,7 +64,7 @@ export function useFeed() {
         .select('*')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
-        .limit(POSTS_PER_PAGE);
+        .limit(limit);
       // Dev-only: demo mode shows all demo posts alongside the real feed,
       // mirroring the web useFeed. Release builds never take this branch.
       if (isDemoMode()) {
@@ -66,9 +72,10 @@ export function useFeed() {
       } else {
         // Friends' posts (any visibility) + friends-of-friends' posts marked
         // mutual_friends — port of the web expansion via get_mutual_friend_ids.
-        const { data: mutualData } = await supabase.rpc('get_mutual_friend_ids', {
+        const { data: mutualData, error: mutualError } = await supabase.rpc('get_mutual_friend_ids', {
           p_user_id: userId,
         });
+        if (mutualError) throw mutualError;
         const mutualIds = (mutualData ?? []).map((r: { user_id: string }) => r.user_id);
         if (mutualIds.length > 0) {
           query = query.or(
@@ -80,8 +87,10 @@ export function useFeed() {
       }
       if (cursor) query = query.lt('created_at', cursor);
 
-      const { data: rows } = await query;
+      const { data: rows, error } = await query;
+      if (error) throw error;
       const { posts: page, likedByMe } = await hydratePosts(rows ?? [], userId);
+      if (revision !== getSessionRevision() || started !== generation.current) return [];
       if (likedByMe.size > 0) {
         setLikedPosts((prev) => {
           const next = new Set(prev);
@@ -91,7 +100,7 @@ export function useFeed() {
       }
       return page;
     },
-    [userId, friendIds]
+    [userId, friendIds, friendQuery.isError]
   );
 
   // While a post detail is open, one feed card's media is teleported into
@@ -101,10 +110,6 @@ export function useFeed() {
   // changes are queued here and replayed the moment the detail closes
   // (POST-DETAIL-PLAN.md §4.5).
   const deferred = useRef<Array<() => void>>([]);
-  const runOrDefer = useCallback((fn: () => void) => {
-    if (isPostDetailActive()) deferred.current.push(fn);
-    else fn();
-  }, []);
   useEffect(
     () =>
       onPostDetailClosed(() => {
@@ -129,7 +134,7 @@ export function useFeed() {
       if (isPostDetailActive()) {
         // Replayed when the detail closes; a pull can't happen while the
         // list is scroll-locked, so there is no spinner to honour here.
-        deferred.current.push(() => void refresh(opts));
+        deferred.current = [() => void refresh(opts)];
         return Promise.resolve();
       }
       if (opts?.userInitiated) setIsRefreshing(true);
@@ -137,13 +142,19 @@ export function useFeed() {
         refreshQueued.current = true;
         return refreshInFlight.current;
       }
+      const started = generation.current;
+      const revision = getSessionRevision();
       const run = (async () => {
         try {
-          const page = await fetchPage(null);
+          const limit = opts?.userInitiated ? POSTS_PER_PAGE : loadedCount.current;
+          const page = await fetchPage(null, limit);
+          if (started !== generation.current || revision !== getSessionRevision()) return;
           setPosts(page);
-          setHasMore(page.length === POSTS_PER_PAGE);
+          setHasMore(page.length === limit);
           setIsError(false);
         } catch (e) {
+          if (started !== generation.current || revision !== getSessionRevision()) return;
+          setPosts([]); setLikedPosts(new Set());
           console.warn('[feed] refresh failed', e);
           setIsError(true);
         } finally {
@@ -165,8 +176,11 @@ export function useFeed() {
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMoreRef.current || posts.length === 0 || isPostDetailActive()) return;
     loadingMoreRef.current = true;
+    const started = generation.current;
+    const revision = getSessionRevision();
     try {
       const page = await fetchPage(posts[posts.length - 1].created_at);
+      if (started !== generation.current || revision !== getSessionRevision()) return;
       setPosts((prev) => [...prev, ...page]);
       setHasMore(page.length === POSTS_PER_PAGE);
     } catch (e) {
@@ -197,97 +211,29 @@ export function useFeed() {
     []
   );
 
-  // Realtime: prepend friends' new posts, drop deleted ones (port of the web
-  // incremental handlers). RLS scopes what postgres_changes delivers, but we
-  // still gate on authorship because demo posts are dev-only.
+  // Re-read with the same server authorization as initial load, including mutuals.
   useEffect(() => {
     if (!userId || friendIds === undefined) return;
-    const friendSet = new Set(friendIds);
-
     return createResilientChannel({
-      name: 'feed-realtime',
-      onReconnect: () => void refresh(),
-      configure: (ch) => ch
-        .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'posts' },
-        async (payload) => {
-          const p = payload.new as Record<string, any>;
-          if (!p?.id) return;
-          const visible =
-            p.user_id === userId ||
-            friendSet.has(p.user_id) ||
-            (isDemoMode() && p.is_demo);
-          if (!visible) return;
-          if (p.is_demo && !isDemoMode()) return;
-          const [profiles, imageUrl] = await Promise.all([
-            fetchProfilesSafe(),
-            resolvePostImageUrl(p.image_url ?? null),
-          ]);
-          const profileMap = buildProfileMap(profiles);
-          const post: FeedPost = {
-            id: p.id,
-            user_id: p.user_id,
-            text: p.text ?? '',
-            image_url: imageUrl,
-            media_path: postImageStoragePath(p.image_url ?? null),
-            media_type: p.media_type ?? null,
-            media_width: p.media_width ?? null,
-            media_height: p.media_height ?? null,
-            media_hash: p.media_hash ?? null,
-            mux_playback_id: p.mux_playback_id ?? null,
-            mux_status: p.mux_status ?? null,
-            venue_name: p.venue_name ?? null,
-            venue_id: p.venue_id ?? null,
-            created_at: p.created_at ?? new Date().toISOString(),
-            comments_count: 0,
-            likes_count: 0,
-            display_name: profileMap.get(p.user_id)?.display_name ?? 'Friend',
-            avatar_url: profileMap.get(p.user_id)?.avatar_url ?? null,
-            // Tags are written just after the post row; the next refresh
-            // picks them up.
-            tags: [],
-          };
-          runOrDefer(() =>
-            setPosts((prev) => (prev.some((x) => x.id === post.id) ? prev : [post, ...prev]))
-          );
-        }
-      )
-        .on(
-          'postgres_changes',
-          { event: 'DELETE', schema: 'public', table: 'posts' },
-          (payload) => {
-            const id = (payload.old as Record<string, any>)?.id;
-            if (id) runOrDefer(() => setPosts((prev) => prev.filter((x) => x.id !== id)));
-          }
-        )
-        // Mux finishing an encode: the webhook updates the row and the
-        // processing tile becomes a player without a refresh.
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'posts' },
-          (payload) => {
-            const p = payload.new as Record<string, any>;
-            if (!p?.id) return;
-            runOrDefer(() =>
-              setPosts((prev) =>
-                prev.map((x) =>
-                  x.id === p.id
-                    ? {
-                        ...x,
-                        mux_playback_id: p.mux_playback_id ?? null,
-                        mux_status: p.mux_status ?? null,
-                        media_width: p.media_width ?? x.media_width,
-                        media_height: p.media_height ?? x.media_height,
-                      }
-                    : x
-                )
-              )
-            );
-          }
-        ),
+      name: 'feed-realtime', onReconnect: () => void refresh(),
+      configure: ch => ch.on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => void refresh()),
     });
-  }, [userId, friendIds, refresh, runOrDefer]);
+  }, [userId, friendIds, refresh]);
+
+  useEffect(() => {
+    const redact = () => {
+      ++generation.current;
+      deferred.current = [];
+      resetPostDetail();
+      setPosts([]); setLikedPosts(new Set());
+    };
+    const stop = onPrivateViewsInvalidated(() => { redact(); void refresh(); });
+    const sub = AppState.addEventListener('change', state => {
+      if (state !== 'active') redact(); else void refresh();
+    });
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 15_000);
+    return () => { ++generation.current; stop(); sub.remove(); clearInterval(timer); };
+  }, [refresh]);
 
   const toggleLike = useCallback(
     async (postId: string) => {
@@ -335,7 +281,7 @@ export function useFeed() {
         );
       }
     },
-    [session, likedPosts, posts]
+    [session, likedPosts]
   );
 
   const deletePost = useCallback(

@@ -1,6 +1,12 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { onPrivateViewsInvalidated, privateViewRevision } from '@/lib/private-views';
+import { onNightBoundary } from '@/lib/night-boundary';
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useEffect, useRef } from 'react';
 import {
   ActionSheetIOS,
+  ActivityIndicator,
+  Alert,
   BackHandler,
   Pressable,
   StyleSheet,
@@ -10,7 +16,6 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useQuery } from '@tanstack/react-query';
 import { PortalHost } from 'react-native-teleport';
 import {
   ReanimatedTrueSheetProvider,
@@ -30,11 +35,12 @@ import { blockUser, reportContent } from '@/lib/moderation';
 import {
   POST_DETAIL_HOST,
   closePostDetail,
+  resetPostDetail,
   playPostDetailOpen,
   postDetailProgress,
   usePostDetail,
 } from '@/lib/post-detail';
-import { fetchPostById, type FeedPost } from '@/lib/posts';
+import { fetchPostById, invalidateFeed, type FeedPost } from '@/lib/posts';
 import { supabase } from '@/lib/supabase';
 import { NEON, PURPLE } from '@/lib/theme';
 
@@ -70,6 +76,8 @@ function PostDetail() {
   useDismissKeyboardOnLeave();
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const { session } = useSession();
+  const queryClient = useQueryClient();
+  const likePending = useRef(false);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -88,13 +96,24 @@ function PostDetail() {
 
   // Deep-link path: nothing handed over, fetch the post ourselves.
   const fetched = useQuery({
-    queryKey: ['post-detail', postId],
-    enabled: !!postId && !!session && !handedOver,
+    queryKey: ['post-detail', postId, session?.user.id],
+    enabled: !!postId && !!session,
     queryFn: () => fetchPostById(postId!, session!.user.id),
   });
-  const post: FeedPost | null = handedOver ? handedPost : (fetched.data?.post ?? null);
+  const authorized = !!fetched.data?.post;
+  const post: FeedPost | null = authorized ? (handedOver ? handedPost : fetched.data!.post) : null;
   const isLiked = handedOver ? handedLiked : (fetched.data?.isLiked ?? false);
-  const expired = !handedOver && fetched.isSuccess && fetched.data === null;
+  const expired = !postId || (fetched.isSuccess && fetched.data === null);
+
+  useEffect(() => {
+    if (expired || fetched.isError) { resetPostDetail(); invalidateFeed(); }
+  }, [expired, fetched.isError]);
+  useEffect(() => {
+    const clear = () => { resetPostDetail(); void sheetRef.current?.dismiss(); };
+    const stop = onPrivateViewsInvalidated(clear);
+    const boundary = onNightBoundary(clear);
+    return () => { stop(); boundary(); };
+  }, []);
 
   // Start the fly once the host is mounted and painted at the card's frame.
   // Without a teleport there is nothing to fly: land at 1 immediately.
@@ -120,7 +139,7 @@ function PostDetail() {
     closing.current = true;
     await sheetRef.current?.dismiss();
     if (storePostId === postId && phase !== 'idle') closePostDetail({ animated: teleported });
-    else router.back();
+    else if (router.canGoBack()) router.back(); else router.replace('/');
   };
 
   // Android hardware back reverses the fly instead of popping under it.
@@ -184,10 +203,23 @@ function PostDetail() {
 
   /* ── Actions ── */
   const isOwner = !!post && post.user_id === session?.user.id;
-  const onLike = () => {
-    if (!post) return;
-    if (toggleLike) toggleLike(post.id);
-    else void toggleLikeStandalone(post, isLiked, session?.user.id);
+  const onLike = async () => {
+    if (!post || !session || likePending.current) return;
+    if (handedOver && toggleLike) { toggleLike(post.id); return; }
+    likePending.current = true;
+    const key = ['post-detail', postId, session.user.id];
+    const revision = privateViewRevision();
+    await queryClient.cancelQueries({ queryKey: key });
+    if (revision !== privateViewRevision()) { likePending.current = false; return; }
+    const previous = fetched.data;
+    queryClient.setQueryData(key, { post: { ...post, likes_count: Math.max(0, post.likes_count + (isLiked ? -1 : 1)) }, isLiked: !isLiked });
+    try {
+      await toggleLikeStandalone(post, isLiked, session.user.id);
+      invalidateFeed();
+    } catch {
+      if (revision === privateViewRevision()) queryClient.setQueryData(key, previous);
+      Alert.alert('Like not saved', 'Please try again.');
+    } finally { likePending.current = false; }
   };
   const onShare = () => {
     if (!post) return;
@@ -205,11 +237,18 @@ function PostDetail() {
           if (index !== 0) return;
           // Leave first: deleting drops the feed row, and with it the Portal
           // that owns the media on this screen.
-          closing.current = true;
-          void sheetRef.current?.dismiss().then(() => {
-            closePostDetail({ animated: false });
-            deletePost?.(post.id);
-          });
+          void (async () => {
+            try {
+              if (!deletePost) {
+                const { error } = await supabase.from('posts').delete().eq('id', post.id).eq('user_id', session.user.id);
+                if (error) throw error;
+              }
+              await sheetRef.current?.dismiss();
+              if (handedOver) { closePostDetail({ animated: false }); deletePost?.(post.id); }
+              else if (router.canGoBack()) router.back(); else router.replace('/');
+              invalidateFeed();
+            } catch { Alert.alert('Delete not confirmed', 'Please refresh before trying again.'); }
+          })();
         }
       );
     } else {
@@ -267,7 +306,7 @@ function PostDetail() {
           hostStyle,
         ]}
       >
-        {teleported ? (
+        {teleported && authorized ? (
           <PortalHost name={POST_DETAIL_HOST} style={{ flex: 1 }} />
         ) : post && postHasMedia(post) ? (
           <PostMedia post={post} />
@@ -295,6 +334,11 @@ function PostDetail() {
           </Pressable>
         </View>
 
+        {!authorized && !expired ? (
+          <View className="flex-1 justify-center items-center">
+            {fetched.isError ? <Text onPress={() => void fetched.refetch()} className="text-white">Could not load this post. Tap to retry.</Text> : <ActivityIndicator color={NEON} />}
+          </View>
+        ) : null}
         {expired ? (
           <View className="flex-1 justify-center">
             <ExpiredState what="This post" onDismiss={() => void close()} dismissLabel="Back" />
@@ -472,10 +516,9 @@ function RailButton({
  * next open reflects it.
  */
 async function toggleLikeStandalone(post: FeedPost, isLiked: boolean, userId: string | undefined) {
-  if (!userId) return;
-  if (isLiked) {
-    await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', userId);
-  } else {
-    await supabase.from('post_likes').insert({ post_id: post.id, user_id: userId });
-  }
+  if (!userId) throw new Error('Sign in required');
+  const { error } = isLiked
+    ? await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', userId)
+    : await supabase.from('post_likes').insert({ post_id: post.id, user_id: userId });
+  if (error) throw error;
 }

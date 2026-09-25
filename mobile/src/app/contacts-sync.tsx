@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   Linking,
   Pressable,
@@ -134,11 +135,18 @@ export default function ContactsSyncSheet() {
     }
   };
 
+  const pendingRequests = useRef(new Set<string>());
   const addFriend = async (match: ContactMatch) => {
-    if (!userId || requested.has(match.user_id)) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setRequested((prev) => new Set(prev).add(match.user_id));
-    await sendFriendRequest(userId, match.user_id);
+    if (!userId || pendingRequests.current.has(match.user_id) || requested.has(match.user_id)) return;
+    pendingRequests.current.add(match.user_id);
+    setRequested(prev => new Set(prev).add(match.user_id));
+    try {
+      if (!await sendFriendRequest(userId, match.user_id)) throw new Error('Request denied');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      setRequested(prev => { const next = new Set(prev); next.delete(match.user_id); return next; });
+      Alert.alert('Request not sent', 'Please check your connection and try again.');
+    } finally { pendingRequests.current.delete(match.user_id); }
   };
 
   const inviteBySms = (person: Inviteable) => {

@@ -1,7 +1,8 @@
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { onNightBoundary } from '@/lib/night-boundary';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
@@ -82,7 +83,6 @@ export function useNotifications() {
     refetchInterval: 15_000,
     refetchOnMount: 'always',
     queryFn: async (): Promise<AppNotification[]> => {
-      try {
         const [{ data: rows, error }, profiles] = await Promise.all([
           // From tonight only. Notifications carry no expires_at of their own
           // and are deleted by the nightly cron — which is an hour late in
@@ -97,7 +97,7 @@ export function useNotifications() {
             .limit(50),
           fetchProfilesSafe(),
         ]);
-        if (error) return []; // Never keep sensitive inbox text after a failed revalidation.
+        if (error) throw error;
         const profileMap = buildProfileMap(profiles);
         return (rows ?? []).map((n) => ({
           id: n.id,
@@ -110,9 +110,6 @@ export function useNotifications() {
           sender_name: n.sender_id ? (profileMap.get(n.sender_id)?.display_name ?? null) : null,
           sender_avatar_url: n.sender_id ? (profileMap.get(n.sender_id)?.avatar_url ?? null) : null,
         }));
-      } catch {
-        return [];
-      }
     },
   });
 
@@ -135,15 +132,19 @@ export function useNotifications() {
 
   const markAllAsRead = async () => {
     if (!session || unreadCount === 0) return;
-    // Optimistic: clear the badge immediately
+    // Optimistic badge only; authoritative revalidation rolls back failed saves.
     queryClient.setQueryData<AppNotification[]>(['notifications', session.user.id], (prev) =>
       prev?.map((n) => ({ ...n, is_read: true }))
     );
-    await supabase
+    const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
       .eq('receiver_id', session.user.id)
       .eq('is_read', false);
+    if (error) {
+      // Re-read instead of restoring a possibly revoked sensitive snapshot.
+      void queryClient.resetQueries({ queryKey: ['notifications', session.user.id] });
+    }
   };
 
   return { ...query, unreadCount, markAllAsRead };

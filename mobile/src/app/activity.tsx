@@ -1,9 +1,12 @@
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
+import { useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { liveActivityMessage, withholdLivePreview } from '@/lib/live-preview';
 import { routeForNotification } from '@/lib/push';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { createDmThread } from '@/lib/dm';
 import { openFriendCard } from '@/lib/friend-card';
@@ -113,7 +116,9 @@ export default function ActivityScreen() {
   const { session } = useSession();
   const userId = session?.user.id;
   const queryClient = useQueryClient();
-  const { data: notifications, isLoading, markAllAsRead } = useNotifications();
+  const { data: own } = useOwnNightStatus();
+  const withheld = withholdLivePreview(own?.status?.status, !!own);
+  const { data: notifications, isLoading, isError, refetch, markAllAsRead } = useNotifications();
   const { data: friendIds } = useFriendIds(userId);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -138,13 +143,13 @@ export default function ActivityScreen() {
   });
 
   // Friends Planning / PGing (live night_statuses, not notifications)
-  const { data: planningFriends } = useQuery({
+  const { data: planningRows } = useQuery({
     queryKey: ['planning-friends', userId, friendIds],
     enabled: !!userId && friendIds !== undefined,
     staleTime: 30_000,
     queryFn: async (): Promise<PlanningFriend[]> => {
       if (!friendIds || friendIds.length === 0) return [];
-      const [{ data: statuses }, profiles] = await Promise.all([
+      const [{ data: statuses, error: statusError }, profiles] = await Promise.all([
         supabase
           .from('night_statuses')
           .select('user_id, planning_neighborhood, planning_venue_name')
@@ -153,6 +158,7 @@ export default function ActivityScreen() {
           .gt('expires_at', new Date().toISOString()),
         fetchProfilesSafe(),
       ]);
+      if (statusError) throw statusError;
       const profileMap = buildProfileMap(profiles);
       return (statuses ?? [])
         .filter((s) => profileMap.has(s.user_id))
@@ -238,10 +244,11 @@ export default function ActivityScreen() {
   /** Plan invites: the plan card carries "I'm down", so land on Plans. */
   const goToPlans = () => {
     router.back();
-    setTimeout(() => router.navigate('/'), 250);
+    setTimeout(() => router.navigate('/messages?tab=plans'), 250);
   };
 
-  const all = notifications ?? [];
+  const planningFriends = (planningRows ?? []).map(f => withheld ? { ...f, planning_neighborhood: null, planning_venue_name: null } : f);
+  const all = (notifications ?? []).map(n => ({ ...n, message: liveActivityMessage(n.type, n.message, withheld) }));
   const invites = all.filter(
     (n) => n.type === 'meetup_request' || n.type === 'venue_invite' || n.type === 'plan_invite'
   );
@@ -270,7 +277,7 @@ export default function ActivityScreen() {
         </Pressable>
       </View>
 
-      {isLoading ? (
+      {isError ? (<Text className="text-red-300 p-5" onPress={() => void refetch()}>Could not load Activity. Tap to retry.</Text>) : isLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={NEON} />
         </View>
@@ -423,10 +430,7 @@ export default function ActivityScreen() {
                     label: 'View',
                     // Open the conversation itself, not the inbox
                     // (addendum v3 §11.9)
-                    onPress: () =>
-                      n.sender_id
-                        ? openThreadWith(n.sender_id, n.sender_name ?? 'Chat', n.sender_avatar_url)
-                        : goToMessages(),
+                    onPress: () => router.push(routeForNotification({ type: n.type, data: n.data })),
                   }}
                 />
               ))}

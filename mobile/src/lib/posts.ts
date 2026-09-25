@@ -63,7 +63,7 @@ export async function hydratePosts(
   // count the actual rows and add them to the column value. The column is
   // only nonzero for seeded demo posts; live activity exists solely as
   // post_likes/post_comments rows.
-  const [profiles, { data: likeRows }, { data: commentRows }, imageUrls, tagsByPost] =
+  const [profiles, { data: likeRows, error: likeError }, { data: commentRows, error: commentError }, imageUrls, tagsByPost] =
     await Promise.all([
       fetchProfilesSafe(),
       supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds),
@@ -73,6 +73,7 @@ export async function hydratePosts(
       resolvePostImageUrls(rows.map((p) => p.image_url)),
       fetchTagsForPosts(postIds),
     ]);
+  if (likeError || commentError) throw likeError ?? commentError;
   const profileMap = buildProfileMap(profiles);
 
   const likeCounts = new Map<string, number>();
@@ -125,7 +126,8 @@ export async function fetchPostById(
     .eq('id', postId)
     .gt('expires_at', new Date().toISOString());
   if (!isDemoMode()) query = query.eq('is_demo', false);
-  const { data: row } = await query.maybeSingle();
+  const { data: row, error } = await query.maybeSingle();
+  if (error) throw error;
   if (!row) return null;
   const { posts, likedByMe } = await hydratePosts([row], userId);
   const post = posts[0];

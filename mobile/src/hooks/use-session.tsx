@@ -16,6 +16,7 @@ interface SessionState {
    * treating that as "onboarded" activates gates during signup.
    */
   onboardingResolved: boolean;
+  onboardingError: string | null;
   /** Re-check profile completeness (call after profile writes during onboarding). */
   refreshOnboardingStatus: () => Promise<void>;
 }
@@ -25,6 +26,7 @@ const SessionContext = createContext<SessionState>({
   loading: true,
   onboardingNeeded: false,
   onboardingResolved: false,
+  onboardingError: null,
   refreshOnboardingStatus: async () => {},
 });
 
@@ -44,11 +46,12 @@ const TOUR_FLAG_SHIPPED_AT = Date.parse('2026-09-22T00:00:00Z');
  * exist in the production schema, and a failed select here silently locks
  * users inside onboarding forever. */
 async function fetchOnboardingNeeded(userId: string): Promise<boolean> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('display_name, username, created_at')
     .eq('id', userId)
     .maybeSingle();
+  if (error) throw error;
   if (!(data?.display_name && data?.username)) return true;
   if (await hasSeenTour(userId)) return false;
   // Accounts that finished onboarding before the tour flag shipped have a
@@ -65,6 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // null = not yet known for the current user. The root navigator stays
   // unmounted until it resolves, so it is only ever re-evaluated when the
   // signed-in USER changes — never on a token refresh.
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
   const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | null>(null);
 
   const refreshOnboardingStatus = useCallback(async () => {
@@ -72,8 +76,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const { data } = await supabase.auth.getSession();
     const uid = data.session?.user.id;
     if (!uid) return;
-    const needed = await fetchOnboardingNeeded(uid);
-    if (revision === getSessionRevision()) setOnboardingNeeded(needed);
+    try {
+      const needed = await fetchOnboardingNeeded(uid);
+      if (revision === getSessionRevision()) { setOnboardingNeeded(needed); setOnboardingError(null); }
+    } catch (error) {
+      if (revision === getSessionRevision()) setOnboardingError('Could not load your profile. Your account has not been reset.');
+      throw error;
+    }
   }, []);
 
   useEffect(() => {
@@ -113,13 +122,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const userId = session?.user.id;
   useEffect(() => {
     if (!userId) {
-      setOnboardingNeeded(null);
+      setOnboardingNeeded(null); setOnboardingError(null);
       return;
     }
     let cancelled = false;
-    setOnboardingNeeded(null);
+    setOnboardingNeeded(null); setOnboardingError(null);
     fetchOnboardingNeeded(userId).then((needed) => {
       if (!cancelled) setOnboardingNeeded(needed);
+    }).catch(() => {
+      if (!cancelled) setOnboardingError('Could not load your profile. Your account has not been reset.');
     });
     return () => {
       cancelled = true;
@@ -130,7 +141,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     <SessionContext
       value={{
         session,
-        loading: sessionLoading || (!!session && onboardingNeeded === null),
+        loading: sessionLoading || (!!session && onboardingNeeded === null && !onboardingError),
+        onboardingError,
         onboardingNeeded: onboardingNeeded ?? false,
         onboardingResolved: !!session && onboardingNeeded !== null,
         refreshOnboardingStatus,

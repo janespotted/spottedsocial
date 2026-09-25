@@ -182,6 +182,9 @@ function inboxHarness(result, profileFailure = false) {
   const api = load("hooks/use-notifications.ts", {
     "react": { useEffect() {} },
     "react-native": { AppState: {} },
+    "@/hooks/use-private-query": {
+      usePrivateQuery: (value) => { options = value; return { data: [] }; },
+    },
     "@tanstack/react-query": {
       useQuery: (o) => {
         options = o;
@@ -223,14 +226,8 @@ test("Activity revalidation removes revoked rows and never falls back to stale p
   });
   assert.equal((await allowed.queryFn())[0].message, "Allowed");
   assert.deepEqual(await inboxHarness({ data: [], error: null }).queryFn(), []);
-  assert.deepEqual(
-    await inboxHarness({ data: null, error: { message: "Denied" } }).queryFn(),
-    [],
-  );
-  assert.deepEqual(
-    await inboxHarness({ data: [], error: null }, true).queryFn(),
-    [],
-  );
+  await assert.rejects(inboxHarness({ data: null, error: { message: "Denied" } }).queryFn());
+  await assert.rejects(inboxHarness({ data: [], error: null }, true).queryFn(), /Offline/);
   assert.equal(allowed.refetchOnMount, "always");
 });
 test("native route surface excludes Yap and retains venues, plans and direct/group chat", () => {

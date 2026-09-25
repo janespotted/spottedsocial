@@ -763,6 +763,7 @@ export type Database = {
       }
       night_statuses: {
         Row: {
+          manual_venue_until: string | null
           automatic_venue_updates: boolean
           expires_at: string | null
           id: string
@@ -784,6 +785,7 @@ export type Database = {
           venue_name: string | null
         }
         Insert: {
+          manual_venue_until?: string | null
           automatic_venue_updates?: boolean
           expires_at?: string | null
           id?: string
@@ -805,6 +807,7 @@ export type Database = {
           venue_name?: string | null
         }
         Update: {
+          manual_venue_until?: string | null
           automatic_venue_updates?: boolean
           expires_at?: string | null
           id?: string
@@ -2506,6 +2509,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_party_invite_recipients: { Args: Record<PropertyKey, never>; Returns: { id: string }[] };
+      commit_night_status: { Args: { p_patch: Json; p_fix?: Json; p_audience?: string }; Returns: Json }
+      get_post_share_recipients: { Args: { p_post: string }; Returns: { id: string; display_name: string; avatar_url: string | null; is_out: boolean }[] }
+      share_post_to_dm: { Args: { p_post: string; p_recipient: string }; Returns: string }
+      username_available: { Args: { p_username: string }; Returns: boolean }
+
       save_plan: { Args: { p_id: string | null; p_values: Json; p_participants?: string[] }; Returns: string }
       can_read_plan: { Args: { p_plan: string }; Returns: boolean }
       can_tag_plan: { Args: { p_plan: string; p_user: string }; Returns: boolean }

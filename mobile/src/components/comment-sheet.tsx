@@ -1,9 +1,9 @@
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import type { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { ReanimatedTrueSheet } from '@lodev09/react-native-true-sheet/reanimated';
 import { SymbolView } from 'expo-symbols';
-import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { CommentRow } from '@/components/comment-row';

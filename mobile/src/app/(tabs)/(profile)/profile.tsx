@@ -1,8 +1,9 @@
+import { invalidatePrivateViews } from '@/lib/private-views';
 import { signOutWithPushCleanup } from '@/lib/push';
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { RESET_COPY } from '@/lib/reset-copy';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -174,19 +175,23 @@ export default function ProfileScreen() {
   // a live status keeps its venue; only who can see it changes.
   const setSharingLevel = async (level: Audience) => {
     if (!session) return;
-    await supabase
+    const { error } = await supabase
       .from('profiles')
       .update({ location_sharing_level: level })
       .eq('id', session.user.id);
+    if (error) throw error;
+    invalidatePrivateViews(queryClient);
     syncStatus();
   };
 
   const setPlanningVisibility = async (level: Audience) => {
     if (!session) return;
-    await supabase
+    const { error } = await supabase
       .from('night_statuses')
       .update({ planning_visibility: level })
       .eq('user_id', session.user.id);
+    if (error) throw error;
+    invalidatePrivateViews(queryClient);
     syncStatus();
   };
 
@@ -196,6 +201,8 @@ export default function ProfileScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await stopSharing(session.user.id, { city: ownNight?.city });
+    } catch {
+      Alert.alert('Sharing stop not confirmed', 'New GPS uploads are paused on this phone. Reconnect and tap Stop sharing again to remove the last shared spot from the server.');
     } finally {
       syncStatus();
     }
@@ -394,13 +401,13 @@ export default function ProfileScreen() {
 
           {statusKind === 'out' ? (
             <>
-              <AudienceRow value={sharingLevel} onChange={setSharingLevel} compact />
+              <AudienceRow value={sharingLevel} onChange={setSharingLevel} live compact />
               {/* The rule, next to the audience it applies to (addendum v3 §3) */}
               <Text className="text-xs text-white/55 font-sans">{RESET_COPY.sharedUntil}</Text>
             </>
           ) : statusKind === 'planning' ? (
             <>
-              <AudienceRow value={planningLevel} onChange={setPlanningVisibility} compact />
+              <AudienceRow value={planningLevel} onChange={setPlanningVisibility} live compact />
               <Text className="text-xs text-white/55 font-sans">{RESET_COPY.tbdStatus}</Text>
             </>
           ) : statusKind === 'off' ? (

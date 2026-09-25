@@ -10,7 +10,7 @@ import {
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { useQuery } from '@tanstack/react-query';
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { supabase } from '@/lib/supabase';
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { PLAN_TYPES, toLocalDateString } from '@/lib/plans';

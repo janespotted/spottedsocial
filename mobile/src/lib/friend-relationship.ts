@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { invalidatePrivateViews } from './private-views';
 import { supabase } from './supabase';
 
 /**
@@ -8,20 +9,9 @@ import { supabase } from './supabase';
  * invalidateFriendGraph() in the caller so the map, lists and cards agree.
  */
 
-export const FRIEND_GRAPH_QUERY_KEYS = [
-  ['friend-ids'],
-  ['friends-out'],
-  ['map-data'],
-  ['friend-card'],
-  ['profile-page'],
-  ['friends'],
-  ['mutual-friends-with'],
-] as const;
-
+export { PRIVATE_VIEW_KEYS } from './private-views';
 export function invalidateFriendGraph(queryClient: QueryClient): void {
-  for (const queryKey of FRIEND_GRAPH_QUERY_KEYS) {
-    void queryClient.invalidateQueries({ queryKey: [...queryKey] });
-  }
+  invalidatePrivateViews(queryClient);
 }
 
 /** Close Friend on/off. Throws on failure so the caller can roll back. */
@@ -62,12 +52,13 @@ export async function removeFriend(
 
 /** Whether the viewer hides their location from this person (location_hidden). */
 export async function fetchLocationHidden(userId: string, friendId: string): Promise<boolean> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('location_hidden')
     .select('id')
     .eq('user_id', userId)
     .eq('hidden_from_id', friendId)
     .maybeSingle();
+  if (error) throw error;
   return !!data;
 }
 
@@ -97,7 +88,7 @@ export interface MutualFriend {
 /** Friends the viewer and this person share (server RPC, demo users excluded). */
 export async function fetchMutualFriendsWith(otherUserId: string): Promise<MutualFriend[]> {
   const { data, error } = await supabase.rpc('get_mutual_friends_with', { p_other_id: otherUserId });
-  if (error) return [];
+  if (error) throw error;
   return (data ?? [])
     .filter((m) => !m.is_demo)
     .map((m) => ({ user_id: m.user_id, display_name: m.display_name, avatar_url: m.avatar_url }));
@@ -105,21 +96,23 @@ export async function fetchMutualFriendsWith(otherUserId: string): Promise<Mutua
 
 /** Viewer already has a pending request out to this person. */
 export async function fetchFriendRequestPending(userId: string, otherUserId: string): Promise<boolean> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('friendships')
     .select('id')
     .eq('user_id', userId)
     .eq('friend_id', otherUserId)
     .eq('status', 'pending')
     .maybeSingle();
+  if (error) throw error;
   return !!data;
 }
 
 export async function cancelFriendRequest(userId: string, otherUserId: string): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('friendships')
     .delete()
     .eq('user_id', userId)
     .eq('friend_id', otherUserId)
     .eq('status', 'pending');
+  if (error) throw error;
 }

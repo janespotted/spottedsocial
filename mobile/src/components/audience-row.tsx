@@ -12,16 +12,18 @@ export function AudienceRow({
   onChange,
   context = 'status',
   compact = false,
+  live = false,
 }: {
   value: Audience;
-  onChange: (a: Audience) => void;
+  onChange: (a: Audience) => void | Promise<void>;
+  live?: boolean;
   context?: 'status' | 'post';
   compact?: boolean;
 }) {
   const label = audienceLabel(value);
   return (
     <Pressable
-      onPress={() => openAudiencePicker({ value, context, onConfirm: onChange })}
+      onPress={() => openAudiencePicker({ value, context, live, onConfirm: onChange })}
       accessibilityRole="button"
       accessibilityLabel={`Visible to ${label}. Change audience`}
       className={`flex-row items-center gap-2 rounded-xl bg-[#2d1b4e]/50 border border-white/[0.06] active:bg-white/5 ${

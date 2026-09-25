@@ -111,7 +111,13 @@ export function ensureLocationReady(): Promise<void> {
   return readyPromise;
 }
 
-/** Current authorization without prompting. `denied` also covers device location services being off. */
+/** Device-wide location services, separate from this app's authorization. */
+export async function locationServicesEnabled(): Promise<boolean> {
+  await ensureLocationReady();
+  return (await BackgroundGeolocation.getProviderState()).enabled;
+}
+
+/** Current app authorization without prompting. */
 export async function getLocationPermission(): Promise<LocationPermission> {
   await ensureLocationReady();
   const state = await BackgroundGeolocation.getProviderState();

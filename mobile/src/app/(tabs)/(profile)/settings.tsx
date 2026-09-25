@@ -1,5 +1,5 @@
 import { signOutWithPushCleanup } from '@/lib/push';
-import { useCallback, useState } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { ActionSheetIOS, Alert, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
@@ -211,7 +211,7 @@ export default function SettingsScreen() {
   };
   const locationSubtitle =
     locationPermission === 'always'
-      ? 'Always — your spot updates as you move'
+      ? 'Always allowed — sharing also requires an active Out check-in'
       : locationPermission === 'when_in_use'
         ? 'While using the app — tap for automatic updates'
         : locationPermission === 'denied'
@@ -220,12 +220,18 @@ export default function SettingsScreen() {
             ? 'Not set — tap to allow'
             : ' ';
 
+  const receiptSaving = useRef(false);
+  const [receiptPending, setReceiptPending] = useState(false);
   const toggleReadReceipts = async (value: boolean) => {
-    if (!userId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await supabase.from('profiles').update({ show_read_receipts: value }).eq('id', userId);
-    refetch();
-    queryClient.invalidateQueries({ queryKey: ['dm-threads'] });
+    if (!userId || receiptSaving.current) return;
+    receiptSaving.current = true; setReceiptPending(true);
+    try {
+      const { error } = await supabase.from('profiles').update({ show_read_receipts: value }).eq('id', userId);
+      if (error) throw error;
+      await refetch();
+      void queryClient.invalidateQueries({ queryKey: ['dm-threads'] });
+    } catch { Alert.alert('Read receipt setting not saved', 'Please try again.'); }
+    finally { receiptSaving.current = false; setReceiptPending(false); }
   };
 
   // Apple requires an in-app account-deletion path. The delete-account edge
@@ -286,6 +292,7 @@ export default function SettingsScreen() {
           right={
             <Switch
               value={prefs?.show_read_receipts ?? false}
+              disabled={receiptPending}
               onValueChange={toggleReadReceipts}
               trackColorOnClassName="accent-[#a855f7]"
             />

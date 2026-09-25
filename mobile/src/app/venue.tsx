@@ -1,3 +1,7 @@
+import { withholdLivePreview } from '@/lib/live-preview';
+import { useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { getNightKey } from '@/lib/tonight';
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useState } from 'react';
 import {
   ActionSheetIOS,
@@ -15,7 +19,7 @@ import { Image } from '@/components/styled';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery as useCachedQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe, type SafeProfile } from '@/lib/profiles';
 import { isDemoMode } from '@/lib/demo-mode';
@@ -66,6 +70,10 @@ interface VenueCardData {
   friendsAtVenue: FriendAtVenue[];
   friendsPlanning: FriendAtVenue[];
   similarVenues: SimilarVenue[];
+}
+
+function uniquePeople(profiles: SafeProfile[]): SafeProfile[] {
+  return [...new Map(profiles.map(p => [p.id, p])).values()];
 }
 
 function toFriend(p: SafeProfile): FriendAtVenue {
@@ -161,6 +169,8 @@ function PlanningRow({ friends }: { friends: FriendAtVenue[] }) {
 export default function VenueScreen() {
   const { venueId } = useLocalSearchParams<{ venueId: string }>();
   const { session } = useSession();
+  const { data: ownNight } = useOwnNightStatus();
+  const withheld = withholdLivePreview(ownNight?.status?.status, !!ownNight);
   const { data: friendIds } = useFriendIds(session?.user.id);
   const queryClient = useQueryClient();
   const { height: windowHeight } = useWindowDimensions();
@@ -175,11 +185,9 @@ export default function VenueScreen() {
   const [selectedInvitees, setSelectedInvitees] = useState<Set<string>>(new Set());
   const [sendingInvites, setSendingInvites] = useState(false);
 
-  // friendIds deliberately NOT in the key: its refetches produce a new array
-  // reference, and re-keying flips the query back to loading — the whole card
-  // (banner included) blinks. Friend changes mid-view aren't worth that.
-  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ['venue-card', venueId],
+  // Relationships are part of the key so an old eligible guest list is never reused.
+  const { data: rawData, isLoading, isError, refetch, isRefetching } = useQuery({
+    queryKey: ['venue-card', venueId, session?.user.id, friendIds],
     enabled: !!venueId && !!session && friendIds !== undefined,
     retry: 1,
     queryFn: async (): Promise<VenueCardData | null> => {
@@ -194,9 +202,8 @@ export default function VenueScreen() {
 
       const [
         { data: wishlistEntry },
-        { data: myProfile },
-        { data: statuses },
-        { data: venuePlans },
+        { data: statuses, error: statusError },
+        { data: venuePlans, error: plansError },
         profiles,
       ] = await Promise.all([
         supabase
@@ -205,11 +212,6 @@ export default function VenueScreen() {
           .eq('user_id', session!.user.id)
           .eq('venue_name', venue.name)
           .maybeSingle(),
-        supabase
-          .from('profiles')
-          .select('last_known_lat, last_known_lng')
-          .eq('id', session!.user.id)
-          .single(),
         supabase
           .from('night_statuses')
           .select('user_id')
@@ -220,26 +222,21 @@ export default function VenueScreen() {
           .from('plans')
           .select('id, user_id')
           .eq('venue_id', venueId!)
-          .eq('plan_date', nowIso.split('T')[0])
+          .eq('plan_date', getNightKey())
           .gt('expires_at', nowIso),
         fetchProfilesSafe(),
       ]);
 
+      if (statusError || plansError) throw statusError ?? plansError;
+      const myProfile = profiles.find(p => p.id === session!.user.id);
       const profileMap = buildProfileMap(profiles);
       const friendSet = new Set(friendIds ?? []);
 
-      // Friends here now — dedupe by display name like web
-      const seenNames = new Set<string>();
-      const friendsAtVenue = (statuses ?? [])
-        .map((s) => s.user_id)
-        .filter((id) => friendSet.has(id) && profileMap.has(id))
-        .map((id) => profileMap.get(id)!)
-        .filter((p) => {
-          if (seenNames.has(p.display_name)) return false;
-          seenNames.add(p.display_name);
-          return true;
-        })
-        .map(toFriend);
+      // Friends here now — dedupe by user ID
+      const friendsAtVenue = uniquePeople((statuses ?? [])
+        .map(s => s.user_id)
+        .filter(id => friendSet.has(id) && profileMap.has(id))
+        .map(id => profileMap.get(id)!)).map(toFriend);
 
       // Friends planning: plan creators + "I'm down" + participants, today
       let friendsPlanning: FriendAtVenue[] = [];
@@ -310,7 +307,9 @@ export default function VenueScreen() {
   });
 
   // Hours + photos + rating: live edge function with cached-columns fallback
-  const { data: hoursData } = useQuery({
+  const data = rawData && withheld ? { ...rawData, friendsAtVenue: [] } : rawData;
+
+  const { data: hoursData } = useCachedQuery({
     queryKey: ['venue-hours', venueId],
     enabled: !!venueId,
     staleTime: 10 * 60_000,
@@ -475,7 +474,9 @@ export default function VenueScreen() {
     }
     setInvitePickerOpen(false);
     setSelectedInvitees(new Set());
-    const friends = JSON.stringify(selected);
+    const delivered = selected.filter(friend => result.recipientIds.includes(friend.id));
+    if (delivered.length < selected.length) Alert.alert('Some invites were not sent', 'The confirmation lists only people who could receive your invitation.');
+    const friends = JSON.stringify(delivered);
     const notificationIds = JSON.stringify(result.notificationIds);
     router.back();
     setTimeout(

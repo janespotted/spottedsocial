@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -9,8 +9,9 @@ import { control, controlTint, INK_LIGHT } from "@/lib/theme";
 type Scope = "all" | "close" | "none";
 export default function NotificationSettings() {
   const { session } = useSession();
-  const db = supabase as any;
+  const db = supabase;
   const saving = useRef(false);
+  const [pending, setPending] = useState(false);
   const query = useQuery({
     queryKey: ["notification-preferences", session?.user.id],
     enabled: !!session,
@@ -24,7 +25,7 @@ export default function NotificationSettings() {
   });
   const save = async (key: string, value: Scope) => {
     if (!session || saving.current || !query.data) return;
-    saving.current = true;
+    saving.current = true; setPending(true);
     try {
       const { error } = await db.from("notification_preferences").upsert({
         user_id: session.user.id,
@@ -36,7 +37,7 @@ export default function NotificationSettings() {
     } catch {
       Alert.alert("Could not save", "Please try again.");
     } finally {
-      saving.current = false;
+      saving.current = false; setPending(false);
     }
   };
   return (
@@ -56,6 +57,7 @@ export default function NotificationSettings() {
         These settings never expand who can see a friend's status. Their sharing
         audience always applies.
       </Text>
+      {pending ? <Text className="text-white/60">Saving…</Text> : null}
       {query.isError
         ? (
           <Pressable onPress={() => query.refetch()}>
@@ -78,7 +80,7 @@ export default function NotificationSettings() {
           ], ["none", "Off"]] as const).map(([value, label]) => (
             <Pressable
               key={value}
-              disabled={!query.data}
+              disabled={pending || !query.data}
               onPress={() => save(key, value)}
               className={`rounded-2xl p-4 ${
                 control[query.data?.[key] === value ? "selected" : "ordinary"]

@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { invalidateFeed } from './posts';
+import { invalidatePrivateViews } from './private-views';
 
 /**
  * Everything that shows tonight's content and must be re-read the moment
@@ -7,17 +7,6 @@ import { invalidateFeed } from './posts';
  * the UI without requiring a force quit"). The status keys live in
  * hooks/use-own-night-status.ts and are invalidated alongside these.
  */
-const NIGHTLY_CONTENT_QUERY_KEYS = [
-  'notifications',
-  'activity',
-  'dm-threads',
-  'comments',
-  'post-likes',
-  'venue-card',
-  'friend-card',
-  'close-friend-ids',
-] as const;
-
 type BoundaryListener = () => void;
 const listeners = new Set<BoundaryListener>();
 
@@ -38,10 +27,7 @@ export function onNightBoundary(listener: BoundaryListener): () => void {
  * and wakes local-state screens. Safe to call more than once.
  */
 export function handleNightBoundary(queryClient: QueryClient): void {
-  for (const key of NIGHTLY_CONTENT_QUERY_KEYS) {
-    void queryClient.invalidateQueries({ queryKey: [key] });
-  }
-  invalidateFeed();
+  invalidatePrivateViews(queryClient);
   for (const listener of [...listeners]) {
     try {
       listener();

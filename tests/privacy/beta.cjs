@@ -12,7 +12,7 @@ let total = 0;
 const results = [];
 const added = (n) =>
   /v1_(beta_access_closure|plans_inbox_privacy|read_receipt_privacy)\.sql$/
-    .test(n);
+    .test(n) || n.includes('_v1_product_');
 async function run(fixed) {
   const db = new PGlite();
   await db.exec(fs.readFileSync(__dirname + "/audited-schema.sql", "utf8"));

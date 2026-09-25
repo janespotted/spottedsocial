@@ -1,6 +1,8 @@
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   Share,
@@ -10,13 +12,8 @@ import {
 import { useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { isDemoMode } from '@/lib/demo-mode';
-import { createDmThread } from '@/lib/dm';
 import { APP_BASE_URL } from '@/lib/invites';
-import { fetchProfilesSafe } from '@/lib/profiles';
-import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
 import { NEON } from '@/lib/theme';
@@ -34,66 +31,23 @@ interface ShareFriend {
  * Sharing someone else's post is limited to mutual friends of the author.
  */
 export default function SharePostSheet() {
-  const { postId, authorId, authorName } = useLocalSearchParams<{
+  const { postId, authorName } = useLocalSearchParams<{
     postId: string;
     authorId: string;
     authorName?: string;
   }>();
   const { session } = useSession();
   const userId = session?.user.id;
-  const { data: friendIds } = useFriendIds(userId);
   const [sending, setSending] = useState<string | null>(null);
   const [sent, setSent] = useState<Set<string>>(new Set());
 
-  const { data: friends } = useQuery({
-    queryKey: ['share-friends', userId, postId, friendIds ?? []],
-    enabled: !!session && friendIds !== undefined && !!authorId,
+  const { data: friends, isError, isLoading, refetch } = useQuery({
+    queryKey: ['share-friends', userId, postId],
+    enabled: !!session && !!postId,
     queryFn: async (): Promise<ShareFriend[]> => {
-      const profiles = await fetchProfilesSafe();
-      let eligible = new Set(friendIds ?? []);
-
-      // Someone else's post → recipients must also be friends with the author
-      const isDemoPost = profiles.find((p) => p.id === authorId)?.is_demo;
-      if (authorId !== userId && !isDemoPost) {
-        const [s, r] = await Promise.all([
-          supabase
-            .from('friendships')
-            .select('friend_id')
-            .eq('user_id', authorId)
-            .eq('status', 'accepted'),
-          supabase
-            .from('friendships')
-            .select('user_id')
-            .eq('friend_id', authorId)
-            .eq('status', 'accepted'),
-        ]);
-        const authorFriends = new Set([
-          ...(s.data?.map((f) => f.friend_id) ?? []),
-          ...(r.data?.map((f) => f.user_id) ?? []),
-        ]);
-        eligible = new Set([...eligible].filter((id) => authorFriends.has(id)));
-      }
-
-      const { data: statuses } = await supabase
-        .from('night_statuses')
-        .select('user_id')
-        .eq('status', 'out')
-        .not('expires_at', 'is', null)
-        .gt('expires_at', new Date().toISOString());
-      const outIds = new Set((statuses ?? []).map((s2) => s2.user_id));
-
-      return profiles
-        .filter((p) => eligible.has(p.id) && (isDemoMode() || !p.is_demo))
-        .map((p) => ({
-          id: p.id,
-          display_name: p.display_name,
-          avatar_url: p.avatar_url,
-          is_out: outIds.has(p.id),
-        }))
-        .sort((a, b) => {
-          if (a.is_out !== b.is_out) return a.is_out ? -1 : 1;
-          return a.display_name.localeCompare(b.display_name);
-        });
+      const { data, error } = await supabase.rpc('get_post_share_recipients', { p_post: postId });
+      if (error) throw error;
+      return (data ?? []) as ShareFriend[];
     },
   });
 
@@ -101,22 +55,12 @@ export default function SharePostSheet() {
     if (!userId || !postId || sending) return;
     setSending(friend.id);
     try {
-      const threadId = await createDmThread(friend.id);
-      const { error } = await supabase.from('dm_messages').insert({
-        thread_id: threadId,
-        sender_id: userId,
-        text: `[shared_post:${postId}]`,
-      });
+      const { error } = await supabase.rpc('share_post_to_dm', { p_post: postId, p_recipient: friend.id });
       if (error) throw error;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSent((prev) => new Set(prev).add(friend.id));
-      const { data: me } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', userId)
-        .maybeSingle();
     } catch {
-      /* demo users / offline */
+      Alert.alert('Post not sent', 'The recipient may no longer have access. Refresh and try again.');
     } finally {
       setSending(null);
     }
@@ -131,6 +75,9 @@ export default function SharePostSheet() {
   return (
     <View className="pt-6 pb-8" style={{ maxHeight: 560 }}>
       <Text className="text-white text-lg font-sans-semibold px-5 mb-3">Send to</Text>
+      {isLoading ? <ActivityIndicator color={NEON} /> : null}
+      {isError ? <Text className="text-red-300 px-5 py-3" onPress={() => void refetch()}>Could not load eligible recipients. Tap to retry.</Text> : null}
+      {!postId ? <Text className="text-white/60 px-5">This post is unavailable.</Text> : null}
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}>
         {(friends ?? []).map((friend) => (
           <View key={friend.id} className="flex-row items-center gap-3 py-2.5">
@@ -165,7 +112,7 @@ export default function SharePostSheet() {
         ))}
         {friends && friends.length === 0 ? (
           <Text className="text-white/50 text-sm font-sans py-6 text-center">
-            No mutual friends to share with.
+            No friends currently have access to this post.
           </Text>
         ) : null}
       </ScrollView>

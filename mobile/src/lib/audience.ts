@@ -38,7 +38,8 @@ export interface AudienceRequest {
   value: Audience;
   /** Status audiences warn on empty tiers; post audiences do the same. Kept for copy. */
   context: 'status' | 'post';
-  onConfirm: (value: Audience) => void;
+  live?: boolean;
+  onConfirm: (value: Audience) => void | Promise<void>;
 }
 
 let request: AudienceRequest | null = null;

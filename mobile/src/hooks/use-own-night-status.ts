@@ -17,7 +17,7 @@ export const NIGHT_STATUS_QUERY_KEYS = [
   'friends-out',
   'leaderboard',
   'profile-page',
-  'plans',
+  'plans', 'planning-friends', 'party-details', 'party-guests', 'friend-card', 'venue-card',
 ] as const;
 
 export function invalidateNightStatusQueries(queryClient: QueryClient): void {
@@ -32,11 +32,12 @@ export interface OwnNightData {
 }
 
 async function fetchOwnNightData(userId: string): Promise<OwnNightData> {
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('city, is_out')
     .eq('id', userId)
     .maybeSingle<{ city: string | null; is_out: boolean | null }>();
+  if (profileError) throw profileError;
   const city = profile?.city ?? 'nyc';
   // Install the profile zone before anything computes an expiry tonight.
   setActiveCity(city);
@@ -72,7 +73,7 @@ export function useOwnNightStatus(opts: { refetchInterval?: number } = {}) {
     queryKey: [OWN_NIGHT_STATUS_KEY, session?.user.id],
     enabled: !!session,
     staleTime: 0,
-    refetchInterval: opts.refetchInterval,
+    refetchInterval: Math.min(opts.refetchInterval ?? 15_000, 15_000),
     // The opening-prompt gate covers the app until this resolves. If the
     // network monitor mis-reports "offline" at cold start, a paused query
     // would leave that cover up forever — so never pause: let it fail and
