@@ -89,12 +89,12 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [showDownList, setShowDownList] = useState(false);
 
-  const { data: downs = [] } = useQuery({
+  const { data: downs = [], isError: downsError, refetch: retryDowns } = useQuery({
     queryKey: ['plan-downs', plan.id, currentUserId],
     queryFn: () => fetchPlanDowns(plan.id),
     staleTime: 30_000,
   });
-  const { data: participants = [] } = useQuery({
+  const { data: participants = [], isError: participantsError, refetch: retryParticipants } = useQuery({
     queryKey: ['plan-participants', plan.id, currentUserId],
     queryFn: () => fetchPlanParticipants(plan.id),
     staleTime: 30_000,
@@ -120,7 +120,7 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
   };
 
   const handleToggleDown = async () => {
-    if (isTogglingDown) return;
+    if (isTogglingDown || downsError) return;
     setIsTogglingDown(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
@@ -208,6 +208,11 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
 
   return (
     <View className="bg-white/[0.06] rounded-2xl p-4">
+      {downsError || participantsError ? (
+        <Pressable onPress={() => { void retryDowns(); void retryParticipants(); }}>
+          <Text className="text-red-300 mb-3">Could not load everyone on this plan. Tap to retry.</Text>
+        </Pressable>
+      ) : null}
       {/* Plan type badge */}
       {planTypeInfo ? (
         <View className="flex-row mb-2">
@@ -282,7 +287,7 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
         </View>
       ) : null}
 
-      {participants.length === 0 && downs.length === 0 ? (
+      {!participantsError && !downsError && participants.length === 0 && downs.length === 0 ? (
         <Text className="text-white/45 text-xs font-sans mb-3">Nobody&apos;s joined yet</Text>
       ) : null}
 
@@ -291,7 +296,7 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
         {!isOwner ? (
           <Pressable
             onPress={handleToggleDown}
-            disabled={isTogglingDown}
+            disabled={isTogglingDown || downsError}
             className={`flex-row items-center rounded-xl px-3 py-1.5 active:opacity-80 ${
               isDown ? 'bg-[#bfe600]' : 'bg-[#a855f7]/20'
             }`}

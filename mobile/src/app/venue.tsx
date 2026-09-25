@@ -242,10 +242,11 @@ export default function VenueScreen() {
       let friendsPlanning: FriendAtVenue[] = [];
       if (venuePlans?.length) {
         const planIds = venuePlans.map((p) => p.id);
-        const [{ data: downs }, { data: participants }] = await Promise.all([
+        const [{ data: downs, error: downsError }, { data: participants, error: participantsError }] = await Promise.all([
           supabase.from('plan_downs').select('user_id').in('plan_id', planIds),
           supabase.from('plan_participants').select('user_id').in('plan_id', planIds),
         ]);
+        if (downsError || participantsError) throw downsError ?? participantsError;
         const atVenueIds = new Set(friendsAtVenue.map((f) => f.id));
         const interested = [
           ...new Set([
