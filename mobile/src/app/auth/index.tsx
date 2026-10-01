@@ -11,6 +11,8 @@ import {
   formatNational,
   openCountryPicker,
   placeholderFor,
+  stripTrunkPrefix,
+  SUPPORTED_LABEL,
   toE164,
   validateNational,
   type Country,
@@ -60,6 +62,7 @@ export default function PhoneScreen() {
     if (text.trim().startsWith('+') && next.startsWith(prefix)) {
       next = next.slice(prefix.length);
     }
+    next = stripTrunkPrefix(next, country);
     // The field shows the FORMATTED number, so backspacing a separator
     // ")" or "-" leaves the digits unchanged and the character would spring
     // back. Deleting a separator deletes the digit before it instead.
@@ -79,7 +82,7 @@ export default function PhoneScreen() {
         setCountry(next);
         // A number typed for one country rarely survives the switch; keep
         // it, but re-check it against the new rules.
-        setDigits((d) => d.slice(0, next.nsnLength ?? 15));
+        setDigits((d) => stripTrunkPrefix(d, next).slice(0, next.nsnLength ?? 15));
       },
     });
   };
@@ -213,7 +216,7 @@ export default function PhoneScreen() {
                 </Text>
               ) : (
                 <Text className="text-xs text-white/45 font-sans px-1">
-                  we&apos;re US-only for now — enter a {country.dial} number
+                  we can only text numbers in {SUPPORTED_LABEL} for now
                 </Text>
               )}
             </View>

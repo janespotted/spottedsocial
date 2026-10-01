@@ -9,6 +9,7 @@ import {
   isSupported,
   searchCountries,
   SUPPORTED_COUNT,
+  SUPPORTED_LABEL,
   useCountryPickerRequest,
   type Country,
 } from '@/lib/country-codes';
@@ -20,7 +21,7 @@ const MAX_ROWS = 7;
  * Country dialling code picker for the sign-in phone field. Opened with
  * openCountryPicker(); picking a row hands it back and dismisses.
  *
- * Spotted is US-only today, so every country outside SUPPORTED_COUNTRIES is
+ * Sign-in is limited to SUPPORTED_COUNTRIES, so every other country is
  * shown dimmed and does not respond to a tap — the list answers "is my
  * country here?" instead of hiding the answer.
  *
@@ -62,13 +63,12 @@ export default function CountryCodeSheet() {
         <View className="w-12" />
       </View>
 
-      {/* Says up front why everything below the US is greyed out. */}
+      {/* Says up front why everything below the divider is greyed out. */}
       <View className="mx-5 flex-row items-start gap-2 rounded-xl px-3 py-2.5 bg-[#a855f7]/10 border border-[#a855f7]/25">
         <SymbolView name="info.circle" size={14} tintColor="#c4a0f5" />
         <Text className="text-white/70 text-xs font-sans flex-1">
-          Spotted is only in the US right now, so US numbers (+1) are the only
-          ones we can text a code to. Other countries are coming as we launch
-          in more cities.
+          Right now we can only text a code to numbers in {SUPPORTED_LABEL}.
+          Other countries are coming as we launch in more cities.
         </Text>
       </View>
 

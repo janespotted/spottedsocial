@@ -4,16 +4,17 @@ import { router } from 'expo-router';
 /**
  * Country dialling codes for the sign-in phone field.
  *
- * Spotted only launches in US cities, so **the US is the only country a
- * user may sign in from today**. The rest of the list is still rendered —
- * dimmed and unselectable — so the picker answers "can I use my foreign
- * number?" with a clear no rather than looking broken or missing.
+ * Sign-in is open to the US and Pakistan (the Lahore test city). The rest of
+ * the list is still rendered — dimmed and unselectable — so the picker
+ * answers "can I use my foreign number?" with a clear no rather than looking
+ * broken or missing.
  *
- * To open another country: add its code to SUPPORTED_COUNTRIES, and give it
- * an `nsnLength` if its national numbers are a fixed length (otherwise it
- * falls back to the ITU 6–15 envelope). Nothing else needs to change.
+ * To open another country: add its code to SUPPORTED_COUNTRIES (the order
+ * here is the order in the picker), and give it an `nsnLength` if its
+ * national numbers are a fixed length (otherwise it falls back to the ITU
+ * 6–15 envelope). Twilio's SMS geo-permissions must allow it too.
  */
-export const SUPPORTED_COUNTRIES: readonly string[] = ['US'];
+export const SUPPORTED_COUNTRIES: readonly string[] = ['US', 'PK'];
 
 export function isSupported(code: string): boolean {
   return SUPPORTED_COUNTRIES.includes(code);
@@ -27,6 +28,13 @@ export interface Country {
   dial: string;
   /** Digits in a valid national number, used to validate and to format. */
   nsnLength?: number;
+  /**
+   * The domestic trunk prefix ("0" in Pakistan: 0300 1234567). People type
+   * their number the way they dial it at home, so it is dropped on entry.
+   */
+  trunkPrefix?: string;
+  /** First digit every mobile number starts with — SMS can't reach landlines. */
+  mobileStart?: string;
 }
 
 /** Regional-indicator flag for an alpha-2 code ("US" → 🇺🇸). */
@@ -36,7 +44,7 @@ export function flagFor(code: string): string {
   );
 }
 
-/** The only selectable country today, and the field's starting value. */
+/** The field's starting value. */
 export const DEFAULT_COUNTRY: Country = { code: 'US', name: 'United States', dial: '+1', nsnLength: 10 };
 
 const POPULAR: Country[] = [
@@ -80,7 +88,7 @@ const REST: Country[] = [
   { code: 'NZ', name: 'New Zealand', dial: '+64' },
   { code: 'NG', name: 'Nigeria', dial: '+234' },
   { code: 'NO', name: 'Norway', dial: '+47' },
-  { code: 'PK', name: 'Pakistan', dial: '+92' },
+  { code: 'PK', name: 'Pakistan', dial: '+92', nsnLength: 10, trunkPrefix: '0', mobileStart: '3' },
   { code: 'PE', name: 'Peru', dial: '+51' },
   { code: 'PH', name: 'Philippines', dial: '+63' },
   { code: 'PL', name: 'Poland', dial: '+48' },
@@ -113,11 +121,17 @@ export const COUNTRIES: Country[] = [...POPULAR, ...REST].sort((a, b) => {
   const sa = isSupported(a.code);
   const sb = isSupported(b.code);
   if (sa !== sb) return sa ? -1 : 1;
+  if (sa) return SUPPORTED_COUNTRIES.indexOf(a.code) - SUPPORTED_COUNTRIES.indexOf(b.code);
   return a.name.localeCompare(b.name);
 });
 
 /** Where the supported block ends and the unavailable one begins. */
 export const SUPPORTED_COUNT = SUPPORTED_COUNTRIES.length;
+
+/** "the US and Pakistan" — for copy that names where sign-in works. */
+export const SUPPORTED_LABEL = SUPPORTED_COUNTRIES.map((code) =>
+  code === 'US' ? 'the US' : findCountry(code).name,
+).join(' and ');
 
 export function findCountry(code: string): Country {
   return COUNTRIES.find((c) => c.code === code) ?? DEFAULT_COUNTRY;
@@ -159,7 +173,15 @@ export function formatE164(e164: string): string {
 
 /** Placeholder that matches what `formatNational` will produce. */
 export function placeholderFor(country: Country): string {
-  return country.dial === '+1' ? '(555) 123-4567' : 'phone number';
+  if (country.dial === '+1') return '(555) 123-4567';
+  if (country.code === 'PK') return '3001234567';
+  return 'phone number';
+}
+
+/** Drop the domestic trunk prefix someone typed out of habit ("0300…"). */
+export function stripTrunkPrefix(digits: string, country: Country): string {
+  const t = country.trunkPrefix;
+  return t && digits.startsWith(t) ? digits.slice(t.length) : digits;
 }
 
 /**
@@ -178,6 +200,9 @@ export function validateNational(digits: string, country: Country): string | nul
     }
     if (country.dial === '+1' && /^[01]/.test(digits)) {
       return 'area codes don’t start with 0 or 1';
+    }
+    if (country.mobileStart && !digits.startsWith(country.mobileStart)) {
+      return `enter a mobile number — ${country.name} mobiles start with ${country.mobileStart}`;
     }
     return null;
   }
