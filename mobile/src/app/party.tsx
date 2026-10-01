@@ -1,3 +1,4 @@
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useState } from "react";
 import {
   Alert,
@@ -8,7 +9,6 @@ import {
   View,
 } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/hooks/use-session";
 import { supabase } from "@/lib/supabase";
 import { fetchProfilesSafe } from "@/lib/profiles";
@@ -28,7 +28,7 @@ export default function Party() {
   const owner = me === hostId;
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
-  const db = supabase as any;
+  const db = supabase;
   const query = useQuery({
     queryKey: ["party-details", hostId, me],
     refetchInterval: 15_000,
@@ -50,27 +50,14 @@ export default function Party() {
       }
       const active = status.data?.status === "out" &&
         status.data?.is_private_party &&
-        Date.parse(status.data.expires_at) > Date.now();
-      const rows = (requests.data ?? []).filter((r: any) =>
+        Date.parse(status.data.expires_at ?? '') > Date.now();
+      const rows = (requests.data ?? []).filter((r) =>
         r.status_id === status.data?.id &&
         r.expires_at === status.data?.expires_at
       ) as RequestRow[];
-      const [sent, received] = owner
-        ? await Promise.all([
-          db.from("friendships").select("friend_id").eq("user_id", me).eq(
-            "status",
-            "accepted",
-          ),
-          db.from("friendships").select("user_id").eq("friend_id", me).eq(
-            "status",
-            "accepted",
-          ),
-        ])
-        : [{ data: [] }, { data: [] }];
-      const ids = new Set([
-        ...(sent.data ?? []).map((r: any) => r.friend_id),
-        ...(received.data ?? []).map((r: any) => r.user_id),
-      ]);
+      const eligible = owner ? await db.rpc('get_party_invite_recipients') : { data: [], error: null };
+      if (eligible.error) throw eligible.error;
+      const ids = new Set((eligible.data ?? []).map((r: { id: string }) => r.id));
       return {
         active,
         requests: rows,
@@ -80,7 +67,7 @@ export default function Party() {
       };
     },
   });
-  const act = async (work: () => Promise<any>) => {
+  const act = async (work: () => PromiseLike<{ error: unknown }>) => {
     if (busy) return;
     setBusy(true);
     try {
@@ -176,8 +163,9 @@ export default function Party() {
                     }
                   })}
                   <Text className="text-white font-sans-semibold mt-3">
-                    Invite a friend
+                    Invite an eligible friend
                   </Text>
+                  <Text className="text-white/60">Only friends in your current party audience are listed. Invitation acceptance does not share your address.</Text>
                   {query.data.friends.map((f) => (
                     <View key={f.id}>
                       {button(

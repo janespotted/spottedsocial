@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { supabase } from '@/lib/supabase';
 import type { Audience } from '@/lib/audience';
 import { useFriendIds } from './use-friend-ids';
@@ -20,13 +20,14 @@ export function useAudienceCounts(userId: string | undefined) {
     enabled: !!userId && friendIds !== undefined,
     staleTime: 60_000,
     queryFn: async (): Promise<AudienceCounts> => {
-      const [{ count: closeCount }, { data: mutualRows }] = await Promise.all([
+      const [{ count: closeCount, error: closeError }, { data: mutualRows, error: mutualError }] = await Promise.all([
         supabase
           .from('close_friends')
           .select('close_friend_id', { count: 'exact', head: true })
           .eq('user_id', userId!),
         supabase.rpc('get_mutual_friend_ids', { p_user_id: userId! }),
       ]);
+      if (closeError || mutualError) throw closeError ?? mutualError;
       const friends = friendIds?.length ?? 0;
       const mutuals = ((mutualRows ?? []) as Array<{ user_id: string }>).length;
       return {

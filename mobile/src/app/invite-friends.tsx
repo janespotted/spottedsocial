@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Share, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
@@ -17,7 +17,7 @@ export default function InviteFriendsSheet() {
   const userId = session?.user.id;
   const [regenerating, setRegenerating] = useState(false);
 
-  const { data: invite, isLoading, refetch } = useQuery({
+  const { data: invite, isLoading, isError, refetch } = useQuery({
     queryKey: ['invite-code', userId],
     enabled: !!session,
     queryFn: () => fetchOrCreateInviteCode(userId!),
@@ -40,6 +40,8 @@ export default function InviteFriendsSheet() {
       await regenerateInviteCode(userId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refetch();
+    } catch {
+      Alert.alert('Link not updated', 'Please try again.');
     } finally {
       setRegenerating(false);
     }
@@ -59,7 +61,7 @@ export default function InviteFriendsSheet() {
         </View>
       </View>
 
-      {isLoading || !inviteUrl ? (
+      {isError || (!isLoading && !inviteUrl) ? (<Text className="text-red-300 py-5" onPress={() => void refetch()}>Could not load your invite link. Tap to retry.</Text>) : isLoading ? (
         <View className="py-16">
           <ActivityIndicator color={NEON} />
         </View>
@@ -67,7 +69,7 @@ export default function InviteFriendsSheet() {
         <>
           {/* QR code — scan to open the invite link */}
           <View className="p-4 rounded-2xl bg-white">
-            <QRCode value={inviteUrl} size={180} backgroundColor="#ffffff" color="#1a0f2e" />
+            <QRCode value={inviteUrl!} size={180} backgroundColor="#ffffff" color="#1a0f2e" />
           </View>
 
           {/* Link display */}

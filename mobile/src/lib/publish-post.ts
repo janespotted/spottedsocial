@@ -99,9 +99,10 @@ async function uploadMedia(
       Authorization: `Bearer ${token}`,
       apikey: SUPABASE_PUBLISHABLE_KEY,
       'Content-Type': media.mimeType,
-      'x-upsert': 'true',
-      // Paths are unique per upload (userId/timestamp), so the object never
-      // changes: let the CDN and every device cache it for a year.
+      'x-upsert': 'false',
+      // Paths are unique per upload (userId/private-v1/timestamp), so the
+      // object never changes: let the CDN and every device cache it. Access
+      // is enforced when the signed link is issued (lib/private-media).
       'cache-control': 'max-age=31536000, immutable',
     },
     onProgress: ({ bytesSent, totalBytes }) => {
@@ -183,7 +184,7 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
       if (isVideo) {
         uploadedKey = await uploadVideoToMux(prepared, onProgress, signal);
       } else {
-        const path = `${userId}/${Date.now()}.${prepared.fileExt}`;
+        const path = `${userId}/private-v1/${Date.now()}.${prepared.fileExt}`;
         await uploadMedia(path, prepared, onProgress, signal);
         uploadedKey = path;
       }

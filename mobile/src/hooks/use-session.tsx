@@ -2,6 +2,7 @@ import { createContext, use, useCallback, useEffect, useState, type ReactNode } 
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { hasSeenTour } from '@/lib/tour-seen';
+import { getSessionRevision, setSessionIdentity } from '@/lib/session-identity';
 
 interface SessionState {
   session: Session | null;
@@ -15,6 +16,7 @@ interface SessionState {
    * treating that as "onboarded" activates gates during signup.
    */
   onboardingResolved: boolean;
+  onboardingError: string | null;
   /** Re-check profile completeness (call after profile writes during onboarding). */
   refreshOnboardingStatus: () => Promise<void>;
 }
@@ -24,6 +26,7 @@ const SessionContext = createContext<SessionState>({
   loading: true,
   onboardingNeeded: false,
   onboardingResolved: false,
+  onboardingError: null,
   refreshOnboardingStatus: async () => {},
 });
 
@@ -43,11 +46,12 @@ const TOUR_FLAG_SHIPPED_AT = Date.parse('2026-09-22T00:00:00Z');
  * exist in the production schema, and a failed select here silently locks
  * users inside onboarding forever. */
 async function fetchOnboardingNeeded(userId: string): Promise<boolean> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('display_name, username, created_at')
     .eq('id', userId)
     .maybeSingle();
+  if (error) throw error;
   if (!(data?.display_name && data?.username)) return true;
   if (await hasSeenTour(userId)) return false;
   // Accounts that finished onboarding before the tour flag shipped have a
@@ -64,16 +68,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // null = not yet known for the current user. The root navigator stays
   // unmounted until it resolves, so it is only ever re-evaluated when the
   // signed-in USER changes — never on a token refresh.
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
   const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | null>(null);
 
   const refreshOnboardingStatus = useCallback(async () => {
+    const revision = getSessionRevision();
     const { data } = await supabase.auth.getSession();
     const uid = data.session?.user.id;
     if (!uid) return;
-    setOnboardingNeeded(await fetchOnboardingNeeded(uid));
+    try {
+      const needed = await fetchOnboardingNeeded(uid);
+      if (revision === getSessionRevision()) { setOnboardingNeeded(needed); setOnboardingError(null); }
+    } catch (error) {
+      if (revision === getSessionRevision()) setOnboardingError('Could not load your profile. Your account has not been reset.');
+      throw error;
+    }
   }, []);
 
   useEffect(() => {
+    let disposed = false;
+    let authEventSeen = false;
     // Keep ONE session object per signed-in user. Supabase emits a fresh
     // Session on INITIAL_SESSION, SIGNED_IN echoes and every hourly
     // TOKEN_REFRESHED; every hook in the app keys effects on `session`, so a
@@ -84,6 +98,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // the identity only needs to change when the user does. USER_UPDATED
     // carries changed profile fields (email/phone) and is taken as-is.
     const applySession = (next: Session | null, event: AuthChangeEvent | 'GET_SESSION') => {
+      if (disposed) return;
+      setSessionIdentity(next?.user.id ?? null, next?.access_token ?? null);
       setSession((prev) => {
         if (prev && next && prev.user.id === next.user.id && event !== 'USER_UPDATED') return prev;
         return next;
@@ -91,26 +107,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
 
     supabase.auth.getSession().then(({ data }) => {
-      applySession(data.session, 'GET_SESSION');
+      if (!authEventSeen) applySession(data.session, 'GET_SESSION');
       setSessionLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      authEventSeen = true;
       applySession(next, event);
+      setSessionLoading(false);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => { disposed = true; sub.subscription.unsubscribe(); };
   }, []);
 
   // Re-evaluate onboarding status whenever the signed-in user changes
   const userId = session?.user.id;
   useEffect(() => {
     if (!userId) {
-      setOnboardingNeeded(null);
+      setOnboardingNeeded(null); setOnboardingError(null);
       return;
     }
     let cancelled = false;
-    setOnboardingNeeded(null);
+    setOnboardingNeeded(null); setOnboardingError(null);
     fetchOnboardingNeeded(userId).then((needed) => {
       if (!cancelled) setOnboardingNeeded(needed);
+    }).catch(() => {
+      if (!cancelled) setOnboardingError('Could not load your profile. Your account has not been reset.');
     });
     return () => {
       cancelled = true;
@@ -121,7 +141,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     <SessionContext
       value={{
         session,
-        loading: sessionLoading || (!!session && onboardingNeeded === null),
+        loading: sessionLoading || (!!session && onboardingNeeded === null && !onboardingError),
+        onboardingError,
         onboardingNeeded: onboardingNeeded ?? false,
         onboardingResolved: !!session && onboardingNeeded !== null,
         refreshOnboardingStatus,

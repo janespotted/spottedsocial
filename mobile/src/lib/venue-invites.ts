@@ -12,6 +12,7 @@ export interface SendInvitesResult {
   ok: boolean;
   /** Notification ids created — Undo deletes exactly these (web parity). */
   notificationIds: string[];
+  recipientIds: string[];
 }
 
 /**
@@ -24,7 +25,7 @@ export async function sendVenueInvites(
   venueName: string,
   friends: InviteFriend[]
 ): Promise<SendInvitesResult> {
-  if (friends.length === 0) return { ok: false, notificationIds: [] };
+  if (friends.length === 0) return { ok: false, notificationIds: [], recipientIds: [] };
 
   try {
     const profiles = await fetchProfilesSafe();
@@ -33,11 +34,7 @@ export async function sendVenueInvites(
     const demoIds = new Set(profiles.filter((p) => p.is_demo).map((p) => p.id));
     const realFriends = friends.filter((f) => !demoIds.has(f.id));
 
-    if (realFriends.length === 0) {
-      // All-demo selection (dev testing) — treat as success, nothing to write
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      return { ok: true, notificationIds: [] };
-    }
+    if (realFriends.length === 0) return { ok: false, notificationIds: [], recipientIds: [] };
 
     const message = `${senderFirstName} invited you to ${venueName}. Want to go?`;
     const { data: inserted, error } = await supabase.rpc('create_notifications_batch', {
@@ -63,10 +60,11 @@ export async function sendVenueInvites(
         .catch(() => {});
     }
 
+    if (!inserted?.length) return { ok: false, notificationIds: [], recipientIds: [] };
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    return { ok: true, notificationIds: (inserted ?? []).map((n) => n.id) };
+    return { ok: true, notificationIds: inserted.map(n => n.id), recipientIds: inserted.map(n => n.receiver_id) };
   } catch {
-    return { ok: false, notificationIds: [] };
+    return { ok: false, notificationIds: [], recipientIds: [] };
   }
 }
 
@@ -76,7 +74,8 @@ export async function sendVenueInvites(
  * invite disappears from the recipient's Activity, as in the original build.
  */
 export async function undoNotifications(notificationIds: string[]): Promise<boolean> {
-  if (notificationIds.length === 0) return true;
-  const { error } = await supabase.from('notifications').delete().in('id', notificationIds);
-  return !error;
+  if (notificationIds.length === 0) return false;
+  const ids = [...new Set(notificationIds)];
+  const { data, error } = await supabase.from('notifications').delete().in('id', ids).select('id');
+  return !error && data?.length === ids.length;
 }

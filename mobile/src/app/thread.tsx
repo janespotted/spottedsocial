@@ -1,8 +1,11 @@
+import { useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { withholdLivePreview } from '@/lib/live-preview';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  AppState,
   Keyboard,
   Pressable,
   StyleSheet,
@@ -12,9 +15,10 @@ import {
 } from 'react-native';
 import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { onNightBoundary } from '@/lib/night-boundary';
+import { confirmMessage, sharedPostResults } from '@/lib/thread-state';
 import { RESET_COPY } from '@/lib/reset-copy';
 import { Image } from '@/components/styled';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,13 +31,14 @@ import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import {
   markThreadRead,
+  fetchPeerReadReceipt,
   SHARED_POST_REGEX,
   type DmMember,
   type DmMessage,
 } from '@/lib/dm';
 import { fetchProfilesSafe } from '@/lib/profiles';
-import { muxThumbnailUrl } from '@/lib/mux';
-import { resolvePostImageUrl } from '@/lib/posts';
+import { resolveMuxPosters } from '@/lib/mux';
+import { resolvePostImageUrl, resolvePostImageUrls } from '@/lib/posts';
 import { isFromTonight } from '@/lib/time-context';
 import { useSession } from '@/hooks/use-session';
 import { useTypingIndicator } from '@/hooks/use-typing-indicator';
@@ -94,10 +99,18 @@ export default function ThreadScreen() {
   const [otherMember, setOtherMember] = useState<DmMember | null>(null);
   const [myName, setMyName] = useState('Someone');
   const [hearted, setHearted] = useState<Set<string>>(new Set());
-  const [sharedPosts, setSharedPosts] = useState<Map<string, SharedPostData>>(new Map());
+  const [sharedPosts, setSharedPosts] = useState<Map<string, SharedPostData | null>>(new Map());
   const [otherReadAt, setOtherReadAt] = useState<string | null>(null);
-  const [bothShowReceipts, setBothShowReceipts] = useState(false);
+  const refreshSharedPostsRef = useRef<() => void>(() => {});
+  const refreshReceiptRef = useRef<() => void>(() => {});
   const [draft, setDraft] = useState('');
+  const sendingRef = useRef(false);
+  const draftRevision = useRef(0);
+  const { data: own } = useOwnNightStatus();
+  const withheld = withholdLivePreview(own?.status?.status, !!own);
+  const [threadAccess, setThreadAccess] = useState<'loading' | 'allowed' | 'unavailable' | 'error'>('loading');
+  const [metadataRevision, setMetadataRevision] = useState(0);
+  const [threadError, setThreadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const lastTapRef = useRef<{ id: string; time: number } | null>(null);
@@ -108,16 +121,19 @@ export default function ThreadScreen() {
 
   /* ── Thread data: members, group info, read-receipt privacy ── */
   useEffect(() => {
-    if (!threadId || !userId) return;
+    if (!threadId || !userId) { setThreadAccess('unavailable'); return; }
     let cancelled = false;
-    (async () => {
-      const [{ data: threadData }, { data: members }, profiles, { data: myProfile }] =
+    let request = 0;
+    const refresh = async () => {
+      const current = ++request;
+      try {
+      const [{ data: threadData, error: threadFailure }, { data: members, error: memberFailure }, profiles, { data: myProfile }] =
         await Promise.all([
           supabase
             .from('dm_threads')
             .select('is_group, name, group_avatar_url')
             .eq('id', threadId)
-            .single(),
+            .maybeSingle(),
           supabase
             .from('dm_thread_members')
             .select('user_id')
@@ -128,7 +144,10 @@ export default function ThreadScreen() {
           fetchProfilesSafe().catch(() => []),
           supabase.from('profiles').select('display_name').eq('id', userId).maybeSingle(),
         ]);
-      if (cancelled) return;
+      if (cancelled || current !== request) return;
+      if (threadFailure || memberFailure) throw threadFailure ?? memberFailure;
+      if (!threadData) { setThreadAccess('unavailable'); setMessages([]); setMemberMap(new Map()); setOtherMember(null); setGroupInfo(null); return; }
+      setThreadAccess('allowed');
       if (myProfile?.display_name) setMyName(myProfile.display_name);
 
       const memberIds = (members ?? []).map((m) => m.user_id);
@@ -162,51 +181,57 @@ export default function ThreadScreen() {
           display_name: p?.display_name ?? 'Unknown',
           username: (p as { username?: string })?.username ?? '',
           avatar_url: p?.avatar_url ?? null,
-          venue_name: s?.venue_name ?? null,
-          venue_id: s?.venue_id ?? null,
+          venue_name: withheld ? null : s?.venue_name ?? null,
+          venue_id: withheld ? null : s?.venue_id ?? null,
         };
         newMap.set(id, member);
         allMembers.push(member);
       }
-      if (cancelled) return;
+      if (cancelled || current !== request) return;
       setMemberMap(newMap);
 
       if (threadData?.is_group) {
         setGroupInfo({
           name: threadData.name ?? null,
-          group_avatar_url: threadData.group_avatar_url ?? null,
+          group_avatar_url: await resolvePostImageUrl(threadData.group_avatar_url ?? null),
           members: allMembers,
         });
         setOtherMember(null);
       } else {
         setGroupInfo(null);
         setOtherMember(allMembers[0] ?? null);
-        // "Seen" only when BOTH users share read receipts
-        const otherId = allMembers[0]?.user_id;
-        if (otherId) {
-          const { data: privacy } = await supabase
-            .from('profiles')
-            .select('show_read_receipts')
-            .in('id', [userId, otherId]);
-          if (!cancelled) {
-            setBothShowReceipts(
-              (privacy?.length ?? 0) === 2 && (privacy ?? []).every((p) => p.show_read_receipts)
-            );
-          }
-          const { data: receipt } = await supabase
-            .from('dm_read_receipts')
-            .select('last_read_at')
-            .eq('thread_id', threadId)
-            .eq('user_id', otherId)
-            .maybeSingle();
-          if (!cancelled && receipt) setOtherReadAt(receipt.last_read_at);
-        }
       }
-    })();
-    return () => {
-      cancelled = true;
+      } catch {
+        if (!cancelled && current === request) { setThreadAccess('error'); setOtherMember(null); setGroupInfo(null); setMessages([]); }
+      }
     };
-  }, [threadId, userId]);
+    void refresh();
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 15_000);
+    return () => {
+      cancelled = true; clearInterval(timer);
+    };
+  }, [threadId, userId, withheld, metadataRevision]);
+
+  // RLS exposes peer receipts only when both users currently opt in. Refresh
+  // on focus/foreground and while visible so preference revocation clears Seen.
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    let generation = 0;
+    const refresh = async () => {
+      const request = ++generation;
+      setOtherReadAt(null);
+      if (!threadId || !otherMember?.user_id || !userId || groupInfo) return;
+      const receipt = await fetchPeerReadReceipt(threadId, otherMember.user_id);
+      if (active && request === generation) setOtherReadAt(receipt);
+    };
+    refreshReceiptRef.current = () => { void refresh(); };
+    void refresh();
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 15_000);
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void refresh(); else { ++generation; setOtherReadAt(null); }
+    });
+    return () => { active = false; ++generation; clearInterval(timer); subscription.remove(); refreshReceiptRef.current = () => {}; setOtherReadAt(null); };
+  }, [threadId, userId, otherMember?.user_id, groupInfo]));
 
   // After each commit, everything rendered counts as seen (entrance
   // animations only fire at row mount, so live arrivals animate once)
@@ -217,18 +242,19 @@ export default function ThreadScreen() {
   /* ── Messages: fetch + realtime ── */
   const fetchMessages = useCallback(async () => {
     if (!threadId) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('dm_messages')
       .select('*')
       .eq('thread_id', threadId)
       .order('created_at', { ascending: true });
+    if (error) { setMessages([]); setThreadError('Could not load messages.'); return; }
     if (!data) return;
     const tonight = data.filter((m) => isFromTonight(m.created_at)) as DmMessage[];
     // Fetched history must not play entrance animations — only live arrivals
     for (const m of tonight) seenIdsRef.current.add(m.id);
     setMessages(tonight);
-    // Resolve storage paths to signed URLs (mobile uploads store paths)
-    const pathMsgs = tonight.filter((m) => m.image_url && !m.image_url.startsWith('http'));
+    // Resolve media to the authenticated gateway (including legacy public URLs)
+    const pathMsgs = tonight.filter((m) => m.image_url);
     for (const msg of pathMsgs) {
       const url = await resolvePostImageUrl(msg.image_url);
       if (url) {
@@ -242,7 +268,7 @@ export default function ThreadScreen() {
   // At 5 AM the night's messages are gone — re-read rather than keep
   // showing them (addendum v3 §4). Messages live in local state, so the
   // query invalidation in handleNightBoundary cannot reach them.
-  useEffect(() => onNightBoundary(() => void fetchMessages()), [fetchMessages]);
+  useEffect(() => onNightBoundary(() => { setMessages([]); setSharedPosts(new Map()); void fetchMessages(); }), [fetchMessages]);
 
   useEffect(() => {
     if (!threadId || !userId) return;
@@ -265,9 +291,11 @@ export default function ThreadScreen() {
         },
         async (payload) => {
           const newMsg = payload.new as DmMessage;
-          if (newMsg.image_url && !newMsg.image_url.startsWith('http')) {
+          if (newMsg.image_url) {
             newMsg.image_url = await resolvePostImageUrl(newMsg.image_url);
           }
+          // A media lookup may finish after the local 5 AM boundary.
+          if (!isFromTonight(newMsg.created_at)) return;
           setMessages((prev) =>
             prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]
           );
@@ -282,11 +310,8 @@ export default function ThreadScreen() {
           table: 'dm_read_receipts',
           filter: `thread_id=eq.${threadId}`,
         },
-        (payload) => {
-          const row = payload.new as { user_id?: string; last_read_at?: string } | null;
-          if (row?.user_id && row.user_id !== userId && row.last_read_at) {
-            setOtherReadAt(row.last_read_at);
-          }
+        () => {
+          refreshReceiptRef.current();
         }
       ),
     });
@@ -312,62 +337,56 @@ export default function ThreadScreen() {
     })();
   }, [messages.length, userId]);
 
-  /* ── Shared post cards ── */
-  useEffect(() => {
-    const ids = [
-      ...new Set(
-        messages
-          .map((m) => m.text.match(SHARED_POST_REGEX)?.[1])
-          .filter((id): id is string => !!id && !sharedPosts.has(id))
-      ),
-    ];
-    if (ids.length === 0) return;
-    (async () => {
-      const [{ data: posts }, profiles] = await Promise.all([
-        supabase
-          .from('posts')
-          .select('id, text, image_url, media_type, mux_playback_id, venue_name, user_id')
-          .in('id', ids),
-        fetchProfilesSafe(),
-      ]);
-      if (!posts) return;
-      const profileMap = new Map(profiles.map((p) => [p.id, p]));
-      // Mux videos have no storage object — preview with the poster frame
-      const resolved = await Promise.all(
-        posts.map(async (p) => ({
-          ...p,
-          image_url:
-            p.media_type === 'video' && !p.image_url && p.mux_playback_id
-              ? muxThumbnailUrl(p.mux_playback_id, { width: 480 })
-              : await resolvePostImageUrl(p.image_url),
-        }))
-      );
-      setSharedPosts((prev) => {
-        const next = new Map(prev);
-        for (const p of resolved) {
-          next.set(p.id, {
-            id: p.id,
-            text: p.text,
-            image_url: p.image_url,
-            venue_name: p.venue_name,
-            author_name: profileMap.get(p.user_id)?.display_name ?? 'Someone',
-          });
+  /* Revalidate on focus and on a bounded timer, independent of the result map.
+   * A missing/revoked post is a stable unavailable result, not a new fetch trigger. */
+  const sharedPostIds = [...new Set(messages.map(m => m.text.match(SHARED_POST_REGEX)?.[1]).filter(Boolean))].sort().join(',');
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    let generation = 0;
+    const ids = sharedPostIds ? sharedPostIds.split(',') : [];
+    const refresh = async () => {
+      const request = ++generation;
+      // Keep the previous results on screen until the new ones replace them.
+      if (!ids.length) { setSharedPosts(new Map()); return; }
+      try {
+        const [{ data: posts, error }, profiles] = await Promise.all([
+          supabase.from('posts').select('id,text,image_url,media_type,mux_playback_id,venue_name,user_id').in('id', ids),
+          fetchProfilesSafe(),
+        ]);
+        if (error) throw error;
+        const profileMap = new Map(profiles.map(p => [p.id, p]));
+        const isMux = (p: { media_type: string | null; image_url: string | null; mux_playback_id: string | null }) =>
+          p.media_type === 'video' && !p.image_url && !!p.mux_playback_id;
+        const [images, posters] = await Promise.all([
+          resolvePostImageUrls((posts ?? []).filter(p => !isMux(p)).map(p => p.image_url)),
+          resolveMuxPosters((posts ?? []).filter(isMux).map(p => p.mux_playback_id!), 480),
+        ]);
+        const resolved = (posts ?? []).map(p => ({
+          id: p.id, text: p.text, venue_name: p.venue_name,
+          author_name: profileMap.get(p.user_id)?.display_name ?? 'Someone',
+          image_url: isMux(p) ? posters.get(p.mux_playback_id!) ?? null : p.image_url ? images.get(p.image_url) ?? null : null,
+        }));
+        if (active && request === generation) setSharedPosts(sharedPostResults(ids, resolved));
+      } catch {
+        if (active && request === generation) {
+          setSharedPosts(sharedPostResults(ids, []));
+          setThreadError('Could not refresh shared posts.');
         }
-        return next;
-      });
-    })();
-  }, [messages, sharedPosts]);
+      }
+    };
+    refreshSharedPostsRef.current = () => { void refresh(); };
+    void refresh();
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 15_000);
+    const boundary = onNightBoundary(() => { ++generation; setSharedPosts(new Map()); });
+    return () => { active = false; ++generation; clearInterval(timer); boundary(); refreshSharedPostsRef.current = () => {}; setSharedPosts(new Map()); };
+  }, [sharedPostIds]));
 
   /* ── Send ── */
-  const recipientIds = groupInfo
-    ? groupInfo.members.map((m) => m.user_id)
-    : otherMember
-      ? [otherMember.user_id]
-      : [];
-
   const send = useCallback(async () => {
     const text = draft.trim();
-    if (!text || !userId || !threadId || text.length > 2000) return;
+    if (!text || !userId || !threadId || text.length > 2000 || sendingRef.current) return;
+    sendingRef.current = true;
+    const revision = draftRevision.current;
     setDraft('');
     const optimistic: DmMessage = {
       id: `optimistic-${Date.now()}`,
@@ -382,21 +401,25 @@ export default function ThreadScreen() {
       .from('dm_messages')
       .insert({ thread_id: threadId, sender_id: userId, text })
       .select()
-      .single();
-    if (error) {
+      .single().then(result => result, error => ({ data: null, error }));
+    sendingRef.current = false;
+    if (error || !inserted) {
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-      setDraft(text);
+      if (draftRevision.current === revision) setDraft(text);
+      Alert.alert('Message not confirmed', 'Your message could not be confirmed. Check the thread before retrying.', [{ text: 'OK' }]);
+      setThreadError(`Not confirmed: ${text}`);
       return;
     }
     setMessages((prev) =>
-      prev.map((m) => (m.id === optimistic.id ? (inserted as DmMessage) : m))
+      confirmMessage(prev, optimistic.id, inserted as DmMessage, isFromTonight(inserted.created_at))
     );
-  }, [draft, userId, threadId, myName, recipientIds]);
+  }, [draft, userId, threadId]);
 
   /** Upload + send one image, whatever produced it (camera or library). */
   const sendImageAsset = useCallback(
     async (asset: { uri: string; mimeType?: string | null }) => {
-    if (!userId || !threadId) return;
+    if (!userId || !threadId || sendingRef.current) return;
+    sendingRef.current = true;
     setUploading(true);
     const optimisticId = `optimistic-img-${Date.now()}`;
     setMessages((prev) => [
@@ -412,31 +435,31 @@ export default function ThreadScreen() {
     ]);
     try {
       const ext = asset.mimeType === 'image/png' ? 'png' : 'jpg';
-      const path = `${userId}/dm/${threadId}/${Date.now()}.${ext}`;
+      const path = `${userId}/private-v1/dm/${threadId}/${Date.now()}.${ext}`;
       const body = await fetch(asset.uri).then((r) => r.arrayBuffer());
       const { error: uploadErr } = await supabase.storage
         .from('post-images')
-        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: true });
+        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: false });
       if (uploadErr) throw uploadErr;
       const { data: inserted, error: insertErr } = await supabase
         .from('dm_messages')
         .insert({ thread_id: threadId, sender_id: userId, text: '', image_url: path })
         .select()
         .single();
-      if (insertErr) throw insertErr;
+      if (insertErr || !inserted) throw insertErr ?? new Error('Message was not confirmed');
       // Keep the local uri for display — the stored value is a private path
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === optimisticId ? { ...(inserted as DmMessage), image_url: asset.uri } : m
-        )
+        confirmMessage(prev, optimisticId, { ...(inserted as DmMessage), image_url: asset.uri }, isFromTonight(inserted!.created_at))
       );
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      Alert.alert('Photo not confirmed', 'Check the thread before choosing the photo again.');
     } finally {
+      sendingRef.current = false;
       setUploading(false);
     }
     },
-    [userId, threadId, myName, recipientIds]
+    [userId, threadId]
   );
 
   /**
@@ -560,19 +583,19 @@ export default function ThreadScreen() {
     if (result.canceled || !asset) return;
     try {
       const ext = asset.mimeType === 'image/png' ? 'png' : 'jpg';
-      const path = `group-avatars/${threadId}/${Date.now()}.${ext}`;
+      const path = `group-avatars/${threadId}/private-v1/${Date.now()}.${ext}`;
       const body = await fetch(asset.uri).then((r) => r.arrayBuffer());
       const { error: uploadErr } = await supabase.storage
         .from('post-images')
-        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: true });
+        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: false });
       if (uploadErr) throw uploadErr;
-      const { data: urlData } = supabase.storage.from('post-images').getPublicUrl(path);
+      const mediaUrl = await resolvePostImageUrl(path);
       const { error } = await supabase
         .from('dm_threads')
-        .update({ group_avatar_url: urlData.publicUrl })
+        .update({ group_avatar_url: path })
         .eq('id', threadId);
       if (!error) {
-        setGroupInfo((prev) => (prev ? { ...prev, group_avatar_url: urlData.publicUrl } : prev));
+        setGroupInfo((prev) => (prev ? { ...prev, group_avatar_url: mediaUrl } : prev));
       }
     } catch {
       /* upload failed — keep prior photo */
@@ -612,6 +635,16 @@ export default function ThreadScreen() {
     return null;
   })();
 
+  const openSharedPost = (id: string) => router.push({ pathname: '/post-detail', params: { postId: id } });
+
+  if (threadAccess !== 'allowed') return (
+    <View className="flex-1 items-center justify-center gap-4">
+      <Text className="text-white">{threadAccess === 'loading' ? 'Loading conversation…' : threadAccess === 'error' ? 'Could not load this conversation.' : 'This conversation is unavailable.'}</Text>
+      {threadAccess === 'error' ? <Text className="text-[#d4ff00]" onPress={() => setMetadataRevision(x => x + 1)}>Retry</Text> : null}
+      <Text className="text-white" onPress={goBack}>Back to messages</Text>
+    </View>
+  );
+
   return (
     <View className="flex-1">
       {/* Header */}
@@ -641,7 +674,7 @@ export default function ThreadScreen() {
               <Text className="text-white/60 text-xs font-sans">
                 {groupInfo.members.length + 1} members
               </Text>
-            ) : otherMember?.venue_name ? (
+            ) : !withheld && otherMember?.venue_name ? (
               <Pressable
                 onPress={() =>
                   otherMember.venue_id &&
@@ -681,6 +714,7 @@ export default function ThreadScreen() {
         textInputNativeID="dm-input"
         style={{ flex: 1 }}
       >
+      {threadError ? <Pressable onPress={() => { setThreadError(null); void fetchMessages(); refreshSharedPostsRef.current(); }} className="px-4 py-2"><Text className="text-red-300">{threadError} Tap to refresh.</Text></Pressable> : null}
       <KeyboardAwareLegendList
         data={messages}
         keyExtractor={(m: DmMessage) => m.id}
@@ -707,7 +741,7 @@ export default function ThreadScreen() {
         // The animated LegendList variant freezes mounted rows unless
         // extraData invalidates them — everything renderItem reads from
         // component state must be listed here
-        extraData={{ memberMap, otherMember, hearted, sharedPosts, otherReadAt, bothShowReceipts }}
+        extraData={{ memberMap, otherMember, hearted, sharedPosts, otherReadAt }}
         renderItem={({ item, index }: { item: DmMessage; index: number }) => {
           const isMine = item.sender_id === userId;
           const isNew = !seenIdsRef.current.has(item.id);
@@ -716,7 +750,6 @@ export default function ThreadScreen() {
             isMine &&
             item.id === lastSentByMeId &&
             !groupInfo &&
-            bothShowReceipts &&
             !!otherReadAt &&
             new Date(otherReadAt) >= new Date(item.created_at);
           const postMatch = item.text.match(SHARED_POST_REGEX);
@@ -750,7 +783,7 @@ export default function ThreadScreen() {
                   {postMatch ? (
                     sharedPost ? (
                       <Pressable
-                        onPress={() => onMessageTap(item.id)}
+                        onPress={() => openSharedPost(sharedPost.id)}
                         className={`rounded-2xl overflow-hidden border ${
                           isMine ? 'border-[#a855f7]/30 bg-[#4c2f6e]/50' : 'border-white/20 bg-white/10'
                         }`}
@@ -784,7 +817,7 @@ export default function ThreadScreen() {
                           isMine ? 'bg-[#4c2f6e] rounded-br-sm' : 'bg-white/95 rounded-bl-sm'
                         }`}
                       >
-                        <Text className="text-sm font-sans italic text-white/50">Shared post</Text>
+                        <Text className="text-sm font-sans italic text-white/50">Post unavailable or expired</Text>
                       </View>
                     )
                   ) : (
@@ -861,6 +894,7 @@ export default function ThreadScreen() {
               nativeID="dm-input"
               value={draft}
               onChangeText={(text) => {
+              draftRevision.current += 1;
                 setDraft(text);
                 if (text.length > 0) setTyping();
               }}

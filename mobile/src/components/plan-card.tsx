@@ -1,3 +1,4 @@
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useState } from 'react';
 import {
   ActionSheetIOS,
@@ -11,7 +12,7 @@ import {
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
   PLAN_TYPES,
@@ -23,9 +24,7 @@ import {
   getSmartDateLabel,
   votePlan,
   type Plan,
-  type PlanComment,
 } from '@/lib/plans';
-import { notifyPlanDown } from '@/lib/notifications';
 import { validateCommentText } from '@/lib/validation';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
@@ -80,18 +79,23 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
   const [isVoting, setIsVoting] = useState(false);
   const [isTogglingDown, setIsTogglingDown] = useState(false);
   const [showComments, setShowComments] = useState(false);
-  const [comments, setComments] = useState<PlanComment[] | null>(null);
+  const commentsQuery = useQuery({
+    queryKey: ['plan-comments', plan.id, currentUserId],
+    enabled: showComments,
+    queryFn: () => fetchPlanComments(plan.id),
+  });
+  const comments = commentsQuery.data ?? null;
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [showDownList, setShowDownList] = useState(false);
 
-  const { data: downs = [] } = useQuery({
-    queryKey: ['plan-downs', plan.id],
+  const { data: downs = [], isError: downsError, refetch: retryDowns } = useQuery({
+    queryKey: ['plan-downs', plan.id, currentUserId],
     queryFn: () => fetchPlanDowns(plan.id),
     staleTime: 30_000,
   });
-  const { data: participants = [] } = useQuery({
-    queryKey: ['plan-participants', plan.id],
+  const { data: participants = [], isError: participantsError, refetch: retryParticipants } = useQuery({
+    queryKey: ['plan-participants', plan.id, currentUserId],
     queryFn: () => fetchPlanParticipants(plan.id),
     staleTime: 30_000,
   });
@@ -109,43 +113,39 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
       refreshPlans();
     } catch (e) {
       console.error('Error voting:', e);
+      Alert.alert('Vote not saved', 'Please try again.');
     } finally {
       setIsVoting(false);
     }
   };
 
   const handleToggleDown = async () => {
-    if (isTogglingDown) return;
+    if (isTogglingDown || downsError) return;
     setIsTogglingDown(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       if (isDown) {
-        await supabase
+        const { error } = await supabase
           .from('plan_downs')
           .delete()
           .eq('plan_id', plan.id)
           .eq('user_id', currentUserId);
+        if (error) throw error;
       } else {
-        await supabase.from('plan_downs').insert({ plan_id: plan.id, user_id: currentUserId });
+        const { error } = await supabase.from('plan_downs').insert({ plan_id: plan.id, user_id: currentUserId });
+        if (error) throw error;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        notifyPlanDown(plan, currentUserId);
       }
       refreshDowns();
     } catch (e) {
       console.error('Error toggling down:', e);
+      Alert.alert('Response not saved', 'Please try again.');
     } finally {
       setIsTogglingDown(false);
     }
   };
 
-  const handleToggleComments = async () => {
-    if (!showComments && comments === null) {
-      setShowComments(true);
-      setComments(await fetchPlanComments(plan.id));
-    } else {
-      setShowComments(!showComments);
-    }
-  };
+  const handleToggleComments = () => setShowComments((value) => !value);
 
   const handlePostComment = async () => {
     const validation = validateCommentText(newComment);
@@ -156,11 +156,14 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
       const { error } = await supabase
         .from('plan_comments')
         .insert({ plan_id: plan.id, user_id: currentUserId, text: validation.data! });
-      if (!error) {
+      if (error) throw error;
+      {
         setNewComment('');
-        setComments(await fetchPlanComments(plan.id));
+        void queryClient.invalidateQueries({ queryKey: ['plan-comments', plan.id] });
         refreshPlans(); // comments_count lives on the plan row
       }
+    } catch {
+      Alert.alert('Comment not sent', 'Your draft is saved. Please try again.');
     } finally {
       setIsPostingComment(false);
     }
@@ -205,6 +208,11 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
 
   return (
     <View className="bg-white/[0.06] rounded-2xl p-4">
+      {downsError || participantsError ? (
+        <Pressable onPress={() => { void retryDowns(); void retryParticipants(); }}>
+          <Text className="text-red-300 mb-3">Could not load everyone on this plan. Tap to retry.</Text>
+        </Pressable>
+      ) : null}
       {/* Plan type badge */}
       {planTypeInfo ? (
         <View className="flex-row mb-2">
@@ -279,7 +287,7 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
         </View>
       ) : null}
 
-      {participants.length === 0 && downs.length === 0 ? (
+      {!participantsError && !downsError && participants.length === 0 && downs.length === 0 ? (
         <Text className="text-white/45 text-xs font-sans mb-3">Nobody&apos;s joined yet</Text>
       ) : null}
 
@@ -288,7 +296,7 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
         {!isOwner ? (
           <Pressable
             onPress={handleToggleDown}
-            disabled={isTogglingDown}
+            disabled={isTogglingDown || downsError}
             className={`flex-row items-center rounded-xl px-3 py-1.5 active:opacity-80 ${
               isDown ? 'bg-[#bfe600]' : 'bg-[#a855f7]/20'
             }`}
@@ -381,7 +389,7 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
       {/* Comments */}
       {showComments ? (
         <View className="mt-4 pt-4 border-t border-white/10 gap-3">
-          {comments === null ? (
+          {commentsQuery.isError ? (<Text onPress={() => void commentsQuery.refetch()} className="text-red-300">Could not load comments. Tap to retry.</Text>) : comments === null ? (
             <ActivityIndicator color={NEON} />
           ) : comments.length === 0 ? (
             <Text className="text-white/55 text-sm font-sans text-center py-1">

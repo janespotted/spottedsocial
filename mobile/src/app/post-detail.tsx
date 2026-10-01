@@ -1,6 +1,12 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { onRelationshipChanged } from '@/lib/relationship-events';
+import { onPrivateViewsInvalidated, privateViewRevision } from '@/lib/private-views';
+import { onNightBoundary } from '@/lib/night-boundary';
 import { useEffect, useRef } from 'react';
 import {
   ActionSheetIOS,
+  ActivityIndicator,
+  Alert,
   BackHandler,
   Pressable,
   StyleSheet,
@@ -10,7 +16,6 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useQuery } from '@tanstack/react-query';
 import { PortalHost } from 'react-native-teleport';
 import {
   ReanimatedTrueSheetProvider,
@@ -34,7 +39,7 @@ import {
   postDetailProgress,
   usePostDetail,
 } from '@/lib/post-detail';
-import { fetchPostById, type FeedPost } from '@/lib/posts';
+import { fetchPostById, invalidateFeed, type FeedPost } from '@/lib/posts';
 import { supabase } from '@/lib/supabase';
 import { NEON, PURPLE } from '@/lib/theme';
 
@@ -70,6 +75,8 @@ function PostDetail() {
   useDismissKeyboardOnLeave();
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const { session } = useSession();
+  const queryClient = useQueryClient();
+  const likePending = useRef(false);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -86,15 +93,23 @@ function PostDetail() {
   const sheetOnly = handedOver && mode === 'sheet';
   const teleported = handedOver && mode === 'reel' && !!origin;
 
-  // Deep-link path: nothing handed over, fetch the post ourselves.
+  // Deep-link path: nothing handed over, fetch the post ourselves. A
+  // handed-over post was read by the feed under RLS a moment ago; fetching
+  // it again here would hold back the PortalHost while the fly has already
+  // started, so the media would jump in late. Losing access while the reel
+  // is open is handled below by the relationship signal, not by polling.
   const fetched = useQuery({
-    queryKey: ['post-detail', postId],
+    queryKey: ['post-detail', postId, session?.user.id],
     enabled: !!postId && !!session && !handedOver,
     queryFn: () => fetchPostById(postId!, session!.user.id),
   });
   const post: FeedPost | null = handedOver ? handedPost : (fetched.data?.post ?? null);
   const isLiked = handedOver ? handedLiked : (fetched.data?.isLiked ?? false);
-  const expired = !handedOver && fetched.isSuccess && fetched.data === null;
+  const expired = !postId || (!handedOver && fetched.isSuccess && fetched.data === null);
+
+  useEffect(() => {
+    if (expired) invalidateFeed();
+  }, [expired]);
 
   // Start the fly once the host is mounted and painted at the card's frame.
   // Without a teleport there is nothing to fly: land at 1 immediately.
@@ -115,13 +130,30 @@ function PostDetail() {
   // route, so it must be gone BEFORE the route goes (True Sheet's
   // documented blank-screen trap); dismiss() is a no-op when it is not up.
   const closing = useRef(false);
-  const close = async () => {
+  const close = async (animated = teleported) => {
     if (closing.current) return;
     closing.current = true;
     await sheetRef.current?.dismiss();
-    if (storePostId === postId && phase !== 'idle') closePostDetail({ animated: teleported });
-    else router.back();
+    if (storePostId === postId && phase !== 'idle') closePostDetail({ animated });
+    else if (router.canGoBack()) router.back(); else router.replace('/');
   };
+  const closeRef = useRef(close);
+  closeRef.current = close;
+
+  // Leave at once (no fly) when the author unfriends or blocks the viewer,
+  // or drops them from close friends, when the night resets, or when the
+  // account changes. Closing through closePostDetail returns the media to
+  // its card before the route goes (CLAUDE.md "Close order").
+  const authorId = post?.user_id;
+  useEffect(() => {
+    const leave = () => void closeRef.current(false);
+    const stops = [
+      onRelationshipChanged((otherUserId) => { if (otherUserId === authorId) leave(); }),
+      onPrivateViewsInvalidated(leave),
+      onNightBoundary(leave),
+    ];
+    return () => { for (const stop of stops) stop(); };
+  }, [authorId]);
 
   // Android hardware back reverses the fly instead of popping under it.
   useEffect(() => {
@@ -184,10 +216,23 @@ function PostDetail() {
 
   /* ── Actions ── */
   const isOwner = !!post && post.user_id === session?.user.id;
-  const onLike = () => {
-    if (!post) return;
-    if (toggleLike) toggleLike(post.id);
-    else void toggleLikeStandalone(post, isLiked, session?.user.id);
+  const onLike = async () => {
+    if (!post || !session || likePending.current) return;
+    if (handedOver && toggleLike) { toggleLike(post.id); return; }
+    likePending.current = true;
+    const key = ['post-detail', postId, session.user.id];
+    const revision = privateViewRevision();
+    await queryClient.cancelQueries({ queryKey: key });
+    if (revision !== privateViewRevision()) { likePending.current = false; return; }
+    const previous = fetched.data;
+    queryClient.setQueryData(key, { post: { ...post, likes_count: Math.max(0, post.likes_count + (isLiked ? -1 : 1)) }, isLiked: !isLiked });
+    try {
+      await toggleLikeStandalone(post, isLiked, session.user.id);
+      invalidateFeed();
+    } catch {
+      if (revision === privateViewRevision()) queryClient.setQueryData(key, previous);
+      Alert.alert('Like not saved', 'Please try again.');
+    } finally { likePending.current = false; }
   };
   const onShare = () => {
     if (!post) return;
@@ -205,11 +250,18 @@ function PostDetail() {
           if (index !== 0) return;
           // Leave first: deleting drops the feed row, and with it the Portal
           // that owns the media on this screen.
-          closing.current = true;
-          void sheetRef.current?.dismiss().then(() => {
-            closePostDetail({ animated: false });
-            deletePost?.(post.id);
-          });
+          void (async () => {
+            try {
+              if (!deletePost) {
+                const { error } = await supabase.from('posts').delete().eq('id', post.id).eq('user_id', session.user.id);
+                if (error) throw error;
+              }
+              await sheetRef.current?.dismiss();
+              if (handedOver) { closePostDetail({ animated: false }); deletePost?.(post.id); }
+              else if (router.canGoBack()) router.back(); else router.replace('/');
+              invalidateFeed();
+            } catch { Alert.alert('Delete not confirmed', 'Please refresh before trying again.'); }
+          })();
         }
       );
     } else {
@@ -295,6 +347,11 @@ function PostDetail() {
           </Pressable>
         </View>
 
+        {!post && !expired ? (
+          <View className="flex-1 justify-center items-center">
+            {fetched.isError ? <Text onPress={() => void fetched.refetch()} className="text-white">Could not load this post. Tap to retry.</Text> : <ActivityIndicator color={NEON} />}
+          </View>
+        ) : null}
         {expired ? (
           <View className="flex-1 justify-center">
             <ExpiredState what="This post" onDismiss={() => void close()} dismissLabel="Back" />
@@ -472,10 +529,9 @@ function RailButton({
  * next open reflects it.
  */
 async function toggleLikeStandalone(post: FeedPost, isLiked: boolean, userId: string | undefined) {
-  if (!userId) return;
-  if (isLiked) {
-    await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', userId);
-  } else {
-    await supabase.from('post_likes').insert({ post_id: post.id, user_id: userId });
-  }
+  if (!userId) throw new Error('Sign in required');
+  const { error } = isLiked
+    ? await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', userId)
+    : await supabase.from('post_likes').insert({ post_id: post.id, user_id: userId });
+  if (error) throw error;
 }

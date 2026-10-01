@@ -1,0 +1,14 @@
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const source=file=>fs.readFileSync(path.join(__dirname,'../src',file),'utf8');
+function compile(s,scope={}){const m={exports:{}};vm.runInNewContext(ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{module:m,exports:m.exports,console,Date,Map,Set,Promise,setTimeout,clearTimeout,setInterval,clearInterval,...scope});return m.exports;}
+function load(file,mocks={},transform=s=>s){return compile(transform(source(file)),{require:n=>{if(n in mocks)return mocks[n];throw Error('Missing mock '+n);}});}
+function extract(file,name,scope={}){const s=source(file),tree=ts.createSourceFile(file,s,ts.ScriptTarget.Latest,true);let match;function visit(n){if(ts.isVariableDeclaration(n)&&n.name.getText(tree)===name)match=ts.isCallExpression(n.initializer)&&n.initializer.expression.getText(tree)==='useCallback'?n.initializer.arguments[0]:n.initializer;if(ts.isFunctionDeclaration(n)&&n.name?.text===name)match=n;ts.forEachChild(n,visit);}visit(tree);if(!match)throw Error('Missing '+name);return compile('export const fn = ('+match.getText(tree).replace(/^export\s+/, '')+');',scope).fn;}
+function callback(file,hook,contains,scope={}){const s=source(file),tree=ts.createSourceFile(file,s,ts.ScriptTarget.Latest,true);let match,deps;function visit(n){if(ts.isCallExpression(n)&&n.expression.getText(tree)===hook&&n.arguments[0]?.getText(tree).includes(contains)){const arg=n.arguments[0];match=ts.isCallExpression(arg)&&arg.expression.getText(tree)==='useCallback'?arg.arguments[0]:arg;deps=ts.isCallExpression(arg)?arg.arguments[1]?.getText(tree):n.arguments[1]?.getText(tree);}ts.forEachChild(n,visit);}visit(tree);if(!match)throw Error('Missing '+hook+' '+contains);return{fn:compile('export const fn = '+match.getText(tree)+';',scope).fn,deps};}
+function builder(result){const p=new Proxy({then:(yes,no)=>Promise.resolve(typeof result==='function'?result():result).then(yes,no)},{get:(o,k)=>k==='then'?o.then:()=>p});return p;}
+const flush=()=>new Promise(resolve=>setImmediate(resolve));
+module.exports={source,compile,load,extract,callback,builder,flush};
+module.exports.queryFunction = function(file,key,scope={}) {
+ const s=source(file),tree=ts.createSourceFile(file,s,ts.ScriptTarget.Latest,true);let found;
+ function visit(n){if(ts.isCallExpression(n)&&['useQuery','usePrivateQuery'].includes(n.expression.getText(tree))){const obj=n.arguments[0];if(obj&&ts.isObjectLiteralExpression(obj)&&obj.getText(tree).includes(key)){const prop=obj.properties.find(p=>p.name?.getText(tree)==='queryFn');if(prop)found=prop.initializer;}}ts.forEachChild(n,visit);}visit(tree);
+ if(!found)throw Error('Missing query '+key);return compile('export const fn='+found.getText(tree),scope).fn;
+};

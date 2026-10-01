@@ -1,6 +1,8 @@
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
+import { getNightKey } from '@/lib/tonight';
 import { Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { useFriendIds } from '@/hooks/use-friend-ids';
@@ -28,16 +30,15 @@ function formatTimeTo12Hour(time: string): string {
 
 /** Tonight / Tomorrow / weekday / "Fri, Jan 3" — port of getSmartEventDateLabel. */
 function getSmartEventDateLabel(dateStr: string): string {
-  const date = new Date(`${dateStr}T00:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  const today = new Date(`${getNightKey()}T00:00:00Z`);
   const daysAway = Math.round((date.getTime() - today.getTime()) / 86_400_000);
   if (daysAway === 0) return 'Tonight';
   if (daysAway === 1) return 'Tomorrow';
   if (daysAway > 1 && daysAway <= 7) {
-    return date.toLocaleDateString('en-US', { weekday: 'long' });
+    return date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
   }
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 /** Upcoming events at a venue with friend RSVPs and "I'm Down" toggle. */
@@ -45,14 +46,14 @@ export function VenueEventsSection({ venueId }: { venueId: string }) {
   const { session } = useSession();
   const { data: friendIds } = useFriendIds(session?.user.id);
   const queryClient = useQueryClient();
-  const queryKey = ['venue-events', venueId];
+  const queryKey = ['venue-events', venueId, session?.user.id, friendIds];
 
-  const { data: events } = useQuery({
+  const { data: events, isError, refetch } = useQuery({
     queryKey,
     enabled: !!venueId && !!session,
     queryFn: async (): Promise<VenueEvent[]> => {
-      const today = new Date().toISOString().split('T')[0];
-      const { data: rows } = await supabase
+      const today = getNightKey();
+      const { data: rows, error } = await supabase
         .from('events')
         .select('id, title, event_date, start_time, ticket_url')
         .eq('venue_id', venueId)
@@ -60,6 +61,7 @@ export function VenueEventsSection({ venueId }: { venueId: string }) {
         .gt('expires_at', new Date().toISOString())
         .order('event_date', { ascending: true })
         .limit(5);
+      if (error) throw error;
       if (!rows?.length) return [];
 
       const [{ data: rsvps }, profiles] = await Promise.all([
@@ -106,6 +108,7 @@ export function VenueEventsSection({ venueId }: { venueId: string }) {
     queryClient.invalidateQueries({ queryKey });
   };
 
+  if (isError) return <Text className="text-red-300" onPress={() => void refetch()}>Could not load events. Tap to retry.</Text>;
   if (!events?.length) return null;
 
   return (

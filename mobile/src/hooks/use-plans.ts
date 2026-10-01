@@ -1,5 +1,6 @@
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { fetchEventsWithFriends, fetchMyVotes, fetchPlans } from '@/lib/plans';
 import type { NightStatusKind } from '@/lib/night-status';
@@ -73,7 +74,7 @@ export function usePlansRealtime() {
     const invalidatePlans = () => {
       clearTimeout(plansTimer);
       plansTimer = setTimeout(
-        () => queryClient.invalidateQueries({ queryKey: ['plans'] }),
+        () => { for (const key of ['plans', 'plan-downs', 'plan-participants', 'plan-comments']) void queryClient.invalidateQueries({ queryKey: [key] }); },
         1500
       );
     };
@@ -94,6 +95,9 @@ export function usePlansRealtime() {
       configure: (ch) =>
         ch
           .on('postgres_changes', { event: '*', schema: 'public', table: 'plans' }, invalidatePlans)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'plan_votes' }, invalidatePlans)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'plan_participants' }, invalidatePlans)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'plan_comments' }, invalidatePlans)
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'plan_downs' },

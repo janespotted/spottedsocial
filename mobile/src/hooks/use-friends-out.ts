@@ -1,5 +1,7 @@
+import { withholdLivePreview } from '@/lib/live-preview';
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
@@ -38,7 +40,7 @@ export function useFriendsOut() {
   const { session } = useSession();
   const { data: friendIds } = useFriendIds(session?.user.id);
   const { data: own } = useOwnNightStatus();
-  const viewerStayingIn = own?.status?.status === 'home';
+  const viewerStayingIn = withholdLivePreview(own?.status?.status, !!own);
   const queryClient = useQueryClient();
 
   // Realtime: refetch Out/Planning cards whenever any night status changes.
@@ -66,7 +68,7 @@ export function useFriendsOut() {
         return { outFriends: [], planningFriends: [], venuesWithheld: false };
       }
 
-      const [{ data: statuses }, profiles] = await Promise.all([
+      const [{ data: statuses, error: statusError }, profiles] = await Promise.all([
         supabase
           .from('night_statuses')
           .select('user_id, status, venue_name, planning_neighborhood, planning_venue_name')
@@ -76,6 +78,7 @@ export function useFriendsOut() {
         fetchProfilesSafe(),
       ]);
 
+      if (statusError) throw statusError;
       const profileMap = buildProfileMap(profiles);
       const rows: FriendNightStatus[] = (statuses ?? [])
         .filter((s) => profileMap.has(s.user_id))

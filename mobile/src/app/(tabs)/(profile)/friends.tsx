@@ -1,3 +1,5 @@
+import { invalidateFriendGraph, setCloseFriend } from '@/lib/friend-relationship';
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { Alert } from 'react-native';
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
@@ -6,7 +8,7 @@ import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { LegendList } from '@legendapp/list/react-native';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
 import { fetchPeopleYouMayKnow, sendFriendRequest, type SuggestedFriend } from '@/lib/friends';
@@ -47,6 +49,9 @@ async function fetchFriendsData(userId: string): Promise<FriendsData> {
     fetchPeopleYouMayKnow(userId),
   ]);
 
+  for (const response of [incomingRes, sentRes, receivedRes, closeRes]) {
+    if (response.error) throw response.error;
+  }
   const profileMap = new Map(profiles.map((p) => [p.id, p]));
   const closeIds = new Set((closeRes.data ?? []).map((c) => c.close_friend_id));
   const friendIds = [
@@ -129,11 +134,7 @@ export default function FriendsScreen() {
   const { refreshing, onRefresh } = usePullToRefresh(refetch);
   const hasFriends = (data?.rows ?? []).some((r) => r.kind === 'friend');
 
-  const invalidate = () => {
-    refetch();
-    queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-    queryClient.invalidateQueries({ queryKey: ['profile-page'] });
-  };
+  const invalidate = () => invalidateFriendGraph(queryClient);
 
   const acceptRequest = async (row: FriendRow) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -153,17 +154,8 @@ export default function FriendsScreen() {
   const toggleClose = async (row: FriendRow) => {
     if (!userId || !row.userId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (row.isClose) {
-      await supabase
-        .from('close_friends')
-        .delete()
-        .eq('user_id', userId)
-        .eq('close_friend_id', row.userId);
-    } else {
-      await supabase
-        .from('close_friends')
-        .insert({ user_id: userId, close_friend_id: row.userId });
-    }
+    try { await setCloseFriend(userId, row.userId, !row.isClose); }
+    catch { Alert.alert('Friend setting not saved', 'Please try again.'); return; }
     invalidate();
   };
 

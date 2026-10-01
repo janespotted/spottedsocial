@@ -34,6 +34,8 @@ export default function EditProfileSheet() {
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const usernameRevision = useRef(0);
+  const [checkingUsername, setCheckingUsername] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -53,6 +55,8 @@ export default function EditProfileSheet() {
   }, [userId]);
 
   const checkUsername = (value: string) => {
+    const revision = ++usernameRevision.current;
+    setCheckingUsername(false);
     const normalized = value.toLowerCase().trim();
     setUsername(normalized);
     setUsernameError(null);
@@ -62,14 +66,15 @@ export default function EditProfileSheet() {
       setUsernameError('3–20 chars: lowercase letters, numbers, _ or .');
       return;
     }
+    setCheckingUsername(true);
     debounceRef.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', normalized)
-        .neq('id', userId!)
-        .maybeSingle();
-      if (data) setUsernameError('That username is taken');
+      try {
+      const { data, error } = await supabase.rpc('username_available', { p_username: normalized });
+      if (revision !== usernameRevision.current) return;
+      if (error) setUsernameError('Could not check availability. Try again.');
+      else if (data !== true) setUsernameError('That username is taken');
+      } catch { if (revision === usernameRevision.current) setUsernameError('Could not check availability. Try again.'); }
+      finally { if (revision === usernameRevision.current) setCheckingUsername(false); }
     }, 400);
   };
 
@@ -106,7 +111,7 @@ export default function EditProfileSheet() {
   };
 
   const save = async () => {
-    if (!userId || saving || usernameError) return;
+    if (!userId || saving || checkingUsername || usernameError) return;
     const name = displayName.trim();
     const handle = username.trim();
     if (!name || !USERNAME_REGEX.test(handle)) {
@@ -200,7 +205,7 @@ export default function EditProfileSheet() {
 
       <Pressable
         onPress={save}
-        disabled={saving || !!usernameError || !displayName.trim()}
+        disabled={checkingUsername || saving || !!usernameError || !displayName.trim()}
         className="rounded-full py-3.5 items-center active:opacity-90 disabled:opacity-30"
         style={{ backgroundColor: NEON }}
       >

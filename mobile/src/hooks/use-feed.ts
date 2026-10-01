@@ -1,22 +1,24 @@
+import { onPrivateViewsInvalidated } from '@/lib/private-views';
+import { onRelationshipChanged } from '@/lib/relationship-events';
+import type { Database } from '@/lib/database.types';
+import { getSessionRevision } from '@/lib/session-identity';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { isDemoMode } from '@/lib/demo-mode';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
-import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { isPostDetailActive, onPostDetailClosed } from '@/lib/post-detail';
 import {
   hydratePosts,
   onCommentAdded,
   onFeedInvalidated,
-  postImageStoragePath,
-  resolvePostImageUrl,
   type FeedPost,
 } from '@/lib/posts';
 import { useFriendIds } from './use-friend-ids';
 import { useSession } from './use-session';
 
 const POSTS_PER_PAGE = 10;
+type PostRow = Database['public']['Tables']['posts']['Row'];
 
 // The post shape lives with its hydration in lib/posts.ts; re-exported so
 // every existing `import type { FeedPost } from '@/hooks/use-feed'` holds.
@@ -47,10 +49,16 @@ export function useFeed() {
   const loadingMoreRef = useRef(false);
   const refreshInFlight = useRef<Promise<void> | null>(null);
   const refreshQueued = useRef(false);
+  const generation = useRef(0);
+  const loadedCount = useRef(POSTS_PER_PAGE);
+  loadedCount.current = Math.max(POSTS_PER_PAGE, posts.length);
 
   const fetchPage = useCallback(
-    async (cursor: string | null): Promise<FeedPost[]> => {
+    async (cursor: string | null, limit = POSTS_PER_PAGE): Promise<FeedPost[]> => {
       if (!userId) return [];
+      if (friendQuery.isError) throw new Error("Could not load relationships");
+      const revision = getSessionRevision();
+      const started = generation.current;
       const userIds = [userId, ...(friendIds ?? [])];
 
       let query = supabase
@@ -58,7 +66,7 @@ export function useFeed() {
         .select('*')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
-        .limit(POSTS_PER_PAGE);
+        .limit(limit);
       // Dev-only: demo mode shows all demo posts alongside the real feed,
       // mirroring the web useFeed. Release builds never take this branch.
       if (isDemoMode()) {
@@ -66,9 +74,10 @@ export function useFeed() {
       } else {
         // Friends' posts (any visibility) + friends-of-friends' posts marked
         // mutual_friends — port of the web expansion via get_mutual_friend_ids.
-        const { data: mutualData } = await supabase.rpc('get_mutual_friend_ids', {
+        const { data: mutualData, error: mutualError } = await supabase.rpc('get_mutual_friend_ids', {
           p_user_id: userId,
         });
+        if (mutualError) throw mutualError;
         const mutualIds = (mutualData ?? []).map((r: { user_id: string }) => r.user_id);
         if (mutualIds.length > 0) {
           query = query.or(
@@ -80,8 +89,10 @@ export function useFeed() {
       }
       if (cursor) query = query.lt('created_at', cursor);
 
-      const { data: rows } = await query;
+      const { data: rows, error } = await query;
+      if (error) throw error;
       const { posts: page, likedByMe } = await hydratePosts(rows ?? [], userId);
+      if (revision !== getSessionRevision() || started !== generation.current) return [];
       if (likedByMe.size > 0) {
         setLikedPosts((prev) => {
           const next = new Set(prev);
@@ -91,7 +102,7 @@ export function useFeed() {
       }
       return page;
     },
-    [userId, friendIds]
+    [userId, friendIds, friendQuery.isError]
   );
 
   // While a post detail is open, one feed card's media is teleported into
@@ -137,13 +148,21 @@ export function useFeed() {
         refreshQueued.current = true;
         return refreshInFlight.current;
       }
+      const started = generation.current;
+      const revision = getSessionRevision();
       const run = (async () => {
         try {
-          const page = await fetchPage(null);
+          const limit = opts?.userInitiated ? POSTS_PER_PAGE : loadedCount.current;
+          const page = await fetchPage(null, limit);
+          if (started !== generation.current || revision !== getSessionRevision()) return;
           setPosts(page);
-          setHasMore(page.length === POSTS_PER_PAGE);
+          setHasMore(page.length === limit);
           setIsError(false);
         } catch (e) {
+          if (started !== generation.current || revision !== getSessionRevision()) return;
+          // Keep what is on screen: a network blip is not a revocation (RLS
+          // and the relationship signal handle that). The screen shows the
+          // error only when there is nothing to show.
           console.warn('[feed] refresh failed', e);
           setIsError(true);
         } finally {
@@ -165,8 +184,11 @@ export function useFeed() {
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMoreRef.current || posts.length === 0 || isPostDetailActive()) return;
     loadingMoreRef.current = true;
+    const started = generation.current;
+    const revision = getSessionRevision();
     try {
       const page = await fetchPage(posts[posts.length - 1].created_at);
+      if (started !== generation.current || revision !== getSessionRevision()) return;
       setPosts((prev) => [...prev, ...page]);
       setHasMore(page.length === POSTS_PER_PAGE);
     } catch (e) {
@@ -197,97 +219,87 @@ export function useFeed() {
     []
   );
 
-  // Realtime: prepend friends' new posts, drop deleted ones (port of the web
-  // incremental handlers). RLS scopes what postgres_changes delivers, but we
-  // still gate on authorship because demo posts are dev-only.
+  // Realtime: prepend new posts, drop deleted ones, and swap in a video once
+  // Mux finishes encoding. RLS scopes what postgres_changes delivers (own,
+  // friends' and mutual-audience posts), and each row goes through the same
+  // hydration as a page, so it arrives with its signed media links.
   useEffect(() => {
     if (!userId || friendIds === undefined) return;
-    const friendSet = new Set(friendIds);
-
+    const hydrateOne = async (row: PostRow): Promise<FeedPost | null> => {
+      if (row.is_demo && !isDemoMode()) return null;
+      if (row.expires_at && Date.parse(row.expires_at) <= Date.now()) return null;
+      const revision = getSessionRevision();
+      const { posts: [post] } = await hydratePosts([row], userId);
+      return revision === getSessionRevision() ? (post ?? null) : null;
+    };
     return createResilientChannel({
       name: 'feed-realtime',
       onReconnect: () => void refresh(),
-      configure: (ch) => ch
-        .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'posts' },
-        async (payload) => {
-          const p = payload.new as Record<string, any>;
-          if (!p?.id) return;
-          const visible =
-            p.user_id === userId ||
-            friendSet.has(p.user_id) ||
-            (isDemoMode() && p.is_demo);
-          if (!visible) return;
-          if (p.is_demo && !isDemoMode()) return;
-          const [profiles, imageUrl] = await Promise.all([
-            fetchProfilesSafe(),
-            resolvePostImageUrl(p.image_url ?? null),
-          ]);
-          const profileMap = buildProfileMap(profiles);
-          const post: FeedPost = {
-            id: p.id,
-            user_id: p.user_id,
-            text: p.text ?? '',
-            image_url: imageUrl,
-            media_path: postImageStoragePath(p.image_url ?? null),
-            media_type: p.media_type ?? null,
-            media_width: p.media_width ?? null,
-            media_height: p.media_height ?? null,
-            media_hash: p.media_hash ?? null,
-            mux_playback_id: p.mux_playback_id ?? null,
-            mux_status: p.mux_status ?? null,
-            venue_name: p.venue_name ?? null,
-            venue_id: p.venue_id ?? null,
-            created_at: p.created_at ?? new Date().toISOString(),
-            comments_count: 0,
-            likes_count: 0,
-            display_name: profileMap.get(p.user_id)?.display_name ?? 'Friend',
-            avatar_url: profileMap.get(p.user_id)?.avatar_url ?? null,
-            // Tags are written just after the post row; the next refresh
-            // picks them up.
-            tags: [],
-          };
-          runOrDefer(() =>
-            setPosts((prev) => (prev.some((x) => x.id === post.id) ? prev : [post, ...prev]))
-          );
-        }
-      )
-        .on(
-          'postgres_changes',
-          { event: 'DELETE', schema: 'public', table: 'posts' },
-          (payload) => {
-            const id = (payload.old as Record<string, any>)?.id;
+      configure: (ch) =>
+        ch
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => {
+            const row = payload.new as PostRow;
+            if (!row?.id) return;
+            try {
+              const post = await hydrateOne(row);
+              if (post) runOrDefer(() => setPosts((prev) => (prev.some((x) => x.id === post.id) ? prev : [post, ...prev])));
+            } catch {
+              void refresh();
+            }
+          })
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
+            const id = (payload.old as { id?: string })?.id;
             if (id) runOrDefer(() => setPosts((prev) => prev.filter((x) => x.id !== id)));
-          }
-        )
-        // Mux finishing an encode: the webhook updates the row and the
-        // processing tile becomes a player without a refresh.
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'posts' },
-          (payload) => {
-            const p = payload.new as Record<string, any>;
-            if (!p?.id) return;
-            runOrDefer(() =>
-              setPosts((prev) =>
-                prev.map((x) =>
-                  x.id === p.id
-                    ? {
-                        ...x,
-                        mux_playback_id: p.mux_playback_id ?? null,
-                        mux_status: p.mux_status ?? null,
-                        media_width: p.media_width ?? x.media_width,
-                        media_height: p.media_height ?? x.media_height,
-                      }
-                    : x
+          })
+          // Mux finishing an encode: the webhook updates the row and the
+          // processing tile becomes a player without a refresh.
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, async (payload) => {
+            const row = payload.new as PostRow;
+            if (!row?.id) return;
+            try {
+              const post = await hydrateOne(row);
+              runOrDefer(() =>
+                setPosts((prev) =>
+                  post ? prev.map((x) => (x.id === post.id ? post : x)) : prev.filter((x) => x.id !== row.id)
                 )
-              )
-            );
-          }
-        ),
+              );
+            } catch {
+              void refresh();
+            }
+          }),
     });
   }, [userId, friendIds, refresh, runOrDefer]);
+
+  // Someone unfriended / blocked / dropped from close friends: their posts
+  // leave the feed at once, then page one is re-read under the new RLS. An
+  // open reel of theirs closes itself first (app/post-detail.tsx), and the
+  // deferral holds this until the media is back in its card.
+  useEffect(
+    () =>
+      onRelationshipChanged((otherUserId) =>
+        runOrDefer(() => {
+          setPosts((prev) => prev.filter((p) => p.user_id !== otherUserId));
+          void refresh();
+        })
+      ),
+    [refresh, runOrDefer]
+  );
+
+  // Account change, own block/hide, night reset: drop everything and re-read.
+  useEffect(() => {
+    const stop = onPrivateViewsInvalidated(() =>
+      runOrDefer(() => {
+        ++generation.current;
+        setPosts([]);
+        setLikedPosts(new Set());
+        void refresh();
+      })
+    );
+    return () => {
+      ++generation.current;
+      stop();
+    };
+  }, [refresh, runOrDefer]);
 
   const toggleLike = useCallback(
     async (postId: string) => {
@@ -335,7 +347,7 @@ export function useFeed() {
         );
       }
     },
-    [session, likedPosts, posts]
+    [session, likedPosts]
   );
 
   const deletePost = useCallback(
@@ -352,7 +364,9 @@ export function useFeed() {
     [session, refresh]
   );
 
-  return { posts, likedPosts, isLoading, isRefreshing, isError, hasMore, refresh, loadMore, toggleLike, deletePost };
+  // An error only replaces the feed when there is nothing to show; a failed
+  // background refresh keeps the posts already on screen.
+  return { posts, likedPosts, isLoading, isRefreshing, isError: isError && posts.length === 0, hasMore, refresh, loadMore, toggleLike, deletePost };
 }
 
 export function getTimeAgo(iso: string): string {

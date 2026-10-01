@@ -1,6 +1,6 @@
 import { ActionSheetIOS, Alert } from 'react-native';
 import { supabase } from './supabase';
-import { invalidateFeed } from './posts';
+import { invalidatePrivateViews } from './private-views';
 import { queryClient } from './query-client';
 
 /** Same reason values the web ReportDialog writes to the reports table. */
@@ -93,9 +93,7 @@ export function blockUser(blockerId: string, blockedId: string, blockedName: str
               `and(user_id.eq.${blockerId},close_friend_id.eq.${blockedId}),and(user_id.eq.${blockedId},close_friend_id.eq.${blockerId})`
             );
           // Friend-list invalidation re-derives the feed without their posts
-          await queryClient.invalidateQueries({ queryKey: ['friend-ids'] });
-          await queryClient.invalidateQueries({ queryKey: ['friends-out'] });
-          invalidateFeed();
+          invalidatePrivateViews(queryClient);
           Alert.alert(`${blockedName} blocked`);
         },
       },

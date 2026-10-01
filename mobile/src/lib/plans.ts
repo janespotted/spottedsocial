@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { buildProfileMap, fetchProfilesSafe, type SafeProfile } from './profiles';
 import { isDemoMode } from './demo-mode';
-import { nightResetAfterDate, nightStartAt } from './tonight';
+import { nightResetAfterDate, nightStartAt, getNightKey } from './tonight';
 
 export interface Plan {
   id: string;
@@ -77,14 +77,13 @@ export function formatTimeTo12Hour(time: string): string {
 
 /** Tonight / Tomorrow / "In N days" / "Fri, Jan 3" — port of getSmartDateLabel. */
 export function getSmartDateLabel(dateStr: string): string {
-  const date = new Date(`${dateStr}T00:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  const today = new Date(`${getNightKey()}T00:00:00Z`);
   const daysAway = Math.round((date.getTime() - today.getTime()) / 86_400_000);
   if (daysAway === 0) return 'Tonight';
   if (daysAway === 1) return 'Tomorrow';
   if (daysAway > 1 && daysAway <= 7) return `In ${daysAway} days`;
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 /** Local YYYY-MM-DD (toISOString would shift across UTC midnight). */
@@ -141,10 +140,11 @@ export async function fetchPlans(): Promise<Plan[]> {
 
 /** The caller's up/down votes, keyed by plan id. */
 export async function fetchMyVotes(userId: string): Promise<Record<string, 'up' | 'down'>> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('plan_votes')
     .select('plan_id, vote_type')
     .eq('user_id', userId);
+  if (error) throw error;
   const votes: Record<string, 'up' | 'down'> = {};
   for (const v of data ?? []) votes[v.plan_id] = v.vote_type as 'up' | 'down';
   return votes;
@@ -158,23 +158,27 @@ export async function votePlan(
   currentVote: 'up' | 'down' | null
 ): Promise<void> {
   if (currentVote === voteType) {
-    await supabase.from('plan_votes').delete().eq('plan_id', planId).eq('user_id', userId);
+    const { error } = await supabase.from('plan_votes').delete().eq('plan_id', planId).eq('user_id', userId);
+    if (error) throw error;
   } else if (currentVote) {
-    await supabase
+    const { error } = await supabase
       .from('plan_votes')
       .update({ vote_type: voteType })
       .eq('plan_id', planId)
       .eq('user_id', userId);
+    if (error) throw error;
   } else {
-    await supabase
+    const { error } = await supabase
       .from('plan_votes')
       .insert({ plan_id: planId, user_id: userId, vote_type: voteType });
+    if (error) throw error;
   }
 }
 
 /** "I'm down" reactions on a plan, with profiles. */
 export async function fetchPlanDowns(planId: string): Promise<PlanPerson[]> {
-  const { data } = await supabase.from('plan_downs').select('user_id').eq('plan_id', planId);
+  const { data, error } = await supabase.from('plan_downs').select('user_id').eq('plan_id', planId);
+  if (error) throw error;
   if (!data?.length) return [];
   const profiles = await fetchProfilesSafe();
   const profileMap = buildProfileMap(profiles);
@@ -189,7 +193,8 @@ export async function fetchPlanDowns(planId: string): Promise<PlanPerson[]> {
 
 /** Friends the creator tagged as going with them. */
 export async function fetchPlanParticipants(planId: string): Promise<PlanPerson[]> {
-  const { data } = await supabase.from('plan_participants').select('user_id').eq('plan_id', planId);
+  const { data, error } = await supabase.from('plan_participants').select('user_id').eq('plan_id', planId);
+  if (error) throw error;
   if (!data?.length) return [];
   const profiles = await fetchProfilesSafe();
   const profileMap = buildProfileMap(profiles);
@@ -203,11 +208,12 @@ export async function fetchPlanParticipants(planId: string): Promise<PlanPerson[
 }
 
 export async function fetchPlanComments(planId: string): Promise<PlanComment[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('plan_comments')
     .select('id, user_id, text, created_at')
     .eq('plan_id', planId)
     .order('created_at', { ascending: true });
+  if (error) throw error;
   if (!data?.length) return [];
   const profiles = await fetchProfilesSafe();
   const profileMap = buildProfileMap(profiles);
@@ -229,15 +235,6 @@ export async function postPlanComment(planId: string, userId: string, text: stri
 export async function deletePlan(planId: string, userId: string): Promise<void> {
   const { error } = await supabase.from('plans').delete().eq('id', planId).eq('user_id', userId);
   if (error) throw error;
-  // The invites the plan sent are not children of the plan row (they are
-  // `notifications`), so deleting the plan used to leave them pointing at
-  // something that no longer exists — an invite you can still tap.
-  await supabase
-    .from('notifications')
-    .delete()
-    .eq('sender_id', userId)
-    .in('type', ['plan_invite', 'plan_down'])
-    .gte('created_at', nightStartAt().toISOString());
 }
 
 /**
@@ -251,7 +248,7 @@ export async function fetchEventsWithFriends(
 ): Promise<EventWithFriends[]> {
   if (friendIds.length === 0) return [];
 
-  const today = toLocalDateString(new Date());
+  const today = getNightKey(new Date(), city);
   let eventsQuery = supabase
     .from('events')
     .select('*')
@@ -261,10 +258,11 @@ export async function fetchEventsWithFriends(
     .order('event_date', { ascending: true });
   if (!isDemoMode()) eventsQuery = eventsQuery.eq('is_demo', false);
 
-  const { data: events } = await eventsQuery;
+  const { data: events, error: eventsError } = await eventsQuery;
+  if (eventsError) throw eventsError;
   if (!events?.length) return [];
 
-  const [{ data: rsvps }, profiles] = await Promise.all([
+  const [{ data: rsvps, error: rsvpError }, profiles] = await Promise.all([
     supabase
       .from('event_rsvps')
       .select('event_id, user_id, rsvp_type')
@@ -272,6 +270,7 @@ export async function fetchEventsWithFriends(
     fetchProfilesSafe(),
   ]);
 
+  if (rsvpError) throw rsvpError;
   const friendSet = new Set(friendIds);
   const friendRsvps = (rsvps ?? []).filter((r) => friendSet.has(r.user_id));
   if (friendRsvps.length === 0) return [];
@@ -318,4 +317,19 @@ export async function toggleEventRsvp(
       .insert({ event_id: eventId, user_id: userId, rsvp_type: 'interested' });
     if (error) throw error;
   }
+}
+
+/** Server validates audience, venue and participants, then commits them together. */
+export async function savePlan(planId: string | null, values: {
+  venue: { id: string }; planDate: string; planTime: string; planType: string | null;
+  description: string; visibility: 'friends' | 'close_friends'; friends: { id: string }[];
+}): Promise<string> {
+  const { data, error } = await supabase.rpc('save_plan', {
+    p_id: planId,
+    p_values: { venue_id: values.venue.id, plan_date: values.planDate, plan_time: values.planTime,
+      plan_type: values.planType, description: values.description.trim(), visibility: values.visibility },
+    p_participants: values.friends.map(f => f.id),
+  });
+  if (error || !data) throw error ?? new Error('Could not save plan');
+  return data;
 }

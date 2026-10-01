@@ -22,6 +22,7 @@ export function OnboardingScaffold({
   total,
   onContinue,
   continueLabel = 'Continue',
+  disabled = false,
   footnote,
   fills,
   children,
@@ -33,6 +34,7 @@ export function OnboardingScaffold({
   total: number;
   onContinue: () => void;
   continueLabel?: string;
+  disabled?: boolean;
   /** Quiet line directly above the step counter ("Update your status anytime"). */
   footnote?: string;
   /**
@@ -91,6 +93,7 @@ export function OnboardingScaffold({
       </Text>
 
       <Pressable
+        disabled={disabled}
         onPress={onContinue}
         accessibilityRole="button"
         className="w-full min-h-13 rounded-full items-center justify-center active:opacity-90"

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -24,6 +24,7 @@ export function useFriendIds(userId: string | undefined) {
           .eq('friend_id', userId!)
           .eq('status', 'accepted'),
       ]);
+      if (sent.error || received.error) throw sent.error ?? received.error;
       const ids = [
         ...(sent.data?.map((f) => f.friend_id) ?? []),
         ...(received.data?.map((f) => f.user_id) ?? []),

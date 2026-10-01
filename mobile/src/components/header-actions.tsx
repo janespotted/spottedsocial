@@ -9,8 +9,9 @@ import { NEON } from '@/lib/theme';
 function statusWord(status: string | null | undefined): { label: string; answered: boolean } {
   switch (status) {
     case 'out':
-    case 'off':
       return { label: 'Out', answered: true };
+    case 'off':
+      return { label: 'Hidden', answered: true };
     case 'planning':
       return { label: 'TBD', answered: true };
     case 'home':

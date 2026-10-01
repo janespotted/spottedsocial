@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { SymbolView } from 'expo-symbols';
@@ -154,12 +154,18 @@ export default function SearchScreen() {
   const outNow = friendsOut?.outFriends ?? [];
   const venuesWithheld = friendsOut?.venuesWithheld ?? false;
 
+  const pendingRequests = useRef(new Set<string>());
   const handleAdd = async (personId: string) => {
-    if (!session) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Optimistic; a duplicate insert also lands here as "Sent"
-    setSentIds((prev) => new Set(prev).add(personId));
-    await sendFriendRequest(session.user.id, personId);
+    if (!session || pendingRequests.current.has(personId) || sentIds.has(personId)) return;
+    pendingRequests.current.add(personId);
+    setSentIds(prev => new Set(prev).add(personId));
+    try {
+      if (!await sendFriendRequest(session.user.id, personId)) throw new Error('Request denied');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      setSentIds(prev => { const next = new Set(prev); next.delete(personId); return next; });
+      Alert.alert('Request not sent', 'Please check your connection and try again.');
+    } finally { pendingRequests.current.delete(personId); }
   };
 
   const openVenue = (venueId: string) => {

@@ -1,8 +1,9 @@
+import { invalidatePrivateViews } from '@/lib/private-views';
 import { signOutWithPushCleanup } from '@/lib/push';
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { RESET_COPY } from '@/lib/reset-copy';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -11,7 +12,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
 import { getVenuePhotoUrl } from '@/lib/venues';
-import { muxThumbnailUrl } from '@/lib/mux';
+import { resolveMuxPosters } from '@/lib/mux';
+import { resolvePostImageUrls } from '@/lib/posts';
 import { stopSharing } from '@/lib/night-status';
 import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
@@ -50,6 +52,8 @@ interface ProfileData {
     text: string;
     likes_count: number | null;
     comments_count: number | null;
+    /** Signed grid thumbnail: the photo, or the video's poster frame. */
+    thumb_url: string | null;
   }>;
   inviteCode: string | null;
 }
@@ -98,13 +102,28 @@ async function fetchProfileData(userId: string): Promise<ProfileData> {
     if (recentSpots.length >= 9) break;
   }
 
+  // One link request each for the grid's photos and video posters.
+  const rows = postsRes.data ?? [];
+  const [images, posters] = await Promise.all([
+    resolvePostImageUrls(rows.filter((p) => p.media_type !== 'video').map((p) => p.image_url)),
+    resolveMuxPosters(rows.flatMap((p) => (p.media_type === 'video' && p.mux_playback_id ? [p.mux_playback_id] : [])), 480)
+      .catch(() => new Map<string, string>()),
+  ]);
+  const posts = rows.map((p) => ({
+    ...p,
+    thumb_url:
+      p.media_type === 'video'
+        ? (p.mux_playback_id ? posters.get(p.mux_playback_id) ?? null : null)
+        : p.image_url ? images.get(p.image_url) ?? null : null,
+  }));
+
   return {
     profile: profileRes.data ?? null,
     placesCount: new Set(checkins.map((c) => c.venue_name)).size,
     weeklyCount: checkins.filter((c) => c.started_at && c.started_at > weekAgo).length,
     recentSpots,
     wishlist: wishlistRes.data ?? [],
-    posts: postsRes.data ?? [],
+    posts,
     inviteCode: inviteRes.data?.code ?? null,
   };
 }
@@ -174,19 +193,23 @@ export default function ProfileScreen() {
   // a live status keeps its venue; only who can see it changes.
   const setSharingLevel = async (level: Audience) => {
     if (!session) return;
-    await supabase
+    const { error } = await supabase
       .from('profiles')
       .update({ location_sharing_level: level })
       .eq('id', session.user.id);
+    if (error) throw error;
+    invalidatePrivateViews(queryClient);
     syncStatus();
   };
 
   const setPlanningVisibility = async (level: Audience) => {
     if (!session) return;
-    await supabase
+    const { error } = await supabase
       .from('night_statuses')
       .update({ planning_visibility: level })
       .eq('user_id', session.user.id);
+    if (error) throw error;
+    invalidatePrivateViews(queryClient);
     syncStatus();
   };
 
@@ -196,6 +219,8 @@ export default function ProfileScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await stopSharing(session.user.id, { city: ownNight?.city });
+    } catch {
+      Alert.alert('Sharing stop not confirmed', 'New GPS uploads are paused on this phone. Reconnect and tap Stop sharing again to remove the last shared spot from the server.');
     } finally {
       syncStatus();
     }
@@ -394,13 +419,13 @@ export default function ProfileScreen() {
 
           {statusKind === 'out' ? (
             <>
-              <AudienceRow value={sharingLevel} onChange={setSharingLevel} compact />
+              <AudienceRow value={sharingLevel} onChange={setSharingLevel} live compact />
               {/* The rule, next to the audience it applies to (addendum v3 §3) */}
               <Text className="text-xs text-white/55 font-sans">{RESET_COPY.sharedUntil}</Text>
             </>
           ) : statusKind === 'planning' ? (
             <>
-              <AudienceRow value={planningLevel} onChange={setPlanningVisibility} compact />
+              <AudienceRow value={planningLevel} onChange={setPlanningVisibility} live compact />
               <Text className="text-xs text-white/55 font-sans">{RESET_COPY.tbdStatus}</Text>
             </>
           ) : statusKind === 'off' ? (
@@ -524,13 +549,7 @@ export default function ProfileScreen() {
                 <GridTile
                   key={post.id}
                   label={`♥ ${post.likes_count ?? 0} · 💬 ${post.comments_count ?? 0}`}
-                  imageUrl={
-                    post.media_type === 'video'
-                      ? post.mux_playback_id
-                        ? muxThumbnailUrl(post.mux_playback_id, { width: 480 })
-                        : null
-                      : post.image_url
-                  }
+                  imageUrl={post.thumb_url}
                 />
               ))}
             </View>

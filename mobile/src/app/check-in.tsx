@@ -84,7 +84,7 @@ async function scheduleMorningAfter(city: string, userId: string): Promise<void>
       identifier: 'morning-after-recap', // same id → replaces prior schedule
       content: {
         title: 'Last night on Spotted ☀️',
-        body: 'Look back at your stops and saved posts from last night.',
+        body: 'Look back at your saved venue stops from last night.',
         data: { type: 'morning_after', url: '/morning-after', receiver_id: userId },
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: next },
@@ -386,6 +386,7 @@ export default function CheckInSheet() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [payoff, setPayoff] = useState<Payoff | null>(null);
+  const [venueOnly, setVenueOnly] = useState(false);
   const [auto, setAuto] = useState<AutoUpdates | null>(null);
   const [autoBusy, setAutoBusy] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -411,16 +412,6 @@ export default function CheckInSheet() {
   const refreshStatusQueries = () => {
     markNightAnswered();
     invalidateNightStatusQueries(queryClient);
-  };
-
-  const persistAudience = async () => {
-    if (!userId || !audienceOverride || audienceOverride === savedAudience) return;
-    const { error } = await supabase
-      .from('profiles')
-      .update({ location_sharing_level: audienceOverride })
-      .eq('id', userId);
-    if (error) throw error;
-    queryClient.invalidateQueries({ queryKey: ['check-in-profile'] });
   };
 
   const showPayoff = async (kind: Payoff['kind'], venueName: string | null, isParty = false) => {
@@ -609,12 +600,12 @@ export default function CheckInSheet() {
     setSubmitting(true);
     setError(null);
     try {
-      await persistAudience();
-      await goOutAtVenue(userId, {
+      const saved = await goOutAtVenue(userId, {
         venue: { id: selectedVenue?.id ?? null, name: venueName },
         coords: location ? { lat: location.lat, lng: location.lng, accuracy: location.accuracy, recordedAt: location.timestamp } : null,
-        city,
+        city, audience,
       });
+      setVenueOnly(!saved.gpsShared);
       // The check-in is saved. Automatic updates are a separate outcome,
       // reported on the payoff screen — never as a check-in failure.
       settleAutomaticUpdates(userId);
@@ -623,7 +614,7 @@ export default function CheckInSheet() {
       refreshStatusQueries();
       await showPayoff('out', venueName);
     } catch {
-      setError('Could not share your spot. Try again.');
+      setError('Could not confirm your check-in. Refresh your status before retrying; automatic uploads remain paused.');
     } finally {
       setSubmitting(false);
     }
@@ -646,17 +637,16 @@ export default function CheckInSheet() {
     setSubmitting(true);
     setError(null);
     try {
-      // Exact GPS goes to close/direct friends only (mutuals get no pin)
+      // Exact party GPS goes to eligible Close Friends only.
       const coords = location
-        ? { lat: location.lat, lng: location.lng }
+        ? { lat: location.lat, lng: location.lng, accuracy: location.accuracy, recordedAt: location.timestamp }
         : await getCurrentPosition();
       const venueName = `Private Party (${neighborhood})`;
-      await persistAudience();
       await goOutAtVenue(userId, {
         venue: { id: null, name: venueName },
         coords,
         city,
-        privateParty: { neighborhood },
+        audience, privateParty: { neighborhood },
       });
       // No background tracking at a private party: the exact spot is for
       // close friends only and a house party does not move.
@@ -665,7 +655,7 @@ export default function CheckInSheet() {
       refreshStatusQueries();
       await showPayoff('out', venueName, true);
     } catch {
-      setError('Could not start your party. Try again.');
+      setError('Could not confirm your party. Refresh your status before retrying; automatic uploads remain paused.');
     } finally {
       setSubmitting(false);
     }
@@ -677,7 +667,6 @@ export default function CheckInSheet() {
     setSubmitting(true);
     setError(null);
     try {
-      await persistAudience();
       await goPlanning(userId, { city, neighborhood, visibility: audience });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refreshStatusQueries();
@@ -716,7 +705,7 @@ export default function CheckInSheet() {
   const payoffLine = payoff
     ? payoff.kind === 'out'
       ? payoff.out > 0
-        ? `${plural(payoff.out, 'friend')} ${isAre(payoff.out)} nearby.`
+        ? `${plural(payoff.out, 'friend')} ${isAre(payoff.out)} out tonight.`
         : "You're the first one out tonight."
       : payoff.out > 0
         ? `${plural(payoff.out, 'friend')} ${isAre(payoff.out)} out tonight.`
@@ -830,7 +819,7 @@ export default function CheckInSheet() {
           <View className="items-center py-2 gap-3">
             <SymbolView name="location.slash" size={36} tintColor="rgba(168,85,247,0.6)" />
             <Text className="text-white/70 text-sm font-sans text-center">
-              Everything still works: pick your venue yourself, share it, and see who&apos;s out.
+              You can share a venue status without GPS. A precise map pin and saved stop need a recent location fix.
               Location only lets Spotted guess the venue for you.
             </Text>
             <Text className="text-white/55 text-xs font-sans text-center">
@@ -981,7 +970,7 @@ export default function CheckInSheet() {
           {payoff.isParty ? <PrimaryButton label="Party invitations & address" onPress={() => router.push(`/party?hostId=${userId}` as never)} /> : null}
           {payoff.venueName ? (
             <Text className="text-white/55 text-xs font-sans text-center">
-              Friends can see you at {payoff.venueName}.
+              Your chosen audience can see your venue status at {payoff.venueName}. {venueOnly && !payoff.isParty ? 'No precise pin or GPS stop was saved.' : ''}
             </Text>
           ) : null}
 

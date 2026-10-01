@@ -1,3 +1,6 @@
+import { signOutWithPushCleanup } from '@/lib/push';
+import { Alert, Pressable, Text, View } from 'react-native';
+import { AccountScope } from '@/components/account-scope';
 import '../../global.css';
 import { useEffect } from 'react';
 import {
@@ -25,6 +28,7 @@ import { PushNotificationManager } from '@/components/push-notification-manager'
 import { ToastHost } from '@/components/toast-host';
 import { hydrateDemoMode } from '@/lib/demo-mode';
 import { queryClient } from '@/lib/query-client';
+import { subscribeRelationshipEvents } from '@/lib/relationship-events';
 
 // Native splash only: the lime S on midnight stays up until fonts and the
 // session are known, then fades out over the real first screen.
@@ -43,6 +47,14 @@ function SplashController() {
   return null;
 }
 
+/** Unfriend / block / close-friend removal reaches every screen at once. */
+function RelationshipEvents() {
+  const { session } = useSession();
+  const userId = session?.user.id;
+  useEffect(() => (userId ? subscribeRelationshipEvents(userId, queryClient) : undefined), [userId]);
+  return null;
+}
+
 /**
  * Every form sheet is opaque (client feedback §9). They used to be
  * transparent to show the native sheet material, but with no background
@@ -51,11 +63,16 @@ function SplashController() {
 const SHEET_CONTENT_STYLE = { backgroundColor: INK_LIGHT } as const;
 
 function RootNavigator() {
-  const { session, loading, onboardingNeeded } = useSession();
+  const { session, loading, onboardingNeeded, onboardingError, refreshOnboardingStatus } = useSession();
   const contentStyle = useResolveClassNames('bg-background');
   const gradientStyle = useResolveClassNames(SCREEN_GRADIENT);
 
   if (loading) return null;
+  if (onboardingError) return <View className="flex-1 bg-background items-center justify-center p-6 gap-4">
+    <Text className="text-white text-center">{onboardingError}</Text>
+    <Pressable onPress={() => void refreshOnboardingStatus().catch(() => {})}><Text className="text-[#d4ff00]">Retry loading profile</Text></Pressable>
+    <Pressable onPress={() => void signOutWithPushCleanup().catch(() => Alert.alert("Sign out not confirmed", "Reconnect and try again."))}><Text className="text-white/60">Sign out</Text></Pressable>
+  </View>;
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle }}>
@@ -77,7 +94,6 @@ function RootNavigator() {
       {/* Chat threads: root-level pushes so they slide OVER the native tab
           bar (per-screen tab-bar hiding pops visibly with native tabs) */}
       <Stack.Screen name="thread" options={{ contentStyle: gradientStyle }} />
-      <Stack.Screen name="yap-thread" options={{ contentStyle: gradientStyle }} />
       {/* Camera-first composer: full screen, no swipe-dismiss (the sheet
           guards populated drafts itself) */}
       <Stack.Screen
@@ -249,19 +265,22 @@ export default function RootLayout() {
           <KeyboardProvider>
             <HeroUINativeProvider>
               <SessionProvider>
-                <QueryClientProvider client={queryClient}>
-                  {/* react-native-teleport: a feed post's media is re-parented
-                      into the post detail screen (POST-DETAIL-PLAN.md) */}
-                  <PortalProvider>
-                    <RootNavigator />
-                  </PortalProvider>
-                  <NightStatusGate />
-                  <BackgroundLocationManager />
-                  <PushNotificationManager />
-                  <StatusBar style="light" />
-                  <SplashController />
-                  <ToastHost />
-                </QueryClientProvider>
+                <AccountScope>
+                  <QueryClientProvider client={queryClient}>
+                    {/* react-native-teleport: a feed post's media is re-parented
+                        into the post detail screen (POST-DETAIL-PLAN.md) */}
+                    <PortalProvider>
+                      <RootNavigator />
+                    </PortalProvider>
+                    <RelationshipEvents />
+                    <NightStatusGate />
+                    <BackgroundLocationManager />
+                    <PushNotificationManager />
+                    <StatusBar style="light" />
+                    <SplashController />
+                    <ToastHost />
+                  </QueryClientProvider>
+                </AccountScope>
               </SessionProvider>
             </HeroUINativeProvider>
           </KeyboardProvider>

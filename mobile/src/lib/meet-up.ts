@@ -31,11 +31,7 @@ export async function sendMeetUp(
     const profiles = await fetchProfilesSafe();
     const targetProfile = profiles.find((p) => p.id === target.user_id);
 
-    // Demo friends can't receive anything real — confirm optimistically in dev
-    if (targetProfile?.is_demo) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      return { status: 'sent', notificationId: null };
-    }
+    if (targetProfile?.is_demo) throw new Error('Demo profiles cannot receive requests.');
 
     // One meet-up per pair per night, in EITHER direction, and none once
     // they have already agreed. The old guard only caught an *unread*
@@ -69,6 +65,7 @@ export async function sendMeetUp(
     if (error) throw error;
 
     const notif = Array.isArray(data) ? data[0] : data;
+    if (!notif?.id) throw new Error('This person is no longer available for this request.');
     if (notif?.id) {
       supabase.functions
         .invoke('send-push', {
@@ -100,12 +97,13 @@ export async function sendMeetUp(
  */
 export async function cancelMeetUp(currentUserId: string, otherUserId: string): Promise<void> {
   const pair = `and(sender_id.eq.${currentUserId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${currentUserId})`;
-  await supabase
-    .from('notifications')
-    .delete()
-    .or(pair)
-    .in('type', ['meetup_request', 'meetup_accepted'])
-    .gte('created_at', nightStartAt().toISOString());
+  const { data: existing, error: readError } = await supabase.from('notifications').select('id').or(pair)
+    .in('type', ['meetup_request', 'meetup_accepted']).gte('created_at', nightStartAt().toISOString());
+  if (readError || !existing?.length) throw new Error('Could not confirm the request. Refresh and try again.');
+  const ids = existing.map(n => n.id);
+  const { data, error } = await supabase.from('notifications').delete().in('id', ids).select('id');
+  if (error || data?.length !== ids.length) throw new Error('Could not cancel every request. One may already have been read or handled.');
+
 }
 
 /** Is there a meet up between these two tonight, and has it been accepted? */
@@ -180,6 +178,7 @@ async function acceptInviteNotification(
     });
     if (error) throw error;
     const notif = Array.isArray(data) ? data[0] : data;
+    if (!notif?.id) throw new Error('This person is no longer available for this request.');
     if (notif?.id) {
       supabase.functions
         .invoke('send-push', {

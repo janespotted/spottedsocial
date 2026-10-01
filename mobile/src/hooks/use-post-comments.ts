@@ -1,5 +1,6 @@
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { notifyCommentAdded } from '@/lib/posts';
@@ -29,26 +30,27 @@ export function usePostComments(postId: string | undefined) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const queryKey = ['comments', postId];
+  const queryKey = ['comments', postId, session?.user.id];
 
   // A push or link can land here after the post expired at 5am. Without
   // this the screen showed an empty comment list with no explanation
   // (addendum v3 §4).
-  const { data: postExists, isLoading: checkingPost } = useQuery({
-    queryKey: ['comments-post-exists', postId],
+  const { data: postExists, isLoading: checkingPost, isError: postError } = useQuery({
+    queryKey: ['comments-post-exists', postId, session?.user.id],
     enabled: !!postId && !!session,
     staleTime: 30_000,
     queryFn: async () => {
-      const { data } = await supabase.from('posts').select('id').eq('id', postId!).maybeSingle();
+      const { data, error } = await supabase.from('posts').select('id').eq('id', postId!).maybeSingle();
+      if (error) throw error;
       return !!data;
     },
   });
 
-  const { data: comments, isLoading } = useQuery({
+  const { data: comments, isLoading, isError: commentsError } = useQuery({
     queryKey,
     enabled: !!postId && !!session,
     queryFn: async (): Promise<PostComment[]> => {
-      const [{ data: rows }, profiles] = await Promise.all([
+      const [{ data: rows, error: rowsError }, profiles] = await Promise.all([
         supabase
           .from('post_comments')
           .select('id, user_id, text, created_at, likes_count')
@@ -56,6 +58,7 @@ export function usePostComments(postId: string | undefined) {
           .order('created_at', { ascending: true }),
         fetchProfilesSafe(),
       ]);
+      if (rowsError) throw rowsError;
       const profileMap = buildProfileMap(profiles);
 
       // Like the feed: the likes_count column has no maintaining trigger in
@@ -139,14 +142,14 @@ export function usePostComments(postId: string | undefined) {
   };
 
   return {
-    comments: comments ?? [],
+    comments: postExists ? comments ?? [] : [],
     isLoading,
     postExists,
     checkingPost,
     draft,
     setDraft,
     sending,
-    error,
+    error: error ?? (postError || commentsError ? 'Could not load comments. Reopen to retry.' : null),
     send,
     toggleCommentLike,
     currentUserId: session?.user.id,

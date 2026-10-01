@@ -1,3 +1,4 @@
+import { resolvePostImageUrl } from './posts';
 import { supabase } from './supabase';
 import { isDemoMode } from './demo-mode';
 import { fetchProfilesSafe } from './profiles';
@@ -153,7 +154,7 @@ export async function fetchDmThreads(userId: string): Promise<DmThreadPreview[]>
       id: threadId,
       is_group: info?.is_group ?? false,
       name: info?.name ?? null,
-      group_avatar_url: info?.group_avatar_url ?? null,
+      group_avatar_url: await resolvePostImageUrl(info?.group_avatar_url ?? null),
       members,
       venue_name: members.length === 1 ? members[0].venue_name : null,
       last_message: last ? { text: last.text, created_at: last.created_at } : null,
@@ -182,4 +183,13 @@ export async function markThreadRead(threadId: string, userId: string): Promise<
       { thread_id: threadId, user_id: userId, last_read_at: new Date().toISOString() },
       { onConflict: 'thread_id,user_id' }
     );
+}
+
+/** Server RLS decides mutual opt-in; never read another user's raw profile. */
+export async function fetchPeerReadReceipt(threadId: string, peerId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.from('dm_read_receipts').select('last_read_at')
+      .eq('thread_id', threadId).eq('user_id', peerId).maybeSingle();
+    return error ? null : data?.last_read_at ?? null;
+  } catch { return null; }
 }

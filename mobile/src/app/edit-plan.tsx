@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { usePrivateQuery } from '@/hooks/use-private-query';
+import { supabase } from '@/lib/supabase';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import { fetchPlanParticipants, getPlanExpiry } from '@/lib/plans';
+import { fetchPlanParticipants, savePlan } from '@/lib/plans';
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { useSession } from '@/hooks/use-session';
 import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
-import { PlanForm, type PlanFormValues, type PlanFriend } from '@/components/plan-form';
+import { PlanForm, type PlanFormValues } from '@/components/plan-form';
 
 /**
  * Edit-plan modal. The plan rides in as route params (same fields the web
@@ -29,57 +29,22 @@ export default function EditPlanScreen() {
     visibility: string;
   }>();
 
-  const [initialFriends, setInitialFriends] = useState<PlanFriend[] | null>(null);
-
-  useEffect(() => {
-    if (!params.planId) return;
-    let cancelled = false;
-    (async () => {
-      const [participants, profiles] = await Promise.all([
-        fetchPlanParticipants(params.planId),
-        fetchProfilesSafe(),
-      ]);
-      if (cancelled) return;
-      setInitialFriends(
-        participants.map((p) => ({
-          id: p.user_id,
-          display_name: p.display_name,
-          avatar_url: p.avatar_url,
-          username: profiles.find((pr) => pr.id === p.user_id)?.username ?? '',
-        }))
-      );
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [params.planId]);
+  const query = usePrivateQuery({
+    queryKey: ['edit-plan', params.planId, session?.user.id],
+    enabled: !!params.planId && !!session,
+    queryFn: async () => {
+      const { data: plan, error } = await supabase.from('plans').select('*').eq('id', params.planId).eq('user_id', session!.user.id).maybeSingle();
+      if (error) throw error;
+      if (!plan) return null;
+      const [participants, profiles] = await Promise.all([fetchPlanParticipants(plan.id), fetchProfilesSafe()]);
+      return { plan, friends: participants.map(p => ({ id: p.user_id, display_name: p.display_name, avatar_url: p.avatar_url, username: profiles.find(pr => pr.id === p.user_id)?.username ?? '' })) };
+    },
+  });
 
   const handleSubmit = async (values: PlanFormValues) => {
-    if (!session) return;
+    if (!session || !params.planId) return;
     try {
-      const { error } = await supabase
-        .from('plans')
-        .update({
-          venue_id: values.venue.id,
-          venue_name: values.venue.name,
-          plan_date: values.planDate,
-          plan_time: values.planTime,
-          plan_type: values.planType,
-          description: values.description.trim() || null,
-          visibility: values.visibility,
-          expires_at: getPlanExpiry(values.planDate),
-        })
-        .eq('id', params.planId)
-        .eq('user_id', session.user.id);
-      if (error) throw error;
-
-      // Sync participants: delete old, insert new (same as web)
-      await supabase.from('plan_participants').delete().eq('plan_id', params.planId);
-      if (values.friends.length > 0) {
-        await supabase
-          .from('plan_participants')
-          .insert(values.friends.map((f) => ({ plan_id: params.planId, user_id: f.id })));
-      }
+      await savePlan(params.planId, values);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['plans'] });
@@ -91,13 +56,13 @@ export default function EditPlanScreen() {
     }
   };
 
-  if (initialFriends === null) {
-    return (
-      <View className="flex-1 bg-[#110a24] items-center justify-center">
-        <ActivityIndicator color="#d4ff00" />
-      </View>
-    );
-  }
+  if (!params.planId || query.isError || query.data === null) return <View className="flex-1 bg-[#110a24] items-center justify-center p-6 gap-4">
+    <Text className="text-white">{query.isError ? 'Could not load this plan.' : 'This plan is unavailable or cannot be edited by you.'}</Text>
+    {query.isError ? <Text className="text-[#d4ff00]" onPress={() => void query.refetch()}>Retry</Text> : null}
+    <Text className="text-white" onPress={() => router.canGoBack() ? router.back() : router.replace('/messages?tab=plans')}>Back to Plans</Text>
+  </View>;
+  if (!query.data) return <View className="flex-1 items-center justify-center"><ActivityIndicator color="#d4ff00" /></View>;
+  const { plan, friends } = query.data;
 
   return (
     <PlanForm
@@ -105,15 +70,15 @@ export default function EditPlanScreen() {
       submitLabel="Save Changes"
       submittingLabel="Saving..."
       initial={{
-        venue: params.venueId
-          ? { id: params.venueId, name: params.venueName ?? '', neighborhood: '' }
+        venue: plan.venue_id
+          ? { id: plan.venue_id, name: plan.venue_name ?? '', neighborhood: '' }
           : null,
-        planDate: params.planDate,
-        planTime: params.planTime,
-        planType: params.planType || null,
-        description: params.description ?? '',
-        visibility: params.visibility === 'close_friends' ? 'close_friends' : 'friends',
-        friends: initialFriends,
+        planDate: plan.plan_date,
+        planTime: plan.plan_time,
+        planType: plan.plan_type || null,
+        description: plan.description ?? '',
+        visibility: plan.visibility === 'close_friends' ? 'close_friends' : 'friends',
+        friends,
       }}
       onSubmit={handleSubmit}
     />

@@ -1,3 +1,4 @@
+import { locationServicesEnabled } from '@/lib/location-ready';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Alert, Linking, Pressable, Text, View, useWindowDimensions} from 'react-native';
 import {router, useFocusEffect} from 'expo-router';
@@ -551,6 +552,10 @@ export default function MapScreen() {
     if (locating) return;
     setLocating(true);
     try {
+      if (!await locationServicesEnabled()) {
+        Alert.alert('Device Location Services are off', 'Open iPhone Settings › Privacy & Security › Location Services to turn them on. Your Spotted permission is separate.');
+        return;
+      }
       let permission = await getLocationPermission();
 
       if (permission === 'not_determined') permission = await requestWhenInUse();
@@ -913,7 +918,9 @@ export default function MapScreen() {
                 onPress={async () => {
                   if (!session) return;
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  await stopSharing(session.user.id, {city});
+                  try { await stopSharing(session.user.id, {city}); } catch {
+                    Alert.alert('Sharing stop not confirmed', 'New GPS uploads are paused on this phone. Reconnect and tap Stop sharing again to remove the last shared spot from the server.');
+                  }
                   invalidateNightStatusQueries(queryClient);
                 }}
                 accessibilityLabel='Stop sharing'

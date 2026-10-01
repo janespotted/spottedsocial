@@ -226,3 +226,11 @@ export function usePostDetail<T>(selector: (s: PostDetailState) => T): T {
 export function getPostDetailState(): PostDetailState {
   return state;
 }
+
+/** Identity changes must not run navigation callbacks from the previous account. */
+export function resetPostDetail(): void {
+  state = IDLE;
+  feedScroller = null;
+  postDetailProgress.value = 0;
+  emit();
+}

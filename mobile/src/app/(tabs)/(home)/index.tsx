@@ -68,7 +68,7 @@ function OutTonightCard({
           style={{ backgroundColor: 'rgba(212,255,0,0.08)', borderWidth: 1, borderColor: 'rgba(212,255,0,0.3)' }}
         >
           <Text className="flex-1 text-white/75 text-xs font-sans leading-4">
-            You&apos;re staying in, so venues are hidden. Going out after all? Update your status.
+            Live friend locations are hidden while you are Staying In. Shared posts, Plans and invitations remain available.
           </Text>
           <SymbolView name="chevron.right" size={12} tintColor={NEON} />
         </Pressable>

@@ -1,3 +1,4 @@
+import type { CardRelationship } from '@/lib/relationship-tier';
 import { locationLabel, locationAge, STALE_AFTER_MS } from '@/lib/location-quality';
 import { useLocationClock } from '@/hooks/use-location-clock';
 import { useEffect, useState } from 'react';
@@ -22,14 +23,15 @@ import { openFriendCard } from '@/lib/friend-card';
 import { showToast } from '@/lib/toast';
 import { Avatar } from '@/components/avatar';
 import { DropdownMenu } from '@/components/dropdown-menu';
-import type { MapFriend, RelationshipType } from '@/hooks/use-map-data';
+import type { MapFriend } from '@/hooks/use-map-data';
 import { NEON, PURPLE } from '@/lib/theme';
 import { RESET_COPY } from '@/lib/reset-copy';
 
 export type FriendStatusKind = 'out' | 'party' | 'planning' | 'home' | 'unknown';
 
 /** Everything the card shows; built by app/friend-card.tsx from the userId. */
-export interface FriendCardData extends MapFriend {
+export interface FriendCardData extends Omit<MapFriend, 'relationshipType'> {
+  relationshipType: CardRelationship;
   username: string | null;
   statusKind: FriendStatusKind;
   /** Secondary line for non-venue states ("TBD tonight — thinking X", "In for the night"). */
@@ -53,12 +55,14 @@ export interface FriendAtVenue {
 const RING_GRADIENTS: Record<string, string> = {
   close: 'bg-gradient-to-br from-[#a855f7] to-[#d4ff00]',
   direct: 'bg-gradient-to-br from-[#a855f7] to-[#a855f7]/60',
+  unrelated: 'bg-white/20',
   mutual: 'bg-gradient-to-br from-[#a855f7] to-[#6366f1]',
 };
 
-const BADGE: Record<RelationshipType, { bg: string; text: string; label: string }> = {
+const BADGE: Record<CardRelationship, { bg: string; text: string; label: string }> = {
   close: { bg: 'bg-[#d4ff00]/15', text: 'text-[#d4ff00]', label: 'Close Friend' },
   direct: { bg: 'bg-[#9333ea]/15', text: 'text-[#c084fc]', label: 'Friend' },
+  unrelated: { bg: 'bg-white/10', text: 'text-white/60', label: 'Not friends' },
   mutual: { bg: 'bg-[#6366f1]/15', text: 'text-[#818cf8]', label: 'Mutual' },
 };
 
@@ -90,7 +94,7 @@ export function FriendCardBody({
   const firstName = data.display_name.split(' ')[0];
 
   // Optimistic local copies of the things the card can change
-  const [relationship, setRelationship] = useState<RelationshipType>(data.relationshipType);
+  const [relationship, setRelationship] = useState<CardRelationship>(data.relationshipType);
   const [hidden, setHidden] = useState(data.locationHidden);
   const [requestPending, setRequestPending] = useState(data.requestPending);
   const [showMutuals, setShowMutuals] = useState(false);
@@ -224,7 +228,10 @@ export function FriendCardBody({
           text: 'Cancel it',
           style: 'destructive',
           onPress: async () => {
-            await cancelMeetUp(currentUserId, data.user_id);
+            try { await cancelMeetUp(currentUserId, data.user_id); } catch (error) {
+              Alert.alert('Could not cancel', error instanceof Error ? error.message : 'Please retry.');
+              return;
+            }
             setMeetUpState('none');
             showToast(`Meet up with ${firstName} cleared`);
           },
@@ -377,7 +384,7 @@ export function FriendCardBody({
 
           {/* Relationship badge — a control, as in the original */}
           <View className="flex-row items-center gap-1.5 mt-1">
-            {relationship === 'mutual' ? (
+            {relationship === 'unrelated' ? <Text className="text-white/60 text-[10px]">Not friends</Text> : relationship === 'mutual' ? (
               <Pressable
                 onPress={() => setShowMutuals((v) => !v)}
                 accessibilityRole="button"
@@ -497,7 +504,7 @@ export function FriendCardBody({
           </DropdownMenu>
         ) : null}
 
-        {relationship === 'mutual' ? (
+        {relationship === 'mutual' || relationship === 'unrelated' ? (
           <Pressable
             onPress={handleFriendRequest}
             accessibilityRole="button"

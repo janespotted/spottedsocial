@@ -728,6 +728,18 @@ export type Database = {
           },
         ]
       }
+      media_object_deletions: {
+        Row: { bucket_id: string; name: string; queued_at: string; attempts: number; last_error: string | null }
+        Insert: { bucket_id: string; name: string; queued_at?: string; attempts?: number; last_error?: string | null }
+        Update: { bucket_id?: string; name?: string; queued_at?: string; attempts?: number; last_error?: string | null }
+        Relationships: []
+      }
+      mux_uploads: {
+        Row: { upload_id: string; user_id: string; asset_id: string | null; playback_id: string | null; status: string; width: number | null; height: number | null; created_at: string }
+        Insert: { upload_id: string; user_id: string; asset_id?: string | null; playback_id?: string | null; status?: string; width?: number | null; height?: number | null; created_at?: string }
+        Update: { upload_id?: string; user_id?: string; asset_id?: string | null; playback_id?: string | null; status?: string; width?: number | null; height?: number | null; created_at?: string }
+        Relationships: [{ foreignKeyName: "mux_uploads_user_id_fkey"; columns: ["user_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] }]
+      }
       mux_asset_deletions: {
         Row: {
           asset_id: string
@@ -751,6 +763,7 @@ export type Database = {
       }
       night_statuses: {
         Row: {
+          manual_venue_until: string | null
           automatic_venue_updates: boolean
           expires_at: string | null
           id: string
@@ -772,6 +785,7 @@ export type Database = {
           venue_name: string | null
         }
         Insert: {
+          manual_venue_until?: string | null
           automatic_venue_updates?: boolean
           expires_at?: string | null
           id?: string
@@ -793,6 +807,7 @@ export type Database = {
           venue_name?: string | null
         }
         Update: {
+          manual_venue_until?: string | null
           automatic_venue_updates?: boolean
           expires_at?: string | null
           id?: string
@@ -1080,6 +1095,7 @@ export type Database = {
           is_demo: boolean | null
           plan_date: string
           plan_time: string
+          privacy_revision: string
           plan_type: string | null
           score: number | null
           user_id: string
@@ -1096,6 +1112,7 @@ export type Database = {
           is_demo?: boolean | null
           plan_date: string
           plan_time: string
+          privacy_revision?: string
           plan_type?: string | null
           score?: number | null
           user_id: string
@@ -1112,6 +1129,7 @@ export type Database = {
           is_demo?: boolean | null
           plan_date?: string
           plan_time?: string
+          privacy_revision?: string
           plan_type?: string | null
           score?: number | null
           user_id?: string
@@ -1241,6 +1259,7 @@ export type Database = {
           media_width: number | null
           mux_asset_id: string | null
           mux_playback_id: string | null
+          mux_signed: boolean
           mux_status: string | null
           mux_upload_id: string | null
           text: string
@@ -1264,6 +1283,7 @@ export type Database = {
           media_width?: number | null
           mux_asset_id?: string | null
           mux_playback_id?: string | null
+          mux_signed?: boolean
           mux_status?: string | null
           mux_upload_id?: string | null
           text: string
@@ -1287,6 +1307,7 @@ export type Database = {
           media_width?: number | null
           mux_asset_id?: string | null
           mux_playback_id?: string | null
+          mux_signed?: boolean
           mux_status?: string | null
           mux_upload_id?: string | null
           text?: string
@@ -1509,6 +1530,30 @@ export type Database = {
           action_type?: string
           created_at?: string
           id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      relationship_events: {
+        Row: {
+          created_at: string
+          id: number
+          kind: string
+          other_user_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          kind: string
+          other_user_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          kind?: string
+          other_user_id?: string
           user_id?: string
         }
         Relationships: []
@@ -2488,6 +2533,32 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_party_invite_recipients: { Args: Record<PropertyKey, never>; Returns: { id: string }[] };
+      commit_night_status: { Args: { p_patch: Json; p_fix?: Json; p_audience?: string }; Returns: Json }
+      get_post_share_recipients: { Args: { p_post: string }; Returns: { id: string; display_name: string; avatar_url: string | null; is_out: boolean }[] }
+      share_post_to_dm: { Args: { p_post: string; p_recipient: string }; Returns: string }
+      username_available: { Args: { p_username: string }; Returns: boolean }
+
+      save_plan: { Args: { p_id: string | null; p_values: Json; p_participants?: string[] }; Returns: string }
+      can_read_plan: { Args: { p_plan: string }; Returns: boolean }
+      can_tag_plan: { Args: { p_plan: string; p_user: string }; Returns: boolean }
+      can_read_notification: { Args: { p_id: string }; Returns: boolean }
+      can_read_receipt: { Args: { p_owner: string; p_thread: string }; Returns: boolean }
+      match_contacts: { Args: { p_phones: string[] }; Returns: { phone: string; user_id: string; display_name: string; username: string; avatar_url: string | null }[] }
+
+      get_demo_status_locations: { Args: never; Returns: { user_id: string; lat: number; lng: number }[] }
+      friendship_available: { Args: { p_other: string }; Returns: boolean }
+      private_media_target: { Args: { p_path?: string | null; p_playback_id?: string | null }; Returns: Json }
+      private_media_targets: { Args: { p_paths?: string[]; p_playback_ids?: string[] }; Returns: { kind: string; media_key: string; expires_at: string | null }[] }
+      can_upload_v1_media: { Args: { p_name: string }; Returns: boolean }
+      replace_private_media_path: { Args: { p_old: string; p_new: string }; Returns: undefined }
+      pending_private_media_cleanup: { Args: never; Returns: Database["public"]["Tables"]["media_object_deletions"]["Row"][] }
+      upsert_own_night_status: { Args: { p_patch: Json }; Returns: undefined }
+      get_own_night_status: { Args: never; Returns: Database["public"]["Tables"]["night_statuses"]["Row"][] }
+      remove_friendship: { Args: { p_other: string }; Returns: string | null }
+      restore_friendship: { Args: { p_token: string }; Returns: undefined }
+      can_read_post: { Args: { p_id: string }; Returns: boolean }
+
       _can_see_location_unchecked: {
         Args: { target_user_id: string; viewer_id: string }
         Returns: boolean

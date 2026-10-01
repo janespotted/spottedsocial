@@ -13,8 +13,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
  * Authenticity: every request is checked against the Mux-Signature header
  * (HMAC-SHA256 of `${timestamp}.${rawBody}` with MUX_WEBHOOK_SECRET) and a
  * 5-minute replay window. verify_jwt is off — Mux does not hold a Supabase
- * token. Always answer 2xx once the signature checks out: Mux retries
- * non-2xx responses, and a row we cannot find is not going to appear later.
+ * token. Provider state is persisted before updating the optional post. Database
+ * failures return 5xx for retry, including an upload whose registry is not ready.
  */
 
 const TOLERANCE_SECONDS = 300
@@ -71,6 +71,8 @@ interface MuxEvent {
     playback_ids?: { id: string; policy: string }[]
     tracks?: MuxTrack[]
     aspect_ratio?: string
+    passthrough?: string
+    meta?: { creator_id?: string }
     duration?: number
   }
 }
@@ -100,66 +102,49 @@ Deno.serve(async (req) => {
   const { type, data } = event
 
   try {
-    switch (type) {
-      case 'video.upload.asset_created': {
-        // data = the upload; data.asset_id is the new asset
-        if (data.asset_id) {
-          const { error } = await supabase
-            .from('posts')
-            .update({ mux_asset_id: data.asset_id })
-            .eq('mux_upload_id', data.id)
-          if (error) console.error('asset_created update failed:', error)
-        }
-        break
-      }
-
-      case 'video.asset.ready': {
-        // data = the asset; carries upload_id when it came from a direct upload
-        const playbackId = data.playback_ids?.find((p) => p.policy === 'public')?.id ?? data.playback_ids?.[0]?.id
-        if (!playbackId) {
-          console.error(`asset ${data.id} ready without a playback id`)
-          break
-        }
-        const video = data.tracks?.find((t) => t.type === 'video')
-        const patch = {
-          mux_asset_id: data.id,
-          mux_playback_id: playbackId,
-          mux_status: 'ready',
-          media_width: video?.max_width ?? null,
-          media_height: video?.max_height ?? null,
-        }
-        let query = supabase.from('posts').update(patch)
-        query = data.upload_id ? query.eq('mux_upload_id', data.upload_id) : query.eq('mux_asset_id', data.id)
-        const { data: rows, error } = await query.select('id')
-        if (error) console.error('asset.ready update failed:', error)
-        else if (!rows?.length) console.warn(`asset.ready: no post for asset ${data.id} / upload ${data.upload_id}`)
-        break
-      }
-
-      case 'video.asset.errored': {
-        let query = supabase.from('posts').update({ mux_status: 'errored', mux_asset_id: data.id })
-        query = data.upload_id ? query.eq('mux_upload_id', data.upload_id) : query.eq('mux_asset_id', data.id)
-        const { error } = await query
-        if (error) console.error('asset.errored update failed:', error)
-        break
-      }
-
-      case 'video.upload.errored':
-      case 'video.upload.cancelled': {
-        const { error } = await supabase
-          .from('posts')
-          .update({ mux_status: 'errored' })
-          .eq('mux_upload_id', data.id)
-        if (error) console.error(`${type} update failed:`, error)
-        break
-      }
-
-      default:
-        // video.asset.created, static renditions, etc. — nothing to record
-        break
+    let lookup = supabase.from('mux_uploads').select('upload_id,user_id')
+    lookup = type.startsWith('video.upload.') ? lookup.eq('upload_id',data.id)
+      : data.upload_id ? lookup.eq('upload_id',data.upload_id) : lookup.eq('asset_id',data.id)
+    if (!['video.upload.asset_created','video.asset.ready','video.asset.errored','video.upload.errored','video.upload.cancelled'].includes(type)) {
+      return Response.json({received:true})
     }
-  } catch (e) {
-    console.error(`mux-webhook ${type} handler threw:`, e)
+    const {data:upload,error:lookupError}=await lookup.maybeSingle()
+    if(lookupError)throw lookupError
+    if(!upload) {
+      const owner=data.passthrough ?? data.meta?.creator_id
+      const asset=type.startsWith('video.asset.') ? data.id : data.asset_id
+      if(owner && asset) {
+        const {data:profile,error:profileError}=await supabase.from('profiles').select('id').eq('id',owner).maybeSingle()
+        if(profileError)throw profileError
+        if(!profile) {
+          const {error:queueError}=await supabase.from('mux_asset_deletions').upsert({asset_id:asset},{onConflict:'asset_id',ignoreDuplicates:true})
+          if(queueError)throw queueError
+          return Response.json({received:true})
+        }
+      }
+      return new Response('Upload registry not ready',{status:503})
+    }
+    let registry: Record<string,unknown> = {}, patch: Record<string,unknown> = {}
+    if(type==='video.upload.asset_created' && data.asset_id) {
+      registry={asset_id:data.asset_id};patch={mux_asset_id:data.asset_id}
+    } else if(type==='video.asset.ready') {
+      const playbackId=data.playback_ids?.find(p=>p.policy==='signed')?.id
+      // Never accept public playback or an arbitrary fallback ID.
+      if(!playbackId)return new Response('Signed playback not ready',{status:503})
+      const video=data.tracks?.find(t=>t.type==='video')
+      registry={asset_id:data.id,playback_id:playbackId,status:'ready',width:video?.max_width??null,height:video?.max_height??null}
+      patch={mux_asset_id:data.id,mux_playback_id:playbackId,mux_signed:true,mux_status:'ready',media_width:video?.max_width??null,media_height:video?.max_height??null}
+    } else if(type.endsWith('.errored') || type.endsWith('.cancelled')) {
+      registry={status:'errored'};patch={mux_status:'errored'}
+    }
+    if(Object.keys(registry).length) {
+      const {error}=await supabase.from('mux_uploads').update(registry).eq('upload_id',upload.upload_id)
+      if(error)throw error
+      const {error:postError}=await supabase.from('posts').update(patch).eq('mux_upload_id',upload.upload_id).eq('user_id',upload.user_id)
+      if(postError)throw postError
+    }
+  } catch {
+    return new Response('Media update pending retry',{status:503})
   }
 
   return new Response(JSON.stringify({ received: true }), {

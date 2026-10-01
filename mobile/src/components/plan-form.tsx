@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActionSheetIOS,
   Keyboard,
@@ -10,7 +10,7 @@ import {
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { useQuery } from '@tanstack/react-query';
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { supabase } from '@/lib/supabase';
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { PLAN_TYPES, toLocalDateString } from '@/lib/plans';
@@ -192,12 +192,27 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
     },
   });
 
+  const { data: closeIds } = useQuery({
+    queryKey: ['plan-close-friends', session?.user.id], enabled: !!session,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('close_friends').select('close_friend_id').eq('user_id', session!.user.id);
+      if (error) throw error;
+      return (data ?? []).map(f => f.close_friend_id);
+    },
+  });
+  const eligibleFriends = friends.filter(f => visibility === 'friends' || closeIds?.includes(f.id));
+  useEffect(() => {
+    if (!friendIds || (visibility === 'close_friends' && !closeIds)) return;
+    setSelectedFriends(previous => previous.filter(f => friendIds.includes(f.id) &&
+      (visibility === 'friends' || closeIds!.includes(f.id))));
+  }, [visibility, friendIds, closeIds]);
+
   const filteredVenues = venues.filter(
     (v) =>
       v.name.toLowerCase().includes(venueSearch.toLowerCase()) ||
       v.neighborhood.toLowerCase().includes(venueSearch.toLowerCase())
   );
-  const filteredFriends = friends.filter(
+  const filteredFriends = eligibleFriends.filter(
     (f) =>
       f.display_name.toLowerCase().includes(friendSearch.toLowerCase()) ||
       f.username.toLowerCase().includes(friendSearch.toLowerCase())

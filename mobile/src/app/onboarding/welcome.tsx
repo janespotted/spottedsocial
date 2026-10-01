@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, View } from 'react-native';
 import BackgroundGeolocation from 'react-native-background-geolocation';
 import { ensureLocationReady } from '@/lib/location-ready';
 import { markTourSeen } from '@/lib/tour-seen';
@@ -38,6 +38,8 @@ export default function OnboardingTourScreen() {
   const { session, refreshOnboardingStatus } = useSession();
   const [step, setStep] = useState(1);
   const [finishing, setFinishing] = useState(false);
+  const advancing = useRef(false);
+  const [pending, setPending] = useState(false);
 
   /**
    * Ask for When In Use right after the privacy screen, which just
@@ -70,12 +72,16 @@ export default function OnboardingTourScreen() {
   };
 
   const advance = async () => {
-    if (step === 3) await askForLocation();
-    if (step >= TOTAL) {
-      await finish();
-      return;
-    }
-    setStep((s) => s + 1);
+    if (advancing.current) return;
+    advancing.current = true; setPending(true);
+    try {
+      if (step === 3) await askForLocation();
+      if (step >= TOTAL) await finish();
+      else setStep(s => Math.min(TOTAL, s + 1));
+    } catch {
+      setFinishing(false);
+      Alert.alert('Could not finish setup', 'Your progress is saved. Please try again.');
+    } finally { advancing.current = false; setPending(false); }
   };
 
   const frame = (
@@ -88,7 +94,8 @@ export default function OnboardingTourScreen() {
       {...props}
       step={step}
       total={TOTAL}
-      onContinue={props.onContinue ?? advance}
+      disabled={pending}
+      onContinue={advance}
     />
   );
 
@@ -152,7 +159,7 @@ export default function OnboardingTourScreen() {
         frame({
           title: 'Find tonight’s\ntop spots.',
           subtitle:
-            'See your city’s venues ranked by total check-ins from everyone on Spotted.',
+            'Explore your city’s venues, with activity from people whose sharing includes you. Catalog order fills in when there is no shared activity.',
           children: <LeaderboardIllustration />,
         })}
 

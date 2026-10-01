@@ -248,7 +248,7 @@ export function PrivacyRingIllustration() {
   const tiers = [
     { label: 'Close Friends', sub: 'Only your selected inner circle', on: true },
     { label: 'Friends', sub: "Everyone you're friends with", on: false },
-    { label: 'Friends + Mutual Friends', sub: 'Your friends and mutuals', on: false },
+    { label: 'Friends + Mutuals', sub: 'Your friends and mutuals', on: false },
   ];
   return (
     <View>

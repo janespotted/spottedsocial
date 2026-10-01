@@ -26,9 +26,11 @@ export default function UsernameScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
+  const usernameRevision = useRef(0);
+  const savingRef = useRef(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const checkUsernameAvailability = useCallback(async (value: string) => {
+  const checkUsernameAvailability = useCallback(async (value: string, revision: number) => {
     if (!USERNAME_REGEX.test(value)) {
       setUsernameAvailable(null);
       setUsernameError('use lowercase letters, numbers, _ or .');
@@ -43,34 +45,25 @@ export default function UsernameScreen() {
     }
     setUsernameChecking(true);
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', value)
-        .maybeSingle();
-      if (data) {
-        setUsernameAvailable(false);
-        setUsernameError("that one's taken");
-        const alts = [`${value}2`, `${value}_`, `${value}${Math.floor(Math.random() * 99)}`];
-        const { data: taken } = await supabase
-          .from('profiles')
-          .select('username')
-          .in('username', alts);
-        const takenSet = new Set(taken?.map((t) => t.username) ?? []);
-        setSuggestions(alts.filter((a) => !takenSet.has(a)).slice(0, 3));
-      } else {
-        setUsernameAvailable(true);
-        setUsernameError(null);
-        setSuggestions([]);
-      }
+      const { data, error } = await supabase.rpc('username_available', { p_username: value });
+      if (revision !== usernameRevision.current) return;
+      if (error) throw error;
+      setUsernameAvailable(data === true);
+      setUsernameError(data === true ? null : "that one's taken");
+      setSuggestions([]);
+
     } catch {
+      if (revision !== usernameRevision.current) return;
       setUsernameAvailable(null);
+      setUsernameError("Could not check availability. Try again.");
     } finally {
-      setUsernameChecking(false);
+      if (revision === usernameRevision.current) setUsernameChecking(false);
     }
   }, []);
 
   const handleUsernameChange = (value: string) => {
+    const revision = ++usernameRevision.current;
+    setUsernameChecking(false);
     const cleaned = value.toLowerCase().replace(/[^a-z0-9_.]/g, '').slice(0, 20);
     setUsername(cleaned);
     setUsernameAvailable(null);
@@ -79,14 +72,15 @@ export default function UsernameScreen() {
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (cleaned.length >= 3) {
-      debounceRef.current = setTimeout(() => checkUsernameAvailability(cleaned), 500);
+      debounceRef.current = setTimeout(() => checkUsernameAvailability(cleaned, revision), 500);
     } else if (cleaned.length > 0) {
       setUsernameError('at least 3 characters');
     }
   };
 
   const handleCreateProfile = async () => {
-    if (!usernameAvailable || !agreedToTerms || !session) return;
+    if (!usernameAvailable || usernameChecking || !agreedToTerms || !session || savingRef.current) return;
+    savingRef.current = true;
     setLoading(true);
     setError(null);
     // Default avatar: unique DiceBear cartoon per user (same style/palette
@@ -105,6 +99,7 @@ export default function UsernameScreen() {
         existing?.avatar_url ??
         `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(cleanUsername)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`,
     });
+    savingRef.current = false;
     setLoading(false);
     if (err) {
       setError(err.message);
@@ -176,7 +171,7 @@ export default function UsernameScreen() {
               key={s}
               onPress={() => {
                 setUsername(s);
-                checkUsernameAvailability(s);
+                handleUsernameChange(s);
               }}
               className="px-3 py-1.5 rounded-full border border-white/15 active:bg-white/5"
             >

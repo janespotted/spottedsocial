@@ -42,7 +42,7 @@ export interface MuxDirectUpload {
 }
 
 /**
- * Mint a direct-upload URL whose resulting asset is public, capped at
+ * Mint a direct-upload URL whose resulting asset requires signed playback, capped at
  * 1080p and encoded at the "basic" quality tier — a 14-second phone clip
  * viewed on a phone gains nothing from the higher tiers.
  */
@@ -53,7 +53,7 @@ export function createDirectUpload(userId: string): Promise<MuxDirectUpload> {
       cors_origin: '*',
       timeout: 3600,
       new_asset_settings: {
-        playback_policies: ['public'],
+        playback_policies: ['signed'],
         video_quality: 'basic',
         max_resolution_tier: '1080p',
         normalize_audio: true,

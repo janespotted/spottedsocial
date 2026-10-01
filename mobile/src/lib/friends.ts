@@ -14,7 +14,7 @@ export async function fetchPeopleYouMayKnow(userId: string): Promise<SuggestedFr
     supabase.rpc as (fn: string, args: object) => PromiseLike<{ data: unknown; error: unknown }>
   )('get_people_you_may_know', { p_user_id: userId, p_limit: 10 });
   if (error) return [];
-  return ((data ?? []) as Array<Record<string, any>>).map((r) => ({
+  return ((data ?? []) as Array<{ user_id: string; display_name: string; username?: string; avatar_url: string | null; mutual_count?: number }>).map((r) => ({
     id: r.user_id,
     display_name: r.display_name,
     username: r.username ?? '',

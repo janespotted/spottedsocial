@@ -1,5 +1,8 @@
+import { usePrivateQuery as useQuery } from './use-private-query';
+import { useOwnNightStatus } from './use-own-night-status';
+import { withholdLivePreview } from '@/lib/live-preview';
 import { useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
 import { isDemoMode } from '@/lib/demo-mode';
@@ -48,17 +51,10 @@ export interface LeaderboardData {
   biggestMover: BiggestMover | null;
 }
 
-function calculateEnergyLevel(rank: number, userCount: number): number {
-  if (!BOOTSTRAP_MODE) {
-    // Production mode: Based on actual check-in counts
-    if (userCount >= 10) return 3;
-    if (userCount >= 5) return 2;
-    return userCount > 0 ? 1 : 0;
-  }
-  // Bootstrap mode: Based on leaderboard ranking position
-  if (rank <= 7) return 3; // Top tier (ranks 1-7)
-  if (rank <= 14) return 2; // Mid tier (ranks 8-14)
-  return 1; // Lower tier (ranks 15+)
+function calculateEnergyLevel(_rank: number, userCount: number): number {
+  if (userCount >= 10) return 3;
+  if (userCount >= 5) return 2;
+  return userCount > 0 ? 1 : 0;
 }
 
 type MutableVenue = LeaderboardVenue & { popularity_rank: number };
@@ -86,8 +82,7 @@ async function fetchLeaderboard(
     )
     .eq('venues.city', city)
     .not('venue_name', 'is', null)
-    .not('lat', 'is', null)
-    .not('lng', 'is', null)
+    .eq('status', 'out')
     .not('expires_at', 'is', null)
     .gt('expires_at', new Date().toISOString());
   if (neighborhood) statusQuery = statusQuery.eq('venues.neighborhood', neighborhood);
@@ -129,8 +124,9 @@ async function fetchLeaderboard(
     fetchProfilesSafe(),
   ]);
 
+  for (const result of [promotedResult, statusesResult, topVenuesResult]) if (result.error) throw result.error;
   const promotedVenues = promotedResult.data ?? [];
-  const statuses = (statusesResult.data ?? []) as unknown as Array<Record<string, any>>;
+  const statuses = (statusesResult.data ?? []) as unknown as Array<{ venue_name: string; venue_id: string; user_id: string; updated_at: string | null; venues: { operating_hours?: VenueHours | null; opened_at?: string | null; neighborhood?: string | null; popularity_rank?: number | null } }>;
   const topVenues = topVenuesResult.data ?? [];
   const profileMap = buildProfileMap(profiles);
 
@@ -156,7 +152,7 @@ async function fetchLeaderboard(
         rank,
         movement: 'same',
         friends: [],
-        energyLevel: rank <= 7 ? 3 : rank <= 14 ? 2 : 1,
+        energyLevel: 0,
         isPromoted: venue.is_leaderboard_promoted ?? false,
         isNewlyOpened,
         popularity_rank: venue.popularity_rank ?? 999,
@@ -178,7 +174,7 @@ async function fetchLeaderboard(
       rank: 0,
       movement: 'same',
       friends: [],
-      energyLevel: 1,
+      energyLevel: 0,
       isPromoted: true,
       isNewlyOpened,
       popularity_rank: venue.popularity_rank ?? 999,
@@ -255,17 +251,13 @@ async function fetchLeaderboard(
       return a.popularity_rank - b.popularity_rank;
     });
 
-  // Top 20 non-promoted venues get ranks; movement is randomized each fetch
-  // (parity with the web leaderboard — real movement tracking isn't built)
+  // Top 20 non-promoted venues get ranks; movement remains neutral until measured history exists
   const rankedVenues = nonPromotedVenues.slice(0, 20).map((venue, index) => {
     const rank = index + 1;
     return {
       ...venue,
       rank,
-      movement: (Math.random() > 0.5 ? 'up' : Math.random() > 0.5 ? 'down' : 'same') as
-        | 'up'
-        | 'down'
-        | 'same',
+      movement: 'same' as const,
       energyLevel: calculateEnergyLevel(rank, venue.count),
     };
   });
@@ -281,7 +273,7 @@ async function fetchLeaderboard(
 
   // Biggest mover fallback chain:
   // 1. open venues with recent velocity, 2. open venues with any activity,
-  // 3. any venue with activity, 4. top bootstrap venue
+  // 3. any venue with measured activity. Catalog-only venues are never a live claim.
   const openVenuesWithVelocity = nonPromotedVenues
     .filter((v) => isVenueOpen(v.operatingHours ?? null))
     .filter((v) => v.recentCheckinCount > 0)
@@ -293,20 +285,7 @@ async function fetchLeaderboard(
   const anyVenueWithActivity = nonPromotedVenues
     .filter((v) => v.count > 0)
     .sort((a, b) => b.count - a.count);
-  const topBootstrapVenue =
-    BOOTSTRAP_MODE && topVenues[0]
-      ? {
-          venue_name: topVenues[0].name,
-          venue_id: topVenues[0].id,
-          friends: [] as LeaderboardFriend[],
-        }
-      : null;
-
-  const moverVenue =
-    openVenuesWithVelocity[0] ||
-    openVenuesWithActivity[0] ||
-    (BOOTSTRAP_MODE ? anyVenueWithActivity[0] : null) ||
-    topBootstrapVenue;
+  const moverVenue = openVenuesWithVelocity[0] || openVenuesWithActivity[0] || anyVenueWithActivity[0];
 
   const biggestMover: BiggestMover | null = moverVenue
     ? {
@@ -322,10 +301,12 @@ async function fetchLeaderboard(
 export function useLeaderboard(city: string | null, neighborhood: string | null) {
   const { session } = useSession();
   const queryClient = useQueryClient();
+  const { data: own } = useOwnNightStatus();
+  const withheld = withholdLivePreview(own?.status?.status, !!own);
   const { data: friendIds } = useFriendIds(session?.user.id);
 
   const query = useQuery({
-    queryKey: ['leaderboard', city, neighborhood, friendIds ?? []],
+    queryKey: ['leaderboard', session?.user.id, city, neighborhood, friendIds ?? []],
     enabled: !!session && !!city,
     staleTime: 30_000,
     queryFn: () => fetchLeaderboard(city!, neighborhood, session!.user.id, friendIds ?? []),
@@ -356,5 +337,5 @@ export function useLeaderboard(city: string | null, neighborhood: string | null)
     };
   }, [session, queryClient]);
 
-  return query;
+  return { ...query, data: query.data && withheld ? { ...query.data, venues: query.data.venues.map(v => ({ ...v, friends: [] })), biggestMover: query.data.biggestMover ? { ...query.data.biggestMover, friends: [] } : null } : query.data };
 }

@@ -1,7 +1,9 @@
+import { withholdLivePreview } from '@/lib/live-preview';
+import { useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { Pressable, Text } from 'react-native';
 import { ActivityIndicator, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { getCurrentPosition } from '@/lib/background-location';
@@ -15,7 +17,7 @@ import { FriendCardBody, type FriendCardData, type FriendStatusKind } from '@/co
 import { useSession } from '@/hooks/use-session';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useFriendsOut } from '@/hooks/use-friends-out';
-import type { RelationshipType } from '@/hooks/use-map-data';
+import { relationshipTier } from '@/lib/relationship-tier';
 import { NEON } from '@/lib/theme';
 
 const METERS_PER_MILE = 1609.34;
@@ -34,15 +36,17 @@ export default function FriendCardScreen() {
   const { data: friendIds } = useFriendIds(currentUserId);
   const { data: friendsOut } = useFriendsOut();
 
-  const { data: friend } = useQuery({
-    queryKey: ['friend-card', userId],
+  const { data: own } = useOwnNightStatus();
+  const withheld = withholdLivePreview(own?.status?.status, !!own);
+  const { data: rawFriend, isLoading, isError, refetch } = useQuery({
+    queryKey: ['friend-card', userId, currentUserId, friendIds],
     enabled: !!userId && !!currentUserId && friendIds !== undefined,
     staleTime: 30_000,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
     queryFn: async (): Promise<FriendCardData | null> => {
       const me = currentUserId!;
-      const [profiles, { data: close }, { data: status }, locationHidden, myFix] = await Promise.all([
+      const [profiles, { data: close, error: closeError }, { data: status, error: statusError }, locationHidden, myFix] = await Promise.all([
         fetchProfilesSafe(),
         supabase
           .from('close_friends')
@@ -62,20 +66,15 @@ export default function FriendCardScreen() {
         fetchLocationHidden(me, userId!),
         getCurrentPosition(),
       ]);
+      if (closeError || statusError) throw closeError ?? statusError;
       const profile = profiles.find((p) => p.id === userId);
       if (!profile) return null;
 
-      const relationshipType: RelationshipType = close
-        ? 'close'
-        : (friendIds ?? []).includes(profile.id)
-          ? 'direct'
-          : 'mutual';
-
-      // Mutual tier extras (the original card's popover + Add Friend)
-      const [mutualFriends, requestPending] =
-        relationshipType === 'mutual'
-          ? await Promise.all([fetchMutualFriendsWith(userId!), fetchFriendRequestPending(me, userId!)])
-          : [[], false];
+      const direct = (friendIds ?? []).includes(profile.id);
+      const [mutualFriends, requestPending] = !direct
+        ? await Promise.all([fetchMutualFriendsWith(userId!), fetchFriendRequestPending(me, userId!)])
+        : [[], false];
+      const relationshipType = relationshipTier(!!close, direct, mutualFriends.length);
 
       // Tonight — the original card's status subtitle variants
       let statusKind: FriendStatusKind = 'unknown';
@@ -123,6 +122,11 @@ export default function FriendCardScreen() {
     },
   });
 
+  const friend = rawFriend && withheld ? {
+    ...rawFriend, venue_name: '', venue_id: null, party_neighborhood: null, distanceMi: null,
+    statusLine: rawFriend.statusKind === 'home' ? 'In for the night' : 'Live location previews hidden while you are Staying In',
+  } : rawFriend;
+
   // Friends at the same venue tonight (the "also here" avatars)
   const friendsAtVenue =
     friend?.venue_name && friendsOut
@@ -159,7 +163,11 @@ export default function FriendCardScreen() {
         />
       ) : (
         <View className="items-center justify-center py-16">
-          <ActivityIndicator color={NEON} />
+          {isLoading && userId ? <ActivityIndicator color={NEON} /> : <>
+            <Text className="text-white/70">{isError ? 'Could not load this person.' : 'This person is unavailable.'}</Text>
+            {isError ? <Text className="text-[#d4ff00] p-3" onPress={() => void refetch()}>Retry</Text> : null}
+            <Text className="text-white p-3" onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>Back</Text>
+          </>}
         </View>
       )}
     </View>
