@@ -1,56 +1,73 @@
-import { capsuleCodec, mediaHandler, muxToken, type MediaDependencies } from './private-media.ts'
+import { linkHandler, muxSigner, muxToken, LINK_TTL_SECONDS, type LinkDependencies, type LinkResponse } from './private-media.ts'
 import { secureMuxAsset, type Asset } from './secure-mux-asset.ts'
 const assert=(v:unknown,message='Assertion failed')=>{if(!v)throw Error(message)}
-const key=btoa('01234567890123456789012345678901')
 const endpoint='https://project.invalid/functions/v1/private-media'
-const request=(query:string,token='allowed')=>new Request(endpoint+query,{headers:token?{Authorization:`Bearer ${token}`}:{}})
-async function harness() {
- const codec=await capsuleCodec(key);let allowed=true,calls=0
- const deps:MediaDependencies={...codec,endpoint,now:()=>1000000,
-  async authorize(req,path,playback){return allowed&&req.headers.get('Authorization')==='Bearer allowed'?playback?{playback_id:playback,expires_at:new Date(2000000).toISOString()}:{bucket:'post-images',path:path!}:null},
-  storage:p=>({url:'https://storage.invalid/'+p,headers:{Authorization:'Bearer service-secret'}}),
-  mux:async(p,k)=>`https://${k==='thumbnail'?'image':'stream'}.mux.com/${p}.${k==='thumbnail'?'jpg':'m3u8'}?token=provider-secret`,
-  fetch:async()=>{calls++;return new Response('private bytes',{headers:{'Content-Type':'image/jpeg'}})},
+const request=(body:unknown,token='allowed')=>new Request(endpoint,{method:'POST',body:JSON.stringify(body),headers:token?{Authorization:`Bearer ${token}`}:{}})
+const NOW=1000000
+function harness() {
+ const allowed=new Set(['owner/private-v1/photo.jpg','signed']);let signedPaths:string[]=[];const claims:Record<string,unknown>[]=[]
+ const deps:LinkDependencies={now:()=>NOW*1000,
+  async authorize(req,paths,playback){
+   if(req.headers.get('Authorization')!=='Bearer allowed')return null
+   return [...paths.filter(p=>allowed.has(p)).map(p=>({kind:'path' as const,media_key:p,expires_at:null})),
+    ...playback.filter(p=>allowed.has(p)).map(p=>({kind:'playback' as const,media_key:p,expires_at:new Date((NOW+3600)*1000).toISOString()}))]
+  },
+  async signPaths(paths){signedPaths=paths;return new Map(paths.map(p=>[p,'https://storage.invalid/sign/'+p+'?token=t']))},
+  async signMux(p,aud,exp,c){claims.push({...c,sub:p,aud,exp});return `${aud}-token`},
  }
- return {deps,handler:mediaHandler(deps),calls:()=>calls,revoke:()=>{allowed=false}}
+ return {deps,handler:linkHandler(deps),signedPaths:()=>signedPaths,claims,revoke:()=>allowed.clear()}
 }
-Deno.test('missing JWT, unrelated viewer and revoked viewer receive no private bytes',async()=>{
- const h=await harness()
- assert((await h.handler(request('?path=owner/photo.jpg',''))).status===401)
- assert((await h.handler(request('?path=owner/photo.jpg','outsider'))).status===404)
- assert(h.calls()===0)
- assert(await (await h.handler(request('?path=owner/photo.jpg'))).text()==='private bytes')
- h.revoke();assert((await h.handler(request('?path=owner/photo.jpg'))).status===404);assert(h.calls()===1)
+Deno.test('missing JWT and invalid session receive no links',async()=>{
+ const h=harness()
+ assert((await h.handler(request({paths:['owner/private-v1/photo.jpg']},''))).status===401)
+ assert((await h.handler(request({paths:['owner/private-v1/photo.jpg']},'outsider'))).status===401)
+ assert(h.signedPaths().length===0)
 })
-Deno.test('authorized Storage response is streamed without shared caching or service credential disclosure',async()=>{
- const h=await harness();const res=await h.handler(request('?path=owner/photo.jpg'))
- assert(res.headers.get('cache-control')?.includes('no-store'));assert(res.headers.get('vary')==='Authorization')
- assert(![...res.headers.values()].join('').includes('service-secret'));assert(await res.text()==='private bytes')
+Deno.test('only authorized items are signed; revoked viewers get nothing',async()=>{
+ const h=harness()
+ const res=await h.handler(request({paths:['owner/private-v1/photo.jpg','other/private-v1/x.jpg'],playback_ids:['signed','unknown']}))
+ const body=await res.json() as LinkResponse
+ assert(Object.keys(body.paths).join()==='owner/private-v1/photo.jpg');assert(h.signedPaths().join()==='owner/private-v1/photo.jpg')
+ assert(body.paths['owner/private-v1/photo.jpg'].expires_at===NOW+LINK_TTL_SECONDS)
+ assert(Object.keys(body.playback).join()==='signed')
+ assert(res.headers.get('cache-control')?.includes('no-store'))
+ h.revoke()
+ const after=await (await h.handler(request({paths:['owner/private-v1/photo.jpg'],playback_ids:['signed']}))).json() as LinkResponse
+ assert(Object.keys(after.paths).length===0&&Object.keys(after.playback).length===0)
 })
-Deno.test('HLS manifests encrypt every URI and require authorization again for copied segment URLs',async()=>{
- const h=await harness()
- h.deps.fetch=async()=>new Response('#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="key.bin?token=provider-secret"\n#EXT-X-MAP:URI="init.mp4"\nsegment.ts?token=provider-secret\n',{headers:{'Content-Type':'application/vnd.apple.mpegurl'}})
- const res=await h.handler(request('?playback_id=signed&kind=video'));assert(res.status===200)
- const body=await res.text();assert(!body.includes('provider-secret'));assert(!body.includes('stream.mux.com'))
- const urls=[...body.matchAll(/https:\/\/project.invalid[^"\s]+/g)].map(m=>m[0]);assert(urls.length===3)
- const copied=await h.handler(new Request(urls[2],{headers:{Authorization:'Bearer outsider'}}));assert(copied.status===404)
- h.revoke();assert((await h.handler(new Request(urls[2],{headers:{Authorization:'Bearer allowed'}}))).status===404)
+Deno.test('Mux links point at the CDN, expire with the post, and carry thumbnail options as claims',async()=>{
+ const h=harness();h.deps.authorize=async()=>[{kind:'playback',media_key:'signed',expires_at:new Date((NOW+60)*1000).toISOString()}]
+ const body=await (await h.handler(request({playback_ids:['signed'],poster_width:480}))).json() as LinkResponse
+ const link=body.playback.signed
+ assert(link.stream==='https://stream.mux.com/signed.m3u8?token=v-token');assert(link.poster==='https://image.mux.com/signed/thumbnail.jpg?token=t-token')
+ assert(link.expires_at===NOW+60)
+ const thumb=h.claims.find(c=>c.aud==='t')!;assert(thumb.width===480&&thumb.height===600&&thumb.time===0.5&&thumb.exp===NOW+60)
 })
-Deno.test('tampered, expired and non-Mux capsules cannot fetch an upstream resource',async()=>{
- const h=await harness()
- for(const cap of ['invalid',await h.deps.seal({playback:'p',url:'https://stream.mux.com/a',expires:999}),await h.deps.seal({playback:'p',url:'https://127.0.0.1/private',expires:2000})]) {
-  assert((await h.handler(request('?resource='+encodeURIComponent(cap)))).status>=400)
- }
- assert(h.calls()===0)
+Deno.test('expired parent gets no Mux link',async()=>{
+ const h=harness();h.deps.authorize=async()=>[{kind:'playback',media_key:'signed',expires_at:new Date((NOW-1)*1000).toISOString()}]
+ const body=await (await h.handler(request({playback_ids:['signed']}))).json() as LinkResponse
+ assert(Object.keys(body.playback).length===0);assert(h.claims.length===0)
 })
-Deno.test('Mux redirect to a non-Mux host is denied without forwarding a token',async()=>{
- const h=await harness();let calls=0
- h.deps.fetch=async()=>{calls++;return new Response(null,{status:302,headers:{Location:'https://attacker.invalid/'}})}
- assert((await h.handler(request('?playback_id=signed'))).status===502);assert(calls===1)
+Deno.test('malformed and oversized requests are rejected before authorization',async()=>{
+ const h=harness();let calls=0;const authorize=h.deps.authorize;h.deps.authorize=async(...a)=>{calls++;return authorize(...a)}
+ assert((await h.handler(request({paths:'x'}))).status===400)
+ assert((await h.handler(request({paths:Array.from({length:61},(_,i)=>'p'+i)}))).status===400)
+ assert((await h.handler(request({playback_ids:['a'],poster_width:5000}))).status===400)
+ assert((await h.handler(new Request(endpoint,{headers:{Authorization:'Bearer allowed'}}))).status===405)
+ assert(calls===0)
 })
-Deno.test('expired parent denies Mux playback even with valid identity',async()=>{
- const h=await harness();h.deps.authorize=async()=>({playback_id:'p',expires_at:new Date(500000).toISOString()})
- assert((await h.handler(request('?playback_id=p'))).status===404);assert(h.calls()===0)
+Deno.test('authorization never echoes an item that was not requested',async()=>{
+ const h=harness();h.deps.authorize=async()=>[{kind:'path',media_key:'someone/else.jpg',expires_at:null}]
+ const body=await (await h.handler(request({paths:['owner/private-v1/photo.jpg']}))).json() as LinkResponse
+ assert(Object.keys(body.paths).length===0)
+})
+Deno.test('Mux signer keeps reserved claims authoritative',async()=>{
+ const keys=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify'])
+ const der=new Uint8Array(await crypto.subtle.exportKey('pkcs8',keys.privateKey))
+ const pem='-----BEGIN PRIVATE KEY-----\n'+btoa(String.fromCharCode(...der))+'\n-----END PRIVATE KEY-----'
+ const sign=await muxSigner('key-id',btoa(pem));const jwt=await sign('asset','t',12345,{width:480,sub:'other',exp:99999999})
+ const claims=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(jwt.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))))
+ assert(claims.sub==='asset'&&claims.exp===12345&&claims.width===480)
 })
 Deno.test('Mux JWT uses verifiable RS256, exact asset, audience and expiry',async()=>{
  const keys=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify'])

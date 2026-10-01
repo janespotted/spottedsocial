@@ -1,4 +1,4 @@
-import { privateMediaUrl } from './private-media';
+import { resolvePrivateMedia } from './private-media';
 import type { Database } from './database.types';
 import { isDemoMode } from './demo-mode';
 import { fetchTagsForPosts, type TaggedFriend } from './post-tags';
@@ -29,6 +29,9 @@ export interface FeedPost {
   /** Mux video: playback id once encoded; status preparing | ready | errored. */
   mux_playback_id: string | null;
   mux_status: string | null;
+  /** Short-lived signed Mux links (lib/private-media); null until encoded or not visible. */
+  mux_stream_url: string | null;
+  mux_poster_url: string | null;
   venue_name: string | null;
   venue_id: string | null;
   created_at: string;
@@ -63,14 +66,13 @@ export async function hydratePosts(
   // count the actual rows and add them to the column value. The column is
   // only nonzero for seeded demo posts; live activity exists solely as
   // post_likes/post_comments rows.
-  const [profiles, { data: likeRows, error: likeError }, { data: commentRows, error: commentError }, imageUrls, tagsByPost] =
+  const [profiles, { data: likeRows, error: likeError }, { data: commentRows, error: commentError }, media, tagsByPost] =
     await Promise.all([
       fetchProfilesSafe(),
       supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds),
       supabase.from('post_comments').select('post_id').in('post_id', postIds),
-      // Uploaded posts store a private-bucket path in image_url — swap for a
-      // authenticated gateway URL. External demo imagery remains public.
-      resolvePostImageUrls(rows.map((p) => p.image_url)),
+      // One link request for the page's images AND videos (lib/private-media).
+      resolvePostMedia(rows),
       fetchTagsForPosts(postIds),
     ]);
   if (likeError || commentError) throw likeError ?? commentError;
@@ -90,7 +92,7 @@ export async function hydratePosts(
     id: p.id,
     user_id: p.user_id,
     text: p.text ?? '',
-    image_url: p.image_url ? (imageUrls.get(p.image_url) ?? null) : null,
+    image_url: p.image_url ? (media.images.get(p.image_url) ?? null) : null,
     media_path: postImageStoragePath(p.image_url),
     media_type: p.media_type,
     media_width: p.media_width,
@@ -98,6 +100,8 @@ export async function hydratePosts(
     media_hash: p.media_hash,
     mux_playback_id: p.mux_playback_id,
     mux_status: p.mux_status,
+    mux_stream_url: p.mux_playback_id ? (media.mux.get(p.mux_playback_id)?.stream ?? null) : null,
+    mux_poster_url: p.mux_playback_id ? (media.mux.get(p.mux_playback_id)?.poster ?? null) : null,
     venue_name: p.venue_name,
     venue_id: p.venue_id,
     created_at: p.created_at ?? new Date().toISOString(),
@@ -136,13 +140,15 @@ export async function fetchPostById(
 
 /**
  * The post-images bucket is private: uploaded posts store a storage path
- * (`userId/private-v1/timestamp.jpg`) in image_url. The authenticated gateway
- * rechecks the parent on every request. External demo imagery remains public.
+ * (`userId/private-v1/timestamp.jpg`) in image_url, exchanged for a
+ * short-lived signed URL by lib/private-media. Demo/seed posts store full
+ * http URLs and pass through as-is.
  */
 
 /**
  * Storage path behind an image_url value, or null for external http URLs.
- * Legacy public/signed Storage URLs are normalized to the same protected key.
+ * Also the stable cache key: signed URLs carry a fresh token every time
+ * they are minted, so caching by URL would re-download on every feed load.
  */
 export function postImageStoragePath(imageUrl: string | null): string | null {
   if (!imageUrl) return null;
@@ -152,16 +158,49 @@ export function postImageStoragePath(imageUrl: string | null): string | null {
   return null;
 }
 
-/** Returns an authenticated endpoint, never a transferable Storage signed URL. */
+/**
+ * Signed links for a page of posts: images by storage path, Mux videos by
+ * playback id, in one request. A failed request leaves media blank (the
+ * next refresh retries) rather than failing the whole feed.
+ */
+async function resolvePostMedia(
+  rows: ReadonlyArray<Pick<PostRow, 'image_url' | 'mux_playback_id'>>
+): Promise<{ images: Map<string, string | null>; mux: Map<string, { stream: string; poster: string }> }> {
+  const images = new Map<string, string | null>();
+  const paths: string[] = [];
+  for (const { image_url } of rows) {
+    if (!image_url || images.has(image_url)) continue;
+    const path = postImageStoragePath(image_url);
+    images.set(image_url, path ? null : image_url);
+    if (path) paths.push(path);
+  }
+  const playbackIds = rows.flatMap((r) => (r.mux_playback_id ? [r.mux_playback_id] : []));
+  try {
+    const links = await resolvePrivateMedia({ paths, playbackIds });
+    for (const url of images.keys()) {
+      const path = postImageStoragePath(url);
+      if (path) images.set(url, links.paths.get(path) ?? null);
+    }
+    return { images, mux: links.playback };
+  } catch (e) {
+    console.warn('[posts] media links failed', e);
+    return { images, mux: new Map() };
+  }
+}
+
 export async function resolvePostImageUrl(imageUrl: string | null): Promise<string | null> {
   if (!imageUrl) return null;
-  const path = postImageStoragePath(imageUrl);
-  return path ? privateMediaUrl({ path }) : imageUrl; // External seed/demo imagery stays public.
+  return (await resolvePostImageUrls([imageUrl])).get(imageUrl) ?? null;
 }
-export async function resolvePostImageUrls(imageUrls: ReadonlyArray<string | null>): Promise<Map<string, string | null>> {
-  const result = new Map<string, string | null>();
-  for (const url of imageUrls) if (url && !result.has(url)) result.set(url, await resolvePostImageUrl(url));
-  return result;
+
+/**
+ * Batch form for lists: one link request for a whole set instead of one
+ * per item. Returns a map keyed by the original image_url value.
+ */
+export async function resolvePostImageUrls(
+  imageUrls: ReadonlyArray<string | null>
+): Promise<Map<string, string | null>> {
+  return (await resolvePostMedia(imageUrls.map((image_url) => ({ image_url, mux_playback_id: null })))).images;
 }
 
 /**

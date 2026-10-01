@@ -100,8 +100,10 @@ async function uploadMedia(
       apikey: SUPABASE_PUBLISHABLE_KEY,
       'Content-Type': media.mimeType,
       'x-upsert': 'false',
-      // Access is rechecked on each authenticated gateway request.
-      'cache-control': 'private, no-store',
+      // Paths are unique per upload (userId/private-v1/timestamp), so the
+      // object never changes: let the CDN and every device cache it. Access
+      // is enforced when the signed link is issued (lib/private-media).
+      'cache-control': 'max-age=31536000, immutable',
     },
     onProgress: ({ bytesSent, totalBytes }) => {
       if (totalBytes > 0) onProgress?.(Math.min(1, bytesSent / totalBytes));

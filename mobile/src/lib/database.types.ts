@@ -1534,6 +1534,30 @@ export type Database = {
         }
         Relationships: []
       }
+      relationship_events: {
+        Row: {
+          created_at: string
+          id: number
+          kind: string
+          other_user_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          kind: string
+          other_user_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          kind?: string
+          other_user_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reports: {
         Row: {
           created_at: string | null
@@ -2525,6 +2549,7 @@ export type Database = {
       get_demo_status_locations: { Args: never; Returns: { user_id: string; lat: number; lng: number }[] }
       friendship_available: { Args: { p_other: string }; Returns: boolean }
       private_media_target: { Args: { p_path?: string | null; p_playback_id?: string | null }; Returns: Json }
+      private_media_targets: { Args: { p_paths?: string[]; p_playback_ids?: string[] }; Returns: { kind: string; media_key: string; expires_at: string | null }[] }
       can_upload_v1_media: { Args: { p_name: string }; Returns: boolean }
       replace_private_media_path: { Args: { p_old: string; p_new: string }; Returns: undefined }
       pending_private_media_cleanup: { Args: never; Returns: Database["public"]["Tables"]["media_object_deletions"]["Row"][] }

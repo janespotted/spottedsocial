@@ -1,7 +1,7 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { onRelationshipChanged } from '@/lib/relationship-events';
 import { onPrivateViewsInvalidated, privateViewRevision } from '@/lib/private-views';
 import { onNightBoundary } from '@/lib/night-boundary';
-import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useEffect, useRef } from 'react';
 import {
   ActionSheetIOS,
@@ -35,7 +35,6 @@ import { blockUser, reportContent } from '@/lib/moderation';
 import {
   POST_DETAIL_HOST,
   closePostDetail,
-  resetPostDetail,
   playPostDetailOpen,
   postDetailProgress,
   usePostDetail,
@@ -94,26 +93,23 @@ function PostDetail() {
   const sheetOnly = handedOver && mode === 'sheet';
   const teleported = handedOver && mode === 'reel' && !!origin;
 
-  // Deep-link path: nothing handed over, fetch the post ourselves.
+  // Deep-link path: nothing handed over, fetch the post ourselves. A
+  // handed-over post was read by the feed under RLS a moment ago; fetching
+  // it again here would hold back the PortalHost while the fly has already
+  // started, so the media would jump in late. Losing access while the reel
+  // is open is handled below by the relationship signal, not by polling.
   const fetched = useQuery({
     queryKey: ['post-detail', postId, session?.user.id],
-    enabled: !!postId && !!session,
+    enabled: !!postId && !!session && !handedOver,
     queryFn: () => fetchPostById(postId!, session!.user.id),
   });
-  const authorized = !!fetched.data?.post;
-  const post: FeedPost | null = authorized ? (handedOver ? handedPost : fetched.data!.post) : null;
+  const post: FeedPost | null = handedOver ? handedPost : (fetched.data?.post ?? null);
   const isLiked = handedOver ? handedLiked : (fetched.data?.isLiked ?? false);
-  const expired = !postId || (fetched.isSuccess && fetched.data === null);
+  const expired = !postId || (!handedOver && fetched.isSuccess && fetched.data === null);
 
   useEffect(() => {
-    if (expired || fetched.isError) { resetPostDetail(); invalidateFeed(); }
-  }, [expired, fetched.isError]);
-  useEffect(() => {
-    const clear = () => { resetPostDetail(); void sheetRef.current?.dismiss(); };
-    const stop = onPrivateViewsInvalidated(clear);
-    const boundary = onNightBoundary(clear);
-    return () => { stop(); boundary(); };
-  }, []);
+    if (expired) invalidateFeed();
+  }, [expired]);
 
   // Start the fly once the host is mounted and painted at the card's frame.
   // Without a teleport there is nothing to fly: land at 1 immediately.
@@ -134,13 +130,30 @@ function PostDetail() {
   // route, so it must be gone BEFORE the route goes (True Sheet's
   // documented blank-screen trap); dismiss() is a no-op when it is not up.
   const closing = useRef(false);
-  const close = async () => {
+  const close = async (animated = teleported) => {
     if (closing.current) return;
     closing.current = true;
     await sheetRef.current?.dismiss();
-    if (storePostId === postId && phase !== 'idle') closePostDetail({ animated: teleported });
+    if (storePostId === postId && phase !== 'idle') closePostDetail({ animated });
     else if (router.canGoBack()) router.back(); else router.replace('/');
   };
+  const closeRef = useRef(close);
+  closeRef.current = close;
+
+  // Leave at once (no fly) when the author unfriends or blocks the viewer,
+  // or drops them from close friends, when the night resets, or when the
+  // account changes. Closing through closePostDetail returns the media to
+  // its card before the route goes (CLAUDE.md "Close order").
+  const authorId = post?.user_id;
+  useEffect(() => {
+    const leave = () => void closeRef.current(false);
+    const stops = [
+      onRelationshipChanged((otherUserId) => { if (otherUserId === authorId) leave(); }),
+      onPrivateViewsInvalidated(leave),
+      onNightBoundary(leave),
+    ];
+    return () => { for (const stop of stops) stop(); };
+  }, [authorId]);
 
   // Android hardware back reverses the fly instead of popping under it.
   useEffect(() => {
@@ -306,7 +319,7 @@ function PostDetail() {
           hostStyle,
         ]}
       >
-        {teleported && authorized ? (
+        {teleported ? (
           <PortalHost name={POST_DETAIL_HOST} style={{ flex: 1 }} />
         ) : post && postHasMedia(post) ? (
           <PostMedia post={post} />
@@ -334,7 +347,7 @@ function PostDetail() {
           </Pressable>
         </View>
 
-        {!authorized && !expired ? (
+        {!post && !expired ? (
           <View className="flex-1 justify-center items-center">
             {fetched.isError ? <Text onPress={() => void fetched.refetch()} className="text-white">Could not load this post. Tap to retry.</Text> : <ActivityIndicator color={NEON} />}
           </View>

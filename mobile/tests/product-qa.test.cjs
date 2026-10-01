@@ -3,7 +3,7 @@ const {load,extract,callback,builder,flush,source}=require('./product-test-runti
 const threadState=load('lib/thread-state.ts');
 test('QA-01 unavailable shared post is bounded; eligible post appears on next scheduled revalidation',async()=>{
  let state=new Map(),queries=0,rows=[],timer;
- const scope={sharedPostIds:'p',refreshSharedPostsRef:{current:()=>{}},AppState:{currentState:'active'},setSharedPosts:x=>state=x,setThreadError:()=>{},supabase:{from:()=>{queries++;return builder({data:rows,error:null});}},fetchProfilesSafe:async()=>[{id:'a',display_name:'Jane'}],sharedPostResults:threadState.sharedPostResults,resolvePostImageUrl:async x=>x,muxThumbnailUrl:()=>'',onNightBoundary:()=>()=>{},setInterval:fn=>{timer=fn;return 1},clearInterval:()=>{}};
+ const scope={sharedPostIds:'p',refreshSharedPostsRef:{current:()=>{}},AppState:{currentState:'active'},setSharedPosts:x=>state=x,setThreadError:()=>{},supabase:{from:()=>{queries++;return builder({data:rows,error:null});}},fetchProfilesSafe:async()=>[{id:'a',display_name:'Jane'}],sharedPostResults:threadState.sharedPostResults,resolvePostImageUrls:async urls=>new Map(urls.filter(Boolean).map(u=>[u,u])),resolveMuxPosters:async()=>new Map(),onNightBoundary:()=>()=>{},setInterval:fn=>{timer=fn;return 1},clearInterval:()=>{}};
  const effect=callback('app/thread.tsx','useFocusEffect','sharedPostResults',scope);
  assert.equal(effect.deps,'[sharedPostIds]');const stop=effect.fn();await flush();
  assert.equal(state.get('p'),null);assert.equal(queries,1);
@@ -62,13 +62,23 @@ test('QA-09 check-in uses one atomic RPC; local resume failure never reports com
   const result=await api.goOutAtVenue('a',{venue:{id:null,name:'Test'}});assert.equal(calls,1);assert.equal(result.gpsShared,false);assert.equal(result.trackingReady,!failed);
  }
 });
-test('QA-13/16 sensitive query policy hides stale denied data, distinguishes failure, and retains authorized data',()=>{
+test('QA-13/16 private queries keep authorized data through a failed refetch and never poll',()=>{
  let response={data:['allowed'],isError:false},options;
  const api=load('hooks/use-private-query.ts',{'@tanstack/react-query':{useQuery:o=>{options=o;return response;}}});
- assert.equal(api.usePrivateQuery({queryKey:['x']}).data[0],'allowed');
- response={data:['previously-private'],isError:true};const denied=api.usePrivateQuery({queryKey:['x']});assert.equal(denied.data,undefined);assert.equal(denied.isError,true);
- assert.equal(options.refetchInterval,15000);assert.equal(options.retry,false);assert.equal(options.refetchOnMount,'always');
+ assert.equal(api.usePrivateQuery({queryKey:['x'],staleTime:30000}).data[0],'allowed');
+ // A network blip is not a revocation: revocation is RLS + the relationship signal.
+ response={data:['allowed'],isError:true};const blip=api.usePrivateQuery({queryKey:['x']});assert.equal(blip.data[0],'allowed');assert.equal(blip.isError,true);
+ api.usePrivateQuery({queryKey:['x'],staleTime:30000});assert.equal(options.refetchInterval,undefined);assert.equal(options.staleTime,30000);
  response={data:[],isError:false};assert.equal(api.usePrivateQuery({queryKey:['x']}).data.length,0);
+});
+test('QA-13 relationship signal reaches screens first, then refetches every private view',()=>{
+ const order=[];let handler;
+ const api=load('lib/relationship-events.ts',{'./private-media':{forgetPrivateMediaLinks:()=>order.push('forget')},'./private-views':{PRIVATE_VIEW_KEYS:['friend-ids','post-detail']},
+  './resilient-channel':{createResilientChannel:config=>{config.configure({on:(_t,filter,fn)=>{assert.equal(filter.table,'relationship_events');assert.equal(filter.filter,'user_id=eq.viewer');handler=fn;return{}}});return()=>{}}}});
+ api.onRelationshipChanged(other=>order.push('screen:'+other));
+ api.subscribeRelationshipEvents('viewer',{invalidateQueries:({queryKey})=>order.push('refetch:'+queryKey[0])});
+ handler({new:{other_user_id:'ex-friend'}});
+ assert.deepEqual(order,['forget','screen:ex-friend','refetch:friend-ids','refetch:post-detail']);
 });
 test('QA-13/20/21 privacy and 5AM reset cancels old reads before clearing every sensitive parent and child',()=>{
  const api=load('lib/private-views.ts');let redacted=0,calls=[];api.onPrivateViewsInvalidated(()=>redacted++);
@@ -98,10 +108,22 @@ test('QA-16/20 failed plan child reads cannot masquerade as empty; authorized em
  for(const name of ['fetchPlanDowns','fetchPlanParticipants','fetchPlanComments']){if(denied)await assert.rejects(api[name]('p'),/offline/);else assert.equal((await api[name]('p')).length,0);}
  }
 });
-test('QA-25 eligible mutual realtime event triggers canonical feed read, without a direct-friend filter',()=>{
- let refreshed=0,listener;const effect=callback('hooks/use-feed.ts','useEffect',"name: 'feed-realtime'",{userId:'viewer',friendIds:['direct'],refresh:()=>refreshed++,createResilientChannel:config=>{config.configure({on:(...args)=>{listener=args.at(-1)}});return()=>{}}});
- effect.fn();listener({new:{user_id:'eligible-mutual'}});assert.equal(refreshed,1);
- listener({new:{user_id:'revoked'}});assert.equal(refreshed,2); // RPC/RLS, not the event payload, decides visibility.
+test('QA-25 realtime posts: RLS-delivered mutual post is hydrated and shown without a direct-friend filter; deletes drop; failures re-read',async()=>{
+ let posts=[],refreshed=0,fail=false;const listeners={};
+ const effect=callback('hooks/use-feed.ts','useEffect',"name: 'feed-realtime'",{userId:'viewer',friendIds:['direct'],refresh:()=>refreshed++,runOrDefer:fn=>fn(),setPosts:f=>posts=f(posts),isDemoMode:()=>false,getSessionRevision:()=>1,
+  hydratePosts:async rows=>{if(fail)throw Error('offline');return{posts:rows.map(r=>({id:r.id,user_id:r.user_id})),likedByMe:new Set()}},
+  createResilientChannel:config=>{const ch={on:(_t,f,fn)=>{listeners[f.event]=fn;return ch}};config.configure(ch);return()=>{}}});
+ effect.fn();
+ await listeners.INSERT({new:{id:'m1',user_id:'eligible-mutual',expires_at:new Date(Date.now()+3600e3).toISOString()}});
+ assert.equal(posts[0].id,'m1'); // RPC/RLS, not a client friend list, decides visibility.
+ await listeners.INSERT({new:{id:'old',user_id:'direct',expires_at:new Date(Date.now()-1).toISOString()}});assert.equal(posts.length,1);
+ listeners.DELETE({old:{id:'m1'}});assert.equal(posts.length,0);
+ fail=true;await listeners.INSERT({new:{id:'m2',user_id:'direct',expires_at:new Date(Date.now()+3600e3).toISOString()}});assert.equal(refreshed,1);
+});
+test('QA-25 unfriend removes that author from the feed at once and re-reads',()=>{
+ let posts=[{id:'1',user_id:'ex'},{id:'2',user_id:'stays'}],refreshed=0,listener;
+ const effect=callback('hooks/use-feed.ts','useEffect','onRelationshipChanged',{onRelationshipChanged:fn=>{listener=fn;return()=>{}},runOrDefer:fn=>fn(),setPosts:f=>posts=f(posts),refresh:()=>refreshed++});
+ effect.fn();listener('ex');assert.deepEqual(posts.map(p=>p.id),['2']);assert.equal(refreshed,1);
 });
 test('QA-27 standalone Like toggles cached state and rolls back failed writes',async()=>{
  for(const fails of [false,true]){

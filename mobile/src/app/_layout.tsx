@@ -28,6 +28,7 @@ import { PushNotificationManager } from '@/components/push-notification-manager'
 import { ToastHost } from '@/components/toast-host';
 import { hydrateDemoMode } from '@/lib/demo-mode';
 import { queryClient } from '@/lib/query-client';
+import { subscribeRelationshipEvents } from '@/lib/relationship-events';
 
 // Native splash only: the lime S on midnight stays up until fonts and the
 // session are known, then fades out over the real first screen.
@@ -43,6 +44,14 @@ function SplashController() {
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync().catch(() => {});
   }, [loading]);
+  return null;
+}
+
+/** Unfriend / block / close-friend removal reaches every screen at once. */
+function RelationshipEvents() {
+  const { session } = useSession();
+  const userId = session?.user.id;
+  useEffect(() => (userId ? subscribeRelationshipEvents(userId, queryClient) : undefined), [userId]);
   return null;
 }
 
@@ -263,6 +272,7 @@ export default function RootLayout() {
                     <PortalProvider>
                       <RootNavigator />
                     </PortalProvider>
+                    <RelationshipEvents />
                     <NightStatusGate />
                     <BackgroundLocationManager />
                     <PushNotificationManager />

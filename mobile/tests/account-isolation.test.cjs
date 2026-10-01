@@ -51,14 +51,25 @@ test('A response body completing after B login is rejected',async()=>{
  const response=await identity.sessionFetch('https://synthetic.invalid/private');const decoded=response.json();
  identity.setSessionIdentity('B','b');finish();await assert.rejects(decoded,/Account changed/);
 });
-test('media endpoint uses current identity, never sends app credentials to external URLs',()=>{
- const {identity}=harness();identity.setSessionIdentity('A','token-a');
- const media=load('private-media.ts',{'./supabase':{SUPABASE_URL:'https://project.invalid',SUPABASE_PUBLISHABLE_KEY:'public-key'},'./session-identity':identity});
- const raw='https://project.invalid/storage/v1/object/public/post-images/A/photo.jpg';
- const a=media.privateMediaSource(raw);assert.equal(a.headers.Authorization,'Bearer token-a');assert(a.uri.includes('/functions/v1/private-media?'));
- identity.setSessionIdentity('B','token-b');const b=media.privateMediaSource(raw);
- assert.equal(b.headers.Authorization,'Bearer token-b');assert.notEqual(a.cacheKey,b.cacheKey);
- assert.equal(media.privateMediaSource('https://external.invalid/demo.jpg').headers,undefined);
+test('media links: one batched request, fresh links reused, unauthorized items dropped, cleared on account change',async()=>{
+ const {identity}=harness();identity.setSessionIdentity('A','token-a');const asked=[];let allow=true;
+ const now=Math.floor(Date.now()/1000);
+ const invoke=async(name,{body})=>{asked.push({name,...body});const ok=p=>allow&&!p.startsWith('other/');
+  return{data:{paths:Object.fromEntries(body.paths.filter(ok).map(p=>[p,{url:'https://project.invalid/storage/v1/object/sign/post-images/'+p+'?token=x',expires_at:now+1800}])),
+   playback:Object.fromEntries(body.playback_ids.filter(()=>allow).map(id=>[id,{stream:'https://stream.mux.com/'+id+'.m3u8?token=v',poster:'https://image.mux.com/'+id+'/thumbnail.jpg?token=t',expires_at:now+1800}]))},error:null}};
+ const media=load('private-media.ts',{'./supabase':{supabase:{functions:{invoke}}},'./session-identity':identity});
+ const first=await media.resolvePrivateMedia({paths:['A/private-v1/1.jpg','other/private-v1/2.jpg'],playbackIds:['vid']});
+ assert.equal(asked.length,1);assert.equal(asked[0].name,'private-media');
+ assert.equal(first.paths.get('A/private-v1/1.jpg').includes('/object/sign/'),true);assert.equal(first.paths.has('other/private-v1/2.jpg'),false);
+ assert.equal(first.playback.get('vid').stream,'https://stream.mux.com/vid.m3u8?token=v');
+ // A refresh inside the link lifetime costs no request and keeps the same URL (no re-download, no player restart).
+ const again=await media.resolvePrivateMedia({paths:['A/private-v1/1.jpg'],playbackIds:['vid']});
+ assert.equal(asked.length,1);assert.equal(again.paths.get('A/private-v1/1.jpg'),first.paths.get('A/private-v1/1.jpg'));
+ assert.equal(media.signedStoragePath(first.paths.get('A/private-v1/1.jpg')),'A/private-v1/1.jpg');
+ // Account change forgets every link; the next account asks the server itself.
+ identity.setSessionIdentity('B','token-b');allow=false;
+ const b=await media.resolvePrivateMedia({paths:['A/private-v1/1.jpg'],playbackIds:['vid']});
+ assert.equal(asked.length,2);assert.equal(b.paths.size,0);assert.equal(b.playback.size,0);
 });
 test('post audience preference is per-account and a delayed A preference cannot populate B',async()=>{
  const {identity}=harness();const saved=new Map();let delay=null;
@@ -70,12 +81,14 @@ test('post audience preference is per-account and a delayed A preference cannot 
 
 test('account boundary clears private module stores before returning and changes the React tree key',()=>{
  const {identity}=harness();const calls=[];
- const mocks={react:{useSyncExternalStore:(_subscribe,get)=>get()},'react/jsx-runtime':{jsx:(type,props,key)=>({type,props,key})},'@/lib/session-identity':identity};
+ const mocks={react:{useSyncExternalStore:(_subscribe,get)=>get()},'react/jsx-runtime':{jsx:(type,props,key)=>({type,props,key})},'@/lib/session-identity':identity,'expo-image':{Image:{clearMemoryCache:()=>{calls.push('clearMemoryCache');return Promise.resolve(true)},clearDiskCache:()=>{calls.push('clearDiskCache');return Promise.resolve(true)}}}};
  for(const [module,names] of Object.entries({'post-detail':['resetPostDetail'],'audience':['clearAudienceRequest'],'tag-picker':['clearTagRequest'],'country-codes':['clearCountryRequest'],'toast':['dismissToast'],'night-status':['invalidateOutStatusCache'],'night-gate':['setNightGateState','takePendingDeepLink'],'map-filters':['resetMapFilters'],'tonight':['setActiveCity'],'venue-arrival-engine':['resetDwellTracker']}))mocks['@/lib/'+module]=Object.fromEntries(names.map(n=>[n,()=>calls.push(n)]));
  mocks['@/lib/background-location']={stopBackgroundLocation:()=>{calls.push('stopBackgroundLocation');return Promise.resolve()}};
  const scope=load('../components/account-scope.tsx',mocks);identity.setSessionIdentity('A','a');const a=scope.AccountScope({children:'private A'});calls.length=0;
  identity.setSessionIdentity('B','b');const b=scope.AccountScope({children:'B'});
- assert.notEqual(a.key,b.key);assert.equal(calls.length,12);assert(calls.includes('resetPostDetail'));assert(calls.includes('stopBackgroundLocation'));
+ assert.notEqual(a.key,b.key);assert.equal(calls.length,14);assert(calls.includes('resetPostDetail'));
+ // Disk-cached media of the previous account is never served to the next one.
+ assert(calls.includes('clearMemoryCache'));assert(calls.includes('clearDiskCache'));assert(calls.includes('stopBackgroundLocation'));
 });
 test('post detail reset removes Account A content and callbacks without invoking them',()=>{
  let routed=0,privateCallback=0;

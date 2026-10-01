@@ -1,13 +1,11 @@
-import { getSessionAccessToken, onSessionTokenChange } from '@/lib/session-identity';
-import { privateMediaSource } from '@/lib/private-media';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Image } from '@/components/styled';
 import { useEvent } from 'expo';
 import { SymbolView } from 'expo-symbols';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import type { FeedPost } from '@/lib/posts';
-import { muxHlsUrl, muxPlaybackState, muxThumbnailUrl } from '@/lib/mux';
+import { muxPlaybackState } from '@/lib/mux';
 import { NEON } from '@/lib/theme';
 
 /** Feed media is full-bleed 4:5: height = width × this. */
@@ -32,13 +30,21 @@ export function postHasMedia(post: FeedPost): boolean {
  * the manifest loads; legacy Storage videos play from their signed URL.
  */
 function PostVideo({
-  uri,
+  uri: latestUri,
+  sourceKey,
   poster,
   isVisible,
   showMuteButton,
   muteTop,
 }: {
   uri: string;
+  /**
+   * What the video IS (playback id / storage path). Signed links are
+   * re-minted every ~25 minutes; a new token for the same video must not
+   * hand the player a new source, which would restart it — including while
+   * it is teleported into the reel.
+   */
+  sourceKey: string;
   poster?: string | null;
   isVisible: boolean;
   showMuteButton: boolean;
@@ -47,9 +53,11 @@ function PostVideo({
   // Videos play WITH sound (client, Sept 2026). The mute control is kept
   // behind `showMuteButton` — currently off everywhere — because it is
   // likely to come back; the player state below is what it needs.
-  useSyncExternalStore(onSessionTokenChange, getSessionAccessToken, getSessionAccessToken);
+  const pinned = useRef({ key: sourceKey, uri: latestUri });
+  if (pinned.current.key !== sourceKey) pinned.current = { key: sourceKey, uri: latestUri };
+  const uri = pinned.current.uri;
   const [muted, setMuted] = useState(false);
-  const player = useVideoPlayer({ ...privateMediaSource(uri), useCaching: false, contentType: uri.includes('playback_id=') && uri.includes('kind=video') ? 'hls' : 'auto' }, (p) => {
+  const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.play();
   });
@@ -83,7 +91,8 @@ function PostVideo({
       {showPoster ? (
         <Image
           pointerEvents="none"
-          source={{ uri: poster }}
+          // Tokenised URL; the playback id is the stable cache key.
+          source={{ uri: poster, cacheKey: `mux-poster:${sourceKey}` }}
           className="absolute inset-0"
           contentFit="cover"
           transition={0}
@@ -112,8 +121,12 @@ function PostVideo({
   );
 }
 
-/** Mux still encoding (a few seconds for a 14 s clip) or gave up. */
-function VideoPending({ errored }: { errored: boolean }) {
+/**
+ * Mux still encoding (a few seconds for a 14 s clip) or gave up. `label`
+ * false: encoded, but the signed link has not arrived (it comes with the
+ * next refresh) — a bare spinner, not "processing".
+ */
+function VideoPending({ errored, label = true }: { errored: boolean; label?: boolean }) {
   return (
     <View className="w-full h-full items-center justify-center gap-3 bg-[#0b0618]">
       {errored ? (
@@ -121,9 +134,11 @@ function VideoPending({ errored }: { errored: boolean }) {
       ) : (
         <ActivityIndicator color={NEON} />
       )}
-      <Text className="text-white/55 text-xs font-sans-medium">
-        {errored ? "This video couldn't be processed" : 'Video is processing…'}
-      </Text>
+      {label ? (
+        <Text className="text-white/55 text-xs font-sans-medium">
+          {errored ? "This video couldn't be processed" : 'Video is processing…'}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -157,23 +172,25 @@ export function PostMedia({
 }) {
   if (isMuxVideoPost(post)) {
     const muxState = muxPlaybackState(post.mux_status, post.mux_playback_id);
-    return muxState === 'ready' && post.mux_playback_id ? (
-      <PostVideo
-        uri={muxHlsUrl(post.mux_playback_id)}
-        poster={muxThumbnailUrl(post.mux_playback_id)}
-        isVisible={isVisible}
-        showMuteButton={showMuteButton}
-        muteTop={muteTop}
-      />
-    ) : (
-      <VideoPending errored={muxState === 'errored'} />
-    );
+    if (muxState === 'ready' && post.mux_playback_id && post.mux_stream_url)
+      return (
+        <PostVideo
+          uri={post.mux_stream_url}
+          sourceKey={post.mux_playback_id}
+          poster={post.mux_poster_url}
+          isVisible={isVisible}
+          showMuteButton={showMuteButton}
+          muteTop={muteTop}
+        />
+      );
+    return <VideoPending errored={muxState === 'errored'} label={muxState !== 'ready'} />;
   }
   if (!post.image_url) return null;
   if (post.media_type === 'video')
     return (
       <PostVideo
         uri={post.image_url}
+        sourceKey={post.media_path ?? post.image_url}
         isVisible={isVisible}
         showMuteButton={showMuteButton}
         muteTop={muteTop}
@@ -181,7 +198,8 @@ export function PostMedia({
     );
   return (
     <Image
-      // SecureImage replaces private cache keys and disables native byte caching.
+      // cacheKey: signed URLs change every mint, the path never does —
+      // without it every feed refresh re-downloads every image.
       source={{ uri: post.image_url, cacheKey: post.media_path ?? undefined }}
       placeholder={post.media_hash ? { thumbhash: post.media_hash } : undefined}
       placeholderContentFit="cover"

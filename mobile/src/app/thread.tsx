@@ -37,8 +37,8 @@ import {
   type DmMessage,
 } from '@/lib/dm';
 import { fetchProfilesSafe } from '@/lib/profiles';
-import { muxThumbnailUrl } from '@/lib/mux';
-import { resolvePostImageUrl } from '@/lib/posts';
+import { resolveMuxPosters } from '@/lib/mux';
+import { resolvePostImageUrl, resolvePostImageUrls } from '@/lib/posts';
 import { isFromTonight } from '@/lib/time-context';
 import { useSession } from '@/hooks/use-session';
 import { useTypingIndicator } from '@/hooks/use-typing-indicator';
@@ -346,8 +346,8 @@ export default function ThreadScreen() {
     const ids = sharedPostIds ? sharedPostIds.split(',') : [];
     const refresh = async () => {
       const request = ++generation;
-      setSharedPosts(new Map());
-      if (!ids.length) return;
+      // Keep the previous results on screen until the new ones replace them.
+      if (!ids.length) { setSharedPosts(new Map()); return; }
       try {
         const [{ data: posts, error }, profiles] = await Promise.all([
           supabase.from('posts').select('id,text,image_url,media_type,mux_playback_id,venue_name,user_id').in('id', ids),
@@ -355,12 +355,17 @@ export default function ThreadScreen() {
         ]);
         if (error) throw error;
         const profileMap = new Map(profiles.map(p => [p.id, p]));
-        const resolved = await Promise.all((posts ?? []).map(async p => ({
+        const isMux = (p: { media_type: string | null; image_url: string | null; mux_playback_id: string | null }) =>
+          p.media_type === 'video' && !p.image_url && !!p.mux_playback_id;
+        const [images, posters] = await Promise.all([
+          resolvePostImageUrls((posts ?? []).filter(p => !isMux(p)).map(p => p.image_url)),
+          resolveMuxPosters((posts ?? []).filter(isMux).map(p => p.mux_playback_id!), 480),
+        ]);
+        const resolved = (posts ?? []).map(p => ({
           id: p.id, text: p.text, venue_name: p.venue_name,
           author_name: profileMap.get(p.user_id)?.display_name ?? 'Someone',
-          image_url: p.media_type === 'video' && !p.image_url && p.mux_playback_id
-            ? muxThumbnailUrl(p.mux_playback_id, { width: 480 }) : await resolvePostImageUrl(p.image_url),
-        })));
+          image_url: isMux(p) ? posters.get(p.mux_playback_id!) ?? null : p.image_url ? images.get(p.image_url) ?? null : null,
+        }));
         if (active && request === generation) setSharedPosts(sharedPostResults(ids, resolved));
       } catch {
         if (active && request === generation) {

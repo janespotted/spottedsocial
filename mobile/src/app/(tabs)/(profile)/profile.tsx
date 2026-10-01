@@ -12,7 +12,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { supabase } from '@/lib/supabase';
 import { getVenuePhotoUrl } from '@/lib/venues';
-import { muxThumbnailUrl } from '@/lib/mux';
+import { resolveMuxPosters } from '@/lib/mux';
+import { resolvePostImageUrls } from '@/lib/posts';
 import { stopSharing } from '@/lib/night-status';
 import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
@@ -51,6 +52,8 @@ interface ProfileData {
     text: string;
     likes_count: number | null;
     comments_count: number | null;
+    /** Signed grid thumbnail: the photo, or the video's poster frame. */
+    thumb_url: string | null;
   }>;
   inviteCode: string | null;
 }
@@ -99,13 +102,28 @@ async function fetchProfileData(userId: string): Promise<ProfileData> {
     if (recentSpots.length >= 9) break;
   }
 
+  // One link request each for the grid's photos and video posters.
+  const rows = postsRes.data ?? [];
+  const [images, posters] = await Promise.all([
+    resolvePostImageUrls(rows.filter((p) => p.media_type !== 'video').map((p) => p.image_url)),
+    resolveMuxPosters(rows.flatMap((p) => (p.media_type === 'video' && p.mux_playback_id ? [p.mux_playback_id] : [])), 480)
+      .catch(() => new Map<string, string>()),
+  ]);
+  const posts = rows.map((p) => ({
+    ...p,
+    thumb_url:
+      p.media_type === 'video'
+        ? (p.mux_playback_id ? posters.get(p.mux_playback_id) ?? null : null)
+        : p.image_url ? images.get(p.image_url) ?? null : null,
+  }));
+
   return {
     profile: profileRes.data ?? null,
     placesCount: new Set(checkins.map((c) => c.venue_name)).size,
     weeklyCount: checkins.filter((c) => c.started_at && c.started_at > weekAgo).length,
     recentSpots,
     wishlist: wishlistRes.data ?? [],
-    posts: postsRes.data ?? [],
+    posts,
     inviteCode: inviteRes.data?.code ?? null,
   };
 }
@@ -531,13 +549,7 @@ export default function ProfileScreen() {
                 <GridTile
                   key={post.id}
                   label={`♥ ${post.likes_count ?? 0} · 💬 ${post.comments_count ?? 0}`}
-                  imageUrl={
-                    post.media_type === 'video'
-                      ? post.mux_playback_id
-                        ? muxThumbnailUrl(post.mux_playback_id, { width: 480 })
-                        : null
-                      : post.image_url
-                  }
+                  imageUrl={post.thumb_url}
                 />
               ))}
             </View>

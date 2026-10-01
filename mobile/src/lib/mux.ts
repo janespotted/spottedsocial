@@ -1,21 +1,21 @@
-import { privateMediaUrl } from './private-media';
+import { resolvePrivateMedia } from './private-media';
 
 export type MuxStatus = 'preparing' | 'ready' | 'errored';
 
-/** HLS manifest; AVPlayer (expo-video) and ExoPlayer play it natively. */
-export function muxHlsUrl(playbackId: string): string {
-  return privateMediaUrl({ playback_id: playbackId, kind: 'video' });
-}
-
 /**
- * Poster frame, cropped to the feed's 4:5 so it lines up with the player
- * that replaces it. Stable per playback id, so it caches like any image.
+ * Mux playback is signed-only: the HLS manifest
+ * (`stream.mux.com/{id}.m3u8?token=`) and the poster frame
+ * (`image.mux.com/{id}/thumbnail.jpg?token=`, cropped 4:5 so it lines up
+ * with the player that replaces it) come from lib/private-media. Feed posts
+ * carry them as `mux_stream_url` / `mux_poster_url`; other lists use this
+ * batch helper for poster frames at their own size.
  */
-export function muxThumbnailUrl(
-  playbackId: string,
-  { width = 1080, height = Math.round(width * 1.25), time = 0.5 } = {}
-): string {
-  return privateMediaUrl({ playback_id: playbackId, kind: 'thumbnail', width: String(width), height: String(height), time: String(time) });
+export async function resolveMuxPosters(
+  playbackIds: readonly string[],
+  width = 1080
+): Promise<Map<string, string>> {
+  const { playback } = await resolvePrivateMedia({ playbackIds, posterWidth: width });
+  return new Map([...playback].map(([id, link]) => [id, link.poster]));
 }
 
 /** What the feed should draw for a video post. */

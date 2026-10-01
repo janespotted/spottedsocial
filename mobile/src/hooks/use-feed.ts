@@ -1,12 +1,13 @@
-import { AppState } from 'react-native';
 import { onPrivateViewsInvalidated } from '@/lib/private-views';
+import { onRelationshipChanged } from '@/lib/relationship-events';
+import type { Database } from '@/lib/database.types';
 import { getSessionRevision } from '@/lib/session-identity';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { isDemoMode } from '@/lib/demo-mode';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { supabase } from '@/lib/supabase';
-import { isPostDetailActive, onPostDetailClosed, resetPostDetail } from '@/lib/post-detail';
+import { isPostDetailActive, onPostDetailClosed } from '@/lib/post-detail';
 import {
   hydratePosts,
   onCommentAdded,
@@ -17,6 +18,7 @@ import { useFriendIds } from './use-friend-ids';
 import { useSession } from './use-session';
 
 const POSTS_PER_PAGE = 10;
+type PostRow = Database['public']['Tables']['posts']['Row'];
 
 // The post shape lives with its hydration in lib/posts.ts; re-exported so
 // every existing `import type { FeedPost } from '@/hooks/use-feed'` holds.
@@ -110,6 +112,10 @@ export function useFeed() {
   // changes are queued here and replayed the moment the detail closes
   // (POST-DETAIL-PLAN.md §4.5).
   const deferred = useRef<Array<() => void>>([]);
+  const runOrDefer = useCallback((fn: () => void) => {
+    if (isPostDetailActive()) deferred.current.push(fn);
+    else fn();
+  }, []);
   useEffect(
     () =>
       onPostDetailClosed(() => {
@@ -134,7 +140,7 @@ export function useFeed() {
       if (isPostDetailActive()) {
         // Replayed when the detail closes; a pull can't happen while the
         // list is scroll-locked, so there is no spinner to honour here.
-        deferred.current = [() => void refresh(opts)];
+        deferred.current.push(() => void refresh(opts));
         return Promise.resolve();
       }
       if (opts?.userInitiated) setIsRefreshing(true);
@@ -154,7 +160,9 @@ export function useFeed() {
           setIsError(false);
         } catch (e) {
           if (started !== generation.current || revision !== getSessionRevision()) return;
-          setPosts([]); setLikedPosts(new Set());
+          // Keep what is on screen: a network blip is not a revocation (RLS
+          // and the relationship signal handle that). The screen shows the
+          // error only when there is nothing to show.
           console.warn('[feed] refresh failed', e);
           setIsError(true);
         } finally {
@@ -211,29 +219,87 @@ export function useFeed() {
     []
   );
 
-  // Re-read with the same server authorization as initial load, including mutuals.
+  // Realtime: prepend new posts, drop deleted ones, and swap in a video once
+  // Mux finishes encoding. RLS scopes what postgres_changes delivers (own,
+  // friends' and mutual-audience posts), and each row goes through the same
+  // hydration as a page, so it arrives with its signed media links.
   useEffect(() => {
     if (!userId || friendIds === undefined) return;
-    return createResilientChannel({
-      name: 'feed-realtime', onReconnect: () => void refresh(),
-      configure: ch => ch.on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => void refresh()),
-    });
-  }, [userId, friendIds, refresh]);
-
-  useEffect(() => {
-    const redact = () => {
-      ++generation.current;
-      deferred.current = [];
-      resetPostDetail();
-      setPosts([]); setLikedPosts(new Set());
+    const hydrateOne = async (row: PostRow): Promise<FeedPost | null> => {
+      if (row.is_demo && !isDemoMode()) return null;
+      if (row.expires_at && Date.parse(row.expires_at) <= Date.now()) return null;
+      const revision = getSessionRevision();
+      const { posts: [post] } = await hydratePosts([row], userId);
+      return revision === getSessionRevision() ? (post ?? null) : null;
     };
-    const stop = onPrivateViewsInvalidated(() => { redact(); void refresh(); });
-    const sub = AppState.addEventListener('change', state => {
-      if (state !== 'active') redact(); else void refresh();
+    return createResilientChannel({
+      name: 'feed-realtime',
+      onReconnect: () => void refresh(),
+      configure: (ch) =>
+        ch
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => {
+            const row = payload.new as PostRow;
+            if (!row?.id) return;
+            try {
+              const post = await hydrateOne(row);
+              if (post) runOrDefer(() => setPosts((prev) => (prev.some((x) => x.id === post.id) ? prev : [post, ...prev])));
+            } catch {
+              void refresh();
+            }
+          })
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
+            const id = (payload.old as { id?: string })?.id;
+            if (id) runOrDefer(() => setPosts((prev) => prev.filter((x) => x.id !== id)));
+          })
+          // Mux finishing an encode: the webhook updates the row and the
+          // processing tile becomes a player without a refresh.
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, async (payload) => {
+            const row = payload.new as PostRow;
+            if (!row?.id) return;
+            try {
+              const post = await hydrateOne(row);
+              runOrDefer(() =>
+                setPosts((prev) =>
+                  post ? prev.map((x) => (x.id === post.id ? post : x)) : prev.filter((x) => x.id !== row.id)
+                )
+              );
+            } catch {
+              void refresh();
+            }
+          }),
     });
-    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 15_000);
-    return () => { ++generation.current; stop(); sub.remove(); clearInterval(timer); };
-  }, [refresh]);
+  }, [userId, friendIds, refresh, runOrDefer]);
+
+  // Someone unfriended / blocked / dropped from close friends: their posts
+  // leave the feed at once, then page one is re-read under the new RLS. An
+  // open reel of theirs closes itself first (app/post-detail.tsx), and the
+  // deferral holds this until the media is back in its card.
+  useEffect(
+    () =>
+      onRelationshipChanged((otherUserId) =>
+        runOrDefer(() => {
+          setPosts((prev) => prev.filter((p) => p.user_id !== otherUserId));
+          void refresh();
+        })
+      ),
+    [refresh, runOrDefer]
+  );
+
+  // Account change, own block/hide, night reset: drop everything and re-read.
+  useEffect(() => {
+    const stop = onPrivateViewsInvalidated(() =>
+      runOrDefer(() => {
+        ++generation.current;
+        setPosts([]);
+        setLikedPosts(new Set());
+        void refresh();
+      })
+    );
+    return () => {
+      ++generation.current;
+      stop();
+    };
+  }, [refresh, runOrDefer]);
 
   const toggleLike = useCallback(
     async (postId: string) => {
@@ -298,7 +364,9 @@ export function useFeed() {
     [session, refresh]
   );
 
-  return { posts, likedPosts, isLoading, isRefreshing, isError, hasMore, refresh, loadMore, toggleLike, deletePost };
+  // An error only replaces the feed when there is nothing to show; a failed
+  // background refresh keeps the posts already on screen.
+  return { posts, likedPosts, isLoading, isRefreshing, isError: isError && posts.length === 0, hasMore, refresh, loadMore, toggleLike, deletePost };
 }
 
 export function getTimeAgo(iso: string): string {

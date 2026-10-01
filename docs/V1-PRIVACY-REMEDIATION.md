@@ -48,7 +48,7 @@ Preflight against the real schema/data:
 
 Review/deploy the two new Edge Functions `private-media` and `private-media-cleanup`, and changes to `mux-create-upload`, `mux-webhook`, `delete-account` and `_shared/mux`. No function is deployed by these migration files. Review `supabase/config.toml`: `private-media` verifies a user through Auth itself and rechecks the SQL parent; cleanup requires the service credential. Keep the existing Mux cleanup worker/queue functioning.
 
-Required server secrets: existing Supabase/Mux API/webhook secrets, plus `MUX_SIGNING_KEY_ID`, base64 PEM `MUX_SIGNING_PRIVATE_KEY` (PKCS#1 or PKCS#8) and `PRIVATE_MEDIA_PROXY_KEY` (base64 32 random bytes). These must remain server-only. The cron wrapper uses existing Vault names `spotted_push_url` (project base URL) and `spotted_push_service_key`. Verify their validity without exposing values. The app continues to use its existing public Supabase configuration.
+Required server secrets: existing Supabase/Mux API/webhook secrets, plus `MUX_SIGNING_KEY_ID`, base64 PEM `MUX_SIGNING_PRIVATE_KEY` (PKCS#1 or PKCS#8) (`PRIVATE_MEDIA_PROXY_KEY` is no longer used: `private-media` now issues short-lived Storage/Mux links instead of proxying bytes — see migration `20261001120000_v1_media_links_relationship_events.sql`). These must remain server-only. The cron wrapper uses existing Vault names `spotted_push_url` (project base URL) and `spotted_push_service_key`. Verify their validity without exposing values. The app continues to use its existing public Supabase configuration.
 
 ## Legacy-media rollout gates — operator action, not executed here
 

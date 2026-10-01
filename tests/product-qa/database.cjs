@@ -140,6 +140,33 @@ const [A,C,F,M,U,BR]=[1,2,3,4,5,6].map(id),V=id(100);const results=[];
   await actor(F,'update notifications set is_read=true where id=$1',[seen.id]);assert.equal((await actor(A,'delete from notifications where id=$1 returning id',[seen.id])).rows.length,0);
   assert.equal(Number(await scalar('select count(*) from notifications where id=$1',[seen.id])),1);
  });
+ await test('Media links: batch authorization returns only what the caller may see, and revocation is immediate',async()=>{
+  const path=A+'/private-v1/photo.jpg';
+  await q("insert into posts(user_id,text,visibility,image_url,expires_at) values($1,'Photo','all_friends',$2,now()+interval '2 hours')",[A,path]);
+  await q("insert into posts(user_id,text,visibility,media_type,mux_playback_id,mux_signed,expires_at) values($1,'Video','all_friends','video','signed-pb',true,now()+interval '2 hours')",[A]);
+  await q("insert into posts(user_id,text,visibility,media_type,mux_playback_id,mux_signed,expires_at) values($1,'Legacy','all_friends','video','public-pb',false,now()+interval '2 hours')",[A]);
+  const ask=who=>actor(who,'select kind,media_key,expires_at from private_media_targets($1,$2) order by kind',[[path,U+'/private-v1/x.jpg'],['signed-pb','public-pb','unknown']]);
+  const friend=await ask(F);assert(!friend.error,friend.error);
+  assert.deepEqual(friend.rows.map(r=>r.kind+':'+r.media_key),['path:'+path,'playback:signed-pb']);
+  assert(friend.rows.find(r=>r.kind==='playback').expires_at);
+  assert.equal((await ask(U)).rows.length,0);
+  assert(denied(await ask(null)));
+  assert.equal((await actor(F,'select * from private_media_targets($1,$2)',[Array.from({length:61},(_,i)=>'p'+i),[]])).code,'22023');
+  await q('delete from friendships where (user_id=$1 and friend_id=$2) or (user_id=$2 and friend_id=$1)',[A,F]);
+  assert.equal((await ask(F)).rows.length,0);
+ });
+ await test('Relationship events: unfriend, block and close-friend removal signal both people, each reading only their own',async()=>{
+  await q('delete from friendships where (user_id=$1 and friend_id=$2) or (user_id=$2 and friend_id=$1)',[A,F]);
+  const own=who=>actor(who,'select user_id,other_user_id,kind from relationship_events');
+  assert.deepEqual((await own(F)).rows.map(r=>[r.user_id,r.other_user_id,r.kind]),[[F,A,'unfriended']]);
+  assert.deepEqual((await own(A)).rows.map(r=>[r.user_id,r.other_user_id,r.kind]),[[A,F,'unfriended']]);
+  assert.equal((await own(U)).rows.length,0);assert(denied(await own(null)));
+  assert.equal((await actor(F,"insert into relationship_events(user_id,other_user_id,kind) values($1,$2,'blocked')",[F,A])).code,'42501');
+  await q('insert into blocked_users(blocker_id,blocked_id) values($1,$2)',[U,M]);
+  assert((await own(M)).rows.some(r=>r.other_user_id===U&&r.kind==='blocked'));
+  await q('delete from close_friends where user_id=$1 and close_friend_id=$2',[A,C]);
+  assert((await own(C)).rows.some(r=>r.other_user_id===A&&r.kind==='close_friend_removed'));
+ });
  // Further product cases are appended before this marker as workstreams land.
  await db.close();
  if(process.env.SPOTTED_PRODUCT_RESULTS)fs.writeFileSync(process.env.SPOTTED_PRODUCT_RESULTS,JSON.stringify(results,null,2));

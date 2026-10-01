@@ -1,25 +1,25 @@
-import { getSessionAccessToken, onSessionTokenChange } from '@/lib/session-identity';
-import { createElement, forwardRef, useSyncExternalStore } from 'react';
+import { createElement, forwardRef } from 'react';
 import { withUniwind } from 'uniwind';
-import { Image as ExpoImage, type ImageProps, type ImageSource } from 'expo-image';
-import { isPrivateMediaUrl, normalizePrivateMediaUrl, privateMediaSource } from '@/lib/private-media';
+import { Image as ExpoImage, type ImageProps } from 'expo-image';
+import { signedStoragePath } from '@/lib/private-media';
 
-// Disable native disk/memory caching for protected bytes, including thumbnails.
-// AccountScope remounts existing native views when identity changes.
-const SecureImage = forwardRef<ExpoImage, ImageProps>((props, ref) => {
-  useSyncExternalStore(onSessionTokenChange, getSessionAccessToken, getSessionAccessToken);
-  let protectedSource = false;
-  const source = (value: ImageProps['source']): ImageProps['source'] => {
-    if (Array.isArray(value)) return value.map(v => source(v) as ImageSource);
-    const uri = typeof value === 'string' ? value : value && typeof value === 'object' && 'uri' in value ? value.uri : undefined;
-    if (uri && isPrivateMediaUrl(normalizePrivateMediaUrl(uri))) {
-      protectedSource = true;
-      return { ...(typeof value === 'object' ? value : {}), ...privateMediaSource(uri) };
-    }
-    return value;
-  };
-  const resolved = source(props.source);
-  return createElement(ExpoImage, { ...props, ref, source: resolved, ...(protectedSource ? { cachePolicy: 'none' } : {}) });
+/**
+ * Signed Storage URLs carry a fresh token on every mint; the storage path
+ * never changes. Any signed post-images URL rendered without an explicit
+ * cacheKey (DM photos, group avatars) is cached by its path, so it loads
+ * from disk instead of re-downloading after the link is re-minted.
+ */
+const CachedImage = forwardRef<ExpoImage, ImageProps>((props, ref) => {
+  const { source } = props;
+  if (source && typeof source === 'object' && !Array.isArray(source) && 'uri' in source && source.uri && !source.cacheKey) {
+    const path = signedStoragePath(source.uri);
+    if (path) return createElement(ExpoImage, { ...props, ref, source: { ...source, cacheKey: path } });
+  } else if (typeof source === 'string') {
+    const path = signedStoragePath(source);
+    if (path) return createElement(ExpoImage, { ...props, ref, source: { uri: source, cacheKey: path } });
+  }
+  return createElement(ExpoImage, { ...props, ref });
 });
-SecureImage.displayName = 'SecureImage';
-export const Image = withUniwind(SecureImage);
+CachedImage.displayName = 'CachedImage';
+
+export const Image = withUniwind(CachedImage);
