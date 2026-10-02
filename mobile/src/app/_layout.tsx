@@ -26,6 +26,7 @@ import { BackgroundLocationManager } from '@/components/background-location-mana
 import { NightStatusGate } from '@/components/night-status-gate';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import { ToastHost } from '@/components/toast-host';
+import { ConfettiHost } from '@/components/confetti';
 import { hydrateDemoMode } from '@/lib/demo-mode';
 import { queryClient } from '@/lib/query-client';
 import { subscribeRelationshipEvents } from '@/lib/relationship-events';
@@ -279,6 +280,7 @@ export default function RootLayout() {
                     <StatusBar style="light" />
                     <SplashController />
                     <ToastHost />
+                    <ConfettiHost />
                   </QueryClientProvider>
                 </AccountScope>
               </SessionProvider>

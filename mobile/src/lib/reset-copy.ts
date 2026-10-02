@@ -22,6 +22,10 @@ export const RESET_KEPT =
 export const RESET_COPY = {
   /** Status sheet footer, under Yes / TBD / No. */
   statusFooter: RESET_TITLE,
+  /** Status sheet, above "Set as TBD" / "Set as staying in" (client mockup, Sept 2026). */
+  statusClears: 'Your status clears at 5 AM.',
+  /** Status sheet, above "Check in". */
+  checkInClears: 'Your status and check-in clear at 5 AM.',
   /** Yes → venue confirmation, near the share CTA. */
   venueConfirm: 'Your status + shared spot clear at 5am.',
   /** TBD sheet, under the supporting copy. */
