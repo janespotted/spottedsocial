@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar } from '@/components/avatar';
-import { CalendarPlus, ImagePlus, Images, Sunrise, Ticket as TicketIcon } from 'lucide-react-native';
+import { CalendarPlus, Images, Sunrise, Ticket as TicketIcon, Users, type LucideIcon } from 'lucide-react-native';
 import { DayPlaceholder } from '@/components/day-placeholder';
 import { ErrorState } from '@/components/empty-state';
 import { Polaroid } from '@/components/recap-cover';
@@ -74,8 +74,37 @@ function Ticket({ stop, index, city }: { stop: NightRecap['stops'][number]; inde
   );
 }
 
+/** An empty chapter's placeholder inside the story panel: a dashed card, a Lucide icon, two lines. */
+function ChapterPlaceholder({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
+  return (
+    <View
+      className="items-center rounded-2xl border border-dashed border-white/20 bg-white/[0.03] px-5 py-6"
+      accessible
+      accessibilityLabel={`${title}. ${body}`}
+    >
+      <View className="w-14 h-14 rounded-[20px] items-center justify-center mb-3 bg-[#d4ff00]/10 border border-[#d4ff00]/30">
+        <Icon size={26} color={NEON} strokeWidth={1.9} />
+      </View>
+      <Text className="text-white text-base font-sans-semibold text-center">{title}</Text>
+      <Text className="text-white/60 text-sm font-sans text-center leading-5 mt-1">{body}</Text>
+    </View>
+  );
+}
+
 function StopsChapter({ recap, city }: { recap: NightRecap; city: string }) {
   const one = recap.stops.length === 1;
+  if (recap.stops.length === 0) {
+    return (
+      <>
+        <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-6">{'No stops\non the map.'}</Text>
+        <ChapterPlaceholder
+          icon={TicketIcon}
+          title="No check-ins last night"
+          body="Check in when you get somewhere and each spot lands here as a ticket."
+        />
+      </>
+    );
+  }
   return (
     <>
       <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-6">
@@ -122,13 +151,26 @@ function PicturesChapter({ recap }: { recap: NightRecap }) {
     <>
       <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-5">{'Camera roll\nconfidential.'}</Text>
       {recap.photos.length === 0 ? (
-        <View className="flex-row items-center gap-3 rounded-2xl border border-dashed border-white/20 px-4 py-4 mb-1">
-          <View className="w-11 h-11 rounded-2xl items-center justify-center bg-[#d4ff00]/10 border border-[#d4ff00]/30">
-            <ImagePlus size={20} color={NEON} strokeWidth={1.9} />
-          </View>
-          <Text className="flex-1 text-white/70 text-sm font-sans leading-5">
-            No pictures from last night. Add one you took and keep it here.
-          </Text>
+        // Empty frames, as in the mockup — tapping one adds a picture.
+        <View className="flex-row py-2">
+          {[-5, 6, -3].map((rotate, i) => (
+            <Pressable
+              key={rotate}
+              onPress={add}
+              disabled={adding}
+              accessibilityRole="button"
+              accessibilityLabel="Add a picture from your library"
+              className="w-1/3 items-center"
+            >
+              <Polaroid
+                width={92}
+                rotate={rotate}
+                icon="photo.badge.plus"
+                tint="rgba(255,255,255,0.7)"
+                className={`opacity-80 ${i === 1 ? 'mt-4' : ''}`}
+              />
+            </Pressable>
+          ))}
         </View>
       ) : (
         <View className="flex-row flex-wrap gap-y-4 py-2">
@@ -162,12 +204,28 @@ function PicturesChapter({ recap }: { recap: NightRecap }) {
           <Text className="text-[#d4ff00] text-sm font-sans-medium">Add from your library</Text>
         </Pressable>
       )}
-      <Text className="text-white/60 text-xs font-sans mt-1">Your night, saved here. Only you.</Text>
+      <Text className="text-white/60 text-xs font-sans mt-1">
+        {recap.photos.length === 0
+          ? 'No pictures from last night yet. Add yours — only you can see them.'
+          : 'Your night, saved here. Only you.'}
+      </Text>
     </>
   );
 }
 
 function PeopleChapter({ recap }: { recap: NightRecap }) {
+  if (recap.people.length === 0) {
+    return (
+      <>
+        <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-6">{'Just you\nand the night.'}</Text>
+        <ChapterPlaceholder
+          icon={Users}
+          title="No crossed paths"
+          body="Friends who share their check-ins with you show up here when you’re at the same spot."
+        />
+      </>
+    );
+  }
   return (
     <>
       <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-4">{'Look who\nwas there.'}</Text>
@@ -201,9 +259,10 @@ function PeopleChapter({ recap }: { recap: NightRecap }) {
 /**
  * Morning After — "Replay the night" (client brief §3; screenshots 03–05).
  * Three chapters the user moves through by tapping the labels or Next /
- * Back; nothing advances on its own. Chapters come from what the night had
- * (`recapChapters`), so one stop, no photos or no crossed paths read
- * naturally, and a night with no activity gets an honest empty state.
+ * Back; nothing advances on its own. All three always show, as in the
+ * mockup: an empty one (no check-ins, no photos, no crossed paths) shows a
+ * placeholder instead of sample content, and a night with no activity at
+ * all gets an honest empty state.
  * Private: the data comes only from get_night_recap(), the owner's own.
  */
 export default function MorningAfter() {
@@ -211,7 +270,13 @@ export default function MorningAfter() {
   const recap = recapQuery.data ?? null;
   const { city } = useNightMode();
   const chapters = useMemo(() => (recap ? recapChapters(recap) : []), [recap]);
-  const [index, setIndex] = useState(0);
+  // `?chapter=pictures` opens straight on a chapter (links, notifications).
+  const { chapter: startAt } = useLocalSearchParams<{ chapter?: string }>();
+  const [index, setIndex] = useState(() => Math.max(0, (['stops', 'pictures', 'people'] as string[]).indexOf(startAt ?? '')));
+  useEffect(() => {
+    const i = (['stops', 'pictures', 'people'] as string[]).indexOf(startAt ?? '');
+    if (i >= 0) setIndex(i);
+  }, [startAt]);
   useEffect(() => {
     if (index >= chapters.length && chapters.length > 0) setIndex(chapters.length - 1);
   }, [chapters.length, index]);

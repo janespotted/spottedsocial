@@ -10,11 +10,11 @@ test('DM-01 plans split into tonight and upcoming by night key, keeping order',(
  assert.equal(upcoming.map(x=>x.id).join(),'b,e','yesterday is dropped');
 });
 
-test('DM-02 recap chapters come from what exists; no blank chapters',()=>{
+test('DM-02 a recap always has the three chapters; no activity has none',()=>{
  const s=[{}],p=[{}],f=[{}];
  assert.equal(recap.recapChapters({stops:s,photos:p,people:f}).join(),'stops,pictures,people');
- assert.equal(recap.recapChapters({stops:s,photos:[],people:[]}).join(),'stops,pictures','pictures stays with stops so photos can be added');
- assert.equal(recap.recapChapters({stops:[],photos:p,people:[]}).join(),'pictures');
+ assert.equal(recap.recapChapters({stops:s,photos:[],people:[]}).join(),'stops,pictures,people','empty chapters show placeholders');
+ assert.equal(recap.recapChapters({stops:[],photos:p,people:[]}).join(),'stops,pictures,people');
  assert.equal(recap.recapChapters({stops:[],photos:[],people:[]}).join(),'');
 });
 

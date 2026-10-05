@@ -86,16 +86,13 @@ export function recapDateLabel(nightDate: string): string {
 export type RecapChapter = 'stops' | 'pictures' | 'people';
 
 /**
- * Which chapters a recap has, in order. An empty chapter is left out rather
- * than shown blank — except The pictures while there are stops, because it
- * is the one place to add photos from the library.
+ * The replay's chapters, as in the mockup: always The stops, The pictures,
+ * The people once there is a recap (an empty one shows its placeholder),
+ * none when the night had nothing at all.
  */
 export function recapChapters(recap: Pick<NightRecap, 'stops' | 'photos' | 'people'>): RecapChapter[] {
-  const chapters: RecapChapter[] = [];
-  if (recap.stops.length > 0) chapters.push('stops');
-  if (recap.photos.length > 0 || recap.stops.length > 0) chapters.push('pictures');
-  if (recap.people.length > 0) chapters.push('people');
-  return chapters;
+  const any = recap.stops.length > 0 || recap.photos.length > 0 || recap.people.length > 0;
+  return any ? ['stops', 'pictures', 'people'] : [];
 }
 
 /**

@@ -23,7 +23,7 @@ export function Polaroid({
   rotate: number;
   photo?: RecapPhoto;
   url?: string;
-  icon?: 'photo' | 'sparkles';
+  icon?: 'photo' | 'sparkles' | 'photo.badge.plus';
   tint?: string;
   className?: string;
 }) {
