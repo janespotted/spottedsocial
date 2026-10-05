@@ -1,4 +1,5 @@
 import { morningAfterAt } from '@/lib/tonight';
+import { useNightMode } from '@/hooks/use-night-mode';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -66,7 +67,8 @@ import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own
 import type { OwnNightStatus } from '@/lib/night-status';
 import { AudienceRow } from '@/components/audience-row';
 import { fireConfetti } from '@/lib/confetti';
-import { INK_LIGHT, NEON } from '@/lib/theme';
+import { INK_LIGHT, NEON, primaryControl, primaryControlText } from '@/lib/theme';
+import { SymbolView } from 'expo-symbols';
 
 /** Which part of the sheet is showing. The answer itself is `answer`. */
 type View_ = 'main' | 'spot' | 'party' | 'done';
@@ -534,6 +536,43 @@ function AreaChips({
  * waits for an explicit "Allow location".
  */
 export default function CheckInSheet() {
+  const { isNight } = useNightMode();
+  // Every way in (Status pill, profile rows, push links, nudges) lands here,
+  // so this one guard keeps In / TBD / Out to Night Mode (DAY-NIGHT-MODE-PLAN.md
+  // §4.8). The server refuses the write too (guard_night_mode_status).
+  return isNight ? <CheckInFlow /> : <NightModeClosed />;
+}
+
+/** Day Mode: nothing to set yet — say when it opens, offer a plan instead. */
+function NightModeClosed() {
+  const { opensLabel } = useNightMode();
+  return (
+    <View className="pt-7 pb-safe-offset-4 px-5 gap-3">
+      <View className="flex-row items-center gap-2">
+        <SymbolView name="moon.stars" size={18} tintColor={NEON} />
+        <Text className="text-white text-xl font-sans-semibold">Night Mode opens at {opensLabel}</Text>
+      </View>
+      <Text className="text-white/60 text-sm font-sans leading-5">
+        Set In, TBD or Out and check in once tonight goes live. Nothing is shared until you choose.
+      </Text>
+      <Pressable
+        onPress={() => {
+          router.back();
+          setTimeout(() => router.push('/create-plan'), 350);
+        }}
+        accessibilityRole="button"
+        className={`min-h-12 rounded-full items-center justify-center mt-2 active:opacity-85 ${primaryControl}`}
+      >
+        <Text className={`text-[15px] font-sans-semibold ${primaryControlText}`}>Make a plan</Text>
+      </Pressable>
+      <Pressable onPress={() => router.back()} accessibilityRole="button" className="min-h-11 items-center justify-center">
+        <Text className="text-white/70 text-[15px] font-sans-medium">Got it</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function CheckInFlow() {
   const { gate, step: initialStep } = useLocalSearchParams<{ gate?: string; step?: string }>();
   const isGate = gate === '1';
   const { session } = useSession();

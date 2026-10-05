@@ -28,7 +28,10 @@ export async function sendMeetUp(target: { user_id: string }): Promise<SendMeetU
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     return { status: 'sent', inviteId: row.invite_id, threadId: row.thread_id };
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'try again';
+    // Supabase errors are not always Error instances; the server's own words
+    // ("Meet ups open when Night Mode starts at 6 PM.") are what to show.
+    const raw = e && typeof e === 'object' ? (e as { message?: unknown }).message : undefined;
+    const message = typeof raw === 'string' && raw ? raw : 'try again';
     Alert.alert('Could not send meet up', message);
     return { status: 'failed', message };
   }

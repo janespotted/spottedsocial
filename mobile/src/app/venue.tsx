@@ -33,6 +33,7 @@ import { RESET_COPY } from '@/lib/reset-copy';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useFriendsOut } from '@/hooks/use-friends-out';
 import { useSession } from '@/hooks/use-session';
+import { useNightMode } from '@/hooks/use-night-mode';
 import { Avatar } from '@/components/avatar';
 import { VenueEventsSection } from '@/components/venue-events-section';
 
@@ -167,6 +168,7 @@ function PlanningRow({ friends }: { friends: FriendAtVenue[] }) {
 
 /** Full port of the web VenueIdCard, presented as a modal route. */
 export default function VenueScreen() {
+  const { isNight, opensLabel } = useNightMode();
   const { venueId } = useLocalSearchParams<{ venueId: string }>();
   const { session } = useSession();
   const { data: ownNight } = useOwnNightStatus();
@@ -725,7 +727,15 @@ export default function VenueScreen() {
           </View>
 
           {/* Invite: the headline action when nobody is here, quieter once
-              the who's-here card carries the story */}
+              the who's-here card carries the story. A venue invite means
+              "join me here now", so it opens with Night Mode
+              (DAY-NIGHT-MODE-PLAN.md §4.8). */}
+          {!isNight ? (
+            <View className="w-full min-h-11 mb-3 rounded-xl flex-row items-center justify-center gap-2 border border-white/10">
+              <SymbolView name="moon.stars" size={14} tintColor="rgba(255,255,255,0.6)" />
+              <Text className="text-white/60 font-sans-medium text-sm">Invites open at {opensLabel}</Text>
+            </View>
+          ) : (
           <Pressable
             onPress={() => setInvitePickerOpen(true)}
             accessibilityRole="button"
@@ -737,6 +747,7 @@ export default function VenueScreen() {
               Invite friends here
             </Text>
           </Pressable>
+          )}
 
           {/* ── ZONE 3: Utility row — Save has a label and a clear on state ── */}
           <View className="flex-row items-center gap-2 mb-3">

@@ -1,6 +1,7 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import profileIcon from '@/assets/images/tab-profile.png';
-import { LAVENDER, MIST } from '@/lib/theme';
+import { useNightMode } from '@/hooks/use-night-mode';
+import { LAVENDER, MIST, PLUM_BADGE } from '@/lib/theme';
 
 /**
  * Brand bible: Lavender marks the active tab; inactive tabs stay muted.
@@ -35,10 +36,17 @@ import { LAVENDER, MIST } from '@/lib/theme';
  * lime here; a lime S would fight the other five icons rather than look
  * premium. `renderingMode` is left at its default, already `template` because
  * `iconColor` is set.
+ *
+ * Day Mode (DAY-NIGHT-MODE-PLAN.md §4.2): Leaderboard and Map stay tappable
+ * but open the "Opens today at 6 PM" screen, marked by a small moon badge.
+ * The icons themselves never change (the rule above); the moon is the badge
+ * text on a plum badge. `badgeBackgroundColor` colours every tab badge — no
+ * other tab uses one today. Changing a badge does not remount the tabs.
  */
 export default function TabsLayout() {
+  const { isNight } = useNightMode();
   return (
-    <NativeTabs tintColor={LAVENDER} iconColor={MIST}>
+    <NativeTabs tintColor={LAVENDER} iconColor={MIST} badgeBackgroundColor={PLUM_BADGE}>
       <NativeTabs.Trigger name="(home)">
         <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
@@ -46,10 +54,12 @@ export default function TabsLayout() {
       <NativeTabs.Trigger name="(leaderboard)">
         <NativeTabs.Trigger.Icon sf="chart.bar.xaxis" />
         <NativeTabs.Trigger.Label>Leaderboard</NativeTabs.Trigger.Label>
+        {isNight ? null : <NativeTabs.Trigger.Badge>☾</NativeTabs.Trigger.Badge>}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="(map)">
         <NativeTabs.Trigger.Icon sf="mappin.and.ellipse" />
         <NativeTabs.Trigger.Label>Map</NativeTabs.Trigger.Label>
+        {isNight ? null : <NativeTabs.Trigger.Badge>☾</NativeTabs.Trigger.Badge>}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="(messages)">
         <NativeTabs.Trigger.Icon sf={{ default: 'text.bubble', selected: 'text.bubble.fill' }} />

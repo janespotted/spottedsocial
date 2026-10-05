@@ -178,6 +178,42 @@ export function isUnexpired(expiresAt: string | null | undefined): boolean {
   return !Number.isNaN(t) && t > Date.now();
 }
 
+/**
+ * Night Mode opening hour by the night's weekday (client brief, Oct 2026):
+ * Mon–Thu 6 PM, Fri 4 PM, Sat noon, Sun 3 PM, local to the profile city.
+ * Indexed by JS getUTCDay() of the night's date (0 = Sunday). The SQL twin is
+ * public.night_mode_opens_at() — change both together.
+ */
+export const NIGHT_MODE_OPENING: readonly number[] = [15, 18, 18, 18, 18, 16, 12];
+
+/**
+ * When Night Mode opens for the night `now` belongs to. The night is keyed by
+ * its 5 AM start, so 1 AM Saturday still belongs to Friday night (open) and
+ * 9 AM Saturday is Saturday's day (closed until noon).
+ */
+export function nightModeOpensAt(now: Date = new Date(), city?: string | null): Date {
+  const tz = cityToTimezone(city);
+  const [year, month, day] = getNightKey(now, city).split('-').map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return zonedToUtc(year, month, day, NIGHT_MODE_OPENING[weekday], tz);
+}
+
+/** Night Mode runs from the opening hour until the 5 AM reset. */
+export function isNightModeOpen(now: Date = new Date(), city?: string | null): boolean {
+  return now.getTime() >= nightModeOpensAt(now, city).getTime();
+}
+
+/** The next moment Day/Night flips: the opening in the day, the reset at night. */
+export function nextModeChangeAt(now: Date = new Date(), city?: string | null): Date {
+  return isNightModeOpen(now, city) ? nightResetAt(now, city) : nightModeOpensAt(now, city);
+}
+
+/** "6 PM" / "12 PM" in the city's zone, for "Opens today at …". */
+export function formatOpeningTime(at: Date, city?: string | null): string {
+  // Every opening is on the hour, so the hour alone reads cleanly ("6 PM").
+  return at.toLocaleTimeString('en-US', { hour: 'numeric', timeZone: cityToTimezone(city) });
+}
+
 /** 10 AM following this nightlife session, in the profile city. */
 export function morningAfterAt(now: Date = new Date(), city?: string | null): Date {
   const tz = cityToTimezone(city);

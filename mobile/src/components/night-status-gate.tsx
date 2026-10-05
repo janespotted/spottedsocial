@@ -4,6 +4,7 @@ import { router, useRootNavigationState, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/use-session';
 import { handleNightBoundary } from '@/lib/night-boundary';
+import { useNightMode } from '@/hooks/use-night-mode';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import {
   deferDeepLink,
@@ -54,6 +55,9 @@ export function NightStatusGate() {
   const rootState = useRootNavigationState();
   const navReady = !!rootState?.key;
   const { data, isError } = useOwnNightStatus();
+  // Day Mode has no tonight to answer for yet (DAY-NIGHT-MODE-PLAN.md D2):
+  // the question waits for the opening, then asks as before.
+  const { isNight } = useNightMode();
   const gateState = useNightGateState();
   const lastNavRef = useRef(0);
   const failedOpenRef = useRef(false);
@@ -85,8 +89,8 @@ export function NightStatusGate() {
       return;
     }
     failedOpenRef.current = false;
-    setNightGateState(data.status ? 'answered' : 'open');
-  }, [gated, data, isError]);
+    setNightGateState(data.status || !isNight ? 'answered' : 'open');
+  }, [gated, data, isError, isNight]);
 
   // Fail open if "unknown" drags on (query paused offline, never resolving)
   useEffect(() => {

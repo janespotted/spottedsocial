@@ -243,6 +243,15 @@ function RootNavigator() {
           contentStyle: SHEET_CONTENT_STYLE,
         }}
       />
+      <Stack.Screen
+        name="night-hours"
+        options={{
+          presentation: 'formSheet',
+          sheetAllowedDetents: 'fitToContents',
+          sheetGrabberVisible: true,
+          contentStyle: SHEET_CONTENT_STYLE,
+        }}
+      />
       </Stack.Protected>
       <Stack.Screen name="business" />
     </Stack>

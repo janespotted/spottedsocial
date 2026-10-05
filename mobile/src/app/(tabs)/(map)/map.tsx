@@ -56,6 +56,8 @@ import {NEON} from '@/lib/theme';
 import {canGroupSpots, locationAge, locationLabel, STALE_AFTER_MS} from '@/lib/location-quality';
 import {useLocationClock} from '@/hooks/use-location-clock';
 import {RESET_COPY} from '@/lib/reset-copy';
+import {useNightMode} from '@/hooks/use-night-mode';
+import {DayTabScreen} from '@/components/night-opening-screen';
 import venuePinImage from '../../../../assets/images/venue-pin.png';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_PUBLIC_TOKEN ?? null);
@@ -280,7 +282,18 @@ function PromotedVenueMarker({
   );
 }
 
+/**
+ * Day Mode (DAY-NIGHT-MODE-PLAN.md §4.4): the live map only mounts once
+ * Night Mode opens. Before that the tab shows the opening screen, so no
+ * map-data polling, realtime channel, arrival prompts or location fix runs
+ * and no stale pins are shown as live.
+ */
 export default function MapScreen() {
+  const {isNight} = useNightMode();
+  return isNight ? <LiveMapScreen /> : <DayTabScreen kind='map' />;
+}
+
+function LiveMapScreen() {
   const {session} = useSession();
   const {unreadCount} = useNotifications();
   const queryClient = useQueryClient();

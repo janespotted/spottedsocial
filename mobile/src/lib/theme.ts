@@ -57,3 +57,22 @@ export const primaryControlText = 'text-[#1a0f2e]';
 
 /** Outlined secondary action (profile Edit / Share, etc.). */
 export const outlineControl = 'border border-white/20 active:bg-white/5';
+
+/*
+ * Day Mode and Morning After (client mockup, Oct 2026; DAY-NIGHT-MODE-SPEC.md).
+ */
+/** The moon badge on Leaderboard / Map in Day Mode (native tab badge fill). */
+export const PLUM_BADGE = '#493551';
+/** Raised plum surface: the countdown row, the opening screen's icon tile, the Day chip. */
+export const dayRaised = 'bg-[#302142] border border-[#493657]';
+/** The "LAST NIGHT" sticker and other lime-on-ink labels. */
+export const STICKER_INK = '#1a1229';
+/** Morning After stop tickets: light paper with dark ink (8.9:1). */
+export const TICKET_PAPER = '#F0E6F3';
+export const TICKET_INK = '#281835';
+export const TICKET_MUTED = '#594460';
+/** Polaroid frame border on the scrapbook photos. */
+export const POLAROID_EDGE = '#DCCEE3';
+/** The Morning After cover card and the replay's story panel. */
+export const recapCover = 'bg-gradient-to-br from-[#503165] to-[#2E2043] border border-[#715087]';
+export const recapPanel = 'bg-gradient-to-br from-[#382447] to-[#251B37]';

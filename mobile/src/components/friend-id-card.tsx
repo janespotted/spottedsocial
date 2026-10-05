@@ -1,6 +1,7 @@
 import type { CardRelationship } from '@/lib/relationship-tier';
 import { locationLabel, locationAge, STALE_AFTER_MS } from '@/lib/location-quality';
 import { useLocationClock } from '@/hooks/use-location-clock';
+import { useNightMode } from '@/hooks/use-night-mode';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -115,6 +116,9 @@ export function FriendCardBody({
   const lastSeen = data.is_private_party ? '' : locationLabel(data.last_location_at, now);
   const stale = locationAge(data.last_location_at, now) >= STALE_AFTER_MS;
   const isOut = data.statusKind === 'out' || data.statusKind === 'party';
+  // Meet Up is a "right now" request: Night Mode only (DAY-NIGHT-MODE-PLAN.md
+  // §4.8). In the day the card offers Make plans + Chat.
+  const { isNight } = useNightMode();
 
   /** Open another person's card: close this sheet first, then push theirs. */
   const switchTo = (userId: string) => {
@@ -483,7 +487,7 @@ export function FriendCardBody({
 
         {/* Meet Up always asks again — every request is its own card in the
             DM, with no once-per-night limit (client, Oct 2026). */}
-        {isOut ? (
+        {isOut && isNight ? (
           <Pressable
             onPress={handleMeetUp}
             disabled={meetUpSent}

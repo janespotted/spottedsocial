@@ -20,6 +20,8 @@ import {
 import { Avatar } from '@/components/avatar';
 import { DropdownMenu } from '@/components/dropdown-menu';
 import { HeaderActions } from '@/components/header-actions';
+import { DayTabScreen } from '@/components/night-opening-screen';
+import { useNightMode } from '@/hooks/use-night-mode';
 import { NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
 
 function openVenue(venueName: string, venueId?: string | null) {
@@ -327,7 +329,16 @@ function BiggestMoverCard({ mover }: { mover: BiggestMover }) {
 
 /* ── Screen ── */
 
+/**
+ * Day Mode (DAY-NIGHT-MODE-PLAN.md §4.4): rankings are tonight's, so the live
+ * board (and its realtime channel) only mounts once Night Mode opens.
+ */
 export default function LeaderboardScreen() {
+  const { isNight } = useNightMode();
+  return isNight ? <LiveLeaderboardScreen /> : <DayTabScreen kind="leaderboard" />;
+}
+
+function LiveLeaderboardScreen() {
   const { session } = useSession();
   const { unreadCount } = useNotifications();
   const [neighborhood, setNeighborhood] = useState<string | null>(null);

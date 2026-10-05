@@ -40,20 +40,26 @@ test('QA-35 shared card opens post detail while ordinary messages retain reactio
  const s=source('app/thread.tsx');const calls=[];extract('app/thread.tsx','openSharedPost',{router:{push:route=>calls.push(route)}})('visible-post');assert.equal(calls[0].pathname,'/post-detail');assert.equal(calls[0].params.postId,'visible-post');assert.match(s,/onPress=\{\(\) => openSharedPost\(sharedPost.id\)\}/);assert.match(s,/onPress=\{\(\) => onMessageTap\(item.id\)\}/);
 });
 const haptics={'expo-haptics':{notificationAsync:()=>{},NotificationFeedbackType:{Success:1}}};
-function inviteApi(rows,error=null){return load('lib/venue-invites.ts',{...haptics,'./profiles':{fetchProfilesSafe:async()=>[]},'./supabase':{supabase:{rpc:async()=>({data:rows,error}),from:()=>builder({data:rows,error}),functions:{invoke:async()=>({})}}}});}
+function inviteApi(data,error=null){return load('lib/dm-invites.ts',{...haptics,'./supabase':{supabase:{rpc:async()=>({data,error}),from:()=>builder({data,error})}}});}
 test('QA-07 venue confirmations list only actual recipients and deny zero-result success',async()=>{
- const friends=[{id:'a'},{id:'b'}];const none=await inviteApi([]).sendVenueInvites('me','Bar',friends);assert.equal(none.ok,false);
- const some=await inviteApi([{id:'n',receiver_id:'b'}]).sendVenueInvites('me','Bar',friends);assert.equal(some.ok,true);assert.equal(some.recipientIds.join(','),'b');assert.equal(some.notificationIds.join(','),'n');
+ const friends=[{id:'a'},{id:'b'}];const none=await inviteApi([]).sendVenueInvites('venue',friends);assert.equal(none.ok,false);
+ const some=await inviteApi([{invite_id:'i',receiver_id:'b',thread_id:'t',created:true}]).sendVenueInvites('venue',friends);
+ assert.equal(some.ok,true);assert.equal(some.recipientIds.join(','),'b');assert.equal(some.inviteIds.join(','),'i');assert.equal(some.threadIds.b,'t');
+ // A double tap returns the card already made: shown as sent, but not this send's to undo.
+ const again=await inviteApi([{invite_id:'i',receiver_id:'b',thread_id:'t',created:false}]).sendVenueInvites('venue',friends);
+ assert.equal(again.ok,true);assert.equal(again.inviteIds.length,0);
 });
-test('QA-08 Undo needs returned deleted IDs: zero/partial fails, actual delete succeeds',async()=>{
- assert.equal(await inviteApi([]).undoNotifications(['read']),false);
- assert.equal(await inviteApi([{id:'a'}]).undoNotifications(['a','b']),false);
- assert.equal(await inviteApi([{id:'a'}]).undoNotifications(['a']),true);
+test('QA-08 Undo needs every invite withdrawn: zero/partial fails, full withdrawal succeeds',async()=>{
+ assert.equal(await inviteApi(0).withdrawInvites(['read']),false);
+ assert.equal(await inviteApi(1).withdrawInvites(['a','b']),false);
+ assert.equal(await inviteApi(1).withdrawInvites(['a']),true);
+ assert.equal(await inviteApi(null,{message:'x'}).withdrawInvites(['a']),false);
 });
 test('QA-07 meetup reports rejected recipient as failure and accepted recipient as sent',async()=>{
  for(const allowed of [false,true]){
- const api=load('lib/meet-up.ts',{...haptics,'react-native':{Alert:{alert:()=>{}}},'./profiles':{fetchProfilesSafe:async()=>[]},'./dm':{},'./tonight':{nightStartAt:()=>new Date(0)},'./supabase':{supabase:{from:()=>builder({data:[],error:null}),rpc:async()=>({data:allowed?[{id:'n'}]:[],error:null}),functions:{invoke:async()=>({})}}}});
- assert.equal((await api.sendMeetUp('a',{user_id:'b',display_name:'B'})).status,allowed?'sent':'failed');
+ const api=load('lib/meet-up.ts',{...haptics,'react-native':{Alert:{alert:()=>{}}},'./dm':{},'./supabase':{supabase:{rpc:async()=>({data:allowed?[{result:'sent',invite_id:'i',thread_id:'t'}]:[],error:null})}}});
+ const r=await api.sendMeetUp({user_id:'b'});assert.equal(r.status,allowed?'sent':'failed');
+ if(allowed){assert.equal(r.inviteId,'i');assert.equal(r.threadId,'t');}
  }
 });
 test('QA-09 check-in uses one atomic RPC; local resume failure never reports committed save as failed',async()=>{
@@ -188,11 +194,10 @@ test('QA-26 venue/event date stays in profile-city night across UTC midnight, 5A
  const q=new Proxy({then:yes=>Promise.resolve({data:[],error:null}).then(yes)},{get:(o,k)=>k==='then'?o.then:(...args)=>{if(k==='gte'&&args[0]==='event_date')bound=args[1];return q;}});
  return queryFunction('components/venue-events-section.tsx','getNightKey',{getNightKey:()=> '2026-09-25',supabase:{from:()=>q},venueId:'v'})().then(()=>assert.equal(bound,'2026-09-25'));
 });
-test('QA-08 meetup cancellation does not claim success after partial recall; complete recall succeeds',async()=>{
- for(const count of [0,1,2]){
- let reads=0;const api=load('lib/meet-up.ts',{...haptics,'react-native':{},'./profiles':{},'./dm':{},'./tonight':{nightStartAt:()=>new Date(0)},'./supabase':{supabase:{from:()=>builder({data:reads++===0?[{id:'one'},{id:'two'}]:Array.from({length:count},(_,i)=>({id:String(i)})),error:null})}}});
- if(count===2)await api.cancelMeetUp('a','b');else await assert.rejects(api.cancelMeetUp('a','b'),/every request/);
- }
+test('QA-08 a refused meet up (e.g. before Night Mode opens) shows the server message',async()=>{
+ const alerts=[];const err=Object.assign(new Error('Meet ups open when Night Mode starts at 6 PM.'),{hint:'night_mode_closed'});
+ const api=load('lib/meet-up.ts',{...haptics,'react-native':{Alert:{alert:(t,m)=>alerts.push(m)}},'./dm':{},'./supabase':{supabase:{rpc:async()=>({data:null,error:err})}}});
+ const r=await api.sendMeetUp({user_id:'b'});assert.equal(r.status,'failed');assert.equal(alerts[0],'Meet ups open when Night Mode starts at 6 PM.');
 });
 test('QA-29 device Location Services and app permission remain independent',async()=>{
  for(const enabled of [false,true]){const fn=extract('lib/location-ready.ts','locationServicesEnabled',{ensureLocationReady:async()=>{},BackgroundGeolocation:{getProviderState:async()=>({enabled,status:3})}});assert.equal(await fn(),enabled);}

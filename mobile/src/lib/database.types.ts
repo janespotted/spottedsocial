@@ -2587,6 +2587,10 @@ export type Database = {
       respond_to_invite: { Args: { p_invite: string; p_accept: boolean }; Returns: Database["public"]["Tables"]["invites"]["Row"] }
       withdraw_invites: { Args: { p_ids: string[] }; Returns: number }
       can_read_invite: { Args: { p_id: string }; Returns: boolean }
+      get_night_mode: { Args: Record<PropertyKey, never>; Returns: Json }
+      set_night_mode_override: { Args: { p_mode: string }; Returns: Json }
+      night_mode_opens_at: { Args: { p_city: string; p_at?: string }; Returns: string }
+      is_night_mode: { Args: { p_city: string; p_at?: string }; Returns: boolean }
       username_available: { Args: { p_username: string }; Returns: boolean }
 
       save_plan: { Args: { p_id: string | null; p_values: Json; p_participants?: string[] }; Returns: string }
