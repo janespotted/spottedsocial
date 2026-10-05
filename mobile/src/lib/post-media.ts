@@ -40,3 +40,12 @@ export async function pickFromLibrary(): Promise<CapturedMedia | null> {
         : 'jpg',
   };
 }
+
+/** Photos only, one at a time — Morning After's "Add from your library". */
+export async function pickPhotoFromLibrary(): Promise<CapturedMedia | null> {
+  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, allowsEditing: false });
+  const asset = result.assets?.[0];
+  if (result.canceled || !asset) return null;
+  const mimeType = asset.mimeType ?? 'image/jpeg';
+  return { uri: asset.uri, type: 'image', mimeType, fileExt: mimeType === 'image/png' ? 'png' : 'jpg' };
+}

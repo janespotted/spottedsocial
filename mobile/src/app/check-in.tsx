@@ -175,7 +175,7 @@ async function scheduleMorningAfter(city: string, userId: string): Promise<void>
       identifier: 'morning-after-recap', // same id → replaces prior schedule
       content: {
         title: 'Last night on Spotted ☀️',
-        body: 'Look back at your saved venue stops from last night.',
+        body: 'Replay the night — your stops, pictures and familiar faces.',
         data: { type: 'morning_after', url: '/morning-after', receiver_id: userId },
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: next },

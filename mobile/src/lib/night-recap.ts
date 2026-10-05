@@ -1,5 +1,8 @@
 import { supabase } from './supabase';
 import { resolvePrivateMedia } from './private-media';
+import { prepareForUpload } from './media-prep';
+import { pickPhotoFromLibrary } from './post-media';
+import { uploadMedia } from './publish-post';
 
 /**
  * Morning After (DAY-NIGHT-MODE-PLAN.md §2). The 5 AM reset builds a private
@@ -93,4 +96,33 @@ export function recapChapters(recap: Pick<NightRecap, 'stops' | 'photos' | 'peop
   if (recap.photos.length > 0 || recap.stops.length > 0) chapters.push('pictures');
   if (recap.people.length > 0) chapters.push('people');
   return chapters;
+}
+
+/**
+ * "Add from your library": only a photo the user explicitly picks in the
+ * system picker (no library access otherwise), resized like a post photo,
+ * uploaded under <uid>/recap-v1/ and attached to their recap. False when
+ * the picker was cancelled.
+ */
+export async function addLibraryPhoto(recapId: string, userId: string): Promise<boolean> {
+  const picked = await pickPhotoFromLibrary();
+  if (!picked) return false;
+  const prepared = await prepareForUpload(picked);
+  const path = `${userId}/recap-v1/${Date.now()}.${prepared.fileExt}`;
+  await uploadMedia(path, prepared);
+  const { error } = await supabase.rpc('add_recap_photo', {
+    p_recap: recapId,
+    p_key: path,
+    p_width: prepared.width,
+    p_height: prepared.height,
+    p_thumbhash: prepared.thumbhash,
+  });
+  if (error) throw error;
+  return true;
+}
+
+/** Testers only: a recap of tonight so far, instead of waiting for 5 AM. */
+export async function buildMyRecapNow(): Promise<void> {
+  const { error } = await supabase.rpc('build_my_recap_now');
+  if (error) throw error;
 }

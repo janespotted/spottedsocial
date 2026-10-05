@@ -2,6 +2,8 @@
 
 What to build is in `DAY-NIGHT-MODE-SPEC.md` (the client brief, the mockup, the 11 screenshots). This file is **how**: the decisions, the data model, the order of work, and the tests. File and line references were checked against the code on Oct 5 2026.
 
+
+**Status (Oct 5 2026):** phases 1–5 are built on `feat/day-night-mode`. Both migrations (`20261006100000_night_mode_schedule`, `20261006110000_morning_after_recaps`) passed rolled-back dry runs (29 + 29 checks, including a full `nightly_reset()`), but are **not applied yet**. Enforcement stays off after applying.
 ---
 
 ## 0. Decisions to confirm before building

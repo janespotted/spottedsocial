@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {load}=require('./product-test-runtime.cjs');
 const plans=load('lib/plans.ts',{'./supabase':{supabase:{}},'./profiles':{},'./demo-mode':{isDemoMode:()=>false},'./tonight':{getNightKey:()=>'2026-10-05',nightResetAfterDate:()=>new Date(),nightStartAt:()=>new Date()}});
-const recap=load('lib/night-recap.ts',{'./supabase':{supabase:{}},'./private-media':{resolvePrivateMedia:async()=>({paths:new Map()})}});
+const recap=load('lib/night-recap.ts',{'./supabase':{supabase:{}},'./private-media':{resolvePrivateMedia:async()=>({paths:new Map()})},'./media-prep':{},'./post-media':{},'./publish-post':{}});
 
 test('DM-01 plans split into tonight and upcoming by night key, keeping order',()=>{
  const items=[{id:'a',d:'2026-10-05'},{id:'b',d:'2026-10-09'},{id:'c',d:'2026-10-04'},{id:'d',d:'2026-10-05'},{id:'e',d:'2026-10-06'}];

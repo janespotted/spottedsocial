@@ -17,7 +17,7 @@ import { nightResetAt } from '@/lib/tonight';
 const GATE_HREF: Href = { pathname: '/check-in', params: { gate: '1' } };
 
 // Screens the check-in sheet itself opens on top of the pending question.
-const ALLOWED_ABOVE_GATE = new Set(['check-in', 'audience', 'morning-after']);
+const ALLOWED_ABOVE_GATE = new Set(['check-in', 'audience', 'morning-after', 'recap-photo', 'crossed-paths']);
 
 // setTimeout overflows past ~24.8 days; clamp so a long-lived session
 // re-arms instead of firing immediately.

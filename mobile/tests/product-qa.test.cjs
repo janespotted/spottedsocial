@@ -177,13 +177,15 @@ test('QA-16 invite link read failure neither spins nor generates a replacement; 
  if(denied)await assert.rejects(api.fetchOrCreateInviteCode('a'),/offline/);else assert.equal((await api.fetchOrCreateInviteCode('a')).code,'ABCDEFGH');
  }
 });
-test('QA-22 Morning After reads only owned visit history, never expired posts, and reports visit failures',async()=>{
- const {queryFunction}=require('./product-test-runtime.cjs');let tables=[];
- for(const fails of [false,true]){
- const recap=queryFunction('app/morning-after.tsx','morning-after',{session:{user:{id:'a'}},getActiveCity:()=>null,nightStartAt:d=>new Date(d.getTime()-1),supabase:{from:table=>{tables.push(table);return builder(table==='profiles'?{data:{city:'nyc'},error:null}:{data:[{id:'visit'}],error:fails?Error('offline'):null});}}});
- if(fails)await assert.rejects(recap(),/offline/);else assert.equal((await recap()).visits[0].id,'visit');
- }
- assert.deepEqual([...new Set(tables)],['profiles','checkins']);assert.doesNotMatch(source('app/check-in.tsx'),/saved posts from last night/);
+test('QA-22 Morning After reads only the owner\'s recap RPC, never tables, and reports failures',async()=>{
+ let tables=[],rpcs=[];
+ const mk=(result)=>load('lib/night-recap.ts',{'./supabase':{supabase:{from:t=>{tables.push(t);return builder({data:null,error:null});},rpc:async(name)=>{rpcs.push(name);return result;}}},'./private-media':{},'./media-prep':{},'./post-media':{},'./publish-post':{}});
+ await assert.rejects(mk({data:null,error:Object.assign(Error('offline'),{code:'x'})}).fetchNightRecap(),/offline/);
+ assert.equal(await mk({data:null,error:null}).fetchNightRecap(),null,'no activity is null, never a fabricated recap');
+ const r=await mk({data:{id:'r',night_date:'2026-10-04',stops:[{venue_name:'V'}]},error:null}).fetchNightRecap();
+ assert.equal(r.id,'r');assert.equal(r.stops.length,1);assert.equal(r.photos.length,0);assert.equal(r.people.length,0);
+ assert.equal(tables.length,0);assert.equal([...new Set(rpcs)].join(),'get_night_recap');
+ assert.doesNotMatch(source('app/check-in.tsx'),/saved posts from last night/);
 });
 test('QA-26 venue/event date stays in profile-city night across UTC midnight, 5AM and DST',()=>{
  const tonight=load('lib/tonight.ts');

@@ -73,13 +73,14 @@ function friendly(e: unknown, fallback: string): string {
 
 /**
  * Streams the file to the private post-images bucket with byte progress.
+ * Also used by Morning After for photos picked from the library.
  *
  * supabase-js buffers the whole file in JS and reports nothing until the
  * response lands, so we hit the Storage REST endpoint directly through the
  * native upload task (URLSession) — a 14 s video never touches JS memory and
  * the progress ring is real.
  */
-async function uploadMedia(
+export async function uploadMedia(
   path: string,
   media: PreparedMedia,
   onProgress?: (fraction: number) => void,

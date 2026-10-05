@@ -7,6 +7,7 @@ import { useNightMode } from '@/hooks/use-night-mode';
 import { useSession } from '@/hooks/use-session';
 import { getCityLabel } from '@/lib/city-neighborhoods';
 import { NIGHT_MODE_KEY, setNightModeOverride, type NightModeKind } from '@/lib/night-mode';
+import { buildMyRecapNow, NIGHT_RECAP_KEY } from '@/lib/night-recap';
 import { getNightKey } from '@/lib/tonight';
 import { control, NEON, primaryControl, primaryControlText } from '@/lib/theme';
 
@@ -107,12 +108,41 @@ function TesterSwitch({ override }: { override: NightModeKind | null }) {
     }
   };
 
+  // The real recap is built at 5 AM; this previews it from tonight so far.
+  const buildRecap = async () => {
+    if (saving) return;
+    setSaving('recap');
+    try {
+      await buildMyRecapNow();
+      await queryClient.invalidateQueries({ queryKey: [NIGHT_RECAP_KEY] });
+      router.back();
+      setTimeout(() => router.push('/morning-after'), 350);
+    } catch (e) {
+      Alert.alert('Could not build the recap', e instanceof Error ? e.message : 'Try again.');
+    } finally {
+      setSaving(null);
+    }
+  };
+
   return (
     <View className="gap-2 rounded-2xl border border-dashed border-white/20 p-3">
       <View className="flex-row items-center gap-1.5">
         <SymbolView name="wrench.and.screwdriver" size={12} tintColor="rgba(255,255,255,0.6)" />
         <Text className="text-white/60 text-xs font-sans-medium">Tester · mode for this account</Text>
       </View>
+      <Pressable
+        onPress={buildRecap}
+        disabled={!!saving}
+        accessibilityRole="button"
+        className={`min-h-10 rounded-full flex-row items-center justify-center gap-2 ${control.ordinary}`}
+      >
+        {saving === 'recap' ? (
+          <ActivityIndicator size="small" color={NEON} />
+        ) : (
+          <SymbolView name="sunrise" size={13} tintColor="rgba(255,255,255,0.85)" />
+        )}
+        <Text className="text-white/85 text-sm font-sans-medium">Build my recap from tonight so far</Text>
+      </Pressable>
       <View className="flex-row gap-2" accessibilityRole="radiogroup">
         {(['auto', 'day', 'night'] as const).map((option) => {
           const selected = current === option;
