@@ -4,7 +4,9 @@ import { router, Stack } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar } from '@/components/avatar';
-import { EmptyState, ErrorState } from '@/components/empty-state';
+import { CalendarPlus, ImagePlus, Images, Sunrise, Ticket as TicketIcon } from 'lucide-react-native';
+import { DayPlaceholder } from '@/components/day-placeholder';
+import { ErrorState } from '@/components/empty-state';
 import { Polaroid } from '@/components/recap-cover';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { useNightRecap, useRecapPhotoUrls } from '@/hooks/use-night-recap';
@@ -120,7 +122,14 @@ function PicturesChapter({ recap }: { recap: NightRecap }) {
     <>
       <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-5">{'Camera roll\nconfidential.'}</Text>
       {recap.photos.length === 0 ? (
-        <Text className="text-white/60 text-sm font-sans mb-2">No pictures from last night.</Text>
+        <View className="flex-row items-center gap-3 rounded-2xl border border-dashed border-white/20 px-4 py-4 mb-1">
+          <View className="w-11 h-11 rounded-2xl items-center justify-center bg-[#d4ff00]/10 border border-[#d4ff00]/30">
+            <ImagePlus size={20} color={NEON} strokeWidth={1.9} />
+          </View>
+          <Text className="flex-1 text-white/70 text-sm font-sans leading-5">
+            No pictures from last night. Add one you took and keep it here.
+          </Text>
+        </View>
       ) : (
         <View className="flex-row flex-wrap gap-y-4 py-2">
           {recap.photos.map((photo, i) => (
@@ -240,12 +249,14 @@ export default function MorningAfter() {
         ) : recapQuery.isError ? (
           <ErrorState title="Couldn’t load your recap" onRetry={() => recapQuery.refetch()} />
         ) : !recap || chapters.length === 0 ? (
-          <EmptyState
-            icon="sunrise"
-            title="Nothing to replay"
-            body="Morning After shows the spots you checked into, your pictures and the friends you crossed paths with — after a night out."
-            actions={[{ label: 'Make a plan', icon: 'calendar.badge.plus', primary: true, onPress: () => router.push('/create-plan') }]}
-          />
+          <View className="mt-6">
+            <DayPlaceholder
+              icons={[Sunrise, TicketIcon, Images]}
+              title="Nothing to replay yet"
+              body="Morning After shows the spots you checked into, your pictures and the friends you crossed paths with — after a night out."
+              action={{ label: 'Make a plan', icon: CalendarPlus, onPress: () => router.push('/create-plan') }}
+            />
+          </View>
         ) : (
           <>
             <View className="flex-row items-center justify-between mb-4">

@@ -30,6 +30,8 @@ import { EventCard } from '@/components/event-card';
 import { EmptyState, ErrorState, type EmptyAction } from '@/components/empty-state';
 import { addFriendsActions } from '@/lib/add-friends';
 import { FriendsOutBanner } from '@/components/friends-out-banner';
+import { DayPlaceholder } from '@/components/day-placeholder';
+import { CalendarDays, CalendarHeart, CalendarPlus, Martini } from 'lucide-react-native';
 import { RESET_COPY } from '@/lib/reset-copy';
 import { NEON } from '@/lib/theme';
 
@@ -340,6 +342,13 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
         </View>
       ) : loadFailed && !hasContent ? (
         <ErrorState title="Couldn't load tonight's plans" onRetry={refreshAll} retrying={isRefreshing} />
+      ) : !hasContent && !isNight && friendCount > 0 ? (
+        <DayPlaceholder
+          icons={[CalendarHeart, Martini, CalendarDays]}
+          title="No plans yet"
+          body="Make one for tonight or later this week and see who’s down."
+          action={{ label: 'Share a plan', icon: CalendarPlus, onPress: () => router.push('/create-plan') }}
+        />
       ) : !hasContent ? (
         (() => {
           const s = emptyState();

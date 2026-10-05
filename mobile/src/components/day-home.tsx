@@ -2,6 +2,8 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useQueryClient } from '@tanstack/react-query';
+import { CalendarHeart, CalendarPlus, Martini, PartyPopper } from 'lucide-react-native';
+import { DayPlaceholder } from '@/components/day-placeholder';
 import { RecapCover } from '@/components/recap-cover';
 import { PlanCard } from '@/components/plan-card';
 import { useCountdown, useNightMode } from '@/hooks/use-night-mode';
@@ -96,7 +98,12 @@ function TonightPlans({ city }: { city: string }) {
       {plansQuery.isLoading ? (
         <View className="h-40 rounded-2xl bg-white/[0.06]" />
       ) : tonight.length === 0 ? (
-        <Text className="text-white text-[15px] font-sans-medium">What&apos;s the plan tonight?</Text>
+        <DayPlaceholder
+          icons={[Martini, CalendarHeart, PartyPopper]}
+          title="What’s the plan tonight?"
+          body="Pick a spot and a time — friends can say they’re down."
+          action={{ label: 'Share a plan', icon: CalendarPlus, onPress: () => router.push('/create-plan') }}
+        />
       ) : (
         tonight.slice(0, PREVIEW_PLANS).map((plan) => (
           <PlanCard
@@ -110,14 +117,16 @@ function TonightPlans({ city }: { city: string }) {
         ))
       )}
 
-      <Pressable
-        onPress={() => router.push('/create-plan')}
-        accessibilityRole="button"
-        className="self-start flex-row items-center gap-1.5 min-h-11 active:opacity-70"
-      >
-        <SymbolView name="plus" size={14} tintColor={NEON} />
-        <Text className="text-[#d4ff00] text-[15px] font-sans-medium">Share a plan</Text>
-      </Pressable>
+      {tonight.length > 0 ? (
+        <Pressable
+          onPress={() => router.push('/create-plan')}
+          accessibilityRole="button"
+          className="self-start flex-row items-center gap-1.5 min-h-11 active:opacity-70"
+        >
+          <SymbolView name="plus" size={14} tintColor={NEON} />
+          <Text className="text-[#d4ff00] text-[15px] font-sans-medium">Share a plan</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
