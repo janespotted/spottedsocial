@@ -44,6 +44,20 @@ export async function setNightModeOverride(mode: NightModeKind | 'auto'): Promis
   return state;
 }
 
+/**
+ * Testers only: switch the server's Night Mode rules on or off for EVERY
+ * user (spotted_private.night_mode_settings.enforced). Off, the server allows
+ * Out / TBD / Meet Ups / invites at any hour (builds without Day Mode keep
+ * working); on, it refuses them before the opening.
+ */
+export async function setNightModeEnforced(on: boolean): Promise<NightModeServerState> {
+  const { error } = await supabase.rpc('set_night_mode_enforced', { p_on: on });
+  if (error) throw error;
+  const state = await fetchNightModeServerState();
+  if (!state) throw new Error('Could not read the setting back');
+  return state;
+}
+
 /** A refusal from a Night-only RPC ("Meet ups open when Night Mode starts at 6 PM."). */
 export function isNightModeClosedError(error: unknown): boolean {
   return !!error && typeof error === 'object' && (error as { hint?: string }).hint === 'night_mode_closed';

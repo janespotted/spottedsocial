@@ -16,6 +16,9 @@ import { getLocationPermission, type LocationPermission } from '@/lib/location-r
 import { ALL_CITY_IDS, DEMO_CITIES, getCityLabel } from '@/lib/city-neighborhoods';
 import { setActiveCity } from '@/lib/tonight';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { useNightMode } from '@/hooks/use-night-mode';
+import { NIGHT_MODE_KEY, setNightModeEnforced, setNightModeOverride } from '@/lib/night-mode';
+import { buildMyRecapNow, NIGHT_RECAP_KEY } from '@/lib/night-recap';
 import { PURPLE } from '@/lib/theme';
 
 function SettingsRow({
@@ -148,6 +151,82 @@ export default function SettingsScreen() {
         await queryClient.invalidateQueries();
       }
     );
+  };
+
+  // Night Mode tester tools (DAY-NIGHT-MODE-PLAN.md D8) — tester accounts
+  // only (spotted_private.night_mode_testers, added by SQL). The server
+  // refuses these calls for anyone else.
+  const nightMode = useNightMode();
+  const [nightBusy, setNightBusy] = useState(false);
+  const putNightState = (state: Awaited<ReturnType<typeof setNightModeOverride>>) =>
+    queryClient.setQueryData([NIGHT_MODE_KEY, userId], state);
+
+  const toggleEnforced = (next: boolean) => {
+    if (nightBusy) return;
+    Alert.alert(
+      next ? 'Enforce Night Mode for everyone?' : 'Stop enforcing Night Mode?',
+      next
+        ? 'Before the opening time, the server will refuse Out, TBD, Meet Ups and venue invites for every user. Builds without Day Mode will see errors instead of the opening screen.'
+        : 'The server will allow Out, TBD, Meet Ups and venue invites at any hour again. The app still shows Day Mode.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: next ? 'Enforce' : 'Stop enforcing',
+          style: next ? 'default' : 'destructive',
+          onPress: async () => {
+            setNightBusy(true);
+            try {
+              putNightState(await setNightModeEnforced(next));
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (e) {
+              Alert.alert('Could not change it', e instanceof Error ? e.message : 'Try again.');
+            } finally {
+              setNightBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const MODE_OPTIONS = ['auto', 'day', 'night'] as const;
+  const MODE_LABEL = { auto: 'Auto — follow the schedule', day: 'Day', night: 'Night' } as const;
+  const chooseMode = () => {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: 'Mode for this account',
+        message: 'Forces Day or Night on this account only — the app and the server both follow it.',
+        options: [...MODE_OPTIONS.map((m) => MODE_LABEL[m]), 'Cancel'],
+        cancelButtonIndex: MODE_OPTIONS.length,
+      },
+      async (index) => {
+        const next = MODE_OPTIONS[index];
+        if (!next || next === (nightMode.override ?? 'auto')) return;
+        setNightBusy(true);
+        try {
+          putNightState(await setNightModeOverride(next));
+        } catch (e) {
+          Alert.alert('Could not switch', e instanceof Error ? e.message : 'Try again.');
+        } finally {
+          setNightBusy(false);
+        }
+      }
+    );
+  };
+
+  // The real recap is built at 5 AM; this previews it from tonight so far.
+  const buildRecapNow = async () => {
+    if (nightBusy) return;
+    setNightBusy(true);
+    try {
+      await buildMyRecapNow();
+      await queryClient.invalidateQueries({ queryKey: [NIGHT_RECAP_KEY] });
+      router.push('/morning-after');
+    } catch (e) {
+      Alert.alert('Could not build the recap', e instanceof Error ? e.message : 'Try again.');
+    } finally {
+      setNightBusy(false);
+    }
   };
 
   // Background location ("Always"). It was only ever offered on the payoff
@@ -334,6 +413,38 @@ export default function SettingsScreen() {
             subtitle={`${getCityLabel(ownCity ?? 'nyc')} — tap to change`}
             onPress={changeCity}
           />
+        ) : null}
+
+        {/* Night Mode tester tools — tester accounts only. */}
+        {nightMode.tester ? (
+          <>
+            <Text className="text-white/45 text-xs font-sans-medium mt-3 mb-1 px-1">NIGHT MODE · TESTERS</Text>
+            <SettingsRow
+              icon="moon.stars"
+              title="Enforce Night Mode for everyone"
+              subtitle={nightMode.enforced ? 'On — follows the schedule' : 'Off — allowed at any hour'}
+              right={
+                <Switch
+                  value={nightMode.enforced}
+                  disabled={nightBusy}
+                  onValueChange={toggleEnforced}
+                  trackColorOnClassName="accent-[#a855f7]"
+                />
+              }
+            />
+            <SettingsRow
+              icon="sun.max"
+              title="Mode for this account"
+              subtitle={nightMode.override ? `Forced ${nightMode.override === 'day' ? 'Day' : 'Night'}` : 'Auto — follows the schedule'}
+              onPress={nightBusy ? undefined : chooseMode}
+            />
+            <SettingsRow
+              icon="sunrise"
+              title="Build my recap from tonight so far"
+              subtitle="Preview Morning After without waiting for 5 AM"
+              onPress={nightBusy ? undefined : buildRecapNow}
+            />
+          </>
         ) : null}
 
         {/* The permanent explanation the client asked for (addendum v3 §3):

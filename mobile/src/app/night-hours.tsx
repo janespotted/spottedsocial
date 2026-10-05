@@ -1,15 +1,9 @@
-import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
-import { useQueryClient } from '@tanstack/react-query';
 import { useNightMode } from '@/hooks/use-night-mode';
-import { useSession } from '@/hooks/use-session';
 import { getCityLabel } from '@/lib/city-neighborhoods';
-import { NIGHT_MODE_KEY, setNightModeOverride, type NightModeKind } from '@/lib/night-mode';
-import { buildMyRecapNow, NIGHT_RECAP_KEY } from '@/lib/night-recap';
 import { getNightKey } from '@/lib/tonight';
-import { control, NEON, primaryControl, primaryControlText } from '@/lib/theme';
+import { primaryControl, primaryControlText } from '@/lib/theme';
 
 /** The schedule as the client wrote it; weekdays are the night's date (0 = Sunday). */
 const ROWS: { label: string; time: string; days: number[] }[] = [
@@ -22,8 +16,8 @@ const ROWS: { label: string; time: string; days: number[] }[] = [
 /**
  * When Night Mode opens (client brief §6), opened from the Day pill and the
  * Home countdown. A `fitToContents` form sheet, so it holds no scroll view.
- * Tester accounts also get the Auto / Day / Night switch here; the server
- * honours it too (DAY-NIGHT-MODE-PLAN.md D8).
+ * (Tester tools — Auto / Day / Night, enforcement, recap preview — live in
+ * Settings.)
  */
 export default function NightHoursSheet() {
   const mode = useNightMode();
@@ -75,8 +69,6 @@ export default function NightHoursSheet() {
         when you&apos;re ready to meet now. Plans and messages work all day.
       </Text>
 
-      {mode.tester ? <TesterSwitch override={mode.override} /> : null}
-
       <Pressable
         onPress={openComposer}
         accessibilityRole="button"
@@ -84,87 +76,6 @@ export default function NightHoursSheet() {
       >
         <Text className={`text-[15px] font-sans-semibold ${primaryControlText}`}>Make a plan</Text>
       </Pressable>
-    </View>
-  );
-}
-
-/** Testers only: force Day or Night for this account, on the device and the server. */
-function TesterSwitch({ override }: { override: NightModeKind | null }) {
-  const { session } = useSession();
-  const queryClient = useQueryClient();
-  const [saving, setSaving] = useState<string | null>(null);
-  const current = override ?? 'auto';
-
-  const choose = async (next: NightModeKind | 'auto') => {
-    if (saving || next === current) return;
-    setSaving(next);
-    try {
-      const state = await setNightModeOverride(next);
-      queryClient.setQueryData([NIGHT_MODE_KEY, session?.user.id], state);
-    } catch (e) {
-      Alert.alert('Could not switch', e instanceof Error ? e.message : 'Try again.');
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  // The real recap is built at 5 AM; this previews it from tonight so far.
-  const buildRecap = async () => {
-    if (saving) return;
-    setSaving('recap');
-    try {
-      await buildMyRecapNow();
-      await queryClient.invalidateQueries({ queryKey: [NIGHT_RECAP_KEY] });
-      router.back();
-      setTimeout(() => router.push('/morning-after'), 350);
-    } catch (e) {
-      Alert.alert('Could not build the recap', e instanceof Error ? e.message : 'Try again.');
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  return (
-    <View className="gap-2 rounded-2xl border border-dashed border-white/20 p-3">
-      <View className="flex-row items-center gap-1.5">
-        <SymbolView name="wrench.and.screwdriver" size={12} tintColor="rgba(255,255,255,0.6)" />
-        <Text className="text-white/60 text-xs font-sans-medium">Tester · mode for this account</Text>
-      </View>
-      <Pressable
-        onPress={buildRecap}
-        disabled={!!saving}
-        accessibilityRole="button"
-        className={`min-h-10 rounded-full flex-row items-center justify-center gap-2 ${control.ordinary}`}
-      >
-        {saving === 'recap' ? (
-          <ActivityIndicator size="small" color={NEON} />
-        ) : (
-          <SymbolView name="sunrise" size={13} tintColor="rgba(255,255,255,0.85)" />
-        )}
-        <Text className="text-white/85 text-sm font-sans-medium">Build my recap from tonight so far</Text>
-      </Pressable>
-      <View className="flex-row gap-2" accessibilityRole="radiogroup">
-        {(['auto', 'day', 'night'] as const).map((option) => {
-          const selected = current === option;
-          return (
-            <Pressable
-              key={option}
-              onPress={() => choose(option)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              className={`flex-1 min-h-10 rounded-full items-center justify-center ${selected ? control.selected : control.ordinary}`}
-            >
-              {saving === option ? (
-                <ActivityIndicator size="small" color={NEON} />
-              ) : (
-                <Text className={`text-sm font-sans-medium ${selected ? 'text-[#d4ff00]' : 'text-white/85'}`}>
-                  {option === 'auto' ? 'Auto' : option === 'day' ? 'Day' : 'Night'}
-                </Text>
-              )}
-            </Pressable>
-          );
-        })}
-      </View>
     </View>
   );
 }

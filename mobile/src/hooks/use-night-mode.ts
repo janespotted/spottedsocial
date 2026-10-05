@@ -19,6 +19,8 @@ export interface NightMode {
   resetsAt: Date;
   tester: boolean;
   override: NightModeKind | null;
+  /** Whether the server enforces the schedule for everyone (testers see this). */
+  enforced: boolean;
 }
 
 /**
@@ -65,6 +67,7 @@ export function useNightMode(): NightMode {
     resetsAt: nightResetAt(now, city),
     tester: !!server.data?.tester,
     override,
+    enforced: !!server.data?.enforced,
   };
 }
 
