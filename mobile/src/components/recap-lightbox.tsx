@@ -62,11 +62,15 @@ function rubber(v: number, lo: number, hi: number) {
   return v;
 }
 
-/** A photo's on-screen size: its real aspect ratio, as large as the stage allows. */
-function fit(photo: RecapPhoto, maxW: number, maxH: number): Box {
-  const aspect = photo.width && photo.height ? photo.width / photo.height : 4 / 5;
-  const w = Math.min(maxW, maxH * aspect);
-  return { w, h: w / aspect };
+/**
+ * The stage frame, as in the mockup (screenshot 06): one large 4:5 frame,
+ * the full width when the screen allows, the photo filling it. Every photo
+ * uses the same frame, so nothing jumps between pages; pinch or double-tap
+ * to see more of a wide photo.
+ */
+function frame(maxW: number, maxH: number): Box {
+  // Full width; 4:5 tall, or as tall as fits above the controls on short screens.
+  return { w: maxW, h: Math.min(maxH, maxW * 1.25) };
 }
 
 function Page({
@@ -192,7 +196,7 @@ export function RecapLightbox({
   const stageH = winH - stageTop - insets.bottom - 12;
   const maxPhotoH = stageH - CONTROLS - CONTROLS_GAP;
   const last = photos.length - 1;
-  const boxes = useMemo(() => photos.map((p) => fit(p, stageW, maxPhotoH)), [photos, stageW, maxPhotoH]);
+  const boxes = useMemo(() => photos.map(() => frame(stageW, maxPhotoH)), [photos, stageW, maxPhotoH]);
   const boxTops = useMemo(() => boxes.map((b) => (stageH - (b.h + CONTROLS_GAP + CONTROLS)) / 2), [boxes, stageH]);
   const heightsSV = useSharedValue(boxes.map((b) => b.h));
   useEffect(() => {
