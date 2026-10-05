@@ -15,6 +15,7 @@ import { SymbolView } from 'expo-symbols';
 import { useQueryClient } from '@tanstack/react-query';
 // import { stayIn } from '@/lib/night-status'; — with the parked handleStayIn below
 import { sendMeetUp } from '@/lib/meet-up';
+import { openFriendCard } from '@/lib/friend-card';
 import { type Plan, type EventWithFriends } from '@/lib/plans';
 import { useSession } from '@/hooks/use-session';
 import { useFriendsOut, type FriendNightStatus } from '@/hooks/use-friends-out';
@@ -335,30 +336,38 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
                     i > 0 ? 'border-t border-white/[0.06]' : ''
                   }`}
                 >
-                  <View
-                    className="rounded-full border-2"
-                    style={{
-                      borderColor: friend.isOut ? 'rgba(212,255,0,0.5)' : 'rgba(168,85,247,0.5)',
-                    }}
+                  {/* Avatar + name open their friend card, as everywhere else */}
+                  <Pressable
+                    onPress={() => openFriendCard(friend.user_id, userId)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${friend.display_name}'s card`}
+                    className="flex-1 min-w-0 flex-row items-center gap-3 active:opacity-70"
                   >
-                    <Avatar name={friend.display_name} url={friend.avatar_url} size="md" />
-                  </View>
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-white font-sans-semibold text-[15px]" numberOfLines={1}>
-                      {friend.display_name}
-                    </Text>
-                    {friend.isOut ? (
-                      <Text className="text-[#d4ff00] text-sm font-sans" numberOfLines={1}>
-                        ● Out{friend.venue_name ? ` · ${friend.venue_name}` : venuesWithheld ? ' · venue hidden' : ''}
+                    <View
+                      className="rounded-full border-2"
+                      style={{
+                        borderColor: friend.isOut ? 'rgba(212,255,0,0.5)' : 'rgba(168,85,247,0.5)',
+                      }}
+                    >
+                      <Avatar name={friend.display_name} url={friend.avatar_url} size="md" />
+                    </View>
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-white font-sans-semibold text-[15px]" numberOfLines={1}>
+                        {friend.display_name}
                       </Text>
-                    ) : (
-                      <Text className="text-[#a855f7] text-sm font-sans" numberOfLines={1}>
-                        {friend.planning_venue_name
-                          ? `thinking ${friend.planning_venue_name}`
-                          : `TBD · ${friend.planning_neighborhood || 'down for anything'}`}
-                      </Text>
-                    )}
-                  </View>
+                      {friend.isOut ? (
+                        <Text className="text-[#d4ff00] text-sm font-sans" numberOfLines={1}>
+                          ● Out{friend.venue_name ? ` · ${friend.venue_name}` : venuesWithheld ? ' · venue hidden' : ''}
+                        </Text>
+                      ) : (
+                        <Text className="text-[#a855f7] text-sm font-sans" numberOfLines={1}>
+                          {friend.planning_venue_name
+                            ? `thinking ${friend.planning_venue_name}`
+                            : `TBD · ${friend.planning_neighborhood || 'down for anything'}`}
+                        </Text>
+                      )}
+                    </View>
+                  </Pressable>
                   <Pressable
                     onPress={() => handleMeetUp(friend)}
                     className={`flex-row items-center gap-1.5 px-4 py-2 rounded-full active:opacity-80 ${

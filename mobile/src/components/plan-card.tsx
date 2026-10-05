@@ -28,6 +28,7 @@ import {
 import { validateCommentText } from '@/lib/validation';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
+import { openFriendCard } from '@/lib/friend-card';
 import { NEON } from '@/lib/theme';
 
 /** Overlapping avatar strip ("going with" / "N down"). */
@@ -226,7 +227,13 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
 
       {/* Header */}
       <View className="flex-row items-start justify-between mb-2">
-        <View className="flex-row items-center gap-3 shrink">
+        {/* Avatar + name open the author's friend card (no-op on your own) */}
+        <Pressable
+          onPress={() => openFriendCard(plan.user_id, currentUserId)}
+          disabled={isOwner}
+          accessibilityRole={isOwner ? undefined : 'button'}
+          className="flex-row items-center gap-3 shrink active:opacity-70"
+        >
           <Avatar name={plan.user?.display_name ?? '?'} url={plan.user?.avatar_url ?? null} size="md" />
           <View className="shrink">
             <Text className="text-white font-sans-semibold text-base" numberOfLines={1}>
@@ -243,7 +250,7 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
               </Text>
             </View>
           </View>
-        </View>
+        </Pressable>
 
         <View className="flex-row items-start gap-2 pl-2">
           <View className="items-end">
@@ -324,10 +331,14 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
       {showDownList && downs.length > 0 ? (
         <View className="rounded-xl bg-white/5 p-3 mb-3 gap-2.5">
           {downs.map((down) => (
-            <View key={down.user_id} className="flex-row items-center gap-3">
+            <Pressable
+              key={down.user_id}
+              onPress={() => openFriendCard(down.user_id, currentUserId)}
+              className="flex-row items-center gap-3 active:opacity-70"
+            >
               <Avatar name={down.display_name} url={down.avatar_url} size="sm" />
               <Text className="text-white text-sm font-sans-medium">{down.display_name}</Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       ) : null}
@@ -398,10 +409,15 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
           ) : (
             comments.map((comment) => (
               <View key={comment.id} className="flex-row gap-2">
-                <Avatar name={comment.display_name} url={comment.avatar_url} size="sm" />
+                <Pressable onPress={() => openFriendCard(comment.user_id, currentUserId)} hitSlop={4}>
+                  <Avatar name={comment.display_name} url={comment.avatar_url} size="sm" />
+                </Pressable>
                 <View className="flex-1 min-w-0">
                   <View className="flex-row items-center gap-2">
-                    <Text className="text-white text-sm font-sans-medium">
+                    <Text
+                      onPress={() => openFriendCard(comment.user_id, currentUserId)}
+                      className="text-white text-sm font-sans-medium"
+                    >
                       {comment.display_name}
                     </Text>
                     <Text className="text-white/55 text-xs font-sans">
