@@ -41,7 +41,7 @@
     "react-native": "0.86.2",
     "react-native-background-fetch": "^4.4.2",
     "react-native-background-geolocation": "^5.4.0",
-    "react-native-gesture-handler": "~2.32.0",
+    "react-native-gesture-handler": "^3.3.0",
     "react-native-keyboard-controller": "1.21.9",
     "react-native-nitro-image": "^0.15.2",
     "react-native-nitro-modules": "^0.37.1",

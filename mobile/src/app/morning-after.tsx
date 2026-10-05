@@ -1,13 +1,32 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, Text, View, useWindowDimensions, type View as RNView } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
-import { Avatar } from '@/components/avatar';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import Animated, {
+  Extrapolation,
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  interpolate,
+  useAnimatedStyle,
+  useDerivedValue,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  type SharedValue,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { CalendarPlus, Images, Sunrise, Ticket as TicketIcon, Users, type LucideIcon } from 'lucide-react-native';
+import { Avatar } from '@/components/avatar';
 import { DayPlaceholder } from '@/components/day-placeholder';
 import { ErrorState } from '@/components/empty-state';
+import { PressableScale, Reveal } from '@/components/motion';
+import { SPRING, useNudge } from '@/lib/motion';
 import { Polaroid } from '@/components/recap-cover';
+import { RecapLightbox, type SourceRect } from '@/components/recap-lightbox';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { useNightRecap, useRecapPhotoUrls } from '@/hooks/use-night-recap';
 import { useSession } from '@/hooks/use-session';
@@ -37,9 +56,18 @@ const CHAPTER: Record<RecapChapter, { tab: string; number: string }> = {
   pictures: { tab: 'The pictures', number: 'THE PICTURES' },
   people: { tab: 'The people', number: 'THE PEOPLE' },
 };
+const CHAPTER_KEYS: RecapChapter[] = ['stops', 'pictures', 'people'];
+const TAB_GAP = 6;
+/** Resting angles for the scrapbook photos, by position in a row of three. */
+const PHOTO_TILT = [-5, 6, -3];
 
 function clock(iso: string, city: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: cityToTimezone(city) });
+}
+
+/** A chapter page's visibility, 1 when centred, 0 a page away — drives its Reveal. */
+function usePageVisibility(progress: SharedValue<number>, i: number) {
+  return useDerivedValue(() => 1 - Math.min(1, Math.abs(progress.value - i)));
 }
 
 /** A stop as a little ticket (screenshot 03). "Until" only when recorded. */
@@ -48,7 +76,10 @@ function Ticket({ stop, index, city }: { stop: NightRecap['stops'][number]; inde
   return (
     <View
       className="rounded-lg px-4 py-3.5"
-      style={{ backgroundColor: TICKET_PAPER, transform: [{ rotate: index % 2 === 0 ? '-2deg' : '2deg' }] }}
+      style={{
+        backgroundColor: TICKET_PAPER,
+        boxShadow: '0 6px 18px rgba(8, 3, 20, 0.35)',
+      }}
       accessible
       accessibilityLabel={`${index === 0 ? 'First stop' : 'Next stop'}, ${stop.venue_name}, ${clock(stop.arrived_at, city)}${
         stop.left_at ? ` until ${clock(stop.left_at, city)}` : ''
@@ -91,43 +122,80 @@ function ChapterPlaceholder({ icon: Icon, title, body }: { icon: LucideIcon; tit
   );
 }
 
-function StopsChapter({ recap, city }: { recap: NightRecap; city: string }) {
-  const one = recap.stops.length === 1;
+function Title({ children, when }: { children: string; when: SharedValue<number> }) {
+  return (
+    <Reveal when={when} from={{ y: 10 }} delay={40}>
+      <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-6">{children}</Text>
+    </Reveal>
+  );
+}
+
+function ArrowConnector({ label, when, delay }: { label: string; when: SharedValue<number>; delay: number }) {
+  return (
+    <Reveal when={when} delay={delay} from={{ y: -6, scale: 0.9 }}>
+      <View className="flex-row items-center justify-center gap-1.5 py-3">
+        <SymbolView name="arrow.down" size={11} tintColor="rgba(255,255,255,0.7)" />
+        <Text className="text-white/70 text-[11px] font-sans">{label}</Text>
+      </View>
+    </Reveal>
+  );
+}
+
+/** Tickets drop onto the table one after another and settle at an angle. */
+function StopsChapter({ recap, city, when }: { recap: NightRecap; city: string; when: SharedValue<number> }) {
   if (recap.stops.length === 0) {
     return (
       <>
-        <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-6">{'No stops\non the map.'}</Text>
-        <ChapterPlaceholder
-          icon={TicketIcon}
-          title="No check-ins last night"
-          body="Check in when you get somewhere and each spot lands here as a ticket."
-        />
+        <Title when={when}>{'No stops\non the map.'}</Title>
+        <Reveal when={when} delay={140} from={{ y: 18, scale: 0.97 }}>
+          <ChapterPlaceholder
+            icon={TicketIcon}
+            title="No check-ins last night"
+            body="Check in when you get somewhere and each spot lands here as a ticket."
+          />
+        </Reveal>
       </>
     );
   }
   return (
     <>
-      <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-6">
-        {one ? 'You picked\nyour spot.' : 'You made\nthe rounds.'}
-      </Text>
+      <Title when={when}>{recap.stops.length === 1 ? 'You picked\nyour spot.' : 'You made\nthe rounds.'}</Title>
       {recap.stops.map((stop, i) => (
         <View key={`${stop.arrived_at}-${i}`}>
           {i > 0 ? (
-            <View className="flex-row items-center justify-center gap-1.5 py-3">
-              <SymbolView name="arrow.down" size={11} tintColor="rgba(255,255,255,0.7)" />
-              <Text className="text-white/70 text-[11px] font-sans">
-                {i === recap.stops.length - 1 ? 'one more stop' : 'next stop'}
-              </Text>
-            </View>
+            <ArrowConnector
+              when={when}
+              delay={140 + i * 170 - 70}
+              label={i === recap.stops.length - 1 ? 'one more stop' : 'next stop'}
+            />
           ) : null}
-          <Ticket stop={stop} index={i} city={city} />
+          <Reveal
+            when={when}
+            delay={140 + i * 170}
+            rotate={i % 2 === 0 ? -2 : 2}
+            from={{ y: -34, scale: 1.08, rotate: i % 2 === 0 ? 4 : -4 }}
+            spring={SPRING.land}
+          >
+            <Ticket stop={stop} index={i} city={city} />
+          </Reveal>
         </View>
       ))}
     </>
   );
 }
 
-function PicturesChapter({ recap }: { recap: NightRecap }) {
+/** Photos are dealt onto the table; a tap lifts one into the lightbox. */
+function PicturesChapter({
+  recap,
+  when,
+  photoRefs,
+  onOpen,
+}: {
+  recap: NightRecap;
+  when: SharedValue<number>;
+  photoRefs: React.RefObject<(RNView | null)[]>;
+  onOpen: (index: number) => void;
+}) {
   const { session } = useSession();
   const queryClient = useQueryClient();
   const urls = useRecapPhotoUrls(recap);
@@ -139,7 +207,10 @@ function PicturesChapter({ recap }: { recap: NightRecap }) {
     setAdding(true);
     try {
       const added = await addLibraryPhoto(recap.id, session.user.id);
-      if (added) await queryClient.invalidateQueries({ queryKey: [NIGHT_RECAP_KEY] });
+      if (added) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await queryClient.invalidateQueries({ queryKey: [NIGHT_RECAP_KEY] });
+      }
     } catch (e) {
       Alert.alert('Couldn’t add that picture', e instanceof Error ? e.message : 'Try again.');
     } finally {
@@ -149,139 +220,291 @@ function PicturesChapter({ recap }: { recap: NightRecap }) {
 
   return (
     <>
-      <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-5">{'Camera roll\nconfidential.'}</Text>
-      {recap.photos.length === 0 ? (
-        // Empty frames, as in the mockup — tapping one adds a picture.
-        <View className="flex-row py-2">
-          {[-5, 6, -3].map((rotate, i) => (
-            <Pressable
-              key={rotate}
-              onPress={add}
-              disabled={adding}
-              accessibilityRole="button"
-              accessibilityLabel="Add a picture from your library"
-              className="w-1/3 items-center"
-            >
-              <Polaroid
-                width={92}
-                rotate={rotate}
-                icon="photo.badge.plus"
-                tint="rgba(255,255,255,0.7)"
-                className={`opacity-80 ${i === 1 ? 'mt-4' : ''}`}
-              />
-            </Pressable>
-          ))}
-        </View>
-      ) : (
-        <View className="flex-row flex-wrap gap-y-4 py-2">
-          {recap.photos.map((photo, i) => (
-            <Pressable
-              key={photo.id}
-              onPress={() => router.push({ pathname: '/recap-photo', params: { index: String(i) } })}
-              accessibilityRole="imagebutton"
-              accessibilityLabel={`Open picture ${i + 1} of ${recap.photos.length}`}
-              className="w-1/3 items-center"
-            >
-              <Polaroid
-                width={92}
-                rotate={[-5, 6, -3][i % 3]}
-                photo={photo}
-                url={urls.data?.get(photo.storage_key)}
-                className={i % 3 === 1 ? 'mt-4' : ''}
-              />
-            </Pressable>
-          ))}
-        </View>
-      )}
-      {full ? null : (
-        <Pressable
-          onPress={add}
-          disabled={adding}
-          accessibilityRole="button"
-          className="flex-row items-center gap-2 min-h-11 mt-3 self-start active:opacity-70"
-        >
-          {adding ? <ActivityIndicator size="small" color={NEON} /> : <SymbolView name="plus" size={14} tintColor={NEON} />}
-          <Text className="text-[#d4ff00] text-sm font-sans-medium">Add from your library</Text>
-        </Pressable>
-      )}
-      <Text className="text-white/60 text-xs font-sans mt-1">
+      <Title when={when}>{'Camera roll\nconfidential.'}</Title>
+      <View className="flex-row flex-wrap gap-y-4 py-2">
         {recap.photos.length === 0
-          ? 'No pictures from last night yet. Add yours — only you can see them.'
-          : 'Your night, saved here. Only you.'}
-      </Text>
+          ? // Empty frames, as in the mockup — tapping one adds a picture.
+            PHOTO_TILT.map((rotate, i) => (
+              <Reveal
+                key={rotate}
+                when={when}
+                delay={140 + i * 110}
+                rotate={rotate}
+                from={{ y: 40, scale: 0.7, rotate: 0 }}
+                spring={SPRING.land}
+                className={`w-1/3 items-center ${i === 1 ? 'mt-4' : ''}`}
+              >
+                <PressableScale onPress={add} disabled={adding} accessibilityLabel="Add a picture from your library">
+                  <Polaroid width={92} rotate={0} icon="photo.badge.plus" tint="rgba(255,255,255,0.7)" className="opacity-80" />
+                </PressableScale>
+              </Reveal>
+            ))
+          : recap.photos.map((photo, i) => (
+              <Reveal
+                key={photo.id}
+                when={when}
+                delay={140 + i * 110}
+                rotate={PHOTO_TILT[i % 3]}
+                from={{ y: 40, scale: 0.7, rotate: 0 }}
+                spring={SPRING.land}
+                className={`w-1/3 items-center ${i % 3 === 1 ? 'mt-4' : ''}`}
+              >
+                <View
+                  ref={(el) => {
+                    photoRefs.current[i] = el;
+                  }}
+                  collapsable={false}
+                >
+                  <PressableScale
+                    onPress={() => onOpen(i)}
+                    scaleTo={0.93}
+                    accessibilityRole="imagebutton"
+                    accessibilityLabel={`Open picture ${i + 1} of ${recap.photos.length}`}
+                  >
+                    <Polaroid width={92} rotate={0} photo={photo} url={urls.data?.get(photo.storage_key)} />
+                  </PressableScale>
+                </View>
+              </Reveal>
+            ))}
+      </View>
+      {full ? null : (
+        <Reveal when={when} delay={420}>
+          <PressableScale
+            onPress={add}
+            disabled={adding}
+            className="flex-row items-center gap-2 min-h-11 mt-3 self-start"
+          >
+            {adding ? <ActivityIndicator size="small" color={NEON} /> : <SymbolView name="plus" size={14} tintColor={NEON} />}
+            <Text className="text-[#d4ff00] text-sm font-sans-medium">Add from your library</Text>
+          </PressableScale>
+        </Reveal>
+      )}
+      <Reveal when={when} delay={480}>
+        <Text className="text-white/60 text-xs font-sans mt-1">
+          {recap.photos.length === 0
+            ? 'No pictures from last night yet. Add yours — only you can see them.'
+            : 'Your night, saved here. Only you.'}
+        </Text>
+      </Reveal>
     </>
   );
 }
 
-function PeopleChapter({ recap }: { recap: NightRecap }) {
+/** Friends slide in one by one; each row lifts under the finger. */
+function PeopleChapter({ recap, when }: { recap: NightRecap; when: SharedValue<number> }) {
   if (recap.people.length === 0) {
     return (
       <>
-        <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-6">{'Just you\nand the night.'}</Text>
-        <ChapterPlaceholder
-          icon={Users}
-          title="No crossed paths"
-          body="Friends who share their check-ins with you show up here when you’re at the same spot."
-        />
+        <Title when={when}>{'Just you\nand the night.'}</Title>
+        <Reveal when={when} delay={140} from={{ y: 18, scale: 0.97 }}>
+          <ChapterPlaceholder
+            icon={Users}
+            title="No crossed paths"
+            body="Friends who share their check-ins with you show up here when you’re at the same spot."
+          />
+        </Reveal>
       </>
     );
   }
   return (
     <>
-      <Text className="text-white text-[33px] leading-[36px] font-sans-semibold mt-3 mb-4">{'Look who\nwas there.'}</Text>
+      <Title when={when}>{'Look who\nwas there.'}</Title>
       {recap.people.map((person, i) => (
-        <Pressable
-          key={person.friend_id}
-          onPress={() => router.push({ pathname: '/crossed-paths', params: { friendId: person.friend_id } })}
-          accessibilityRole="button"
-          accessibilityLabel={`${person.display_name}, crossed paths at ${person.venue_name}`}
-          className={`flex-row items-center gap-3 py-3.5 active:opacity-70 ${i > 0 ? 'border-t border-white/10' : ''}`}
-        >
-          <View className="rounded-full border-2" style={{ borderColor: '#9273A5' }}>
-            <Avatar name={person.display_name} url={person.avatar_url} size="md" />
-          </View>
-          <View className="flex-1 min-w-0">
-            <Text className="text-white text-[15px] font-sans-medium" numberOfLines={1}>
-              {person.display_name}
-            </Text>
-            <Text className="text-white/60 text-xs font-sans mt-0.5" numberOfLines={1}>
-              Crossed paths at {person.venue_name}
-            </Text>
-          </View>
-          <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.6)" />
-        </Pressable>
+        <Reveal key={person.friend_id} when={when} delay={140 + i * 90} from={{ x: 28 }}>
+          <PressableScale
+            onPress={() => router.push({ pathname: '/crossed-paths', params: { friendId: person.friend_id } })}
+            scaleTo={0.98}
+            accessibilityLabel={`${person.display_name}, crossed paths at ${person.venue_name}`}
+            className={`flex-row items-center gap-3 py-3.5 ${i > 0 ? 'border-t border-white/10' : ''}`}
+          >
+            <View className="rounded-full border-2" style={{ borderColor: '#9273A5' }}>
+              <Avatar name={person.display_name} url={person.avatar_url} size="md" />
+            </View>
+            <View className="flex-1 min-w-0">
+              <Text className="text-white text-[15px] font-sans-medium" numberOfLines={1}>
+                {person.display_name}
+              </Text>
+              <Text className="text-white/60 text-xs font-sans mt-0.5" numberOfLines={1}>
+                Crossed paths at {person.venue_name}
+              </Text>
+            </View>
+            <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.6)" />
+          </PressableScale>
+        </Reveal>
       ))}
-      <Text className="text-white/60 text-xs font-sans mt-5">Overlapping check-ins shared with you.</Text>
+      <Reveal when={when} delay={160 + recap.people.length * 90}>
+        <Text className="text-white/60 text-xs font-sans mt-5">Overlapping check-ins shared with you.</Text>
+      </Reveal>
     </>
   );
 }
 
+/** One chapter tab; its label brightens as its page nears the centre. */
+function ChapterTab({
+  label,
+  i,
+  progress,
+  width,
+  onPress,
+  selected,
+}: {
+  label: string;
+  i: number;
+  progress: SharedValue<number>;
+  width: number;
+  onPress: () => void;
+  selected: boolean;
+}) {
+  const text = useAnimatedStyle(() => ({
+    opacity: interpolate(Math.abs(progress.value - i), [0, 1], [1, 0.55], Extrapolation.CLAMP),
+  }));
+  return (
+    <PressableScale
+      onPress={onPress}
+      haptic="none"
+      scaleTo={0.97}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      style={{ width }}
+      className="min-h-11 pt-2"
+    >
+      <View style={{ height: 3, borderRadius: 2, backgroundColor: '#584366' }} />
+      <Animated.Text
+        style={text}
+        className="text-center text-[11px] font-sans-medium text-white mt-2"
+        accessibilityState={{ selected }}
+      >
+        {label}
+      </Animated.Text>
+    </PressableScale>
+  );
+}
+
 /**
- * Morning After — "Replay the night" (client brief §3; screenshots 03–05).
- * Three chapters the user moves through by tapping the labels or Next /
- * Back; nothing advances on its own. All three always show, as in the
- * mockup: an empty one (no check-ins, no photos, no crossed paths) shows a
- * placeholder instead of sample content, and a night with no activity at
- * all gets an honest empty state.
- * Private: the data comes only from get_night_recap(), the owner's own.
+ * Morning After — "Replay the night" (client brief §3; screenshots 03–06).
+ * The three chapters are a real pager: swipe between them (the page follows
+ * the finger, a flick carries its velocity into the spring), or tap a label
+ * or Next / Back. The lime bar and the labels track the swipe continuously,
+ * the panel's height morphs between chapters, and each chapter assembles as
+ * it comes into view — tickets drop onto the table, photos are dealt,
+ * friends slide in. Nothing advances on its own. Photos open in a lightbox
+ * that flies out of (and back into) their frames. All of it honours Reduce
+ * Motion. Private: the data comes only from get_night_recap().
  */
 export default function MorningAfter() {
   const recapQuery = useNightRecap();
   const recap = recapQuery.data ?? null;
+  const urls = useRecapPhotoUrls(recap);
   const { city } = useNightMode();
+  const reduce = useReducedMotion();
+  const { width: winW } = useWindowDimensions();
+  const W = winW - 32;
+  const tabW = (W - TAB_GAP * 2) / 3;
   const chapters = useMemo(() => (recap ? recapChapters(recap) : []), [recap]);
+  const count = Math.max(1, chapters.length);
+
   // `?chapter=pictures` opens straight on a chapter (links, notifications).
   const { chapter: startAt } = useLocalSearchParams<{ chapter?: string }>();
-  const [index, setIndex] = useState(() => Math.max(0, (['stops', 'pictures', 'people'] as string[]).indexOf(startAt ?? '')));
+  const initial = Math.max(0, CHAPTER_KEYS.indexOf((startAt ?? '') as RecapChapter));
+  const [index, setIndex] = useState(initial);
+  const progress = useSharedValue(initial);
+  const fromGesture = useRef(false);
+
   useEffect(() => {
-    const i = (['stops', 'pictures', 'people'] as string[]).indexOf(startAt ?? '');
+    const i = CHAPTER_KEYS.indexOf((startAt ?? '') as RecapChapter);
     if (i >= 0) setIndex(i);
   }, [startAt]);
+
+  // Taps (labels, Next / Back, links) spring the pager; a swipe already did.
   useEffect(() => {
-    if (index >= chapters.length && chapters.length > 0) setIndex(chapters.length - 1);
-  }, [chapters.length, index]);
-  const chapter = chapters[index];
-  const last = index === chapters.length - 1;
+    if (fromGesture.current) {
+      fromGesture.current = false;
+      return;
+    }
+    progress.value = reduce ? index : withSpring(index, SPRING.page);
+  }, [index, progress, reduce]);
+
+  const goTo = useCallback(
+    (i: number) => {
+      const next = Math.max(0, Math.min(count - 1, i));
+      if (next !== index) void Haptics.selectionAsync();
+      setIndex(next);
+    },
+    [count, index]
+  );
+
+  const settleFromSwipe = (i: number) => {
+    if (i !== index) void Haptics.selectionAsync();
+    fromGesture.current = i !== index;
+    setIndex(i);
+  };
+
+  const startProgress = useSharedValue(0);
+  const swipe = usePanGesture({
+    // Horizontal only, so the page still scrolls vertically.
+    activeOffsetX: [-12, 12],
+    failOffsetY: [-14, 14],
+    onBegin: () => {
+      'worklet';
+      startProgress.value = progress.value;
+    },
+    onUpdate: (e) => {
+      'worklet';
+      const raw = startProgress.value - e.translationX / W;
+      const max = count - 1;
+      // Rubber band past the first and last chapter.
+      progress.value = raw < 0 ? raw / 3 : raw > max ? max + (raw - max) / 3 : raw;
+    },
+    onDeactivate: (e) => {
+      'worklet';
+      const from = Math.round(startProgress.value);
+      const projected = progress.value - (e.velocityX / W) * 0.2;
+      const target = Math.min(count - 1, Math.max(0, Math.min(from + 1, Math.max(from - 1, Math.round(projected)))));
+      progress.value = withSpring(target, { ...SPRING.page, velocity: -e.velocityX / W });
+      scheduleOnRN(settleFromSwipe, target);
+    },
+  });
+
+  // Each page reports its height; the panel morphs between them as you swipe.
+  const [heights, setHeights] = useState<number[]>([0, 0, 0]);
+  const heightsSV = useSharedValue<number[]>([0, 0, 0]);
+  useEffect(() => {
+    heightsSV.value = heights;
+  }, [heights, heightsSV]);
+  const onPageLayout = (i: number, h: number) =>
+    setHeights((prev) => (Math.abs(prev[i] - h) < 1 ? prev : prev.map((v, j) => (j === i ? h : v))));
+  const panelStyle = useAnimatedStyle(() => {
+    const hs = heightsSV.value;
+    if (hs.some((h) => h === 0)) return {};
+    return { height: interpolate(progress.value, [0, 1, 2], hs, Extrapolation.CLAMP) };
+  });
+  const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -progress.value * W }] }));
+  const indicator = useAnimatedStyle(() => ({ transform: [{ translateX: progress.value * (tabW + TAB_GAP) }] }));
+
+  const v0 = usePageVisibility(progress, 0);
+  const v1 = usePageVisibility(progress, 1);
+  const v2 = usePageVisibility(progress, 2);
+  const visibility = [v0, v1, v2];
+
+  // Lightbox: measure the photo frames, then let the picture fly out of one.
+  const photoRefs = useRef<(RNView | null)[]>([]);
+  const [lightbox, setLightbox] = useState<{ index: number; sources: (SourceRect | undefined)[] } | null>(null);
+  const openPhoto = async (i: number) => {
+    if (!recap) return;
+    const sources = await Promise.all(
+      recap.photos.map(
+        (_, j) =>
+          new Promise<SourceRect | undefined>((resolve) => {
+            const el = photoRefs.current[j];
+            if (!el) return resolve(undefined);
+            el.measureInWindow((x, y, width, height) =>
+              resolve(width > 0 ? { x, y, width, height, rotate: PHOTO_TILT[j % 3] } : undefined)
+            );
+          })
+      )
+    );
+    setLightbox({ index: i, sources });
+  };
 
   const sameCrew = () =>
     router.push({
@@ -293,19 +516,24 @@ export default function MorningAfter() {
       },
     });
 
+  const last = index === count - 1;
+  const nextLabel = last ? (recap && recap.people.length > 0 ? 'Same crew, new plan' : 'Make the next plan') : 'Next';
+  const nudge = useNudge(4, 2600);
+
   return (
     <View className="flex-1 bg-[#110a24]">
-      <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView contentContainerClassName="px-4 pt-safe-offset-2 pb-safe-offset-6">
-        <Pressable
+      {/* No swipe-back while a photo is open: the swipe belongs to the photo. */}
+      <Stack.Screen options={{ headerShown: false, gestureEnabled: !lightbox }} />
+      <ScrollView contentContainerClassName="px-4 pt-safe-offset-2 pb-safe-offset-6" scrollEnabled={!lightbox}>
+        <PressableScale
           onPress={() => router.back()}
-          hitSlop={8}
-          accessibilityRole="button"
-          className="flex-row items-center gap-2 self-start min-h-11 mb-1 active:opacity-70"
+          haptic="none"
+          accessibilityLabel="Back"
+          className="flex-row items-center gap-2 self-start min-h-11 mb-1"
         >
           <SymbolView name="arrow.left" size={14} tintColor="rgba(255,255,255,0.7)" />
           <Text className="text-white/70 text-sm font-sans">Back</Text>
-        </Pressable>
+        </PressableScale>
 
         {recapQuery.isLoading ? (
           <View className="py-24 items-center">
@@ -314,14 +542,14 @@ export default function MorningAfter() {
         ) : recapQuery.isError ? (
           <ErrorState title="Couldn’t load your recap" onRetry={() => recapQuery.refetch()} />
         ) : !recap || chapters.length === 0 ? (
-          <View className="mt-6">
+          <Animated.View entering={FadeInDown.springify().damping(18)} className="mt-6">
             <DayPlaceholder
               icons={[Sunrise, TicketIcon, Images]}
               title="Nothing to replay yet"
               body="Morning After shows the spots you checked into, your pictures and the friends you crossed paths with — after a night out."
               action={{ label: 'Make a plan', icon: CalendarPlus, onPress: () => router.push('/create-plan') }}
             />
-          </View>
+          </Animated.View>
         ) : (
           <>
             <View className="flex-row items-center justify-between mb-4">
@@ -333,64 +561,111 @@ export default function MorningAfter() {
               </Text>
             </View>
 
-            <View className="flex-row gap-1.5 mb-4" accessibilityRole="tablist">
-              {chapters.map((c, i) => {
-                const selected = i === index;
-                return (
-                  <Pressable
+            {/* Tabs: three quiet bars and one lime bar that rides the swipe */}
+            <View className="mb-4" accessibilityRole="tablist">
+              <View className="flex-row" style={{ gap: TAB_GAP }}>
+                {chapters.map((c, i) => (
+                  <ChapterTab
                     key={c}
-                    onPress={() => setIndex(i)}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected }}
-                    className="flex-1 min-h-11 pt-2"
-                    style={{ borderTopWidth: 3, borderTopColor: selected ? NEON : '#584366' }}
-                  >
-                    <Text className={`text-center text-[11px] font-sans-medium ${selected ? 'text-white' : 'text-white/60'}`}>
-                      {CHAPTER[c].tab}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+                    label={CHAPTER[c].tab}
+                    i={i}
+                    progress={progress}
+                    width={tabW}
+                    selected={i === index}
+                    onPress={() => goTo(i)}
+                  />
+                ))}
+              </View>
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  { position: 'absolute', top: 8, left: 0, width: tabW, height: 3, borderRadius: 2, backgroundColor: NEON },
+                  indicator,
+                ]}
+              />
             </View>
 
-            <View className={`rounded-[20px] px-4 py-5 min-h-[420px] ${recapPanel}`} accessibilityLiveRegion="polite">
-              <Text className="text-white/75 text-[11px] font-sans-medium tracking-[1.5px]">
-                {String(index + 1).padStart(2, '0')} / {CHAPTER[chapter].number}
-              </Text>
-              {chapter === 'stops' ? (
-                <StopsChapter recap={recap} city={city} />
-              ) : chapter === 'pictures' ? (
-                <PicturesChapter recap={recap} />
-              ) : (
-                <PeopleChapter recap={recap} />
-              )}
-            </View>
-
-            <View className="flex-row gap-2.5 mt-4">
-              {index > 0 ? (
-                <Pressable
-                  onPress={() => setIndex(index - 1)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Previous chapter"
-                  className={`w-14 min-h-12 rounded-full items-center justify-center ${outlineControl}`}
+            {/* The story panel: a swipeable pager whose height follows the page */}
+            <Reveal from={{ y: 22, scale: 0.98 }} delay={60}>
+              <GestureDetector gesture={swipe}>
+                <Animated.View
+                  className={`rounded-[20px] overflow-hidden min-h-105 ${recapPanel}`}
+                  style={panelStyle}
+                  accessibilityLiveRegion="polite"
                 >
-                  <SymbolView name="arrow.left" size={16} tintColor="#ffffff" />
-                </Pressable>
+                  <Animated.View style={[{ flexDirection: 'row', width: W * count, alignItems: 'flex-start' }, rowStyle]}>
+                    {chapters.map((c, i) => (
+                      <View
+                        key={c}
+                        style={{ width: W }}
+                        className="px-4 py-5 min-h-105"
+                        onLayout={(e) => onPageLayout(i, e.nativeEvent.layout.height)}
+                        accessibilityElementsHidden={i !== index}
+                        importantForAccessibility={i === index ? 'auto' : 'no-hide-descendants'}
+                      >
+                        <Reveal when={visibility[i]} from={{ y: 6 }}>
+                          <Text className="text-white/75 text-[11px] font-sans-medium tracking-[1.5px]">
+                            {String(i + 1).padStart(2, '0')} / {CHAPTER[c].number}
+                          </Text>
+                        </Reveal>
+                        {c === 'stops' ? (
+                          <StopsChapter recap={recap} city={city} when={visibility[i]} />
+                        ) : c === 'pictures' ? (
+                          <PicturesChapter recap={recap} when={visibility[i]} photoRefs={photoRefs} onOpen={openPhoto} />
+                        ) : (
+                          <PeopleChapter recap={recap} when={visibility[i]} />
+                        )}
+                      </View>
+                    ))}
+                  </Animated.View>
+                </Animated.View>
+              </GestureDetector>
+            </Reveal>
+
+            <Reveal from={{ y: 16 }} delay={160} className="flex-row gap-2.5 mt-4">
+              {index > 0 ? (
+                <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)}>
+                  <PressableScale
+                    onPress={() => goTo(index - 1)}
+                    haptic="none"
+                    accessibilityLabel="Previous chapter"
+                    className={`w-14 min-h-12 rounded-full items-center justify-center ${outlineControl}`}
+                  >
+                    <SymbolView name="arrow.left" size={16} tintColor="#ffffff" />
+                  </PressableScale>
+                </Animated.View>
               ) : null}
-              <Pressable
-                onPress={last ? sameCrew : () => setIndex(index + 1)}
-                accessibilityRole="button"
-                className={`flex-1 min-h-12 rounded-full flex-row items-center justify-center gap-2 active:opacity-85 ${primaryControl}`}
+              <PressableScale
+                onPress={last ? sameCrew : () => goTo(index + 1)}
+                haptic={last ? 'medium' : 'none'}
+                accessibilityLabel={nextLabel}
+                className={`flex-1 min-h-12 rounded-full flex-row items-center justify-center gap-2 ${primaryControl}`}
               >
-                <Text className={`text-[15px] font-sans-semibold ${primaryControlText}`}>
-                  {last ? (recap.people.length > 0 ? 'Same crew, new plan' : 'Make the next plan') : 'Next'}
-                </Text>
-                <SymbolView name="arrow.right" size={15} tintColor="#1a0f2e" weight="semibold" />
-              </Pressable>
-            </View>
+                <Animated.Text
+                  key={nextLabel}
+                  entering={FadeIn.duration(200)}
+                  className={`text-[15px] font-sans-semibold ${primaryControlText}`}
+                >
+                  {nextLabel}
+                </Animated.Text>
+                <Animated.View style={nudge}>
+                  <SymbolView name="arrow.right" size={15} tintColor="#1a0f2e" weight="semibold" />
+                </Animated.View>
+              </PressableScale>
+            </Reveal>
           </>
         )}
       </ScrollView>
+
+      {lightbox && recap ? (
+        <RecapLightbox
+          photos={recap.photos}
+          urls={urls.data}
+          startIndex={lightbox.index}
+          sources={lightbox.sources}
+          onClose={() => setLightbox(null)}
+        />
+      ) : null}
     </View>
   );
 }
