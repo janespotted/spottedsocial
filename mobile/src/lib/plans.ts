@@ -86,6 +86,23 @@ export function getSmartDateLabel(dateStr: string): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
+/**
+ * Split plans/events into tonight's and later ones by their date against the
+ * night key (YYYY-MM-DD of the night's 5 AM start, lib/tonight.ts), keeping
+ * order. Anything dated before tonight is dropped — the reset is about to
+ * take it.
+ */
+export function splitTonightUpcoming<T>(items: T[], dateOf: (item: T) => string, nightKey: string): { tonight: T[]; upcoming: T[] } {
+  const tonight: T[] = [];
+  const upcoming: T[] = [];
+  for (const item of items) {
+    const date = dateOf(item);
+    if (date === nightKey) tonight.push(item);
+    else if (date > nightKey) upcoming.push(item);
+  }
+  return { tonight, upcoming };
+}
+
 /** Local YYYY-MM-DD (toISOString would shift across UTC midnight). */
 export function toLocalDateString(date: Date): string {
   const y = date.getFullYear();

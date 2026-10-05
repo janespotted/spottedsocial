@@ -5,7 +5,7 @@ Status: **requirements and screenshots captured.** The implementation plan is `D
 Sources:
 
 - Client brief (Oct 5 2026), sections 1–8 below.
-- The client's tappable mockup, a ChatGPT/Codex share named "Spotted Morning After Replay". A copy is saved at `mobile/design-reference/spotted-morning-after-replay.html`; open it in a browser to click through. Only its **Day Mode** variant renders. The Night Mode screens are in its script but are never shown.
+- The client's tappable mockup, a ChatGPT/Codex share named "Spotted Morning After Replay". It is not kept in the repo; the screenshots below show it. Only its **Day Mode** variant renders. The Night Mode screens are in its script but are never shown.
 - Names, venues, photos and times in the mockup (Sophie, Mia, Alex, Penelope, Gospel, Nowadays, San Vicente, "Mon, Sep 21") are **examples, not production data**.
 
 ---

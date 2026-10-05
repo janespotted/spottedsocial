@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -33,6 +33,10 @@ import { PostCard } from '@/components/post-card';
 // import { PlansFeed } from '@/components/plans-feed';
 import { Avatar } from '@/components/avatar';
 import { HeaderActions } from '@/components/header-actions';
+import { DayHome } from '@/components/day-home';
+import { NightOpeningScreen } from '@/components/night-opening-screen';
+import { SubTabs } from '@/components/sub-tabs';
+import { useNightMode } from '@/hooks/use-night-mode';
 import { FriendsOutPill } from '@/components/friends-out-pill';
 import { NEON, PURPLE } from '@/lib/theme';
 
@@ -201,7 +205,16 @@ function EmptyFeed({
  * with it (there was nothing left worth animating). The wordmark, city pill
  * and actions were always anchored — they are unchanged.
  */
-function HomeHeader({ city, unreadCount }: { city: string | null; unreadCount: number }) {
+function HomeHeader({
+  city,
+  unreadCount,
+  children,
+}: {
+  city: string | null;
+  unreadCount: number;
+  /** Day Mode's Morning After | Newsfeed tabs. */
+  children?: ReactNode;
+}) {
   return (
     <View
       className="pt-safe-offset-3 z-10"
@@ -211,7 +224,7 @@ function HomeHeader({ city, unreadCount }: { city: string | null; unreadCount: n
         borderBottomColor: 'rgba(255, 255, 255, 0.06)',
       }}
     >
-      <View className="flex-row items-center justify-between px-4 h-10 mb-3">
+      <View className={`flex-row items-center justify-between px-4 h-10 ${children ? '' : 'mb-3'}`}>
         {/* Wordmark is anchored: same size on every tab, never animates */}
         <Text
           className="text-white font-sans-light"
@@ -230,13 +243,49 @@ function HomeHeader({ city, unreadCount }: { city: string | null; unreadCount: n
           <HeaderActions unreadCount={unreadCount} />
         </View>
       </View>
+      {children}
     </View>
   );
 }
 
 /* ── Screen ── */
 
+/**
+ * Night Mode: the Newsfeed, exactly as before. Day Mode (DAY-NIGHT-MODE-PLAN.md
+ * §4.5): Morning After | Newsfeed tabs — the countdown, the recap card and
+ * tonight's plans, with the Newsfeed showing its opening screen. The feed
+ * (posts query, realtime channel) only mounts at night, and so does the Post
+ * button: posting opens with Night Mode (D1).
+ */
 export default function HomeScreen() {
+  const { isNight } = useNightMode();
+  return isNight ? <NewsfeedScreen /> : <DayHomeScreen />;
+}
+
+type DayTab = 'morning' | 'feed';
+
+function DayHomeScreen() {
+  const { city } = useNightMode();
+  const { unreadCount } = useNotifications();
+  const [tab, setTab] = useState<DayTab>('morning');
+  return (
+    <View className="flex-1 bg-[#110a24]">
+      <HomeHeader city={city} unreadCount={unreadCount}>
+        <SubTabs<DayTab>
+          tabs={[
+            { key: 'morning', label: 'Morning After' },
+            { key: 'feed', label: 'Newsfeed', icon: 'moon' },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+      </HomeHeader>
+      {tab === 'morning' ? <DayHome /> : <NightOpeningScreen kind="newsfeed" />}
+    </View>
+  );
+}
+
+function NewsfeedScreen() {
   useNoKeyboardOnFocus(); // back from comments / search must never leave the keyboard up
   const { session } = useSession();
   const feed = useFeed();

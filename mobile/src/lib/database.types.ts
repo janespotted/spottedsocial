@@ -2591,6 +2591,9 @@ export type Database = {
       set_night_mode_override: { Args: { p_mode: string }; Returns: Json }
       night_mode_opens_at: { Args: { p_city: string; p_at?: string }; Returns: string }
       is_night_mode: { Args: { p_city: string; p_at?: string }; Returns: boolean }
+      get_night_recap: { Args: Record<PropertyKey, never>; Returns: Json }
+      add_recap_photo: { Args: { p_recap: string; p_key: string; p_width?: number | null; p_height?: number | null; p_thumbhash?: string | null }; Returns: Json }
+      build_my_recap_now: { Args: Record<PropertyKey, never>; Returns: Json }
       username_available: { Args: { p_username: string }; Returns: boolean }
 
       save_plan: { Args: { p_id: string | null; p_values: Json; p_participants?: string[] }; Returns: string }

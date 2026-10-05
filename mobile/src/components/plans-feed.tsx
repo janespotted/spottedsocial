@@ -16,7 +16,9 @@ import { useQueryClient } from '@tanstack/react-query';
 // import { stayIn } from '@/lib/night-status'; — with the parked handleStayIn below
 import { sendMeetUp } from '@/lib/meet-up';
 import { openFriendCard } from '@/lib/friend-card';
-import { type Plan, type EventWithFriends } from '@/lib/plans';
+import { splitTonightUpcoming, type Plan, type EventWithFriends } from '@/lib/plans';
+import { getNightKey } from '@/lib/tonight';
+import { useNightMode } from '@/hooks/use-night-mode';
 import { useSession } from '@/hooks/use-session';
 import { useFriendsOut, type FriendNightStatus } from '@/hooks/use-friends-out';
 import { useMyNightStatus, usePlanEvents, usePlans, usePlansRealtime } from '@/hooks/use-plans';
@@ -93,6 +95,9 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
   const friendsData = friendsOutQuery.data;
   const { data: friendIds } = useFriendIds(userId || undefined);
   usePlansRealtime();
+  // Day Mode (DAY-NIGHT-MODE-PLAN.md §4.6): Plans stay open all day, but
+  // nothing live — no "Around tonight" Meet Ups, no status nudges.
+  const { isNight } = useNightMode();
 
   const [aroundExpanded, setAroundExpanded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -183,12 +188,21 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
     ...plans.map((plan) => ({ type: 'plan' as const, data: plan })),
     ...events.map((event) => ({ type: 'event' as const, data: event })),
   ].sort(sortFeedItems);
+  // Tonight first, then later dates (a plan can be made for any day this week)
+  const { tonight: tonightItems, upcoming: upcomingItems } = splitTonightUpcoming(
+    feedItems,
+    (item) => (item.type === 'plan' ? item.data.plan_date : item.data.event_date),
+    getNightKey(new Date(), city)
+  );
 
-  // Combined "Around tonight" list: out friends first, then TBD
-  const aroundTonight: (FriendNightStatus & { isOut: boolean })[] = [
-    ...outFriends.map((f) => ({ ...f, isOut: true })),
-    ...planningFriends.map((f) => ({ ...f, isOut: false })),
-  ];
+  // Combined "Around tonight" list: out friends first, then TBD. Live, so
+  // Night Mode only.
+  const aroundTonight: (FriendNightStatus & { isOut: boolean })[] = isNight
+    ? [
+        ...outFriends.map((f) => ({ ...f, isOut: true })),
+        ...planningFriends.map((f) => ({ ...f, isOut: false })),
+      ]
+    : [];
   const visibleAround = aroundExpanded
     ? aroundTonight
     : aroundTonight.slice(0, AROUND_TONIGHT_COLLAPSE);
@@ -207,6 +221,14 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
         title: 'Add friends to see who\'s out',
         body: 'Plans and tonight\'s activity come from your friends. Find people you know to get started.',
         actions: addFriendsActions(),
+      };
+    }
+    if (!isNight) {
+      return {
+        icon: 'calendar',
+        title: 'No plans yet',
+        body: 'Make a plan for tonight or later this week and see who\'s down.',
+        actions: [{ ...sharePlan, primary: true }],
       };
     }
     if (isUserOut) {
@@ -249,6 +271,20 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
     };
   };
 
+  const renderItem = (item: FeedItem) =>
+    item.type === 'plan' ? (
+      <PlanCard
+        key={`plan-${item.data.id}`}
+        plan={item.data}
+        currentUserId={userId}
+        userVote={votes[item.data.id] ?? null}
+        onEdit={handleEditPlan}
+        onDeleted={handlePlanDeleted}
+      />
+    ) : (
+      <EventCard key={`event-${item.data.id}`} event={item.data} currentUserId={userId} />
+    );
+
   return (
     <ScrollView
       contentContainerClassName="px-4 pt-4 pb-28 gap-6"
@@ -264,10 +300,12 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
     >
       {/* Persistent, compact — meetups and invites go with the night
           (addendum v3 §3). Not a modal, not dismissible. */}
-      <View className="flex-row items-center gap-2 px-1">
-        <SymbolView name="moon.stars" size={12} tintColor="rgba(255,255,255,0.45)" />
-        <Text className="text-white/45 text-xs font-sans flex-1">{RESET_COPY.plansHeader}</Text>
-      </View>
+      {isNight ? (
+        <View className="flex-row items-center gap-2 px-1">
+          <SymbolView name="moon.stars" size={12} tintColor="rgba(255,255,255,0.45)" />
+          <Text className="text-white/45 text-xs font-sans flex-1">{RESET_COPY.plansHeader}</Text>
+        </View>
+      ) : null}
 
       {/* The Out / TBD / Staying In segmented control used to sit here
           (client change, Sept 2026). Setting a status is the StatusPill's
@@ -275,12 +313,12 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
           is still READ below for the banner and the empty states. */}
 
       {/* TBD: surface friends heading out the moment it happens */}
-      {isUserPlanning && outFriends.length > 0 ? (
+      {isNight && isUserPlanning && outFriends.length > 0 ? (
         <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
       ) : null}
 
       {/* "No" tonight: names only, venues withheld, with the way back in */}
-      {venuesWithheld && aroundTonight.length > 0 ? (
+      {isNight && venuesWithheld && aroundTonight.length > 0 ? (
         <Pressable
           onPress={handleSwitchToOut}
           accessibilityRole="button"
@@ -417,26 +455,20 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
             </Pressable>
 
             <View className="gap-4">
-              {feedItems.map((item) =>
-                item.type === 'plan' ? (
-                  <PlanCard
-                    key={`plan-${item.data.id}`}
-                    plan={item.data}
-                    currentUserId={userId}
-                    userVote={votes[item.data.id] ?? null}
-                    onEdit={handleEditPlan}
-                    onDeleted={handlePlanDeleted}
-                  />
-                ) : (
-                  <EventCard
-                    key={`event-${item.data.id}`}
-                    event={item.data}
-                    currentUserId={userId}
-                  />
-                )
-              )}
+              {tonightItems.length === 0 && upcomingItems.length > 0 ? (
+                <Text className="text-white/55 text-sm font-sans px-1">Nothing planned for tonight yet.</Text>
+              ) : null}
+              {tonightItems.map(renderItem)}
             </View>
           </View>
+
+          {/* 4. Later this week — same cards, same data */}
+          {upcomingItems.length > 0 ? (
+            <View>
+              <Text className="text-white font-sans-semibold text-xl mb-3">Upcoming plans</Text>
+              <View className="gap-4">{upcomingItems.map(renderItem)}</View>
+            </View>
+          ) : null}
         </>
       )}
     </ScrollView>

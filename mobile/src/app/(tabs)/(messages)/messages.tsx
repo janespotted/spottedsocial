@@ -13,6 +13,7 @@ import { useNoKeyboardOnFocus } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { Avatar } from '@/components/avatar';
+import { SubTabs } from '@/components/sub-tabs';
 import { HeaderActions } from '@/components/header-actions';
 import { EmptyState, ErrorState } from '@/components/empty-state';
 import { addFriendsActions } from '@/lib/add-friends';
@@ -209,43 +210,29 @@ export default function MessagesScreen() {
         </View>
 
         {/* Plans and direct/group messages. */}
-        <View className="flex-row items-center px-4 pt-2 pb-3">
-          {(
-            [
-              ['plans', 'Plans'],
-              ['messages', 'DMs'],
-            ] as [TabType, string][]
-          ).map(([tab, label]) => (
-            <Pressable key={tab} onPress={() => setActiveTab(tab)} className="mr-6">
-              <Text
-                className="font-sans-semibold text-2xl"
-                style={{ color: activeTab === tab ? '#ffffff' : 'rgba(255,255,255,0.4)' }}
+        <SubTabs<TabType>
+          tabs={[
+            { key: 'plans', label: 'Plans' },
+            { key: 'messages', label: 'DMs' },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
+          trailing={
+            activeTab === 'messages' ? (
+              // Compose icon, same flow as the empty-state "New chat" button
+              <Pressable
+                onPress={() => router.push('/new-chat')}
+                hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel="New chat"
+                className="w-9 h-9 rounded-full items-center justify-center active:opacity-90"
+                style={{ backgroundColor: NEON }}
               >
-                {label}
-              </Text>
-              {activeTab === tab ? (
-                <View
-                  className="rounded-full mt-0.5"
-                  style={{ height: 2.5, backgroundColor: NEON }}
-                />
-              ) : null}
-            </Pressable>
-          ))}
-          <View className="flex-1" />
-          {activeTab === 'messages' ? (
-            // Compose icon, same flow as the empty-state "New chat" button
-            <Pressable
-              onPress={() => router.push('/new-chat')}
-              hitSlop={4}
-              accessibilityRole="button"
-              accessibilityLabel="New chat"
-              className="w-9 h-9 rounded-full items-center justify-center active:opacity-90"
-              style={{ backgroundColor: NEON }}
-            >
-              <SymbolView name="square.and.pencil" size={17} tintColor="#1a0f2e" weight="semibold" />
-            </Pressable>
-          ) : null}
-        </View>
+                <SymbolView name="square.and.pencil" size={17} tintColor="#1a0f2e" weight="semibold" />
+              </Pressable>
+            ) : null
+          }
+        />
       </View>
 
       {activeTab === 'plans' ? (
