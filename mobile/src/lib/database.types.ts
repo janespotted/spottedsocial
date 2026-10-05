@@ -497,6 +497,51 @@ export type Database = {
         }
         Relationships: []
       }
+      invites: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          kind: string
+          message_id: string
+          receiver_id: string
+          responded_at: string | null
+          sender_id: string
+          status: string
+          thread_id: string
+          venue_id: string | null
+          venue_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          kind: string
+          message_id: string
+          receiver_id: string
+          responded_at?: string | null
+          sender_id: string
+          status?: string
+          thread_id: string
+          venue_id?: string | null
+          venue_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          kind?: string
+          message_id?: string
+          receiver_id?: string
+          responded_at?: string | null
+          sender_id?: string
+          status?: string
+          thread_id?: string
+          venue_id?: string | null
+          venue_name?: string | null
+        }
+        Relationships: []
+      }
       leaderboard_neighborhoods: {
         Row: {
           center_lat: number
@@ -2537,6 +2582,11 @@ export type Database = {
       commit_night_status: { Args: { p_patch: Json; p_fix?: Json; p_audience?: string }; Returns: Json }
       get_post_share_recipients: { Args: { p_post: string }; Returns: { id: string; display_name: string; avatar_url: string | null; is_out: boolean }[] }
       share_post_to_dm: { Args: { p_post: string; p_recipient: string }; Returns: string }
+      send_venue_invites: { Args: { p_venue_id: string; p_receivers: string[] }; Returns: { invite_id: string; receiver_id: string; thread_id: string; created: boolean }[] }
+      send_meetup: { Args: { p_receiver: string }; Returns: { result: string; invite_id: string | null; thread_id: string | null }[] }
+      respond_to_invite: { Args: { p_invite: string; p_accept: boolean }; Returns: Database["public"]["Tables"]["invites"]["Row"] }
+      withdraw_invites: { Args: { p_ids: string[] }; Returns: number }
+      can_read_invite: { Args: { p_id: string }; Returns: boolean }
       username_available: { Args: { p_username: string }; Returns: boolean }
 
       save_plan: { Args: { p_id: string | null; p_values: Json; p_participants?: string[] }; Returns: string }

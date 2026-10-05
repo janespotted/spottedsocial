@@ -7,6 +7,18 @@ import { nightStartAt } from './tonight';
 
 /** Messages containing `[shared_post:<id>]` render as shared-post cards. */
 export const SHARED_POST_REGEX = /^\[shared_post:([a-f0-9-]+)\]$/;
+/**
+ * `[invite:<id>]` (venue) and `[meetup:<id>]` render as invite cards; the
+ * status lives in `invites`. Only the send RPCs can post one (a database
+ * trigger rejects it from clients), and the card still checks the row points
+ * back at this message.
+ */
+const INVITE_POINTER = /^\[(invite|meetup):([a-f0-9-]{36})\]$/;
+
+export function parseInvitePointer(text: string): { kind: 'venue' | 'meetup'; id: string } | null {
+  const match = text.match(INVITE_POINTER);
+  return match ? { kind: match[1] === 'invite' ? 'venue' : 'meetup', id: match[2] } : null;
+}
 
 export interface DmMember {
   user_id: string;
@@ -24,7 +36,7 @@ export interface DmThreadPreview {
   group_avatar_url: string | null;
   members: DmMember[];
   venue_name: string | null;
-  last_message: { text: string; created_at: string } | null;
+  last_message: { text: string; created_at: string; sender_id: string } | null;
   unread: boolean;
 }
 
@@ -47,8 +59,11 @@ export function threadTitle(thread: DmThreadPreview): string {
   return thread.members[0]?.display_name ?? 'Conversation';
 }
 
-/** Preview text for the thread list (shared posts render as a label). */
-export function previewText(text: string): string {
+/** Preview text for the thread list (shared posts and invites render as a label). */
+export function previewText(text: string, mine = false): string {
+  const invite = parseInvitePointer(text);
+  if (invite?.kind === 'venue') return mine ? '📍 You sent an invite' : '📍 Sent you an invite';
+  if (invite) return mine ? 'You sent a meet up request' : 'Sent you a meet up request';
   return SHARED_POST_REGEX.test(text) ? 'Shared a post' : text || '📷 Photo';
 }
 
@@ -157,7 +172,7 @@ export async function fetchDmThreads(userId: string): Promise<DmThreadPreview[]>
       group_avatar_url: await resolvePostImageUrl(info?.group_avatar_url ?? null),
       members,
       venue_name: members.length === 1 ? members[0].venue_name : null,
-      last_message: last ? { text: last.text, created_at: last.created_at } : null,
+      last_message: last ? { text: last.text, created_at: last.created_at, sender_id: last.sender_id } : null,
       unread,
     });
   }

@@ -1112,6 +1112,19 @@ export default function Thread() {
                           );
                         }
 
+                        // Venue invites and meet ups are interactive cards in the
+                        // mobile app; here they read as a label, not the raw pointer
+                        const invitePointer = message.text.match(/^\[(invite|meetup):[a-f0-9-]{36}\]$/);
+                        if (invitePointer) {
+                          const what = invitePointer[1] === 'invite' ? 'venue invite' : 'meet up request';
+                          return (
+                            <div className={`rounded-2xl px-4 py-2.5 ${isCurrentUser ? 'bg-[#4c2f6e] text-white rounded-br-sm' : 'bg-white/95 text-[#1a0f2e] rounded-bl-sm'}`}>
+                              <p className="text-sm">📍 {isCurrentUser ? `You sent a ${what}` : `Sent you a ${what}`}</p>
+                              <p className={`text-xs mt-0.5 ${isCurrentUser ? 'text-white/60' : 'text-[#1a0f2e]/60'}`}>Open the Spotted app to see it</p>
+                            </div>
+                          );
+                        }
+
                         // Regular message
                         return (
                           <div

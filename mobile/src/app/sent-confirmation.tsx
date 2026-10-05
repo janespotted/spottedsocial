@@ -1,4 +1,4 @@
-import { parseConfirmationPeople, parseNotificationIds } from '@/lib/route-input';
+import { parseConfirmationPeople, parseNotificationIds, parseThreadIds } from '@/lib/route-input';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -13,7 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useResolveClassNames } from 'uniwind';
 import { createDmThread } from '@/lib/dm';
-import { undoNotifications } from '@/lib/venue-invites';
+import { withdrawInvites } from '@/lib/dm-invites';
 import { openFriendCard } from '@/lib/friend-card';
 import { showToast } from '@/lib/toast';
 import { Avatar } from '@/components/avatar';
@@ -27,8 +27,10 @@ export interface SentConfirmationParams {
   /** JSON: [{ id, display_name, avatar_url }] — the people just contacted */
   friends: string;
   venueName?: string;
-  /** JSON: notification ids the send created (Undo deletes them) */
-  notificationIds: string;
+  /** JSON: invite ids the send created (Undo withdraws them) */
+  inviteIds: string;
+  /** JSON: { friendId: threadId }, the thread each card landed in */
+  threadIds: string;
 }
 
 interface Person {
@@ -49,7 +51,8 @@ function joinNames(people: Person[]): string {
  * §1 / §11.6): "Invites Sent!" after venue invites and "You sent a Meet Up
  * Request to X!" after a meet-up, with the recipient avatar, the S mark,
  * brief Spotted-coloured confetti, and circular Undo + Chat actions. Undo
- * deletes the notification rows the send created (web parity). Tapping the
+ * withdraws the invites or meet up while unanswered (their DM cards and
+ * pushes go with them). Tapping the
  * backdrop closes it. Copy carries the 5am rule (addendum v3 §3).
  */
 export default function SentConfirmationScreen() {
@@ -74,7 +77,8 @@ export default function SentConfirmationScreen() {
 
   const kind = params.kind === 'meetup' ? 'meetup' : 'invites';
   const friends = parseConfirmationPeople(params.friends);
-  const notificationIds = parseNotificationIds(params.notificationIds);
+  const inviteIds = parseNotificationIds(params.inviteIds);
+  const threadIds = parseThreadIds(params.threadIds);
   const first = friends[0];
 
   const pop = () => {
@@ -93,7 +97,7 @@ export default function SentConfirmationScreen() {
     if (busy) return;
     setBusy(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const ok = await undoNotifications(notificationIds);
+    const ok = await withdrawInvites(inviteIds);
     close();
     setTimeout(
       () =>
@@ -102,7 +106,7 @@ export default function SentConfirmationScreen() {
             ? kind === 'meetup'
               ? 'Meet up request undone'
               : `Invite${friends.length > 1 ? 's' : ''} undone`
-            : "Couldn't undo — it may already be read"
+            : "Couldn't undo — they may have already answered"
         ),
       350
     );
@@ -112,7 +116,7 @@ export default function SentConfirmationScreen() {
     if (!first || busy) return;
     setBusy(true);
     try {
-      const threadId = await createDmThread(first.id);
+      const threadId = threadIds[first.id] ?? (await createDmThread(first.id));
       close();
       setTimeout(
         () =>
@@ -129,7 +133,7 @@ export default function SentConfirmationScreen() {
 
   const headline = kind === 'meetup' ? `You sent a Meet Up Request to ${first?.display_name ?? 'them'}!` : 'Invites Sent!';
 
-  if (!friends.length || !notificationIds.length) return <View className="flex-1 items-center justify-center bg-[#110a24] p-6 gap-4">
+  if (!friends.length || !inviteIds.length) return <View className="flex-1 items-center justify-center bg-[#110a24] p-6 gap-4">
     <Text className="text-white">This confirmation is unavailable. Check Activity or your conversation for the current result.</Text>
     <Text className="text-[#d4ff00]" onPress={pop}>Back</Text>
   </View>;
@@ -185,7 +189,7 @@ export default function SentConfirmationScreen() {
             </Text>
           ) : (
             <Text className="text-white/80 text-[15px] font-sans text-center leading-5">
-              Your request is in their Activity. Push delivery depends on their settings.
+              Your request is in your chat with them and in their Activity.
             </Text>
           )}
           <Text className="text-white/60 text-xs font-sans mt-2">

@@ -8,7 +8,7 @@ import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
 import { createDmThread } from '@/lib/dm';
-import { cancelMeetUp, fetchMeetUpState, sendMeetUp } from '@/lib/meet-up';
+import { sendMeetUp } from '@/lib/meet-up';
 import { blockUser, reportContent } from '@/lib/moderation';
 import { sendFriendRequest } from '@/lib/friends';
 import {
@@ -98,19 +98,9 @@ export function FriendCardBody({
   const [hidden, setHidden] = useState(data.locationHidden);
   const [requestPending, setRequestPending] = useState(data.requestPending);
   const [showMutuals, setShowMutuals] = useState(false);
+  // In flight only: there is no limit on Meet Ups, so the button is never
+  // locked by an earlier one (client, Oct 2026).
   const [meetUpSent, setMeetUpSent] = useState(false);
-  // What's already between us tonight, so the button says so instead of
-  // failing after the tap.
-  const [meetUpState, setMeetUpState] = useState<'none' | 'pending' | 'accepted'>('none');
-  useEffect(() => {
-    let active = true;
-    fetchMeetUpState(currentUserId, data.user_id).then((state) => {
-      if (active) setMeetUpState(state);
-    });
-    return () => {
-      active = false;
-    };
-  }, [currentUserId, data.user_id]);
   useEffect(() => {
     setRelationship(data.relationshipType);
     setHidden(data.locationHidden);
@@ -216,64 +206,29 @@ export function FriendCardBody({
   // ── Actions ─────────────────────────────────────────────────────────
   // Meet Up → the original build's confirmation card with confetti, Undo
   // and Chat (addendum v3 §1); the card replaces this sheet.
-  const confirmCancelMeetUp = () => {
-    Alert.alert(
-      meetUpState === 'accepted' ? `Cancel with ${firstName}?` : 'Cancel this meet up?',
-      meetUpState === 'accepted'
-        ? "They won't be notified — it just clears for both of you tonight."
-        : `Your request to ${firstName} will be withdrawn.`,
-      [
-        { text: 'Keep it', style: 'cancel' },
-        {
-          text: 'Cancel it',
-          style: 'destructive',
-          onPress: async () => {
-            try { await cancelMeetUp(currentUserId, data.user_id); } catch (error) {
-              Alert.alert('Could not cancel', error instanceof Error ? error.message : 'Please retry.');
-              return;
-            }
-            setMeetUpState('none');
-            showToast(`Meet up with ${firstName} cleared`);
-          },
-        },
-      ]
-    );
-  };
-
   const handleMeetUp = async () => {
     if (meetUpSent) return;
-    // Already something tonight → offer to clear it rather than fail.
-    if (meetUpState !== 'none') {
-      confirmCancelMeetUp();
-      return;
-    }
     setMeetUpSent(true);
-    const result = await sendMeetUp(currentUserId, data);
+    const result = await sendMeetUp(data);
     if (result.status === 'sent') {
       onDismiss();
       const friends = JSON.stringify([
         { id: data.user_id, display_name: data.display_name, avatar_url: data.avatar_url },
       ]);
-      const notificationIds = JSON.stringify(result.notificationId ? [result.notificationId] : []);
+      // Undo withdraws the request; Chat opens the thread holding its card
+      const inviteIds = JSON.stringify([result.inviteId]);
+      const threadIds = JSON.stringify({ [data.user_id]: result.threadId });
       setTimeout(
         () =>
           router.push({
             pathname: '/sent-confirmation',
-            params: { kind: 'meetup', friends, notificationIds },
+            params: { kind: 'meetup', friends, inviteIds, threadIds },
           }),
         350
       );
       return;
     }
     setMeetUpSent(false);
-    if (result.status === 'duplicate' || result.status === 'already_met') {
-      onDismiss();
-      const message =
-        result.status === 'already_met'
-          ? `You and ${firstName} are already meeting up tonight`
-          : `A meet up with ${firstName} is already waiting`;
-      setTimeout(() => showToast(message), 350);
-    }
   };
 
   const handleMakePlans = () => {
@@ -526,45 +481,22 @@ export function FriendCardBody({
           </Pressable>
         ) : null}
 
-        {/* Meet Up reports tonight's state: asking, waiting, or on. Tapping
-            the last two offers to clear it (one meet up per pair per
-            night), instead of failing after the tap. */}
+        {/* Meet Up always asks again — every request is its own card in the
+            DM, with no once-per-night limit (client, Oct 2026). */}
         {isOut ? (
           <Pressable
             onPress={handleMeetUp}
+            disabled={meetUpSent}
             accessibilityRole="button"
-            accessibilityLabel={
-              meetUpState === 'accepted'
-                ? `Meeting up with ${firstName} — tap to cancel`
-                : meetUpState === 'pending'
-                  ? `Meet up requested — tap to cancel`
-                  : `Meet up with ${firstName}`
-            }
+            accessibilityLabel={`Meet up with ${firstName}`}
             className="flex-1 h-[42px] rounded-full flex-row items-center justify-center gap-2 active:opacity-90"
             style={{
-              backgroundColor: meetUpSent || meetUpState !== 'none' ? 'rgba(212,255,0,0.35)' : NEON,
+              backgroundColor: meetUpSent ? 'rgba(212,255,0,0.35)' : NEON,
               boxShadow: '0 0 16px rgba(212,255,0,0.25)',
             }}
           >
-            <SymbolView
-              name={
-                meetUpState === 'accepted'
-                  ? 'checkmark.circle.fill'
-                  : meetUpSent || meetUpState === 'pending'
-                    ? 'checkmark'
-                    : 'person.badge.plus'
-              }
-              size={16}
-              tintColor="#000000"
-              weight="semibold"
-            />
-            <Text className="text-black text-sm font-sans-semibold">
-              {meetUpState === 'accepted'
-                ? "You're on"
-                : meetUpSent || meetUpState === 'pending'
-                  ? 'Sent'
-                  : 'Meet Up'}
-            </Text>
+            <SymbolView name={meetUpSent ? 'checkmark' : 'person.badge.plus'} size={16} tintColor="#000000" weight="semibold" />
+            <Text className="text-black text-sm font-sans-semibold">{meetUpSent ? 'Sent' : 'Meet Up'}</Text>
           </Pressable>
         ) : (
           <Pressable

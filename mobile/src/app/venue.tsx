@@ -26,7 +26,7 @@ import { isDemoMode } from '@/lib/demo-mode';
 import { reportContent } from '@/lib/moderation';
 import { getHoursDisplayString, type VenueHours, type VenueHoursDisplay } from '@/lib/venue-hours';
 import { calculateDistanceMiles, getVenuePhotoUrl, getVenueTypeDisplay } from '@/lib/venues';
-import { sendVenueInvites, type InviteFriend } from '@/lib/venue-invites';
+import { sendVenueInvites, type InviteFriend } from '@/lib/dm-invites';
 import { APP_BASE_URL, fetchOrCreateInviteCode, getInviteUrl } from '@/lib/invites';
 import { NEON, control, outlineControl } from '@/lib/theme';
 import { RESET_COPY } from '@/lib/reset-copy';
@@ -467,10 +467,16 @@ export default function VenueScreen() {
       .map((r) => ({ id: r.id, display_name: r.display_name, avatar_url: r.avatar_url }));
     if (selected.length === 0) return;
     setSendingInvites(true);
-    const result = await sendVenueInvites(session.user.id, venue.name, selected);
+    const result = await sendVenueInvites(venue.id, selected);
     setSendingInvites(false);
     if (!result.ok) {
       Alert.alert('Could not send invites', 'Please try again.');
+      return;
+    }
+    // A double tap: the same invite went out seconds ago, and the RPC
+    // returned those cards instead of a second set. Re-inviting later is fine.
+    if (result.inviteIds.length === 0) {
+      Alert.alert('Invite already sent', `You just invited them to ${venue.name}. It's in your chat with them.`);
       return;
     }
     setInvitePickerOpen(false);
@@ -478,13 +484,15 @@ export default function VenueScreen() {
     const delivered = selected.filter(friend => result.recipientIds.includes(friend.id));
     if (delivered.length < selected.length) Alert.alert('Some invites were not sent', 'The confirmation lists only people who could receive your invitation.');
     const friends = JSON.stringify(delivered);
-    const notificationIds = JSON.stringify(result.notificationIds);
+    // Undo withdraws these; Chat opens the thread the card landed in
+    const inviteIds = JSON.stringify(result.inviteIds);
+    const threadIds = JSON.stringify(result.threadIds);
     router.back();
     setTimeout(
       () =>
         router.push({
           pathname: '/sent-confirmation',
-          params: { kind: 'invites', friends, venueName: venue.name, notificationIds },
+          params: { kind: 'invites', friends, venueName: venue.name, inviteIds, threadIds },
         }),
       350
     );

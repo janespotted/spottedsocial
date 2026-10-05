@@ -42,10 +42,10 @@ function GroupAvatar({ thread }: { thread: DmThreadPreview }) {
   );
 }
 
-function ThreadRow({ thread, onPress }: { thread: DmThreadPreview; onPress: () => void }) {
+function ThreadRow({ thread, userId, onPress }: { thread: DmThreadPreview; userId?: string; onPress: () => void }) {
   const title = threadTitle(thread);
   const subtitle = thread.last_message
-    ? previewText(thread.last_message.text)
+    ? previewText(thread.last_message.text, thread.last_message.sender_id === userId)
     : thread.venue_name
       ? `@ ${thread.venue_name}`
       : 'Say hi 👋';
@@ -293,7 +293,7 @@ export default function MessagesScreen() {
               />
             )
           }
-          renderItem={({ item }) => <ThreadRow thread={item} onPress={() => openThread(item)} />}
+          renderItem={({ item }) => <ThreadRow thread={item} userId={session?.user.id} onPress={() => openThread(item)} />}
         />
       )}
     </View>

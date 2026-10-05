@@ -431,6 +431,10 @@ export function MessagesTab({ preselectedUser, onClearPreselection, source }: Me
                       }`}>
                         {thread.last_message.text.match(/^\[shared_post:[a-f0-9-]+\]$/)
                           ? 'Shared a post'
+                          : /^\[invite:[a-f0-9-]{36}\]$/.test(thread.last_message.text)
+                          ? '📍 Venue invite'
+                          : /^\[meetup:[a-f0-9-]{36}\]$/.test(thread.last_message.text)
+                          ? 'Meet up request'
                           : thread.last_message.text || '📷 Photo'}
                       </p>
                     )}

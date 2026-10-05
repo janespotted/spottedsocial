@@ -22,6 +22,14 @@ export function routeForNotification(data: Record<string, unknown> | undefined):
       return uuid(details.thread_id) ? `/thread?threadId=${details.thread_id}` as Href : '/messages?tab=dms' as Href;
     case 'venue_yap':
       return '/messages';
+    // Invites and meet ups live as cards in the 1:1 thread; older rows have no thread_id
+    case 'venue_invite':
+    case 'venue_invite_accepted':
+    case 'venue_invite_declined':
+    case 'meetup_request':
+    case 'meetup_accepted':
+    case 'meetup_declined':
+      return uuid(details.thread_id) ? `/thread?threadId=${details.thread_id}` as Href : '/activity';
     case 'post_tag':
     case 'post_like':
     case 'post_comment':

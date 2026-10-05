@@ -39,6 +39,8 @@ const VALID_NOTIFICATION_TYPES = [
   "dm",
   "meetup_accepted",
   "venue_invite_accepted",
+  "venue_invite_declined",
+  "meetup_declined",
   "rally",
   "plan_down",
   "plan_invite",
@@ -889,6 +891,18 @@ function getNotificationContent(
     case "venue_invite_accepted":
       return {
         title: "📍 Invite Accepted!",
+        body: message,
+        url: "/messages?tab=activity",
+      };
+    case "meetup_declined":
+      return {
+        title: "Meet Up Update",
+        body: message,
+        url: "/messages?tab=activity",
+      };
+    case "venue_invite_declined":
+      return {
+        title: "📍 Invite Declined",
         body: message,
         url: "/messages?tab=activity",
       };

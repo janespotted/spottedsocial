@@ -11,13 +11,24 @@ import { supabase } from '@/lib/supabase';
 import { createDmThread } from '@/lib/dm';
 import { openFriendCard } from '@/lib/friend-card';
 import { acceptMeetUp, acceptVenueInvite } from '@/lib/meet-up';
+import { notificationInviteStatus, respondToInvite, type InviteStatus } from '@/lib/dm-invites';
+import { showToast } from '@/lib/toast';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { useNotifications, type AppNotification } from '@/hooks/use-notifications';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
-import { NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
+import { InviteStatusPill } from '@/components/invite-card';
+import {
+  INK_LIGHT,
+  NEON,
+  PURPLE,
+  VIOLET_FILL,
+  outlineControl,
+  primaryControl,
+  primaryControlText,
+} from '@/lib/theme';
 import { RESET_COPY } from '@/lib/reset-copy';
 
 const CARD = 'bg-[#1a0a2e]/80 rounded-2xl p-3.5';
@@ -45,57 +56,106 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-/** Web ActivityTab card: avatar + bold name + time, typed subtitle, right action */
+/**
+ * Web ActivityTab card: avatar + bold name + time, typed subtitle, right
+ * action. A request with two choices (Accept / Decline) puts them on their
+ * own row under the text, styled like the invite card in the DM.
+ */
 function ActivityCard({
   n,
   subtitleClass = 'text-white/70',
   action,
+  dismiss,
+  status,
+  busy = false,
 }: {
   n: AppNotification;
   subtitleClass?: string;
   action?: { label?: string; icon?: string; onPress: () => void; chevron?: boolean };
+  /** The second choice beside the action (Decline on an invite or meet up). */
+  dismiss?: { label: string; onPress: () => void };
+  /** An answered invite / meet up: the same pill as its card in the DM. */
+  status?: InviteStatus;
+  busy?: boolean;
 }) {
+  const choices = !!(action && dismiss);
   return (
-    <View className={`${CARD} mb-2 flex-row items-center gap-3`}>
-      <Pressable
-        onPress={() => n.sender_id && openFriendCard(n.sender_id)}
-        disabled={!n.sender_id}
-        className="active:opacity-70"
-      >
-        <View className="rounded-full border-2 border-[#a855f7]/60">
-          <Avatar name={n.sender_name ?? '•'} url={n.sender_avatar_url} size="md" />
-        </View>
-      </Pressable>
-      <View className="flex-1 min-w-0">
-        <View className="flex-row items-center gap-2">
-          <Text className="text-white text-sm font-sans-semibold" numberOfLines={1}>
-            {n.sender_name ?? 'Spotted'}
+    <View className={`${CARD} mb-2 gap-3`}>
+      <View className="flex-row items-center gap-3">
+        <Pressable
+          onPress={() => n.sender_id && openFriendCard(n.sender_id)}
+          disabled={!n.sender_id}
+          className="active:opacity-70"
+        >
+          <View className="rounded-full border-2 border-[#a855f7]/60">
+            <Avatar name={n.sender_name ?? '•'} url={n.sender_avatar_url} size="md" />
+          </View>
+        </Pressable>
+        <View className="flex-1 min-w-0">
+          <View className="flex-row items-center gap-2">
+            <Text className="text-white text-sm font-sans-semibold shrink" numberOfLines={1}>
+              {n.sender_name ?? 'Spotted'}
+            </Text>
+            <Text className="text-white/55 text-xs font-sans shrink-0" numberOfLines={1}>
+              {getTimeAgo(n.created_at)}
+              {EXPIRING_TYPES.has(n.type) ? ` · ${RESET_COPY.activityExpires}` : ''}
+            </Text>
+          </View>
+          <Text className={`text-xs font-sans mt-0.5 ${subtitleClass}`} numberOfLines={2}>
+            {subtitleFor(n)}
           </Text>
-          <Text className="text-white/55 text-xs font-sans">
-            {getTimeAgo(n.created_at)}
-            {EXPIRING_TYPES.has(n.type) ? ` · ${RESET_COPY.activityExpires}` : ''}
-          </Text>
+          {status ? (
+            <View className="mt-1.5">
+              <InviteStatusPill status={status} />
+            </View>
+          ) : null}
         </View>
-        <Text className={`text-xs font-sans mt-0.5 ${subtitleClass}`} numberOfLines={2}>
-          {subtitleFor(n)}
-        </Text>
+        {action && !choices ? (
+          action.chevron ? (
+            <Pressable onPress={action.onPress} hitSlop={10}>
+              <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.35)" />
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={action.onPress}
+              className="h-8 px-4 rounded-2xl border border-white/20 items-center justify-center flex-row gap-1 active:bg-white/10"
+            >
+              {action.icon ? (
+                <SymbolView name={action.icon as never} size={12} tintColor="#ffffff" />
+              ) : null}
+              <Text className="text-white text-xs font-sans-medium">{action.label}</Text>
+            </Pressable>
+          )
+        ) : null}
       </View>
-      {action ? (
-        action.chevron ? (
-          <Pressable onPress={action.onPress} hitSlop={10}>
-            <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.35)" />
-          </Pressable>
-        ) : (
+      {choices ? (
+        <View className="flex-row gap-2.5">
           <Pressable
-            onPress={action.onPress}
-            className="h-8 px-4 rounded-2xl border border-white/20 items-center justify-center flex-row gap-1 active:bg-white/10"
+            onPress={action!.onPress}
+            disabled={busy}
+            accessibilityRole="button"
+            className={`flex-1 min-h-10 rounded-full flex-row items-center justify-center gap-1.5 active:opacity-85 disabled:opacity-60 ${primaryControl}`}
           >
-            {action.icon ? (
-              <SymbolView name={action.icon as never} size={12} tintColor="#ffffff" />
-            ) : null}
-            <Text className="text-white text-xs font-sans-medium">{action.label}</Text>
+            {busy ? (
+              <ActivityIndicator size="small" color={INK_LIGHT} />
+            ) : (
+              <>
+                <SymbolView name="checkmark" size={12} tintColor={INK_LIGHT} weight="semibold" />
+                <Text className={`text-sm font-sans-semibold ${primaryControlText}`}>{action!.label}</Text>
+              </>
+            )}
           </Pressable>
-        )
+          <Pressable
+            onPress={dismiss!.onPress}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={dismiss!.label}
+            className={`flex-1 min-h-10 rounded-full flex-row items-center justify-center gap-1.5 disabled:opacity-60 ${outlineControl}`}
+          >
+            <SymbolView name="xmark" size={11} tintColor="#ffffff" weight="semibold" />
+            <Text className="text-white text-sm font-sans-medium">Decline</Text>
+          </Pressable>
+        </View>
       ) : null}
     </View>
   );
@@ -109,8 +169,20 @@ const EXPIRING_TYPES = new Set([
   'plan_invite',
   'meetup_accepted',
   'venue_invite_accepted',
+  'venue_invite_declined',
+  'meetup_declined',
   'plan_down',
 ]);
+
+/** Invites and meet ups sent since the DM cards carry the row id; older rows don't. */
+function inviteIdOf(n: AppNotification): string | null {
+  const id = n.data?.invite_id;
+  return typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
+}
+function threadIdOf(n: AppNotification): string | null {
+  const id = n.data?.thread_id;
+  return typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
+}
 
 export default function ActivityScreen() {
   const { session } = useSession();
@@ -189,8 +261,36 @@ export default function ActivityScreen() {
     }
   };
 
+  /**
+   * An invite or meet up answered here is the same answer as its card in
+   * the DM: one RPC, the sender is notified, this row keeps the answer as a
+   * pill, and Accept opens the thread on the card now reading Accepted.
+   * Older rows (no invite_id) keep the notification-only accept.
+   */
+  const answerInvite = async (n: AppNotification, inviteId: string, accept: boolean) => {
+    if (busyId) return;
+    setBusyId(n.id);
+    const what = n.type === 'meetup_request' ? 'Meet up' : 'Invite';
+    try {
+      const saved = await respondToInvite(inviteId, accept);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      if (accept && saved.status === 'accepted') {
+        openThread(saved.thread_id, n.sender_name ?? 'Chat', n.sender_avatar_url);
+      } else if (!accept) {
+        showToast(saved.status === 'declined' ? `${what} declined` : 'You already answered this');
+      }
+    } catch {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      showToast(`This ${what.toLowerCase()} is no longer available`);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleAccept = async (n: AppNotification) => {
     if (!userId || !n.sender_id || busyId) return;
+    const inviteId = inviteIdOf(n);
+    if (inviteId) return answerInvite(n, inviteId, true);
     setBusyId(n.id);
     const threadId =
       n.type === 'venue_invite'
@@ -209,6 +309,14 @@ export default function ActivityScreen() {
         250
       );
     }
+  };
+
+  const openThread = (threadId: string, name: string, avatarUrl: string | null) => {
+    router.back();
+    setTimeout(
+      () => router.push({ pathname: '/thread', params: { threadId, title: name, avatarUrl: avatarUrl ?? '' } }),
+      250
+    );
   };
 
   // Navigating while this modal is still dismissing makes iOS present the
@@ -257,6 +365,8 @@ export default function ActivityScreen() {
     (n) =>
       n.type === 'meetup_accepted' ||
       n.type === 'venue_invite_accepted' ||
+      n.type === 'venue_invite_declined' ||
+      n.type === 'meetup_declined' ||
       n.type === 'plan_down'
   );
   const dms = all.filter((n) => n.type === 'dm');
@@ -358,27 +468,55 @@ export default function ActivityScreen() {
 
           <SectionHeader title="Invites to You" />
           {invites.length ? (
-            invites.map((n) => (
-              <ActivityCard
-                key={n.id}
-                n={n}
-                subtitleClass={
-                  n.type === 'venue_invite' || n.type === 'plan_invite'
-                    ? 'text-[#d4ff00]'
-                    : 'text-white/70'
-                }
-                action={
-                  // A plan invite has nothing to accept here — "I'm down"
-                  // lives on the plan card itself, so open Plans.
-                  n.type === 'plan_invite'
-                    ? { label: 'See plan', onPress: goToPlans }
-                    : {
-                        label: busyId === n.id ? '...' : "I'm down!",
-                        onPress: () => handleAccept(n),
-                      }
-                }
-              />
-            ))
+            invites.map((n) => {
+              const inviteId = inviteIdOf(n);
+              const threadId = threadIdOf(n);
+              // The answer, given here or on the card in the DM
+              const answered = inviteId ? notificationInviteStatus(n.data) : null;
+              const status = answered && answered !== 'pending' ? answered : undefined;
+              return (
+                <ActivityCard
+                  key={n.id}
+                  n={n}
+                  status={status}
+                  subtitleClass={
+                    n.type === 'venue_invite' || n.type === 'plan_invite'
+                      ? 'text-[#d4ff00]'
+                      : 'text-white/70'
+                  }
+                  action={
+                    // A plan invite has nothing to accept here — "I'm down"
+                    // lives on the plan card itself, so open Plans.
+                    n.type === 'plan_invite'
+                      ? { label: 'See plan', onPress: goToPlans }
+                      : status
+                        ? {
+                            label: 'Chat',
+                            icon: 'bubble.left',
+                            onPress: () =>
+                              threadId
+                                ? openThread(threadId, n.sender_name ?? 'Chat', n.sender_avatar_url)
+                                : n.sender_id &&
+                                  openThreadWith(n.sender_id, n.sender_name ?? 'Chat', n.sender_avatar_url),
+                          }
+                        : {
+                            // Card-backed requests say what the DM card says
+                            label: inviteId ? 'Accept' : busyId === n.id ? '...' : "I'm down!",
+                            onPress: () => handleAccept(n),
+                          }
+                  }
+                  busy={busyId === n.id}
+                  dismiss={
+                    inviteId && !status
+                      ? {
+                          label: n.type === 'meetup_request' ? 'Decline meet up' : 'Decline invite',
+                          onPress: () => void answerInvite(n, inviteId, false),
+                        }
+                      : undefined
+                  }
+                />
+              );
+            })
           ) : (
             <Text className="text-white/50 text-sm font-sans py-2">
               No invites yet — they&apos;ll land here.
@@ -401,18 +539,21 @@ export default function ActivityScreen() {
 
           {accepted.length ? (
             <>
-              <SectionHeader title="Accepted Invites" />
+              <SectionHeader title="Invite Replies" />
               {accepted.map((n) => (
                 <ActivityCard
                   key={n.id}
                   n={n}
-                  subtitleClass="text-[#d4ff00]"
+                  subtitleClass={n.type === 'venue_invite_declined' ? 'text-white/70' : 'text-[#d4ff00]'}
                   action={{
                     label: 'Chat',
                     icon: 'bubble.left',
-                    onPress: () =>
-                      n.sender_id &&
-                      openThreadWith(n.sender_id, n.sender_name ?? 'Chat', n.sender_avatar_url),
+                    // Invite replies open the thread holding the card
+                    onPress: () => {
+                      const threadId = threadIdOf(n);
+                      if (threadId) openThread(threadId, n.sender_name ?? 'Chat', n.sender_avatar_url);
+                      else if (n.sender_id) openThreadWith(n.sender_id, n.sender_name ?? 'Chat', n.sender_avatar_url);
+                    },
                   }}
                 />
               ))}

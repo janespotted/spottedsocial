@@ -14,7 +14,6 @@ import { SymbolView } from 'expo-symbols';
 // import * as Haptics from 'expo-haptics'; — with the parked handleStayIn below
 import { useQueryClient } from '@tanstack/react-query';
 // import { stayIn } from '@/lib/night-status'; — with the parked handleStayIn below
-import { showToast } from '@/lib/toast';
 import { sendMeetUp } from '@/lib/meet-up';
 import { type Plan, type EventWithFriends } from '@/lib/plans';
 import { useSession } from '@/hooks/use-session';
@@ -134,13 +133,12 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
   */
 
   /**
-   * Shared outcome handling: `sent` shows the confirmation card, and the
-   * blocked cases say why instead of silently doing nothing.
+   * `sent` shows the confirmation card (sendMeetUp alerts on failure). There
+   * is no once-per-night limit: every Meet Up is its own card in the DM.
    */
   const handleMeetUp = async (friend: { user_id: string; display_name: string; avatar_url?: string | null }) => {
     if (!session) return;
-    const result = await sendMeetUp(session.user.id, friend);
-    const firstName = friend.display_name.split(' ')[0];
+    const result = await sendMeetUp(friend);
     if (result.status === 'sent') {
       router.push({
         pathname: '/sent-confirmation',
@@ -149,13 +147,12 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
           friends: JSON.stringify([
             { id: friend.user_id, display_name: friend.display_name, avatar_url: friend.avatar_url ?? null },
           ]),
-          notificationIds: JSON.stringify(result.notificationId ? [result.notificationId] : []),
+          // Undo withdraws the request; Chat opens the thread holding its card
+          inviteIds: JSON.stringify([result.inviteId]),
+          threadIds: JSON.stringify({ [friend.user_id]: result.threadId }),
         },
       });
-      return;
     }
-    if (result.status === 'already_met') showToast(`You and ${firstName} are already meeting up tonight`);
-    else if (result.status === 'duplicate') showToast(`A meet up with ${firstName} is already waiting`);
   };
 
   const handleEditPlan = (plan: Plan) => {

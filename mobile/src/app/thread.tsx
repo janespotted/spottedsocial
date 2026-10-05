@@ -32,6 +32,7 @@ import { supabase } from '@/lib/supabase';
 import {
   markThreadRead,
   fetchPeerReadReceipt,
+  parseInvitePointer,
   SHARED_POST_REGEX,
   type DmMember,
   type DmMessage,
@@ -42,7 +43,9 @@ import { resolvePostImageUrl, resolvePostImageUrls } from '@/lib/posts';
 import { isFromTonight } from '@/lib/time-context';
 import { useSession } from '@/hooks/use-session';
 import { useTypingIndicator } from '@/hooks/use-typing-indicator';
+import { useThreadInvites } from '@/hooks/use-thread-invites';
 import { Avatar } from '@/components/avatar';
+import { InviteCard } from '@/components/invite-card';
 import { SpottedCamera } from '@/components/spotted-camera';
 import { NEON } from '@/lib/theme';
 
@@ -118,6 +121,7 @@ export default function ThreadScreen() {
   const seenIdsRef = useRef<Set<string>>(new Set());
   const contentContainerStyle = useResolveClassNames('px-4 py-4');
   const { typingNames, setTyping } = useTypingIndicator(threadId, userId, memberMap);
+  const { invites, responding, respond } = useThreadInvites(threadId, messages);
 
   /* ── Thread data: members, group info, read-receipt privacy ── */
   useEffect(() => {
@@ -741,7 +745,7 @@ export default function ThreadScreen() {
         // The animated LegendList variant freezes mounted rows unless
         // extraData invalidates them — everything renderItem reads from
         // component state must be listed here
-        extraData={{ memberMap, otherMember, hearted, sharedPosts, otherReadAt }}
+        extraData={{ memberMap, otherMember, hearted, sharedPosts, otherReadAt, invites, responding }}
         renderItem={({ item, index }: { item: DmMessage; index: number }) => {
           const isMine = item.sender_id === userId;
           const isNew = !seenIdsRef.current.has(item.id);
@@ -754,17 +758,45 @@ export default function ThreadScreen() {
             new Date(otherReadAt) >= new Date(item.created_at);
           const postMatch = item.text.match(SHARED_POST_REGEX);
           const sharedPost = postMatch ? sharedPosts.get(postMatch[1]) : null;
+          const pointer = parseInvitePointer(item.text);
+          const inviteId = pointer?.id;
+          // A sent card names the receiver; a received one names the sender
+          const otherName = isMine
+            ? otherMember?.display_name
+            : (sender?.display_name ?? otherMember?.display_name);
 
           return (
             <Animated.View
               entering={isNew ? FadeInDown.springify().damping(20).stiffness(250) : undefined}
             >
             <View className="mb-2.5">
-              {needsTimestamp(messages[index - 1], item) ? (
+              {/* Everything here is tonight's, so the thread opens with
+                  "Tonight"; an invite card carries its own time. */}
+              {index === 0 ? (
+                <Text className="text-white/55 text-xs font-sans text-center py-2">
+                  {inviteId ? 'Tonight' : `Tonight · ${timeLabel(item.created_at)}`}
+                </Text>
+              ) : needsTimestamp(messages[index - 1], item) && !inviteId ? (
                 <Text className="text-white/55 text-xs font-sans text-center py-2">
                   {timeLabel(item.created_at)}
                 </Text>
               ) : null}
+              {pointer && inviteId ? (
+                <View className={`flex-row ${isMine ? 'justify-end' : 'justify-start'}`}>
+                  <View className="max-w-[85%]">
+                    <InviteCard
+                      kind={pointer.kind}
+                      invite={invites.get(inviteId)}
+                      isMine={isMine}
+                      otherFirstName={otherName?.split(' ')[0] || (isMine ? 'them' : 'Someone')}
+                      createdAt={item.created_at}
+                      busy={responding.has(inviteId)}
+                      onRespond={(accept) => void respond(inviteId, accept)}
+                      onOpenVenue={(venueId) => router.push({ pathname: '/venue', params: { venueId } })}
+                    />
+                  </View>
+                </View>
+              ) : (
               <View className={`flex-row items-end gap-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
                 {!isMine ? (
                   <Avatar
@@ -853,6 +885,7 @@ export default function ThreadScreen() {
                   ) : null}
                 </View>
               </View>
+              )}
               {showSeen ? (
                 <Text className="text-white/55 text-xs font-sans text-right mt-1 mr-1">Seen</Text>
               ) : null}
