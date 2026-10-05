@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, View, useWindowDimensions, type View as RNView } from 'react-native';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { ActivityIndicator, Alert, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
@@ -15,7 +15,9 @@ import Animated, {
   useDerivedValue,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withSpring,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -25,8 +27,9 @@ import { DayPlaceholder } from '@/components/day-placeholder';
 import { ErrorState } from '@/components/empty-state';
 import { PressableScale, Reveal } from '@/components/motion';
 import { SPRING, useNudge } from '@/lib/motion';
+import { RECAP_PHOTO_GROUP, recapActivePhotoId } from '@/lib/recap-transitions';
+import Transition from 'react-native-screen-transitions';
 import { Polaroid } from '@/components/recap-cover';
-import { RecapLightbox, type SourceRect } from '@/components/recap-lightbox';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { useNightRecap, useRecapPhotoUrls } from '@/hooks/use-night-recap';
 import { useSession } from '@/hooks/use-session';
@@ -38,6 +41,7 @@ import {
   recapDateLabel,
   type NightRecap,
   type RecapChapter,
+  type RecapPhoto,
 } from '@/lib/night-recap';
 import { cityToTimezone } from '@/lib/tonight';
 import {
@@ -184,17 +188,79 @@ function StopsChapter({ recap, city, when }: { recap: NightRecap; city: string; 
   );
 }
 
-/** Photos are dealt onto the table; a tap lifts one into the lightbox. */
+/**
+ * One scrapbook photo. A tap picks it up — it straightens (its tilt is undone)
+ * — and pushes the viewer; the picture then zooms into it (a
+ * react-native-screen-transitions boundary, app/(recap)/_layout.tsx). Straightening first matters: the
+ * transition measures the picture's layout frame, which is unrotated, so a
+ * tilted photo would snap. Back here it lands straight, then re-tilts.
+ */
+function ScrapbookPhoto({
+  photo,
+  url,
+  i,
+  count,
+  when,
+}: {
+  photo: RecapPhoto;
+  url: string | undefined;
+  i: number;
+  count: number;
+  when: SharedValue<number>;
+}) {
+  const tilt = PHOTO_TILT[i % 3];
+  const reduce = useReducedMotion();
+  const straight = useSharedValue(0);
+  const picked = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!picked.current) return;
+      picked.current = false;
+      // Let the photo land first (the shared transition), then re-tilt.
+      straight.value = withDelay(reduce ? 0 : 460, withSpring(0, SPRING.land));
+    }, [reduce, straight])
+  );
+
+  const untilt = useAnimatedStyle(() => ({ transform: [{ rotate: `${-tilt * straight.value}deg` }] }));
+
+  const open = () => {
+    if (picked.current) return;
+    picked.current = true;
+    recapActivePhotoId.value = photo.id;
+    straight.value = withTiming(1, { duration: reduce ? 0 : 140 });
+    // Navigate once it is upright: the zoom measures the picture when the
+    // transition starts, and an upright picture is exactly its frame.
+    setTimeout(() => router.push({ pathname: '/recap-photo', params: { index: String(i) } }), reduce ? 0 : 140);
+  };
+
+  return (
+    <View className={`w-1/3 items-center ${i % 3 === 1 ? 'mt-4' : ''}`}>
+      <Reveal when={when} delay={140 + i * 110} rotate={tilt} from={{ y: 40, scale: 0.7, rotate: 0 }} spring={SPRING.land}>
+        <Animated.View style={untilt}>
+          <PressableScale
+            onPress={open}
+            scaleTo={0.97}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={`Open picture ${i + 1} of ${count}`}
+          >
+            <Transition.Boundary group={RECAP_PHOTO_GROUP} id={photo.id} anchor="center" scaleMode="uniform">
+              <Polaroid width={92} rotate={0} photo={photo} url={url} boundTarget />
+            </Transition.Boundary>
+          </PressableScale>
+        </Animated.View>
+      </Reveal>
+    </View>
+  );
+}
+
+/** Photos are dealt onto the table; a tap opens one in the viewer. */
 function PicturesChapter({
   recap,
   when,
-  photoRefs,
-  onOpen,
 }: {
   recap: NightRecap;
   when: SharedValue<number>;
-  photoRefs: React.RefObject<(RNView | null)[]>;
-  onOpen: (index: number) => void;
 }) {
   const { session } = useSession();
   const queryClient = useQueryClient();
@@ -240,31 +306,14 @@ function PicturesChapter({
               </Reveal>
             ))
           : recap.photos.map((photo, i) => (
-              <Reveal
+              <ScrapbookPhoto
                 key={photo.id}
+                photo={photo}
+                url={urls.data?.get(photo.storage_key)}
+                i={i}
+                count={recap.photos.length}
                 when={when}
-                delay={140 + i * 110}
-                rotate={PHOTO_TILT[i % 3]}
-                from={{ y: 40, scale: 0.7, rotate: 0 }}
-                spring={SPRING.land}
-                className={`w-1/3 items-center ${i % 3 === 1 ? 'mt-4' : ''}`}
-              >
-                <View
-                  ref={(el) => {
-                    photoRefs.current[i] = el;
-                  }}
-                  collapsable={false}
-                >
-                  <PressableScale
-                    onPress={() => onOpen(i)}
-                    scaleTo={0.93}
-                    accessibilityRole="imagebutton"
-                    accessibilityLabel={`Open picture ${i + 1} of ${recap.photos.length}`}
-                  >
-                    <Polaroid width={92} rotate={0} photo={photo} url={urls.data?.get(photo.storage_key)} />
-                  </PressableScale>
-                </View>
-              </Reveal>
+              />
             ))}
       </View>
       {full ? null : (
@@ -387,8 +436,8 @@ function ChapterTab({
  * or Next / Back. The lime bar and the labels track the swipe continuously,
  * the panel's height morphs between chapters, and each chapter assembles as
  * it comes into view — tickets drop onto the table, photos are dealt,
- * friends slide in. Nothing advances on its own. Photos open in a lightbox
- * that flies out of (and back into) their frames. All of it honours Reduce
+ * friends slide in. Nothing advances on its own. Photos fly into the viewer
+ * (/recap-photo), zooming out of their Polaroids. All of it honours Reduce
  * Motion. Private: the data comes only from get_night_recap().
  */
 export default function MorningAfter() {
@@ -486,26 +535,6 @@ export default function MorningAfter() {
   const v2 = usePageVisibility(progress, 2);
   const visibility = [v0, v1, v2];
 
-  // Lightbox: measure the photo frames, then let the picture fly out of one.
-  const photoRefs = useRef<(RNView | null)[]>([]);
-  const [lightbox, setLightbox] = useState<{ index: number; sources: (SourceRect | undefined)[] } | null>(null);
-  const openPhoto = async (i: number) => {
-    if (!recap) return;
-    const sources = await Promise.all(
-      recap.photos.map(
-        (_, j) =>
-          new Promise<SourceRect | undefined>((resolve) => {
-            const el = photoRefs.current[j];
-            if (!el) return resolve(undefined);
-            el.measureInWindow((x, y, width, height) =>
-              resolve(width > 0 ? { x, y, width, height, rotate: PHOTO_TILT[j % 3] } : undefined)
-            );
-          })
-      )
-    );
-    setLightbox({ index: i, sources });
-  };
-
   const sameCrew = () =>
     router.push({
       pathname: '/create-plan',
@@ -522,9 +551,8 @@ export default function MorningAfter() {
 
   return (
     <View className="flex-1 bg-[#110a24]">
-      {/* No swipe-back while a photo is open: the swipe belongs to the photo. */}
-      <Stack.Screen options={{ headerShown: false, gestureEnabled: !lightbox }} />
-      <ScrollView contentContainerClassName="px-4 pt-safe-offset-2 pb-safe-offset-6" scrollEnabled={!lightbox}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView contentContainerClassName="px-4 pt-safe-offset-2 pb-safe-offset-6">
         <PressableScale
           onPress={() => router.back()}
           haptic="none"
@@ -611,7 +639,7 @@ export default function MorningAfter() {
                         {c === 'stops' ? (
                           <StopsChapter recap={recap} city={city} when={visibility[i]} />
                         ) : c === 'pictures' ? (
-                          <PicturesChapter recap={recap} when={visibility[i]} photoRefs={photoRefs} onOpen={openPhoto} />
+                          <PicturesChapter recap={recap} when={visibility[i]} />
                         ) : (
                           <PeopleChapter recap={recap} when={visibility[i]} />
                         )}
@@ -657,15 +685,6 @@ export default function MorningAfter() {
         )}
       </ScrollView>
 
-      {lightbox && recap ? (
-        <RecapLightbox
-          photos={recap.photos}
-          urls={urls.data}
-          startIndex={lightbox.index}
-          sources={lightbox.sources}
-          onClose={() => setLightbox(null)}
-        />
-      ) : null}
     </View>
   );
 }

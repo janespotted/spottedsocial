@@ -66,3 +66,4 @@ export function useNudge(distance = 3, every = 2400) {
   }, [reduce, distance, every, x]);
   return useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
 }
+

@@ -17,7 +17,8 @@ import { nightResetAt } from '@/lib/tonight';
 const GATE_HREF: Href = { pathname: '/check-in', params: { gate: '1' } };
 
 // Screens the check-in sheet itself opens on top of the pending question.
-const ALLOWED_ABOVE_GATE = new Set(['check-in', 'audience', 'morning-after', 'crossed-paths']);
+// '(recap)' is the Morning After flow (morning-after, recap-photo, crossed-paths).
+const ALLOWED_ABOVE_GATE = new Set(['check-in', 'audience', 'morning-after', '(recap)']);
 
 // setTimeout overflows past ~24.8 days; clamp so a long-lived session
 // re-arms instead of firing immediately.
@@ -158,7 +159,7 @@ export function NightStatusGate() {
 
   // Cover the app until we know whether to ask — never usable before the question
   const topRoute = rootState?.routes[rootState.routes.length - 1]?.name;
-  if (gated && gateState === 'unknown' && topRoute !== 'morning-after') {
+  if (gated && gateState === 'unknown' && topRoute !== 'morning-after' && topRoute !== '(recap)') {
     return (
       <View
         style={[StyleSheet.absoluteFill, { backgroundColor: '#110a24' }]}

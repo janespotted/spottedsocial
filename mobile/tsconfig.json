@@ -8,6 +8,12 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "react-native-screen-transitions": [
+        "./node_modules/react-native-screen-transitions/lib/typescript/index.d.ts"
+      ],
+      "react-native-screen-transitions/expo-router": [
+        "./node_modules/react-native-screen-transitions/lib/typescript/navigators/expo-router/index.d.ts"
       ]
     }
   },

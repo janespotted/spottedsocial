@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Camera, MapPinned, Sunrise } from 'lucide-react-native';
+import Transition from 'react-native-screen-transitions';
 import { Avatar } from '@/components/avatar';
 import { DayPlaceholder } from '@/components/day-placeholder';
 import { Image } from '@/components/styled';
@@ -18,6 +19,7 @@ export function Polaroid({
   icon = 'photo',
   tint = 'rgba(255,255,255,0.75)',
   className = '',
+  boundTarget = false,
 }: {
   width: number;
   rotate: number;
@@ -26,6 +28,12 @@ export function Polaroid({
   icon?: 'photo' | 'sparkles' | 'photo.badge.plus';
   tint?: string;
   className?: string;
+  /**
+   * Marks the picture (inside the frame's border) as the measured target of
+   * the caller's `Transition.Boundary`, so the photo zooms from exactly the
+   * picture, not the whole Polaroid.
+   */
+  boundTarget?: boolean;
 }) {
   return (
     <View
@@ -39,7 +47,19 @@ export function Polaroid({
         transform: [{ rotate: `${rotate}deg` }],
       }}
     >
-      {url ? (
+      {url && boundTarget ? (
+        // Only inside the Morning After stack (app/(recap)) — a boundary needs
+        // the screen-transitions navigator around it; Home's card has none.
+        <Transition.Boundary.Target style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+          <Image
+            source={{ uri: url }}
+            placeholder={photo?.thumbhash ? { thumbhash: photo.thumbhash } : undefined}
+            className="w-full h-full"
+            contentFit="cover"
+            accessibilityIgnoresInvertColors
+          />
+        </Transition.Boundary.Target>
+      ) : url ? (
         <Image
           source={{ uri: url }}
           placeholder={photo?.thumbhash ? { thumbhash: photo.thumbhash } : undefined}
