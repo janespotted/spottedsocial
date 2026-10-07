@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Image } from '@/components/styled';
-import { useEvent } from 'expo';
 import { SymbolView } from 'expo-symbols';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import type { FeedPost } from '@/lib/posts';
@@ -62,8 +61,17 @@ function PostVideo({
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
   });
-  const { status } = useEvent(player, 'statusChange', { status: player.status });
-  const showPoster = !!poster && status !== 'readyToPlay';
+  // The poster covers the wait for the FIRST frame only. It used to follow
+  // the player status, but an HLS loop (and a resume) drops back to
+  // 'loading' for a moment, so the poster flashed over the video on every
+  // replay. A new player (another video in a recycled row) shows it again.
+  const [firstFrameShown, setFirstFrameShown] = useState(false);
+  const [framePlayer, setFramePlayer] = useState(player);
+  if (framePlayer !== player) {
+    setFramePlayer(player);
+    setFirstFrameShown(false);
+  }
+  const showPoster = !!poster && !firstFrameShown;
 
   // The only place playback starts: the feed passes isVisible for the one
   // video it has chosen (most on screen, Home focused); everything else
@@ -89,6 +97,7 @@ function PostVideo({
         style={{ width: '100%', height: '100%' }}
         contentFit="cover"
         nativeControls={false}
+        onFirstFrameRender={() => setFirstFrameShown(true)}
       />
       {showPoster ? (
         <Image
