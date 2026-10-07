@@ -29,7 +29,8 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "appleTeamId": "WAG8BQTW69"
+      "appleTeamId": "WAG8BQTW69",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -58,6 +59,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-apple-authentication",
       [
         "expo-splash-screen",
         {

@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { supabase } from '@/lib/supabase';
+import { isAppleSignInAvailable, signInWithApple } from '@/lib/apple-sign-in';
 import { SpottedMark } from '@/components/spotted-mark';
 import {
   DEFAULT_COUNTRY,
@@ -48,6 +50,11 @@ export default function PhoneScreen() {
   // Nothing is marked wrong until the field has been left or submitted —
   // flagging "too short" on the first keystroke is the confusing part.
   const [touched, setTouched] = useState(false);
+
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  useEffect(() => {
+    void isAppleSignInAvailable().then(setAppleAvailable);
+  }, []);
 
   const phoneProblem = useMemo(
     () => validateNational(digits, country),
@@ -127,6 +134,20 @@ export default function PhoneScreen() {
     // On success the session listener redirects automatically.
   };
 
+  const continueWithApple = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await signInWithApple();
+      // On success the session listener redirects (onboarding for a new account).
+    } catch (e) {
+      setError(e instanceof Error ? e.message.toLowerCase() : 'apple sign-in failed, please try again');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const switchMode = (next: 'phone' | 'email') => {
     setMode(next);
     setError(null);
@@ -147,6 +168,8 @@ export default function PhoneScreen() {
         className="flex-1"
         contentContainerClassName="flex-grow items-center justify-center px-6"
         keyboardShouldPersistTaps="handled"
+        // The number pad has no return key; a swipe puts it away
+        keyboardDismissMode="on-drag"
         bottomOffset={32}
       >
         <View style={{ marginBottom: 16 }}>
@@ -195,7 +218,9 @@ export default function PhoneScreen() {
                   keyboardType="phone-pad"
                   textContentType="telephoneNumber"
                   autoComplete="tel-national"
-                  autoFocus
+                  // No autoFocus: the number pad covered "Continue with
+                  // Apple", and App Review wants the sign-in options shown
+                  // with equal prominence.
                   className={`flex-1 ${inputClass}`}
                   style={
                     touched && phoneProblem && digits.length > 0
@@ -268,6 +293,24 @@ export default function PhoneScreen() {
               {busy ? (mode === 'phone' ? 'sending...' : 'signing in...') : 'continue'}
             </Text>
           </Pressable>
+          {appleAvailable ? (
+            <>
+              <View className="flex-row items-center gap-3">
+                <View className="flex-1 h-px bg-white/15" />
+                <Text className="text-xs text-white/45 font-sans">or</Text>
+                <View className="flex-1 h-px bg-white/15" />
+              </View>
+              {/* Apple's own button (App Review requires its artwork and
+                  wording); white reads best on the dark background. */}
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={16}
+                style={{ width: '100%', height: 48, opacity: busy ? 0.4 : 1 }}
+                onPress={continueWithApple}
+              />
+            </>
+          ) : null}
           {/* Email/password was the Twilio-outage workaround (SOW FIX #12:
               phone-OTP only). Toggle hidden per client; uncomment to restore.
               NOTE: with Twilio still suspended, fresh sign-ins are impossible

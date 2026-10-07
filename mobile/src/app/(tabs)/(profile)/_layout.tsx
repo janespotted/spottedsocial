@@ -11,6 +11,8 @@ export default function ProfileLayout() {
       <Stack.Screen name="friends" options={{ title: 'Friends' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       <Stack.Screen name="blocked-hidden" options={{ title: 'Blocked & Hidden' }} />
+      <Stack.Screen name="sign-in-methods" options={{ title: 'Sign-in methods' }} />
+      <Stack.Screen name="add-phone" options={{ title: 'Phone number' }} />
     </Stack>
   );
 }

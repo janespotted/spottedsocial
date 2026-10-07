@@ -365,6 +365,12 @@ export default function SettingsScreen() {
           onPress={() => router.push('/edit-profile')}
         />
         <SettingsRow
+          icon="key"
+          title="Sign-in methods"
+          subtitle="Phone number and Apple"
+          onPress={() => router.push('/sign-in-methods')}
+        />
+        <SettingsRow
           icon="checkmark.message"
           title="Read Receipts"
           subtitle='Show "Seen" in DMs (both sides must enable)'

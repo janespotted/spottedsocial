@@ -43,7 +43,8 @@ export default function CityScreen() {
       setError(err.message);
       return;
     }
-    router.push('/onboarding/welcome');
+    // No phone on the account (Sign in with Apple): offer to add one, skippable
+    router.push(session.user.phone ? '/onboarding/welcome' : '/onboarding/phone');
   };
 
   return (

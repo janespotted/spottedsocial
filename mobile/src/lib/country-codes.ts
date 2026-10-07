@@ -217,7 +217,7 @@ export function toE164(digits: string, country: Country): string {
 }
 
 /* ---------------------------------------------------------------------- *
- * Picker request store — /auth/country-code is a separate screen (a form
+ * Picker request store — /country-code is a separate screen (a form
  * sheet), so the current selection and the handler cross that boundary
  * here, the same pattern as lib/audience.ts and lib/tag-picker.ts.
  * ---------------------------------------------------------------------- */
@@ -237,7 +237,7 @@ function emit() {
 export function openCountryPicker(req: CountryPickerRequest): void {
   request = req;
   emit();
-  router.push('/auth/country-code');
+  router.push('/country-code');
 }
 
 export function clearCountryRequest(): void {

@@ -1,13 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { ProgressDots } from '@/components/progress-dots';
+import { useSession } from '@/hooks/use-session';
 import { NEON } from '@/lib/theme';
 
 export default function NameScreen() {
   const [displayName, setDisplayName] = useState('');
   const [focused, setFocused] = useState(false);
+
+  // Sign in with Apple shares the user's name once (lib/apple-sign-in.ts
+  // saves it a moment after the session starts): offer it, never overwrite
+  // what they've typed.
+  const { session } = useSession();
+  const appleName = session?.user.user_metadata?.full_name as string | undefined;
+  useEffect(() => {
+    if (appleName) setDisplayName((current) => current || appleName);
+  }, [appleName]);
 
   const handleContinue = () => {
     if (!displayName.trim()) return;

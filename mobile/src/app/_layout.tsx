@@ -88,6 +88,17 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Screen name="terms" options={{ presentation: 'modal' }} />
       <Stack.Screen name="privacy" options={{ presentation: 'modal' }} />
+      {/* Signed out (login) AND signed in (adding a phone in onboarding or
+          Settings), so it sits outside both guards */}
+      <Stack.Screen
+        name="country-code"
+        options={{
+          presentation: 'formSheet',
+          sheetAllowedDetents: 'fitToContents',
+          sheetGrabberVisible: true,
+          contentStyle: SHEET_CONTENT_STYLE,
+        }}
+      />
       {/* Everything below requires a session — the guard evicts any of
           these left open (thread, sheets, modals) the moment it drops,
           instead of stranding them above the auth screen */}
