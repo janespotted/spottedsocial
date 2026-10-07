@@ -32,6 +32,8 @@ const SessionContext = createContext<SessionState>({
 
 /** Ship date of the tour-seen flag (2026-09-22). See fetchOnboardingNeeded. */
 const TOUR_FLAG_SHIPPED_AT = Date.parse('2026-09-22T00:00:00Z');
+/** How long after sign-up a complete profile with no tour flag can still be mid-tour. */
+const MID_TOUR_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** Onboarding is done when the profile is complete (name + username) AND
  * the tour has been finished.
@@ -53,13 +55,18 @@ async function fetchOnboardingNeeded(userId: string): Promise<boolean> {
     .maybeSingle();
   if (error) throw error;
   if (!(data?.display_name && data?.username)) return true;
-  if (await hasSeenTour(userId)) return false;
-  // Accounts that finished onboarding before the tour flag shipped have a
-  // complete profile and no flag; without this they would all be sent back
-  // through the tour on update. Only accounts created after the cutoff can
-  // legitimately be mid-tour.
+  const { data: auth } = await supabase.auth.getSession();
+  const user = auth.session?.user.id === userId ? auth.session.user : null;
+  if (!user || (await hasSeenTour(user))) return false;
+  // A complete profile with no flag is either mid-tour (a brand-new
+  // account) or an existing account that finished before the flag was
+  // stored on the account: pre-flag accounts, and ones that only recorded
+  // it on another device. Only a recent sign-up can be mid-tour; anyone
+  // else signing in on a fresh install must land in the app, not on the
+  // name step.
   const createdAt = data.created_at ? Date.parse(data.created_at) : NaN;
-  return Number.isNaN(createdAt) ? false : createdAt >= TOUR_FLAG_SHIPPED_AT;
+  if (Number.isNaN(createdAt) || createdAt < TOUR_FLAG_SHIPPED_AT) return false;
+  return Date.now() - createdAt < MID_TOUR_WINDOW_MS;
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
