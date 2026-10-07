@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import {
   GestureDetector,
   usePanGesture,
@@ -16,9 +17,8 @@ import { scheduleOnRN } from 'react-native-worklets';
 import Transition from 'react-native-screen-transitions';
 import { Image } from '@/components/styled';
 import { PressableScale } from '@/components/motion';
-import { useNightRecap, useRecapPhotoUrls } from '@/hooks/use-night-recap';
+import { useNightRecap, useRecapPictures, type RecapPicture } from '@/hooks/use-night-recap';
 import { SPRING } from '@/lib/motion';
-import type { RecapPhoto } from '@/lib/night-recap';
 import { RECAP_PHOTO_GROUP, recapActivePhotoId } from '@/lib/recap-transitions';
 import { INK, NEON, outlineControl } from '@/lib/theme';
 
@@ -43,6 +43,37 @@ function rubber(v: number, lo: number, hi: number) {
 }
 
 /**
+ * A video post, playing over its poster. Plays only while its page is the
+ * current one, with sound and looping like the feed; the poster stays until
+ * the first frame is drawn. The stream link is pinned at mount: a re-minted
+ * token must not hand the player a new source and restart it.
+ */
+function RecapVideo({ stream, active }: { stream: string; active: boolean }) {
+  const source = useRef(stream).current;
+  const player = useVideoPlayer(source, (p) => {
+    p.loop = true;
+  });
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    try {
+      if (active) player.play();
+      else player.pause();
+    } catch {
+      /* player may be released during unmount */
+    }
+  }, [active, player]);
+  return (
+    <VideoView
+      player={player}
+      style={[StyleSheet.absoluteFill, { opacity: shown ? 1 : 0 }]}
+      contentFit="cover"
+      nativeControls={false}
+      onFirstFrameRender={() => setShown(true)}
+    />
+  );
+}
+
+/**
  * One photo in the large 4:5 frame (screenshot 06). Each photo is a boundary
  * in the "recap" group (the same identity as its Polaroid picture), and the
  * frame is the measured target, so the route's navigation.zoom grows the
@@ -51,8 +82,8 @@ function rubber(v: number, lo: number, hi: number) {
  */
 function Page({
   photo,
-  url,
   i,
+  index,
   w,
   h,
   left,
@@ -62,9 +93,10 @@ function Page({
   panY,
   count,
 }: {
-  photo: RecapPhoto;
-  url: string | undefined;
+  photo: RecapPicture;
   i: number;
+  /** The page on screen: a video plays only there, and loads one page ahead. */
+  index: number;
   w: number;
   h: number;
   left: number;
@@ -91,12 +123,12 @@ function Page({
         style={{ width: w, height: h, borderRadius: 18, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.06)' }}
         accessible
         accessibilityRole="image"
-        accessibilityLabel={`Picture ${i + 1} of ${count}`}
+        accessibilityLabel={`${photo.video ? 'Video' : 'Picture'} ${i + 1} of ${count}`}
       >
         <Animated.View style={[{ width: '100%', height: '100%' }, zoomed]}>
-          {url ? (
+          {photo.url ? (
             <Image
-              source={{ uri: url }}
+              source={{ uri: photo.url }}
               placeholder={photo.thumbhash ? { thumbhash: photo.thumbhash } : undefined}
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"
@@ -106,6 +138,9 @@ function Page({
               <SymbolView name="photo" size={30} tintColor="rgba(255,255,255,0.45)" />
             </View>
           )}
+          {photo.video && photo.stream && Math.abs(index - i) <= 1 ? (
+            <RecapVideo stream={photo.stream} active={index === i} />
+          ) : null}
         </Animated.View>
       </Transition.Boundary.Target>
     </Transition.Boundary>
@@ -146,8 +181,8 @@ function Dot({ i, page }: { i: number; page: SharedValue<number> }) {
 export default function RecapPhotoScreen() {
   const { index: raw } = useLocalSearchParams<{ index?: string }>();
   const { data: recap } = useNightRecap();
-  const urls = useRecapPhotoUrls(recap);
-  const photos = useMemo(() => recap?.photos ?? [], [recap]);
+  // The chapter's list, in the chapter's order (saved, then camera roll)
+  const { pictures: photos } = useRecapPictures(recap);
   const { width: winW, height: winH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -286,7 +321,7 @@ export default function RecapPhotoScreen() {
 
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         {photos.map((photo, i) => (
-          <Ambient key={photo.id} url={urls.data?.get(photo.storage_key)} i={i} page={page} />
+          <Ambient key={photo.id} url={photo.url} i={i} page={page} />
         ))}
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(17, 10, 36, 0.62)' }]} />
       </View>
@@ -299,8 +334,8 @@ export default function RecapPhotoScreen() {
                 <Page
                   key={photo.id}
                   photo={photo}
-                  url={urls.data?.get(photo.storage_key)}
                   i={i}
+                  index={index}
                   w={w}
                   h={h}
                   left={i * (w + GAP)}
@@ -341,7 +376,9 @@ export default function RecapPhotoScreen() {
         style={{ position: 'absolute', left: 16, right: 16, top: photoTop + h + CONTROLS_GAP, height: CONTROLS }}
       >
         <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-white/60 text-xs font-sans">Last night · Only you</Text>
+          <Text className="text-white/60 text-xs font-sans">
+            {photos[index]?.onDevice ? 'Last night · On this phone' : 'Last night · Only you'}
+          </Text>
           {photos.length > 1 ? (
             <View className="flex-row items-center gap-1.5" accessible={false}>
               {photos.map((p, i) => (

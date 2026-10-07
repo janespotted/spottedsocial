@@ -21,13 +21,23 @@ export interface RecapStop {
   left_at: string | null;
 }
 
+/** A saved recap picture: a photo (Storage) or a video post, shown as its poster (Mux). */
 export interface RecapPhoto {
   id: string;
-  storage_key: string;
+  kind: 'photo' | 'video';
+  /** Photos only. */
+  storage_key: string | null;
+  /** Videos only. */
+  mux_playback_id: string | null;
   width: number | null;
   height: number | null;
   thumbhash: string | null;
   source: 'post' | 'library';
+}
+
+/** The key its signed link is cached under: the storage path, or `mux:<playback id>`. */
+export function recapMediaKey(photo: Pick<RecapPhoto, 'storage_key' | 'mux_playback_id'>): string {
+  return photo.storage_key ?? `mux:${photo.mux_playback_id}`;
 }
 
 export interface RecapPerson {
@@ -64,16 +74,37 @@ export async function fetchNightRecap(): Promise<NightRecap | null> {
     night_date: r.night_date,
     expires_at: r.expires_at ?? '',
     stops: r.stops ?? [],
-    photos: r.photos ?? [],
+    // Rows from before video posts joined the recap carry no kind
+    photos: (r.photos ?? []).map((p) => ({
+      ...p,
+      kind: p.mux_playback_id ? 'video' : 'photo',
+      storage_key: p.storage_key ?? null,
+      mux_playback_id: p.mux_playback_id ?? null,
+    })),
     people: r.people ?? [],
   };
 }
 
-/** Signed links for the recap's photos (owner only, via private_media_target). */
-export async function resolveRecapPhotoUrls(photos: RecapPhoto[]): Promise<Map<string, string>> {
+/** A saved picture's signed links: the image (a photo, or a video's poster) and a video's stream. */
+export interface RecapPhotoLink {
+  url: string;
+  stream?: string;
+}
+
+/**
+ * Signed links for the recap's pictures (owner only, via private_media_target),
+ * keyed by recapMediaKey: a photo's file, or a video's 4:5 poster frame plus
+ * its HLS stream.
+ */
+export async function resolveRecapPhotoUrls(photos: RecapPhoto[]): Promise<Map<string, RecapPhotoLink>> {
   if (photos.length === 0) return new Map();
-  const { paths } = await resolvePrivateMedia({ paths: photos.map((p) => p.storage_key) });
-  return paths;
+  const paths = photos.flatMap((p) => (p.storage_key ? [p.storage_key] : []));
+  const playbackIds = photos.flatMap((p) => (p.mux_playback_id ? [p.mux_playback_id] : []));
+  const links = await resolvePrivateMedia({ paths, playbackIds });
+  const out = new Map<string, RecapPhotoLink>();
+  for (const [path, url] of links.paths) out.set(path, { url });
+  for (const [id, link] of links.playback) out.set(`mux:${id}`, { url: link.poster, stream: link.stream });
+  return out;
 }
 
 /** "SEP 21" from the night's date (a calendar date, so read in UTC). */

@@ -6,24 +6,25 @@ import Transition from 'react-native-screen-transitions';
 import { Avatar } from '@/components/avatar';
 import { DayPlaceholder } from '@/components/day-placeholder';
 import { Image } from '@/components/styled';
-import { useRecapPhotoUrls } from '@/hooks/use-night-recap';
-import type { NightRecap, RecapPhoto } from '@/lib/night-recap';
+import { useRecapPictures } from '@/hooks/use-night-recap';
+import type { NightRecap } from '@/lib/night-recap';
 import { NEON, POLAROID_EDGE, recapCover, STICKER_INK } from '@/lib/theme';
 
 /** A Polaroid: thin edges, a thicker bottom, tilted. Shows a photo or an icon. */
 export function Polaroid({
   width,
   rotate,
-  photo,
+  thumbhash,
   url,
   icon = 'photo',
   tint = 'rgba(255,255,255,0.75)',
   className = '',
   boundTarget = false,
+  video = false,
 }: {
   width: number;
   rotate: number;
-  photo?: RecapPhoto;
+  thumbhash?: string | null;
   url?: string;
   icon?: 'photo' | 'sparkles' | 'photo.badge.plus';
   tint?: string;
@@ -34,6 +35,8 @@ export function Polaroid({
    * picture, not the whole Polaroid.
    */
   boundTarget?: boolean;
+  /** A video post's poster: marked with a small play badge. */
+  video?: boolean;
 }) {
   return (
     <View
@@ -53,7 +56,7 @@ export function Polaroid({
         <Transition.Boundary.Target style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
           <Image
             source={{ uri: url }}
-            placeholder={photo?.thumbhash ? { thumbhash: photo.thumbhash } : undefined}
+            placeholder={thumbhash ? { thumbhash } : undefined}
             className="w-full h-full"
             contentFit="cover"
             accessibilityIgnoresInvertColors
@@ -62,7 +65,7 @@ export function Polaroid({
       ) : url ? (
         <Image
           source={{ uri: url }}
-          placeholder={photo?.thumbhash ? { thumbhash: photo.thumbhash } : undefined}
+          placeholder={thumbhash ? { thumbhash } : undefined}
           className="w-full h-full"
           contentFit="cover"
           accessibilityIgnoresInvertColors
@@ -70,6 +73,15 @@ export function Polaroid({
       ) : (
         <SymbolView name={icon} size={Math.round(width * 0.36)} tintColor={tint} />
       )}
+      {url && video ? (
+        <View
+          pointerEvents="none"
+          className="absolute items-center justify-center rounded-full bg-black/45"
+          style={{ width: width * 0.3, height: width * 0.3 }}
+        >
+          <SymbolView name="play.fill" size={Math.round(width * 0.13)} tintColor="#ffffff" />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -82,7 +94,7 @@ export function Polaroid({
  * sample content.
  */
 export function RecapCover({ recap, loading }: { recap: NightRecap | null | undefined; loading: boolean }) {
-  const photoUrls = useRecapPhotoUrls(recap);
+  const { pictures } = useRecapPictures(recap);
   if (loading) return <View className="h-52 rounded-[22px] bg-white/[0.06]" />;
 
   if (!recap) {
@@ -95,13 +107,13 @@ export function RecapCover({ recap, loading }: { recap: NightRecap | null | unde
     );
   }
 
-  const first = recap.photos[0];
-  const firstUrl = first ? photoUrls.data?.get(first.storage_key) : undefined;
+  // Saved pictures first, then camera-roll ones (once library access exists)
+  const first = pictures[0];
   const faces = recap.people.slice(0, 3);
   const stops = recap.stops.length;
   const label = [
     stops ? `${stops} ${stops === 1 ? 'stop' : 'stops'}` : null,
-    recap.photos.length ? `${recap.photos.length} ${recap.photos.length === 1 ? 'picture' : 'pictures'}` : null,
+    pictures.length ? `${pictures.length} ${pictures.length === 1 ? 'picture' : 'pictures'}` : null,
     recap.people.length ? `${recap.people.length} familiar ${recap.people.length === 1 ? 'face' : 'faces'}` : null,
   ]
     .filter(Boolean)
@@ -136,8 +148,9 @@ export function RecapCover({ recap, loading }: { recap: NightRecap | null | unde
           <Polaroid
             width={60}
             rotate={9}
-            photo={first}
-            url={firstUrl}
+            thumbhash={first?.thumbhash}
+            url={first?.url}
+            video={first?.video}
             icon="sparkles"
             tint="#D5F677"
             className="absolute right-0 bottom-0"

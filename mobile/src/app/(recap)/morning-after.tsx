@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Linking, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -31,7 +31,7 @@ import { RECAP_PHOTO_GROUP, recapActivePhotoId } from '@/lib/recap-transitions';
 import Transition from 'react-native-screen-transitions';
 import { Polaroid } from '@/components/recap-cover';
 import { useNightMode } from '@/hooks/use-night-mode';
-import { useNightRecap, useRecapPhotoUrls } from '@/hooks/use-night-recap';
+import { useNightRecap, useRecapPictures, type RecapPicture } from '@/hooks/use-night-recap';
 import { useSession } from '@/hooks/use-session';
 import {
   addLibraryPhoto,
@@ -41,7 +41,6 @@ import {
   recapDateLabel,
   type NightRecap,
   type RecapChapter,
-  type RecapPhoto,
 } from '@/lib/night-recap';
 import { cityToTimezone } from '@/lib/tonight';
 import {
@@ -109,19 +108,40 @@ function Ticket({ stop, index, city }: { stop: NightRecap['stops'][number]; inde
   );
 }
 
-/** An empty chapter's placeholder inside the story panel: a dashed card, a Lucide icon, two lines. */
-function ChapterPlaceholder({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
+/**
+ * An empty chapter's placeholder inside the story panel: a dashed card, a
+ * Lucide icon, two lines, and optionally the one action that fills it.
+ */
+function ChapterPlaceholder({
+  icon: Icon,
+  title,
+  body,
+  action,
+}: {
+  icon: LucideIcon;
+  title: string;
+  body: string;
+  action?: { label: string; onPress: () => void };
+}) {
   return (
     <View
       className="items-center rounded-2xl border border-dashed border-white/20 bg-white/[0.03] px-5 py-6"
-      accessible
-      accessibilityLabel={`${title}. ${body}`}
+      accessible={!action}
+      accessibilityLabel={action ? undefined : `${title}. ${body}`}
     >
       <View className="w-14 h-14 rounded-[20px] items-center justify-center mb-3 bg-[#d4ff00]/10 border border-[#d4ff00]/30">
         <Icon size={26} color={NEON} strokeWidth={1.9} />
       </View>
       <Text className="text-white text-base font-sans-semibold text-center">{title}</Text>
       <Text className="text-white/60 text-sm font-sans text-center leading-5 mt-1">{body}</Text>
+      {action ? (
+        <PressableScale
+          onPress={action.onPress}
+          className={`mt-4 min-h-11 px-5 rounded-full items-center justify-center ${primaryControl}`}
+        >
+          <Text className={`text-[15px] font-sans-semibold ${primaryControlText}`}>{action.label}</Text>
+        </PressableScale>
+      ) : null}
     </View>
   );
 }
@@ -197,13 +217,11 @@ function StopsChapter({ recap, city, when }: { recap: NightRecap; city: string; 
  */
 function ScrapbookPhoto({
   photo,
-  url,
   i,
   count,
   when,
 }: {
-  photo: RecapPhoto;
-  url: string | undefined;
+  photo: RecapPicture;
   i: number;
   count: number;
   when: SharedValue<number>;
@@ -242,10 +260,10 @@ function ScrapbookPhoto({
             onPress={open}
             scaleTo={0.97}
             accessibilityRole="imagebutton"
-            accessibilityLabel={`Open picture ${i + 1} of ${count}`}
+            accessibilityLabel={`Open ${photo.video ? 'video' : 'picture'} ${i + 1} of ${count}`}
           >
             <Transition.Boundary group={RECAP_PHOTO_GROUP} id={photo.id} anchor="center" scaleMode="uniform">
-              <Polaroid width={92} rotate={0} photo={photo} url={url} boundTarget />
+              <Polaroid width={92} rotate={0} thumbhash={photo.thumbhash} url={photo.url} video={photo.video} boundTarget />
             </Transition.Boundary>
           </PressableScale>
         </Animated.View>
@@ -254,7 +272,14 @@ function ScrapbookPhoto({
   );
 }
 
-/** Photos are dealt onto the table; a tap opens one in the viewer. */
+/**
+ * Photos are dealt onto the table; a tap opens one in the viewer. They are
+ * the night's photo and video posts (a video shows its poster), anything
+ * added from the library, and — once the user allows it — photos from the
+ * camera roll taken during their stops, which stay on the phone. "Add from
+ * your library" is a small extra once there is something here; an empty
+ * chapter offers the camera roll instead, never an upload form.
+ */
 function PicturesChapter({
   recap,
   when,
@@ -264,9 +289,11 @@ function PicturesChapter({
 }) {
   const { session } = useSession();
   const queryClient = useQueryClient();
-  const urls = useRecapPhotoUrls(recap);
+  const { pictures, access, requestAccess, canSuggest } = useRecapPictures(recap);
   const [adding, setAdding] = useState(false);
   const full = recap.photos.length >= MAX_RECAP_PHOTOS;
+  const onDevice = pictures.some((p) => p.onDevice);
+  const askCameraRoll = canSuggest && access === 'undetermined';
 
   const add = async () => {
     if (!session || adding) return;
@@ -284,54 +311,68 @@ function PicturesChapter({
     }
   };
 
+  const showCameraRoll = async () => {
+    const granted = await requestAccess();
+    if (granted === 'all' || granted === 'limited') void Haptics.selectionAsync();
+  };
+
+  if (pictures.length === 0) {
+    return (
+      <>
+        <Title when={when}>{'Camera roll\nconfidential.'}</Title>
+        <Reveal when={when} delay={140} from={{ y: 18, scale: 0.97 }}>
+          {askCameraRoll ? (
+            <ChapterPlaceholder
+              icon={Images}
+              title="Find your photos from last night"
+              body="Spotted looks only at photos you took during your stops. They stay on this phone."
+              action={{ label: 'Show my photos', onPress: showCameraRoll }}
+            />
+          ) : canSuggest && access === 'denied' ? (
+            <ChapterPlaceholder
+              icon={Images}
+              title="No pictures from last night"
+              body="Allow photo access in Settings and the photos you took during your stops show up here."
+              action={{ label: 'Open Settings', onPress: () => void Linking.openSettings() }}
+            />
+          ) : (
+            <ChapterPlaceholder
+              icon={Images}
+              title="No pictures from last night"
+              body="Photos and videos you post while you’re out, and photos you take during your stops, land here."
+            />
+          )}
+        </Reveal>
+      </>
+    );
+  }
+
   return (
     <>
       <Title when={when}>{'Camera roll\nconfidential.'}</Title>
       <View className="flex-row flex-wrap gap-y-4 py-2">
-        {recap.photos.length === 0
-          ? // Empty frames, as in the mockup — tapping one adds a picture.
-            PHOTO_TILT.map((rotate, i) => (
-              <Reveal
-                key={rotate}
-                when={when}
-                delay={140 + i * 110}
-                rotate={rotate}
-                from={{ y: 40, scale: 0.7, rotate: 0 }}
-                spring={SPRING.land}
-                className={`w-1/3 items-center ${i === 1 ? 'mt-4' : ''}`}
-              >
-                <PressableScale onPress={add} disabled={adding} accessibilityLabel="Add a picture from your library">
-                  <Polaroid width={92} rotate={0} icon="photo.badge.plus" tint="rgba(255,255,255,0.7)" className="opacity-80" />
-                </PressableScale>
-              </Reveal>
-            ))
-          : recap.photos.map((photo, i) => (
-              <ScrapbookPhoto
-                key={photo.id}
-                photo={photo}
-                url={urls.data?.get(photo.storage_key)}
-                i={i}
-                count={recap.photos.length}
-                when={when}
-              />
-            ))}
+        {pictures.map((photo, i) => (
+          <ScrapbookPhoto key={photo.id} photo={photo} i={i} count={pictures.length} when={when} />
+        ))}
       </View>
-      {full ? null : (
-        <Reveal when={when} delay={420}>
-          <PressableScale
-            onPress={add}
-            disabled={adding}
-            className="flex-row items-center gap-2 min-h-11 mt-3 self-start"
-          >
+      <Reveal when={when} delay={420} className="flex-row flex-wrap items-center gap-x-5 mt-3">
+        {full ? null : (
+          <PressableScale onPress={add} disabled={adding} className="flex-row items-center gap-2 min-h-11">
             {adding ? <ActivityIndicator size="small" color={NEON} /> : <SymbolView name="plus" size={14} tintColor={NEON} />}
             <Text className="text-[#d4ff00] text-sm font-sans-medium">Add from your library</Text>
           </PressableScale>
-        </Reveal>
-      )}
+        )}
+        {askCameraRoll ? (
+          <PressableScale onPress={showCameraRoll} className="flex-row items-center gap-2 min-h-11">
+            <SymbolView name="photo.on.rectangle" size={14} tintColor={NEON} />
+            <Text className="text-[#d4ff00] text-sm font-sans-medium">Find more on your phone</Text>
+          </PressableScale>
+        ) : null}
+      </Reveal>
       <Reveal when={when} delay={480}>
         <Text className="text-white/60 text-xs font-sans mt-1">
-          {recap.photos.length === 0
-            ? 'No pictures from last night yet. Add yours — only you can see them.'
+          {onDevice
+            ? 'Your night, saved here. Only you. Camera-roll photos stay on this phone.'
             : 'Your night, saved here. Only you.'}
         </Text>
       </Reveal>
@@ -443,7 +484,8 @@ function ChapterTab({
 export default function MorningAfter() {
   const recapQuery = useNightRecap();
   const recap = recapQuery.data ?? null;
-  const urls = useRecapPhotoUrls(recap);
+  // Warm the picture links and camera-roll scan before the chapter is reached
+  useRecapPictures(recap);
   const { city } = useNightMode();
   const reduce = useReducedMotion();
   const { width: winW } = useWindowDimensions();

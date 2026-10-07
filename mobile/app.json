@@ -74,7 +74,7 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Spotted shows your latest photo as a shortcut to your library. Photos you don't share never leave your device.",
+          "photosPermission": "Spotted shows the photos you took during last night's stops in your private Morning After, and your latest photo as a shortcut to your library. Photos you don't share never leave your device.",
           "savePhotosPermission": "Spotted can save captured photos and videos to your library."
         }
       ],
