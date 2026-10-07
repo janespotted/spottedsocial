@@ -57,15 +57,17 @@ function PostVideo({
   if (pinned.current.key !== sourceKey) pinned.current = { key: sourceKey, uri: latestUri };
   const uri = pinned.current.uri;
   const [muted, setMuted] = useState(false);
+  // No play() here: the list renders rows beyond the viewport, and every one
+  // of them would start (with sound) until the effect below paused it.
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
-    p.play();
   });
   const { status } = useEvent(player, 'statusChange', { status: player.status });
   const showPoster = !!poster && status !== 'readyToPlay';
 
-  // Viewport-based pause: only the on-screen video plays (web parity —
-  // saves battery and stops off-screen audio when unmuted)
+  // The only place playback starts: the feed passes isVisible for the one
+  // video it has chosen (most on screen, Home focused); everything else
+  // pauses. Saves battery and keeps off-screen audio silent.
   useEffect(() => {
     try {
       if (isVisible) player.play();

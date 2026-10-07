@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -6,12 +6,12 @@ import {
   RefreshControl,
   Text,
   View,
-  type ViewToken,
 } from 'react-native';
 import { Image } from '@/components/styled';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
+import type { FeedPost } from '@/lib/posts';
 import { registerFeedScroller, usePostDetail } from '@/lib/post-detail';
 import { useQuery } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
@@ -348,24 +348,6 @@ function NewsfeedScreen() {
   const outFriends = friendsData?.outFriends ?? [];
   const planningFriends = friendsData?.planningFriends ?? [];
 
-  // Viewport-based video pause: track which video posts are ≥50% on screen.
-  // Only video ids go in the set so image-only scrolling never re-renders.
-  const [visibleVideoIds, setVisibleVideoIds] = useState<Set<string>>(new Set());
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const next = new Set<string>();
-      for (const token of viewableItems) {
-        const item = token.item as { id?: string; media_type?: string | null } | null;
-        if (token.isViewable && item?.media_type === 'video' && item.id) next.add(item.id);
-      }
-      setVisibleVideoIds((prev) => {
-        if (prev.size === next.size && [...next].every((id) => prev.has(id))) return prev;
-        return next;
-      });
-    }
-  ).current;
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
-
   // While a post detail is open one card's media lives on that screen; a
   // scroll here could recycle that row out from under it (POST-DETAIL-PLAN.md §4.5).
   const postDetailActive = usePostDetail((s) => s.phase !== 'idle');
@@ -384,6 +366,53 @@ function NewsfeedScreen() {
     return () => registerFeedScroller(null);
   }, []);
 
+  // One video plays at a time: the one most on screen, if at least half of
+  // its row is. Measured from the list's own geometry rather than its
+  // viewability callbacks — those report once from estimated sizes (every
+  // row "100%") and not again until the first scroll, so a video below the
+  // fold played at launch. Two 4:5 videos can both be half visible, so the
+  // most visible wins. Decided at most every 150 ms; only the winning id
+  // reaches state, so scrolling past images never re-renders.
+  const [viewportVideoId, setViewportVideoId] = useState<string | null>(null);
+  const listHeaderHeight = useRef(0);
+  const pickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pickVisibleVideo = useCallback(() => {
+    if (pickTimer.current) return;
+    pickTimer.current = setTimeout(() => {
+      pickTimer.current = null;
+      const list = listRef.current?.getState();
+      if (!list) return;
+      // Item positions start below the list header
+      const viewTop = list.scroll - listHeaderHeight.current;
+      let best: { id: string; percent: number } | null = null;
+      for (let i = Math.max(0, list.startBuffered); i <= list.endBuffered; i++) {
+        const post = list.data[i] as FeedPost | undefined;
+        const size = list.sizeAtIndex(i); // measured sizes only
+        if (post?.media_type !== 'video' || !size) continue;
+        const top = list.positionAtIndex(i) - viewTop;
+        const percent = (100 * (Math.min(top + size, list.scrollLength) - Math.max(top, 0))) / size;
+        if (percent >= 50 && (!best || percent > best.percent)) best = { id: post.id, percent };
+      }
+      setViewportVideoId(best?.id ?? null);
+    }, 150);
+  }, []);
+  useEffect(() => {
+    pickVisibleVideo();
+  }, [feed.posts, pickVisibleVideo]);
+  useEffect(
+    () => () => {
+      if (pickTimer.current) clearTimeout(pickTimer.current);
+    },
+    []
+  );
+
+  // Nothing plays behind another tab or a pushed screen — except the post
+  // detail: the reel plays the teleported video (whichever was tapped), and
+  // the comment sheet sits over a feed that is still on screen.
+  const isFocused = useIsFocused();
+  const reelPostId = usePostDetail((s) => (s.phase !== 'idle' && s.mode === 'reel' ? s.postId : null));
+  const playingVideoId = reelPostId ?? (isFocused || postDetailActive ? viewportVideoId : null);
+
   return (
     <View className="flex-1 bg-[#110a24]">
       <HomeHeader city={city ?? null} unreadCount={unreadCount} />
@@ -397,8 +426,12 @@ function NewsfeedScreen() {
         contentContainerStyle={contentContainerStyle}
         onEndReached={feed.loadMore}
         onEndReachedThreshold={0.5}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
+        onScroll={pickVisibleVideo}
+        onLoad={pickVisibleVideo}
+        onItemSizeChanged={pickVisibleVideo}
+        // Rows only re-render when data or extraData change; without this
+        // they never heard which video should play
+        extraData={playingVideoId}
         refreshControl={
           <RefreshControl
             refreshing={feed.isRefreshing}
@@ -421,11 +454,20 @@ function NewsfeedScreen() {
           )
         }
         ListHeaderComponent={
-          isPlanning && outFriends.length > 0 ? (
-            <View className="px-4 pt-4">
-              <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
-            </View>
-          ) : null
+          // Always mounted (0 high when empty) so pickVisibleVideo knows
+          // where the first row starts
+          <View
+            onLayout={(e) => {
+              listHeaderHeight.current = e.nativeEvent.layout.height;
+              pickVisibleVideo();
+            }}
+          >
+            {isPlanning && outFriends.length > 0 ? (
+              <View className="px-4 pt-4">
+                <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
+              </View>
+            ) : null}
+          </View>
         }
         ListEmptyComponent={
           feed.isLoading ? (
@@ -463,7 +505,7 @@ function NewsfeedScreen() {
             currentUserId={session?.user.id ?? ''}
             onToggleLike={feed.toggleLike}
             onDelete={feed.deletePost}
-            isVisible={item.media_type !== 'video' || visibleVideoIds.has(item.id)}
+            isVisible={item.media_type !== 'video' || playingVideoId === item.id}
           />
         )}
       />
