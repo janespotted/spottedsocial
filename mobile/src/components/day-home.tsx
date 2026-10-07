@@ -132,12 +132,14 @@ function TonightPlans({ city }: { city: string }) {
 }
 
 /**
- * Home in Day Mode, "Morning After" tab (client brief §2), in the brief's
- * order: the countdown, the Morning After card, tonight's plans. Kept light —
- * one heading, no explanations; detail is behind taps.
+ * Home's "Morning After" tab (client brief §2), in the brief's order: the
+ * countdown, the Morning After card, tonight's plans. Kept light — one
+ * heading, no explanations; detail is behind taps. Also shown at night
+ * (minus the countdown, since Night Mode is open): last night's recap lives
+ * until the 5 AM reset.
  */
 export function DayHome() {
-  const { city } = useNightMode();
+  const { city, isNight } = useNightMode();
   const recap = useNightRecap();
   const queryClient = useQueryClient();
   return (
@@ -154,7 +156,7 @@ export function DayHome() {
         />
       }
     >
-      <NightCountdownRow />
+      {isNight ? null : <NightCountdownRow />}
       <RecapCover recap={recap.data} loading={recap.isLoading} />
       <TonightPlans city={city} />
     </ScrollView>

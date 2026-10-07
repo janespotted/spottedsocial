@@ -13,7 +13,7 @@ export interface SubTab<T extends string> {
 
 /**
  * The large text tabs under a tab header — Chat's Plans | DMs and Home's
- * Morning After | Newsfeed (Day Mode). The selected one is white with a lime
+ * Morning After | Newsfeed. The selected one is white with a lime
  * underline; the rest are dimmed. `trailing` sits at the far right (Chat's
  * compose button).
  */

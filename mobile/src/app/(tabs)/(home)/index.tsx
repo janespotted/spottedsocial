@@ -13,10 +13,8 @@ import { SymbolView } from 'expo-symbols';
 import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import type { FeedPost } from '@/lib/posts';
 import { registerFeedScroller, usePostDetail } from '@/lib/post-detail';
-import { useQuery } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
 import { useNoKeyboardOnFocus } from '@/hooks/use-dismiss-keyboard-on-leave';
-import { supabase } from '@/lib/supabase';
 import { sendMeetUp } from '@/lib/meet-up';
 import { useSession } from '@/hooks/use-session';
 import { useFeed } from '@/hooks/use-feed';
@@ -212,7 +210,7 @@ function HomeHeader({
 }: {
   city: string | null;
   unreadCount: number;
-  /** Day Mode's Morning After | Newsfeed tabs. */
+  /** The Morning After | Newsfeed tabs. */
   children?: ReactNode;
 }) {
   return (
@@ -251,41 +249,69 @@ function HomeHeader({
 /* ── Screen ── */
 
 /**
- * Night Mode: the Newsfeed, exactly as before. Day Mode (DAY-NIGHT-MODE-PLAN.md
- * §4.5): Morning After | Newsfeed tabs — the countdown, the recap card and
- * tonight's plans, with the Newsfeed showing its opening screen. The feed
- * (posts query, realtime channel) only mounts at night, and so does the Post
- * button: posting opens with Night Mode (D1).
+ * Morning After | Newsfeed tabs in both modes (DAY-NIGHT-MODE-PLAN.md §4.5;
+ * D6 changed Oct 7 2026 — the tabs were Day-only, which left Morning After
+ * unreachable from Home all evening while last night's recap was still live).
+ * Day opens on Morning After, with the Newsfeed showing its opening screen;
+ * Night opens on the live Newsfeed. The feed (posts query, realtime channel)
+ * only mounts at night, and so does the Post button: posting opens with
+ * Night Mode (D1).
  */
 export default function HomeScreen() {
-  const { isNight } = useNightMode();
-  return isNight ? <NewsfeedScreen /> : <DayHomeScreen />;
-}
-
-type DayTab = 'morning' | 'feed';
-
-function DayHomeScreen() {
-  const { city } = useNightMode();
+  const { isNight, city } = useNightMode();
   const { unreadCount } = useNotifications();
-  const [tab, setTab] = useState<DayTab>('morning');
+  const [tab, setTab] = useState<HomeTab>(isNight ? 'feed' : 'morning');
+  // Each mode opens on its own default tab, including when it flips while open
+  const [tabMode, setTabMode] = useState(isNight);
+  if (tabMode !== isNight) {
+    setTabMode(isNight);
+    setTab(isNight ? 'feed' : 'morning');
+  }
   return (
     <View className="flex-1 bg-[#110a24]">
       <HomeHeader city={city} unreadCount={unreadCount}>
-        <SubTabs<DayTab>
+        <SubTabs<HomeTab>
           tabs={[
             { key: 'morning', label: 'Morning After' },
-            { key: 'feed', label: 'Newsfeed', icon: 'moon' },
+            // The moon marks a section that is closed until Night Mode
+            { key: 'feed', label: 'Newsfeed', icon: isNight ? undefined : 'moon' },
           ]}
           value={tab}
           onChange={setTab}
         />
       </HomeHeader>
-      {tab === 'morning' ? <DayHome /> : <NightOpeningScreen kind="newsfeed" />}
+      {isNight ? (
+        // Morning After covers the feed instead of replacing it. The feed
+        // keeps its posts in component state, so a remount would refetch
+        // (skeletons), and display:none detaches the native scroll view and
+        // loses the scroll position — both were seen on device.
+        <View className="flex-1">
+          <View
+            className="flex-1"
+            accessibilityElementsHidden={tab !== 'feed'}
+            importantForAccessibility={tab === 'feed' ? 'auto' : 'no-hide-descendants'}
+          >
+            <NewsfeedScreen active={tab === 'feed'} />
+          </View>
+          {tab === 'morning' ? (
+            <View className="absolute inset-0 bg-[#110a24]">
+              <DayHome />
+            </View>
+          ) : null}
+        </View>
+      ) : tab === 'morning' ? (
+        <DayHome />
+      ) : (
+        <NightOpeningScreen kind="newsfeed" />
+      )}
     </View>
   );
 }
 
-function NewsfeedScreen() {
+type HomeTab = 'morning' | 'feed';
+
+/** The live feed, its roster pill and the Post button. `active` = its tab is showing. */
+function NewsfeedScreen({ active }: { active: boolean }) {
   useNoKeyboardOnFocus(); // back from comments / search must never leave the keyboard up
   const { session } = useSession();
   const feed = useFeed();
@@ -293,23 +319,8 @@ function NewsfeedScreen() {
   const { data: friendIds } = useFriendIds(session?.user.id);
   const { data: ownNight } = useOwnNightStatus();
   const isPlanning = ownNight?.status?.status === 'planning';
-  const { unreadCount } = useNotifications();
   // pb clears the native tab bar, home indicator and the Post FAB
   const contentContainerStyle = useResolveClassNames('pb-36');
-
-  const { data: city } = useQuery({
-    queryKey: ['home-city', session?.user.id],
-    enabled: !!session,
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('city')
-        .eq('id', session!.user.id)
-        .maybeSingle<{ city: string | null }>();
-      return data?.city ?? 'nyc';
-    },
-  });
 
   /**
    * `sent` shows the confirmation card (sendMeetUp alerts on failure). There
@@ -406,17 +417,18 @@ function NewsfeedScreen() {
     []
   );
 
-  // Nothing plays behind another tab or a pushed screen — except the post
-  // detail: the reel plays the teleported video (whichever was tapped), and
-  // the comment sheet sits over a feed that is still on screen.
+  // Nothing plays behind another tab, Morning After or a pushed screen —
+  // except the post detail: the reel plays the teleported video (whichever
+  // was tapped), and the comment sheet sits over a feed that is still on
+  // screen.
   const isFocused = useIsFocused();
   const reelPostId = usePostDetail((s) => (s.phase !== 'idle' && s.mode === 'reel' ? s.postId : null));
-  const playingVideoId = reelPostId ?? (isFocused || postDetailActive ? viewportVideoId : null);
+  const playingVideoId = !active
+    ? null
+    : (reelPostId ?? (isFocused || postDetailActive ? viewportVideoId : null));
 
   return (
-    <View className="flex-1 bg-[#110a24]">
-      <HomeHeader city={city ?? null} unreadCount={unreadCount} />
-
+    <View className="flex-1">
       <LegendList
         ref={listRef}
         data={feed.posts}
