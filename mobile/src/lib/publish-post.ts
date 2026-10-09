@@ -1,4 +1,6 @@
 import { File } from 'expo-file-system';
+import { isDevice } from 'expo-device';
+import { Platform } from 'react-native';
 import type { Audience } from './audience';
 import { prepareForUpload, type PreparedMedia } from './media-prep';
 import type { CapturedMedia } from './post-media';
@@ -7,6 +9,10 @@ import { supabase, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './supabase';
 import { getActiveCity } from './tonight';
 
 const BUCKET = 'post-images';
+
+// Simulator background URLSession transfers can fail before sending bytes.
+// Physical iPhones retain native background transfers and byte progress.
+const uploadSessionType = Platform.OS === 'ios' && !isDevice ? 'foreground' : 'background';
 
 /** What the composer needs to draw the published post without re-fetching it. */
 export interface PublishedPost {
@@ -96,6 +102,7 @@ export async function uploadMedia(
   // application/octet-stream and the bucket's allowed-types list rejects it.
   const result = await new File(media.uri).upload(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${encoded}`, {
     httpMethod: 'POST',
+    sessionType: uploadSessionType,
     headers: {
       Authorization: `Bearer ${token}`,
       apikey: SUPABASE_PUBLISHABLE_KEY,
@@ -148,6 +155,7 @@ async function uploadVideoToMux(
 
   const result = await new File(media.uri).upload(data.url, {
     httpMethod: 'PUT',
+    sessionType: uploadSessionType,
     headers: { 'Content-Type': media.mimeType },
     onProgress: ({ bytesSent, totalBytes }) => {
       if (totalBytes > 0) onProgress?.(Math.min(1, bytesSent / totalBytes));

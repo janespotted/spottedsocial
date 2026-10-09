@@ -102,6 +102,8 @@ export default function Party() {
     query.data?.people.find((p) => p.id === id)?.display_name ?? "A friend";
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
       className="flex-1 bg-background"
       contentContainerStyle={{ padding: 20, paddingBottom: 60, gap: 12 }}
     >

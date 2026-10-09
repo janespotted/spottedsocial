@@ -1,9 +1,9 @@
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useState } from 'react';
 import {
   // Alert — with the parked handleStayIn below
   Pressable,
   RefreshControl,
-  ScrollView,
   Text,
   View,
   type NativeScrollEvent,
@@ -288,7 +288,10 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
     );
 
   return (
-    <ScrollView
+    <KeyboardAwareScrollView
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      bottomOffset={24}
       contentContainerClassName="px-4 pt-4 pb-28 gap-6"
       onScroll={onScroll}
       scrollEventThrottle={16}
@@ -480,6 +483,6 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
           ) : null}
         </>
       )}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }

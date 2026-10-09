@@ -77,7 +77,7 @@ async function fetchLeaderboard(
       updated_at,
       is_promoted,
       is_demo,
-      venues!inner(popularity_rank, is_leaderboard_promoted, city, opened_at, operating_hours, neighborhood)
+      venues:venues!night_statuses_venue_id_fkey!inner(popularity_rank, is_leaderboard_promoted, city, opened_at, operating_hours, neighborhood)
     `
     )
     .eq('venues.city', city)

@@ -1,3 +1,4 @@
+import { DropdownMenuSurface } from '@/components/dropdown-menu';
 import { withholdLivePreview } from '@/lib/live-preview';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
@@ -151,25 +152,27 @@ export default function FriendCardScreen() {
   };
 
   return (
-    <View className="bg-[#1a0f2e] pb-safe-offset-2">
-      {friend?.is_private_party ? <Pressable className="p-4" onPress={()=>router.push(`/party?hostId=${friend.user_id}` as never)}><Text className="text-[#d4ff00] text-center font-sans-semibold">View party / request address</Text></Pressable> : null}
-      {friend ? (
-        <FriendCardBody
-          data={friend}
-          currentUserId={currentUserId ?? ''}
-          onDismiss={() => router.back()}
-          friendsAtVenue={friendsAtVenue}
-          onOpenVenue={(name) => void openVenue(name)}
-        />
-      ) : (
-        <View className="items-center justify-center py-16">
-          {isLoading && userId ? <ActivityIndicator color={NEON} /> : <>
-            <Text className="text-white/70">{isError ? 'Could not load this person.' : 'This person is unavailable.'}</Text>
-            {isError ? <Text className="text-[#d4ff00] p-3" onPress={() => void refetch()}>Retry</Text> : null}
-            <Text className="text-white p-3" onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>Back</Text>
-          </>}
-        </View>
-      )}
-    </View>
+    <DropdownMenuSurface>
+      <View className="bg-[#1a0f2e] pb-safe-offset-2">
+        {friend?.is_private_party ? <Pressable className="p-4" onPress={()=>router.push(`/party?hostId=${friend.user_id}` as never)}><Text className="text-[#d4ff00] text-center font-sans-semibold">View party / request address</Text></Pressable> : null}
+        {friend ? (
+          <FriendCardBody
+            data={friend}
+            currentUserId={currentUserId ?? ''}
+            onDismiss={() => router.back()}
+            friendsAtVenue={friendsAtVenue}
+            onOpenVenue={(name) => void openVenue(name)}
+          />
+        ) : (
+          <View className="items-center justify-center py-16">
+            {isLoading && userId ? <ActivityIndicator color={NEON} /> : <>
+              <Text className="text-white/70">{isError ? 'Could not load this person.' : 'This person is unavailable.'}</Text>
+              {isError ? <Text className="text-[#d4ff00] p-3" onPress={() => void refetch()}>Retry</Text> : null}
+              <Text className="text-white p-3" onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>Back</Text>
+            </>}
+          </View>
+        )}
+      </View>
+    </DropdownMenuSurface>
   );
 }

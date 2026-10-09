@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { forgetPrivateMediaLinks } from './private-media';
-import { PRIVATE_VIEW_KEYS } from './private-views';
+import { invalidatePrivateViews, PRIVATE_VIEW_KEYS } from './private-views';
 import { createResilientChannel } from './resilient-channel';
 
 /**
@@ -36,8 +36,15 @@ export function subscribeRelationshipEvents(userId: string, queryClient: QueryCl
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'relationship_events', filter: `user_id=eq.${userId}` },
         (payload) => {
-          const other = (payload.new as { other_user_id?: string } | null)?.other_user_id;
+          const event = payload.new as { other_user_id?: string; kind?: string } | null;
+          const other = event?.other_user_id;
           if (!other) return;
+          if (event?.kind === 'location_changed') {
+            // Drop cached GPS/recap data and cancel in-flight reads immediately.
+            // Location hiding does not revoke otherwise valid post sharing.
+            invalidatePrivateViews(queryClient);
+            return;
+          }
           forgetPrivateMediaLinks();
           // Screens first (an open reel closes before the feed drops its row),
           // then the queries.

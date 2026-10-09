@@ -43,8 +43,12 @@ interface PlanningFriend {
 
 /** "Nadeem wants to meet up with you" → "wants to meet up with you" */
 function subtitleFor(n: AppNotification): string {
-  const first = n.sender_name?.split(' ')[0];
-  if (first && n.message.startsWith(first)) return n.message.slice(first.length).trim();
+  const name = n.sender_name?.trim();
+  for (const prefix of [name, name?.split(' ')[0]]) {
+    if (!prefix || !n.message.startsWith(prefix)) continue;
+    const rest = n.message.slice(prefix.length);
+    if (/^(?:\s|:|$)/.test(rest)) return rest.replace(/^\s*:\s*|^\s+/, '');
+  }
   return n.message;
 }
 
@@ -64,6 +68,7 @@ function SectionHeader({ title }: { title: string }) {
 function ActivityCard({
   n,
   subtitleClass = 'text-white/70',
+  onOpen,
   action,
   dismiss,
   status,
@@ -71,6 +76,7 @@ function ActivityCard({
 }: {
   n: AppNotification;
   subtitleClass?: string;
+  onOpen?: () => void;
   action?: { label?: string; icon?: string; onPress: () => void; chevron?: boolean };
   /** The second choice beside the action (Decline on an invite or meet up). */
   dismiss?: { label: string; onPress: () => void };
@@ -80,7 +86,13 @@ function ActivityCard({
 }) {
   const choices = !!(action && dismiss);
   return (
-    <View className={`${CARD} mb-2 gap-3`}>
+    <Pressable
+      className={`${CARD} mb-2 gap-3`}
+      onPress={onOpen}
+      disabled={!onOpen}
+      accessible={!!onOpen}
+      accessibilityRole={onOpen ? 'button' : undefined}
+    >
       <View className="flex-row items-center gap-3">
         <Pressable
           onPress={() => n.sender_id && openFriendCard(n.sender_id)}
@@ -157,7 +169,7 @@ function ActivityCard({
           </Pressable>
         </View>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -582,7 +594,7 @@ export default function ActivityScreen() {
             <>
               <SectionHeader title="Post Engagement" />
               {engagement.map((n) => (
-                <ActivityCard key={n.id} n={n} />
+                <ActivityCard key={n.id} n={n} onOpen={() => router.push(routeForNotification({ type: n.type, data: n.data }))} />
               ))}
             </>
           ) : null}
