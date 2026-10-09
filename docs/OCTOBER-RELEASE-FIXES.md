@@ -1,6 +1,6 @@
 # October release audit fixes
 
-Based on `8999c419be8ad9b2813fda2dff5f8cb41a7c9b99` (`feat/day-night-mode`). These changes are prepared locally; neither GitHub nor production has been updated.
+Based on `8999c419be8ad9b2813fda2dff5f8cb41a7c9b99` (`feat/day-night-mode`). The app changes are committed locally. The database fix was deployed to the approved test project on October 9; neither GitHub nor production has been updated.
 
 ## Changes
 
@@ -25,15 +25,17 @@ Based on `8999c419be8ad9b2813fda2dff5f8cb41a7c9b99` (`feat/day-night-mode`). The
 - A deleted test plan disappears after returning to Plans without pulling to refresh. Profile/group denied and zero-row saves are covered by source-execution tests.
 - No new Spotted crash reports during the fix validation.
 
-Earlier failures are retained separately. The initial venue swipe targeted a full-height scroll container whose lower portion was behind the keyboard; the corrected native gesture starts in the visible venue list. The old auth test was updated to mock the session lookup now required by the actual profile loader.
+Earlier failures are retained separately. The first hosted test harness attempted a direct plan insert with a returned row, which RLS rejected; the corrected harness used a separate read, and the app's actual `save_plan` endpoint was also exercised successfully. An initial inspector navigation raced a modal dismissal; native Home-card navigation and the full recap flow subsequently passed. The initial venue swipe targeted a full-height scroll container whose lower portion was behind the keyboard; the corrected native gesture starts in the visible venue list. The old auth test was updated to mock the session lookup now required by the actual profile loader.
 
 ## Deployment and remaining checks
 
-Apply `20261009213458_release_audit_privacy_and_plan_counts.sql` to the test project only after approval, then run hosted privacy/counter/Realtime checks and Supabase advisors. The prior approval covered seven release migrations, not this new fix migration. The isolated test result is not proof of hosted rollout.
+After explicit approval, applied `20261009213458_release_audit_privacy_and_plan_counts.sql` to `spotted-ai-night-simulation` (`mdwmkpefuvcozoqprvvo`). The hosted migration is recorded as `20261009234142_release_audit_privacy_and_plan_counts`. **23 hosted checks passed** with normal authenticated synthetic users. Group creation/denials, recap consent, private Realtime delivery, vote/comment counters, attendee/participant updates, and the actual save-plan endpoint passed. The native recap cache removed a revoked overlap without manual refresh. All existing plan counts matched their underlying records after backfill. Anonymous execution remained denied for group creation and recap retrieval.
 
-The shared recap uploader is repaired, but its complete Morning After flow still needs a repeat on the patched test schema. Physical photo/video capture, APNs, real SMS, background GPS and the real 5am boundary remain device/service checks. Test Mux configuration is still unavailable; the app correctly preserves the draft when video upload cannot start. The simulator transfer fix does not establish physical-device background-transfer success.
+Supabase security advisors were reviewed. Existing legacy public-function and Auth configuration warnings remain; the new private trigger helpers have hardened search paths and no client execution permission. This deployment is not a complete remediation of the project-wide advisor list.
 
-This fix pass removed its disposable post and plan and restored the synthetic account's city and party state. Earlier audit cleanup still returns `Invalid or expired requestState` from the Supabase connector. Two prior temporary tester rows remain with Auto overrides, plus the previously reported exact test records; no global Night Mode enforcement was enabled. Stored media deletion follows the existing cleanup queue; queue completion is not asserted here.
+The complete Morning After library flow passed on the patched test schema: native Home → replay → Pictures → library picker → selected synthetic image → two rendered pictures. The saved library row and private image response (HTTP 200) were independently confirmed; Close Friend and unrelated accounts were denied access to that recap image. Physical photo/video capture, APNs, real SMS, background GPS and the real 5am boundary remain device/service checks. Test Mux configuration is still unavailable; the app correctly preserves the draft when video upload cannot start. The simulator transfer fix does not establish physical-device background-transfer success.
+
+Cleanup is complete for the original exact-ID audit manifest and this fix pass. The two temporary tester rows, disposable records and test notifications were removed. Five remaining private files were deleted through the Storage API and their queue entries acknowledged; independent reads confirmed zero remaining files and queue entries for those paths. The normal eight-account fixture, seven active baseline check-ins and canonical DM were retained. City, party state and location audience were restored. Global Night Mode enforcement remains false. The configured Supabase CLI connection was used only for scoped test-file cleanup; temporary local credentials were removed.
 
 ## Repeat local checks
 
