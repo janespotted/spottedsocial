@@ -146,7 +146,9 @@ export function PostComposer({
   const canShare = !posting && (!!media || caption.trim().length > 0);
 
   const share = async () => {
-    if (!session || posting) return;
+    // State reaches the button on the next render; the controller locks the
+    // attempt immediately so two taps cannot upload or publish twice.
+    if (!session || posting || abortRef.current) return;
     const textCheck = validatePostText(caption);
     const venueCheck = validateVenueName(venueName);
     if (!textCheck.success || !venueCheck.success) {
@@ -204,7 +206,7 @@ export function PostComposer({
 
   // Close mid-upload cancels it and returns to editing; nothing is lost
   const close = () => {
-    if (posting) {
+    if (abortRef.current || posting) {
       abortRef.current?.abort();
       return;
     }

@@ -19,6 +19,7 @@ import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useNotifications } from '@/hooks/use-notifications';
+import { useNightMode } from '@/hooks/use-night-mode';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { Avatar } from '@/components/avatar';
 import { AudienceRow } from '@/components/audience-row';
@@ -160,6 +161,7 @@ function EmptyCard({ icon, title, subtitle }: { icon: string; title: string; sub
 export default function ProfileScreen() {
   const { session } = useSession();
   const { unreadCount } = useNotifications();
+  const { isNight } = useNightMode();
   const queryClient = useQueryClient();
   const { data: friendIds } = useFriendIds(session?.user.id);
   const [spotsView, setSpotsView] = useState<SpotsView>('recent');
@@ -343,6 +345,20 @@ export default function ProfileScreen() {
             <SymbolView name="gearshape" size={16} tintColor="#ffffff" />
           </Pressable>
         </View>
+
+        {isNight ? (
+          <Pressable
+            onPress={() => router.push('/morning-after')}
+            accessibilityRole="button"
+            accessibilityLabel="Morning After"
+            accessibilityHint="Open your recap from last night"
+            className="flex-row items-center gap-2.5 min-h-11 px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] active:bg-white/[0.06]"
+          >
+            <SymbolView name="sun.max" size={16} tintColor={PURPLE} />
+            <Text className="flex-1 text-white/75 text-sm font-sans-medium">Morning After</Text>
+            <SymbolView name="chevron.right" size={12} tintColor="rgba(255,255,255,0.3)" />
+          </Pressable>
+        ) : null}
 
         {/* Friends row */}
         <Pressable

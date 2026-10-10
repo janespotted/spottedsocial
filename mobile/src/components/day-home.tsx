@@ -134,9 +134,8 @@ function TonightPlans({ city }: { city: string }) {
 /**
  * Home's "Morning After" tab (client brief §2), in the brief's order: the
  * countdown, the Morning After card, tonight's plans. Kept light — one
- * heading, no explanations; detail is behind taps. Also shown at night
- * (minus the countdown, since Night Mode is open): last night's recap lives
- * until the 5 AM reset.
+ * heading, no explanations; detail is behind taps. At night, Profile links
+ * directly to the recap instead of showing this dashboard on Home.
  */
 export function DayHome() {
   const { city, isNight } = useNightMode();
