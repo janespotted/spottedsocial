@@ -3,7 +3,7 @@ import { signOutWithPushCleanup } from '@/lib/push';
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { RESET_COPY } from '@/lib/reset-copy';
-import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -18,6 +18,7 @@ import { stopSharing } from '@/lib/night-status';
 import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
 import { useFriendIds } from '@/hooks/use-friend-ids';
+import { useFriendRequestCount } from '@/hooks/use-friend-request-count';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
@@ -159,11 +160,13 @@ function EmptyCard({ icon, title, subtitle }: { icon: string; title: string; sub
 }
 
 export default function ProfileScreen() {
+  const { fontScale } = useWindowDimensions();
   const { session } = useSession();
   const { unreadCount } = useNotifications();
   const { isNight } = useNightMode();
   const queryClient = useQueryClient();
-  const { data: friendIds } = useFriendIds(session?.user.id);
+  const { data: friendIds, refetch: refetchFriends } = useFriendIds(session?.user.id);
+  const { data: pendingCount, refetch: refetchRequests } = useFriendRequestCount(session?.user.id);
   const [spotsView, setSpotsView] = useState<SpotsView>('recent');
 
   const { data, isLoading, refetch } = useQuery({
@@ -171,7 +174,7 @@ export default function ProfileScreen() {
     enabled: !!session,
     queryFn: () => fetchProfileData(session!.user.id),
   });
-  const { refreshing, onRefresh } = usePullToRefresh(refetch);
+  const { refreshing, onRefresh } = usePullToRefresh(() => Promise.all([refetch(), refetchFriends(), refetchRequests()]));
   // pb clears the native tab bar + home indicator so Log Out is reachable
   const contentContainerStyle = useResolveClassNames('px-4 pb-32 gap-5');
 
@@ -253,14 +256,18 @@ export default function ProfileScreen() {
     setSpotsView(order[(order.indexOf(spotsView) + 1) % order.length]);
   };
 
+  // Re-measure mounted native text when Dynamic Type changes.
   return (
-    <View className="flex-1">
+    <View key={fontScale} className="flex-1">
       {/* Header — static, web PageHeader parity */}
       <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
-        <View className="flex-row items-center justify-between px-4 h-10 mb-2">
+        <View className="flex-row items-center justify-between px-4 min-h-10 mb-2">
           <Text
-            className="text-white font-sans-light"
+            className="flex-1 text-white font-sans-light"
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+            maxFontSizeMultiplier={1.25}
             style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
           >
             Spotted
@@ -301,7 +308,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Stats row */}
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
           <Text className="text-sm text-white/65 font-sans">
             <Text className="text-white font-sans-medium">{data?.placesCount ?? 0}</Text>{' '}
             {(data?.placesCount ?? 0) === 1 ? 'spot' : 'spots'}
@@ -325,16 +332,16 @@ export default function ProfileScreen() {
           <Pressable
             onPress={() => router.push('/edit-profile')}
             accessibilityRole="button"
-            className={`flex-1 min-h-11 rounded-full items-center justify-center ${outlineControl}`}
+            className={`flex-1 min-h-11 px-3 py-2.5 rounded-full items-center justify-center ${outlineControl}`}
           >
-            <Text className="text-white text-sm font-sans-medium">Edit profile</Text>
+            <Text className="text-white text-sm font-sans-medium text-center">Edit profile</Text>
           </Pressable>
           <Pressable
             onPress={shareProfile}
             accessibilityRole="button"
-            className={`flex-1 min-h-11 rounded-full items-center justify-center ${outlineControl}`}
+            className={`flex-1 min-h-11 px-3 py-2.5 rounded-full items-center justify-center ${outlineControl}`}
           >
-            <Text className="text-white text-sm font-sans-medium">Share profile</Text>
+            <Text className="text-white text-sm font-sans-medium text-center">Share profile</Text>
           </Pressable>
           <Pressable
             onPress={() => router.push('/settings')}
@@ -345,74 +352,6 @@ export default function ProfileScreen() {
             <SymbolView name="gearshape" size={16} tintColor="#ffffff" />
           </Pressable>
         </View>
-
-        {isNight ? (
-          <Pressable
-            onPress={() => router.push('/morning-after')}
-            accessibilityRole="button"
-            accessibilityLabel="Morning After"
-            accessibilityHint="Open your recap from last night"
-            className="flex-row items-center gap-2.5 min-h-11 px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] active:bg-white/[0.06]"
-          >
-            <SymbolView name="sun.max" size={16} tintColor={PURPLE} />
-            <Text className="flex-1 text-white/75 text-sm font-sans-medium">Morning After</Text>
-            <SymbolView name="chevron.right" size={12} tintColor="rgba(255,255,255,0.3)" />
-          </Pressable>
-        ) : null}
-
-        {/* Friends row */}
-        <Pressable
-          onPress={() => router.push('/friends')}
-          className="flex-row items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] active:bg-white/[0.06]"
-        >
-          <View className="w-9 h-9 rounded-full bg-[#a855f7]/15 items-center justify-center">
-            <SymbolView name="person.2" size={15} tintColor={PURPLE} />
-          </View>
-          <View className="flex-1">
-            <Text className="text-white text-sm font-sans-medium">Friends</Text>
-            <Text className="text-white/45 text-xs font-sans">
-              See everyone you&apos;re connected with
-            </Text>
-          </View>
-          <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.2)" />
-        </Pressable>
-
-        {/* Find from Contacts (web ContactsSync entry) */}
-        <Pressable
-          onPress={() => router.push('/contacts-sync')}
-          className="flex-row items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-[#a855f7]/20 active:bg-white/[0.06]"
-        >
-          <View className="w-9 h-9 rounded-full bg-[#a855f7]/20 items-center justify-center">
-            <SymbolView name="person.crop.circle.badge.plus" size={15} tintColor={PURPLE} />
-          </View>
-          <View className="flex-1">
-            <Text className="text-white text-sm font-sans-medium">Find Friends from Contacts</Text>
-            <Text className="text-white/45 text-xs font-sans">
-              See who&apos;s already on Spotted
-            </Text>
-          </View>
-          <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.2)" />
-        </Pressable>
-
-        {/* Invite Friends row (web InviteFriendsSection) */}
-        <Pressable
-          onPress={() => router.push('/invite-friends')}
-          className="flex-row items-center gap-3 p-3.5 rounded-2xl bg-[#2d1b4e]/60 border border-white/20 active:bg-[#2d1b4e]/80"
-        >
-          <View
-            className="w-9 h-9 rounded-full items-center justify-center"
-            style={{ backgroundColor: PURPLE }}
-          >
-            <SymbolView name="link" size={15} tintColor="#ffffff" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-white text-sm font-sans-medium">Invite Friends</Text>
-            <Text className="text-white/45 text-xs font-sans">
-              Share your link or QR code to add friends instantly
-            </Text>
-          </View>
-          <SymbolView name="qrcode" size={16} tintColor="rgba(255,255,255,0.4)" />
-        </Pressable>
 
         {/* Tonight status card — status / venue / audience, Update + Stop sharing */}
         <View className="bg-[#1F1740] border border-[#d4ff00]/25 rounded-2xl p-4 gap-2.5">
@@ -516,6 +455,52 @@ export default function ProfileScreen() {
             );
           })()}
         </View>
+
+        {isNight ? (
+          <Pressable
+            onPress={() => router.push('/morning-after')}
+            accessibilityRole="button"
+            accessibilityLabel="Morning After"
+            accessibilityHint="Open your recap from last night"
+            className="flex-row items-center gap-2.5 min-h-11 px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] active:bg-white/[0.06]"
+          >
+            <SymbolView name="sun.max" size={16} tintColor={PURPLE} />
+            <Text className="flex-1 text-white/75 text-sm font-sans-medium">Morning After</Text>
+            <SymbolView name="chevron.right" size={12} tintColor="rgba(255,255,255,0.3)" />
+          </Pressable>
+        ) : null}
+
+        {/* One entry for your people, discovery and invitations. */}
+        <Pressable
+          onPress={() => { void Haptics.selectionAsync(); router.push('/friends'); }}
+          accessibilityRole="button"
+          accessibilityLabel="Friends"
+          accessibilityValue={{ text: [
+            friendIds ? `${friendIds.length} ${friendIds.length === 1 ? 'friend' : 'friends'}` : '',
+            pendingCount ? `${pendingCount} pending ${pendingCount === 1 ? 'request' : 'requests'}` : '',
+          ].filter(Boolean).join(', ') }}
+          accessibilityHint="View your friends, find people and send invitations"
+          className="flex-row items-center gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] active:bg-white/[0.06]"
+        >
+          <View className="w-10 h-10 rounded-full bg-[#a855f7]/15 items-center justify-center">
+            <SymbolView name="person.2" size={18} tintColor={PURPLE} />
+          </View>
+          <View className="flex-1 min-w-0 gap-1">
+            <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
+              <Text className="text-white text-sm font-sans-medium">Friends</Text>
+              {friendIds ? <Text className="text-white/55 text-sm font-sans">{friendIds.length}</Text> : null}
+              {pendingCount ? (
+                <View className="px-2 py-0.5 rounded-full bg-[#d4ff00]/15">
+                  <Text className="text-xs font-sans-medium" style={{ color: NEON }}>
+                    {pendingCount} {pendingCount === 1 ? 'request' : 'requests'}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <Text className="text-white/55 text-xs font-sans">Find, invite and stay connected</Text>
+          </View>
+          <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.3)" />
+        </Pressable>
 
         {/* Spots section */}
         <View>
