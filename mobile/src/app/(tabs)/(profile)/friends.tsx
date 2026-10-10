@@ -3,7 +3,7 @@ import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { Alert } from 'react-native';
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
-import { ActionSheetIOS, ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-native';
+import { ActionSheetIOS, ActivityIndicator, Pressable, RefreshControl, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -79,6 +79,23 @@ async function fetchFriendsData(userId: string): Promise<FriendsData> {
     }
   }
 
+  const friends = friendIds
+    .map((id) => profileMap.get(id))
+    .filter((p): p is NonNullable<typeof p> => !!p)
+    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  if (friends.length > 0) rows.push({ kind: 'header', key: 'h-friends', title: `Friends (${friends.length})` });
+  for (const p of friends) {
+    rows.push({
+      kind: 'friend',
+      key: `friend-${p.id}`,
+      userId: p.id,
+      display_name: p.display_name,
+      username: p.username,
+      avatar_url: p.avatar_url,
+      isClose: closeIds.has(p.id),
+    });
+  }
+
   // People you may know — exclude anyone already a friend or requester
   const excluded = new Set([...friendIds, ...requests.map((r) => r.user_id), userId]);
   const visibleSuggestions = suggestions.filter((s: SuggestedFriend) => !excluded.has(s.id));
@@ -97,28 +114,12 @@ async function fetchFriendsData(userId: string): Promise<FriendsData> {
     }
   }
 
-  const friends = friendIds
-    .map((id) => profileMap.get(id))
-    .filter((p): p is NonNullable<typeof p> => !!p)
-    .sort((a, b) => a.display_name.localeCompare(b.display_name));
-  rows.push({ kind: 'header', key: 'h-friends', title: `Friends (${friends.length})` });
-  for (const p of friends) {
-    rows.push({
-      kind: 'friend',
-      key: `friend-${p.id}`,
-      userId: p.id,
-      display_name: p.display_name,
-      username: p.username,
-      avatar_url: p.avatar_url,
-      isClose: closeIds.has(p.id),
-    });
-  }
-
   return { rows };
 }
 
 /** Friends — incoming requests + all friends with close-friend stars. */
 export default function FriendsScreen() {
+  const { fontScale } = useWindowDimensions();
   const { session } = useSession();
   const queryClient = useQueryClient();
   const userId = session?.user.id;
@@ -218,8 +219,9 @@ export default function FriendsScreen() {
     );
   };
 
+  // Re-measure mounted native text when Dynamic Type changes.
   return (
-    <View className="flex-1">
+    <View key={fontScale} className="flex-1">
       {/* Header */}
       <View
         className="pt-safe-offset-3 pb-3 px-4 flex-row items-center gap-3 border-b border-white/10"
@@ -249,11 +251,21 @@ export default function FriendsScreen() {
         // hint for the star so Close Friends is manageable from here
         ListHeaderComponent={
           <View className="pt-4 gap-3">
+            <Pressable
+              onPress={() => router.push('/search')}
+              accessibilityRole="button"
+              accessibilityLabel="Search people"
+              accessibilityHint="Find someone by name or username"
+              className="flex-row items-center gap-2.5 min-h-11 px-4 py-3 rounded-full bg-white/[0.05] border border-white/[0.08] active:bg-white/10"
+            >
+              <SymbolView name="magnifyingglass" size={16} tintColor="rgba(255,255,255,0.55)" />
+              <Text className="flex-1 text-white/55 text-sm font-sans">Search by name or username</Text>
+            </Pressable>
             <AddFriendsRow />
             {hasFriends ? (
               <View className="flex-row items-center gap-1.5">
                 <SymbolView name="star.fill" size={11} tintColor={NEON} />
-                <Text className="text-white/60 text-xs font-sans">
+                <Text className="flex-1 text-white/60 text-xs font-sans">
                   Tap the star to add someone to Close Friends — your most private audience.
                 </Text>
               </View>
@@ -272,9 +284,6 @@ export default function FriendsScreen() {
               icon="person.2"
               title="No friends yet"
               body="Find people you know from your contacts, search by username, or send an invite."
-              actions={[
-                { label: 'Search people', icon: 'magnifyingglass', onPress: () => router.push('/search') },
-              ]}
               compact
             />
           )

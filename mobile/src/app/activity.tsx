@@ -16,6 +16,7 @@ import { showToast } from '@/lib/toast';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { useNotifications, type AppNotification } from '@/hooks/use-notifications';
 import { useFriendIds } from '@/hooks/use-friend-ids';
+import { useFriendRequestCount } from '@/hooks/use-friend-request-count';
 import { useSession } from '@/hooks/use-session';
 import { getTimeAgo } from '@/hooks/use-feed';
 import { Avatar } from '@/components/avatar';
@@ -211,20 +212,7 @@ export default function ActivityScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pending friend requests count (web: badge on the top card)
-  const { data: pendingCount } = useQuery({
-    queryKey: ['friend-requests-count', userId],
-    enabled: !!userId,
-    staleTime: 30_000,
-    queryFn: async () => {
-      const { count } = await supabase
-        .from('friendships')
-        .select('id', { count: 'exact', head: true })
-        .eq('friend_id', userId!)
-        .eq('status', 'pending');
-      return count ?? 0;
-    },
-  });
+  const { data: pendingCount } = useFriendRequestCount(userId);
 
   // Friends Planning / PGing (live night_statuses, not notifications)
   const { data: planningRows } = useQuery({

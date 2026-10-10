@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import { NEON, control, outlineControl, primaryControl, primaryControlText } from '@/lib/theme';
@@ -153,23 +153,28 @@ export function ExpiredState({
 
 /** Compact inline row: "Find friends · Invite" for screens that have content. */
 export function AddFriendsRow() {
+  const { fontScale } = useWindowDimensions();
   return (
-    <View className="flex-row gap-2">
+    <View className={`${fontScale > 1.3 ? 'flex-col' : 'flex-row'} gap-2`}>
       <Pressable
         onPress={() => router.push('/contacts-sync')}
         accessibilityRole="button"
-        className={`flex-1 flex-row items-center justify-center gap-2 min-h-11 rounded-full ${control.ordinary} active:opacity-70`}
+        accessibilityLabel="Find friends"
+        accessibilityHint="Find people from your contacts"
+        className={`${fontScale > 1.3 ? '' : 'flex-1'} flex-row items-center justify-center gap-2 min-h-11 px-4 py-3 rounded-full ${control.ordinary} active:opacity-70`}
       >
         <SymbolView name="person.badge.plus" size={15} tintColor="#ffffff" />
-        <Text className="text-white text-sm font-sans-semibold">Find friends</Text>
+        <Text className="shrink text-white text-sm font-sans-medium text-center">Find friends</Text>
       </Pressable>
       <Pressable
         onPress={() => router.push('/invite-friends')}
         accessibilityRole="button"
-        className={`flex-1 flex-row items-center justify-center gap-2 min-h-11 rounded-full ${control.ordinary} active:opacity-70`}
+        accessibilityLabel="Invite friends"
+        accessibilityHint="Share your invitation link or QR code"
+        className={`${fontScale > 1.3 ? '' : 'flex-1'} flex-row items-center justify-center gap-2 min-h-11 px-4 py-3 rounded-full ${control.ordinary} active:opacity-70`}
       >
         <SymbolView name="paperplane" size={15} tintColor="#ffffff" />
-        <Text className="text-white text-sm font-sans-semibold">Invite</Text>
+        <Text className="shrink text-white text-sm font-sans-medium text-center">Invite friends</Text>
       </Pressable>
     </View>
   );
