@@ -1,13 +1,15 @@
 import { createContext, use, useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { hasSeenTour } from '@/lib/tour-seen';
+import { launchRpc, type LaunchState } from '@/lib/launch';
+import { setDemoAuthorization } from '@/lib/demo-mode';
 import { getSessionRevision, setSessionIdentity } from '@/lib/session-identity';
 
 interface SessionState {
   session: Session | null;
+  launch: LaunchState | null;
   loading: boolean;
-  /** True when the signed-in user still needs name/username/welcome onboarding. */
+  /** True when the signed-in user still needs admission, a profile, or two nominations. */
   onboardingNeeded: boolean;
   /**
    * False until onboarding status is known for the current user. Anything
@@ -23,6 +25,7 @@ interface SessionState {
 
 const SessionContext = createContext<SessionState>({
   session: null,
+  launch: null,
   loading: true,
   onboardingNeeded: false,
   onboardingResolved: false,
@@ -30,47 +33,9 @@ const SessionContext = createContext<SessionState>({
   refreshOnboardingStatus: async () => {},
 });
 
-/** Ship date of the tour-seen flag (2026-09-22). See fetchOnboardingNeeded. */
-const TOUR_FLAG_SHIPPED_AT = Date.parse('2026-09-22T00:00:00Z');
-/** How long after sign-up a complete profile with no tour flag can still be mid-tour. */
-const MID_TOUR_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-/** Onboarding is done when the profile is complete (name + username) AND
- * the tour has been finished.
- *
- * The tour needs its own flag because it runs AFTER the username step has
- * already written both fields: without it the gate flips to "done" while
- * the tour is still on screen, so quitting mid-tour dropped the user into
- * the tabs for good — no rest of the tour, and no location prompt (the
- * tour is where it is asked for). See lib/tour-seen.ts.
- *
- * NOTE: do not gate on a profiles column like `has_onboarded` — it does not
- * exist in the production schema, and a failed select here silently locks
- * users inside onboarding forever. */
-async function fetchOnboardingNeeded(userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('display_name, username, created_at')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!(data?.display_name && data?.username)) return true;
-  const { data: auth } = await supabase.auth.getSession();
-  const user = auth.session?.user.id === userId ? auth.session.user : null;
-  if (!user || (await hasSeenTour(user))) return false;
-  // A complete profile with no flag is either mid-tour (a brand-new
-  // account) or an existing account that finished before the flag was
-  // stored on the account: pre-flag accounts, and ones that only recorded
-  // it on another device. Only a recent sign-up can be mid-tour; anyone
-  // else signing in on a fresh install must land in the app, not on the
-  // name step.
-  const createdAt = data.created_at ? Date.parse(data.created_at) : NaN;
-  if (Number.isNaN(createdAt) || createdAt < TOUR_FLAG_SHIPPED_AT) return false;
-  return Date.now() - createdAt < MID_TOUR_WINDOW_MS;
-}
-
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [launch, setLaunch] = useState<LaunchState | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   // null = not yet known for the current user. The root navigator stays
   // unmounted until it resolves, so it is only ever re-evaluated when the
@@ -84,8 +49,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const uid = data.session?.user.id;
     if (!uid) return;
     try {
-      const needed = await fetchOnboardingNeeded(uid);
-      if (revision === getSessionRevision()) { setOnboardingNeeded(needed); setOnboardingError(null); }
+      const state = await launchRpc('get_launch_state');
+      const needed = !state.complete;
+      if (revision === getSessionRevision()) { setLaunch(state); setDemoAuthorization(state.cityTester); setOnboardingNeeded(needed); setOnboardingError(null); }
     } catch (error) {
       if (revision === getSessionRevision()) setOnboardingError('Could not load your profile. Your account has not been reset.');
       throw error;
@@ -129,13 +95,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const userId = session?.user.id;
   useEffect(() => {
     if (!userId) {
-      setOnboardingNeeded(null); setOnboardingError(null);
+      setLaunch(null); setDemoAuthorization(false); setOnboardingNeeded(null); setOnboardingError(null);
       return;
     }
     let cancelled = false;
-    setOnboardingNeeded(null); setOnboardingError(null);
-    fetchOnboardingNeeded(userId).then((needed) => {
-      if (!cancelled) setOnboardingNeeded(needed);
+    setLaunch(null); setDemoAuthorization(false); setOnboardingNeeded(null); setOnboardingError(null);
+    launchRpc('get_launch_state').then((state) => {
+      if (!cancelled) { setLaunch(state); setDemoAuthorization(state.cityTester); setOnboardingNeeded(!state.complete); }
     }).catch(() => {
       if (!cancelled) setOnboardingError('Could not load your profile. Your account has not been reset.');
     });
@@ -148,6 +114,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     <SessionContext
       value={{
         session,
+        launch,
         loading: sessionLoading || (!!session && onboardingNeeded === null && !onboardingError),
         onboardingError,
         onboardingNeeded: onboardingNeeded ?? false,

@@ -102,9 +102,10 @@ function RootNavigator() {
       {/* Everything below requires a session — the guard evicts any of
           these left open (thread, sheets, modals) the moment it drops,
           instead of stranding them above the auth screen */}
-      <Stack.Protected guard={!!session}>
+      <Stack.Protected guard={!!session && !onboardingNeeded}>
       {/* Chat threads: root-level pushes so they slide OVER the native tab
           bar (per-screen tab-bar hiding pops visibly with native tabs) */}
+      <Stack.Screen name="rollout-waves" />
       <Stack.Screen name="thread" options={{ contentStyle: gradientStyle }} />
       {/* Camera-first composer: full screen, no swipe-dismiss (the sheet
           guards populated drafts itself) */}

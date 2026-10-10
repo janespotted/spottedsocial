@@ -29,7 +29,7 @@ export default function InviteFriendsSheet() {
     if (!inviteUrl) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Share.share({
-      message: `Hey! Join me on Spotted to see where friends are going out tonight 🎉 ${inviteUrl}`,
+      message: `Find me on Spotted. New York is opening in invitation waves: ${inviteUrl}`,
     });
   };
 
@@ -56,7 +56,7 @@ export default function InviteFriendsSheet() {
         <View className="flex-1">
           <Text className="text-white text-lg font-sans-semibold">Invite Friends</Text>
           <Text className="text-white/60 text-sm font-sans">
-            Share your link to add friends instantly
+            Share your profile. New members join through rollout waves.
           </Text>
         </View>
       </View>

@@ -182,8 +182,9 @@ export default function PhoneScreen() {
           Spotted
         </Text>
         <Text className="text-white/50 text-base font-sans mb-8">
-          see where your friends are tonight
+          New York, one circle at a time.
         </Text>
+        <Text className="text-white/60 text-sm text-center leading-5 mt-3">New here? Set up your profile and nominate two new people to join a future wave. Both nominations are required.</Text>
 
         <View className="w-full gap-5">
           {mode === 'phone' ? (

@@ -139,24 +139,22 @@ test('QA-27 standalone Like toggles cached state and rolls back failed writes',a
  if(!fails){scope.post=cached.post;scope.isLiked=true;scope.fetched={data:cached};await extract('app/post-detail.tsx','onLike',scope)();assert.equal(cached.isLiked,false);assert.equal(cached.post.likes_count,0);}
  }
 });
-test('QA-17 returning-profile read error does not become onboarding; genuine new and complete accounts still resolve',async()=>{
- for(const data of [null,{display_name:'Jane',username:'jane',created_at:'2026-09-01T00:00:00Z'}]){
- const fn=extract('hooks/use-session.tsx','fetchOnboardingNeeded',{supabase:{from:()=>builder({data,error:null}),auth:{getSession:async()=>({data:{session:{user:{id:'a'}}}})}},hasSeenTour:async()=>false,TOUR_FLAG_SHIPPED_AT:Date.parse('2026-09-22T00:00:00Z')});assert.equal(await fn('a'),data===null);
- }
- const denied=extract('hooks/use-session.tsx','fetchOnboardingNeeded',{supabase:{from:()=>builder({data:null,error:new Error('offline')})}});await assert.rejects(denied('a'),/offline/);
- assert.match(source('app/_layout.tsx'),/if \(onboardingError\) return/);assert.match(source('app/_layout.tsx'),/Retry loading profile/);
+test('QA-17 launch-state read failures preserve the gate and offer Retry',async()=>{
+ let needed=true,reported=null;const fn=extract('hooks/use-session.tsx','refreshOnboardingStatus',{getSessionRevision:()=>1,supabase:{auth:{getSession:async()=>({data:{session:{user:{id:'a'}}}})}},launchRpc:async()=>{throw Error('offline')},setOnboardingError:v=>reported=v,setOnboardingNeeded:v=>needed=v});
+ await assert.rejects(fn(),/offline/);assert.equal(needed,true);assert.match(reported,/not been reset/);
+ assert.match(source('app/_layout.tsx'),/if \(onboardingError\) return/);
 });
-test('QA-18 double Continue during permission prompt advances once; final step stays bounded and retry works',async()=>{
- let step=3,release;const busy={current:false};const scope={advancing:busy,setPending:()=>{},step:3,TOTAL:7,askForLocation:()=>new Promise(r=>release=r),finish:async()=>{},setStep:fn=>step=fn(step),setFinishing:()=>{},Alert:{alert:()=>{}}};
- const advance=extract('app/onboarding/welcome.tsx','advance',scope);const first=advance();await advance();assert.equal(step,3);release();await first;assert.equal(step,4);assert.equal(busy.current,false);
- scope.step=7;scope.finish=async()=>{throw Error('offline')};await extract('app/onboarding/welcome.tsx','advance',scope)();assert.equal(step,4);assert.equal(busy.current,false);
+test('QA-18 repeated onboarding taps submit once and an interrupted save remains retryable',async()=>{
+ let calls=0,release,error=null;const saving={current:false};const perform=extract('app/onboarding/index.tsx','perform',{Error,saving,setBusy:()=>{},setError:v=>error=v});
+ const first=perform(()=>{calls++;return new Promise(r=>release=r)});await perform(async()=>{calls++});assert.equal(calls,1);release();await first;
+ await perform(async()=>{throw Error('offline')});assert.equal(error,'offline');assert.equal(saving.current,false);
+ await perform(async()=>{calls++});assert.equal(calls,2);assert.equal(error,null);
 });
-test('QA-19 late username availability cannot approve a different edited handle',async()=>{
- let finish,available=null,err=null,checking=true;const revision={current:1};
- const fn=extract('app/onboarding/username.tsx','checkUsernameAvailability',{USERNAME_REGEX:/^[a-z0-9_.]{3,20}$/,RESERVED_USERNAMES:new Set(),usernameRevision:revision,setUsernameAvailable:x=>available=x,setUsernameError:x=>err=x,setSuggestions:()=>{},setUsernameChecking:x=>checking=x,supabase:{rpc:()=>new Promise(r=>finish=r)}});
- const old=fn('first',1);revision.current=2;finish({data:true,error:null});await old;assert.equal(available,null);
- const now=fn('second',2);finish({data:false,error:null});await now;assert.equal(available,false);assert.match(err,/taken/);assert.equal(checking,false);
- const good=fn('third',2);finish({data:true,error:null});await good;assert.equal(available,true);assert.equal(err,null);
+test('QA-19 profile save uses server uniqueness and cannot confirm an unavailable username',async()=>{
+ const {load}=require('./product-test-runtime.cjs');const calls=[];
+ const api=load('lib/launch.ts',{'@/lib/supabase':{supabase:{rpc:async(name,args)=>{calls.push({name,args});return {data:null,error:{code:'23505',message:'duplicate'}}}}}});
+ await assert.rejects(api.launchRpc('save_launch_profile',{p_name:'Jane',p_username:'jane',p_terms:true}),/username is taken/);
+ assert.equal(calls[0].args.p_username,'jane');
 });
 test('QA-23 malformed sent-confirmation payloads are unavailable, legitimate recipients survive',()=>{
  const api=load('lib/route-input.ts');for(const raw of [undefined,'null','{}','[]','not-json','[null,4,{}]'])assert.equal(api.parseConfirmationPeople(raw).length,0);

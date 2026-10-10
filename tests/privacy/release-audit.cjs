@@ -16,7 +16,7 @@ async function run(variant) {
   for (const file of ['audited-schema.sql', 'audited-storage.sql']) {
     await db.exec(fs.readFileSync(path.join(__dirname, file), 'utf8'));
   }
-  await db.exec('alter table auth.users add column phone text; create publication supabase_realtime');
+  await db.exec('alter table auth.users add column phone text, add column phone_confirmed_at timestamptz; create publication supabase_realtime');
   for (const file of fs.readdirSync(path.join(root, 'supabase/migrations')).filter(n =>
     n.startsWith('202609222') || n.includes('_v1_') || /^2026100[567]/.test(n)).sort()) {
     await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations', file), 'utf8'));
@@ -79,6 +79,7 @@ async function run(variant) {
   await db.exec('commit');
   await db.exec(migration);
   await db.exec(migration);
+  if (process.env.SPOTTED_LAUNCH_MIGRATION === '1') await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261010230431_nyc_onboarding_waves.sql'),'utf8'));
 
   await test('Migration applies twice and consolidates both historical overloads', async () => {
     assert.equal(await scalar("select count(*)::int from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='create_group_thread'"), 1);

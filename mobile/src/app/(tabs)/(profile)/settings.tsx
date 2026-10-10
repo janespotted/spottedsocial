@@ -60,7 +60,7 @@ function SettingsRow({
 
 /** Settings — read receipts, blocked & hidden, legal, sign out. */
 export default function SettingsScreen() {
-  const { session } = useSession();
+  const { session, launch } = useSession();
   const queryClient = useQueryClient();
   const userId = session?.user.id;
   // pb clears the native tab bar + home indicator: this screen lives inside
@@ -135,6 +135,7 @@ export default function SettingsScreen() {
   };
 
   const changeCity = () => {
+    if (!launch?.cityTester) return;
     const cities = demoOn ? ALL_CITY_IDS : ALL_CITY_IDS.filter((c) => !DEMO_CITIES.has(c));
     ActionSheetIOS.showActionSheetWithOptions(
       {
@@ -146,7 +147,8 @@ export default function SettingsScreen() {
       async (index) => {
         const city = cities[index];
         if (!city || !userId || city === ownCity) return;
-        await supabase.from('profiles').update({ city }).eq('id', userId);
+        const { data, error } = await supabase.from('profiles').update({ city }).eq('id', userId).select('id').single();
+        if (error || !data) { Alert.alert('City not changed', error?.message || 'Try again.'); return; }
         setActiveCity(city);
         await queryClient.invalidateQueries();
       }
@@ -400,7 +402,7 @@ export default function SettingsScreen() {
             default in every build (SOW §15); this switch is how the
             Lahore-based developer tests against venues they can reach,
             while everyone else's app is untouched. */}
-        <SettingsRow
+        {launch?.cityTester ? <SettingsRow
           icon="wrench.and.screwdriver"
           title="Demo Mode"
           subtitle={demoOn ? 'On — demo venues, users and Lahore' : 'Off — real content only'}
@@ -411,8 +413,8 @@ export default function SettingsScreen() {
               trackColorOnClassName="accent-[#a855f7]"
             />
           }
-        />
-        {demoOn ? (
+        /> : null}
+        {launch?.cityTester ? (
           <SettingsRow
             icon="building.2"
             title="City"
@@ -420,6 +422,8 @@ export default function SettingsScreen() {
             onPress={changeCity}
           />
         ) : null}
+
+        {launch?.waveAdmin ? <SettingsRow icon="person.2" title="Rollout waves" subtitle="Review the queue and open the next wave" onPress={() => router.push('/rollout-waves')} /> : null}
 
         {/* Night Mode tester tools — tester accounts only. */}
         {nightMode.tester ? (
