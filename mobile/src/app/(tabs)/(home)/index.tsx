@@ -249,11 +249,9 @@ function HomeHeader({
 /* ── Screen ── */
 
 /**
- * Morning After | Newsfeed tabs in both modes (DAY-NIGHT-MODE-PLAN.md §4.5;
- * D6 changed Oct 7 2026 — the tabs were Day-only, which left Morning After
- * unreachable from Home all evening while last night's recap was still live).
- * Day opens on Morning After, with the Newsfeed showing its opening screen;
- * Night opens on the live Newsfeed. The feed (posts query, realtime channel)
+ * Day opens on Morning After, with the Newsfeed showing its opening screen.
+ * At night Home shows only the live Newsfeed; Morning After stays available
+ * through the compact link on Profile. The feed (posts query, realtime channel)
  * only mounts at night, and so does the Post button: posting opens with
  * Night Mode (D1).
  */
@@ -270,35 +268,18 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 bg-[#110a24]">
       <HomeHeader city={city} unreadCount={unreadCount}>
-        <SubTabs<HomeTab>
+        {!isNight ? <SubTabs<HomeTab>
           tabs={[
             { key: 'morning', label: 'Morning After' },
             // The moon marks a section that is closed until Night Mode
-            { key: 'feed', label: 'Newsfeed', icon: isNight ? undefined : 'moon' },
+            { key: 'feed', label: 'Newsfeed', icon: 'moon' },
           ]}
           value={tab}
           onChange={setTab}
-        />
+        /> : null}
       </HomeHeader>
       {isNight ? (
-        // Morning After covers the feed instead of replacing it. The feed
-        // keeps its posts in component state, so a remount would refetch
-        // (skeletons), and display:none detaches the native scroll view and
-        // loses the scroll position — both were seen on device.
-        <View className="flex-1">
-          <View
-            className="flex-1"
-            accessibilityElementsHidden={tab !== 'feed'}
-            importantForAccessibility={tab === 'feed' ? 'auto' : 'no-hide-descendants'}
-          >
-            <NewsfeedScreen active={tab === 'feed'} />
-          </View>
-          {tab === 'morning' ? (
-            <View className="absolute inset-0 bg-[#110a24]">
-              <DayHome />
-            </View>
-          ) : null}
-        </View>
+        <NewsfeedScreen active />
       ) : tab === 'morning' ? (
         <DayHome />
       ) : (
