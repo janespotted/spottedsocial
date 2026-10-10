@@ -1,5 +1,6 @@
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
 import { fetchEventsWithFriends, fetchMyVotes, fetchPlans } from '@/lib/plans';
@@ -34,8 +35,14 @@ export function useMyNightStatus() {
 /** Unexpired plans (score-sorted) plus the caller's votes. */
 export function usePlans() {
   const { session } = useSession();
+  const queryClient = useQueryClient();
+  const userId = session?.user.id;
+  useFocusEffect(useCallback(() => {
+    if (userId) void queryClient.invalidateQueries({ queryKey: ['plans', userId] });
+  }, [queryClient, userId]));
   return useQuery({
     queryKey: ['plans', session?.user.id],
+    refetchOnMount: 'always',
     enabled: !!session,
     staleTime: 30_000,
     queryFn: async () => {

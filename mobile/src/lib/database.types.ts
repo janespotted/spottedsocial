@@ -2669,7 +2669,7 @@ export type Database = {
       }
       create_dm_thread: { Args: { friend_id: string }; Returns: string }
       create_group_thread: {
-        Args: { group_name: string; member_ids: string[] }
+        Args: { group_name?: string; member_ids: string[] }
         Returns: string
       }
       create_notification: {

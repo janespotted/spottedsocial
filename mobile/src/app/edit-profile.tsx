@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Keyboard,
   Pressable,
   Text,
@@ -91,20 +92,21 @@ export default function EditProfileSheet() {
     setUploadingAvatar(true);
     try {
       const ext = asset.mimeType === 'image/png' ? 'png' : 'jpg';
-      const path = `${userId}/avatar.${ext}`;
+      const path = `${userId}/avatar-${Date.now()}.${ext}`;
       const body = await fetch(asset.uri).then((r) => r.arrayBuffer());
       const { error: uploadErr } = await supabase.storage
         .from('avatars')
-        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: true });
+        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: false });
       if (uploadErr) throw uploadErr;
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-      // Cache-bust — same path is reused on every change
-      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId);
-      setAvatarUrl(publicUrl);
+      const { data, error } = await supabase.from('profiles')
+        .update({ avatar_url: urlData.publicUrl }).eq('id', userId)
+        .select('id, avatar_url').single();
+      if (error || !data) throw error ?? new Error('Profile unavailable');
+      setAvatarUrl(data.avatar_url);
       queryClient.invalidateQueries({ queryKey: ['profile-page'] });
     } catch {
-      /* upload failed — keep prior avatar */
+      Alert.alert('Could not update photo', 'Your profile photo was not changed. Please try again.');
     } finally {
       setUploadingAvatar(false);
     }
@@ -122,11 +124,12 @@ export default function EditProfileSheet() {
     }
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update({ display_name: name, username: handle })
-        .eq('id', userId);
-      if (error) {
+        .eq('id', userId)
+        .select('id').single();
+      if (error || !data) {
         setUsernameError('Could not save — username may be taken');
         return;
       }

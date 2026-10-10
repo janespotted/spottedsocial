@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import * as Contacts from 'expo-contacts';
+import * as Contacts from 'expo-contacts/legacy';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { sendFriendRequest } from '@/lib/friends';

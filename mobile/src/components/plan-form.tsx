@@ -1,3 +1,4 @@
+import { dismissKeyboardNow } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActionSheetIOS,
@@ -262,13 +263,17 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
       </View>
 
       <KeyboardAwareScrollView
+        testID="plan-form-scroll"
         className="flex-1"
         contentContainerClassName="px-5 pb-10"
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        onScrollBeginDrag={dismissKeyboardNow}
       >
         {/* Pressable wrapper so taps on empty space close the friend dropdown;
             interactive children claim their own touches first */}
         <Pressable
+          accessible={false}
           onPress={() => {
             if (showFriendPicker) {
               setShowFriendPicker(false);
@@ -308,7 +313,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
                 className="flex-1 ml-2.5 text-white text-[15px] font-sans"
               />
             </View>
-            <View className="mt-2">
+            <View className="mt-2" testID="plan-venue-results">
               {filteredVenues.map((venue) => (
                 <Pressable
                   key={venue.id}

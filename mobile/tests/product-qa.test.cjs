@@ -141,7 +141,7 @@ test('QA-27 standalone Like toggles cached state and rolls back failed writes',a
 });
 test('QA-17 returning-profile read error does not become onboarding; genuine new and complete accounts still resolve',async()=>{
  for(const data of [null,{display_name:'Jane',username:'jane',created_at:'2026-09-01T00:00:00Z'}]){
- const fn=extract('hooks/use-session.tsx','fetchOnboardingNeeded',{supabase:{from:()=>builder({data,error:null})},hasSeenTour:async()=>false,TOUR_FLAG_SHIPPED_AT:Date.parse('2026-09-22T00:00:00Z')});assert.equal(await fn('a'),data===null);
+ const fn=extract('hooks/use-session.tsx','fetchOnboardingNeeded',{supabase:{from:()=>builder({data,error:null}),auth:{getSession:async()=>({data:{session:{user:{id:'a'}}}})}},hasSeenTour:async()=>false,TOUR_FLAG_SHIPPED_AT:Date.parse('2026-09-22T00:00:00Z')});assert.equal(await fn('a'),data===null);
  }
  const denied=extract('hooks/use-session.tsx','fetchOnboardingNeeded',{supabase:{from:()=>builder({data:null,error:new Error('offline')})}});await assert.rejects(denied('a'),/offline/);
  assert.match(source('app/_layout.tsx'),/if \(onboardingError\) return/);assert.match(source('app/_layout.tsx'),/Retry loading profile/);

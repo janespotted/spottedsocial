@@ -24,7 +24,7 @@ import {
 import Animated, { interpolate, useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommentSheet, type CommentSheetHandle } from '@/components/comment-sheet';
-import { ExpiredState } from '@/components/empty-state';
+import { EmptyState } from '@/components/empty-state';
 import { GradientRingAvatar } from '@/components/post-card';
 import { FEED_MEDIA_ASPECT, PostMedia, postHasMedia } from '@/components/post-media';
 import { getTimeAgo } from '@/hooks/use-feed';
@@ -354,7 +354,12 @@ function PostDetail() {
         ) : null}
         {expired ? (
           <View className="flex-1 justify-center">
-            <ExpiredState what="This post" onDismiss={() => void close()} dismissLabel="Back" />
+            <EmptyState
+              icon="photo"
+              title="This post is unavailable"
+              body="It may have expired, been deleted, or no longer be shared with you."
+              actions={[{ label: 'Back', onPress: () => void close(), primary: true }]}
+            />
           </View>
         ) : null}
 

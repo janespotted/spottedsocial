@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
+import { dismissKeyboardNow, useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { onNightBoundary } from '@/lib/night-boundary';
 import { confirmMessage, sharedPostResults } from '@/lib/thread-state';
 import { RESET_COPY } from '@/lib/reset-copy';
@@ -471,11 +471,12 @@ export default function ThreadScreen() {
    * original composer had a camera affordance, not just a picker).
    */
   const attachImage = useCallback(() => {
-    Keyboard.dismiss();
+    dismissKeyboardNow();
     ActionSheetIOS.showActionSheetWithOptions(
       { options: ['Take a photo', 'Choose from library', 'Cancel'], cancelButtonIndex: 2 },
       async (index) => {
         if (index === 0) {
+          dismissKeyboardNow();
           setCameraOpen(true);
           return;
         }
@@ -564,11 +565,18 @@ export default function ThreadScreen() {
       undefined,
       async (name) => {
         const newName = name?.trim() || null;
-        const { error } = await supabase
-          .from('dm_threads')
-          .update({ name: newName })
-          .eq('id', threadId);
-        if (!error) setGroupInfo((prev) => (prev ? { ...prev, name: newName } : prev));
+        try {
+          const { data, error } = await supabase
+            .from('dm_threads')
+            .update({ name: newName })
+            .eq('id', threadId)
+            .select('id, name')
+            .single();
+          if (error || !data) throw error ?? new Error('Group unavailable');
+          setGroupInfo((prev) => (prev ? { ...prev, name: data.name } : prev));
+        } catch {
+          Alert.alert('Could not rename group', 'Your change was not saved. Please try again.');
+        }
       },
       'plain-text',
       groupInfo.name ?? ''
@@ -593,16 +601,18 @@ export default function ThreadScreen() {
         .from('post-images')
         .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: false });
       if (uploadErr) throw uploadErr;
-      const mediaUrl = await resolvePostImageUrl(path);
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('dm_threads')
         .update({ group_avatar_url: path })
-        .eq('id', threadId);
-      if (!error) {
-        setGroupInfo((prev) => (prev ? { ...prev, group_avatar_url: mediaUrl } : prev));
-      }
+        .eq('id', threadId)
+        .select('id, group_avatar_url')
+        .single();
+      if (error || !data) throw error ?? new Error('Group unavailable');
+      // Signing authorizes the stored group photo, so persist the key first.
+      const mediaUrl = await resolvePostImageUrl(data.group_avatar_url);
+      setGroupInfo((prev) => (prev ? { ...prev, group_avatar_url: mediaUrl } : prev));
     } catch {
-      /* upload failed — keep prior photo */
+      Alert.alert('Could not update group photo', 'Please try again.');
     }
   };
 
@@ -913,6 +923,8 @@ export default function ThreadScreen() {
           <View className="flex-row items-center gap-3 px-4 py-3 pb-safe-offset-3">
             <Pressable
               onPress={attachImage}
+              accessibilityRole="button"
+              accessibilityLabel="Attach photo"
               disabled={uploading}
               hitSlop={6}
               className="w-9 h-9 rounded-full items-center justify-center bg-white/5 border border-white/15 active:opacity-70 disabled:opacity-30"
