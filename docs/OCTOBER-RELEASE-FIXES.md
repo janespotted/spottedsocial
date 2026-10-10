@@ -1,6 +1,6 @@
 # October release audit fixes
 
-Based on `8999c419be8ad9b2813fda2dff5f8cb41a7c9b99` (`feat/day-night-mode`). The app changes are committed locally. The database fix was deployed to the approved test project on October 9; neither GitHub nor production has been updated.
+Based on `8999c419be8ad9b2813fda2dff5f8cb41a7c9b99` (`feat/day-night-mode`). The database fix was deployed to the approved test project on October 9. Production database deployment and validation on a newly signed TestFlight build remain separate release steps; the verification below records the completed test-backend and simulator run.
 
 ## Changes
 
