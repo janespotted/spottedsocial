@@ -9,6 +9,7 @@ export const INTRO_STEPS = [
 
 const key = (userId: string) => `spotted.launchIntro.v2.${userId}`;
 const progress = new Map<string, number>();
+export const cachedIntroStep = (userId?: string): number | null => userId ? progress.get(userId) ?? null : null;
 
 /** This remembers an explanation, never admission or required setup. */
 export async function readIntroStep(userId: string): Promise<number> {
@@ -20,7 +21,9 @@ export async function readIntroStep(userId: string): Promise<number> {
     const value = current === null
       ? legacy === '3' ? INTRO_STEPS.length : ['0', '1', '2'].includes(legacy ?? '') ? Number(legacy) : 0
       : Number(current);
-    return progress.get(userId) ?? (Number.isInteger(value) && value >= 0 && value <= INTRO_STEPS.length ? value : 0);
+    const step = progress.get(userId) ?? (Number.isInteger(value) && value >= 0 && value <= INTRO_STEPS.length ? value : 0);
+    progress.set(userId, step);
+    return step;
   } catch { return progress.get(userId) ?? 0; }
 }
 

@@ -7,7 +7,7 @@ test('Rapid taps cannot skip a page, and reduced motion changes pages without an
     const callbacks=[],saved=[],steps=[];
     const locked={current:false};
     const move=extract('components/launch-introduction.tsx','move',{
-      locked,reduce,INTRO_STEPS:[1,2,3,4],motion:{},setBusy:()=>{},setStep:x=>steps.push(x),
+      locked,reduce,INTRO_STEPS:[1,2,3,4],motion:{setValue:()=>{}},LAUNCH_EASE:()=>{},setBusy:()=>{},setStep:x=>steps.push(x),
       onStep:x=>saved.push(x),scroll:{current:{scrollTo:()=>{}}},
       Haptics:{selectionAsync:async()=>{}},
       Animated:{timing:()=>({start:fn=>callbacks.push(fn)})},
@@ -25,6 +25,46 @@ test('Rapid taps cannot skip a page, and reduced motion changes pages without an
     assert.equal(saved.at(-1),4);
     assert.equal(steps.at(-1),1,'completion returns to setup rather than indexing past the final page');
   }
+});
+
+test('An interrupted page transition stays on the current page and can be retried', () => {
+  const callbacks=[],saved=[],steps=[];
+  const locked={current:false};
+  const move=extract('components/launch-introduction.tsx','move',{
+    locked,reduce:false,INTRO_STEPS:[1,2,3,4],motion:{setValue:()=>{}},LAUNCH_EASE:()=>{},
+    setBusy:()=>{},setStep:x=>steps.push(x),onStep:x=>saved.push(x),
+    scroll:{current:{scrollTo:()=>{}}},Haptics:{selectionAsync:async()=>{}},
+    Animated:{timing:()=>({start:fn=>callbacks.push(fn)})},
+  });
+  move(1); callbacks.shift()({finished:false});
+  assert.equal(locked.current,false);
+  assert.deepEqual(saved,[]);
+  assert.deepEqual(steps,[]);
+  move(1); callbacks.shift()({finished:true}); callbacks.shift()({finished:true});
+  assert.deepEqual(saved,[1]);
+  assert.deepEqual(steps,[1]);
+  assert.equal(locked.current,false);
+});
+
+test('Changing Reduce Motion takes precedence over an older preference read and carries into new screens', async () => {
+  let resolveRead, change;
+  const updates=[],cleanups=[];
+  const hook=extract('components/launch-motion.tsx','useLaunchReducedMotion',{
+    currentReduceMotion:undefined,useReducedMotion:()=>false,
+    useState:initial=>[initial(),value=>updates.push(value)],
+    useEffect:effect=>cleanups.push(effect()),
+    AccessibilityInfo:{
+      isReduceMotionEnabled:()=>new Promise(resolve=>{resolveRead=resolve;}),
+      addEventListener:(_,listener)=>{change=listener;return {remove:()=>{}};},
+    },
+  });
+  assert.equal(hook(),false);
+  change(true);
+  resolveRead(false);
+  await flush();
+  assert.deepEqual(updates,[true],'a stale startup read must not restart motion');
+  assert.equal(hook(),true,'the next illustration starts with the live preference');
+  cleanups.forEach(cleanup=>cleanup());
 });
 
 function setupHarness(launch, save = async () => ({ ...launch, profileSaved: true })) {
@@ -133,6 +173,7 @@ test('Social page continues to the leaderboard; only the last page hands off to 
   const element = (type, props) => ({ type, props });
   const render = extract('components/launch-introduction.tsx', 'IntroductionPages', {
     INTRO_STEPS, useState: value => [value, () => {}], useRef: value => ({current:value}), useEffect: () => {},
+    useLaunchReducedMotion: () => false, LaunchReveal: 'reveal', LaunchProgress: 'progress',
     useWindowDimensions: () => ({height:874,fontScale:1}),
     Animated: { Value: function() { this.interpolate = () => 0; }, View: 'animated' },
     View: 'view', Text: 'text', ScrollView: 'scroll', Pressable: 'pressable', SpottedMark: 'mark', SymbolView: 'symbol',

@@ -9,6 +9,7 @@ import { LaunchButton, LaunchShell } from '@/components/launch-shell';
 import { LaunchIntroduction } from '@/components/launch-introduction';
 import { PhoneVerifyForm } from '@/components/phone-verify-form';
 import { launchRpc, launchStage, nominationPhone, type LaunchState } from '@/lib/launch';
+import { readIntroStep } from '@/lib/launch-intro';
 import { supabase } from '@/lib/supabase';
 import { formatE164 } from '@/lib/country-codes';
 import { INK, MIST, NEON } from '@/lib/theme';
@@ -22,6 +23,7 @@ export default LaunchOnboarding;
 
 function LaunchSetup() {
   const { session, launch, refreshOnboardingStatus } = useSession();
+  useEffect(() => { if (session?.user.id) void readIntroStep(session.user.id); }, [session?.user.id]);
   const [state, setState] = useState<LaunchState | null>(launch);
   const appleName = typeof session?.user.user_metadata?.full_name === 'string' ? session.user.user_metadata.full_name : '';
   const [name, setName] = useState<string>((launch?.profileSaved ? launch.profile?.name : '') || appleName);
