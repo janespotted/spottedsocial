@@ -3,7 +3,6 @@ import { SymbolView } from 'expo-symbols';
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 import { OnboardingPanel } from '@/components/onboarding-scaffold';
 import { INK, LAVENDER, MIST, NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
-import { RESET_TITLE } from '@/lib/reset-copy';
 
 /**
  * The static mock UI inside the onboarding tour. These are illustrations,
@@ -451,7 +450,7 @@ export function SocialNightIllustration() {
       </View>)}
     </View>
     <View className="border-t border-white/10 mt-5 pt-5">
-      <View className="flex-row items-center gap-2"><SymbolView name="clock" size={17} tintColor={NEON} /><Text maxFontSizeMultiplier={1.2} className="flex-1 text-sm font-sans-medium" style={{ color: NEON }}>{RESET_TITLE}</Text></View>
+      <View className="flex-row items-center gap-2"><SymbolView name="clock" size={17} tintColor={NEON} /><Text maxFontSizeMultiplier={1.2} className="flex-1 text-sm font-sans-medium" style={{ color: NEON }}>Everything deletes by 5am - no hangxiety</Text></View>
       <Text maxFontSizeMultiplier={1.2} className="text-xs font-sans mt-2" style={{ color: MIST }}>Your profile and friends stay.</Text>
     </View>
   </OnboardingPanel>;
