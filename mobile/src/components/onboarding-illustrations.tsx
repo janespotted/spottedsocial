@@ -1,12 +1,13 @@
-import { Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 import { OnboardingPanel } from '@/components/onboarding-scaffold';
+import { SceneHalo, sceneArrival, useSceneMotion } from '@/components/onboarding-scene-motion';
 import { INK, LAVENDER, MIST, NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
 
 /**
- * The static mock UI inside the onboarding tour. These are illustrations,
- * not live controls: nothing here reads or writes state, so a tour screen
+ * The local mock UI inside the onboarding tour. These are illustrations,
+ * not live controls: motion never reads or writes account state, so a tour screen
  * can never leave a half-set preference behind. The real versions live in
  * the app (audience sheet, /check-in, the map).
  */
@@ -83,48 +84,53 @@ function VenuePin({ size = 26, color }: { size?: number; color: string }) {
 }
 
 /** 01 — the map: friends out, two venue pins. */
-export function MapIllustration() {
+export function MapIllustration({ animated = false }: { animated?: boolean }) {
+  const time = useSceneMotion(animated);
   return (
     <View
       className="flex-1 rounded-3xl border border-white/10 overflow-hidden"
       style={{ backgroundColor: '#1b1330' }}
     >
       <MapStreets />
+      <View className="absolute items-center justify-center" style={{ top: '42%', left: '22%', width: 24, height: 28 }}>
+        <SceneHalo time={time} />
+        <SceneHalo time={time} start={0.46} size={58} />
+      </View>
 
       {/* Friends-out pill, floating over the map like the real one */}
-      <View className="absolute left-3 right-3 top-3 flex-row items-center justify-between rounded-full border border-white/10 bg-[#241a3d]/90 py-1.5 pl-1.5 pr-3">
+      <Animated.View className="absolute left-3 right-3 top-3 flex-row items-center justify-between rounded-full border border-white/10 bg-[#241a3d]/90 py-1.5 pl-1.5 pr-3" style={sceneArrival(time, 0.36)}>
         <FaceStack />
         <View className="flex-row items-center gap-1">
           <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white/85 font-sans">4 friends are out</Text>
           <SymbolView name="chevron.right" size={10} tintColor="rgba(255,255,255,0.5)" />
         </View>
-      </View>
+      </Animated.View>
 
       {/* Friends on the map — lime ring = out, white ring = mutual */}
-      <View className="absolute" style={{ top: '26%', left: '8%' }}>
+      <Animated.View className="absolute" style={[{ top: '26%', left: '8%' }, sceneArrival(time, 0.08, true)]}>
         <MockFace size={36} ring={NEON} variant={0} />
-      </View>
-      <View className="absolute" style={{ top: '24%', right: '12%' }}>
+      </Animated.View>
+      <Animated.View className="absolute" style={[{ top: '24%', right: '12%' }, sceneArrival(time, 0.22, true)]}>
         <MockFace size={36} ring="rgba(255,255,255,0.55)" variant={1} />
-      </View>
-      <View className="absolute" style={{ top: '64%', left: '13%' }}>
+      </Animated.View>
+      <Animated.View className="absolute" style={[{ top: '64%', left: '13%' }, sceneArrival(time, 0.3, true)]}>
         <MockFace size={36} ring="rgba(255,255,255,0.55)" variant={3} />
-      </View>
+      </Animated.View>
 
-      <View className="absolute flex-row items-center gap-1.5" style={{ top: '42%', left: '22%' }}>
+      <Animated.View className="absolute flex-row items-center gap-1.5" style={[{ top: '42%', left: '22%' }, sceneArrival(time, 0.15, true)]}>
         <VenuePin size={24} color={NEON} />
         <View>
           <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white font-sans-medium">The Violet Room</Text>
           <Text maxFontSizeMultiplier={1.2} className="text-[10px] text-white/50 font-sans">West Village</Text>
         </View>
-      </View>
-      <View className="absolute flex-row items-center gap-1.5" style={{ top: '55%', left: '44%' }}>
+      </Animated.View>
+      <Animated.View className="absolute flex-row items-center gap-1.5" style={[{ top: '55%', left: '44%' }, sceneArrival(time, 0.28, true)]}>
         <VenuePin size={24} color={PURPLE} />
         <View>
           <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white font-sans-medium">Good Company</Text>
           <Text maxFontSizeMultiplier={1.2} className="text-[10px] text-white/50 font-sans">East Village</Text>
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -210,15 +216,19 @@ function StatusPills({ selected }: { selected?: 'yes' | 'tbd' | 'no' }) {
 }
 
 /** 02 — "Are you out?" with Yes chosen and a check-in. */
-export function CheckedInIllustration({ concise = false }: { concise?: boolean }) {
+export function CheckedInIllustration({ concise = false, animated = false }: { concise?: boolean; animated?: boolean }) {
+  const time = useSceneMotion(animated && concise);
   if (concise) return <OnboardingPanel>
     <Text maxFontSizeMultiplier={1.2} className="text-white text-lg font-sans-medium mb-5">Are you out tonight?</Text>
     <View className="flex-row items-center gap-2 mb-6">
-      {["I’m out", 'TBD', 'Staying in'].map((label, i) => <View key={label} className="flex-1 rounded-full min-h-11 px-1 py-2 items-center justify-center" style={{ backgroundColor: i === 0 ? NEON : 'rgba(255,255,255,0.05)' }}><Text maxFontSizeMultiplier={1.2} className="text-xs font-sans-medium text-center" style={{ color: i === 0 ? INK : MIST }}>{label}</Text></View>)}
+      {["I’m out", 'TBD', 'Staying in'].map((label, i) => <Animated.View key={label} className="flex-1 rounded-full min-h-11 px-1 py-2 items-center justify-center" style={{ backgroundColor: i === 0 ? NEON : 'rgba(255,255,255,0.05)', transform: [{ scale: i === 0 ? time.interpolate({ inputRange: [0, 0.08, 0.17, 0.26], outputRange: [1, 0.96, 1.035, 1], extrapolate: 'clamp' }) : 1 }] }}><Text maxFontSizeMultiplier={1.2} className="text-xs font-sans-medium text-center" style={{ color: i === 0 ? INK : MIST }}>{label}</Text></Animated.View>)}
     </View>
-    <View className="flex-row items-center gap-3 mb-5"><VenuePin color={PURPLE} size={25} /><View className="flex-1"><Text maxFontSizeMultiplier={1.2} className="text-xs font-sans mb-1" style={{ color: MIST }}>Your spot</Text><Text maxFontSizeMultiplier={1.2} className="text-white text-base font-sans-medium">The Violet Room</Text></View></View>
-    <View className="flex-row items-center gap-2 mb-6"><SymbolView name="person.2" size={16} tintColor={MIST} /><Text maxFontSizeMultiplier={1.2} className="text-sm font-sans" style={{ color: MIST }}>Visible to Friends</Text><SymbolView name="chevron.down" size={10} tintColor={MIST} /></View>
-    <View className="rounded-xl border border-white/15 min-h-11 items-center justify-center py-3"><Text maxFontSizeMultiplier={1.2} className="text-sm font-sans-medium" style={{ color: NEON }}>Confirm check-in</Text></View>
+    <Animated.View className="flex-row items-center gap-3 mb-5" style={sceneArrival(time, 0.15)}><VenuePin color={PURPLE} size={25} /><View className="flex-1"><Text maxFontSizeMultiplier={1.2} className="text-xs font-sans mb-1" style={{ color: MIST }}>Your spot</Text><Text maxFontSizeMultiplier={1.2} className="text-white text-base font-sans-medium">The Violet Room</Text></View></Animated.View>
+    <Animated.View className="flex-row items-center gap-2 mb-6" style={sceneArrival(time, 0.29)}><SymbolView name="person.2" size={16} tintColor={MIST} /><Text maxFontSizeMultiplier={1.2} className="text-sm font-sans" style={{ color: MIST }}>Visible to Friends</Text><SymbolView name="chevron.down" size={10} tintColor={MIST} /></Animated.View>
+    <View className="rounded-xl border border-white/15 min-h-11 items-center justify-center py-3">
+      <Animated.View className="absolute inset-0 rounded-xl border" style={{ borderColor: NEON, opacity: time.interpolate({ inputRange: [0.45, 0.63, 0.9, 1], outputRange: [0, 0.7, 0.25, 0.25], extrapolate: 'clamp' }) }} />
+      <Text maxFontSizeMultiplier={1.2} className="text-sm font-sans-medium" style={{ color: NEON }}>Confirm check-in</Text>
+    </View>
   </OnboardingPanel>;
   return (
     <OnboardingPanel>
@@ -434,7 +444,8 @@ export function YapIllustration() {
 }
 
 /** Friend actions, presented as a local illustration with no send controls. */
-export function SocialNightIllustration() {
+export function SocialNightIllustration({ animated = false }: { animated?: boolean }) {
+  const time = useSceneMotion(animated);
   const actions = [
     { title: 'Meet Ups', detail: 'Get together', icon: 'person.2' },
     { title: 'Invites', detail: 'Send a spot', icon: 'paperplane' },
@@ -443,11 +454,11 @@ export function SocialNightIllustration() {
   ] as const;
   return <OnboardingPanel>
     <View className="flex-row flex-wrap gap-3">
-      {actions.map(action => <View key={action.title} className="flex-grow rounded-2xl border border-white/10 bg-white/4 p-4" style={{ flexBasis: '44%' }}>
-        <SymbolView name={action.icon} size={24} tintColor={LAVENDER} />
+      {actions.map((action, i) => <Animated.View key={action.title} className="flex-grow rounded-2xl border border-white/10 bg-white/4 p-4" style={[{ flexBasis: '44%' }, sceneArrival(time, 0.08 + i * 0.10)]}>
+        <Animated.View style={{ alignSelf: 'flex-start', transform: [{ translateY: time.interpolate({ inputRange: [0.1 + i * 0.1, 0.23 + i * 0.1, 0.42 + i * 0.1], outputRange: [3, -2, 0], extrapolate: 'clamp' }) }] }}><SymbolView name={action.icon} size={24} tintColor={LAVENDER} /></Animated.View>
         <Text maxFontSizeMultiplier={1.2} className="text-white text-sm font-sans-medium mt-3">{action.title}</Text>
         <Text maxFontSizeMultiplier={1.2} className="text-xs font-sans mt-1" style={{ color: MIST }}>{action.detail}</Text>
-      </View>)}
+      </Animated.View>)}
     </View>
     <View className="border-t border-white/10 mt-5 pt-5">
       <View className="flex-row items-center gap-2"><SymbolView name="clock" size={17} tintColor={NEON} /><Text maxFontSizeMultiplier={1.2} className="flex-1 text-sm font-sans-medium" style={{ color: NEON }}>Everything deletes by 5am - no hangxiety</Text></View>
@@ -457,7 +468,8 @@ export function SocialNightIllustration() {
 }
 
 /** 07 — tonight's leaderboard. */
-export function LeaderboardIllustration() {
+export function LeaderboardIllustration({ animated = false }: { animated?: boolean }) {
+  const time = useSceneMotion(animated);
   const spots = [
     { rank: 1, name: 'The Violet Room', hood: 'West Village' },
     { rank: 2, name: 'After Hours', hood: 'Lower East Side' },
@@ -472,14 +484,14 @@ export function LeaderboardIllustration() {
         {spots.map((spot) => {
           const lead = spot.rank === 1;
           return (
-            <View
+            <Animated.View
               key={spot.rank}
               className="flex-row items-center gap-4 rounded-2xl px-4 py-3"
-              style={{
+              style={[sceneArrival(time, 0.08 + (spot.rank - 1) * 0.12), {
                 backgroundColor: lead ? 'rgba(212,255,0,0.10)' : 'rgba(255,255,255,0.04)',
                 borderLeftWidth: lead ? 3 : 0,
                 borderLeftColor: NEON,
-              }}
+              }]}
             >
               <Text
                 className="text-[20px] font-sans-semibold w-5"
@@ -490,8 +502,11 @@ export function LeaderboardIllustration() {
               <View className="flex-1">
                 <Text maxFontSizeMultiplier={1.2} className="text-[15px] text-white font-sans-medium">{spot.name}</Text>
                 <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white/50 font-sans mt-0.5">{spot.hood}</Text>
+                <View className="h-0.5 rounded-full overflow-hidden mt-2" style={{ width: `${100 - (spot.rank - 1) * 24}%`, backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                  <Animated.View style={{ flex: 1, backgroundColor: lead ? NEON : LAVENDER, opacity: lead ? 0.6 : 0.25, transformOrigin: 'left', transform: [{ scaleX: time.interpolate({ inputRange: [0.3 + spot.rank * 0.1, 0.55 + spot.rank * 0.1, 0.65 + spot.rank * 0.1], outputRange: [0, 0.9, 1], extrapolate: 'clamp' }) }] }} />
+                </View>
               </View>
-            </View>
+            </Animated.View>
           );
         })}
       </View>

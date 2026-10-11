@@ -72,7 +72,7 @@ function IntroductionPages({ initialStep, onStep }: { initialStep: number; onSte
           <LaunchReveal key={step} delay={35} illustration>
           <View accessible accessibilityLabel={step === 0 ? 'Example: I’m out, The Violet Room, visible to Friends. Confirm your check-in.' : step === 1 ? 'Example map with friends and venue pins. Only shared locations appear.' : step === 2 ? 'Send Meet Ups, venue invites and DMs. Post to your friends in the newsfeed. Everything deletes by 5am - no hangxiety. Your profile and friends stay.' : 'Example leaderboard showing three venues ranked by activity visible to you.'}>
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none">
-              {step === 0 ? <CheckedInIllustration concise /> : step === 1 ? <View style={{ height: Math.max(300, Math.min(390, height * 0.4)) }}><MapIllustration /></View> : step === 2 ? <SocialNightIllustration /> : <LeaderboardIllustration />}
+              {step === 0 ? <CheckedInIllustration concise animated /> : step === 1 ? <View style={{ height: Math.max(300, Math.min(390, height * 0.4)) }}><MapIllustration animated /></View> : step === 2 ? <SocialNightIllustration animated /> : <LeaderboardIllustration animated />}
             </View>
           </View>
           </LaunchReveal>
