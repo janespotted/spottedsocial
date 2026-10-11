@@ -7,7 +7,7 @@ test('Rapid taps cannot skip a page, and reduced motion changes pages without an
     const callbacks=[],saved=[],steps=[];
     const locked={current:false};
     const move=extract('components/launch-introduction.tsx','move',{
-      locked,reduce,INTRO_STEPS:[1,2,3],motion:{},setBusy:()=>{},setStep:x=>steps.push(x),
+      locked,reduce,INTRO_STEPS:[1,2,3,4],motion:{},setBusy:()=>{},setStep:x=>steps.push(x),
       onStep:x=>saved.push(x),scroll:{current:{scrollTo:()=>{}}},
       Haptics:{selectionAsync:async()=>{}},
       Animated:{timing:()=>({start:fn=>callbacks.push(fn)})},
@@ -20,10 +20,10 @@ test('Rapid taps cannot skip a page, and reduced motion changes pages without an
       callbacks.shift()({finished:true});
     } else { assert.equal(callbacks.length,0); assert.equal(saved[0],1); }
     assert.equal(locked.current,false);
-    move(3);
+    move(4);
     if (!reduce) callbacks.shift()({finished:true});
-    assert.equal(saved.at(-1),3);
-    assert.equal(steps.at(-1),1,'completion returns to setup rather than indexing a fourth page');
+    assert.equal(saved.at(-1),4);
+    assert.equal(steps.at(-1),1,'completion returns to setup rather than indexing past the final page');
   }
 });
 
@@ -103,13 +103,49 @@ test('Introduction resumes the correct page after restart and keeps accounts sep
   api = load('lib/launch-intro.ts', { '@react-native-async-storage/async-storage': storage });
   assert.equal(await api.readIntroStep('alice'), 1);
   assert.equal(await api.readIntroStep('bob'), 0);
-  await api.saveIntroStep('alice', 3);
+  await api.saveIntroStep('alice', 4);
   api = load('lib/launch-intro.ts', { '@react-native-async-storage/async-storage': storage });
-  assert.equal(await api.readIntroStep('alice'), 3);
+  assert.equal(await api.readIntroStep('alice'), 4);
   // Explanation completion cannot complete the server's mandatory setup.
   const launch = load('lib/launch.ts', { '@/lib/supabase': { supabase: {} } });
   assert.equal(launch.launchStage({ admitted: true, profileSaved: false, complete: false }), 'profile');
   assert.equal(launch.launchStage({ admitted: true, profileSaved: true, complete: false, nominations: [] }), 'nominate');
+});
+
+test('Adding the social page preserves old completion and resumes new progress independently', async () => {
+  const saved = new Map();
+  const storage = { getItem: async k => saved.get(k) ?? null, setItem: async (k,v) => saved.set(k,v) };
+  const read = () => load('lib/launch-intro.ts', { '@react-native-async-storage/async-storage': storage });
+  for (const [oldStep, expected] of [['0',0],['1',1],['2',2],['3',4],['4',0],['bad',0]]) {
+    saved.set('spotted.launchIntro.v1.alice', oldStep);
+    assert.equal(await read().readIntroStep('alice'), expected);
+  }
+  saved.set('spotted.launchIntro.v1.alice', '3');
+  await read().saveIntroStep('alice', 3);
+  assert.equal(await read().readIntroStep('alice'), 3, 'new leaderboard progress takes precedence over legacy completion');
+  assert.equal(await read().readIntroStep('bob'), 0);
+  await read().saveIntroStep('alice', 4);
+  assert.equal(await read().readIntroStep('alice'), 4);
+});
+
+test('Social page continues to the leaderboard; only the last page hands off to nominations', () => {
+  const { INTRO_STEPS } = load('lib/launch-intro.ts', { '@react-native-async-storage/async-storage': {} });
+  const element = (type, props) => ({ type, props });
+  const render = extract('components/launch-introduction.tsx', 'IntroductionPages', {
+    INTRO_STEPS, useState: value => [value, () => {}], useRef: value => ({current:value}), useEffect: () => {},
+    useWindowDimensions: () => ({height:874,fontScale:1}),
+    Animated: { Value: function() { this.interpolate = () => 0; }, View: 'animated' },
+    View: 'view', Text: 'text', ScrollView: 'scroll', Pressable: 'pressable', SpottedMark: 'mark', SymbolView: 'symbol',
+    LaunchButton: 'button', CheckedInIllustration: 'checkin', MapIllustration: 'map', SocialNightIllustration: 'social', LeaderboardIllustration: 'leaderboard',
+    INK: '', NEON: '', MIST: '', require: () => ({jsx:element,jsxs:element}),
+  });
+  const social = nodes(render({ initialStep: 2, onStep: () => {} }));
+  assert.ok(social.some(n => n.type === 'social'));
+  assert.equal(social.find(n => n.type === 'button').props.label, 'Continue');
+  assert.ok(social.some(n => n.props?.accessibilityLabel === 'Introduction 3 of 4'));
+  const last = nodes(render({ initialStep: 3, onStep: () => {} }));
+  assert.ok(last.some(n => n.type === 'leaderboard'));
+  assert.equal(last.find(n => n.type === 'button').props.label, 'Choose your two');
 });
 
 test('Bad or unavailable local storage cannot break setup or overwrite newer intro progress', async () => {

@@ -3,6 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 import { OnboardingPanel } from '@/components/onboarding-scaffold';
 import { INK, LAVENDER, MIST, NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
+import { RESET_TITLE } from '@/lib/reset-copy';
 
 /**
  * The static mock UI inside the onboarding tour. These are illustrations,
@@ -431,6 +432,29 @@ export function YapIllustration() {
       </View>
     </View>
   );
+}
+
+/** Friend actions, presented as a local illustration with no send controls. */
+export function SocialNightIllustration() {
+  const actions = [
+    { title: 'Meet Ups', detail: 'Get together', icon: 'person.2' },
+    { title: 'Invites', detail: 'Send a spot', icon: 'paperplane' },
+    { title: 'DMs', detail: 'Make a plan', icon: 'bubble.left.and.bubble.right' },
+    { title: 'Newsfeed', detail: 'Post to friends', icon: 'square.stack' },
+  ] as const;
+  return <OnboardingPanel>
+    <View className="flex-row flex-wrap gap-3">
+      {actions.map(action => <View key={action.title} className="flex-grow rounded-2xl border border-white/10 bg-white/4 p-4" style={{ flexBasis: '44%' }}>
+        <SymbolView name={action.icon} size={24} tintColor={LAVENDER} />
+        <Text maxFontSizeMultiplier={1.2} className="text-white text-sm font-sans-medium mt-3">{action.title}</Text>
+        <Text maxFontSizeMultiplier={1.2} className="text-xs font-sans mt-1" style={{ color: MIST }}>{action.detail}</Text>
+      </View>)}
+    </View>
+    <View className="border-t border-white/10 mt-5 pt-5">
+      <View className="flex-row items-center gap-2"><SymbolView name="clock" size={17} tintColor={NEON} /><Text maxFontSizeMultiplier={1.2} className="flex-1 text-sm font-sans-medium" style={{ color: NEON }}>{RESET_TITLE}</Text></View>
+      <Text maxFontSizeMultiplier={1.2} className="text-xs font-sans mt-2" style={{ color: MIST }}>Your profile and friends stay.</Text>
+    </View>
+  </OnboardingPanel>;
 }
 
 /** 07 — tonight's leaderboard. */
