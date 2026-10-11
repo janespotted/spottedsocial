@@ -14,10 +14,8 @@ import { formatE164 } from '@/lib/country-codes';
 import { INK, MIST, NEON } from '@/lib/theme';
 
 function LaunchOnboarding() {
-  const { session, launch } = useSession();
-  return <LaunchIntroduction key={session?.user.id} userId={session?.user.id} enabled={!!session && !!launch && !launch.complete && !launch.profileSaved}>
-    <LaunchSetup />
-  </LaunchIntroduction>;
+  const { session } = useSession();
+  return <LaunchSetup key={session?.user.id} />;
 }
 
 export default LaunchOnboarding;
@@ -99,7 +97,8 @@ function LaunchSetup() {
     if (Platform.OS === 'ios') ActionSheetIOS.showActionSheetWithOptions({ title: 'Choose their number', options: [...numbers, 'Cancel'], cancelButtonIndex: numbers.length }, i => { if (numbers[i]) setPhone(numbers[i]); });
     else Alert.alert('Choose their number', undefined, [...numbers.slice(0, 2).map(number => ({ text: number, onPress: () => setPhone(number) })), { text: 'Cancel', style: 'cancel' }]);
   });
-  return <LaunchShell key="nominate" step={2} title="Who’s next?" subtitle="Two new people. A future wave.">
+  return <LaunchIntroduction userId={session?.user.id} enabled={!!session && stage === 'nominate'}>
+  <LaunchShell key="nominate" step={2} title="Who’s next?" subtitle="Two new people. A future wave.">
     <View className="gap-3 mb-6">
       {[1, 2].map(n => {
         const choice = choices.find(c => c.slot === n);
@@ -126,5 +125,6 @@ function LaunchSetup() {
     <View className="mt-auto pt-7"><LaunchButton label={busy ? 'Saving…' : choices.length === 2 ? 'Let’s go' : `${choices.length} of 2 chosen`} disabled={busy || choices.length !== 2 || slot !== 0} onPress={() => void perform(async () => {
       await launchRpc('complete_launch_onboarding'); Keyboard.dismiss(); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); await refreshOnboardingStatus();
     })} /></View>
-  </LaunchShell>;
+  </LaunchShell>
+  </LaunchIntroduction>;
 }

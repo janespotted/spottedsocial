@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { load, extract } = require('./product-test-runtime.cjs');
+const { load, extract, flush } = require('./product-test-runtime.cjs');
 
 test('Rapid taps cannot skip a page, and reduced motion changes pages without animation', () => {
   for (const reduce of [false, true]) {
@@ -27,20 +27,70 @@ test('Rapid taps cannot skip a page, and reduced motion changes pages without an
   }
 });
 
-test('Introduction opens only after sign-in, before profile setup, without restarting completed accounts', () => {
-  let account;
+function setupHarness(launch, save = async () => ({ ...launch, profileSaved: true })) {
+  let cursor = 0;
+  const hooks = [];
   const element = (type, props) => ({ type, props });
-  const render = extract('app/onboarding/index.tsx', 'LaunchOnboarding', {
-    useSession: () => account, LaunchIntroduction: 'intro', LaunchSetup: 'setup',
+  const hook = initial => {
+    const i = cursor++;
+    if (!(i in hooks)) hooks[i] = initial;
+    return [hooks[i], value => { hooks[i] = typeof value === 'function' ? value(hooks[i]) : value; }];
+  };
+  const { launchStage } = load('lib/launch.ts', { '@/lib/supabase': { supabase: {} } });
+  const render = extract('app/onboarding/index.tsx', 'LaunchSetup', {
+    useSession: () => ({ session: { user: { id: 'alice', user_metadata: {} } }, launch, refreshOnboardingStatus: async () => {} }),
+    useState: hook, useRef: value => hook({ current: value })[0], useEffect: () => {}, launchStage,
+    LaunchIntroduction: 'intro', LaunchShell: 'shell', LaunchButton: 'button', Text: 'text', View: 'view',
+    TextInput: 'input', Pressable: 'pressable', SymbolView: 'symbol', MIST: '', NEON: '', INK: '',
+    launchRpc: save, Haptics: { selectionAsync: () => {} }, Keyboard: { dismiss: () => {} },
+    formatE164: value => value,
     require: () => ({ jsx: element, jsxs: element }),
   });
-  for (const session of [null, { user: { id: 'alice' } }]) {
-    for (const launch of [null, { complete: false, profileSaved: false }, { complete: false, profileSaved: true }, { complete: true, profileSaved: true }]) {
-      account = { session, launch };
-      const tree = render();
-      assert.equal(tree.props.enabled, !!session && !!launch && !launch.complete && !launch.profileSaved);
-      assert.equal(tree.props.children.type, 'setup');
-    }
+  return () => { cursor = 0; return render(); };
+}
+function nodes(tree) {
+  if (!tree || typeof tree !== 'object') return [];
+  return [tree, ...[tree.props?.children].flat().flatMap(nodes)];
+}
+
+test('Profile comes first; the introduction waits for saved profile and never replaces the invitation gate', () => {
+  const base = { admitted: true, profileSaved: false, complete: false, hasPhone: true, nominations: [] };
+  assert.equal(setupHarness(base)().props.title, 'Make an entrance.');
+  assert.equal(setupHarness({ ...base, admitted: false })().props.title, 'Your night is coming.');
+  const tour = setupHarness({ ...base, profileSaved: true })();
+  assert.equal(tour.type, 'intro');
+  assert.equal(tour.props.enabled, true);
+  assert.equal(tour.props.userId, 'alice');
+  assert.equal(tour.props.children.props.title, 'Who’s next?');
+  assert.equal(nodes(tour).find(n => n.type === 'button').props.disabled, true, 'zero nominations cannot finish setup');
+  assert.equal(setupHarness({ ...base, profileSaved: true, complete: true })().props.enabled, false);
+});
+
+test('Saving the profile enters the introduction immediately; a rejected save stays on the profile', async () => {
+  for (const reject of [false, true]) {
+    const base = { admitted: true, profileSaved: false, complete: false, hasPhone: true, nominations: [] };
+    const calls = [];
+    const render = setupHarness(base, async (name, args) => {
+      calls.push({ name, args });
+      if (reject) throw Error('That username is taken. Try another.');
+      return { ...base, profileSaved: true };
+    });
+    let tree = render();
+    const named = label => nodes(tree).find(n => n.props?.accessibilityLabel === label);
+    named('Your name').props.onChangeText('Test Member');
+    named('Username').props.onChangeText('test.member');
+    named('Agree to the terms and privacy policy').props.onPress();
+    tree = render();
+    const button = nodes(tree).find(n => n.type === 'button');
+    assert.equal(button.props.disabled, false);
+    button.props.onPress();
+    await flush();
+    tree = render();
+    assert.equal(calls[0].name, 'save_launch_profile');
+    assert.equal(calls[0].args.p_name, 'Test Member');
+    assert.equal(tree.type, reject ? 'shell' : 'intro');
+    if (reject) assert.equal(tree.props.title, 'Make an entrance.');
+    else assert.equal(tree.props.enabled, true);
   }
 });
 

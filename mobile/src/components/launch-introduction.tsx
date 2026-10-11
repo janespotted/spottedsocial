@@ -8,7 +8,7 @@ import { CheckedInIllustration, LeaderboardIllustration, MapIllustration } from 
 import { INTRO_STEPS, readIntroStep, saveIntroStep } from '@/lib/launch-intro';
 import { INK, MIST, NEON } from '@/lib/theme';
 
-/** Mounted only inside authenticated onboarding, before profile entry. */
+/** Mounted after profile entry, before the two required nominations. */
 export function LaunchIntroduction({ userId, enabled, children }: { userId?: string; enabled: boolean; children: ReactNode }) {
   const [step, setStep] = useState<number | null>(null);
   useEffect(() => {
@@ -75,7 +75,7 @@ function IntroductionPages({ initialStep, onStep }: { initialStep: number; onSte
       <View className="flex-row gap-2 mb-5" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{INTRO_STEPS.map((item, i) => <View key={item.label} className="h-0.5 flex-1 rounded-full" style={{ backgroundColor: i <= step ? NEON : 'rgba(255,255,255,0.15)' }} />)}</View>
       <View className="flex-row items-center gap-3">
         {step > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Previous introduction" disabled={busy} onPress={() => move(step - 1)} className="min-h-14 min-w-14 items-center justify-center rounded-2xl border border-white/15 active:opacity-60"><SymbolView name="arrow.left" size={19} tintColor={MIST} /></Pressable> : null}
-        <View className="flex-1"><LaunchButton disabled={busy} label={step === 2 ? 'Make it yours' : 'Continue'} onPress={() => move(step + 1)} /></View>
+        <View className="flex-1"><LaunchButton disabled={busy} label={step === 2 ? 'Choose your two' : 'Continue'} onPress={() => move(step + 1)} /></View>
       </View>
     </ScrollView>
   </View>;
