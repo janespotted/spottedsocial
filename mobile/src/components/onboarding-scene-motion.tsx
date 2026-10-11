@@ -9,7 +9,7 @@ const SCENE_EASE = Easing.bezier(0.22, 1, 0.36, 1);
 type SceneMotion = { arrivals: Animated.Value[]; detail: Animated.Value; halo: Animated.Value };
 
 /** A short, overlapping native sequence. Never holds up navigation or loops. */
-export function useSceneMotion(enabled: boolean) {
+export function useSceneMotion(enabled: boolean, active = true) {
   const reduce = useLaunchReducedMotion();
   const initial = enabled && !reduce ? 0 : 1;
   const motion = useRef<SceneMotion | null>(null);
@@ -21,26 +21,34 @@ export function useSceneMotion(enabled: boolean) {
   const played = useRef(false);
   useEffect(() => {
     const finish = () => [...scene.arrivals, scene.detail, scene.halo].forEach(value => value.setValue(1));
-    if (!enabled || reduce || played.current || AppState.currentState !== 'active') {
+    if (!enabled || reduce || AppState.currentState !== 'active') {
+      if (active) played.current = true;
       finish();
       return;
     }
+    if (!active) {
+      // Prepare an offscreen scene without showing a reset on the outgoing page.
+      played.current = false;
+      [...scene.arrivals, scene.detail, scene.halo].forEach(value => value.setValue(0));
+      return;
+    }
+    if (played.current) { finish(); return; }
     played.current = true;
     const timing = (value: Animated.Value, delay: number, duration: number, easing = SCENE_EASE) => Animated.timing(value, {
       toValue: 1, duration, delay, easing,
       useNativeDriver: true, isInteraction: false,
     });
     const animation = Animated.parallel([
-      ...scene.arrivals.map((value, index) => timing(value, 90 + index * 45, 460)),
-      timing(scene.detail, 330, 650),
-      timing(scene.halo, 240, 1000, Easing.inOut(Easing.sin)),
+      ...scene.arrivals.map((value, index) => timing(value, 160 + index * 45, 460)),
+      timing(scene.detail, 370, 650),
+      timing(scene.halo, 310, 900, Easing.inOut(Easing.sin)),
     ]);
     const subscription = AppState.addEventListener('change', state => {
       if (state !== 'active') { animation.stop(); finish(); }
     });
     animation.start();
     return () => { animation.stop(); subscription.remove(); };
-  }, [enabled, reduce, scene]);
+  }, [enabled, active, reduce, scene]);
   return scene;
 }
 

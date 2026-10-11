@@ -2,48 +2,51 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { load, extract, flush } = require('./product-test-runtime.cjs');
 
+function navigationHarness(reduce = false) {
+  const callbacks=[],saved=[],steps=[],positions=[];
+  const locked={current:false},completion={current:null},currentStep={current:0};
+  const move=extract('components/launch-introduction.tsx','move',{
+    locked,completion,currentStep,reduce,INTRO_STEPS:[1,2,3,4],
+    motion:{setValue:x=>positions.push(x),stopAnimation:()=>{}},PAGE_EASE:()=>{},
+    setBusy:()=>{},setTarget:()=>{},setStep:x=>steps.push(x),onStep:x=>saved.push(x),scrolls:{current:[]},
+    Haptics:{selectionAsync:async()=>{}},Animated:{timing:()=>({start:fn=>callbacks.push(fn)})},
+  });
+  return {move,callbacks,saved,steps,positions,locked,completion,currentStep};
+}
+
 test('Rapid taps cannot skip a page, and reduced motion changes pages without animation', () => {
   for (const reduce of [false, true]) {
-    const callbacks=[],saved=[],steps=[];
-    const locked={current:false};
-    const move=extract('components/launch-introduction.tsx','move',{
-      locked,reduce,INTRO_STEPS:[1,2,3,4],motion:{setValue:()=>{}},LAUNCH_EASE:()=>{},setBusy:()=>{},setStep:x=>steps.push(x),
-      onStep:x=>saved.push(x),scroll:{current:{scrollTo:()=>{}}},
-      Haptics:{selectionAsync:async()=>{}},
-      Animated:{timing:()=>({start:fn=>callbacks.push(fn)})},
-    });
-    move(1);
+    const h=navigationHarness(reduce);
+    h.move(1);
     if (!reduce) {
-      move(2); assert.equal(callbacks.length,1); assert.equal(saved.length,0);
-      callbacks.shift()({finished:true});
-      assert.equal(saved[0],1); assert.equal(steps[0],1);
-      callbacks.shift()({finished:true});
-    } else { assert.equal(callbacks.length,0); assert.equal(saved[0],1); }
-    assert.equal(locked.current,false);
-    move(4);
-    if (!reduce) callbacks.shift()({finished:true});
-    assert.equal(saved.at(-1),4);
-    assert.equal(steps.at(-1),1,'completion returns to setup rather than indexing past the final page');
+      h.move(2); assert.equal(h.callbacks.length,1); assert.deepEqual(h.saved,[]);
+      h.callbacks.shift()({finished:true});
+    } else assert.equal(h.callbacks.length,0);
+    assert.deepEqual(h.saved,[1]); assert.deepEqual(h.steps,[1]);
+    assert.equal(h.locked.current,false);
+    h.currentStep.current=3;h.move(4);
+    assert.equal(h.saved.at(-1),4);
+    assert.equal(h.steps.at(-1),1,'completion returns to setup rather than indexing past the final page');
   }
 });
 
 test('An interrupted page transition stays on the current page and can be retried', () => {
-  const callbacks=[],saved=[],steps=[];
-  const locked={current:false};
-  const move=extract('components/launch-introduction.tsx','move',{
-    locked,reduce:false,INTRO_STEPS:[1,2,3,4],motion:{setValue:()=>{}},LAUNCH_EASE:()=>{},
-    setBusy:()=>{},setStep:x=>steps.push(x),onStep:x=>saved.push(x),
-    scroll:{current:{scrollTo:()=>{}}},Haptics:{selectionAsync:async()=>{}},
-    Animated:{timing:()=>({start:fn=>callbacks.push(fn)})},
-  });
-  move(1); callbacks.shift()({finished:false});
-  assert.equal(locked.current,false);
-  assert.deepEqual(saved,[]);
-  assert.deepEqual(steps,[]);
-  move(1); callbacks.shift()({finished:true}); callbacks.shift()({finished:true});
-  assert.deepEqual(saved,[1]);
-  assert.deepEqual(steps,[1]);
-  assert.equal(locked.current,false);
+  const h=navigationHarness();
+  h.move(1); h.callbacks.shift()({finished:false});
+  assert.equal(h.locked.current,false);assert.deepEqual(h.saved,[]);assert.deepEqual(h.steps,[]);
+  assert.equal(h.positions.at(-1),0);
+  h.move(1);h.callbacks.shift()({finished:true});
+  assert.deepEqual(h.saved,[1]);assert.deepEqual(h.steps,[1]);assert.equal(h.locked.current,false);
+});
+
+test('Settling a transition for Reduce Motion or background ignores its late callback', () => {
+  const h=navigationHarness();h.move(1);
+  const stale=h.callbacks.shift();h.completion.current();
+  assert.deepEqual(h.saved,[1]);assert.equal(h.locked.current,false);
+  h.move(2);stale({finished:false});
+  assert.equal(h.locked.current,true,'an old cancellation cannot unlock the next transition');
+  h.callbacks.shift()({finished:true});
+  assert.deepEqual(h.saved,[1,2]);assert.equal(h.locked.current,false);
 });
 
 test('Changing Reduce Motion takes precedence over an older preference read and carries into new screens', async () => {
@@ -174,7 +177,7 @@ test('Social page continues to the leaderboard; only the last page hands off to 
   const render = extract('components/launch-introduction.tsx', 'IntroductionPages', {
     INTRO_STEPS, useState: value => [value, () => {}], useRef: value => ({current:value}), useEffect: () => {},
     useLaunchReducedMotion: () => false, LaunchReveal: 'reveal', LaunchProgress: 'progress',
-    useWindowDimensions: () => ({height:874,fontScale:1}),
+    useWindowDimensions: () => ({height:874,width:402,fontScale:1}),
     Animated: { Value: function() { this.interpolate = () => 0; }, View: 'animated' },
     View: 'view', Text: 'text', ScrollView: 'scroll', Pressable: 'pressable', SpottedMark: 'mark', SymbolView: 'symbol',
     LaunchButton: 'button', CheckedInIllustration: 'checkin', MapIllustration: 'map', SocialNightIllustration: 'social', LeaderboardIllustration: 'leaderboard',
@@ -182,6 +185,11 @@ test('Social page continues to the leaderboard; only the last page hands off to 
   });
   const social = nodes(render({ initialStep: 2, onStep: () => {} }));
   assert.ok(social.some(n => n.type === 'social'));
+  const panes=social.filter(n=>n.type==='animated');
+  assert.equal(panes.length,4,'all four pages are ready before a transition');
+  assert.equal(panes.filter(n=>n.props.pointerEvents==='auto').length,1);
+  assert.equal(panes.filter(n=>!n.props.accessibilityElementsHidden).length,1,'offscreen pages stay out of VoiceOver');
+  assert.ok(panes.every(n=>n.props.style.opacity===undefined),'pages do not fade to an empty screen');
   assert.equal(social.find(n => n.type === 'button').props.label, 'Continue');
   assert.ok(social.some(n => n.props?.accessibilityLabel === 'Introduction 3 of 4'));
   const last = nodes(render({ initialStep: 3, onStep: () => {} }));

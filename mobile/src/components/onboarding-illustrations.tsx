@@ -84,8 +84,8 @@ function VenuePin({ size = 26, color }: { size?: number; color: string }) {
 }
 
 /** 01 — the map: friends out, two venue pins. */
-export function MapIllustration({ animated = false }: { animated?: boolean }) {
-  const scene = useSceneMotion(animated);
+export function MapIllustration({ animated = false, active = true }: { animated?: boolean; active?: boolean }) {
+  const scene = useSceneMotion(animated, active);
   return (
     <View
       className="flex-1 rounded-3xl border border-white/10 overflow-hidden"
@@ -215,8 +215,8 @@ function StatusPills({ selected }: { selected?: 'yes' | 'tbd' | 'no' }) {
 }
 
 /** 02 — "Are you out?" with Yes chosen and a check-in. */
-export function CheckedInIllustration({ concise = false, animated = false }: { concise?: boolean; animated?: boolean }) {
-  const scene = useSceneMotion(animated && concise);
+export function CheckedInIllustration({ concise = false, animated = false, active = true }: { concise?: boolean; animated?: boolean; active?: boolean }) {
+  const scene = useSceneMotion(animated && concise, active);
   if (concise) return <OnboardingPanel>
     <Text maxFontSizeMultiplier={1.2} className="text-white text-lg font-sans-medium mb-5">Are you out tonight?</Text>
     <View className="flex-row items-center gap-2 mb-6">
@@ -443,8 +443,8 @@ export function YapIllustration() {
 }
 
 /** Friend actions, presented as a local illustration with no send controls. */
-export function SocialNightIllustration({ animated = false }: { animated?: boolean }) {
-  const scene = useSceneMotion(animated);
+export function SocialNightIllustration({ animated = false, active = true }: { animated?: boolean; active?: boolean }) {
+  const scene = useSceneMotion(animated, active);
   const actions = [
     { title: 'Meet Ups', detail: 'Get together', icon: 'person.2' },
     { title: 'Invites', detail: 'Send a spot', icon: 'paperplane' },
@@ -467,8 +467,8 @@ export function SocialNightIllustration({ animated = false }: { animated?: boole
 }
 
 /** 07 — tonight's leaderboard. */
-export function LeaderboardIllustration({ animated = false }: { animated?: boolean }) {
-  const scene = useSceneMotion(animated);
+export function LeaderboardIllustration({ animated = false, active = true }: { animated?: boolean; active?: boolean }) {
+  const scene = useSceneMotion(animated, active);
   const spots = [
     { rank: 1, name: 'The Violet Room', hood: 'West Village' },
     { rank: 2, name: 'After Hours', hood: 'Lower East Side' },

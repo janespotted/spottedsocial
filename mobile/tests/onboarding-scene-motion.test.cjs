@@ -26,7 +26,7 @@ function sceneHarness({ reduce = false, active = true } = {}) {
   });
   return {
     runs,
-    render(enabled = true) { cursor = 0; const time = render(enabled); cleanup = effects.pop()(); return time; },
+    render(enabled = true, visible = true) { cursor = 0; const time = render(enabled, visible); cleanup = effects.pop()(); return time; },
     setReduce(value) { cleanup?.(); reduce = value; },
     background() { AppState.currentState = 'background'; listener?.('background'); },
     foreground() { AppState.currentState = 'active'; listener?.('active'); },
@@ -41,6 +41,31 @@ test('Decorative scenes finish immediately for Reduce Motion, inactive apps, and
     assert.ok([...scene.arrivals, scene.detail, scene.halo].every(v => v.value === 1));
     assert.equal(h.runs.length, 0);
   }
+});
+
+test('Offscreen scenes wait, then rebuild when entered again', () => {
+  const h = sceneHarness();
+  const scene = h.render(true, false);
+  assert.equal(h.runs.length, 0, 'preloading a page does not play its animation');
+  assert.ok(scene.arrivals.every(v => v.value === 0));
+  h.render(true, true);
+  assert.ok(h.runs.every(run => run.started));
+  h.unmount(); h.render(true, false);
+  assert.ok(h.runs.every(run => run.stopped));
+  assert.ok(scene.arrivals.every(v => v.value === 0));
+  const previousRuns = h.runs.length;
+  h.render(true, true);
+  assert.ok(h.runs.length > previousRuns, 'Back can rebuild the earlier scene');
+  h.unmount();
+});
+
+test('A scene entered with Reduce Motion stays complete when the setting is disabled', () => {
+  const h = sceneHarness({ reduce: true });
+  h.render(true, false);
+  const scene = h.render(true, true);
+  h.setReduce(false); h.render(true, true);
+  assert.equal(h.runs.length, 0);
+  assert.ok(scene.arrivals.every(v => v.value === 1));
 });
 
 test('Leaving the app cancels the scene and returning does not replay it', () => {
