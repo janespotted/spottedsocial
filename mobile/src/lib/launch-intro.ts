@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const INTRO_STEPS = [
   { label: 'CHECK IN', title: 'Set your night.', subtitle: 'Choose your spot and who can see you.' },
   { label: 'THE MAP', title: 'Find your people.', subtitle: 'See where your friends are sharing tonight.' },
-  { label: 'LEADERBOARD', title: 'Find your next spot.', subtitle: 'Explore spots with activity shared with you.' },
+  { label: 'LEADERBOARD', title: 'Find your next spot.', subtitle: 'See the top spots in your city right now' },
 ] as const;
 
 const key = (userId: string) => `spotted.launchIntro.v1.${userId}`;
