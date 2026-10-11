@@ -21,7 +21,7 @@ export function useSceneMotion(enabled: boolean, active = true) {
   const played = useRef(false);
   useEffect(() => {
     const finish = () => [...scene.arrivals, scene.detail, scene.halo].forEach(value => value.setValue(1));
-    if (!enabled || reduce || AppState.currentState !== 'active') {
+    if (!enabled || reduce) {
       if (active) played.current = true;
       finish();
       return;
@@ -32,6 +32,7 @@ export function useSceneMotion(enabled: boolean, active = true) {
       [...scene.arrivals, scene.detail, scene.halo].forEach(value => value.setValue(0));
       return;
     }
+    if (AppState.currentState !== 'active') { played.current = true; finish(); return; }
     if (played.current) { finish(); return; }
     played.current = true;
     const timing = (value: Animated.Value, delay: number, duration: number, easing = SCENE_EASE) => Animated.timing(value, {

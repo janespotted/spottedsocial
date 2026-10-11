@@ -68,6 +68,18 @@ test('A scene entered with Reduce Motion stays complete when the setting is disa
   assert.ok(scene.arrivals.every(v => v.value === 1));
 });
 
+test('Backgrounding does not consume the next offscreen scene build', () => {
+  const h = sceneHarness();
+  h.render(true, false);
+  h.background();
+  const scene = h.render(true, false);
+  assert.ok(scene.arrivals.every(v => v.value === 0));
+  h.foreground(); h.render(true, true);
+  assert.ok(h.runs.length > 0);
+  assert.ok(scene.arrivals.every(v => v.value === 0), 'the next build starts from its prepared state');
+  h.unmount();
+});
+
 test('Leaving the app cancels the scene and returning does not replay it', () => {
   const h = sceneHarness();
   const scene = h.render();
