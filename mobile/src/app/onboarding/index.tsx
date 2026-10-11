@@ -6,13 +6,23 @@ import * as Haptics from 'expo-haptics';
 import { SymbolView } from 'expo-symbols';
 import { useSession } from '@/hooks/use-session';
 import { LaunchButton, LaunchShell } from '@/components/launch-shell';
+import { LaunchIntroduction } from '@/components/launch-introduction';
 import { PhoneVerifyForm } from '@/components/phone-verify-form';
 import { launchRpc, launchStage, nominationPhone, type LaunchState } from '@/lib/launch';
 import { supabase } from '@/lib/supabase';
 import { formatE164 } from '@/lib/country-codes';
 import { INK, MIST, NEON } from '@/lib/theme';
 
-export default function LaunchOnboarding() {
+function LaunchOnboarding() {
+  const { session, launch } = useSession();
+  return <LaunchIntroduction key={session?.user.id} userId={session?.user.id} enabled={!!session && !!launch && !launch.complete && !launch.profileSaved}>
+    <LaunchSetup />
+  </LaunchIntroduction>;
+}
+
+export default LaunchOnboarding;
+
+function LaunchSetup() {
   const { session, launch, refreshOnboardingStatus } = useSession();
   const [state, setState] = useState<LaunchState | null>(launch);
   const appleName = typeof session?.user.user_metadata?.full_name === 'string' ? session.user.user_metadata.full_name : '';

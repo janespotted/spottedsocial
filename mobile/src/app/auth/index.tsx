@@ -188,16 +188,6 @@ export default function PhoneScreen() {
         <Text className="text-white/50 text-sm text-center font-sans mt-1 mb-6">
           New York, one circle at a time.
         </Text>
-        <View className="w-full gap-3 mb-6">
-          {([
-            ['person.2', 'See who’s out.'],
-            ['mappin.and.ellipse', 'Find your people.'],
-            ['hand.raised', 'Choose what you share.'],
-          ] as const).map(([icon, label]) => <View key={icon} className="flex-row items-center gap-3">
-            <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><SymbolView name={icon} size={18} tintColor={NEON} /></View>
-            <Text className="flex-1 text-white/85 text-base font-sans">{label}</Text>
-          </View>)}
-        </View>
         <Text className="text-white/60 text-xs text-center leading-5 mb-5">New members must nominate two people for a future wave.</Text>
 
         <View className="w-full gap-5">

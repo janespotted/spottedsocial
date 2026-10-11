@@ -21,7 +21,7 @@ export function LaunchShell({ title, subtitle, step, children }: { title: string
   return <KeyboardAwareScrollView style={{ flex: 1, backgroundColor: INK }} contentContainerClassName="flex-grow px-7 pt-safe-offset-6 pb-safe-offset-6" keyboardShouldPersistTaps="handled" bottomOffset={24}>
     <View className="flex-row items-center justify-between mb-10"><SpottedMark size={36} /><Text style={{ color: MIST }} className="text-xs font-sans-medium tracking-widest flex-1 text-right ml-4">NEW YORK · FIRST WAVE</Text></View>
     <Animated.View style={{ flex: 1, opacity: progress, transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
-      {step !== undefined ? <Text style={{ color: NEON }} className="text-xs font-sans-medium tracking-widest mb-4" accessibilityLabel={`Step ${step} of 2`}>{step === 1 ? '01 / THE INTRODUCTION' : '02 / YOUR TWO'}</Text> : null}
+      {step !== undefined ? <Text style={{ color: NEON }} className="text-xs font-sans-medium tracking-widest mb-4" accessibilityLabel={`Step ${step} of 2`}>{step === 1 ? '01 / YOUR PROFILE' : '02 / YOUR TWO'}</Text> : null}
       <Text accessibilityRole="header" className="text-white text-[34px] leading-[39px] font-sans-light">{title}</Text>
       <Text style={{ color: MIST }} className="text-base leading-6 font-sans mt-3 mb-8">{subtitle}</Text>
       {children}

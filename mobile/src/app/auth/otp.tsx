@@ -34,7 +34,8 @@ export default function OtpScreen() {
     });
     setBusy(false);
     if (err) setError(err.message);
-    // On success the session gate in the root layout swaps to (tabs)
+    // The session gate opens the introduction/setup for new members,
+    // or the app for an already-complete account. Invalid codes stay here.
   };
 
   const resend = async () => {

@@ -1,8 +1,10 @@
 # NYC onboarding and invitation waves
 
-New users sign in, save a combined name/username profile, and nominate exactly two distinct eligible phone numbers. There is no skip or choose-later path. Selections persist server-side; neither account age nor editable auth metadata finishes onboarding. Existing accounts at migration time retain access.
+New users sign in, see three short visual introductions, save a combined name/username profile, and nominate exactly two distinct eligible phone numbers. There is no skip or choose-later path for nominations. Selections persist server-side; neither account age nor editable auth metadata finishes onboarding. Existing accounts at migration time retain access.
 
-The sign-in screen introduces Spotted in three short lines: see who’s out, find your people, choose what you share. Profile and nomination copy stays brief, with nomination entry controls revealed after choosing a card. There are no standalone first-use tip cards. Status and Morning After retain their own brief supporting copy within those features; neither is part of the onboarding sequence.
+After successful phone verification (or Apple sign-in), new members see check-in, the map and the leaderboard: one headline, one sentence and a locally rendered illustration per screen. The shared frame stays still while content fades and rises 8 points over 220 ms; Reduce Motion removes the transition. Illustrations are examples, never live controls. They request no location permission and do not change status, audience, friends or nominations. Large text can scroll, with a labeled illustration for screen readers. Local progress resumes per account; it does not grant admission or complete required setup. Already-complete accounts and members who have saved their profile are not replayed through the introduction.
+
+Sign-in, profile and nomination copy stays brief, with nomination entry controls revealed after choosing a card. There are no standalone first-use tip cards or Morning After tour screen. Location permission remains contextual at the actual check-in.
 
 ## Admission and permissions
 
@@ -26,7 +28,7 @@ The private app page Settings → Rollout waves displays pending and activated c
 
 ## Validation
 
-- `npm --prefix mobile run test:location`: 127 checks, including server-driven gating, safe phone normalization, failed saves, double taps, developer capability reset, and protected route groups.
+- `npm --prefix mobile run test:location`: 131 checks, including server-driven gating, safe phone normalization, failed saves, double taps, developer capability reset, protected route groups, and introduction eligibility/resume/storage failures/reduced motion.
 - `SPOTTED_PGLITE_MODULE=<pglite> node tests/onboarding/database.cjs`: 16 isolated PostgreSQL cases.
 - `SPOTTED_LAUNCH_MIGRATION=1 SPOTTED_PGLITE_MODULE=<pglite> node tests/privacy/release-audit.cjs`: 73 existing privacy/feature checks with the new policies installed.
 - TypeScript check and native simulator walkthrough against the test project, with synthetic nominations only. Actual REST requests from an incomplete account receive 403 for profile, invite, recap, rollout-admin and video-upload endpoints.

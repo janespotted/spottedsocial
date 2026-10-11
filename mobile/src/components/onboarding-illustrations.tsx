@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 import { OnboardingPanel } from '@/components/onboarding-scaffold';
-import { LAVENDER, NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
+import { INK, LAVENDER, MIST, NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
 
 /**
  * The static mock UI inside the onboarding tour. These are illustrations,
@@ -95,7 +95,7 @@ export function MapIllustration() {
       <View className="absolute left-3 right-3 top-3 flex-row items-center justify-between rounded-full border border-white/10 bg-[#241a3d]/90 py-1.5 pl-1.5 pr-3">
         <FaceStack />
         <View className="flex-row items-center gap-1">
-          <Text className="text-[12px] text-white/85 font-sans">4 friends are out</Text>
+          <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white/85 font-sans">4 friends are out</Text>
           <SymbolView name="chevron.right" size={10} tintColor="rgba(255,255,255,0.5)" />
         </View>
       </View>
@@ -114,15 +114,15 @@ export function MapIllustration() {
       <View className="absolute flex-row items-center gap-1.5" style={{ top: '42%', left: '22%' }}>
         <VenuePin size={24} color={NEON} />
         <View>
-          <Text className="text-[12px] text-white font-sans-medium">The Violet Room</Text>
-          <Text className="text-[10px] text-white/50 font-sans">West Village</Text>
+          <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white font-sans-medium">The Violet Room</Text>
+          <Text maxFontSizeMultiplier={1.2} className="text-[10px] text-white/50 font-sans">West Village</Text>
         </View>
       </View>
       <View className="absolute flex-row items-center gap-1.5" style={{ top: '55%', left: '44%' }}>
         <VenuePin size={24} color={PURPLE} />
         <View>
-          <Text className="text-[12px] text-white font-sans-medium">Good Company</Text>
-          <Text className="text-[10px] text-white/50 font-sans">East Village</Text>
+          <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white font-sans-medium">Good Company</Text>
+          <Text maxFontSizeMultiplier={1.2} className="text-[10px] text-white/50 font-sans">East Village</Text>
         </View>
       </View>
     </View>
@@ -210,10 +210,19 @@ function StatusPills({ selected }: { selected?: 'yes' | 'tbd' | 'no' }) {
 }
 
 /** 02 — "Are you out?" with Yes chosen and a check-in. */
-export function CheckedInIllustration() {
+export function CheckedInIllustration({ concise = false }: { concise?: boolean }) {
+  if (concise) return <OnboardingPanel>
+    <Text maxFontSizeMultiplier={1.2} className="text-white text-lg font-sans-medium mb-5">Are you out tonight?</Text>
+    <View className="flex-row items-center gap-2 mb-6">
+      {["I’m out", 'TBD', 'Staying in'].map((label, i) => <View key={label} className="flex-1 rounded-full min-h-11 px-1 py-2 items-center justify-center" style={{ backgroundColor: i === 0 ? NEON : 'rgba(255,255,255,0.05)' }}><Text maxFontSizeMultiplier={1.2} className="text-xs font-sans-medium text-center" style={{ color: i === 0 ? INK : MIST }}>{label}</Text></View>)}
+    </View>
+    <View className="flex-row items-center gap-3 mb-5"><VenuePin color={PURPLE} size={25} /><View className="flex-1"><Text maxFontSizeMultiplier={1.2} className="text-xs font-sans mb-1" style={{ color: MIST }}>Your spot</Text><Text maxFontSizeMultiplier={1.2} className="text-white text-base font-sans-medium">The Violet Room</Text></View></View>
+    <View className="flex-row items-center gap-2 mb-6"><SymbolView name="person.2" size={16} tintColor={MIST} /><Text maxFontSizeMultiplier={1.2} className="text-sm font-sans" style={{ color: MIST }}>Visible to Friends</Text><SymbolView name="chevron.down" size={10} tintColor={MIST} /></View>
+    <View className="rounded-xl border border-white/15 min-h-11 items-center justify-center py-3"><Text maxFontSizeMultiplier={1.2} className="text-sm font-sans-medium" style={{ color: NEON }}>Confirm check-in</Text></View>
+  </OnboardingPanel>;
   return (
     <OnboardingPanel>
-      <Text className="text-[18px] font-sans-semibold text-white text-center mb-5">
+      <Text maxFontSizeMultiplier={1.2} className="text-[18px] font-sans-semibold text-white text-center mb-5">
         Are you out?
       </Text>
       <StatusPills selected="yes" />
@@ -228,17 +237,17 @@ export function CheckedInIllustration() {
           <VenuePin size={20} color={PURPLE} />
         </View>
         <View className="flex-1">
-          <Text className="text-[13px] text-white/55 font-sans">Checked in at</Text>
-          <Text className="text-[17px] text-white font-sans-semibold mt-0.5">The Violet Room</Text>
+          <Text maxFontSizeMultiplier={1.2} className="text-[13px] text-white/55 font-sans">Checked in at</Text>
+          <Text maxFontSizeMultiplier={1.2} className="text-[17px] text-white font-sans-semibold mt-0.5">The Violet Room</Text>
         </View>
         <SymbolView name="chevron.right" size={14} tintColor="rgba(255,255,255,0.4)" />
       </View>
 
-      <Text className="text-[14px] text-white/60 font-sans underline mt-3 ml-15">Change spot</Text>
+      <Text maxFontSizeMultiplier={1.2} className="text-[14px] text-white/60 font-sans underline mt-3 ml-15">Change spot</Text>
 
       <View className="h-px bg-white/10 my-5" />
 
-      <Text className="text-[14px] text-white/45 font-sans text-center">At a private party?</Text>
+      <Text maxFontSizeMultiplier={1.2} className="text-[14px] text-white/45 font-sans text-center">At a private party?</Text>
     </OnboardingPanel>
   );
 }
@@ -433,8 +442,8 @@ export function LeaderboardIllustration() {
   ];
   return (
     <OnboardingPanel>
-      <Text className="text-[16px] text-white font-sans-semibold">Tonight in NYC</Text>
-      <Text className="text-[12px] text-white/50 font-sans mt-0.5">Total Spotted check-ins</Text>
+      <Text maxFontSizeMultiplier={1.2} className="text-[16px] text-white font-sans-semibold">Tonight in NYC</Text>
+      <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white/60 font-sans mt-0.5">Activity shared with you</Text>
 
       <View className="gap-2.5 mt-4">
         {spots.map((spot) => {
@@ -456,8 +465,8 @@ export function LeaderboardIllustration() {
                 {spot.rank}
               </Text>
               <View className="flex-1">
-                <Text className="text-[15px] text-white font-sans-medium">{spot.name}</Text>
-                <Text className="text-[12px] text-white/50 font-sans mt-0.5">{spot.hood}</Text>
+                <Text maxFontSizeMultiplier={1.2} className="text-[15px] text-white font-sans-medium">{spot.name}</Text>
+                <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white/50 font-sans mt-0.5">{spot.hood}</Text>
               </View>
             </View>
           );
