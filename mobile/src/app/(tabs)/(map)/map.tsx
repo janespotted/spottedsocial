@@ -51,7 +51,6 @@ import {
   requestWhenInUse,
 } from '@/lib/location-ready';
 import {IconButton} from '@/components/icon-button';
-import {FirstUseTip} from '@/components/first-use-tip';
 import {SmartArrivalPrompt, VenueMoveBanner} from '@/components/venue-move-banner';
 import {NEON} from '@/lib/theme';
 import {canGroupSpots, locationAge, locationLabel, STALE_AFTER_MS} from '@/lib/location-quality';
@@ -807,7 +806,6 @@ function LiveMapScreen() {
               onPress={() => router.push('/map-filters')}
             />
           </View>
-          <FirstUseTip id="map" />
         </View>
       ) : null}
 

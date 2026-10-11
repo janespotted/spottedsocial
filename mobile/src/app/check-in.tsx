@@ -66,7 +66,6 @@ import { useFriendIds } from '@/hooks/use-friend-ids';
 import { invalidateNightStatusQueries, useOwnNightStatus } from '@/hooks/use-own-night-status';
 import type { OwnNightStatus } from '@/lib/night-status';
 import { AudienceRow } from '@/components/audience-row';
-import { FirstUseTip } from '@/components/first-use-tip';
 import { fireConfetti } from '@/lib/confetti';
 import { INK_LIGHT, NEON, primaryControl, primaryControlText } from '@/lib/theme';
 import { SymbolView } from 'expo-symbols';
@@ -1045,9 +1044,8 @@ function CheckInFlow() {
           <Animated.View key="main" entering={viewEntering} exiting={FADE_AWAY} className="pt-7 pb-8 px-5 gap-5">
             <View className="gap-1.5">
               <Text className="text-white text-[26px] font-sans-semibold">Are you out tonight?</Text>
+              <Text className="text-white/60 text-[15px] font-sans">You can change this anytime.</Text>
             </View>
-
-            <FirstUseTip id="status" />
 
             <Segments value={answer} onChange={chooseAnswer} disabled={submitting} />
 

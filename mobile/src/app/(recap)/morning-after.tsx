@@ -23,7 +23,6 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import { CalendarPlus, Images, Sunrise, Ticket as TicketIcon, Users, type LucideIcon } from 'lucide-react-native';
 import { Avatar } from '@/components/avatar';
-import { FirstUseTip } from '@/components/first-use-tip';
 import { DayPlaceholder } from '@/components/day-placeholder';
 import { ErrorState } from '@/components/empty-state';
 import { PressableScale, Reveal } from '@/components/motion';
@@ -631,8 +630,6 @@ export default function MorningAfter() {
                 {recapDateLabel(recap.night_date)} · ONLY YOU
               </Text>
             </View>
-
-            <FirstUseTip id="recap" className="mb-4" />
 
             {/* Tabs: three quiet bars and one lime bar that rides the swipe */}
             <View className="mb-4" accessibilityRole="tablist">
