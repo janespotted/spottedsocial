@@ -1,6 +1,32 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {load}=require('./product-test-runtime.cjs');
+const {extract}=require('./product-test-runtime.cjs');
+test('Every app route group is explicitly protected for incomplete and signed-out accounts',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const groups=fs.readdirSync(path.join(__dirname,'../src/app')).filter(n=>n.startsWith('('));
+ let sessionState;
+ const element=(type,props)=>({type,props});
+ const render=extract('app/_layout.tsx','RootNavigator',{
+  useSession:()=>sessionState,useResolveClassNames:()=>'',SCREEN_GRADIENT:'',SHEET_CONTENT_STYLE:{},
+  Stack:Object.assign('Stack',{Screen:'Screen',Protected:'Protected'}),
+  require:()=>({jsx:element,jsxs:element}),
+ });
+ const collect=(node,includeHidden=false)=>{
+  if(!node||typeof node!=='object')return [];
+  if(node.type==='Screen')return [node.props.name];
+  if(node.type==='Protected'&&!node.props.guard&&!includeHidden)return [];
+  return [node.props?.children].flat(Infinity).flatMap(n=>collect(n,includeHidden));
+ };
+ for(const signedIn of [false,true])for(const onboardingNeeded of [false,true]){
+  sessionState={session:signedIn?{user:{id:'alice'}}:null,loading:false,onboardingNeeded};
+  const tree=render();
+  for(const group of groups){
+   assert.ok(collect(tree,true).includes(group),`${group} would otherwise be implicitly added outside the guard`);
+   assert.equal(collect(tree).includes(group),signedIn&&!onboardingNeeded,group);
+  }
+ }
+});
 const api=load('lib/launch.ts',{'@/lib/supabase':{supabase:{}}});
 test('Nomination normalization accepts US and explicit international numbers without guessing',()=>{
  for(const [input,expected] of [['(202) 555-0101','+12025550101'],['1 202 555 0101','+12025550101'],['+44 7700 900123','+447700900123'],['+92 300 5550101','+923005550101'],['abc2025550101',null],['5550101',null],['02012345678',null],['+000123456',null]])assert.equal(api.nominationPhone(input),expected,input);

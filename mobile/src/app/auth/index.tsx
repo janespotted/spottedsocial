@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -14,7 +14,6 @@ import {
   openCountryPicker,
   placeholderFor,
   stripTrunkPrefix,
-  SUPPORTED_LABEL,
   toE164,
   validateNational,
   type Country,
@@ -38,6 +37,8 @@ function Orb({ style, color }: { style: object; color: string }) {
 }
 
 export default function PhoneScreen() {
+  const { fontScale } = useWindowDimensions();
+  const inputHeight = Math.max(48, Math.ceil(26 * fontScale) + 16);
   const [mode, setMode] = useState<'phone' | 'email'>('phone');
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
   /** National digits only — the country carries the "+" prefix. */
@@ -154,7 +155,7 @@ export default function PhoneScreen() {
   };
 
   const inputClass =
-    'h-12 rounded-xl bg-white/5 border border-white/20 px-4 py-0 text-white text-[18px] font-sans tracking-wide';
+    'min-h-12 rounded-xl bg-white/5 border border-white/20 px-4 py-0 text-white text-[18px] font-sans tracking-wide';
   const focusedStyle = { borderColor: 'hsl(255, 91%, 76%)', borderWidth: 2 } as const;
   const invalidStyle = { borderColor: '#f87171', borderWidth: 2 } as const;
 
@@ -165,8 +166,10 @@ export default function PhoneScreen() {
       <Orb color="rgba(168,85,247,0.15)" style={{ bottom: -128, left: '25%', width: 288, height: 288 }} />
 
       <KeyboardAwareScrollView
+        // Remount cached text layouts when Dynamic Type changes at runtime.
+        key={fontScale}
         className="flex-1"
-        contentContainerClassName="flex-grow items-center justify-center px-6"
+        contentContainerClassName="flex-grow items-center justify-center px-6 pt-safe-offset-6 pb-safe-offset-6"
         keyboardShouldPersistTaps="handled"
         // The number pad has no return key; a swipe puts it away
         keyboardDismissMode="on-drag"
@@ -177,14 +180,25 @@ export default function PhoneScreen() {
         </View>
         <Text
           className="text-white text-4xl font-sans-light mb-2"
+          maxFontSizeMultiplier={1.3}
           style={{ letterSpacing: 9 }}
         >
           Spotted
         </Text>
-        <Text className="text-white/50 text-base font-sans mb-8">
+        <Text className="text-white/50 text-sm text-center font-sans mt-1 mb-6">
           New York, one circle at a time.
         </Text>
-        <Text className="text-white/60 text-sm text-center leading-5 mt-3">New here? Set up your profile and nominate two new people to join a future wave. Both nominations are required.</Text>
+        <View className="w-full gap-3 mb-6">
+          {([
+            ['person.2', 'See who’s out.'],
+            ['mappin.and.ellipse', 'Find your people.'],
+            ['hand.raised', 'Choose what you share.'],
+          ] as const).map(([icon, label]) => <View key={icon} className="flex-row items-center gap-3">
+            <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><SymbolView name={icon} size={18} tintColor={NEON} /></View>
+            <Text className="flex-1 text-white/85 text-base font-sans">{label}</Text>
+          </View>)}
+        </View>
+        <Text className="text-white/60 text-xs text-center leading-5 mb-5">New members must nominate two people for a future wave.</Text>
 
         <View className="w-full gap-5">
           {mode === 'phone' ? (
@@ -194,7 +208,7 @@ export default function PhoneScreen() {
                   onPress={pickCountry}
                   accessibilityRole="button"
                   accessibilityLabel={`Country code, ${country.name} ${country.dial}. Tap to see available countries.`}
-                  className="h-12 flex-row items-center gap-1.5 rounded-xl bg-white/5 border border-white/20 px-3 active:opacity-80"
+                  className="min-h-12 flex-row items-center gap-1.5 rounded-xl bg-white/5 border border-white/20 px-3 active:opacity-80"
                 >
                   <Text className="text-[20px]">{flagFor(country.code)}</Text>
                   <Text className="text-white text-[17px] font-sans tracking-wide">
@@ -223,13 +237,13 @@ export default function PhoneScreen() {
                   // Apple", and App Review wants the sign-in options shown
                   // with equal prominence.
                   className={`flex-1 ${inputClass}`}
-                  style={
+                  style={[{ height: inputHeight },
                     touched && phoneProblem && digits.length > 0
                       ? invalidStyle
                       : focused === 'phone'
                         ? focusedStyle
                         : undefined
-                  }
+                  ]}
                 />
               </View>
               {/* One line under the field: what's wrong, or what will be
@@ -242,7 +256,7 @@ export default function PhoneScreen() {
                 </Text>
               ) : (
                 <Text className="text-xs text-white/45 font-sans px-1">
-                  we can only text numbers in {SUPPORTED_LABEL} for now
+                  We’ll text you a sign-in code.
                 </Text>
               )}
             </View>
@@ -261,7 +275,7 @@ export default function PhoneScreen() {
                 autoCorrect={false}
                 autoFocus
                 className={inputClass}
-                style={focused === 'email' ? focusedStyle : undefined}
+                style={[{ height: inputHeight }, focused === 'email' ? focusedStyle : undefined]}
               />
               <TextInput
                 value={password}
@@ -274,7 +288,7 @@ export default function PhoneScreen() {
                 secureTextEntry
                 autoCapitalize="none"
                 className={inputClass}
-                style={focused === 'password' ? focusedStyle : undefined}
+                style={[{ height: inputHeight }, focused === 'password' ? focusedStyle : undefined]}
                 onSubmitEditing={signInWithEmail}
               />
             </>
@@ -287,11 +301,11 @@ export default function PhoneScreen() {
           <Pressable
             onPress={mode === 'phone' ? sendCode : signInWithEmail}
             disabled={busy || (mode === 'phone' && !!phoneProblem)}
-            className="w-full min-h-12 rounded-2xl items-center justify-center active:opacity-90 disabled:opacity-40"
+            className="w-full min-h-12 py-3 rounded-2xl items-center justify-center active:opacity-90 disabled:opacity-40"
             style={{ backgroundColor: NEON }}
           >
             <Text className="text-black text-base font-sans-semibold">
-              {busy ? (mode === 'phone' ? 'sending...' : 'signing in...') : 'continue'}
+              {busy ? (mode === 'phone' ? 'Sending…' : 'Signing in…') : 'Continue'}
             </Text>
           </Pressable>
           {appleAvailable ? (

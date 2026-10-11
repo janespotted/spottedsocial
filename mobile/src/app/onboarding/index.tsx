@@ -23,7 +23,8 @@ export default function LaunchOnboarding() {
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [slot, setSlot] = useState(launch?.nominations.length === 2 ? 0 : launch?.nominations.length === 1 ? 2 : 1);
+  // Keep the opening view to two cards; show entry controls after a choice.
+  const [slot, setSlot] = useState(launch?.nominations.length === 1 ? 2 : 0);
   const [phone, setPhone] = useState('');
   const [verifyPhone, setVerifyPhone] = useState(false);
   const usernameInput = useRef<TextInput>(null);
@@ -43,14 +44,14 @@ export default function LaunchOnboarding() {
   }, [stage]);
   const errorView = error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" className="text-red-300 text-sm leading-5 mt-4 mb-4">{error}</Text> : null;
 
-  if (stage === 'waiting') return <LaunchShell key="waiting" title="Your night is coming." subtitle="Spotted is opening New York in small waves. Your place opens when your invitation is activated.">
+  if (stage === 'waiting') return <LaunchShell key="waiting" title="Your night is coming." subtitle="New York opens in small waves. Your invitation unlocks your place.">
     <View className="rounded-3xl bg-white/5 border border-white/10 p-6 mb-8 gap-3">
       <SymbolView name="sparkles" tintColor={NEON} size={28} />
-      <Text className="text-white text-lg font-sans-medium">A little anticipation.</Text>
-      <Text style={{ color: MIST }} className="text-base leading-6">Once you’re in, make your profile and nominate two new people for a future wave. Both nominations are required.</Text>
+      <Text className="text-white text-lg font-sans-medium">First, your invitation.</Text>
+      <Text style={{ color: MIST }} className="text-base leading-6">When it opens: your profile, two required nominations, then you’re in.</Text>
     </View>
     {!state?.hasPhone ? <>
-      <Text className="text-sm text-white/70 leading-5 mb-4">Invited by phone? Verify that number to claim your place. You can also contact us for help with your Apple account.</Text>
+      <Text className="text-sm text-white/70 leading-5 mb-4">Invited by phone? Verify that number to claim your place.</Text>
       {verifyPhone ? <PhoneVerifyForm onVerified={() => { setVerifyPhone(false); refresh(); }} /> : <Pressable onPress={() => setVerifyPhone(true)} className="py-4"><Text style={{ color: NEON }}>Claim a phone invitation</Text></Pressable>}
     </> : null}
     {errorView}
@@ -59,7 +60,7 @@ export default function LaunchOnboarding() {
     <Pressable className="py-4" onPress={() => void supabase.auth.signOut()}><Text className="text-white/60 text-center">Use another account</Text></Pressable>
   </LaunchShell>;
 
-  if (stage === 'profile') return <LaunchShell key="profile" step={1} title="Make an entrance." subtitle="Your name, your handle. Then choose two people who should be here next.">
+  if (stage === 'profile') return <LaunchShell key="profile" step={1} title="Make an entrance." subtitle="Your name. Your handle.">
     <Text className="text-sm text-white/65 mb-2">Your name</Text>
     <TextInput accessibilityLabel="Your name" value={name} onChangeText={setName} maxLength={50} textContentType="name" returnKeyType="next" onSubmitEditing={() => usernameInput.current?.focus()} className="text-white text-2xl font-sans-light border-b border-white/20 pb-3 mb-7" placeholder="First and last name" placeholderTextColor={MIST} />
     <Text className="text-sm text-white/65 mb-2">Username</Text>
@@ -88,7 +89,7 @@ export default function LaunchOnboarding() {
     if (Platform.OS === 'ios') ActionSheetIOS.showActionSheetWithOptions({ title: 'Choose their number', options: [...numbers, 'Cancel'], cancelButtonIndex: numbers.length }, i => { if (numbers[i]) setPhone(numbers[i]); });
     else Alert.alert('Choose their number', undefined, [...numbers.slice(0, 2).map(number => ({ text: number, onPress: () => setPhone(number) })), { text: 'Cancel', style: 'cancel' }]);
   });
-  return <LaunchShell key="nominate" step={2} title="Who’s next?" subtitle="Choose two new people for a future wave. Your kind of people.">
+  return <LaunchShell key="nominate" step={2} title="Who’s next?" subtitle="Two new people. A future wave.">
     <View className="gap-3 mb-6">
       {[1, 2].map(n => {
         const choice = choices.find(c => c.slot === n);
@@ -110,7 +111,7 @@ export default function LaunchOnboarding() {
       })} className="min-h-11 items-center justify-center rounded-xl border border-white/25 disabled:opacity-35"><Text className="text-white font-sans-medium">{busy ? 'Saving…' : `Confirm nominee ${slot}`}</Text></Pressable>
       {choices.length === 2 ? <Pressable className="min-h-11 items-center justify-center mt-2" onPress={() => { setSlot(0); setPhone(''); setError(null); }}><Text className="text-white/65">Keep saved choices</Text></Pressable> : null}
     </View> : null}
-    <Text className="text-white/65 text-sm leading-5">Two nominations are required. Your people join the list for a future wave. No message is sent now.</Text>
+    <Text className="text-white/65 text-sm leading-5">Both are required. No invitations sent yet.</Text>
     {errorView}
     <View className="mt-auto pt-7"><LaunchButton label={busy ? 'Saving…' : choices.length === 2 ? 'Let’s go' : `${choices.length} of 2 chosen`} disabled={busy || choices.length !== 2 || slot !== 0} onPress={() => void perform(async () => {
       await launchRpc('complete_launch_onboarding'); Keyboard.dismiss(); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); await refreshOnboardingStatus();
