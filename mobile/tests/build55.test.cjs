@@ -30,3 +30,8 @@ test('night Home keeps its yellow bottom-left Post action independently of feed 
  assert.match(fab,/\{keyboardOpen \? null :/);assert.match(fab,/left-4/);assert.match(fab,/backgroundColor: NEON/);assert.doesNotMatch(fab,/feed\.posts|hasPosts|friendCount/);
  const venue=source('app/venue.tsx');assert.match(venue,/\[moreInfoOpen, setMoreInfoOpen\] = useState\(false\)/);assert.match(venue,/setMoreInfoOpen\(false\).*\[venueId\]/s);
 });
+test('DM inbox name opens Friend ID while the conversation row still opens chat',()=>{
+ let cards=[],chats=0;const render=extract('app/(tabs)/(messages)/messages.tsx','ThreadRow',{require:()=>jsx,View:'View',Text:'Text',Pressable:'Pressable',Avatar:'Avatar',GroupAvatar:'GroupAvatar',threadTitle:()=> 'Alex',formatWhen:()=>'',previewText:()=>'',NEON:'lime',friendCardPress:id=>e=>{e.stopPropagation();cards.push(id)}});
+ const tree=render({thread:{id:'dm',is_group:false,members:[{user_id:'friend',avatar_url:null}],last_message:null},userId:'me',onPress:()=>chats++});let stopped=false;
+ nodes(tree).find(n=>n.type==='Text'&&n.props.children==='Alex').props.onPress({stopPropagation:()=>stopped=true});assert(stopped);assert.deepEqual(cards,['friend']);assert.equal(chats,0);tree.props.onPress();assert.equal(chats,1);
+});

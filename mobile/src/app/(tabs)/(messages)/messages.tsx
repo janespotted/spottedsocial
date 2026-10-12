@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { useEffect, useState } from 'react';
 import { Pressable, RefreshControl, Text, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -55,11 +56,13 @@ function ThreadRow({ thread, userId, onPress }: { thread: DmThreadPreview; userI
       {thread.is_group ? (
         <GroupAvatar thread={thread} />
       ) : (
-        <Avatar name={title} url={thread.members[0]?.avatar_url ?? null} size="md" />
+        <Avatar userId={thread.members[0]?.user_id} name={title} url={thread.members[0]?.avatar_url ?? null} size="md" />
       )}
       <View className="flex-1 min-w-0 gap-0.5">
         <Text
           className={`text-base ${thread.unread ? 'text-white font-sans-semibold' : 'text-white font-sans-medium'}`}
+          onPress={thread.is_group ? undefined : friendCardPress(thread.members[0]?.user_id, userId)}
+          accessibilityRole={thread.is_group ? undefined : 'button'}
           numberOfLines={1}
         >
           {title}
