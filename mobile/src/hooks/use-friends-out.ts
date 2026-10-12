@@ -34,8 +34,7 @@ export interface FriendsOutData {
 /**
  * Friends who are out or planning tonight. Visibility (sharing level, hide,
  * block) is enforced server-side by RLS on night_statuses — this hook only
- * shapes the data, plus the one client-side rule that a viewer who is
- * staying in does not see precise venues (client feedback §8).
+ * shapes authorized identities or count-only data for a nonparticipating viewer.
  */
 export function useFriendsOut({ enabled = true }: { enabled?: boolean } = {}) {
   const { session } = useSession();
@@ -64,6 +63,9 @@ export function useFriendsOut({ enabled = true }: { enabled?: boolean } = {}) {
     queryKey: ['friends-out', session?.user.id, friendIds, viewerStayingIn],
     enabled: enabled && !!session && !!friendIds,
     staleTime: 30_000,
+    // RLS deliberately withholds identity-bearing status events from No viewers.
+    // Refresh their aggregate endpoint without widening the realtime audience.
+    refetchInterval: viewerStayingIn ? 30_000 : false,
     queryFn: async (): Promise<FriendsOutData> => {
       if (!friendIds || friendIds.length === 0) {
         return { outFriends: [], planningFriends: [], venuesWithheld: viewerStayingIn, outCount: 0, planningCount: 0 };

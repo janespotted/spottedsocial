@@ -98,3 +98,23 @@ test('Five tabs share one clock, recompute on foreground, and release the timer'
   assert(selectors.every(select => !select()));
   for (const dispose of clean) dispose(); assert.equal(jobs.size, 0); assert.equal(appRemoved, 1);
 });
+
+test('Counts refresh when status events are withheld, without querying friend identities', async () => {
+  let query, calls = 0, count = 1;
+  const { useFriendsOut } = load('hooks/use-friends-out.ts', {
+    '@/lib/live-preview': { withholdLivePreview: () => true },
+    '@/hooks/use-private-query': { usePrivateQuery: options => { query = options; return options; } },
+    react: { useEffect: () => {} },
+    '@tanstack/react-query': { useQueryClient: () => ({}) },
+    '@/lib/resilient-channel': { createResilientChannel: () => {} },
+    '@/lib/supabase': { supabase: { from: () => { throw Error('identity-bearing table queried'); }, rpc: async name => { assert.equal(name, 'get_friends_night_counts'); calls++; return { data: { out: count, planning: 0 } }; } } },
+    '@/lib/profiles': { fetchProfilesSafe: () => { throw Error('profiles queried'); }, buildProfileMap: () => {} },
+    './use-friend-ids': { useFriendIds: () => ({ data: ['friend'] }) },
+    './use-own-night-status': { useOwnNightStatus: () => ({ data: { status: { status: 'home' } } }) },
+    './use-session': { useSession: () => ({ session: { user: { id: 'viewer' } } }) },
+  });
+  useFriendsOut(); assert.equal(query.refetchInterval, 30_000);
+  assert.equal((await query.queryFn()).outCount, 1); count = 2;
+  const refreshed = await query.queryFn(); assert.equal(refreshed.outCount, 2);
+  assert.deepEqual(refreshed.outFriends, []); assert.deepEqual(refreshed.planningFriends, []); assert.equal(calls, 2);
+});
