@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
-import { ActionSheetIOS, Pressable, RefreshControl, Text, View } from 'react-native';
+import { Pressable, RefreshControl, Text, View } from 'react-native';
 import { Image } from '@/components/styled';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -19,6 +19,7 @@ import {
 } from '@/hooks/use-leaderboard';
 import { EmptyState, ErrorState } from '@/components/empty-state';
 import { Avatar } from '@/components/avatar';
+import { openFriendCard } from '@/lib/friend-card';
 import { DropdownMenu } from '@/components/dropdown-menu';
 import { HeaderActions } from '@/components/header-actions';
 import { DayTabScreen } from '@/components/night-opening-screen';
@@ -43,48 +44,16 @@ function openVenue(venueName: string, venueId?: string | null) {
 
 /* ── Friend avatar stack (popover → action sheet on native) ── */
 
-function showFriendsSheet(venueName: string, friends: LeaderboardFriend[]) {
-  ActionSheetIOS.showActionSheetWithOptions(
-    {
-      title: `Friends at ${venueName}`,
-      options: [...friends.map((f) => f.display_name), 'Close'],
-      cancelButtonIndex: friends.length,
-    },
-    () => {}
-  );
-}
-
-function FriendStack({
-  venueName,
-  friends,
-}: {
-  venueName: string;
-  friends: LeaderboardFriend[];
-}) {
-  if (friends.length === 0) return null;
-  return (
-    <Pressable
-      onPress={() => showFriendsSheet(venueName, friends)}
-      className="flex-row items-center active:opacity-70"
-    >
-      <View className="flex-row">
-        {friends.slice(0, 3).map((friend, idx) => (
-          <View
-            key={friend.user_id}
-            className="rounded-full border-2 border-[#1e1338]"
-            style={idx > 0 ? { marginLeft: -8 } : undefined}
-          >
-            <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
-          </View>
-        ))}
-      </View>
-      {friends.length > 3 ? (
-        <Text className="ml-1.5 text-xs text-white/60 font-sans-medium">
-          +{friends.length - 3}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
+function FriendStack({ friends }: { venueName: string; friends: LeaderboardFriend[] }) {
+  if (!friends.length) return null;
+  return <View className="flex-row items-center">
+    {friends.slice(0, 3).map(friend => <Pressable key={friend.user_id}
+      onPress={event => { event.stopPropagation(); openFriendCard(friend.user_id); }}
+      accessibilityRole="button" accessibilityLabel={`Open ${friend.display_name}’s friend card`}
+      className="min-h-11 min-w-11 items-center justify-center active:opacity-70">
+      <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+    </Pressable>)}
+  </View>;
 }
 
 /* ── Cards ── */
@@ -129,9 +98,8 @@ function PromotedCard({ venue }: { venue: LeaderboardVenue }) {
 }
 
 function VenueCard({ venue }: { venue: LeaderboardVenue }) {
-  const hasActivity = venue.count > 0;
-  const isTop1 = hasActivity && venue.rank === 1;
-  const isTop3 = hasActivity && venue.rank >= 1 && venue.rank <= 3;
+  const isTop1 = venue.rank === 1;
+  const isTop3 = venue.rank >= 1 && venue.rank <= 3;
 
   const subParts: string[] = [];
   if (venue.neighborhood) subParts.push(venue.neighborhood);
@@ -143,7 +111,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
     <Pressable
       onPress={() => openVenue(venue.venue_name, venue.venue_id)}
       accessibilityRole="button"
-      accessibilityLabel={`${hasActivity ? `Number ${venue.rank}, ` : ''}${venue.venue_name}. Open venue`}
+      accessibilityLabel={`Number ${venue.rank}, ${venue.venue_name}. Open venue`}
       className={`relative overflow-hidden rounded-2xl mb-3 active:opacity-80 ${
         isTop1
           ? 'bg-[#221540] p-5 border border-[#d4ff00]/20'
@@ -158,7 +126,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
 
       <View className="flex-row items-center gap-3">
         {/* Rank Number */}
-        {hasActivity ? <View className="w-10 items-center">
+        <View className="w-10 items-center">
           <Text
             className={`font-sans-semibold tabular-nums ${
               isTop1 ? 'text-4xl text-[#d4ff00]' : isTop3 ? 'text-3xl text-[#d4ff00]' : 'text-2xl text-white/50'
@@ -171,7 +139,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
           >
             {venue.rank}
           </Text>
-        </View> : null}
+        </View>
 
         {/* Venue Info */}
         <View className="flex-1 min-w-0">
@@ -277,7 +245,7 @@ function LeaderboardHeader({
       {/* Title + subtitle — full-width rows below the top bar */}
       <View className="px-4 pt-2">
         <Text className="text-3xl font-sans-semibold text-white">Leaderboard</Text>
-        <Text className="text-white/50 text-sm mt-0.5 font-sans">Top spots tonight</Text>
+        <Text className="text-white/50 text-sm mt-0.5 font-sans">Spotted picks + check-ins</Text>
       </View>
 
       {/* Neighborhood filter — the original build's Spotted dropdown, not
@@ -370,8 +338,6 @@ function LiveLeaderboardScreen() {
   const { refreshing, onRefresh } = usePullToRefresh(refetch);
   const venues = data?.venues ?? [];
   const biggestMover = data?.biggestMover ?? null;
-  const firstLive = venues.findIndex(v => !v.isPromoted && v.count > 0);
-  const firstCatalog = venues.findIndex(v => !v.isPromoted && v.count === 0);
 
   return (
     <View className="flex-1">
@@ -384,7 +350,7 @@ function LiveLeaderboardScreen() {
 
       <LegendList
         data={venues}
-        keyExtractor={(v) => v.venue_name}
+        keyExtractor={(v) => v.venue_id ?? v.venue_name}
         recycleItems
         contentContainerStyle={contentContainerStyle}
         refreshControl={
@@ -397,10 +363,7 @@ function LiveLeaderboardScreen() {
         ListEmptyComponent={isLoading ? <LeaderboardSkeleton /> : isError
           ? <ErrorState title="Couldn’t load spots" onRetry={() => void refetch()} retrying={refreshing} />
           : <EmptyState icon="chart.bar" title="Start the night" actions={[{label:'Check in',onPress:()=>router.push('/check-in'),primary:true}]} />}
-        renderItem={({ item, index }) => <>
-          {index === firstLive || index === firstCatalog ? <Text className="text-white/60 text-xs font-sans-medium px-1 pb-3 pt-2" accessibilityRole="header">{index === firstLive ? 'Live activity' : 'Explore spots'}</Text> : null}
-          {item.isPromoted ? <PromotedCard venue={item} /> : <VenueCard venue={item} />}
-        </>}
+        renderItem={({ item }) => item.isPromoted ? <PromotedCard venue={item} /> : <VenueCard venue={item} />}
         ListFooterComponent={biggestMover ? <BiggestMoverCard mover={biggestMover} /> : null}
       />
     </View>

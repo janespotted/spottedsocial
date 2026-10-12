@@ -265,7 +265,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
 
       {/* TBD: surface friends heading out the moment it happens */}
       {isNight && isUserPlanning && outFriends.length > 0 ? (
-        <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
+        <FriendsOutBanner count={outFriends.length} friends={outFriends} />
       ) : null}
 
       {/* "No" tonight: names only, venues withheld, with the way back in */}

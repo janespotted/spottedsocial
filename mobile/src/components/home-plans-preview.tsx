@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -42,10 +43,10 @@ export function HomePlansPreview() {
       const date = preview.tonight ? '' : new Date(`${plan.plan_date}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
       const detail = [plan.user?.display_name, date, formatTimeTo12Hour(plan.plan_time)].filter(Boolean).join(' · ');
       return <Pressable key={plan.id} accessibilityRole="button" accessibilityLabel={`${plan.venue_name}. ${detail}. Open Plans`} onPress={openPlans} className="px-4 py-3 border-t border-white/5 flex-row items-center gap-3 active:opacity-70">
-        <Avatar name={plan.user?.display_name ?? ''} url={plan.user?.avatar_url ?? null} size="sm" />
+        <Avatar userId={plan.user_id} name={plan.user?.display_name ?? ''} url={plan.user?.avatar_url ?? null} size="sm" />
         <View className="flex-1 min-w-0 gap-1">
           <Text className="text-white font-sans-medium text-sm" numberOfLines={1}>{plan.venue_name}</Text>
-          <Text className="text-white/55 font-sans text-xs" numberOfLines={1}>{detail}</Text>
+          <Text className="text-white/55 font-sans text-xs" numberOfLines={1}><Text onPress={friendCardPress(plan.user_id)} accessibilityRole="button">{plan.user?.display_name}</Text>{[date, formatTimeTo12Hour(plan.plan_time)].filter(Boolean).map(value => ` · ${value}`).join('')}</Text>
         </View>
         <SymbolView name="chevron.right" size={11} tintColor={MIST} />
       </Pressable>;

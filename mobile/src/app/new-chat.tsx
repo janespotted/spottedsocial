@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
@@ -167,9 +168,9 @@ export default function NewChatSheet() {
               disabled={!!creating}
               className="flex-row items-center gap-3 py-2.5 active:opacity-70"
             >
-              <Avatar name={friend.display_name} url={friend.avatar_url} size="md" />
+              <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="md" />
               <View className="flex-1 min-w-0">
-                <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
+                <Text className="text-white text-base font-sans-medium" numberOfLines={1} onPress={friendCardPress(friend.id)} accessibilityRole="button">
                   {friend.display_name}
                 </Text>
                 {friend.venue_name ? (

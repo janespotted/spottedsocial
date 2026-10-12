@@ -53,13 +53,13 @@ test('nominee labels stay on the device, remain isolated between accounts, and c
  assert.equal(Object.keys(await api.readNomineeLabels('b')).length,0);
  storage.set('spotted:nominee-label:a:2','bad json');assert.equal(Object.keys(await api.readNomineeLabels('a')).length,1);
 });
-test('catalog-only leaderboard cards do not invent a live rank or first-place treatment',()=>{
+test('nighttime cards always display curated rank without inventing live activity',()=>{
  const jsx={jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})};
  for(const count of [0,2]){
  const fn=extract('app/(tabs)/(leaderboard)/leaderboard.tsx','VenueCard',{require:()=>jsx,View:'View',Text:'Text',Pressable:'Pressable',SymbolView:'SymbolView',FriendStack:'FriendStack',NEON:'lime',openVenue:()=>{}});
  const tree=fn({venue:{rank:1,count,venue_name:'Test Venue',friends:[],movement:'same'}});
- assert.equal(tree.props.accessibilityLabel.includes('Number 1'),count>0);
- assert.equal(!!tree.props.style,count>0);
+ assert.equal(tree.props.accessibilityLabel.includes('Number 1'),true);
+ assert.equal(!!tree.props.style,true);
  }
 });
 test('daytime Home distinguishes a failed plans read from a successful empty list',()=>{

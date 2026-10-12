@@ -162,7 +162,7 @@ export function RecapCover({ recap, loading }: { recap: NightRecap | null | unde
         <View className="flex-row">
           {faces.map((p, i) => (
             <View key={p.friend_id} className={`rounded-full border-2 border-[#3d2752] ${i > 0 ? '-ml-2' : ''}`}>
-              <Avatar name={p.display_name} url={p.avatar_url} size="sm" />
+              <Avatar userId={p.friend_id} name={p.display_name} url={p.avatar_url} size="sm" />
             </View>
           ))}
         </View>

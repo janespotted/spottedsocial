@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { dismissKeyboardNow } from '@/hooks/use-dismiss-keyboard-on-leave';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -392,8 +393,8 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
                       onPress={() => toggleFriend(friend)}
                       className="flex-row items-center gap-1.5 bg-[#1a1230] border border-white/10 rounded-full pl-1 pr-2.5 py-1 active:opacity-70"
                     >
-                      <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
-                      <Text className="text-white text-xs font-sans">
+                      <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
+                      <Text className="text-white text-xs font-sans" onPress={friendCardPress(friend.id)} accessibilityRole="button">
                         {friend.display_name.split(' ')[0]}
                       </Text>
                       <SymbolView name="xmark" size={10} tintColor="rgba(255,255,255,0.3)" />
@@ -432,9 +433,9 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
                         }}
                         className="flex-row items-center gap-3 p-2.5 active:bg-white/5"
                       >
-                        <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+                        <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
                         <View className="flex-1 min-w-0">
-                          <Text className="text-white text-sm font-sans" numberOfLines={1}>
+                          <Text className="text-white text-sm font-sans" numberOfLines={1} onPress={friendCardPress(friend.id)} accessibilityRole="button">
                             {friend.display_name}
                           </Text>
                           <Text className="text-white/45 text-xs font-sans" numberOfLines={1}>

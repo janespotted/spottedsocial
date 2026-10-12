@@ -131,6 +131,7 @@ export default function SentConfirmationScreen() {
     }
   };
 
+  const openPerson = (id: string) => { close(); setTimeout(() => openFriendCard(id, session?.user.id), 350); };
   const headline = kind === 'meetup' ? `You sent a Meet Up Request to ${first?.display_name ?? 'them'}!` : 'Invites Sent!';
 
   if (!friends.length || !inviteIds.length) return <View className="flex-1 items-center justify-center bg-[#110a24] p-6 gap-4">
@@ -181,10 +182,10 @@ export default function SentConfirmationScreen() {
           <Text className="text-6xl mb-3" accessibilityElementsHidden>
             🥳
           </Text>
-          <Text className="text-white text-2xl font-sans-semibold text-center mb-2">{headline}</Text>
+          <Text className="text-white text-2xl font-sans-semibold text-center mb-2">{kind === 'meetup' ? <>You sent a Meet Up Request to <Text onPress={() => first && openPerson(first.id)}>{first?.display_name ?? 'them'}</Text>!</> : headline}</Text>
           {kind === 'invites' ? (
             <Text className="text-white/80 text-[15px] font-sans text-center leading-5">
-              You invited <Text style={{ color: NEON }} className="font-sans-semibold">{joinNames(friends)}</Text> to{' '}
+              You invited {friends.map((p,i)=><Text key={p.id} style={{ color: NEON }} className="font-sans-semibold" onPress={() => openPerson(p.id)} accessibilityRole="button">{i ? ', ' : ''}{p.display_name}</Text>)} to{' '}
               <Text style={{ color: NEON }} className="font-sans-semibold">{params.venueName ?? 'the spot'}</Text>
             </Text>
           ) : (

@@ -60,6 +60,7 @@ export function InviteCard({
   busy,
   onRespond,
   onOpenVenue,
+  onOpenPerson,
 }: {
   kind: InviteKind;
   invite: Invite | null | undefined;
@@ -70,6 +71,7 @@ export function InviteCard({
   busy: boolean;
   onRespond: (accept: boolean) => void;
   onOpenVenue: (venueId: string) => void;
+  onOpenPerson?: () => void;
 }) {
   if (invite === null) {
     return (
@@ -94,12 +96,12 @@ export function InviteCard({
     >
       <View className="flex-row items-center gap-1.5">
         <SymbolView name={isMine ? 'paperplane' : 'bubble.left'} size={13} tintColor={NEON} />
-        <Text className="text-white/60 text-[11px] font-sans flex-1" numberOfLines={1}>
+        <Text className="text-white/60 text-[11px] font-sans flex-1" numberOfLines={1} onPress={onOpenPerson} accessibilityRole={onOpenPerson ? "button" : undefined}>
           {copy.header}
         </Text>
       </View>
 
-      <Text className="text-white text-[17px] font-sans-semibold leading-6" numberOfLines={2}>
+      <Text className="text-white text-[17px] font-sans-semibold leading-6" numberOfLines={2} onPress={onOpenPerson} accessibilityRole={onOpenPerson ? "button" : undefined}>
         {copy.title}
       </Text>
 

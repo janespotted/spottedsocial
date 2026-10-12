@@ -8,7 +8,8 @@ import { supabase } from '@/lib/supabase';
 import { isDemoMode } from '@/lib/demo-mode';
 import { buildProfileMap, fetchProfilesSafe } from '@/lib/profiles';
 import { isVenueOpen, type VenueHours } from '@/lib/venue-hours';
-import { isNightlifeHours } from '@/lib/time-context';
+import { rankNightlife } from '@/lib/leaderboard-ranking';
+import { currentPicks } from '@/lib/venue-recommendations';
 import { useFriendIds } from './use-friend-ids';
 import { useSession } from './use-session';
 
@@ -85,7 +86,7 @@ async function fetchLeaderboard(
     .eq('status', 'out')
     .not('expires_at', 'is', null)
     .gt('expires_at', new Date().toISOString());
-  if (neighborhood) statusQuery = statusQuery.eq('venues.neighborhood', neighborhood);
+
   // Demo content must never reach the launched app (SOW §15)
   if (!isDemoMode()) statusQuery = statusQuery.eq('is_demo', false);
 
@@ -100,34 +101,32 @@ async function fetchLeaderboard(
     .not('leaderboard_promo_order', 'is', null)
     .lte('leaderboard_promo_order', 2)
     .order('leaderboard_promo_order', { ascending: true });
-  if (neighborhood) promotedQuery = promotedQuery.eq('neighborhood', neighborhood);
+  promotedQuery = promotedQuery.eq('is_demo', false);
 
-  // Bootstrap: pre-populate from top venues so the board always shows 20
-  const topVenuesQuery = neighborhood
-    ? supabase
-        .from('venues')
-        .select('id, name, neighborhood, popularity_rank, is_leaderboard_promoted, opened_at, operating_hours')
-        .eq('city', city)
-        .eq('neighborhood', neighborhood)
-        .order('popularity_rank', { ascending: true })
-    : supabase
-        .from('venues')
-        .select('id, name, neighborhood, popularity_rank, is_leaderboard_promoted, opened_at, operating_hours')
-        .eq('city', city)
-        .order('popularity_rank', { ascending: true })
-        .limit(30);
+  // Read the city once; filtering a neighborhood must not change the weight of check-ins.
+  const columns = 'id, name, neighborhood, popularity_rank, is_leaderboard_promoted, opened_at, operating_hours' as const;
+  const reviewed = currentPicks(city);
+  const topVenuesQuery = supabase.from('venues').select(columns).eq('city', city)
+    .eq('is_demo', false).order('popularity_rank', { ascending: true }).limit(100);
+  const reviewedQuery = reviewed.length ? supabase.from('venues').select(columns).eq('city', city)
+    .eq('is_demo', false).in('id', reviewed.map(p => p.venueId)) : Promise.resolve({ data: [], error: null });
 
-  const [promotedResult, statusesResult, topVenuesResult, profiles] = await Promise.all([
+  const [promotedResult, statusesResult, topVenuesResult, profiles, reviewedResult] = await Promise.all([
     promotedQuery,
     statusQuery,
     topVenuesQuery,
     fetchProfilesSafe(),
+    reviewedQuery,
   ]);
 
-  for (const result of [promotedResult, statusesResult, topVenuesResult]) if (result.error) throw result.error;
+  for (const result of [promotedResult, statusesResult, topVenuesResult, reviewedResult]) if (result.error) throw result.error;
   const promotedVenues = promotedResult.data ?? [];
   const statuses = (statusesResult.data ?? []) as unknown as Array<{ venue_name: string; venue_id: string; user_id: string; updated_at: string | null; venues: { operating_hours?: VenueHours | null; opened_at?: string | null; neighborhood?: string | null; popularity_rank?: number | null } }>;
-  const topVenues = topVenuesResult.data ?? [];
+  const topVenues = Array.from(new Map([...(topVenuesResult.data ?? []), ...(reviewedResult.data ?? [])].map(v => [v.id, v])).values());
+  const seedRank = (id: string, name: string, original: number | null | undefined) => {
+    const index = reviewed.findIndex(p => p.venueId === id && p.name === name);
+    return index >= 0 ? index + 1 : original && original < 999 ? original + reviewed.length : 999;
+  };
   const profileMap = buildProfileMap(profiles);
 
   const activePromotedIds = new Set(promotedVenues.map((v) => v.id));
@@ -144,7 +143,7 @@ async function fetchLeaderboard(
     topVenues.forEach((venue, index) => {
       const isNewlyOpened = venue.opened_at ? new Date(venue.opened_at) > threeMonthsAgo : false;
       const rank = index + 1;
-      venueMap.set(venue.name, {
+      venueMap.set(venue.id, {
         venue_name: venue.name,
         venue_id: venue.id,
         neighborhood: venue.neighborhood ?? null,
@@ -153,9 +152,9 @@ async function fetchLeaderboard(
         movement: 'same',
         friends: [],
         energyLevel: 0,
-        isPromoted: venue.is_leaderboard_promoted ?? false,
+        isPromoted: activePromotedIds.has(venue.id),
         isNewlyOpened,
-        popularity_rank: venue.popularity_rank ?? 999,
+        popularity_rank: seedRank(venue.id, venue.name, venue.popularity_rank),
         operatingHours: (venue.operating_hours as VenueHours | null) ?? null,
         recentCheckinCount: 0,
       });
@@ -164,9 +163,9 @@ async function fetchLeaderboard(
 
   // Add ONLY active promoted venues (order 1-2) to ensure they appear
   promotedVenues.forEach((venue) => {
-    if (venueMap.has(venue.name)) return;
+    if (venueMap.has(venue.id)) return;
     const isNewlyOpened = venue.opened_at ? new Date(venue.opened_at) > threeMonthsAgo : false;
-    venueMap.set(venue.name, {
+    venueMap.set(venue.id, {
       venue_name: venue.name,
       venue_id: venue.id,
       neighborhood: venue.neighborhood ?? null,
@@ -177,14 +176,17 @@ async function fetchLeaderboard(
       energyLevel: 0,
       isPromoted: true,
       isNewlyOpened,
-      popularity_rank: venue.popularity_rank ?? 999,
+      popularity_rank: seedRank(venue.id, venue.name, venue.popularity_rank),
       operatingHours: (venue.operating_hours as VenueHours | null) ?? null,
       recentCheckinCount: 0,
     });
   });
 
   // Fold in live night statuses
+  const countedUsers = new Set<string>();
   statuses.forEach((status) => {
+    if (!status.venue_id || countedUsers.has(status.user_id)) return;
+    countedUsers.add(status.user_id);
     const venueName = status.venue_name as string;
     const venueMeta = status.venues ?? {};
     const statusProfile = profileMap.get(status.user_id);
@@ -197,8 +199,8 @@ async function fetchLeaderboard(
     const updatedAt = status.updated_at ? new Date(status.updated_at) : null;
     const isRecentCheckin = !!updatedAt && updatedAt > thirtyMinutesAgo;
 
-    if (!venueMap.has(venueName)) {
-      venueMap.set(venueName, {
+    if (!venueMap.has(status.venue_id)) {
+      venueMap.set(status.venue_id, {
         venue_name: venueName,
         venue_id: status.venue_id ?? null,
         neighborhood: venueMeta.neighborhood ?? null,
@@ -209,13 +211,13 @@ async function fetchLeaderboard(
         energyLevel: 0,
         isPromoted: activePromotedIds.has(status.venue_id),
         isNewlyOpened,
-        popularity_rank: venueMeta.popularity_rank ?? 999,
+        popularity_rank: seedRank(status.venue_id, venueName, venueMeta.popularity_rank),
         operatingHours,
         recentCheckinCount: 0,
       });
     }
 
-    const venue = venueMap.get(venueName)!;
+    const venue = venueMap.get(status.venue_id)!;
     venue.count++; // Count ALL users for energy calculation
     if (isRecentCheckin) venue.recentCheckinCount++;
     if (!venue.operatingHours && operatingHours) venue.operatingHours = operatingHours;
@@ -236,20 +238,16 @@ async function fetchLeaderboard(
   // (paid placement guarantee). No hours data → only during nightlife hours.
   const openVenueArray = venueArray.filter((v) => {
     if (v.isPromoted) return true;
-    if (!v.operatingHours) return isNightlifeHours();
+    if (!v.operatingHours) return true;
     return isVenueOpen(v.operatingHours);
   });
 
   const topPromotedVenues = openVenueArray
-    .filter((v) => v.isPromoted)
+    .filter((v) => v.isPromoted && (!neighborhood || v.neighborhood === neighborhood))
     .sort((a, b) => a.popularity_rank - b.popularity_rank);
 
-  const nonPromotedVenues = openVenueArray
-    .filter((v) => !v.isPromoted)
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.popularity_rank - b.popularity_rank;
-    });
+  const nonPromotedVenues = rankNightlife(openVenueArray.filter(v => !v.isPromoted), countedUsers.size)
+    .filter(v => !neighborhood || v.neighborhood === neighborhood);
 
   // Top 20 non-promoted venues get ranks; movement remains neutral until measured history exists
   const rankedVenues = nonPromotedVenues.slice(0, 20).map((venue, index) => {

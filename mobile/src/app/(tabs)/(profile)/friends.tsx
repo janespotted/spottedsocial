@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { invalidateFriendGraph, setCloseFriend } from '@/lib/friend-relationship';
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { Alert } from 'react-native';
@@ -306,9 +307,9 @@ export default function FriendsScreen() {
             )
           ) : item.kind === 'request' ? (
             <View className="flex-row items-center gap-3 py-2.5">
-              <Avatar name={item.display_name ?? '?'} url={item.avatar_url ?? null} size="md" />
+              <Avatar userId={item.userId} name={item.display_name ?? '?'} url={item.avatar_url ?? null} size="md" />
               <View className="flex-1 min-w-0">
-                <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
+                <Text className="text-white text-base font-sans-medium" numberOfLines={1} onPress={friendCardPress(item.userId)} accessibilityRole="button">
                   {item.display_name}
                 </Text>
                 <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>
@@ -332,9 +333,9 @@ export default function FriendsScreen() {
             </View>
           ) : item.kind === 'suggestion' ? (
             <View className="flex-row items-center gap-3 py-2.5">
-              <Avatar name={item.display_name ?? '?'} url={item.avatar_url ?? null} size="md" />
+              <Avatar userId={item.userId} name={item.display_name ?? '?'} url={item.avatar_url ?? null} size="md" />
               <View className="flex-1 min-w-0">
-                <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
+                <Text className="text-white text-base font-sans-medium" numberOfLines={1} onPress={friendCardPress(item.userId)} accessibilityRole="button">
                   {item.display_name}
                 </Text>
                 <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>
@@ -362,9 +363,9 @@ export default function FriendsScreen() {
               onPress={() => showFriendActions(item)}
               className="flex-row items-center gap-3 py-2.5 active:opacity-70"
             >
-              <Avatar name={item.display_name ?? '?'} url={item.avatar_url ?? null} size="md" />
+              <Avatar userId={item.userId} name={item.display_name ?? '?'} url={item.avatar_url ?? null} size="md" />
               <View className="flex-1 min-w-0">
-                <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
+                <Text className="text-white text-base font-sans-medium" numberOfLines={1} onPress={friendCardPress(item.userId)} accessibilityRole="button">
                   {item.display_name}
                 </Text>
                 <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>

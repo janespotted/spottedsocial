@@ -1,3 +1,4 @@
+import { openFriendCard, friendCardPress } from '@/lib/friend-card';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { withholdLivePreview } from '@/lib/live-preview';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -55,6 +56,7 @@ interface SharedPostData {
   image_url: string | null;
   venue_name: string | null;
   author_name: string;
+  author_id: string;
 }
 
 interface GroupInfo {
@@ -367,6 +369,7 @@ export default function ThreadScreen() {
         ]);
         const resolved = (posts ?? []).map(p => ({
           id: p.id, text: p.text, venue_name: p.venue_name,
+          author_id: p.user_id,
           author_name: profileMap.get(p.user_id)?.display_name ?? 'Someone',
           image_url: isMux(p) ? posters.get(p.mux_playback_id!) ?? null : p.image_url ? images.get(p.image_url) ?? null : null,
         }));
@@ -670,7 +673,7 @@ export default function ThreadScreen() {
           <SymbolView name="chevron.left" size={22} tintColor="rgba(255,255,255,0.6)" />
         </Pressable>
         <Pressable
-          onPress={groupInfo ? showGroupOptions : undefined}
+          onPress={groupInfo ? showGroupOptions : friendCardPress(otherMember?.user_id, userId)}
           className="flex-1 flex-row items-center gap-3"
         >
           {groupInfo && !headerAvatar ? (
@@ -798,6 +801,7 @@ export default function ThreadScreen() {
                       kind={pointer.kind}
                       invite={invites.get(inviteId)}
                       isMine={isMine}
+                      onOpenPerson={() => openFriendCard(isMine ? invites.get(inviteId)?.receiver_id ?? otherMember?.user_id ?? '' : item.sender_id, userId)}
                       otherFirstName={otherName?.split(' ')[0] || (isMine ? 'them' : 'Someone')}
                       createdAt={item.created_at}
                       busy={responding.has(inviteId)}
@@ -810,6 +814,7 @@ export default function ThreadScreen() {
               <View className={`flex-row items-end gap-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
                 {!isMine ? (
                   <Avatar
+                    userId={item.sender_id}
                     name={sender?.display_name ?? otherMember?.display_name ?? '?'}
                     url={sender?.avatar_url ?? otherMember?.avatar_url ?? null}
                     size="sm"
@@ -817,7 +822,7 @@ export default function ThreadScreen() {
                 ) : null}
                 <View className="max-w-[75%]">
                   {groupInfo && !isMine && sender ? (
-                    <Text className="text-white/50 text-xs font-sans mb-1 ml-1">
+                    <Text className="text-white/50 text-xs font-sans mb-1 ml-1" onPress={friendCardPress(item.sender_id, userId)} accessibilityRole="button">
                       {sender.display_name.split(' ')[0]}
                     </Text>
                   ) : null}
@@ -838,7 +843,7 @@ export default function ThreadScreen() {
                           />
                         ) : null}
                         <View className="px-3 py-2">
-                          <Text className="text-white text-xs font-sans-semibold mb-0.5">
+                          <Text className="text-white text-xs font-sans-semibold mb-0.5" onPress={friendCardPress(sharedPost.author_id, userId)} accessibilityRole="button">
                             {sharedPost.author_name}
                           </Text>
                           {sharedPost.text ? (

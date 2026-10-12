@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -408,10 +409,10 @@ function PeopleChapter({ recap, when }: { recap: NightRecap; when: SharedValue<n
             className={`flex-row items-center gap-3 py-3.5 ${i > 0 ? 'border-t border-white/10' : ''}`}
           >
             <View className="rounded-full border-2" style={{ borderColor: '#9273A5' }}>
-              <Avatar name={person.display_name} url={person.avatar_url} size="md" />
+              <Avatar userId={person.friend_id} name={person.display_name} url={person.avatar_url} size="md" />
             </View>
             <View className="flex-1 min-w-0">
-              <Text className="text-white text-[15px] font-sans-medium" numberOfLines={1}>
+              <Text className="text-white text-[15px] font-sans-medium" numberOfLines={1} onPress={friendCardPress(person.friend_id)} accessibilityRole="button">
                 {person.display_name}
               </Text>
               <Text className="text-white/60 text-xs font-sans mt-0.5" numberOfLines={1}>

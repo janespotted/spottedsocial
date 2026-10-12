@@ -1,3 +1,4 @@
+import { openFriendCard, friendCardPress } from '@/lib/friend-card';
 import { withholdLivePreview } from '@/lib/live-preview';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { getNightKey } from '@/lib/tonight';
@@ -113,7 +114,7 @@ function WhosHere({ friends, planning }: { friends: FriendAtVenue[]; planning: F
         <View className="flex-row -space-x-3">
           {visible.map((friend) => (
             <View key={friend.id} className="rounded-full border-2 border-[#0d0a18]">
-              <Avatar name={friend.display_name} url={friend.avatar_url} size="md" />
+              <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="md" />
             </View>
           ))}
           {remaining > 0 ? (
@@ -127,7 +128,7 @@ function WhosHere({ friends, planning }: { friends: FriendAtVenue[]; planning: F
             {count} {count === 1 ? 'friend is' : 'friends are'} here
           </Text>
           <Text className="text-white/60 text-xs font-sans" numberOfLines={expanded ? undefined : 1}>
-            {namesLine(friends)}
+            {friends.slice(0, 3).map((friend, i) => <Text key={friend.id} onPress={friendCardPress(friend.id)} accessibilityRole="button">{i ? ', ' : ''}{friend.display_name.split(' ')[0]}</Text>)}{friends.length > 3 ? ` and ${friends.length - 3} others` : ''}
           </Text>
         </View>
         <SymbolView name={expanded ? 'chevron.up' : 'chevron.down'} size={12} tintColor="rgba(255,255,255,0.4)" />
@@ -136,8 +137,8 @@ function WhosHere({ friends, planning }: { friends: FriendAtVenue[]; planning: F
         <View className="gap-1.5 pt-1 border-t border-white/10">
           {friends.map((friend) => (
             <View key={friend.id} className="flex-row items-center gap-2 pt-1.5">
-              <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
-              <Text className="text-white text-sm font-sans">{friend.display_name}</Text>
+              <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
+              <Text className="text-white text-sm font-sans" onPress={friendCardPress(friend.id)} accessibilityRole="button">{friend.display_name}</Text>
             </View>
           ))}
         </View>
@@ -158,7 +159,7 @@ function PlanningRow({ friends }: { friends: FriendAtVenue[] }) {
     <View className="flex-row items-center gap-3">
       <View className="flex-row -space-x-2">
         {visible.map((friend) => (
-          <Avatar key={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
+          <Avatar key={friend.id} userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
         ))}
       </View>
       <Text className="text-sm text-white/60 font-sans">
@@ -178,9 +179,9 @@ export default function VenueScreen() {
   const { data: friendIds } = useFriendIds(session?.user.id);
   const queryClient = useQueryClient();
   const { height: windowHeight } = useWindowDimensions();
-  // Open by default: hours, events and Nearby spots are the reason to
-  // open a venue, and the sheet sizes to its content either way.
-  const [moreInfoOpen, setMoreInfoOpen] = useState(true);
+  // Each venue starts compact, including when a Nearby spot reuses this route.
+  const [moreInfoOpen, setMoreInfoOpen] = useState(false);
+  useEffect(() => setMoreInfoOpen(false), [venueId]);
   // Keyed by venueId so Nearby spots swaps retry the new venue's photo
   const [photoFailedFor, setPhotoFailedFor] = useState<string | null>(null);
   const photoFailed = photoFailedFor === venueId;
@@ -579,9 +580,9 @@ export default function VenueScreen() {
                       >
                         {selected ? <SymbolView name="checkmark" size={11} tintColor="#000000" weight="bold" /> : null}
                       </View>
-                      <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+                      <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
                       <View className="flex-1 min-w-0">
-                        <Text className="text-white text-sm font-sans-medium" numberOfLines={1}>
+                        <Text className="text-white text-sm font-sans-medium" numberOfLines={1} onPress={friendCardPress(friend.id)} accessibilityRole="button">
                           {friend.display_name}
                         </Text>
                         <Text className="text-xs font-sans" style={{ color: friend.lineColor }} numberOfLines={1}>
@@ -621,9 +622,8 @@ export default function VenueScreen() {
 
   // The sheet is sized to this content (fitToContents). A ScrollView as the
   // root child breaks that measurement on iOS — the sheet opens tall with the
-  // content pinned to its bottom — so the card is a plain View and only the
-  // expandable More Info section scrolls, inside a bounded height (the same
-  // nested pattern the check-in sheet uses).
+  // content pinned to its bottom — so the card and collapsed More Info are plain
+  // content-sized Views.
   return (
     <View className="bg-[#0d0a18]">
       <View className="pb-safe-offset-6">
@@ -799,7 +799,7 @@ export default function VenueScreen() {
             </Pressable>
           </View>
 
-          {/* More Info — open by default */}
+          {/* More Info — collapsed on every new venue */}
           <Pressable
             onPress={() => setMoreInfoOpen((v) => !v)}
             className="flex-row items-center justify-between py-2"

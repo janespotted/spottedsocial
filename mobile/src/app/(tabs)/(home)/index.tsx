@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -81,10 +82,10 @@ function OutTonightCard({
           className="flex-row items-center gap-3 p-2.5 rounded-xl bg-white/5"
         >
           <View className="rounded-full border-2 border-[#d4ff00]">
-            <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+            <Avatar userId={friend.user_id} name={friend.display_name} url={friend.avatar_url} size="sm" />
           </View>
           <View className="flex-1 min-w-0">
-            <Text className="text-white font-sans-medium text-sm" numberOfLines={1}>
+            <Text className="text-white font-sans-medium text-sm" numberOfLines={1} onPress={friendCardPress(friend.user_id)} accessibilityRole="button">
               {friend.display_name}
             </Text>
             <Text className="text-[#d4ff00] text-xs font-sans" numberOfLines={1}>
@@ -119,10 +120,10 @@ function PlanningTonightCard({ friends }: { friends: FriendNightStatus[] }) {
           className="flex-row items-center gap-3 p-2.5 rounded-xl bg-white/5"
         >
           <View className="rounded-full border-2 border-white/20">
-            <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+            <Avatar userId={friend.user_id} name={friend.display_name} url={friend.avatar_url} size="sm" />
           </View>
           <View className="flex-1 min-w-0">
-            <Text className="text-white font-sans-medium text-sm" numberOfLines={1}>
+            <Text className="text-white font-sans-medium text-sm" numberOfLines={1} onPress={friendCardPress(friend.user_id)} accessibilityRole="button">
               {friend.display_name}
             </Text>
             <Text className="text-white/50 text-xs font-sans" numberOfLines={1}>
@@ -166,11 +167,6 @@ function EmptyFeed({
       </View> : null}
       <HomePlansPreview />
       <ForTonight />
-      {friendCount > 0 ? <View className="px-4"><Pressable accessibilityRole="button" accessibilityLabel="Post to tonight’s feed" onPress={() => router.push('/create-post')} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 flex-row items-center gap-3 active:opacity-70">
-        <SymbolView name="camera" size={21} tintColor="rgba(255,255,255,0.7)" />
-        <Text className="text-white/70 text-sm font-sans flex-1">Start tonight’s feed</Text>
-        <Text style={{ color: NEON }} className="font-sans-semibold text-sm">Post</Text>
-      </Pressable></View> : null}
     </View>
   );
 }
@@ -442,7 +438,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
           >
             {isPlanning && outFriends.length > 0 ? (
               <View className="px-4 pt-4">
-                <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
+                <FriendsOutBanner count={outFriends.length} friends={outFriends} />
               </View>
             ) : null}
           </View>
@@ -488,11 +484,11 @@ function NewsfeedScreen({ active }: { active: boolean }) {
         )}
       />
 
-      {/* "N out · M TBD" roster pill — lower left, as in the original build
+      {/* "N out · M TBD" roster pill — lower right, clear of the always-visible Post button
           (addendum v3 §11.1); the roster used to live only in the empty
           state, so it vanished the moment one post existed */}
       {!keyboardOpen ? (
-        <View className="absolute bottom-safe-offset-16 left-4">
+        <View className="absolute bottom-safe-offset-16 right-4">
           <FriendsOutPill />
         </View>
       ) : null}
@@ -501,19 +497,19 @@ function NewsfeedScreen({ active }: { active: boolean }) {
           (49pt) plus the home indicator, with a visible gap above it.
           Home is the Newsfeed only now, so the FAB is always "Post"; the
           Plan FAB moved to the Chat tab's Plans view. */}
-      {keyboardOpen || (feed.posts.length === 0 && !feed.isError && (!friendsQuery.isSuccess || (friendIds?.length ?? 0) > 0)) ? null : (
+      {keyboardOpen ? null : (
         <Pressable
           onPress={() => router.push('/create-post')}
           accessibilityRole="button"
           accessibilityLabel="New post"
-          className="absolute bottom-safe-offset-16 right-4 h-14 pl-4 pr-5 rounded-full flex-row items-center gap-2 active:opacity-90"
+          className="absolute bottom-safe-offset-16 left-4 h-14 pl-4 pr-5 rounded-full flex-row items-center gap-2 active:opacity-90"
           style={{
-            backgroundColor: feed.posts.length ? NEON : 'rgba(255,255,255,0.08)',
-            boxShadow: feed.posts.length ? '0 4px 20px rgba(212, 255, 0, 0.2)' : undefined,
+            backgroundColor: NEON,
+            boxShadow: '0 4px 20px rgba(212, 255, 0, 0.2)',
           }}
         >
-          <SymbolView name="camera.fill" size={20} tintColor={feed.posts.length ? '#1a0f2e' : '#ffffff'} weight="semibold" />
-          <Text className={`text-[15px] font-sans-semibold ${feed.posts.length ? 'text-[#1a0f2e]' : 'text-white'}`}>Post</Text>
+          <SymbolView name="camera.fill" size={20} tintColor="#1a0f2e" weight="semibold" />
+          <Text className="text-[15px] font-sans-semibold text-[#1a0f2e]">Post</Text>
         </Pressable>
       )}
     </View>

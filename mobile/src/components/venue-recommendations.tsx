@@ -3,16 +3,17 @@ import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-na
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Image } from './styled';
+import { VenueSharedVisits } from './venue-shared-visits';
 import { ErrorState } from './empty-state';
 import { useVenueRecommendations } from '@/hooks/use-venue-recommendations';
 import { getVenuePhotoUrl } from '@/lib/venues';
 import { tonightRecommendations, type RecommendedVenue } from '@/lib/venue-recommendations';
-import { NEON, INK_LIGHT, MIST } from '@/lib/theme';
+import { INK_LIGHT, MIST } from '@/lib/theme';
 
 export function RecommendedVenueCard({ venue, compact = false }: { venue: RecommendedVenue; compact?: boolean }) {
   const [photoFailed, setPhotoFailed] = useState(false);
   useEffect(() => setPhotoFailed(false), [venue.id]);
-  return <Pressable accessibilityRole="button" accessibilityLabel={`${venue.name}. ${venue.pick.tags.join(', ')}. ${venue.pick.reason} Open venue`}
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${venue.name}. ${venue.pick.tags.join(', ')}. Open venue`}
     onPress={() => router.push({ pathname: '/venue', params: { venueId: venue.id } })}
     className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] active:opacity-80">
     <View style={{ height: compact ? 120 : 155, backgroundColor: INK_LIGHT }} className="items-center justify-center overflow-hidden">
@@ -23,8 +24,7 @@ export function RecommendedVenueCard({ venue, compact = false }: { venue: Recomm
     <View className="p-3.5 gap-1.5">
       <Text className="text-white text-base font-sans-semibold">{venue.name}</Text>
       <Text className="text-white/60 text-xs font-sans">{venue.pick.neighborhood} · {venue.pick.tags.join(' · ')}</Text>
-      {!compact ? <Text className="text-white/80 text-sm font-sans mt-1">{venue.pick.reason}</Text> : null}
-      {venue.relevance ? <Text style={{ color: NEON }} className="text-xs font-sans mt-1">{venue.relevance}</Text> : null}
+      <VenueSharedVisits venueId={venue.id} compact />
     </View>
   </Pressable>;
 }
