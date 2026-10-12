@@ -55,10 +55,10 @@ function OutTonightCard({
 }: {
   friends: FriendNightStatus[];
   onMeetUp: (friend: FriendNightStatus) => void;
-  /** Viewer said "No" tonight: names only, no venues, with the way back in. */
+  /** Never render cached identities for a viewer who chose No. */
   venuesWithheld?: boolean;
 }) {
-  if (friends.length === 0) return null;
+  if (venuesWithheld || friends.length === 0) return null;
   return (
     <View className="rounded-2xl bg-[#1a0a2e]/80 border border-white/10 p-4 gap-3">
       <View className="flex-row items-center gap-2">
@@ -164,7 +164,7 @@ function EmptyFeed({
 }) {
   return (
     <View className="py-4 gap-6">
-      {friendCount === 0 ? <View className="px-4"><EmptyState compact icon="person.2" title="Find your people" body="Your friends’ nights start here." actions={addFriendsActions()} /></View> : outFriends.length > 0 || planningFriends.length > 0 ? <View className="px-4 gap-4">
+      {friendCount === 0 ? <View className="px-4"><EmptyState compact icon="person.2" title="Find your people" body="Your friends’ nights start here." actions={addFriendsActions()} /></View> : !venuesWithheld && (outFriends.length > 0 || planningFriends.length > 0) ? <View className="px-4 gap-4">
         <OutTonightCard friends={outFriends} onMeetUp={onMeetUp} venuesWithheld={venuesWithheld} />
         <PlanningTonightCard friends={planningFriends} />
       </View> : null}

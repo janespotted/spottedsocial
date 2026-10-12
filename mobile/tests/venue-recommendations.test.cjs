@@ -44,9 +44,10 @@ test('fetch reads only reviewed public ids; absent picks avoid queries and failu
 test('empty Home leads with friends, then recommendations, without a duplicate inline Post action',()=>{
  const jsx={jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})};
  const fn=extract('app/(tabs)/(home)/index.tsx','EmptyFeed',{require:()=>jsx,View:'View',Text:'Text',Pressable:'Pressable',SymbolView:'SymbolView',EmptyState:'EmptyState',OutTonightCard:'OutTonightCard',PlanningTonightCard:'PlanningTonightCard',ForTonight:'ForTonight',HomePlansPreview:'HomePlansPreview',NEON:'lime',addFriendsActions:()=>[{label:'Find friends'}],router:{push:()=>{}}});
- for(const friendCount of [0,3]){const nodes=[];const visit=n=>{if(Array.isArray(n))return n.forEach(visit);if(n&&typeof n==='object'){nodes.push(n);visit(n.props?.children)}};visit(fn({friendCount,outFriends:friendCount ? [{user_id:"friend"}] : [],planningFriends:[],venuesWithheld:true,onMeetUp:()=>{}}));
+ for(const [friendCount,venuesWithheld] of [[0,true],[3,false],[3,true]]){const nodes=[];const visit=n=>{if(Array.isArray(n))return n.forEach(visit);if(n&&typeof n==='object'){nodes.push(n);visit(n.props?.children)}};visit(fn({friendCount,outFriends:friendCount ? [{user_id:"friend"}] : [],planningFriends:[],venuesWithheld,onMeetUp:()=>{}}));
  const types=nodes.map(n=>n.type);assert.ok(types.indexOf('HomePlansPreview')<types.indexOf('ForTonight'));assert.equal(types.filter(t=>t==='ForTonight').length,1);
  if(!friendCount){assert.ok(types.indexOf('EmptyState')<types.indexOf('ForTonight'));assert.equal(types.includes('OutTonightCard'),false)}
- else{assert.ok(types.indexOf('OutTonightCard')<types.indexOf('ForTonight'));assert.equal(nodes.find(n=>n.type==='OutTonightCard').props.venuesWithheld,true);assert.equal(nodes.some(n=>n.props?.children==='Start tonight’s feed'),false)}
+ else if(venuesWithheld){assert.equal(types.includes('OutTonightCard'),false);assert.equal(types.includes('PlanningTonightCard'),false)}
+ else{assert.ok(types.indexOf('OutTonightCard')<types.indexOf('ForTonight'));assert.equal(nodes.find(n=>n.type==='OutTonightCard').props.venuesWithheld,false);assert.equal(nodes.some(n=>n.props?.children==='Start tonight’s feed'),false)}
  }
 });
