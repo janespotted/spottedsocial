@@ -8,14 +8,15 @@ export function PlanningPool({ preview, onQueue }: { preview: boolean; onQueue: 
  const [pool,setPool]=useState<Pool|null>(null),[search,setSearch]=useState(''),[status,setStatus]=useState('all'),[offset,setOffset]=useState(0);
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
  const [source,setSource]=useState(''),[rows,setRows]=useState<PlanningPerson[]>([]),[detail,setDetail]=useState<Prospect|null>(null),[phone,setPhone]=useState('');
- const locked=useRef(false);
+ const locked=useRef(false),dialog=useRef<HTMLDialogElement>(null);
+ useEffect(()=>{ if(detail&&!dialog.current?.open)dialog.current?.showModal(); },[detail?.id]);
  async function call(action:string,data:Record<string,unknown>={}) {
   if(preview)throw Error('Use the connected workspace to manage your planning pool.');
   const {data:result,error}=await (supabase as any).rpc('launch_pool',{p_action:action,p_data:data});
   if(error)throw Error(error.message);return result;
  }
  useEffect(()=>{
-  let current=true; setPool(null);
+  let current=true;
   const timer=setTimeout(()=>{void call('list',{search,status,offset}).then(x=>{if(current)setPool(x)}).catch(e=>{if(current)setError(e.message)});},180);
   return()=>{current=false;clearTimeout(timer)};
  },[search,status,offset,revision]);
@@ -44,6 +45,6 @@ export function PlanningPool({ preview, onQueue }: { preview: boolean; onQueue: 
    {pool&&!pool.rows.length&&<p className="empty">{search||status!=='all'?'No matches. Try another filter.':'Add a guest list to start your planning pool.'}</p>}
    <div className="pagination"><button className="secondary" disabled={offset===0||busy} onClick={()=>setOffset(x=>Math.max(0,x-100))}>Previous</button><span>{pool?.total?`${offset+1}–${Math.min(offset+100,pool.total)} of ${pool.total}`:'0 people'}</span><button className="secondary" disabled={!pool||offset+100>=pool.total||busy} onClick={()=>setOffset(x=>x+100)}>Next</button></div>
   </section>
-  {detail&&<section className="panel pool-detail" aria-label="Planning contact details"><div className="section-title"><div><p className="eyebrow">PLANNING CONTACT</p><h2>{detail.name}</h2></div><button className="quiet" onClick={()=>setDetail(null)}>Close details</button></div><p>Event RSVP: {detail.event_status||'—'} · {detail.source}</p>{detail.invited_by&&<p>Invited to the event by {detail.invited_by}</p>}{detail.plus_one_of&&<p>Plus one of {detail.plus_one_of}</p>}<form onSubmit={e=>{e.preventDefault();void run(async()=>{const normalized=normalizePhone(phone);if(!normalized)throw Error('Enter a valid phone number; include the country code outside the US.');await call('update',{id:detail.id,phone:normalized});setDetail({...detail,phone:normalized});setPhone(normalized);setNotice('Phone saved. No access or invitation sent.')})}}><label>Phone number<input type="tel" autoComplete="off" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+1 212 555 0123" required disabled={busy||!!detail.guest_id}/></label><button disabled={busy||!!detail.guest_id}>Save phone</button></form><button className="secondary" disabled={busy||!detail.phone||!!detail.guest_id} onClick={()=>void run(async()=>{const r=await call('queue',{id:detail.id});setDetail({...detail,guest_id:r.guestId});setNotice('Added to the invitation queue. Open Next up to assign a draft wave. No invitation sent.')})}>{detail.guest_id?'In invitation queue':'Add to invitation queue'}</button></section>}
+  {detail&&<dialog ref={dialog} className="pool-dialog" aria-label="Planning contact details" onCancel={e=>{if(busy)e.preventDefault()}} onClose={()=>setDetail(null)}><section className="panel pool-detail"><div className="section-title"><div><p className="eyebrow">PLANNING CONTACT</p><h2>{detail.name}</h2></div><button className="quiet" disabled={busy} onClick={()=>dialog.current?.close()}>Close details</button></div><p>Event RSVP: {detail.event_status||'—'} · {detail.source}</p>{detail.invited_by&&<p>Invited to the event by {detail.invited_by}</p>}{detail.plus_one_of&&<p>Plus one of {detail.plus_one_of}</p>}<form onSubmit={e=>{e.preventDefault();void run(async()=>{const normalized=normalizePhone(phone);if(!normalized)throw Error('Enter a valid phone number; include the country code outside the US.');await call('update',{id:detail.id,phone:normalized});setDetail({...detail,phone:normalized});setPhone(normalized);setNotice('Phone saved. No access or invitation sent.')})}}><label>Phone number<input type="tel" autoComplete="off" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+1 212 555 0123" required disabled={busy||!!detail.guest_id}/></label><button disabled={busy||!!detail.guest_id}>Save phone</button></form><button className="secondary" disabled={busy||!detail.phone||!!detail.guest_id} onClick={()=>void run(async()=>{const r=await call('queue',{id:detail.id});setDetail({...detail,guest_id:r.guestId});setNotice('Added to the invitation queue. Open Next up to assign a draft wave. No invitation sent.')})}>{detail.guest_id?'In invitation queue':'Add to invitation queue'}</button></section></dialog>}
  </div>;
 }
