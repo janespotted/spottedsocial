@@ -54,6 +54,13 @@ function LaunchSetup() {
   }, [stage]);
   const errorView = error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" className="text-red-300 text-sm leading-5 mt-4 mb-4">{error}</Text> : null;
 
+  if (stage === 'phone') return <LaunchShell key="phone" title="Your number. Your invitation." subtitle="Verify the number you were invited on to unlock your place.">
+    <PhoneVerifyForm onVerified={() => { refresh(); }} />
+    {errorView}
+    <Text className="text-white/60 text-sm leading-5 mt-6">Apple stays connected to this account. Your verified number checks your invitation.</Text>
+    <Pressable className="py-5" onPress={() => void supabase.auth.signOut()}><Text className="text-white/70 text-center">Already have an account? Sign in with your phone</Text></Pressable>
+  </LaunchShell>;
+
   if (stage === 'waiting') return <LaunchShell key="waiting" title="Your night is coming." subtitle="New York opens in small waves. Your invitation unlocks your place.">
     <View className="rounded-3xl bg-white/5 border border-white/10 p-6 mb-8 gap-3">
       <SymbolView name="sparkles" tintColor={NEON} size={28} />

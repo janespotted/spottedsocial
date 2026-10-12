@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 export interface LaunchState {
   admitted: boolean; profileSaved: boolean; complete: boolean; hasPhone: boolean;
   cityTester: boolean; waveAdmin: boolean;
+  phoneRequired?: boolean;
   profile: { name: string | null; username: string | null } | null;
   nominations: { slot: number; phone: string; activated: boolean }[];
 }
@@ -19,7 +20,9 @@ export async function launchRpc<T = LaunchState>(name: LaunchRpc, args?: Record<
   if (!data || data.error) throw new Error(data?.error || 'Could not save. Please try again.');
   return data;
 }
-export function launchStage(state: LaunchState): 'waiting' | 'profile' | 'nominate' | 'complete' {
+export function launchStage(state: LaunchState): 'phone' | 'waiting' | 'profile' | 'nominate' | 'complete' {
+  if (state.complete) return 'complete';
+  if (state.phoneRequired && !state.hasPhone) return 'phone';
   if (!state.admitted) return 'waiting';
   if (!state.profileSaved) return 'profile';
   return state.complete ? 'complete' : 'nominate';

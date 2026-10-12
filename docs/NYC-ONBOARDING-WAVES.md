@@ -12,7 +12,7 @@ The migration introduces private membership, nomination, operator and wave table
 
 Phone numbers are normalized to E.164. A global unique constraint arbitrates concurrent nominations; per-member locks serialize the two slots. Failed eligibility checks consume a bounded hourly check allowance. Completion rechecks registered numbers and requires both saved slots. Only completed nominations can enter a wave. Nominations never create friendships, location consent, or outgoing messages.
 
-Wave activation is admin-only, serialized, bounded to the requested number (1–500), and idempotent by a request UUID persisted before activation, including across app restarts. Activation and notification delivery are separate: this implementation grants phone-bound admission, but does not send SMS. A verified phone can claim its activated nomination exactly once; forwarding a profile/QR link does not grant admission. Apple login remains available. Linking the invited phone is optional for Apple accounts; an operator can admit an Apple-only account after verifying its invitation separately. Phone-only deduplication cannot identify an existing Apple-only account with no linked phone.
+Wave activation is admin-only, serialized, bounded to the requested number (1–500), and idempotent by a request UUID persisted before activation, including across app restarts. Activation and notification delivery are separate: this implementation grants phone-bound admission, but does not send SMS. A verified phone can claim its activated nomination exactly once; forwarding a profile/QR link does not grant admission. Apple login remains available. Under invite-only admission, new Apple accounts must verify the invited phone on the same account; there is no Apple-only bypass. Previously completed accounts retain access. Phone-only deduplication cannot identify an existing Apple-only account with no linked phone.
 
 ## Internal city testing
 
@@ -24,7 +24,7 @@ Deploy the migration and updated `mux-create-upload` function with the new app v
 
 Wave gating defaults **off** so this migration does not silently switch production to closed admission. Mandatory profile/two-person completion still applies to newly created accounts. At the approved launch, enable `spotted_private.launch_settings.wave_gate` in a coordinated change. Provision Jane's exact authenticated user ID in `launch_operators` as city tester/wave admin through an operator-controlled database session, never a client-writable role or `user_metadata`. Admit the initial cohort explicitly in `launch_members` without setting `profile_saved_at` or `completed_at`; they must still complete both onboarding steps. Never bulk-grandfather accounts created after staging without reviewing them.
 
-The private app page Settings → Rollout waves displays pending and activated counts and activates the next batch after a concrete confirmation. It does not turn gating on or send invitations automatically. Delivery copy/provider configuration and production activation remain separate launch operations. The staged implementation is not a published TestFlight build.
+The browser Launch Center (`/launch-admin.html`) replaces blind batch activation with named, capacity-limited guest lists, invitation history, and status filters. See LAUNCH-CENTER.md for the current admin workflow, Apple phone verification, delivery configuration, and rollout requirements. Build 53 is published to internal TestFlight. Controlled admission remains off until the initial guest list and external installation link are ready.
 
 ## Validation
 

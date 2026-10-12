@@ -58,3 +58,12 @@ test('Wave write does not start when its recovery key cannot be persisted',async
  let calls=0;const wave=load('lib/launch-wave.ts',{'@react-native-async-storage/async-storage':{getItem:async()=>null,setItem:async()=>{throw Error('disk unavailable')}},'expo-crypto':{randomUUID:()=> '00000000-0000-4000-8000-000000000090'},'@/lib/launch':{launchRpc:async()=>{calls++}}});
  await assert.rejects(wave.activateWave('admin',100));assert.equal(calls,0);
 });
+
+test('Invited Apple users must verify a phone before the waiting/profile screens',()=>{
+ const base={admitted:false,profileSaved:false,complete:false,hasPhone:false,phoneRequired:true,nominations:[]};
+ assert.equal(api.launchStage(base),'phone');
+ assert.equal(api.launchStage({...base,admitted:true}),'phone');
+ assert.equal(api.launchStage({...base,hasPhone:true}),'waiting');
+ assert.equal(api.launchStage({...base,hasPhone:true,admitted:true}),'profile');
+ assert.equal(api.launchStage({...base,complete:true}),'complete');
+});

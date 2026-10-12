@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [react()],
+  build: { rollupOptions: { input: { app: path.resolve(__dirname, "index.html"), launchAdmin: path.resolve(__dirname, "launch-admin.html") } } },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
