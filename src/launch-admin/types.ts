@@ -49,9 +49,9 @@ export interface GuestPage {
   total: number;
 }
 export const stateLabels: Record<string, string> = {
-  queued: "Pending nomination",
+  queued: "Waiting for a wave",
   selected: "Selected",
-  ready: "Access open · not invited",
+  ready: "Not invited yet",
   invited: "Invited · not joined",
   started: "Started onboarding",
   joined: "Joined",

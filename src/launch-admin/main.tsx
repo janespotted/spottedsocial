@@ -68,9 +68,12 @@ function App() {
   const dialogRef = useRef<HTMLElement | null>(null);
   const identity = useRef<string | null>(null),
     generation = useRef(0),
+    snapshotRequest = useRef(0),
+    guestRequest = useRef(0),
     locked = useRef(false),
     requestId = useRef(crypto.randomUUID());
   const activeWave = snapshot?.waves.find((w) => w.id === wave);
+  const detailWave = snapshot?.waves.find((w) => w.id === detail?.wave_id);
   useEffect(() => {
     if (!modal && !detail) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -125,9 +128,11 @@ function App() {
       eventSeen = true;
       const changed = identity.current !== (s?.user.id || null);
       identity.current = s?.user.id || null;
-      generation.current++;
       setSession(s);
       if (changed || !s) {
+        // Token refresh and duplicate sign-in events must not cancel a read
+        // for the same person. Account changes invalidate every pending read.
+        generation.current++;
         setSnapshot(null);
         setPage({ rows: [], total: 0 });
         setDetail(null);
@@ -138,14 +143,16 @@ function App() {
   }, []);
   async function load() {
     const current = generation.current;
+    const request = ++snapshotRequest.current;
     const result = await api<Snapshot>("snapshot");
-    if (current === generation.current) {
+    if (current === generation.current && request === snapshotRequest.current) {
       setSnapshot(result);
       setInstallUrl(result.settings.installUrl || "");
     }
   }
   async function loadGuests() {
-    const current = ++generation.current;
+    const current = generation.current;
+    const request = ++guestRequest.current;
     if (preview) {
       const fixture = await import("./preview");
       const rows = fixture.guests.filter(
@@ -158,7 +165,8 @@ function App() {
               .toLowerCase()
               .includes(search.toLowerCase())),
       );
-      setPage({ rows, total: rows.length });
+      if (current === generation.current && request === guestRequest.current)
+        setPage({ rows, total: rows.length });
       return;
     }
     const result = await api<GuestPage>("guests", {
@@ -167,7 +175,8 @@ function App() {
       search,
       offset,
     });
-    if (current === generation.current) setPage(result);
+    if (current === generation.current && request === guestRequest.current)
+      setPage(result);
   }
   useEffect(() => {
     setError("");
@@ -853,8 +862,9 @@ function App() {
                 <dl>
                   <dt>Wave</dt>
                   <dd>
-                    {snapshot?.waves.find((w) => w.id === detail.wave_id)
-                      ?.name || "Not selected yet"}
+                    {detailWave
+                      ? `${detailWave.name} · ${detailWave.status}`
+                      : "Not selected yet"}
                   </dd>
                   <dt>Nominated by</dt>
                   <dd>{detail.nominator_name || "Hand-picked by you"}</dd>
@@ -878,136 +888,139 @@ function App() {
                         : "Not recorded"}
                   </dd>
                 </dl>
-                {["ready", "invited"].includes(detail.state) && (
-                  <>
-                    <h3>Send their invitation</h3>
-                    <p>
-                      Personal sharing works without an automated SMS sender.
-                      Copying a message does not mark it as sent.
-                    </p>
-                    <button
-                      disabled={!snapshot?.settings.installUrl}
-                      onClick={() =>
-                        void run(async () => {
-                          await navigator.clipboard.writeText(
-                            invitationText(snapshot!.settings.installUrl!),
-                          );
-                          setNotice(
-                            "Invitation copied. Mark it sent after you actually share it.",
-                          );
-                        })
-                      }
-                    >
-                      Copy invitation
-                    </button>
-                    <button
-                      className="secondary"
-                      disabled={busy}
-                      onClick={() =>
-                        void run(async () => {
-                          await mutate("manual_sent", { id: detail.id });
-                          setDetail(null);
-                          setNotice("Personal invitation recorded.");
-                        })
-                      }
-                    >
-                      I’ve personally sent this invitation
-                    </button>
-                    <h3>Automated SMS</h3>
-                    {!detail.consent_at && (
-                      <>
-                        <p>
-                          Record the recipient’s own request for a Spotted
-                          invitation text. A friend’s nomination isn’t
-                          permission.
-                        </p>
-                        <label>
-                          How and when they opted in
-                          <textarea
-                            value={consent}
-                            onChange={(e) => setConsent(e.target.value)}
-                            placeholder="Requested a launch text via our signup form today…"
-                          />
-                        </label>
-                        <button
-                          className="secondary"
-                          disabled={
-                            busy ||
-                            consent.trim().length < 10 ||
-                            !!detail.suppressed_at
-                          }
-                          onClick={() =>
-                            void run(async () => {
-                              await mutate("consent", {
-                                id: detail.id,
-                                at: new Date(Date.now() - 1000).toISOString(),
-                                note: consent,
-                              });
-                              setDetail(null);
-                            })
-                          }
-                        >
-                          Record recipient permission
-                        </button>
-                      </>
-                    )}
-                    <button
-                      disabled={
-                        busy ||
-                        !detail.consent_at ||
-                        !snapshot?.settings.smsEnabled ||
-                        !!detail.suppressed_at
-                      }
-                      onClick={() => {
-                        if (
-                          confirm(
-                            `Queue one Spotted invitation text to ${detail.phone}?`,
-                          )
-                        )
+                {detailWave?.status === "open" &&
+                  ["ready", "invited"].includes(detail.state) && (
+                    <>
+                      <h3>Send their invitation</h3>
+                      <p>
+                        Personal sharing works without an automated SMS sender.
+                        Copying a message does not mark it as sent.
+                      </p>
+                      <button
+                        disabled={!snapshot?.settings.installUrl}
+                        onClick={() =>
                           void run(async () => {
-                            await mutate("queue_sms", { id: detail.id });
-                            const { error } = await supabase.functions.invoke(
-                              "launch-send-invitations",
-                              { body: {} },
+                            await navigator.clipboard.writeText(
+                              invitationText(snapshot!.settings.installUrl!),
                             );
-                            if (error)
-                              throw Error(
-                                "Invitation queued; sender did not confirm. Refresh to check before sending again.",
-                              );
-                            await loadGuests();
-                            setDetail(null);
                             setNotice(
-                              "Sender run finished. Check delivery status for the result.",
+                              "Invitation copied. Mark it sent after you actually share it.",
                             );
-                          });
-                      }}
-                    >
-                      Send one invitation SMS
-                    </button>
-                    {!snapshot?.settings.smsEnabled && (
-                      <small>
-                        Automated sender is not enabled. Personal sharing is
-                        available once the app link is set.
-                      </small>
-                    )}
-                    <button
-                      className="danger quiet"
-                      disabled={busy}
-                      onClick={() => {
-                        if (
-                          confirm(
-                            "Revoke this unused invitation? It will remain in the wave history.",
-                          )
-                        )
+                          })
+                        }
+                      >
+                        Copy invitation
+                      </button>
+                      <button
+                        className="secondary"
+                        disabled={busy}
+                        onClick={() =>
                           void run(async () => {
-                            await mutate("revoke", { id: detail.id });
+                            await mutate("manual_sent", { id: detail.id });
                             setDetail(null);
-                          });
-                      }}
-                    >
-                      Revoke unused invitation
-                    </button>
-                  </>
+                            setNotice("Personal invitation recorded.");
+                          })
+                        }
+                      >
+                        I’ve personally sent this invitation
+                      </button>
+                      <h3>Automated SMS</h3>
+                      {!detail.consent_at && (
+                        <>
+                          <p>
+                            Record the recipient’s own request for a Spotted
+                            invitation text. A friend’s nomination isn’t
+                            permission.
+                          </p>
+                          <label>
+                            How and when they opted in
+                            <textarea
+                              value={consent}
+                              onChange={(e) => setConsent(e.target.value)}
+                              placeholder="Requested a launch text via our signup form today…"
+                            />
+                          </label>
+                          <button
+                            className="secondary"
+                            disabled={
+                              busy ||
+                              consent.trim().length < 10 ||
+                              !!detail.suppressed_at
+                            }
+                            onClick={() =>
+                              void run(async () => {
+                                await mutate("consent", {
+                                  id: detail.id,
+                                  at: new Date(Date.now() - 1000).toISOString(),
+                                  note: consent,
+                                });
+                                setDetail(null);
+                              })
+                            }
+                          >
+                            Record recipient permission
+                          </button>
+                        </>
+                      )}
+                      <button
+                        disabled={
+                          busy ||
+                          !detail.consent_at ||
+                          !snapshot?.settings.smsEnabled ||
+                          !!detail.suppressed_at
+                        }
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Queue one Spotted invitation text to ${detail.phone}?`,
+                            )
+                          )
+                            void run(async () => {
+                              await mutate("queue_sms", { id: detail.id });
+                              const { error } = await supabase.functions.invoke(
+                                "launch-send-invitations",
+                                { body: {} },
+                              );
+                              if (error)
+                                throw Error(
+                                  "Invitation queued; sender did not confirm. Refresh to check before sending again.",
+                                );
+                              await loadGuests();
+                              setDetail(null);
+                              setNotice(
+                                "Sender run finished. Check delivery status for the result.",
+                              );
+                            });
+                        }}
+                      >
+                        Send one invitation SMS
+                      </button>
+                      {!snapshot?.settings.smsEnabled && (
+                        <small>
+                          Automated sender is not enabled. Personal sharing is
+                          available once the app link is set.
+                        </small>
+                      )}
+                    </>
+                  )}
+                {["ready", "invited"].includes(detail.state) && (
+                  <button
+                    className="danger quiet"
+                    disabled={busy}
+                    onClick={() => {
+                      if (
+                        confirm(
+                          "Revoke this unused invitation? It will remain in the wave history.",
+                        )
+                      )
+                        void run(async () => {
+                          await mutate("revoke", { id: detail.id });
+                          setDetail(null);
+                        });
+                    }}
+                  >
+                    Revoke unused invitation
+                  </button>
                 )}
               </>
             ) : modal === "wave" ? (
