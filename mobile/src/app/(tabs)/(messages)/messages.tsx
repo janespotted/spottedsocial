@@ -1,3 +1,5 @@
+import { useWindowDimensions } from 'react-native';
+import { TabHeaderRow } from '@/components/tab-header-row';
 import { CaptureGuard } from '@/components/capture-guard';
 import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
 import { friendCardPress } from '@/lib/friend-card';
@@ -108,6 +110,7 @@ function RowSkeleton() {
 }
 
 export default function MessagesScreen() {
+  const { fontScale } = useWindowDimensions();
   useNoKeyboardOnFocus(); // back from a thread must never leave the keyboard up
   const { session } = useSession();
   const { unreadCount } = useNotifications();
@@ -194,26 +197,10 @@ export default function MessagesScreen() {
   };
 
   return (
-    <CaptureGuard name="dm-inbox" enabled={activeTab === 'messages'}><View className="flex-1">
+    <CaptureGuard name="dm-inbox" enabled={activeTab === 'messages'}><View key={fontScale} className="flex-1">
       {/* Header — static, web PageHeader parity */}
       <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
-        <View className="flex-row items-center justify-between px-4 min-h-11">
-          <View className="flex-row items-center gap-2 flex-1 min-w-0">
-            <Text
-              className="text-white font-sans-light"
-              numberOfLines={1}
-              style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
-            >
-              Spotted
-            </Text>
-            {city ? (
-              <View className="px-2.5 py-1 rounded-full bg-white/10">
-                <Text className="text-white/70 text-xs font-sans-medium uppercase">{city}</Text>
-              </View>
-            ) : null}
-          </View>
-          <HeaderActions unreadCount={unreadCount} />
-        </View>
+        <TabHeaderRow city={city} unreadCount={unreadCount} />
         <ModeCountdownStrip />
 
         {/* Plans and direct/group messages. */}

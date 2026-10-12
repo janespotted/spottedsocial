@@ -1,3 +1,5 @@
+import { useWindowDimensions } from 'react-native';
+import { TabHeaderRow } from '@/components/tab-header-row';
 import { CaptureGuard } from '@/components/capture-guard';
 import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
 import { CompactRecapEntry } from '@/components/compact-recap-entry';
@@ -201,25 +203,7 @@ function HomeHeader({
         borderBottomColor: 'rgba(255, 255, 255, 0.06)',
       }}
     >
-      <View className={`flex-row items-center justify-between px-4 min-h-11 ${children ? '' : 'mb-3'}`}>
-        {/* Wordmark is anchored: same size on every tab, never animates */}
-        <Text
-          className="text-white font-sans-light"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
-          style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
-        >
-          Spotted
-        </Text>
-        <View className="flex-row items-center gap-2">
-          {city ? (
-            <View className="px-2.5 py-1 rounded-full bg-white/10">
-              <Text className="text-white/70 text-xs font-sans-medium uppercase">{city}</Text>
-            </View>
-          ) : null}
-          <HeaderActions unreadCount={unreadCount} />
-        </View>
-      </View>
+      <TabHeaderRow city={city} unreadCount={unreadCount} />
       {children}
     </View>
   );
@@ -247,6 +231,7 @@ function HomeScreenContent() {
 
 /** The live feed, its roster pill and the Post button. `active` = its tab is showing. */
 function NewsfeedScreen({ active }: { active: boolean }) {
+  const { fontScale } = useWindowDimensions();
   useNoKeyboardOnFocus(); // back from comments / search must never leave the keyboard up
   const { session } = useSession();
   const feed = useFeed();
@@ -365,7 +350,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
     : (reelPostId ?? (isFocused || postDetailActive ? viewportVideoId : null));
 
   return (
-    <View className="flex-1">
+    <View key={fontScale} className="flex-1">
       <LegendList
         ref={listRef}
         data={feed.posts}

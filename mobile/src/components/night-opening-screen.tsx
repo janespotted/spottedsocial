@@ -1,9 +1,10 @@
+import { useWindowDimensions } from 'react-native';
+import { TabHeaderRow } from '@/components/tab-header-row';
 import { ModeCountdownStrip } from './mode-countdown-strip';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
-import { HeaderActions } from '@/components/header-actions';
 import { VenueDiscovery } from '@/components/venue-discovery';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { useNotifications } from '@/hooks/use-notifications';
@@ -20,27 +21,13 @@ const ICONS: Record<OpeningKind, SFSymbol> = { map: 'map', leaderboard: 'chart.b
  * queries, realtime channels or location work start.
  */
 export function DayTabScreen({ kind }: { kind: Exclude<OpeningKind, 'newsfeed'> }) {
+  const { fontScale } = useWindowDimensions();
   const { city } = useNightMode();
   const { unreadCount } = useNotifications();
   return (
-    <View className="flex-1">
+    <View key={fontScale} className="flex-1">
       <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
-        <View className="flex-row items-center justify-between px-4 min-h-11 mb-3">
-          <View className="flex-row items-center gap-2 flex-1 min-w-0">
-            <Text
-              className="text-white font-sans-light"
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.3}
-              style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
-            >
-              Spotted
-            </Text>
-            <View className="px-2.5 py-1 rounded-full bg-white/10">
-              <Text className="text-white/70 text-xs font-sans-medium uppercase">{city}</Text>
-            </View>
-          </View>
-          <HeaderActions unreadCount={unreadCount} />
-        </View>
+        <TabHeaderRow city={city} unreadCount={unreadCount} />
       </View>
       <ModeCountdownStrip />
       <VenueDiscovery liveKind={kind} />

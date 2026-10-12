@@ -1,3 +1,4 @@
+import { TabHeaderRow } from '@/components/tab-header-row';
 import { DayVenueMap } from '@/components/day-venue-map';
 import { withholdLivePreview } from '@/lib/live-preview';
 import { locationServicesEnabled } from '@/lib/location-ready';
@@ -716,52 +717,13 @@ function LiveMapScreen() {
           className='absolute top-safe-offset-3 left-4 right-4 gap-3'
           pointerEvents='box-none'
         >
-          <View
-            className='flex-row items-center justify-between h-10'
-            pointerEvents='box-none'
-          >
-            <View
-              className='flex-row items-center gap-2 flex-1 min-w-0'
-              pointerEvents='box-none'
-            >
-              <Text
-                className='text-white font-sans-light'
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.3}
-                style={{
-                  fontSize: 20,
-                  letterSpacing: 20 * 0.28,
-                  textShadowColor: 'rgba(0,0,0,0.6)',
-                  textShadowRadius: 8,
-                }}
-              >
-                Spotted
-              </Text>
-              {city ? (
-                <View className='px-2.5 py-1 rounded-full bg-[#1a0f2e]/85 border border-white/10'>
-                  <Text className='text-white/70 text-xs font-sans-medium uppercase'>
-                    {city}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            <View className='flex-row items-center gap-2'>
-              <IconButton
-                icon='bell'
-                label='Notifications'
-                size={40}
-                badge={unreadCount}
-                onPress={() => router.push('/activity')}
-              />
-              <StatusPill />
-            </View>
-          </View>
+          <TabHeaderRow city={city} unreadCount={unreadCount} inset={false} actions={<View className="flex-row items-center gap-2"><IconButton icon="bell" label="Notifications" size={40} badge={unreadCount} onPress={() => router.push('/activity')} /><StatusPill /></View>} />
           <View className='flex-row items-center gap-2'>
             <Pressable
               onPress={() => router.push('/search')}
               accessibilityRole='search'
               accessibilityLabel='Search people, venues'
-              className='flex-1 max-w-[260px] h-10 rounded-full px-3 flex-row items-center gap-2 border border-white/15 active:opacity-90'
+              className='flex-1 max-w-[260px] min-h-11 py-2 rounded-full px-3 flex-row items-center gap-2 border border-white/15 active:opacity-90'
               style={{backgroundColor: 'rgba(26, 15, 46, 0.88)'}}
             >
               <SymbolView
@@ -778,7 +740,7 @@ function LiveMapScreen() {
               accessibilityRole='button'
               accessibilityLabel='Friends only'
               accessibilityState={{selected: friendsOnly}}
-              className={`h-10 rounded-full px-3 flex-row items-center gap-1.5 border active:opacity-90 ${
+              className={`min-h-11 py-2 rounded-full px-3 flex-row items-center gap-1.5 border active:opacity-90 ${
                 friendsOnly ? 'border-[#a855f7]/50' : 'border-white/15'
               }`}
               style={{

@@ -1,3 +1,4 @@
+import { TabHeaderRow } from '@/components/tab-header-row';
 import { Alert } from 'react-native';
 import { useEffect, useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
@@ -224,24 +225,7 @@ function LeaderboardHeader({
   ];
   return (
     <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
-      {/* Top bar — same compact layout as the home header, fixed height */}
-      <View className="flex-row items-center justify-between px-4 min-h-11">
-        <View className="flex-row items-center gap-2 flex-1 min-w-0">
-          <Text
-            className="text-white font-sans-light"
-            numberOfLines={1}
-            style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
-          >
-            Spotted
-          </Text>
-          {city ? (
-            <View className="px-2.5 py-1 rounded-full bg-white/10">
-              <Text className="text-white/70 text-xs font-sans-medium uppercase">{city}</Text>
-            </View>
-          ) : null}
-        </View>
-        <HeaderActions unreadCount={unreadCount} />
-      </View>
+      <TabHeaderRow city={city} unreadCount={unreadCount} />
 
       {/* Title + subtitle — full-width rows below the top bar */}
       <View className="px-4 pt-2">

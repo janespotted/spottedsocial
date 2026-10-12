@@ -25,5 +25,5 @@ export function usePrivateScreen(key: string, enabled = true) {
       sequence = sequence.catch(() => {}).then(() => ScreenCapture.allowScreenCaptureAsync(key));
     };
   }, [key, enabled, attempt]));
-  return { ready: !enabled || (focused && ready), failed, retry: () => setAttempt(n => n + 1) };
+  return { focused, ready: !enabled || (focused && ready), failed, retry: () => setAttempt(n => n + 1) };
 }

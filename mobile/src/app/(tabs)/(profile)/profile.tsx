@@ -1,3 +1,4 @@
+import { TabHeaderRow } from '@/components/tab-header-row';
 import { ErrorState } from '@/components/empty-state';
 import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
 import { invalidatePrivateViews } from '@/lib/private-views';
@@ -266,19 +267,7 @@ export default function ProfileScreen() {
     <View key={fontScale} className="flex-1">
       {/* Header — static, web PageHeader parity */}
       <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
-        <View className="flex-row items-center justify-between px-4 min-h-10 mb-2">
-          <Text
-            className="flex-1 text-white font-sans-light"
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.65}
-            maxFontSizeMultiplier={1.25}
-            style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
-          >
-            Spotted
-          </Text>
-          <HeaderActions unreadCount={unreadCount} />
-        </View>
+        <TabHeaderRow unreadCount={unreadCount} />
         <ModeCountdownStrip />
       </View>
 
