@@ -161,12 +161,9 @@ function EmptyFeed({
     return (
       <EmptyState
         icon="person.2"
-        title="Add friends to see their nights"
-        body="Posts from your friends show up here until 5 AM. Find people you know to get started."
-        actions={[
-          ...addFriendsActions(),
-          { label: 'Post something', icon: 'camera.fill', onPress: () => router.push('/create-post') },
-        ]}
+        title="Find your people"
+        body="Your friends’ nights start here."
+        actions={addFriendsActions()}
       />
     );
   }
@@ -179,14 +176,10 @@ function EmptyFeed({
 
       <EmptyState
         icon={nobodyAround ? 'moon.stars' : 'camera'}
-        title={nobodyAround ? 'Nothing from your circle yet' : 'No posts yet tonight'}
-        body={
-          nobodyAround
-            ? "None of your friends have posted or shared a plan tonight. Posts live here until 5 AM — be the first."
-            : 'Friends are around, but nobody has posted yet. Start it off.'
-        }
+        title="No posts yet"
+        body="Start tonight’s feed."
         actions={[
-          { label: "Share what you're up to", icon: 'camera.fill', primary: true, onPress: () => router.push('/create-post') },
+          { label: 'Post', icon: 'camera.fill', primary: true, onPress: () => router.push('/create-post') },
         ]}
         compact={!nobodyAround}
       />
@@ -297,7 +290,8 @@ function NewsfeedScreen({ active }: { active: boolean }) {
   const { session } = useSession();
   const feed = useFeed();
   const { data: friendsData, refetch: refetchFriends } = useFriendsOut();
-  const { data: friendIds } = useFriendIds(session?.user.id);
+  const friendsQuery = useFriendIds(session?.user.id);
+  const friendIds = friendsQuery.data;
   const { data: ownNight } = useOwnNightStatus();
   const isPlanning = ownNight?.status?.status === 'planning';
   // pb clears the native tab bar, home indicator and the Post FAB
@@ -463,7 +457,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
           </View>
         }
         ListEmptyComponent={
-          feed.isLoading ? (
+          feed.isLoading || (feed.posts.length === 0 && friendsQuery.isLoading) ? (
             <View className="px-4 py-8 gap-4">
               {[0, 1].map((i) => (
                 <View key={i} className="gap-3">
@@ -475,10 +469,10 @@ function NewsfeedScreen({ active }: { active: boolean }) {
                 </View>
               ))}
             </View>
-          ) : feed.isError ? (
+          ) : feed.isError || (feed.posts.length === 0 && friendsQuery.isError) ? (
             <ErrorState
               title="Couldn't load your feed"
-              onRetry={() => void feed.refresh({ userInitiated: true })}
+              onRetry={() => { void feed.refresh({ userInitiated: true }); void friendsQuery.refetch(); }}
               retrying={feed.isRefreshing}
             />
           ) : (
@@ -516,19 +510,19 @@ function NewsfeedScreen({ active }: { active: boolean }) {
           (49pt) plus the home indicator, with a visible gap above it.
           Home is the Newsfeed only now, so the FAB is always "Post"; the
           Plan FAB moved to the Chat tab's Plans view. */}
-      {keyboardOpen ? null : (
+      {keyboardOpen || (feed.posts.length === 0 && !feed.isError && (!friendsQuery.isSuccess || (friendIds?.length ?? 0) > 0)) ? null : (
         <Pressable
           onPress={() => router.push('/create-post')}
           accessibilityRole="button"
           accessibilityLabel="New post"
           className="absolute bottom-safe-offset-16 right-4 h-14 pl-4 pr-5 rounded-full flex-row items-center gap-2 active:opacity-90"
           style={{
-            backgroundColor: NEON,
-            boxShadow: '0 4px 20px rgba(212, 255, 0, 0.35)',
+            backgroundColor: feed.posts.length ? NEON : 'rgba(255,255,255,0.08)',
+            boxShadow: feed.posts.length ? '0 4px 20px rgba(212, 255, 0, 0.2)' : undefined,
           }}
         >
-          <SymbolView name="camera.fill" size={20} tintColor="#1a0f2e" weight="semibold" />
-          <Text className="text-[#1a0f2e] text-[15px] font-sans-semibold">Post</Text>
+          <SymbolView name="camera.fill" size={20} tintColor={feed.posts.length ? '#1a0f2e' : '#ffffff'} weight="semibold" />
+          <Text className={`text-[15px] font-sans-semibold ${feed.posts.length ? 'text-[#1a0f2e]' : 'text-white'}`}>Post</Text>
         </Pressable>
       )}
     </View>

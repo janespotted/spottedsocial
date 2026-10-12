@@ -2,45 +2,29 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useQueryClient } from '@tanstack/react-query';
-import { CalendarHeart, CalendarPlus, Martini, PartyPopper } from 'lucide-react-native';
-import { DayPlaceholder } from '@/components/day-placeholder';
+import { EmptyState, ErrorState } from '@/components/empty-state';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { RecapCover } from '@/components/recap-cover';
 import { PlanCard } from '@/components/plan-card';
-import { useCountdown, useNightMode } from '@/hooks/use-night-mode';
+import { useNightMode } from '@/hooks/use-night-mode';
 import { useNightRecap } from '@/hooks/use-night-recap';
 import { usePlans, usePlansRealtime } from '@/hooks/use-plans';
 import { useSession } from '@/hooks/use-session';
 import { splitTonightUpcoming, type Plan } from '@/lib/plans';
 import { getNightKey } from '@/lib/tonight';
-import { dayRaised, NEON } from '@/lib/theme';
+import { NEON } from '@/lib/theme';
 
 /** Home's Tonight's-plans preview shows this many; "See all" opens the rest. */
 const PREVIEW_PLANS = 2;
 
-/** One compact row: when Night Mode opens and how long until it does. */
+/** One compact row with tonight’s opening time. */
 function NightCountdownRow() {
-  const { opensAt, opensLabel } = useNightMode();
-  const { hours, minutes } = useCountdown(opensAt);
+  const { opensLabel } = useNightMode();
   return (
-    <Pressable
-      onPress={() => router.push('/night-hours')}
-      accessibilityRole="button"
-      accessibilityLabel={`Night Mode opens today at ${opensLabel}, in ${Number(hours)} hours ${Number(minutes)} minutes`}
-      className={`flex-row items-center justify-between rounded-2xl px-4 py-3.5 active:opacity-85 ${dayRaised}`}
-    >
-      <View className="flex-row items-center gap-2.5">
-        <SymbolView name="moon.stars" size={17} tintColor={NEON} />
-        <View>
-          <Text className="text-white text-sm font-sans-medium">Night Mode</Text>
-          <Text className="text-white/60 text-xs font-sans mt-0.5">Today at {opensLabel}</Text>
-        </View>
-      </View>
-      <Text className="text-[#d4ff00]" style={{ fontVariant: ['tabular-nums'] }}>
-        <Text className="text-2xl font-sans-medium">{hours}</Text>
-        <Text className="text-xs font-sans">h </Text>
-        <Text className="text-2xl font-sans-medium">{minutes}</Text>
-        <Text className="text-xs font-sans">m</Text>
-      </Text>
+    <Pressable onPress={() => router.push('/night-hours')} accessibilityRole="button" accessibilityLabel={`Night Mode opens today at ${opensLabel}`} className="flex-row items-center gap-2.5 min-h-11 px-1 active:opacity-70">
+      <SymbolView name="moon.stars" size={15} tintColor={NEON} />
+      <Text className="flex-1 text-white/65 text-sm font-sans">Night Mode opens at {opensLabel}</Text>
+      <SymbolView name="chevron.right" size={12} tintColor="rgba(255,255,255,0.5)" />
     </Pressable>
   );
 }
@@ -84,7 +68,7 @@ function TonightPlans({ city }: { city: string }) {
         <Text className="text-white text-lg font-sans-semibold" accessibilityRole="header">
           Tonight&apos;s plans
         </Text>
-        <Pressable
+        {tonight.length > 0 ? <Pressable
           onPress={() => router.push('/messages?tab=plans')}
           hitSlop={8}
           accessibilityRole="link"
@@ -92,18 +76,15 @@ function TonightPlans({ city }: { city: string }) {
         >
           <Text className="text-[#d4ff00] text-sm font-sans-medium">See all</Text>
           <SymbolView name="arrow.right" size={12} tintColor={NEON} />
-        </Pressable>
+        </Pressable> : null}
       </View>
 
       {plansQuery.isLoading ? (
         <View className="h-40 rounded-2xl bg-white/[0.06]" />
+      ) : plansQuery.isError && !plansQuery.data ? (
+        <ErrorState compact title="Couldn’t load plans" body="" onRetry={() => void plansQuery.refetch()} retrying={plansQuery.isRefetching} />
       ) : tonight.length === 0 ? (
-        <DayPlaceholder
-          icons={[Martini, CalendarHeart, PartyPopper]}
-          title="What’s the plan tonight?"
-          body="Pick a spot and a time — friends can say they’re down."
-          action={{ label: 'Share a plan', icon: CalendarPlus, onPress: () => router.push('/create-plan') }}
-        />
+        <EmptyState compact icon="calendar" title="Make a night of it" actions={[{ label: 'Make a plan', icon: 'plus', primary: true, onPress: () => router.push('/create-plan') }]} />
       ) : (
         tonight.slice(0, PREVIEW_PLANS).map((plan) => (
           <PlanCard
@@ -132,32 +113,38 @@ function TonightPlans({ city }: { city: string }) {
 }
 
 /**
- * Home's "Morning After" tab (client brief §2), in the brief's order: the
- * countdown, the Morning After card, tonight's plans. Kept light — one
- * heading, no explanations; detail is behind taps. At night, Profile links
- * directly to the recap instead of showing this dashboard on Home.
+ * Daytime Home: opening time, an available recap, plans and venue discovery.
+ * An empty recap gets one quiet row. At night, Profile links to the recap.
  */
 export function DayHome() {
   const { city, isNight } = useNightMode();
   const recap = useNightRecap();
   const queryClient = useQueryClient();
+  const { refreshing, onRefresh } = usePullToRefresh(async () => {
+    await Promise.all([queryClient.invalidateQueries({ queryKey: ['plans'] }), recap.refetch()]);
+  });
   return (
     <ScrollView
       contentContainerClassName="px-4 pt-4 pb-36 gap-5"
       refreshControl={
         <RefreshControl
-          refreshing={false}
-          onRefresh={() => {
-            void queryClient.invalidateQueries({ queryKey: ['plans'] });
-            void recap.refetch();
-          }}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
           tintColorClassName="accent-[#d4ff00]"
         />
       }
     >
       {isNight ? null : <NightCountdownRow />}
-      <RecapCover recap={recap.data} loading={recap.isLoading} />
+      {recap.data ? <RecapCover recap={recap.data} loading={false} /> : null}
       <TonightPlans city={city} />
+      <Pressable onPress={() => router.push('/explore')} accessibilityRole="button" className="flex-row items-center gap-3 min-h-14 px-4 py-4 rounded-2xl border border-white/10 bg-white/[0.03] active:opacity-70">
+        <SymbolView name="mappin.and.ellipse" size={20} tintColor={NEON} />
+        <Text className="flex-1 text-white text-sm font-sans-medium">Find your next spot</Text>
+        <SymbolView name="chevron.right" size={12} tintColor="rgba(255,255,255,0.5)" />
+      </Pressable>
+      {!recap.data ? recap.isError ? (
+        <ErrorState compact title="Couldn’t load your recap" body="" onRetry={() => void recap.refetch()} retrying={recap.isRefetching} />
+      ) : <RecapCover recap={recap.data} loading={recap.isLoading} /> : null}
     </ScrollView>
   );
 }

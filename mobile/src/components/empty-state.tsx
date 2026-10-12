@@ -35,12 +35,12 @@ export function EmptyState({
   return (
     <View className={`items-center px-8 ${compact ? 'py-8' : 'py-14'}`}>
       <View
-        className={`rounded-full items-center justify-center mb-5 ${compact ? 'w-14 h-14' : 'w-20 h-20'}`}
+        className={`rounded-2xl items-center justify-center mb-5 ${compact ? 'w-11 h-11' : 'w-14 h-14'}`}
         style={{ backgroundColor: tone === 'positive' ? 'rgba(212,255,0,0.10)' : 'rgba(45,27,78,0.6)' }}
       >
         <SymbolView
           name={icon}
-          size={compact ? 24 : 36}
+          size={compact ? 21 : 26}
           tintColor={tone === 'positive' ? NEON : 'rgba(168,85,247,0.7)'}
         />
       </View>
@@ -79,19 +79,21 @@ export function ErrorState({
   body = 'Check your connection and try again.',
   onRetry,
   retrying = false,
+  compact = false,
 }: {
   title?: string;
   body?: string;
   onRetry: () => void;
   retrying?: boolean;
+  compact?: boolean;
 }) {
   return (
-    <View className="items-center px-8 py-14">
-      <View className="w-16 h-16 rounded-full items-center justify-center mb-5" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
+    <View className={`items-center px-6 ${compact ? 'py-6' : 'py-14'}`}>
+      {compact ? null : <View className="w-16 h-16 rounded-full items-center justify-center mb-5" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
         <SymbolView name="wifi.exclamationmark" size={28} tintColor="rgba(255,255,255,0.5)" />
-      </View>
+      </View>}
       <Text className="text-lg font-sans-semibold text-white text-center mb-1.5">{title}</Text>
-      <Text className="text-white/55 text-sm font-sans text-center leading-5 max-w-72">{body}</Text>
+      {body ? <Text className="text-white/55 text-sm font-sans text-center leading-5 max-w-72">{body}</Text> : null}
       <Pressable
         onPress={onRetry}
         disabled={retrying}
@@ -134,10 +136,6 @@ export function ExpiredState({
       <Text className="text-xl font-sans-semibold text-white text-center mb-2">
         {what} expired at 5am
       </Text>
-      <Text className="text-white/55 text-sm font-sans text-center leading-5 max-w-72">
-        Tonight resets at 5am — posts, Yaps, messages, meetups and invites from that night
-        disappear. Your profile and friends stay.
-      </Text>
       {onDismiss ? (
         <Pressable
           onPress={onDismiss}
@@ -169,12 +167,12 @@ export function AddFriendsRow() {
       <Pressable
         onPress={() => router.push('/invite-friends')}
         accessibilityRole="button"
-        accessibilityLabel="Invite friends"
-        accessibilityHint="Share your invitation link or QR code"
+        accessibilityLabel="Share profile"
+        accessibilityHint="Share your profile link or QR code"
         className={`${fontScale > 1.3 ? '' : 'flex-1'} flex-row items-center justify-center gap-2 min-h-11 px-4 py-3 rounded-full ${control.ordinary} active:opacity-70`}
       >
         <SymbolView name="paperplane" size={15} tintColor="#ffffff" />
-        <Text className="shrink text-white text-sm font-sans-medium text-center">Invite friends</Text>
+        <Text className="shrink text-white text-sm font-sans-medium text-center">Share profile</Text>
       </Pressable>
     </View>
   );

@@ -17,6 +17,7 @@ import {
   type LeaderboardFriend,
   type LeaderboardVenue,
 } from '@/hooks/use-leaderboard';
+import { EmptyState, ErrorState } from '@/components/empty-state';
 import { Avatar } from '@/components/avatar';
 import { DropdownMenu } from '@/components/dropdown-menu';
 import { HeaderActions } from '@/components/header-actions';
@@ -128,8 +129,9 @@ function PromotedCard({ venue }: { venue: LeaderboardVenue }) {
 }
 
 function VenueCard({ venue }: { venue: LeaderboardVenue }) {
-  const isTop1 = venue.rank === 1;
-  const isTop3 = venue.rank >= 1 && venue.rank <= 3;
+  const hasActivity = venue.count > 0;
+  const isTop1 = hasActivity && venue.rank === 1;
+  const isTop3 = hasActivity && venue.rank >= 1 && venue.rank <= 3;
 
   const subParts: string[] = [];
   if (venue.neighborhood) subParts.push(venue.neighborhood);
@@ -141,7 +143,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
     <Pressable
       onPress={() => openVenue(venue.venue_name, venue.venue_id)}
       accessibilityRole="button"
-      accessibilityLabel={`Number ${venue.rank}, ${venue.venue_name}. Open venue`}
+      accessibilityLabel={`${hasActivity ? `Number ${venue.rank}, ` : ''}${venue.venue_name}. Open venue`}
       className={`relative overflow-hidden rounded-2xl mb-3 active:opacity-80 ${
         isTop1
           ? 'bg-[#221540] p-5 border border-[#d4ff00]/20'
@@ -156,7 +158,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
 
       <View className="flex-row items-center gap-3">
         {/* Rank Number */}
-        <View className="w-10 items-center">
+        {hasActivity ? <View className="w-10 items-center">
           <Text
             className={`font-sans-semibold tabular-nums ${
               isTop1 ? 'text-4xl text-[#d4ff00]' : isTop3 ? 'text-3xl text-[#d4ff00]' : 'text-2xl text-white/50'
@@ -169,7 +171,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
           >
             {venue.rank}
           </Text>
-        </View>
+        </View> : null}
 
         {/* Venue Info */}
         <View className="flex-1 min-w-0">
@@ -368,6 +370,8 @@ function LiveLeaderboardScreen() {
   const { refreshing, onRefresh } = usePullToRefresh(refetch);
   const venues = data?.venues ?? [];
   const biggestMover = data?.biggestMover ?? null;
+  const firstLive = venues.findIndex(v => !v.isPromoted && v.count > 0);
+  const firstCatalog = venues.findIndex(v => !v.isPromoted && v.count === 0);
 
   return (
     <View className="flex-1">
@@ -390,34 +394,13 @@ function LiveLeaderboardScreen() {
             tintColorClassName="accent-[#d4ff00]"
           />
         }
-        ListHeaderComponent={<Text className="text-white/50 text-xs px-1 pb-3">Activity visible to you, followed by popular venues to explore. Catalog ranking does not imply a live crowd.</Text>}
-        ListEmptyComponent={
-          isError ? (<Pressable onPress={() => refetch()} className="p-6"><Text className="text-white">Could not load venue activity. Tap to retry.</Text></Pressable>) : isLoading ? (
-            <LeaderboardSkeleton />
-          ) : (
-            <View className="items-center justify-center py-16 px-4">
-              <View className="w-20 h-20 rounded-full bg-white/5 items-center justify-center mb-6">
-                <SymbolView name="chart.bar" size={40} tintColor="rgba(168,85,247,0.6)" />
-              </View>
-              <Text className="text-xl font-sans-semibold text-white mb-2 text-center">
-                The night hasn&apos;t started yet
-              </Text>
-              <Text className="text-white/50 text-sm font-sans text-center max-w-xs mb-6">
-                When people check in, the hottest spots show up here.
-              </Text>
-              <Pressable
-                onPress={() => router.push('/check-in')}
-                className="rounded-full px-6 min-h-11 justify-center active:opacity-90"
-                style={{ backgroundColor: VIOLET_FILL }}
-              >
-                <Text className="text-white font-sans-semibold">Be the First</Text>
-              </Pressable>
-            </View>
-          )
-        }
-        renderItem={({ item }) =>
-          item.isPromoted ? <PromotedCard venue={item} /> : <VenueCard venue={item} />
-        }
+        ListEmptyComponent={isLoading ? <LeaderboardSkeleton /> : isError
+          ? <ErrorState title="Couldn’t load spots" onRetry={() => void refetch()} retrying={refreshing} />
+          : <EmptyState icon="chart.bar" title="Start the night" actions={[{label:'Check in',onPress:()=>router.push('/check-in'),primary:true}]} />}
+        renderItem={({ item, index }) => <>
+          {index === firstLive || index === firstCatalog ? <Text className="text-white/60 text-xs font-sans-medium px-1 pb-3 pt-2" accessibilityRole="header">{index === firstLive ? 'Live activity' : 'Explore spots'}</Text> : null}
+          {item.isPromoted ? <PromotedCard venue={item} /> : <VenueCard venue={item} />}
+        </>}
         ListFooterComponent={biggestMover ? <BiggestMoverCard mover={biggestMover} /> : null}
       />
     </View>

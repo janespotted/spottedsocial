@@ -264,7 +264,7 @@ test('QA-13 late failed Like never restores a revoked post snapshot',async()=>{
 
 test('QA-16/20 failed venue Plan child read cannot look like zero people; Plan card offers retry',async()=>{
  const {queryFunction}=require('./product-test-runtime.cjs');
- const fn=queryFunction('app/venue.tsx','venue-card',{session:{user:{id:'a'}},venueId:'v',friendIds:['friend'],getNightKey:()=> '2026-09-25',fetchProfilesSafe:async()=>[],buildProfileMap:()=>new Map(),uniquePeople:x=>x,toFriend:x=>x,supabase:{from:table=>builder(table==='venues'?{data:{id:'v',name:'Bar'},error:null}:table==='plans'?{data:[{id:'p'}],error:null}:table==='plan_downs'?{data:null,error:Error('child offline')}:{data:[],error:null})}});
+ const fn=queryFunction('app/venue.tsx','venue-card',{isNight:true,session:{user:{id:'a'}},venueId:'v',friendIds:['friend'],getNightKey:()=> '2026-09-25',fetchProfilesSafe:async()=>[],buildProfileMap:()=>new Map(),uniquePeople:x=>x,toFriend:x=>x,supabase:{from:table=>builder(table==='venues'?{data:{id:'v',name:'Bar'},error:null}:table==='plans'?{data:[{id:'p'}],error:null}:table==='plan_downs'?{data:null,error:Error('child offline')}:{data:[],error:null})}});
  await assert.rejects(fn(),/child offline/);
  const s=source('components/plan-card.tsx');assert.match(s,/Could not load everyone on this plan/);assert.match(s,/!participantsError && !downsError && participants.length === 0/);assert.match(s,/disabled=\{isTogglingDown \|\| downsError\}/);
 });

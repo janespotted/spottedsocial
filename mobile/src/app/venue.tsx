@@ -2,7 +2,7 @@ import { withholdLivePreview } from '@/lib/live-preview';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { getNightKey } from '@/lib/tonight';
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -176,21 +176,23 @@ export default function VenueScreen() {
   const { data: friendIds } = useFriendIds(session?.user.id);
   const queryClient = useQueryClient();
   const { height: windowHeight } = useWindowDimensions();
-  // Open by default: hours, events and Trending Nearby are the reason to
+  // Open by default: hours, events and Nearby spots are the reason to
   // open a venue, and the sheet sizes to its content either way.
   const [moreInfoOpen, setMoreInfoOpen] = useState(true);
-  // Keyed by venueId so Trending Nearby swaps retry the new venue's photo
+  // Keyed by venueId so Nearby spots swaps retry the new venue's photo
   const [photoFailedFor, setPhotoFailedFor] = useState<string | null>(null);
   const photoFailed = photoFailedFor === venueId;
   const [wishlistOverride, setWishlistOverride] = useState<boolean | null>(null);
+  const savingWishlist = useRef(false);
+  useEffect(() => setWishlistOverride(null), [venueId]);
   const [invitePickerOpen, setInvitePickerOpen] = useState(false);
   const [selectedInvitees, setSelectedInvitees] = useState<Set<string>>(new Set());
   const [sendingInvites, setSendingInvites] = useState(false);
 
   // Relationships are part of the key so an old eligible guest list is never reused.
   const { data: rawData, isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ['venue-card', venueId, session?.user.id, friendIds],
-    enabled: !!venueId && !!session && friendIds !== undefined,
+    queryKey: ['venue-card', venueId, session?.user.id, friendIds, isNight],
+    enabled: !!venueId && !!session && (!isNight || friendIds !== undefined),
     retry: 1,
     queryFn: async (): Promise<VenueCardData | null> => {
       const nowIso = new Date().toISOString();
@@ -203,7 +205,7 @@ export default function VenueScreen() {
       if (!venue) return null;
 
       const [
-        { data: wishlistEntry },
+        { data: wishlistEntry, error: wishlistError },
         { data: statuses, error: statusError },
         { data: venuePlans, error: plansError },
         profiles,
@@ -214,22 +216,22 @@ export default function VenueScreen() {
           .eq('user_id', session!.user.id)
           .eq('venue_name', venue.name)
           .maybeSingle(),
-        supabase
+        isNight ? supabase
           .from('night_statuses')
           .select('user_id')
           .eq('venue_name', venue.name)
           .not('expires_at', 'is', null)
-          .gt('expires_at', nowIso),
-        supabase
+          .gt('expires_at', nowIso) : Promise.resolve({data: [], error: null}),
+        isNight ? supabase
           .from('plans')
           .select('id, user_id')
           .eq('venue_id', venueId!)
           .eq('plan_date', getNightKey())
-          .gt('expires_at', nowIso),
-        fetchProfilesSafe(),
+          .gt('expires_at', nowIso) : Promise.resolve({data: [], error: null}),
+        isNight ? fetchProfilesSafe() : Promise.resolve([]),
       ]);
 
-      if (statusError || plansError) throw statusError ?? plansError;
+      if (wishlistError || statusError || plansError) throw wishlistError ?? statusError ?? plansError;
       const myProfile = profiles.find(p => p.id === session!.user.id);
       const profileMap = buildProfileMap(profiles);
       const friendSet = new Set(friendIds ?? []);
@@ -278,10 +280,11 @@ export default function VenueScreen() {
         );
       }
 
-      // Trending nearby: same neighborhood, fall back to same city
+      // Nearby spots: same neighborhood, fall back to same city
       let { data: similar } = await supabase
         .from('venues')
         .select('id, name, neighborhood')
+        .eq('is_demo', false)
         .eq('neighborhood', venue.neighborhood ?? '')
         .eq('city', venue.city ?? '')
         .neq('id', venueId!)
@@ -291,6 +294,7 @@ export default function VenueScreen() {
         const { data: cityVenues } = await supabase
           .from('venues')
           .select('id, name, neighborhood')
+        .eq('is_demo', false)
           .eq('city', venue.city ?? '')
           .neq('id', venueId!)
           .order('popularity_rank', { ascending: true })
@@ -357,7 +361,8 @@ export default function VenueScreen() {
 
   // Optimistic, and rolled back if the write fails (it never was before)
   const toggleWishlist = async () => {
-    if (!venue || !session) return;
+    if (!venue || !session || savingWishlist.current) return;
+    savingWishlist.current = true;
     const wasSaved = isInWishlist;
     setWishlistOverride(!wasSaved);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -370,6 +375,7 @@ export default function VenueScreen() {
       : await supabase
           .from('wishlist_places')
           .insert({ user_id: session.user.id, venue_name: venue.name, venue_image_url: null });
+    savingWishlist.current = false;
     if (error) {
       setWishlistOverride(wasSaved);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -378,6 +384,8 @@ export default function VenueScreen() {
     }
     if (!wasSaved) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     queryClient.invalidateQueries({ queryKey: ['profile-page'] });
+    queryClient.invalidateQueries({ queryKey: ['saved-venues', session.user.id] });
+    queryClient.invalidateQueries({ queryKey: ['venue-card', venueId] });
   };
 
   const openDirections = () => {
@@ -427,7 +435,7 @@ export default function VenueScreen() {
   // Grouped like the original InviteFriendsModal (addendum v3 §11.6):
   // Friends Out Now (with their venue), TBD Tonight (with their plan),
   // Staying in. A viewer who is in tonight sees names but not venues.
-  const { data: friendsOut } = useFriendsOut();
+  const { data: friendsOut } = useFriendsOut({ enabled: isNight });
   const inviteGroups = (() => {
     const outRows = (friendsOut?.outFriends ?? []).map((f) => ({
       id: f.user_id,
@@ -800,7 +808,7 @@ export default function VenueScreen() {
           {moreInfoOpen ? (
             // A plain View, NOT a ScrollView: under fitToContents the sheet
             // measures once, and a nested scroller that fills after its data
-            // arrives (hours, Trending Nearby) overflows the measured height
+            // arrives (hours, Nearby spots) overflows the measured height
             // and paints over the card. Sized content grows the sheet instead.
             <View className="pt-2 pb-1 gap-3">
               <VenueEventsSection venueId={venue.id} />
@@ -815,7 +823,7 @@ export default function VenueScreen() {
               {data!.similarVenues.length > 0 ? (
                 <View>
                   <Text className="text-xs font-sans-semibold text-white/50 mb-1.5">
-                    Trending Nearby
+                    Nearby spots
                   </Text>
                   <View className="gap-1.5">
                     {data!.similarVenues.map((sv) => (

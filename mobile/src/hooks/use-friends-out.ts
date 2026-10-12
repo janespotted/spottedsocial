@@ -36,7 +36,7 @@ export interface FriendsOutData {
  * shapes the data, plus the one client-side rule that a viewer who is
  * staying in does not see precise venues (client feedback §8).
  */
-export function useFriendsOut() {
+export function useFriendsOut({ enabled = true }: { enabled?: boolean } = {}) {
   const { session } = useSession();
   const { data: friendIds } = useFriendIds(session?.user.id);
   const { data: own } = useOwnNightStatus();
@@ -45,7 +45,7 @@ export function useFriendsOut() {
 
   // Realtime: refetch Out/Planning cards whenever any night status changes.
   useEffect(() => {
-    if (!session) return;
+    if (!session || !enabled) return;
     const invalidate = () => queryClient.invalidateQueries({ queryKey: ['friends-out'] });
     return createResilientChannel({
       name: 'night-status-realtime',
@@ -57,11 +57,11 @@ export function useFriendsOut() {
           invalidate
         ),
     });
-  }, [session, queryClient]);
+  }, [session, queryClient, enabled]);
 
   return useQuery({
     queryKey: ['friends-out', session?.user.id, friendIds, viewerStayingIn],
-    enabled: !!session && !!friendIds,
+    enabled: enabled && !!session && !!friendIds,
     staleTime: 30_000,
     queryFn: async (): Promise<FriendsOutData> => {
       if (!friendIds || friendIds.length === 0) {

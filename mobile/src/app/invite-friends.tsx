@@ -54,9 +54,9 @@ export default function InviteFriendsSheet() {
           <SymbolView name="link" size={20} tintColor="#ffffff" />
         </View>
         <View className="flex-1">
-          <Text className="text-white text-lg font-sans-semibold">Invite Friends</Text>
+          <Text className="text-white text-lg font-sans-semibold">Share profile</Text>
           <Text className="text-white/60 text-sm font-sans">
-            Share your profile. New members join through rollout waves.
+            New members still need a wave invitation.
           </Text>
         </View>
       </View>

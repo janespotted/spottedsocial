@@ -139,7 +139,8 @@ export default function MessagesScreen() {
     staleTime: 15_000,
     queryFn: () => fetchDmThreads(session!.user.id),
   });
-  const { data: friendIds } = useFriendIds(session?.user.id);
+  const friendsQuery = useFriendIds(session?.user.id);
+  const friendIds = friendsQuery.data;
   const hasFriends = (friendIds?.length ?? 0) > 0;
 
   // DM changes refresh the list.
@@ -218,7 +219,7 @@ export default function MessagesScreen() {
           value={activeTab}
           onChange={setActiveTab}
           trailing={
-            activeTab === 'messages' ? (
+            activeTab === 'messages' && (threads?.length ?? 0) > 0 ? (
               // Compose icon, same flow as the empty-state "New chat" button
               <Pressable
                 onPress={() => router.push('/new-chat')}
@@ -253,27 +254,25 @@ export default function MessagesScreen() {
             />
           }
           ListEmptyComponent={
-            isLoading ? (
+            isLoading || (!threads?.length && friendsQuery.isLoading) ? (
               <View>
                 <RowSkeleton />
                 <RowSkeleton />
                 <RowSkeleton />
               </View>
-            ) : threadsError ? (
-              <ErrorState title="Couldn't load your messages" onRetry={() => refetch()} retrying={threadsRefetching} />
+            ) : threadsError || (!threads?.length && friendsQuery.isError) ? (
+              <ErrorState title="Couldn't load your messages" onRetry={() => { void refetch(); void friendsQuery.refetch(); }} retrying={threadsRefetching || friendsQuery.isRefetching} />
             ) : !hasFriends ? (
               // No friends means nobody to chat with: grow the graph first
               <EmptyState
                 icon="person.2"
-                title="Add friends to start chatting"
-                body="Messages on Spotted are between friends. Find people you know and the chat opens up."
+                title="Find your people"
                 actions={addFriendsActions()}
               />
             ) : (
               <EmptyState
                 icon="bubble.left"
-                title="No messages yet"
-                body="Start a conversation with a friend, or meet up with someone who's out."
+                title="Say hey"
                 actions={[
                   { label: 'New chat', icon: 'square.and.pencil', primary: true, onPress: () => router.push('/new-chat') },
                 ]}

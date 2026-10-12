@@ -11,7 +11,7 @@ export interface LaunchDashboard {
   waves: { id: string; activated_at: string; invitation_count: number }[];
 }
 type LaunchRpc = 'get_launch_state' | 'save_launch_profile' | 'save_launch_nomination' |
-  'complete_launch_onboarding' | 'get_launch_dashboard' | 'activate_launch_wave';
+  'complete_launch_onboarding' | 'get_launch_dashboard' | 'activate_launch_wave' | 'get_my_nomination_progress';
 // Generated schema predates this migration. Isolate the new contract here.
 export async function launchRpc<T = LaunchState>(name: LaunchRpc, args?: Record<string, unknown>): Promise<T> {
   const client = supabase as unknown as { rpc: (name: LaunchRpc, args?: Record<string, unknown>) => Promise<{ data: T & { error?: string }; error: { message: string; code?: string } | null }> };

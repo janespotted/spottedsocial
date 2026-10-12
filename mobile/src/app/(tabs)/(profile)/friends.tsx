@@ -17,6 +17,7 @@ import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
 import { AddFriendsRow, EmptyState, ErrorState } from '@/components/empty-state';
 import { NEON } from '@/lib/theme';
+import { addFriendsActions } from '@/lib/add-friends';
 
 interface FriendRow {
   kind: 'request' | 'friend' | 'header' | 'suggestion';
@@ -261,12 +262,12 @@ export default function FriendsScreen() {
               <SymbolView name="magnifyingglass" size={16} tintColor="rgba(255,255,255,0.55)" />
               <Text className="flex-1 text-white/55 text-sm font-sans">Search by name or username</Text>
             </Pressable>
-            <AddFriendsRow />
+            {data?.rows.length ? <AddFriendsRow /> : null}
             {hasFriends ? (
               <View className="flex-row items-center gap-1.5">
                 <SymbolView name="star.fill" size={11} tintColor={NEON} />
                 <Text className="flex-1 text-white/60 text-xs font-sans">
-                  Tap the star to add someone to Close Friends — your most private audience.
+                  Star your Close Friends.
                 </Text>
               </View>
             ) : null}
@@ -280,13 +281,20 @@ export default function FriendsScreen() {
           ) : isError ? (
             <ErrorState title="Couldn't load your friends" onRetry={() => refetch()} retrying={isRefetching} />
           ) : (
-            <EmptyState
-              icon="person.2"
-              title="No friends yet"
-              body="Find people you know from your contacts, search by username, or send an invite."
-              compact
-            />
+            <View>
+              <EmptyState icon="person.2" title="Find your people" actions={addFriendsActions()} />
+              <Pressable accessibilityRole="button" onPress={() => router.push('/invite-friends')} className="self-center min-h-11 px-5 justify-center -mt-8 mb-5 active:opacity-70">
+                <Text className="text-white/70 text-sm font-sans-medium">Share profile</Text>
+              </Pressable>
+            </View>
           )
+        }
+        ListFooterComponent={
+          <Pressable accessibilityRole="button" onPress={() => router.push('/nominations')} className="flex-row items-center gap-3 min-h-14 px-4 py-3 mt-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] active:opacity-70">
+            <SymbolView name="ticket" size={18} tintColor="rgba(255,255,255,0.65)" />
+            <Text className="flex-1 text-white/75 text-sm font-sans-medium">Your nominations</Text>
+            <SymbolView name="chevron.right" size={12} tintColor="rgba(255,255,255,0.5)" />
+          </Pressable>
         }
         renderItem={({ item }) =>
           item.kind === 'header' ? (

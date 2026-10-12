@@ -38,6 +38,7 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
  const nominate=async(n,slot,phone)=>value(await rpc(n,'save_launch_nomination',[slot,phone]));
  const pair=async n=>{await profile(n);await nominate(n,1,'+12025550101');await nominate(n,2,'+12025550102');};
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261012021331_launch_admin_center.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261012034343_member_nomination_progress.sql'),'utf8'));
  const admin=(action,data={},n=1)=>rpc(n,'launch_admin',[action,data]);
  const guest=async phone=>(await q('select * from spotted_private.launch_guests where phone=$1',[phone]))[0];
  const create=async(capacity=100)=>ok(await admin('create_wave',{id:id(90),name:'First 100',capacity}));
@@ -74,5 +75,46 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
  await test('Legacy activation cannot bypass reviewed named waves',async()=>{assert((await rpc(1,'activate_launch_wave',[id(90),100])).error);assert.equal(await scalar('select count(*) from spotted_private.launch_waves'),0);});
  await test('Worker claims once and callbacks are monotonic',async()=>{await create();await seed();await assign('+12025550101');await gated();await open();const gid=(await guest('+12025550101')).id;await q('update spotted_private.launch_settings set sms_enabled=true');ok(await admin('consent',{id:gid,at:'2026-01-01',note:'Recipient requested the launch notification.'}));ok(await admin('queue_sms',{id:gid}));const worker=async(action,data={})=>value(await actor(null,'select launch_message_job($1,$2)',[action,data],'service_role'));const job=await worker('claim');assert(job.id);assert.equal(await worker('claim'),null);await worker('status',{id:job.id,status:'delivered',sid:'SMreceipt'});await worker('status',{id:job.id,status:'accepted',sid:'SMreceipt'});assert.equal(await scalar('select status from spotted_private.launch_messages'),'delivered');assert((await guest('+12025550101')).invited_at);});
  await test('STOP suppresses queued and future messages',async()=>{await create();await seed();await assign('+12025550101');await gated();await open();const gid=(await guest('+12025550101')).id;await q('update spotted_private.launch_settings set sms_enabled=true');ok(await admin('consent',{id:gid,at:'2026-01-01',note:'Recipient requested the launch notification.'}));ok(await admin('queue_sms',{id:gid}));ok(await actor(null,'select launch_message_job($1,$2)',['stop',{phone:'+12025550101'}],'service_role'));assert.equal(await scalar('select status from spotted_private.launch_messages'),'cancelled');assert((await admin('queue_sms',{id:gid})).error);});
+ const progress = async n => value(await rpc(n,'get_my_nomination_progress')).nominations;
+ await test('Member nomination progress denies anonymous and cannot enumerate another account',async()=>{
+  await pair(3);await rpc(3,'complete_launch_onboarding');
+  deny(await actor(null,'select get_my_nomination_progress()',[],'anon'));
+  assert.equal((await progress(3)).length,2);assert.deepEqual(await progress(4),[]);
+  const rows=await progress(3);assert.deepEqual(Object.keys(rows[0]).sort(),['id','phone','slot','status']);
+  assert.deepEqual(rows.map(r=>r.slot),[1,2]);assert(rows.every(r=>r.status==='waiting'));
+ });
+ await test('Progress reads have no writes or activation side effects',async()=>{
+  await pair(3);const before=await scalar('select count(*) from spotted_private.launch_guests');
+  await progress(3);await progress(3);assert.equal(await scalar('select count(*) from spotted_private.launch_guests'),before);
+  assert.equal(await scalar('select count(*) from spotted_private.launch_messages'),0);
+ });
+ await test('Member progress distinguishes selected, unlocked, invited, paused and revoked',async()=>{
+  await pair(3);await rpc(3,'complete_launch_onboarding');await create();await assign('+12025550101');
+  assert.equal((await progress(3))[0].status,'waiting');await gated();await open();
+  assert.equal((await progress(3))[0].status,'ready');ok(await admin('manual_sent',{id:(await guest('+12025550101')).id}));
+  assert.equal((await progress(3))[0].status,'invited');ok(await admin('pause_wave',{id:id(90)}));
+  assert.equal((await progress(3))[0].status,'paused');ok(await admin('revoke',{id:(await guest('+12025550101')).id}));
+  assert.equal((await progress(3))[0].status,'unavailable');
+ });
+ await test('Queued and failed SMS never look invited to the nominator',async()=>{
+  await pair(3);await rpc(3,'complete_launch_onboarding');await create();await assign('+12025550101');await gated();await open();
+  const gid=(await guest('+12025550101')).id;await q('update spotted_private.launch_settings set sms_enabled=true');
+  ok(await admin('consent',{id:gid,at:'2026-01-01',note:'Synthetic recipient requested an invitation.'}));ok(await admin('queue_sms',{id:gid}));
+  assert.equal((await progress(3))[0].status,'ready');await q("update spotted_private.launch_messages set status='failed'");
+  assert.equal((await progress(3))[0].status,'ready');
+ });
+ await test('Member progress requires completed onboarding for Joined',async()=>{
+  await pair(3);await rpc(3,'complete_launch_onboarding');await create();await assign('+12025550101');await gated();await open();
+  await q('update auth.users set phone=$1 where id=$2',['12025550101',id(4)]);await state(4);
+  assert.equal((await progress(3))[0].status,'joining');await profile(4);await nominate(4,1,'+12025550103');await nominate(4,2,'+12025550104');await rpc(4,'complete_launch_onboarding');
+  assert.equal((await progress(3))[0].status,'joined');
+ });
+ await test('Progress recognizes verified members joining while admission is open',async()=>{
+  await pair(3);await rpc(3,'complete_launch_onboarding');await q('update auth.users set phone=$1 where id=$2',['12025550101',id(4)]);
+  await profile(4);await nominate(4,1,'+12025550103');await nominate(4,2,'+12025550104');await rpc(4,'complete_launch_onboarding');
+  assert.equal((await progress(3))[0].status,'joined');
+  await q('update auth.users set phone_confirmed_at=null where id=$1',[id(4)]);
+  assert.equal((await progress(3))[0].status,'waiting');
+ });
  console.log(`${passed}/${passed+failed} passed`);await db.close();process.exitCode=failed?1:0;
 })().catch(e=>{console.error(e.message);process.exitCode=1;});

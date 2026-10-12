@@ -1,5 +1,4 @@
 import { invalidatePrivateViews } from '@/lib/private-views';
-import { signOutWithPushCleanup } from '@/lib/push';
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { RESET_COPY } from '@/lib/reset-copy';
@@ -320,10 +319,6 @@ export default function ProfileScreen() {
               {(friendIds?.length ?? 0) === 1 ? 'friend' : 'friends'}
             </Text>
           </Pressable>
-          <Text className="text-white/40">·</Text>
-          <Text className="text-sm text-white/65 font-sans">
-            <Text className="text-white font-sans-medium">{data?.weeklyCount ?? 0}</Text> this week
-          </Text>
         </View>
 
         {/* Edit profile / Share profile / Settings — full labels so neither
@@ -385,11 +380,11 @@ export default function ProfileScreen() {
             </>
           ) : statusKind === 'off' ? (
             <Text className="text-xs text-white/55 font-sans">
-              Friends can&apos;t see you right now. Update your status to share again.
+              Your location isn’t shared.
             </Text>
           ) : (
             <Text className="text-xs text-white/55 font-sans">
-              Going out after all? Update your status to see who&apos;s where.
+              Live friend locations are hidden while you’re in.
             </Text>
           )}
 
@@ -497,7 +492,6 @@ export default function ProfileScreen() {
                 </View>
               ) : null}
             </View>
-            <Text className="text-white/55 text-xs font-sans">Find, invite and stay connected</Text>
           </View>
           <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.3)" />
         </Pressable>
@@ -526,8 +520,8 @@ export default function ProfileScreen() {
             ) : (
               <EmptyCard
                 icon="mappin.and.ellipse"
-                title="Your night out history starts here"
-                subtitle="Share your spot at venues and they'll show up on your profile."
+                title="Your recent spots"
+                subtitle="Check in to start your list."
               />
             )
           ) : spotsView === 'wishlist' ? (
@@ -540,8 +534,8 @@ export default function ProfileScreen() {
             ) : (
               <EmptyCard
                 icon="bookmark"
-                title="Build your wishlist"
-                subtitle="Save spots you want to check out. They'll live here."
+                title="Your next spots"
+                subtitle="Save a venue to find it here."
               />
             )
           ) : (data?.posts ?? []).length > 0 ? (
@@ -558,19 +552,11 @@ export default function ProfileScreen() {
             <EmptyCard
               icon="camera"
               title="No posts yet"
-              subtitle="Share moments from your nights out and they'll appear here."
+              subtitle="Your posts appear here until 5am."
             />
           )}
         </View>
 
-        {/* Log out */}
-        <Pressable
-          onPress={() => void signOutWithPushCleanup()}
-          className="flex-row items-center justify-center gap-2 py-3 rounded-full border border-red-500/40 active:bg-red-500/10"
-        >
-          <SymbolView name="rectangle.portrait.and.arrow.right" size={15} tintColor="#f87171" />
-          <Text className="text-red-400 text-sm font-sans-medium">Log Out</Text>
-        </Pressable>
       </ScrollView>
     </View>
   );

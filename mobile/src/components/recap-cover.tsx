@@ -1,10 +1,8 @@
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Camera, MapPinned, Sunrise } from 'lucide-react-native';
 import Transition from 'react-native-screen-transitions';
 import { Avatar } from '@/components/avatar';
-import { DayPlaceholder } from '@/components/day-placeholder';
 import { Image } from '@/components/styled';
 import { useRecapPictures } from '@/hooks/use-night-recap';
 import type { NightRecap } from '@/lib/night-recap';
@@ -99,11 +97,13 @@ export function RecapCover({ recap, loading }: { recap: NightRecap | null | unde
 
   if (!recap) {
     return (
-      <DayPlaceholder
-        icons={[Sunrise, MapPinned, Camera]}
-        title="Your Morning After lands here"
-        body="Check in somewhere tonight — tomorrow you’ll get a replay of your stops, pictures and familiar faces."
-      />
+      <View className="flex-row items-center gap-3 px-4 py-3 rounded-2xl bg-white/[0.03]">
+        <SymbolView name="sunrise" size={20} tintColor="rgba(255,255,255,0.65)" />
+        <View className="flex-1 gap-1">
+          <Text className="text-white/85 text-sm font-sans-medium">Morning After</Text>
+          <Text className="text-white/60 text-xs font-sans">Your recap appears after a night out.</Text>
+        </View>
+      </View>
     );
   }
 

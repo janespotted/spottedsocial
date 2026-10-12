@@ -839,7 +839,7 @@ function LiveMapScreen() {
                 : 'No friends out yet'}
             </Text>
             <Text className='text-white/50 text-xs font-sans'>
-              Going out after all? Update your status to see who&apos;s where.
+              Live friend locations are hidden while you’re in.
             </Text>
             <Pressable
               onPress={() => router.push('/check-in')}
@@ -864,12 +864,7 @@ function LiveMapScreen() {
         <View className='absolute top-safe-offset-28 left-4 right-4'>
           <View className='rounded-2xl px-4 py-3 bg-[#1a0f2e]/95 border border-white/10 gap-2'>
             <Text className='text-white text-sm font-sans-semibold'>
-              Nothing matches your filters
-            </Text>
-            <Text className='text-white/50 text-xs font-sans'>
-              {friends.length > 0 || venues.length > 0
-                ? 'Friends and venues are hidden by the current filters.'
-                : 'No friends are sharing yet, and venues are hidden.'}
+              No matches
             </Text>
             <Pressable
               onPress={resetMapFilters}

@@ -9,6 +9,7 @@ import { LaunchButton, LaunchShell } from '@/components/launch-shell';
 import { LaunchIntroduction } from '@/components/launch-introduction';
 import { PhoneVerifyForm } from '@/components/phone-verify-form';
 import { launchRpc, launchStage, nominationPhone, type LaunchState } from '@/lib/launch';
+import { nomineeName, readNomineeLabels, saveNomineeLabel, type NomineeLabels } from '@/lib/nomination-progress';
 import { readIntroStep } from '@/lib/launch-intro';
 import { supabase } from '@/lib/supabase';
 import { formatE164 } from '@/lib/country-codes';
@@ -36,6 +37,9 @@ function LaunchSetup() {
   // Keep the opening view to two cards; show entry controls after a choice.
   const [slot, setSlot] = useState(launch?.nominations.length === 1 ? 2 : 0);
   const [phone, setPhone] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [nomineeLabels, setNomineeLabels] = useState<NomineeLabels>({});
+  useEffect(() => { let active = true; if (session) void readNomineeLabels(session.user.id).then(value => { if (active) setNomineeLabels(value); }); return () => { active = false; }; }, [session?.user.id]);
   const [verifyPhone, setVerifyPhone] = useState(false);
   const usernameInput = useRef<TextInput>(null);
   useEffect(() => { if (launch) setState(launch); }, [launch]);
@@ -102,18 +106,19 @@ function LaunchSetup() {
     if (!contact) return;
     const numbers = [...new Set((contact.phoneNumbers || []).map(p => p.number).filter((p): p is string => !!p))];
     if (!numbers.length) throw new Error('This contact has no phone number. Choose another person or enter one below.');
-    if (numbers.length === 1) { setPhone(numbers[0]); return; }
-    if (Platform.OS === 'ios') ActionSheetIOS.showActionSheetWithOptions({ title: 'Choose their number', options: [...numbers, 'Cancel'], cancelButtonIndex: numbers.length }, i => { if (numbers[i]) setPhone(numbers[i]); });
-    else Alert.alert('Choose their number', undefined, [...numbers.slice(0, 2).map(number => ({ text: number, onPress: () => setPhone(number) })), { text: 'Cancel', style: 'cancel' }]);
+    const chooseNumber = (value: string) => { setPhone(value); setContactName(contact.name ?? ''); };
+    if (numbers.length === 1) { chooseNumber(numbers[0]); return; }
+    if (Platform.OS === 'ios') ActionSheetIOS.showActionSheetWithOptions({ title: 'Choose their number', options: [...numbers, 'Cancel'], cancelButtonIndex: numbers.length }, i => { if (numbers[i]) chooseNumber(numbers[i]); });
+    else Alert.alert('Choose their number', undefined, [...numbers.slice(0, 2).map(number => ({ text: number, onPress: () => chooseNumber(number) })), { text: 'Cancel', style: 'cancel' }]);
   });
   return <LaunchIntroduction userId={session?.user.id} enabled={!!session && stage === 'nominate'}>
   <LaunchShell key="nominate" step={2} title="Who’s next?" subtitle="Two new people. A future wave.">
     <View className="gap-3 mb-6">
       {[1, 2].map(n => {
         const choice = choices.find(c => c.slot === n);
-        return <Pressable key={n} disabled={busy} onPress={() => { setSlot(n); setPhone(choice?.phone || ''); setError(null); }} accessibilityRole="button" accessibilityLabel={`Nominee ${n}${choice ? `, ${choice.phone}, change` : ', choose a person'}`} accessibilityState={{ selected: slot === n }} className="rounded-2xl border p-4 flex-row items-center gap-4" style={{ borderColor: slot === n ? NEON : 'rgba(255,255,255,0.15)', backgroundColor: choice ? 'rgba(212,255,0,0.06)' : 'rgba(255,255,255,0.03)' }}>
+        return <Pressable key={n} disabled={busy} onPress={() => { setSlot(n); setPhone(choice?.phone || ''); setContactName(choice ? nomineeName(nomineeLabels, n, choice.phone) : ''); setError(null); }} accessibilityRole="button" accessibilityLabel={`Nominee ${n}${choice ? `, ${choice.phone}, change` : ', choose a person'}`} accessibilityState={{ selected: slot === n }} className="rounded-2xl border p-4 flex-row items-center gap-4" style={{ borderColor: slot === n ? NEON : 'rgba(255,255,255,0.15)', backgroundColor: choice ? 'rgba(212,255,0,0.06)' : 'rgba(255,255,255,0.03)' }}>
           <Text className="text-xl font-sans-light" style={{ color: choice ? NEON : MIST }}>0{n}</Text>
-          <View className="flex-1"><Text className="text-white text-base font-sans-medium">{choice ? formatE164(choice.phone) : 'Someone worth knowing'}</Text><Text className="text-white/60 text-xs mt-1">{choice ? 'Saved for a future wave · tap to change' : 'Select a contact or add a number'}</Text></View>
+          <View className="flex-1"><Text className="text-white text-base font-sans-medium">{choice ? nomineeName(nomineeLabels, n, choice.phone) || formatE164(choice.phone) : 'Someone worth knowing'}</Text><Text className="text-white/60 text-xs mt-1">{choice ? 'Saved for a future wave · tap to change' : 'Select a contact or add a number'}</Text></View>
           <SymbolView name={choice ? 'checkmark' : 'plus'} tintColor={choice ? NEON : MIST} size={18} />
         </Pressable>;
       })}
@@ -121,11 +126,16 @@ function LaunchSetup() {
     {slot > 0 ? <View className="rounded-2xl bg-white/5 p-5 mb-5">
       <Text className="text-white/70 text-sm mb-3">Nominee {slot}</Text>
       <Pressable disabled={busy} onPress={pickContact} accessibilityRole="button" className="min-h-11 flex-row items-center gap-3 mb-3"><SymbolView name="person.crop.circle.badge.plus" tintColor={NEON} size={22} /><Text style={{ color: NEON }} className="text-base font-sans-medium">Choose from contacts</Text></Pressable>
-      <TextInput accessibilityLabel={`Phone number for nominee ${slot}`} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="Or enter a phone number" placeholderTextColor={MIST} maxLength={30} className="text-white text-lg border-b border-white/20 py-3" />
+      <TextInput accessibilityLabel={`Phone number for nominee ${slot}`} value={phone} onChangeText={value => { setPhone(value); setContactName(''); }} keyboardType="phone-pad" placeholder="Or enter a phone number" placeholderTextColor={MIST} maxLength={30} className="text-white text-lg border-b border-white/20 py-3" />
       <Text className="text-white/55 text-xs leading-5 mt-2 mb-4">US numbers or +country code. Only the number you confirm is shared with Spotted.</Text>
       <Pressable accessibilityRole="button" disabled={busy || !nominationPhone(phone)} onPress={() => void perform(async () => {
         const next = await launchRpc('save_launch_nomination', { p_slot: slot, p_phone: nominationPhone(phone) });
-        setState(next); setPhone(''); setSlot(next.nominations.length === 2 ? 0 : next.nominations.some(c => c.slot === 1) ? 2 : 1); Keyboard.dismiss(); void Haptics.selectionAsync();
+        if (session) {
+          const confirmedPhone = nominationPhone(phone)!;
+          await saveNomineeLabel(session.user.id, slot, confirmedPhone, contactName);
+          setNomineeLabels(current => ({ ...current, [slot]: { phone: confirmedPhone, name: contactName } }));
+        }
+        setContactName(''); setState(next); setPhone(''); setSlot(next.nominations.length === 2 ? 0 : next.nominations.some(c => c.slot === 1) ? 2 : 1); Keyboard.dismiss(); void Haptics.selectionAsync();
       })} className="min-h-11 items-center justify-center rounded-xl border border-white/25 disabled:opacity-35"><Text className="text-white font-sans-medium">{busy ? 'Saving…' : `Confirm nominee ${slot}`}</Text></Pressable>
       {choices.length === 2 ? <Pressable className="min-h-11 items-center justify-center mt-2" onPress={() => { setSlot(0); setPhone(''); setError(null); }}><Text className="text-white/65">Keep saved choices</Text></Pressable> : null}
     </View> : null}

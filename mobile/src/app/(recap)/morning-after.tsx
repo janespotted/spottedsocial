@@ -615,8 +615,8 @@ export default function MorningAfter() {
           <Animated.View entering={FadeInDown.springify().damping(18)} className="mt-6">
             <DayPlaceholder
               icons={[Sunrise, TicketIcon, Images]}
-              title="Nothing to replay yet"
-              body="Your stops, photos and familiar faces after a night out. Just for you."
+              title="No recap yet"
+              body="Your private replay after a night out."
               action={{ label: 'Make a plan', icon: CalendarPlus, onPress: () => router.push('/create-plan') }}
             />
           </Animated.View>
