@@ -6,7 +6,7 @@ The browser admin entry is `/launch-admin.html`. It is a separate entry point, s
 
 Create a named draft with a capacity of 100. Paste numbers and optional names, or upload a CSV. Imports normalize numbers, reject invalid rows, and skip duplicate numbers and completed members. Imported people enter the queue first; select them and assign them to the draft. The server serializes assignments and rejects a batch that exceeds the capacity. Existing members are shown separately; a capacity of 100 means 100 named invitation places, in addition to existing accounts.
 
-Before opening the first wave, save an external TestFlight invitation URL or App Store URL. Build 53 is internal-only, so its App Store Connect page is not a valid invitation link. Confirm invite-only admission in Launch settings. This preserves completed accounts but requires every new entrant, including Apple users, to verify an invited phone. Review the actual guest list before opening access. A forwarded installation link cannot grant admission.
+Before opening the first wave, save an external TestFlight invitation URL or App Store URL. The current build 55 distribution is internal-only, so its App Store Connect page is not a valid invitation link. Confirm invite-only admission in Launch settings. This preserves completed accounts but requires every new entrant, including Apple users, to verify an invited phone. Review the actual guest list before opening access. A forwarded installation link cannot grant admission.
 
 Later nominations enter the queue only after their nominator completes both required nominations. A nominated phone is unique across seed imports and nominations. Draft assignment is separate from admission. Opening a wave is safe to repeat. Pause stops new claims while people already joining retain access. Revoking an unused invitation preserves its history; this action cannot remove an existing account. Opened lists cannot be silently reshuffled.
 
@@ -24,7 +24,7 @@ Search by name, phone, or nominator; filter by wave and status. CSV export label
 
 ## Apple sign-in
 
-Apple stays connected to the same authenticated account. Phone verification uses Supabase `updateUser({phone})` and `verifyOtp({type:'phone_change'})`; the database reads only the confirmed phone from `auth.users`. It never trusts editable user metadata. A phone already belonging to another account is not merged automatically: sign in to that phone's existing account, then link Apple in Settings. Previously completed accounts retain access. Build 53 already has the waiting-screen phone-claim path; the next mobile build adds the dedicated required-phone screen.
+Apple stays connected to the same authenticated account. Phone verification uses Supabase `updateUser({phone})` and `verifyOtp({type:'phone_change'})`; the database reads only the confirmed phone from `auth.users`. It never trusts editable user metadata. A phone already belonging to another account is not merged automatically: sign in to that phone's existing account, then link Apple in Settings. Previously completed accounts retain access. Builds 54 and 55 include the dedicated required-phone screen as well as the waiting-screen phone-claim path.
 
 ## Invitation delivery
 
