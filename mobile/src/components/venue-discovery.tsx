@@ -14,11 +14,15 @@ import { getVenuePhotoUrl, getVenueTypeDisplay } from '@/lib/venues';
 import { NEON } from '@/lib/theme';
 import { Image } from './styled';
 import { EmptyState, ErrorState } from './empty-state';
+import { RecommendedVenueCard } from './venue-recommendations';
+import { pickForVenue, type RecommendedVenue } from '@/lib/venue-recommendations';
+import { useVenueRecommendations } from '@/hooks/use-venue-recommendations';
 
-function VenueRow({ venue, saved }: { venue: DiscoveryVenue; saved: boolean }) {
+function VenueRow({ venue, saved, city }: { venue: DiscoveryVenue; saved: boolean; city: string }) {
   const [photoFailed, setPhotoFailed] = useState(false);
   useEffect(() => setPhotoFailed(false), [venue.id]);
-  const type = getVenueTypeDisplay(venue.type ?? 'bar');
+  const pick = pickForVenue(venue.id, city, venue.name);
+  const type = getVenueTypeDisplay(pick ? pick.category === 'dancing' ? 'nightclub' : 'cocktail_bar' : venue.type ?? 'bar');
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${venue.name}${saved ? ', saved' : ''}. Open venue`}
       onPress={() => router.push({ pathname: '/venue', params: { venueId: venue.id } })}
@@ -43,23 +47,30 @@ export function VenueDiscovery({ liveKind, standalone = false }: { liveKind?: 'm
   const { city, isNight, opensLabel } = useNightMode();
   const [search, setSearch] = useState('');
   const [term, setTerm] = useState('');
-  const [savedOnly, setSavedOnly] = useState(false);
+  const [mode, setMode] = useState<'for-you' | 'all' | 'saved'>(city === 'nyc' ? 'for-you' : 'all');
+  useEffect(() => { setMode(city === 'nyc' ? 'for-you' : 'all'); setSearch(''); setTerm(''); }, [city]);
+  const savedOnly = mode === 'saved';
+  const forYou = mode === 'for-you';
+  const featured = useVenueRecommendations(forYou, term);
   useEffect(() => { const timer = setTimeout(() => setTerm(search.trim()), 200); return () => clearTimeout(timer); }, [search]);
   const saved = useQuery({ queryKey: ['saved-venues', session?.user.id], enabled: !!session,
     queryFn: () => fetchSavedVenueNames(session!.user.id) });
   const venues = useInfiniteQuery({
     queryKey: ['venue-discovery', session?.user.id, city, term, savedOnly ? saved.data : null, savedOnly],
-    enabled: !!session && (!savedOnly || saved.isSuccess),
+    enabled: !!session && !forYou && (!savedOnly || saved.isSuccess),
     initialPageParam: 0,
     queryFn: ({ pageParam }) => fetchDiscoveryVenues(city, term, pageParam, savedOnly ? saved.data : undefined),
     getNextPageParam: (last, pages) => last.length === VENUE_PAGE_SIZE ? pages.length : undefined,
     staleTime: 60_000,
   });
-  const { refreshing, onRefresh } = usePullToRefresh(async () => { await Promise.all([saved.refetch(), venues.refetch()]); });
-  const rows = venues.data?.pages.flat() ?? [];
+  const { refreshing, onRefresh } = usePullToRefresh(async () => {
+    if (forYou) await featured.refresh();
+    else await Promise.all([saved.refetch(), venues.refetch()]);
+  });
+  const rows = forYou ? featured.rows : venues.data?.pages.flat() ?? [];
   const contentContainerStyle = useResolveClassNames(standalone ? 'px-5 pb-safe-offset-8' : 'px-4 pb-32');
-  const waiting = search.trim() !== term || venues.isLoading || (savedOnly && saved.isLoading);
-  const failed = venues.isError || (savedOnly && saved.isError);
+  const waiting = search.trim() !== term || (forYou ? featured.isLoading : venues.isLoading || (savedOnly && saved.isLoading));
+  const failed = forYou ? featured.isError : venues.isError || (savedOnly && saved.isError);
   return (
     <View className="flex-1">
       <View className="px-5 pt-4 pb-3 gap-4">
@@ -78,18 +89,19 @@ export function VenueDiscovery({ liveKind, standalone = false }: { liveKind?: 'm
           {search ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setSearch('')} className="min-h-11 min-w-11 items-center justify-center"><SymbolView name="xmark" size={13} tintColor="rgba(255,255,255,0.65)" /></Pressable> : null}
         </View>
         <View className="flex-row gap-2" accessibilityRole="tablist">
-          {[false, true].map(value => <Pressable key={String(value)} accessibilityRole="tab" accessibilityState={{ selected: savedOnly === value }} onPress={() => setSavedOnly(value)} className={`min-h-11 px-5 justify-center rounded-full ${savedOnly === value ? 'bg-white/10' : ''}`}>
-            <Text className={`text-sm font-sans-medium ${savedOnly === value ? 'text-white' : 'text-white/60'}`}>{value ? 'Saved' : 'All spots'}</Text>
+          {([{ key: 'for-you', label: 'For you' }, { key: 'all', label: 'All spots' }, { key: 'saved', label: 'Saved' }] as const).map(tab => <Pressable key={tab.key} accessibilityRole="tab" accessibilityState={{ selected: mode === tab.key }} onPress={() => setMode(tab.key)} className={`min-h-11 px-5 justify-center rounded-full ${mode === tab.key ? 'bg-white/10' : ''}`}>
+            <Text className={`text-sm font-sans-medium ${mode === tab.key ? 'text-white' : 'text-white/60'}`}>{tab.label}</Text>
           </Pressable>)}
         </View>
       </View>
-      <LegendList data={waiting && search.trim() !== term ? [] : rows} keyExtractor={item => item.id} recycleItems contentContainerStyle={contentContainerStyle}
+      <LegendList key={mode} data={waiting && search.trim() !== term ? [] : rows} keyExtractor={item => item.id} recycleItems contentContainerStyle={contentContainerStyle}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColorClassName="accent-[#d4ff00]" />}
-        onEndReached={() => { if (venues.hasNextPage && !venues.isFetching && !venues.isError) void venues.fetchNextPage(); }} onEndReachedThreshold={0.4}
-        ListEmptyComponent={waiting ? <ActivityIndicator color={NEON} className="py-12" /> : failed ? <ErrorState compact title="Couldn’t load spots" onRetry={onRefresh} retrying={refreshing} /> : <EmptyState compact icon={savedOnly ? 'bookmark' : 'magnifyingglass'} title={term ? 'No matches' : savedOnly ? 'Your next spots' : 'More spots soon'} body={term ? undefined : savedOnly ? 'Save a venue to find it here.' : undefined} actions={term ? [{label:'Clear search',onPress:()=>setSearch(''),primary:true}] : savedOnly ? [{label:'Explore spots',onPress:()=>setSavedOnly(false),primary:true}] : []} />}
-        ListFooterComponent={venues.isFetchingNextPage ? <ActivityIndicator color={NEON} className="py-5" /> : failed && rows.length > 0 ? <ErrorState compact title="Couldn’t refresh spots" body="" onRetry={onRefresh} retrying={refreshing} /> : null}
-        renderItem={({item}) => <VenueRow venue={item} saved={saved.data?.includes(item.name) ?? false} />}
+        onEndReached={() => { if (!forYou && venues.hasNextPage && !venues.isFetching && !venues.isError) void venues.fetchNextPage(); }} onEndReachedThreshold={0.4}
+        ListHeaderComponent={forYou && rows.length > 0 ? <Text className="text-white/55 text-xs font-sans pb-4">Cocktails & dancing, selected by Spotted.</Text> : null}
+        ListEmptyComponent={waiting ? <ActivityIndicator color={NEON} className="py-12" /> : failed ? <ErrorState compact title="Couldn’t load spots" onRetry={onRefresh} retrying={refreshing} /> : <EmptyState compact icon={savedOnly ? 'bookmark' : 'magnifyingglass'} title={term ? 'No matches' : savedOnly ? 'Your next spots' : forYou ? 'More picks soon' : 'More spots soon'} body={term ? undefined : savedOnly ? 'Save a venue to find it here.' : undefined} actions={term ? [{label:'Clear search',onPress:()=>setSearch(''),primary:true}] : savedOnly ? [{label:'Explore spots',onPress:()=>setMode('all'),primary:true}] : forYou ? [{label:'Browse all spots',onPress:()=>setMode('all'),primary:true}] : []} />}
+        ListFooterComponent={!forYou && venues.isFetchingNextPage ? <ActivityIndicator color={NEON} className="py-5" /> : failed && rows.length > 0 ? <ErrorState compact title="Couldn’t refresh spots" body="" onRetry={onRefresh} retrying={refreshing} /> : null}
+        renderItem={({item}) => 'pick' in item ? <View className="mb-4"><RecommendedVenueCard venue={item as RecommendedVenue} /></View> : <VenueRow city={city} venue={item} saved={saved.data?.includes(item.name) ?? false} />}
       />
     </View>
   );

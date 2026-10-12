@@ -229,3 +229,10 @@ Demo mode seeds 24 fake users + content for testing. Real and demo data coexist 
 - Live Leaderboard uses separate Live activity and Explore spots sections. Catalog-only venues have no numbered live rank or first-place treatment. Promoted venues remain explicitly labeled.
 - `get_my_nomination_progress()` is an owner-only, read-only RPC. Place unlocked is not Invited; Invited requires a recorded sent invitation, Joined requires completed onboarding. Opening this screen never sends messages or changes admission.
 - Only a contact’s selected number is uploaded during nomination. Selected names are optional, saved locally by account and slot, and displayed only while the phone still matches.
+
+## Reviewed venue discovery (October 2026)
+
+- NYC Explore defaults to For you; All spots and Saved remain separate. Recommendations come only from the reviewed, expiring `mobile/src/lib/venue-picks.json` manifest, matched to exact real venue ids and names. LA defaults to its catalog. See `docs/VENUE-CURATION.md` for evidence, review deadline and refresh procedure.
+- Never describe catalog order, source coverage or editorial choices as a live crowd score. Why this spot provides sources and review date. Sip & Guzzle is excluded from featured picks, not from search or check-in.
+- Own saved neighborhoods/styles may reorder reviewed picks. No additional friend/private-location queries are permitted for discovery.
+- Night Home places real friends’ activity before For tonight and a compact Post composer. New members get Find friends first; populated feeds keep posts first and put picks after the last page. Preserve empty/error distinctions and audience restrictions.

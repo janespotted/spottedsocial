@@ -35,6 +35,8 @@ import { useFriendsOut } from '@/hooks/use-friends-out';
 import { useSession } from '@/hooks/use-session';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { Avatar } from '@/components/avatar';
+import { pickForVenue } from '@/lib/venue-recommendations';
+import { VenuePickDetails } from '@/components/venue-recommendations';
 import { VenueEventsSection } from '@/components/venue-events-section';
 
 interface VenueData {
@@ -508,10 +510,12 @@ export default function VenueScreen() {
     );
   };
 
+  const reviewedPick = venue ? pickForVenue(venue.id, venue.city ?? '', venue.name) : undefined;
   const typeInfo = venue?.type ? getVenueTypeDisplay(venue.type) : null;
   const distNum = data?.distance ? parseFloat(data.distance) : NaN;
   const metaParts: string[] = [];
-  if (typeInfo) metaParts.push(typeInfo.label);
+  if (reviewedPick) metaParts.push(reviewedPick.category === 'dancing' ? 'Dancing' : 'Cocktails');
+  else if (typeInfo) metaParts.push(typeInfo.label);
   if (venue?.neighborhood) metaParts.push(venue.neighborhood);
   if (!isNaN(distNum) && distNum <= 10) metaParts.push(`${data!.distance} mi`);
 
@@ -672,10 +676,10 @@ export default function VenueScreen() {
             <SymbolView name="xmark" size={14} tintColor="#ffffff" />
           </Pressable>
           <View className="absolute bottom-0 left-0 right-0 px-5 pb-3">
-            {venue?.is_map_promoted ? (
+            {reviewedPick ? (
               <View className="self-start px-2 py-0.5 mb-1.5 rounded-full bg-[#d4ff00]/15 border border-[#d4ff00]/20">
                 <Text className="text-[10px] font-sans-medium" style={{ color: NEON }}>
-                  Featured Tonight
+                  Spotted pick
                 </Text>
               </View>
             ) : null}
@@ -719,6 +723,8 @@ export default function VenueScreen() {
           {metaParts.length > 0 ? (
             <Text className="text-xs text-white/60 font-sans mb-3">{metaParts.join(' · ')}</Text>
           ) : null}
+
+          <VenuePickDetails venueId={venue.id} city={venue.city ?? ''} name={venue.name} />
 
           {/* ── ZONE 2: Social — who's here leads the card ── */}
           <View className="mb-3 gap-3">

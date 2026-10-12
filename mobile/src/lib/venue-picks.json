@@ -1,0 +1,218 @@
+[
+  {
+    "venueId": "bb435190-8c8f-4bed-a55d-9028b88b2197",
+    "name": "Temple Bar",
+    "city": "nyc",
+    "neighborhood": "NoHo",
+    "category": "cocktails",
+    "tags": [
+      "Martinis",
+      "Low-lit"
+    ],
+    "reason": "Martinis in an intimate downtown room.",
+    "visitNote": "Check reservations and dress code.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "The Infatuation",
+        "kind": "editorial",
+        "url": "https://www.theinfatuation.com/new-york/reviews/temple-bar"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.templebar.co/"
+      }
+    ]
+  },
+  {
+    "venueId": "8818a41c-8722-49bb-8984-3dca2f565c4e",
+    "name": "Public Records",
+    "city": "nyc",
+    "neighborhood": "Gowanus",
+    "category": "dancing",
+    "tags": [
+      "Hi-fi",
+      "Electronic"
+    ],
+    "reason": "A sound-focused night across distinct rooms.",
+    "visitNote": "Check the event and ticket details.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "Resident Advisor",
+        "kind": "editorial",
+        "url": "https://ra.co/guides/clubs-in-newyorkcity"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://publicrecords.nyc/"
+      }
+    ]
+  },
+  {
+    "venueId": "cc74bc26-413f-4332-b710-2dfc72323a66",
+    "name": "Katana Kitten",
+    "city": "nyc",
+    "neighborhood": "West Village",
+    "category": "cocktails",
+    "tags": [
+      "Highballs",
+      "Lively"
+    ],
+    "reason": "Japanese-American cocktails with a lively bar feel.",
+    "visitNote": "Check current hours before heading over.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "The Infatuation",
+        "kind": "editorial",
+        "url": "https://www.theinfatuation.com/new-york/reviews/katana-kitten"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.katanakitten.com/"
+      }
+    ]
+  },
+  {
+    "venueId": "33715e37-98ef-4c96-b4ef-8aa67e1def0c",
+    "name": "Gabriela",
+    "city": "nyc",
+    "neighborhood": "Williamsburg",
+    "category": "dancing",
+    "tags": [
+      "House",
+      "Intimate"
+    ],
+    "reason": "House and disco on an intimate dance floor.",
+    "visitNote": "Check the lineup and admission details.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "Resident Advisor",
+        "kind": "editorial",
+        "url": "https://ra.co/guides/clubs-in-newyorkcity"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.gabriela.nyc/about"
+      }
+    ]
+  },
+  {
+    "venueId": "8a676e1c-be0b-458c-99c3-1bfcf449cc6f",
+    "name": "Double Chicken Please",
+    "city": "nyc",
+    "neighborhood": "Lower East Side",
+    "category": "cocktails",
+    "tags": [
+      "Inventive",
+      "Cocktails"
+    ],
+    "reason": "Playful, food-inspired cocktails in The Coop.",
+    "visitNote": "The Coop and Free Range offer different experiences.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "Time Out",
+        "kind": "editorial",
+        "url": "https://www.timeout.com/newyork/bars/double-chicken-please"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://doublechickenplease.com/pages/visitus"
+      }
+    ]
+  },
+  {
+    "venueId": "d9c99d8d-34cb-4e8b-8298-0351aed28c62",
+    "name": "Nowadays",
+    "city": "nyc",
+    "neighborhood": "Ridgewood",
+    "category": "dancing",
+    "tags": [
+      "Listening",
+      "Dance floor"
+    ],
+    "reason": "A music-first dance floor with a spacious garden.",
+    "visitNote": "Check the event and entry requirements.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "Resident Advisor",
+        "kind": "editorial",
+        "url": "https://ra.co/guides/clubs-in-newyorkcity"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://nowadays.nyc/about/"
+      }
+    ]
+  },
+  {
+    "venueId": "a744db2d-86e6-4e97-9316-991eacf5e55a",
+    "name": "Attaboy",
+    "city": "nyc",
+    "neighborhood": "Lower East Side",
+    "category": "cocktails",
+    "tags": [
+      "Bespoke",
+      "Intimate"
+    ],
+    "reason": "Tell the bartender what you like; they build the drink.",
+    "visitNote": "Small groups; check reservations and walk-in availability.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "Time Out",
+        "kind": "editorial",
+        "url": "https://www.timeout.com/newyork/bars/attaboy"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://attaboy.us/visit-us"
+      }
+    ]
+  },
+  {
+    "venueId": "09ad762a-0ac9-4ee9-b6de-89827dd47442",
+    "name": "Elsewhere",
+    "city": "nyc",
+    "neighborhood": "Bushwick",
+    "category": "dancing",
+    "tags": [
+      "DJs",
+      "Multi-room"
+    ],
+    "reason": "DJ nights and live music across multiple rooms.",
+    "visitNote": "Check which event and room your ticket covers.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "Time Out",
+        "kind": "editorial",
+        "url": "https://www.timeout.com/newyork/nightlife/best-clubs-in-nyc"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.elsewhere.club/homepage"
+      }
+    ]
+  }
+]

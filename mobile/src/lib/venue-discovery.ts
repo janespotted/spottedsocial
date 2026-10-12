@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { currentPicks } from './venue-recommendations';
 
 export const VENUE_PAGE_SIZE = 24;
 export interface DiscoveryVenue {
@@ -29,4 +30,15 @@ export async function fetchSavedVenueNames(userId: string) {
   const { data, error } = await supabase.from('wishlist_places').select('venue_name').eq('user_id', userId);
   if (error) throw error;
   return [...new Set((data ?? []).map(row => row.venue_name))].sort();
+}
+
+/** Curated ids only; failed/absent recommendations never fall back to random catalog rows. */
+export async function fetchFeaturedVenues(city: string) {
+  const ids = currentPicks(city).map(p => p.venueId);
+  if (!ids.length) return [] as DiscoveryVenue[];
+  const { data, error } = await supabase.from('venues')
+    .select('id,name,neighborhood,type,google_photo_refs')
+    .eq('city', city).eq('is_demo', false).in('id', ids);
+  if (error) throw error;
+  return (data ?? []) as DiscoveryVenue[];
 }

@@ -4,7 +4,7 @@ const { load, queryFunction, builder, extract } = require('./product-test-runtim
 function catalog(response) {
  const calls=[];
  const q=new Proxy({then:(yes,no)=>Promise.resolve(response).then(yes,no)}, {get:(o,k)=>k==='then'?o.then:(...args)=>{calls.push([k,...args]);return q}});
- const api=load('lib/venue-discovery.ts',{'./supabase':{supabase:{from:t=>{calls.push(['from',t]);return q}}}});
+ const api=load('lib/venue-discovery.ts',{'./venue-recommendations':{currentPicks:()=>[]},'./supabase':{supabase:{from:t=>{calls.push(['from',t]);return q}}}});
  return {api,calls};
 }
 test('daytime discovery reads only real catalog venues in the selected city, with stable paging and literal search',async()=>{

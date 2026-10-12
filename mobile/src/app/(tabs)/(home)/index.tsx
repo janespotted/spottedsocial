@@ -25,6 +25,7 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { EmptyState, ErrorState } from '@/components/empty-state';
 import { addFriendsActions } from '@/lib/add-friends';
 import { FriendsOutBanner } from '@/components/friends-out-banner';
+import { ForTonight } from '@/components/venue-recommendations';
 import { PostCard } from '@/components/post-card';
 // Plans moved out of Home into the Chat tab (client change, Sept 2026).
 // Kept imported nowhere here on purpose — see app/(tabs)/(messages)/messages.tsx.
@@ -141,8 +142,8 @@ function PlanningTonightCard({ friends }: { friends: FriendNightStatus[] }) {
 
 /**
  * Empty feed, by situation (client feedback §8): no friends → add some;
- * friends but nothing posted → say so and offer to post. Friends who are
- * out or TBD still show above, so an empty feed is never a dead end.
+ * friends but nothing posted → real activity, a reviewed venue edit, then Post.
+ * With posts present, recommendations appear only after the last loaded page.
  */
 function EmptyFeed({
   friendCount,
@@ -157,32 +158,18 @@ function EmptyFeed({
   venuesWithheld: boolean;
   onMeetUp: (friend: FriendNightStatus) => void;
 }) {
-  if (friendCount === 0) {
-    return (
-      <EmptyState
-        icon="person.2"
-        title="Find your people"
-        body="Your friends’ nights start here."
-        actions={addFriendsActions()}
-      />
-    );
-  }
-
-  const nobodyAround = outFriends.length === 0 && planningFriends.length === 0;
   return (
-    <View className="px-4 py-4 gap-6">
-      <OutTonightCard friends={outFriends} onMeetUp={onMeetUp} venuesWithheld={venuesWithheld} />
-      <PlanningTonightCard friends={planningFriends} />
-
-      <EmptyState
-        icon={nobodyAround ? 'moon.stars' : 'camera'}
-        title="No posts yet"
-        body="Start tonight’s feed."
-        actions={[
-          { label: 'Post', icon: 'camera.fill', primary: true, onPress: () => router.push('/create-post') },
-        ]}
-        compact={!nobodyAround}
-      />
+    <View className="py-4 gap-6">
+      {friendCount === 0 ? <View className="px-4"><EmptyState compact icon="person.2" title="Find your people" body="Your friends’ nights start here." actions={addFriendsActions()} /></View> : outFriends.length > 0 || planningFriends.length > 0 ? <View className="px-4 gap-4">
+        <OutTonightCard friends={outFriends} onMeetUp={onMeetUp} venuesWithheld={venuesWithheld} />
+        <PlanningTonightCard friends={planningFriends} />
+      </View> : null}
+      <ForTonight />
+      {friendCount > 0 ? <View className="px-4"><Pressable accessibilityRole="button" accessibilityLabel="Post to tonight’s feed" onPress={() => router.push('/create-post')} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 flex-row items-center gap-3 active:opacity-70">
+        <SymbolView name="camera" size={21} tintColor="rgba(255,255,255,0.7)" />
+        <Text className="text-white/70 text-sm font-sans flex-1">Start tonight’s feed</Text>
+        <Text style={{ color: NEON }} className="font-sans-semibold text-sm">Post</Text>
+      </Pressable></View> : null}
     </View>
   );
 }
@@ -435,9 +422,10 @@ function NewsfeedScreen({ active }: { active: boolean }) {
               <ActivityIndicator color={NEON} />
             </View>
           ) : (
-            <Text className="text-white/45 text-xs font-sans text-center py-6">
-              you&apos;re all caught up
-            </Text>
+            <View className="pt-6">
+              <ForTonight />
+              <Text className="text-white/45 text-xs font-sans text-center py-6">you&apos;re all caught up</Text>
+            </View>
           )
         }
         ListHeaderComponent={
