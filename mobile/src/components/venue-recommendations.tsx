@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Image } from './styled';
 import { ErrorState } from './empty-state';
 import { useVenueRecommendations } from '@/hooks/use-venue-recommendations';
 import { getVenuePhotoUrl } from '@/lib/venues';
-import { pickForVenue, tonightRecommendations, type RecommendedVenue } from '@/lib/venue-recommendations';
+import { tonightRecommendations, type RecommendedVenue } from '@/lib/venue-recommendations';
 import { NEON, INK_LIGHT, MIST } from '@/lib/theme';
 
 export function RecommendedVenueCard({ venue, compact = false }: { venue: RecommendedVenue; compact?: boolean }) {
@@ -17,8 +17,8 @@ export function RecommendedVenueCard({ venue, compact = false }: { venue: Recomm
     className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] active:opacity-80">
     <View style={{ height: compact ? 120 : 155, backgroundColor: INK_LIGHT }} className="items-center justify-center overflow-hidden">
       {!photoFailed ? <Image source={{ uri: getVenuePhotoUrl(venue.id, 0) }} className="absolute inset-0 w-full h-full" contentFit="cover" recyclingKey={venue.id} onError={() => setPhotoFailed(true)} /> :
-        <View className="items-center gap-2"><SymbolView name={venue.pick.category === 'dancing' ? 'waveform' : 'wineglass'} size={32} tintColor={MIST} /><Text className="text-white/50 text-xs font-sans">{venue.pick.category === 'dancing' ? 'For the music' : 'For a drink'}</Text></View>}
-      <View className="absolute top-3 left-3 rounded-full bg-black/65 px-2.5 py-1"><Text className="text-white text-[10px] font-sans-medium">{venue.pick.category === 'dancing' ? 'Dancing' : 'Cocktails'}</Text></View>
+        <View className="items-center gap-2"><SymbolView name={venue.pick.category === 'club' ? 'waveform' : 'wineglass'} size={32} tintColor={MIST} /><Text className="text-white/50 text-xs font-sans">{venue.pick.category === 'club' ? 'For the music' : 'For a drink'}</Text></View>}
+      <View className="absolute top-3 left-3 rounded-full bg-black/65 px-2.5 py-1"><Text className="text-white text-[10px] font-sans-medium">{venue.pick.category === 'club' ? 'Club' : 'Bar'}</Text></View>
     </View>
     <View className="p-3.5 gap-1.5">
       <Text className="text-white text-base font-sans-semibold">{venue.name}</Text>
@@ -45,25 +45,5 @@ export function ForTonight() {
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }} decelerationRate="fast" snapToInterval={Math.min(258, width - 64) + 12} snapToAlignment="start">
       {rows.map(venue => <View key={venue.id} style={{ width: Math.min(258, width - 64) }}><RecommendedVenueCard venue={venue} compact /></View>)}
     </ScrollView>
-  </View>;
-}
-
-/** Attribution lives behind one tap on the venue. Claims and sources expire together. */
-export function VenuePickDetails({ venueId, city, name }: { venueId: string; city: string; name: string }) {
-  const [expanded, setExpanded] = useState(false);
-  useEffect(() => setExpanded(false), [venueId]);
-  const pick = pickForVenue(venueId, city, name);
-  if (!pick) return null;
-  const openSource = (url: string) => { void Linking.openURL(url).catch(() => Alert.alert('Couldn’t open source', 'Please try again.')); };
-  return <View className="mb-3 rounded-xl bg-white/[0.04] border border-white/10 px-3">
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} className="min-h-11 flex-row items-center gap-2">
-      <SymbolView name="sparkle" size={13} tintColor={NEON} /><Text className="text-white/85 text-xs font-sans-medium flex-1">Spotted pick · Why this spot</Text><SymbolView name={expanded ? 'chevron.up' : 'chevron.down'} size={11} tintColor={MIST} />
-    </Pressable>
-    {expanded ? <View className="pb-3 gap-2">
-      <Text className="text-white text-sm font-sans">{pick.reason}</Text>
-      <Text className="text-white/65 text-xs font-sans">{pick.visitNote}</Text>
-      {pick.sources.map(source => <Pressable key={source.url} accessibilityRole="link" accessibilityLabel={`Open ${source.publisher} source`} onPress={() => openSource(source.url)} className="min-h-11 flex-row items-center gap-2"><Text className="text-white/85 text-xs font-sans flex-1">{source.publisher}</Text><SymbolView name="arrow.up.right" size={12} tintColor={MIST} /></Pressable>)}
-      <Text className="text-white/50 text-xs font-sans">Reviewed {new Date(`${pick.reviewedAt}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}. An editorial selection, not a live crowd ranking.</Text>
-    </View> : null}
   </View>;
 }

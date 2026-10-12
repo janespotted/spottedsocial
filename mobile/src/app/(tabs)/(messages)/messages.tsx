@@ -108,8 +108,8 @@ export default function MessagesScreen() {
   const { unreadCount } = useNotifications();
   const queryClient = useQueryClient();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
-  const [activeTab, setActiveTab] = useState<TabType>('plans');
-  useEffect(() => { if (tab === 'plans' || tab === 'dms') setActiveTab(tab === 'dms' ? 'messages' : 'plans'); }, [tab]);
+  // Keep the selection in the route so repeated Home → Plans links always open Plans.
+  const activeTab: TabType = tab === 'dms' ? 'messages' : 'plans';
   // pb clears the native tab bar + home indicator so the last row is reachable
   const contentContainerStyle = useResolveClassNames('px-4 pb-28');
 
@@ -217,7 +217,7 @@ export default function MessagesScreen() {
             { key: 'messages', label: 'DMs' },
           ]}
           value={activeTab}
-          onChange={setActiveTab}
+          onChange={value => router.setParams({ tab: value === 'messages' ? 'dms' : 'plans' })}
           trailing={
             activeTab === 'messages' && (threads?.length ?? 0) > 0 ? (
               // Compose icon, same flow as the empty-state "New chat" button

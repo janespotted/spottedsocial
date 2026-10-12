@@ -1,29 +1,21 @@
-# NYC discovery edit
+# NYC nightlife discovery
 
-Explore defaults to **For you** in NYC, with **All spots** and **Saved** alongside it. The initial edit is a reviewed selection of eight cocktail bars and dance venues, not an automated web-consensus score. The full catalog is searchable and is not itself an endorsement. LA defaults to All spots until it has its own reviewed edit.
+Explore defaults to **For you** in NYC; **All spots** and **Saved** remain searchable. This is an expiring editorial edit of clubs and lively social bars, anchored by Gospel. It is not a measured online buzz ranking. LA defaults to its catalog.
 
-## Evidence and relevance
+## Selection and evidence
 
-`mobile/src/lib/venue-picks.json` holds exact production venue ids, names, category, neighborhood, two short tags, a reason, visit guidance, review dates and source links. Each pick needs a current official venue site and independent editorial coverage. Sources checked for this launch edit include The Infatuation, Resident Advisor and Time Out. Official sites establish the venue identity and operating information; their existence is not independent evidence of popularity.
+The six picks are Gospel, Gabriela, Joyface, Le Bain, The Flower Shop and Nowadays. Cocktail-led lounges have been removed from the featured edit. Sip & Guzzle stays excluded from recommendations while remaining searchable.
 
-The eight picks are Temple Bar, Public Records, Katana Kitten, Gabriela, Double Chicken Please, Nowadays, Attaboy and Elsewhere. Sip & Guzzle is excluded from this editorial selection at Jane’s request. It remains searchable, saveable and eligible for ordinary venue interactions. No conclusion about its quality is inferred from that editorial exclusion.
+`mobile/src/lib/venue-picks.json` stores exact production ids and names, club/bar category, area, short tags, editorial context, review dates, and official/editorial links. NYLON covers Gospel’s music-led scene; The Infatuation’s June 2026 East Village guide supports Joyface; Resident Advisor’s February 2026 club guide covers Gabriela and Nowadays; Time Out documents Le Bain’s DJ programming; The Infatuation reviews The Flower Shop’s basement bar. Official sites were checked on October 11, 2026. Some editorial coverage is older: the selection must not be advertised as real-time consensus or current attendance. Official sites establish identity and operations, not independent popularity.
 
-The default order deliberately alternates cocktails and dancing. Saved reviewed venues can prioritize the member’s saved neighborhoods and styles. Only that member’s own wishlist is read; there is no friends-location query, cross-account preference inference, invented attendance, aggregate score or live trend claim. Recommendations require both the reviewed id and matching catalog name, and ignore demo venues. Stale, mismatched or unavailable records cannot fall back to arbitrary catalog entries.
+Why this spot and its source accordion are removed from the consumer UI at Jane’s request. Evidence stays in the manifest for internal review. The venue sheet can show **Here last night** using the viewer’s existing, unexpired recap of overlapping shared visits. It only shows direct friends returned by the existing authorized RPC, exact venue ids, the immediately preceding night, and no timestamps. Current sharing, hidden-location and block controls are rechecked server-side. Relationship invalidation clears cached rows; the UI clears expired recaps. It does not retain new history, expose mutuals’ past visits, or suggest that a past visitor is present now. A broader friends/mutuals visit history needs a separately designed opt-in retention feature.
 
-## Home and venue detail
+The member’s own saved areas/styles can reorder current picks. Discovery itself makes no friends-location queries. Expired, wrong-city, demo, missing or mismatched venue records cannot fall back to arbitrary endorsements. Home shows at most three distinct picks, mixing clubs and bars when both exist.
 
-An empty nighttime feed shows actual friends’ Out / TBD information when available, a three-card For tonight strip, then a compact Post action. New members see Find your people first. A populated feed shows posts first and recommendations after the final page. Existing audience restrictions remain intact.
+## Empty Home
 
-Each venue offers a compact **Why this spot** disclosure with the reason, visit guidance, source links and review date. This also clarifies that the edit is not a live crowd ranking. A Spotted pick label is tied to a valid reviewed pick, not a legacy map-promotion flag. Reviewed categories take precedence over inaccurate catalog categories in this disclosure/card.
+An empty nighttime feed shows existing friends’ activity, a compact Plans preview, nightlife picks, then Post. The preview uses the same audience-filtered plans query as Chat, shows at most two plans (tonight first, otherwise nearest future dates), and routes to `/messages?tab=plans`. Every preview row and See all opens Plans; an empty result offers a single Make a plan shortcut. Loading and errors remain distinct. Realtime and pull-to-refresh update plans. The Chat selection lives in the route so repeated Home links work after switching to DMs. Populated Home keeps posts first; it does not insert the plan preview into the feed.
 
-For tonight offers planning suggestions, not confirmed opening, capacity, event admission or availability. Club visitors must check the official event/lineup; cocktail venue reservations and hours can change. Do not add “open now,” “busy tonight,” “trending,” or numbered top rankings without separate current supporting data. Photos use the existing venue-photo service, with a neutral category fallback if unavailable.
+## Refresh procedure
 
-## Refresh process
-
-Reviewed October 11, 2026. This edit expires at **November 10, 2026, 00:00 UTC**. At expiry, featured claims and recommendations disappear; All spots and Saved remain available. Search, detail and Home share the same eligibility rules.
-
-Before that deadline, recheck every official venue page, closures, editorial evidence, exact address/identity and category. Reassess scene fit, then update the manifest and review dates in a reviewed app change. A refresh currently requires an app release; no automatic scraping, background schedule, admin curation console or remote content rollout is installed. Expiry is intentional and must not be extended without review. A future remote curation workflow should retain approval, evidence, exclusions and expiry, rather than exposing raw search results as endorsements.
-
-## Validation
-
-Run the mobile test suite and TypeScript. The recommendation cases cover evidence/expiry/city gates, exclusions, id/name mismatch, duplicate rows, deterministic own-save relevance, literal search, category diversity, public-only query scope, failure propagation and Home action order. Targeted native inspection uses temporary venue fixtures matching these real venue ids on spotted-ai-night-simulation, never synthetic visitor counts or production user mutations. Remove exact fixture ids and restore temporary tester state afterward.
+Review deadline: **November 10, 2026**. Recheck operations, independent coverage, venue identity, neighborhood and suitability before extending a pick. Remove closures or unsupported picks. Updates currently ship with an app build; no automated scraping or live consensus service is represented. A future admin workflow can replace the manifest without weakening these checks.

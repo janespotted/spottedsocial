@@ -39,7 +39,7 @@ export function rankRecommendations(venues: DiscoveryVenue[], city: string, save
     .map(({ score, order, ...venue }) => venue);
 }
 
-/** Three suggestions, with both cocktails and dancing represented when available. */
+/** Three suggestions, with both clubs and bars represented when available. */
 export function tonightRecommendations(rows: RecommendedVenue[]): RecommendedVenue[] {
   if (rows.length <= 3) return rows;
   const first = rows[0];

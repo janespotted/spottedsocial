@@ -36,7 +36,7 @@ import { useSession } from '@/hooks/use-session';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { Avatar } from '@/components/avatar';
 import { pickForVenue } from '@/lib/venue-recommendations';
-import { VenuePickDetails } from '@/components/venue-recommendations';
+import { VenueSharedVisits } from '@/components/venue-shared-visits';
 import { VenueEventsSection } from '@/components/venue-events-section';
 
 interface VenueData {
@@ -514,7 +514,7 @@ export default function VenueScreen() {
   const typeInfo = venue?.type ? getVenueTypeDisplay(venue.type) : null;
   const distNum = data?.distance ? parseFloat(data.distance) : NaN;
   const metaParts: string[] = [];
-  if (reviewedPick) metaParts.push(reviewedPick.category === 'dancing' ? 'Dancing' : 'Cocktails');
+  if (reviewedPick) metaParts.push(reviewedPick.category === 'club' ? 'Club' : 'Bar');
   else if (typeInfo) metaParts.push(typeInfo.label);
   if (venue?.neighborhood) metaParts.push(venue.neighborhood);
   if (!isNaN(distNum) && distNum <= 10) metaParts.push(`${data!.distance} mi`);
@@ -724,7 +724,7 @@ export default function VenueScreen() {
             <Text className="text-xs text-white/60 font-sans mb-3">{metaParts.join(' · ')}</Text>
           ) : null}
 
-          <VenuePickDetails venueId={venue.id} city={venue.city ?? ''} name={venue.name} />
+          <VenueSharedVisits venueId={venue.id} />
 
           {/* ── ZONE 2: Social — who's here leads the card ── */}
           <View className="mb-3 gap-3">

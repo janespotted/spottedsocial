@@ -22,7 +22,7 @@ function VenueRow({ venue, saved, city }: { venue: DiscoveryVenue; saved: boolea
   const [photoFailed, setPhotoFailed] = useState(false);
   useEffect(() => setPhotoFailed(false), [venue.id]);
   const pick = pickForVenue(venue.id, city, venue.name);
-  const type = getVenueTypeDisplay(pick ? pick.category === 'dancing' ? 'nightclub' : 'cocktail_bar' : venue.type ?? 'bar');
+  const type = getVenueTypeDisplay(pick ? pick.category === 'club' ? 'nightclub' : 'bar' : venue.type ?? 'bar');
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${venue.name}${saved ? ', saved' : ''}. Open venue`}
       onPress={() => router.push({ pathname: '/venue', params: { venueId: venue.id } })}
@@ -98,7 +98,7 @@ export function VenueDiscovery({ liveKind, standalone = false }: { liveKind?: 'm
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColorClassName="accent-[#d4ff00]" />}
         onEndReached={() => { if (!forYou && venues.hasNextPage && !venues.isFetching && !venues.isError) void venues.fetchNextPage(); }} onEndReachedThreshold={0.4}
-        ListHeaderComponent={forYou && rows.length > 0 ? <Text className="text-white/55 text-xs font-sans pb-4">Cocktails & dancing, selected by Spotted.</Text> : null}
+        ListHeaderComponent={forYou && rows.length > 0 ? <Text className="text-white/55 text-xs font-sans pb-4">Clubs & bars, selected by Spotted.</Text> : null}
         ListEmptyComponent={waiting ? <ActivityIndicator color={NEON} className="py-12" /> : failed ? <ErrorState compact title="Couldn’t load spots" onRetry={onRefresh} retrying={refreshing} /> : <EmptyState compact icon={savedOnly ? 'bookmark' : 'magnifyingglass'} title={term ? 'No matches' : savedOnly ? 'Your next spots' : forYou ? 'More picks soon' : 'More spots soon'} body={term ? undefined : savedOnly ? 'Save a venue to find it here.' : undefined} actions={term ? [{label:'Clear search',onPress:()=>setSearch(''),primary:true}] : savedOnly ? [{label:'Explore spots',onPress:()=>setMode('all'),primary:true}] : forYou ? [{label:'Browse all spots',onPress:()=>setMode('all'),primary:true}] : []} />}
         ListFooterComponent={!forYou && venues.isFetchingNextPage ? <ActivityIndicator color={NEON} className="py-5" /> : failed && rows.length > 0 ? <ErrorState compact title="Couldn’t refresh spots" body="" onRetry={onRefresh} retrying={refreshing} /> : null}
         renderItem={({item}) => 'pick' in item ? <View className="mb-4"><RecommendedVenueCard venue={item as RecommendedVenue} /></View> : <VenueRow city={city} venue={item} saved={saved.data?.includes(item.name) ?? false} />}

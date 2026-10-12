@@ -1,82 +1,28 @@
 [
   {
-    "venueId": "bb435190-8c8f-4bed-a55d-9028b88b2197",
-    "name": "Temple Bar",
+    "venueId": "3be42847-9df1-4ee3-b513-b2e82f1ac847",
+    "name": "Gospel",
     "city": "nyc",
-    "neighborhood": "NoHo",
-    "category": "cocktails",
+    "neighborhood": "SoHo",
+    "category": "club",
     "tags": [
-      "Martinis",
-      "Low-lit"
+      "House",
+      "Late nights"
     ],
-    "reason": "Martinis in an intimate downtown room.",
-    "visitNote": "Check reservations and dress code.",
+    "reason": "An intimate SoHo dance floor built around house music.",
+    "visitNote": "Check the night’s program and entry arrangements.",
     "reviewedAt": "2026-10-11",
     "reviewBy": "2026-11-10",
     "sources": [
       {
-        "publisher": "The Infatuation",
+        "publisher": "NYLON",
         "kind": "editorial",
-        "url": "https://www.theinfatuation.com/new-york/reviews/temple-bar"
+        "url": "https://www.nylon.com/nylon-nights/gospel-new-york-exclusive-nightclub"
       },
       {
         "publisher": "Official venue",
         "kind": "official",
-        "url": "https://www.templebar.co/"
-      }
-    ]
-  },
-  {
-    "venueId": "8818a41c-8722-49bb-8984-3dca2f565c4e",
-    "name": "Public Records",
-    "city": "nyc",
-    "neighborhood": "Gowanus",
-    "category": "dancing",
-    "tags": [
-      "Hi-fi",
-      "Electronic"
-    ],
-    "reason": "A sound-focused night across distinct rooms.",
-    "visitNote": "Check the event and ticket details.",
-    "reviewedAt": "2026-10-11",
-    "reviewBy": "2026-11-10",
-    "sources": [
-      {
-        "publisher": "Resident Advisor",
-        "kind": "editorial",
-        "url": "https://ra.co/guides/clubs-in-newyorkcity"
-      },
-      {
-        "publisher": "Official venue",
-        "kind": "official",
-        "url": "https://publicrecords.nyc/"
-      }
-    ]
-  },
-  {
-    "venueId": "cc74bc26-413f-4332-b710-2dfc72323a66",
-    "name": "Katana Kitten",
-    "city": "nyc",
-    "neighborhood": "West Village",
-    "category": "cocktails",
-    "tags": [
-      "Highballs",
-      "Lively"
-    ],
-    "reason": "Japanese-American cocktails with a lively bar feel.",
-    "visitNote": "Check current hours before heading over.",
-    "reviewedAt": "2026-10-11",
-    "reviewBy": "2026-11-10",
-    "sources": [
-      {
-        "publisher": "The Infatuation",
-        "kind": "editorial",
-        "url": "https://www.theinfatuation.com/new-york/reviews/katana-kitten"
-      },
-      {
-        "publisher": "Official venue",
-        "kind": "official",
-        "url": "https://www.katanakitten.com/"
+        "url": "https://www.gospelnyc.com/home"
       }
     ]
   },
@@ -85,12 +31,12 @@
     "name": "Gabriela",
     "city": "nyc",
     "neighborhood": "Williamsburg",
-    "category": "dancing",
+    "category": "club",
     "tags": [
       "House",
       "Intimate"
     ],
-    "reason": "House and disco on an intimate dance floor.",
+    "reason": "House and disco in a club with a house-party feel.",
     "visitNote": "Check the lineup and admission details.",
     "reviewedAt": "2026-10-11",
     "reviewBy": "2026-11-10",
@@ -108,29 +54,83 @@
     ]
   },
   {
-    "venueId": "8a676e1c-be0b-458c-99c3-1bfcf449cc6f",
-    "name": "Double Chicken Please",
+    "venueId": "ba9c2dca-fa06-453c-b30f-a61e87912d8e",
+    "name": "Joyface",
     "city": "nyc",
-    "neighborhood": "Lower East Side",
-    "category": "cocktails",
+    "neighborhood": "East Village",
+    "category": "bar",
     "tags": [
-      "Inventive",
-      "Cocktails"
+      "Disco",
+      "Dancing"
     ],
-    "reason": "Playful, food-inspired cocktails in The Coop.",
-    "visitNote": "The Coop and Free Range offer different experiences.",
+    "reason": "A disco-ball bar with a playful, packed-house feel.",
+    "visitNote": "Check the calendar for dance parties and door times.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "The Infatuation",
+        "kind": "editorial",
+        "url": "https://www.theinfatuation.com/new-york/guides/the-best-bars-in-the-east-village"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.joyface.nyc/"
+      }
+    ]
+  },
+  {
+    "venueId": "19d1fe64-3c88-4a0d-98a7-408684301d42",
+    "name": "Le Bain",
+    "city": "nyc",
+    "neighborhood": "Meatpacking",
+    "category": "club",
+    "tags": [
+      "DJs",
+      "Rooftop"
+    ],
+    "reason": "A skyline dance floor with a rotating DJ program.",
+    "visitNote": "Choose a DJ night; rooftop hours and access can differ.",
     "reviewedAt": "2026-10-11",
     "reviewBy": "2026-11-10",
     "sources": [
       {
         "publisher": "Time Out",
         "kind": "editorial",
-        "url": "https://www.timeout.com/newyork/bars/double-chicken-please"
+        "url": "https://www.timeout.com/newyork/news/out-late-inside-a-queer-kink-party-at-le-bain-in-nycs-meatpacking-district-031224"
       },
       {
         "publisher": "Official venue",
         "kind": "official",
-        "url": "https://doublechickenplease.com/pages/visitus"
+        "url": "https://www.standardhotels.com/new-york/features/le-bain"
+      }
+    ]
+  },
+  {
+    "venueId": "db5c9d56-e572-4f22-8b6d-15a5ed9e2d0d",
+    "name": "The Flower Shop",
+    "city": "nyc",
+    "neighborhood": "Lower East Side",
+    "category": "bar",
+    "tags": [
+      "Social",
+      "Late nights"
+    ],
+    "reason": "A downtown hangout with a lively basement bar.",
+    "visitNote": "Head downstairs for the bar; check current hours.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "The Infatuation",
+        "kind": "editorial",
+        "url": "https://www.theinfatuation.com/new-york/reviews/the-flower-shop"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.theflowershopnyc.com/"
       }
     ]
   },
@@ -139,7 +139,7 @@
     "name": "Nowadays",
     "city": "nyc",
     "neighborhood": "Ridgewood",
-    "category": "dancing",
+    "category": "club",
     "tags": [
       "Listening",
       "Dance floor"
@@ -158,60 +158,6 @@
         "publisher": "Official venue",
         "kind": "official",
         "url": "https://nowadays.nyc/about/"
-      }
-    ]
-  },
-  {
-    "venueId": "a744db2d-86e6-4e97-9316-991eacf5e55a",
-    "name": "Attaboy",
-    "city": "nyc",
-    "neighborhood": "Lower East Side",
-    "category": "cocktails",
-    "tags": [
-      "Bespoke",
-      "Intimate"
-    ],
-    "reason": "Tell the bartender what you like; they build the drink.",
-    "visitNote": "Small groups; check reservations and walk-in availability.",
-    "reviewedAt": "2026-10-11",
-    "reviewBy": "2026-11-10",
-    "sources": [
-      {
-        "publisher": "Time Out",
-        "kind": "editorial",
-        "url": "https://www.timeout.com/newyork/bars/attaboy"
-      },
-      {
-        "publisher": "Official venue",
-        "kind": "official",
-        "url": "https://attaboy.us/visit-us"
-      }
-    ]
-  },
-  {
-    "venueId": "09ad762a-0ac9-4ee9-b6de-89827dd47442",
-    "name": "Elsewhere",
-    "city": "nyc",
-    "neighborhood": "Bushwick",
-    "category": "dancing",
-    "tags": [
-      "DJs",
-      "Multi-room"
-    ],
-    "reason": "DJ nights and live music across multiple rooms.",
-    "visitNote": "Check which event and room your ticket covers.",
-    "reviewedAt": "2026-10-11",
-    "reviewBy": "2026-11-10",
-    "sources": [
-      {
-        "publisher": "Time Out",
-        "kind": "editorial",
-        "url": "https://www.timeout.com/newyork/nightlife/best-clubs-in-nyc"
-      },
-      {
-        "publisher": "Official venue",
-        "kind": "official",
-        "url": "https://www.elsewhere.club/homepage"
       }
     ]
   }

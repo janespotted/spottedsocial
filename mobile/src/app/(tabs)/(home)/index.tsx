@@ -26,10 +26,10 @@ import { EmptyState, ErrorState } from '@/components/empty-state';
 import { addFriendsActions } from '@/lib/add-friends';
 import { FriendsOutBanner } from '@/components/friends-out-banner';
 import { ForTonight } from '@/components/venue-recommendations';
+import { HomePlansPreview } from '@/components/home-plans-preview';
+import { useQueryClient } from '@tanstack/react-query';
 import { PostCard } from '@/components/post-card';
-// Plans moved out of Home into the Chat tab (client change, Sept 2026).
-// Kept imported nowhere here on purpose — see app/(tabs)/(messages)/messages.tsx.
-// import { PlansFeed } from '@/components/plans-feed';
+// Empty Home previews shared plans; the full Plans feed stays in Chat.
 import { Avatar } from '@/components/avatar';
 import { HeaderActions } from '@/components/header-actions';
 import { DayHome } from '@/components/day-home';
@@ -142,7 +142,7 @@ function PlanningTonightCard({ friends }: { friends: FriendNightStatus[] }) {
 
 /**
  * Empty feed, by situation (client feedback §8): no friends → add some;
- * friends but nothing posted → real activity, a reviewed venue edit, then Post.
+ * friends but nothing posted → real activity, shared plans, nightlife picks, then Post.
  * With posts present, recommendations appear only after the last loaded page.
  */
 function EmptyFeed({
@@ -164,6 +164,7 @@ function EmptyFeed({
         <OutTonightCard friends={outFriends} onMeetUp={onMeetUp} venuesWithheld={venuesWithheld} />
         <PlanningTonightCard friends={planningFriends} />
       </View> : null}
+      <HomePlansPreview />
       <ForTonight />
       {friendCount > 0 ? <View className="px-4"><Pressable accessibilityRole="button" accessibilityLabel="Post to tonight’s feed" onPress={() => router.push('/create-post')} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 flex-row items-center gap-3 active:opacity-70">
         <SymbolView name="camera" size={21} tintColor="rgba(255,255,255,0.7)" />
@@ -276,6 +277,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
   useNoKeyboardOnFocus(); // back from comments / search must never leave the keyboard up
   const { session } = useSession();
   const feed = useFeed();
+  const queryClient = useQueryClient();
   const { data: friendsData, refetch: refetchFriends } = useFriendsOut();
   const friendsQuery = useFriendIds(session?.user.id);
   const friendIds = friendsQuery.data;
@@ -412,6 +414,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
             onRefresh={() => {
               feed.refresh({ userInitiated: true });
               refetchFriends();
+              void queryClient.invalidateQueries({ queryKey: ['plans', session?.user.id] });
             }}
             tintColorClassName="accent-[#d4ff00]"
           />
