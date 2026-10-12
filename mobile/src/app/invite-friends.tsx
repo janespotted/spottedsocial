@@ -54,14 +54,14 @@ export default function InviteFriendsSheet() {
           <SymbolView name="link" size={20} tintColor="#ffffff" />
         </View>
         <View className="flex-1">
-          <Text className="text-white text-lg font-sans-semibold">Share profile</Text>
+          <Text className="text-white text-lg font-sans-semibold">Share Spotted</Text>
           <Text className="text-white/60 text-sm font-sans">
             New members still need a wave invitation.
           </Text>
         </View>
       </View>
 
-      {isError || (!isLoading && !inviteUrl) ? (<Text className="text-red-300 py-5" onPress={() => void refetch()}>Could not load your invite link. Tap to retry.</Text>) : isLoading ? (
+      {isError || (!isLoading && !inviteUrl) ? (<Text className="text-red-300 py-5" onPress={() => void refetch()}>Could not load your profile link. Tap to retry.</Text>) : isLoading ? (
         <View className="py-16">
           <ActivityIndicator color={NEON} />
         </View>

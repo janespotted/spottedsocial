@@ -1,3 +1,5 @@
+import { DayVenueMap } from '@/components/day-venue-map';
+import { withholdLivePreview } from '@/lib/live-preview';
 import { locationServicesEnabled } from '@/lib/location-ready';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Alert, Linking, Pressable, Text, View, useWindowDimensions} from 'react-native';
@@ -290,7 +292,7 @@ function PromotedVenueMarker({
  */
 export default function MapScreen() {
   const {isNight} = useNightMode();
-  return isNight ? <LiveMapScreen /> : <DayTabScreen kind='map' />;
+  return isNight ? <LiveMapScreen /> : <DayVenueMap />;
 }
 
 function LiveMapScreen() {
@@ -338,7 +340,7 @@ function LiveMapScreen() {
   const venues = useMemo(() => data?.venues ?? [], [data?.venues]);
   // "No" tonight: precise pins are withheld (see useMapData); show the count + CTA
   const {data: ownNight} = useOwnNightStatus();
-  const stayingIn = ownNight?.status?.status === 'home';
+  const stayingIn = withholdLivePreview(ownNight?.status?.status, !!ownNight);
   const hiddenFriendCount = data?.hiddenFriendCount ?? 0;
 
   // The friend whose card sheet is open — their pin gets the lime halo

@@ -1,3 +1,5 @@
+import { CaptureGuard } from '@/components/capture-guard';
+import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
 import { friendCardPress } from '@/lib/friend-card';
 import { useEffect, useState } from 'react';
 import { Pressable, RefreshControl, Text, View } from 'react-native';
@@ -112,7 +114,7 @@ export default function MessagesScreen() {
   const queryClient = useQueryClient();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   // Keep the selection in the route so repeated Home → Plans links always open Plans.
-  const activeTab: TabType = tab === 'dms' ? 'messages' : 'plans';
+  const activeTab: TabType = tab === 'plans' ? 'plans' : 'messages';
   // pb clears the native tab bar + home indicator so the last row is reachable
   const contentContainerStyle = useResolveClassNames('px-4 pb-28');
 
@@ -192,10 +194,10 @@ export default function MessagesScreen() {
   };
 
   return (
-    <View className="flex-1">
+    <CaptureGuard name="dm-inbox" enabled={activeTab === 'messages'}><View className="flex-1">
       {/* Header — static, web PageHeader parity */}
       <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
-        <View className="flex-row items-center justify-between px-4 h-10">
+        <View className="flex-row items-center justify-between px-4 min-h-11">
           <View className="flex-row items-center gap-2 flex-1 min-w-0">
             <Text
               className="text-white font-sans-light"
@@ -212,6 +214,7 @@ export default function MessagesScreen() {
           </View>
           <HeaderActions unreadCount={unreadCount} />
         </View>
+        <ModeCountdownStrip />
 
         {/* Plans and direct/group messages. */}
         <SubTabs<TabType>
@@ -285,6 +288,6 @@ export default function MessagesScreen() {
           renderItem={({ item }) => <ThreadRow thread={item} userId={session?.user.id} onPress={() => openThread(item)} />}
         />
       )}
-    </View>
+    </View></CaptureGuard>
   );
 }

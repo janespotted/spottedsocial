@@ -57,7 +57,8 @@ import {
   startBackgroundLocation,
   type TrackingResult,
 } from '@/lib/background-location';
-import { getLocationPermission, hasLocationAccess, requestAutomaticUpdates } from '@/lib/location-ready';
+import { getLocationPermission, hasLocationAccess, requestWhenInUse } from '@/lib/location-ready';
+import { StatusAlertPermission } from '@/components/status-alert-permission';
 import { markNightAnswered } from '@/lib/night-gate';
 import { DEFAULT_AUDIENCE, isAudience, type Audience } from '@/lib/audience';
 import { useSession } from '@/hooks/use-session';
@@ -723,7 +724,7 @@ function CheckInFlow() {
   };
 
   const allowLocation = async () => {
-    const permission = await requestAutomaticUpdates().catch(() => 'denied' as const);
+    const permission = await requestWhenInUse().catch(() => 'denied' as const);
     if (hasLocationAccess(permission)) void detectVenue();
     else setLocState('denied');
   };
@@ -1099,7 +1100,7 @@ function CheckInFlow() {
                 </View>
               ) : answer === 'tbd' ? (
                 <View className="gap-4">
-                  <InfoCard lines={['Let friends know you might join.', 'Your location won’t be shared.']} />
+                  <InfoCard lines={['Friends get a TBD update.', 'Your live location stays private.']} />
                   {areaOpen ? (
                     <Animated.View entering={FadeIn.duration(220)} className="gap-2.5">
                       <SectionLabel>Area · optional</SectionLabel>
@@ -1112,7 +1113,7 @@ function CheckInFlow() {
                   )}
                 </View>
               ) : (
-                <InfoCard lines={['You’re staying in tonight.', 'Your location won’t be shared.']} />
+                <InfoCard lines={['Your location stays private.', 'See how many people are out. Choose TBD or Out to see who.']} />
               )}
             </Animated.View>
 
@@ -1126,6 +1127,7 @@ function CheckInFlow() {
               </Animated.View>
             ) : null}
             <Animated.View layout={SHEET_LAYOUT}>
+              {answer === 'yes' ? <Pressable accessibilityRole="button" onPress={() => Alert.alert('Recent visits', 'Eligible friends can see this venue in your recent visits for 90 days. Only people allowed to see your location at the time qualify; your current sharing controls still apply.')} className="min-h-11 items-center justify-center"><Text className="text-white/50 text-xs font-sans">Who can see this visit later? ⓘ</Text></Pressable> : null}
               <ResetNote
                 city={city}
                 text={answer === 'yes' ? RESET_COPY.checkInClears : RESET_COPY.statusClears}
@@ -1338,6 +1340,7 @@ function CheckInFlow() {
               </View>
             ) : null}
 
+            <StatusAlertPermission />
             <View className="self-stretch gap-2 pt-2">
               {offerAlways ? (
                 /* While the Always upgrade is on offer it IS the primary

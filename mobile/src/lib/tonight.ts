@@ -180,11 +180,11 @@ export function isUnexpired(expiresAt: string | null | undefined): boolean {
 
 /**
  * Night Mode opening hour by the night's weekday (client brief, Oct 2026):
- * Mon–Thu 6 PM, Fri 4 PM, Sat noon, Sun 3 PM, local to the profile city.
+ * Every day at 6 PM, local to the profile city.
  * Indexed by JS getUTCDay() of the night's date (0 = Sunday). The SQL twin is
  * public.night_mode_opens_at() — change both together.
  */
-export const NIGHT_MODE_OPENING: readonly number[] = [15, 18, 18, 18, 18, 16, 12];
+export const NIGHT_MODE_OPENING: readonly number[] = [18, 18, 18, 18, 18, 18, 18];
 
 /**
  * When Night Mode opens for the night `now` belongs to. The night is keyed by

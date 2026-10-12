@@ -398,17 +398,18 @@ function PermissionsIntro({
           Ready to capture
         </Text>
         <Text className="text-white/55 text-[14px] font-sans text-center leading-5 px-4">
-          iOS will ask for three things. Nothing is captured or shared until you decide.
+          Allow the camera to take a photo. Nothing is shared until you post.
         </Text>
       </View>
 
       <View className="rounded-2xl overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}>
-        {PERMISSION_ROWS.map((row, i) => (
+        {PERMISSION_ROWS.filter(row => row.key === 'camera').map((row, i) => (
           <View
             key={row.key}
             className="flex-row items-center gap-3 px-4"
             style={{
-              height: 64,
+              minHeight: 64,
+              paddingVertical: 12,
               borderTopWidth: i > 0 ? 1 : 0,
               borderTopColor: 'rgba(255,255,255,0.07)',
             }}
@@ -650,13 +651,6 @@ export function SpottedCamera({
     try {
       if (!cameraPermission.hasPermission && cameraPermission.canRequestPermission) {
         await cameraPermission.requestPermission();
-      }
-      if (!micPermission.hasPermission && micPermission.canRequestPermission) {
-        await micPermission.requestPermission();
-      }
-      if (photosAccess === 'undetermined') {
-        const p = await requestLibraryPermissionsAsync();
-        setPhotosAccess(p.granted ? (p.accessPrivileges === 'limited' ? 'limited' : 'granted') : 'denied');
       }
     } finally {
       setRequesting(false);

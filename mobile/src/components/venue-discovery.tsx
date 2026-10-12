@@ -78,11 +78,6 @@ export function VenueDiscovery({ liveKind, standalone = false }: { liveKind?: 'm
           <Text className="text-white text-2xl font-sans-semibold" accessibilityRole="header">Explore {getCityLabel(city)}</Text>
           <Text className="text-white/60 text-sm font-sans">Save a spot for tonight.</Text>
         </View>
-        {!isNight ? <Pressable accessibilityRole="button" onPress={() => router.push('/night-hours')} className="flex-row items-center gap-2 min-h-11 active:opacity-70">
-          <SymbolView name="moon.stars" size={14} tintColor={NEON} />
-          <Text className="text-white/65 text-xs font-sans flex-1">{liveKind === 'map' ? 'Live map' : liveKind === 'leaderboard' ? 'Live rankings' : 'Night Mode'} opens at {opensLabel}</Text>
-          <SymbolView name="chevron.right" size={11} tintColor="rgba(255,255,255,0.5)" />
-        </Pressable> : null}
         <View className="flex-row items-center gap-2 min-h-11 rounded-full bg-white/[0.05] border border-white/10 px-4">
           <SymbolView name="magnifyingglass" size={16} tintColor="rgba(255,255,255,0.55)" />
           <TextInput accessibilityLabel="Search venues" value={search} onChangeText={setSearch} placeholder="Search spots" placeholderTextColor="rgba(255,255,255,0.55)" autoCorrect={false} returnKeyType="search" className="flex-1 text-white font-sans text-sm py-3" />

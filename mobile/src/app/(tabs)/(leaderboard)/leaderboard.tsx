@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { useEffect, useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { Pressable, RefreshControl, Text, View } from 'react-native';
@@ -224,7 +225,7 @@ function LeaderboardHeader({
   return (
     <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
       {/* Top bar — same compact layout as the home header, fixed height */}
-      <View className="flex-row items-center justify-between px-4 h-10">
+      <View className="flex-row items-center justify-between px-4 min-h-11">
         <View className="flex-row items-center gap-2 flex-1 min-w-0">
           <Text
             className="text-white font-sans-light"
@@ -347,6 +348,7 @@ function LiveLeaderboardScreen() {
         unreadCount={unreadCount}
         onSelectNeighborhood={setNeighborhood}
       />
+      <Pressable accessibilityRole="button" onPress={() => Alert.alert('How spots rank', 'Rankings blend our nightlife picks with eligible check-ins: 70% picks and 30% activity at launch. Activity gradually grows to 90% as more people check in. Promoted spots are marked separately.')} className="px-4 py-2 min-h-11 justify-center"><Text className="text-white/55 text-xs font-sans">Curated + live activity ⓘ</Text></Pressable>
 
       <LegendList
         data={venues}

@@ -1,3 +1,4 @@
+import { ModeCountdownStrip } from './mode-countdown-strip';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -24,7 +25,7 @@ export function DayTabScreen({ kind }: { kind: Exclude<OpeningKind, 'newsfeed'> 
   return (
     <View className="flex-1">
       <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
-        <View className="flex-row items-center justify-between px-4 h-10 mb-3">
+        <View className="flex-row items-center justify-between px-4 min-h-11 mb-3">
           <View className="flex-row items-center gap-2 flex-1 min-w-0">
             <Text
               className="text-white font-sans-light"
@@ -41,6 +42,7 @@ export function DayTabScreen({ kind }: { kind: Exclude<OpeningKind, 'newsfeed'> 
           <HeaderActions unreadCount={unreadCount} />
         </View>
       </View>
+      <ModeCountdownStrip />
       <VenueDiscovery liveKind={kind} />
     </View>
   );
@@ -49,7 +51,7 @@ export function DayTabScreen({ kind }: { kind: Exclude<OpeningKind, 'newsfeed'> 
 /** The small "☀ Day Mode" chip above the opening screens (screenshots 02, 08, 11). */
 export function DayModeChip() {
   return (
-    <View className={`self-start flex-row items-center gap-1.5 h-8 px-3 rounded-full ${dayRaised}`}>
+    <View className={`self-start flex-row items-center gap-1.5 min-h-8 py-2 px-3 rounded-full ${dayRaised}`}>
       <SymbolView name="sun.max" size={13} tintColor="rgba(255,255,255,0.85)" />
       <Text className="text-white/85 text-xs font-sans-medium">Day Mode</Text>
     </View>

@@ -498,6 +498,16 @@ function App() {
           </section>
         ) : wave === "pool" ? <PlanningPool key={session?.user.id || "preview"} preview={preview} onQueue={() => setWave("queue")} /> : (
           <>
+            <section className="panel" aria-label="Launch readiness">
+              <h2>Before you open a wave</h2>
+              <ul>
+                <li>{snapshot.settings.installUrl ? '✓ Install link saved — verify testers can install' : '○ Add a working TestFlight or App Store install link'}</li>
+                <li>{snapshot.waves.some(w => w.selected > 0) ? '✓ People assigned to a wave' : '○ Choose people from the planning pool and collect verified phone numbers'}</li>
+                <li>{snapshot.settings.gated && snapshot.settings.requirePhone ? '✓ Phone-based invitation access is on' : '○ Admission is open — enable phone-based invitations when ready'}</li>
+                <li>{snapshot.settings.smsEnabled ? '✓ SMS enabled — verify delivery before sending' : '○ SMS is off — use reviewed manual invitations or configure a sender'}</li>
+              </ul>
+              <button onClick={() => openModal("settings")}>Review launch settings</button>
+            </section>
             <section className="metrics">
               <div>
                 <span>Members inside</span>

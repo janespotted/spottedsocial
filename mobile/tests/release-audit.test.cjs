@@ -135,6 +135,8 @@ test('DM camera resigns native keyboard again after the attachment sheet closes'
 test('Location-consent signals clear cached private views without falsely revoking shared posts', () => {
   let receive, resets = 0, mediaDrops = 0, closedPosts = 0;
   const api = load('lib/relationship-events.ts', {
+    'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } },
+    '@react-native-community/netinfo': { addEventListener: () => () => {} },
     './private-media': { forgetPrivateMediaLinks: () => mediaDrops++ },
     './private-views': { PRIVATE_VIEW_KEYS: ['night-recap'], invalidatePrivateViews: () => resets++ },
     './resilient-channel': { createResilientChannel: options => {

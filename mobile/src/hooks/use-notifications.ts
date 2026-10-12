@@ -1,3 +1,5 @@
+import { withholdLivePreview, LIVE_ACTIVITY_TYPES } from '@/lib/live-preview';
+import { useOwnNightStatus } from './use-own-night-status';
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
@@ -128,7 +130,10 @@ export function useNotifications() {
     return () => { subscription.remove(); stop(); };
   }, [queryClient, session?.user.id]);
 
-  const unreadCount = (query.data ?? []).filter((n) => !n.is_read).length;
+  const own = useOwnNightStatus();
+  const withheld = withholdLivePreview(own.data?.status?.status, own.isSuccess);
+  const visible = query.data?.filter(n => !withheld || !LIVE_ACTIVITY_TYPES.includes(n.type));
+  const unreadCount = (visible ?? []).filter(n => !n.is_read).length;
 
   const markAllAsRead = async () => {
     if (!session || unreadCount === 0) return;
@@ -147,5 +152,5 @@ export function useNotifications() {
     }
   };
 
-  return { ...query, unreadCount, markAllAsRead };
+  return { ...query, data: visible, unreadCount, markAllAsRead };
 }

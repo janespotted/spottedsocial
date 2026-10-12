@@ -46,7 +46,7 @@ export function EmptyState({
       </View>
       <Text className="text-xl font-sans-semibold text-white text-center mb-2">{title}</Text>
       {body ? (
-        <Text className="text-white/55 text-sm font-sans text-center leading-5 max-w-72">{body}</Text>
+        <Text className="text-white/55 text-sm font-sans text-center max-w-72">{body}</Text>
       ) : null}
       {actions.length > 0 ? (
         <View className="flex-row flex-wrap justify-center gap-2.5 mt-6">
@@ -93,7 +93,7 @@ export function ErrorState({
         <SymbolView name="wifi.exclamationmark" size={28} tintColor="rgba(255,255,255,0.5)" />
       </View>}
       <Text className="text-lg font-sans-semibold text-white text-center mb-1.5">{title}</Text>
-      {body ? <Text className="text-white/55 text-sm font-sans text-center leading-5 max-w-72">{body}</Text> : null}
+      {body ? <Text className="text-white/55 text-sm font-sans text-center max-w-72">{body}</Text> : null}
       <Pressable
         onPress={onRetry}
         disabled={retrying}

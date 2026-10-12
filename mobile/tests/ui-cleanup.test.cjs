@@ -62,18 +62,16 @@ test('nighttime cards always display curated rank without inventing live activit
  assert.equal(!!tree.props.style,true);
  }
 });
-test('daytime Home distinguishes a failed plans read from a successful empty list',()=>{
+test('Home plans preview distinguishes a failed read from a successful empty list',()=>{
  const jsx={jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})};
  for(const mode of ['loading','error','empty','content']){
-  const plans=mode==='content'?[{id:'plan'}]:[];
-  const fn=extract('components/day-home.tsx','TonightPlans',{require:()=>jsx,
-   usePlansRealtime:()=>{},useSession:()=>({session:{user:{id:'owner'}}}),useQueryClient:()=>({}),useNightMode:()=>({city:'nyc'}),
-   usePlans:()=>({data:mode==='error'||mode==='loading'?undefined:{plans,votes:{}},isError:mode==='error',isLoading:mode==='loading'}),
-   splitTonightUpcoming:()=>({tonight:plans}),getNightKey:()=> '2026-10-12',PREVIEW_PLANS:2,
-   View:'View',Text:'Text',Pressable:'Pressable',SymbolView:'SymbolView',ErrorState:'ErrorState',EmptyState:'EmptyState',PlanCard:'PlanCard',NEON:'lime',router:{push:()=>{}}});
-  const types=[];const visit=n=>{if(Array.isArray(n))return n.forEach(visit);if(n&&typeof n==='object'){types.push(n.type);visit(n.props?.children)}};visit(fn({city:'nyc'}));
-  assert.equal(types.includes('ErrorState'),mode==='error');
-  assert.equal(types.includes('EmptyState'),mode==='empty');
-  assert.equal(types.includes('PlanCard'),mode==='content');
+ const plans=mode==='content'?[{id:'plan',plan_time:'21:00',plan_date:'2026-10-12'}]:[];
+ const fn=extract('components/home-plans-preview.tsx','HomePlansPreview',{require:()=>jsx,
+ usePlansRealtime:()=>{},useNightMode:()=>({city:'nyc'}),usePlans:()=>({data:mode==='error'||mode==='loading'?undefined:{plans},isError:mode==='error',isPending:mode==='loading'}),previewPlans:()=>({plans,tonight:true}),getNightKey:()=> '2026-10-12',formatTimeTo12Hour:()=> '9 PM',friendCardPress:()=>()=>{},Avatar:'Avatar',View:'View',Text:'Text',Pressable:'Pressable',SymbolView:'SymbolView',ErrorState:'ErrorState',NEON:'lime',MIST:'white',router:{push:()=>{}}});
+ const tree=fn(); const types=[];const visit=n=>{if(Array.isArray(n))return n.forEach(visit);if(n&&typeof n==='object'){types.push(n.type);visit(n.props?.children)}};visit(tree);
+ assert.equal(types.includes('ErrorState'),mode==='error');
+ if(mode==='loading')assert.equal(tree.props.accessibilityLabel,'Loading plans');
+ if(mode==='empty')assert.equal(tree.props.accessibilityLabel,'Make a plan. Open Plans');
+ if(mode==='content')assert(types.includes('Avatar'));
  }
 });

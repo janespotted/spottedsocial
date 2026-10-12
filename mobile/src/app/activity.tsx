@@ -1,3 +1,4 @@
+import { CaptureGuard } from '@/components/capture-guard';
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { liveActivityMessage, withholdLivePreview } from '@/lib/live-preview';
@@ -197,7 +198,7 @@ function threadIdOf(n: AppNotification): string | null {
   return typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
 }
 
-export default function ActivityScreen() {
+function ActivityScreenContent() {
   const { session } = useSession();
   const userId = session?.user.id;
   const queryClient = useQueryClient();
@@ -609,3 +610,5 @@ export default function ActivityScreen() {
     </View>
   );
 }
+
+export default function ActivityScreen() { return <CaptureGuard name="activity"><ActivityScreenContent /></CaptureGuard>; }

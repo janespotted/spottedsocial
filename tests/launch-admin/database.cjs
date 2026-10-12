@@ -40,6 +40,7 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261012021331_launch_admin_center.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261012034343_member_nomination_progress.sql'),'utf8'));
  for(const f of ['20261012073318_recent_venue_visit_audiences.sql','20261012073319_launch_planning_pool.sql','20261012075847_restrict_raw_historical_checkins.sql']) await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',f),'utf8'));
+ for(const f of ['20261012151728_audit_status_access_and_delivery.sql','20261012153806_audit_delivery_privilege_followup.sql','20261012154708_audit_hide_live_profile_flag.sql','20261012155538_audit_preserve_explicit_invitation_audiences.sql']) await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',f),'utf8'));
  const admin=(action,data={},n=1)=>rpc(n,'launch_admin',[action,data]);
  const guest=async phone=>(await q('select * from spotted_private.launch_guests where phone=$1',[phone]))[0];
  const create=async(capacity=100)=>ok(await admin('create_wave',{id:id(90),name:'First 100',capacity}));
@@ -185,7 +186,9 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
  });
 
  await test('Raw endpoint exposes only current shared checkins; historic data cannot bypass snapshots',async()=>{
-  await visitSetup();await checkin();assert.equal(ok(await actor(2,'select id from checkins where user_id=$1',[id(1)])).length,1);
+  await visitSetup();await checkin();assert.equal(ok(await actor(2,'select id from checkins where user_id=$1',[id(1)])).length,0);
+  await q("insert into night_statuses(user_id,status,expires_at) values($1,'planning',now()+interval '1 hour') on conflict(user_id) do update set status='planning',expires_at=excluded.expires_at",[id(2)]);
+  assert.equal(ok(await actor(2,'select id from checkins where user_id=$1',[id(1)])).length,1);
   await endVisit();assert.equal(ok(await actor(2,'select id from checkins where user_id=$1',[id(1)])).length,0);assert.equal(ok(await actor(1,'select id from checkins where user_id=$1',[id(1)])).length,1);assert.equal((await history(2)).length,1);
  });
  await test('Deleting your checkin withdraws its historical audience too',async()=>{

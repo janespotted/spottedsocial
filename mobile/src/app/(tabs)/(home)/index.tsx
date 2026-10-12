@@ -1,3 +1,6 @@
+import { CaptureGuard } from '@/components/capture-guard';
+import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
+import { CompactRecapEntry } from '@/components/compact-recap-entry';
 import { friendCardPress } from '@/lib/friend-card';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -71,7 +74,7 @@ function OutTonightCard({
           style={{ backgroundColor: 'rgba(212,255,0,0.08)', borderWidth: 1, borderColor: 'rgba(212,255,0,0.3)' }}
         >
           <Text className="flex-1 text-white/75 text-xs font-sans leading-4">
-            Live friend locations are hidden while you are Staying In. Shared posts, Plans and invitations remain available.
+            Check in as TBD or Out to see who’s out.
           </Text>
           <SymbolView name="chevron.right" size={12} tintColor={NEON} />
         </Pressable>
@@ -95,7 +98,7 @@ function OutTonightCard({
           <Pressable
             onPress={() => onMeetUp(friend)}
             accessibilityRole="button"
-            className="min-h-9 px-3.5 rounded-full items-center justify-center bg-[#d4ff00] active:opacity-80"
+            className="min-h-11 px-3.5 rounded-full items-center justify-center bg-[#d4ff00] active:opacity-80"
           >
             <Text className="text-[#1a0f2e] text-xs font-sans-semibold">Meet Up</Text>
           </Pressable>
@@ -165,7 +168,6 @@ function EmptyFeed({
         <OutTonightCard friends={outFriends} onMeetUp={onMeetUp} venuesWithheld={venuesWithheld} />
         <PlanningTonightCard friends={planningFriends} />
       </View> : null}
-      <HomePlansPreview />
       <ForTonight />
     </View>
   );
@@ -199,7 +201,7 @@ function HomeHeader({
         borderBottomColor: 'rgba(255, 255, 255, 0.06)',
       }}
     >
-      <View className={`flex-row items-center justify-between px-4 h-10 ${children ? '' : 'mb-3'}`}>
+      <View className={`flex-row items-center justify-between px-4 min-h-11 ${children ? '' : 'mb-3'}`}>
         {/* Wordmark is anchored: same size on every tab, never animates */}
         <Text
           className="text-white font-sans-light"
@@ -232,41 +234,16 @@ function HomeHeader({
  * only mounts at night, and so does the Post button: posting opens with
  * Night Mode (D1).
  */
-export default function HomeScreen() {
+function HomeScreenContent() {
   const { isNight, city } = useNightMode();
   const { unreadCount } = useNotifications();
-  const [tab, setTab] = useState<HomeTab>(isNight ? 'feed' : 'morning');
-  // Each mode opens on its own default tab, including when it flips while open
-  const [tabMode, setTabMode] = useState(isNight);
-  if (tabMode !== isNight) {
-    setTabMode(isNight);
-    setTab(isNight ? 'feed' : 'morning');
-  }
   return (
     <View className="flex-1 bg-[#110a24]">
-      <HomeHeader city={city} unreadCount={unreadCount}>
-        {!isNight ? <SubTabs<HomeTab>
-          tabs={[
-            { key: 'morning', label: 'Morning After' },
-            // The moon marks a section that is closed until Night Mode
-            { key: 'feed', label: 'Newsfeed', icon: 'moon' },
-          ]}
-          value={tab}
-          onChange={setTab}
-        /> : null}
-      </HomeHeader>
-      {isNight ? (
-        <NewsfeedScreen active />
-      ) : tab === 'morning' ? (
-        <DayHome />
-      ) : (
-        <NightOpeningScreen kind="newsfeed" />
-      )}
+      <HomeHeader city={city} unreadCount={unreadCount}><ModeCountdownStrip /></HomeHeader>
+      {isNight ? <NewsfeedScreen active /> : <DayHome />}
     </View>
   );
 }
-
-type HomeTab = 'morning' | 'feed';
 
 /** The live feed, its roster pill and the Post button. `active` = its tab is showing. */
 function NewsfeedScreen({ active }: { active: boolean }) {
@@ -436,6 +413,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
               pickVisibleVideo();
             }}
           >
+            <View className="pt-4 pb-3 gap-4"><HomePlansPreview /><CompactRecapEntry /></View>
             {isPlanning && outFriends.length > 0 ? (
               <View className="px-4 pt-4">
                 <FriendsOutBanner count={outFriends.length} friends={outFriends} />
@@ -515,3 +493,5 @@ function NewsfeedScreen({ active }: { active: boolean }) {
     </View>
   );
 }
+
+export default function HomeScreen() { return <CaptureGuard name="newsfeed"><HomeScreenContent /></CaptureGuard>; }

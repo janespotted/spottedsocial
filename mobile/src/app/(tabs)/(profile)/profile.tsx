@@ -1,3 +1,5 @@
+import { ErrorState } from '@/components/empty-state';
+import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
 import { invalidatePrivateViews } from '@/lib/private-views';
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
@@ -91,6 +93,7 @@ async function fetchProfileData(userId: string): Promise<ProfileData> {
       .maybeSingle(),
   ]);
 
+  for (const result of [profileRes, checkinsRes, wishlistRes, postsRes, inviteRes]) if (result.error) throw result.error;
   const checkins = checkinsRes.data ?? [];
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   // Recent spots: unique venues, most recent first
@@ -129,9 +132,9 @@ async function fetchProfileData(userId: string): Promise<ProfileData> {
   };
 }
 
-function GridTile({ label, imageUrl }: { label: string; imageUrl?: string | null }) {
+function GridTile({ label, imageUrl, onPress }: { label: string; imageUrl?: string | null; onPress: () => void }) {
   return (
-    <View className="gap-1.5" style={{ width: '31%' }}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} className="gap-1.5 active:opacity-70" style={{ width: '31%' }}>
       <View className="aspect-square rounded-xl overflow-hidden bg-[#1a0a2e] border border-white/[0.08] items-center justify-center">
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} className="w-full h-full" contentFit="cover" />
@@ -142,7 +145,7 @@ function GridTile({ label, imageUrl }: { label: string; imageUrl?: string | null
       <Text className="text-white text-xs font-sans-medium text-center" numberOfLines={1}>
         {label}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -168,7 +171,7 @@ export default function ProfileScreen() {
   const { data: pendingCount, refetch: refetchRequests } = useFriendRequestCount(session?.user.id);
   const [spotsView, setSpotsView] = useState<SpotsView>('recent');
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['profile-page', session?.user.id],
     enabled: !!session,
     queryFn: () => fetchProfileData(session!.user.id),
@@ -231,7 +234,7 @@ export default function ProfileScreen() {
   };
 
   const statusKind = status?.status ?? null;
-  const statusHeadline =
+  const statusHeadline = !isNight ? 'Day Mode' :
     statusKind === 'out'
       ? 'Out tonight'
       : statusKind === 'planning'
@@ -239,7 +242,7 @@ export default function ProfileScreen() {
         : statusKind === 'off'
           ? 'Out tonight · hidden'
           : 'Not out tonight';
-  const statusLine =
+  const statusLine = !isNight ? 'Tonight starts at 6 PM' :
     statusKind === 'out'
       ? (status?.venue_name ?? 'Somewhere')
       : statusKind === 'planning'
@@ -250,9 +253,12 @@ export default function ProfileScreen() {
 
   const shareProfile = () => router.push('/invite-friends');
 
-  const cycleSpotsView = () => {
-    const order: SpotsView[] = ['recent', 'wishlist', 'posts'];
-    setSpotsView(order[(order.indexOf(spotsView) + 1) % order.length]);
+  const openSpot = async (name: string, id?: string | null) => {
+    if (id) { router.push({ pathname: '/venue', params: { venueId: id } }); return; }
+    const { data: venues, error } = await supabase.from('venues').select('id').eq('name', name).eq('city', ownNight?.city ?? 'nyc').limit(1);
+    if (error) { Alert.alert('Couldn’t load spot', 'Please try again.'); return; }
+    if (!venues?.[0]) { Alert.alert('Spot unavailable', 'This spot is no longer in the catalog.'); return; }
+    router.push({ pathname: '/venue', params: { venueId: venues[0].id } });
   };
 
   // Re-measure mounted native text when Dynamic Type changes.
@@ -273,6 +279,7 @@ export default function ProfileScreen() {
           </Text>
           <HeaderActions unreadCount={unreadCount} />
         </View>
+        <ModeCountdownStrip />
       </View>
 
       <ScrollView
@@ -367,7 +374,7 @@ export default function ProfileScreen() {
             {statusLine}
           </Text>
 
-          {statusKind === 'out' ? (
+          {!isNight ? <Text className="text-xs text-white/55 font-sans">Make plans now. Set your status tonight.</Text> : statusKind === 'out' ? (
             <>
               <AudienceRow value={sharingLevel} onChange={setSharingLevel} live compact />
               {/* The rule, next to the audience it applies to (addendum v3 §3) */}
@@ -395,8 +402,8 @@ export default function ProfileScreen() {
               rounded edge. Splitting the rows also matches the hierarchy:
               moving spots is the common action, the other two are not. */}
           {(() => {
-            const hasPrimary = statusKind === 'out' || statusKind === 'off';
-            const canStop = statusKind === 'out' || statusKind === 'planning';
+            const hasPrimary = isNight && (statusKind === 'out' || statusKind === 'off');
+            const canStop = isNight && (statusKind === 'out' || statusKind === 'planning');
             return (
               <View className="gap-2 mt-1">
                 {hasPrimary ? (
@@ -417,7 +424,7 @@ export default function ProfileScreen() {
                 ) : null}
                 <View className="flex-row gap-2">
                   <Pressable
-                    onPress={() => router.push('/check-in')}
+                    onPress={() => router.push(isNight ? '/check-in' : '/create-plan')}
                     className={`flex-1 py-2.5 rounded-full items-center active:opacity-90 ${
                       hasPrimary ? 'border border-white/20' : ''
                     }`}
@@ -429,7 +436,7 @@ export default function ProfileScreen() {
                       }`}
                       numberOfLines={1}
                     >
-                      Update status
+                      {isNight ? 'Update status' : 'Make a plan'}
                     </Text>
                   </Pressable>
                   {canStop ? (
@@ -498,20 +505,19 @@ export default function ProfileScreen() {
 
         {/* Spots section */}
         <View>
-          <Pressable onPress={cycleSpotsView} className="flex-row items-center gap-2 mb-1">
-            <Text className="text-xl font-sans-semibold text-white">
-              {SPOTS_LABELS[spotsView]}
-            </Text>
-            <SymbolView name="chevron.up.chevron.down" size={13} tintColor="rgba(255,255,255,0.5)" />
-          </Pressable>
-          <Text className="text-white/60 text-sm font-sans mb-3">Only you can see</Text>
+          <View accessibilityRole="tablist" className="flex-row flex-wrap gap-2 mb-2">
+            {(Object.keys(SPOTS_LABELS) as SpotsView[]).map(key => <Pressable key={key} accessibilityRole="tab" accessibilityState={{ selected: spotsView === key }} onPress={() => setSpotsView(key)} className={`min-h-11 px-3 py-2 rounded-full justify-center ${spotsView === key ? 'bg-white/10' : ''}`}><Text className={`${spotsView === key ? 'text-white' : 'text-white/60'} text-sm font-sans-medium`}>{SPOTS_LABELS[key]}</Text></Pressable>)}
+          </View>
+          <Text className="text-white/60 text-xs font-sans mb-3">{spotsView === 'posts' ? 'Shared with each post’s audience · until 5am' : spotsView === 'recent' ? 'Your history · eligible friends may see recent visits' : 'Only you can see your saved list'}</Text>
+          {isError ? <ErrorState compact title="Couldn’t load your profile" onRetry={() => void refetch()} /> : null}
 
-          {spotsView === 'recent' ? (
+          {isError ? null : spotsView === 'recent' ? (
             (data?.recentSpots ?? []).length > 0 ? (
               <View className="flex-row flex-wrap gap-3">
                 {(data?.recentSpots ?? []).map((spot) => (
                   <GridTile
                     key={spot.venue_name}
+                    onPress={() => void openSpot(spot.venue_name, spot.venue_id)}
                     label={spot.venue_name}
                     imageUrl={spot.venue_id ? getVenuePhotoUrl(spot.venue_id, 0) : null}
                   />
@@ -528,7 +534,7 @@ export default function ProfileScreen() {
             (data?.wishlist ?? []).length > 0 ? (
               <View className="flex-row flex-wrap gap-3">
                 {(data?.wishlist ?? []).map((place) => (
-                  <GridTile key={place.id} label={place.venue_name} />
+                  <GridTile key={place.id} label={place.venue_name} onPress={() => void openSpot(place.venue_name)} />
                 ))}
               </View>
             ) : (
@@ -543,6 +549,7 @@ export default function ProfileScreen() {
               {(data?.posts ?? []).map((post) => (
                 <GridTile
                   key={post.id}
+                  onPress={() => router.push({ pathname: '/post-detail', params: { postId: post.id } })}
                   label={`♥ ${post.likes_count ?? 0} · 💬 ${post.comments_count ?? 0}`}
                   imageUrl={post.thumb_url}
                 />

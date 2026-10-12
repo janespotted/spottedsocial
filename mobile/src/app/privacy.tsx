@@ -4,7 +4,7 @@ export default function PrivacyScreen() {
   return (
     <LegalPage
       title="Privacy Policy"
-      lastUpdated="December 2024"
+      lastUpdated="October 2026"
       sections={[
         {
           heading: '1. Information We Collect',
@@ -30,7 +30,7 @@ export default function PrivacyScreen() {
         },
         {
           heading: '3. Location Data',
-          body: 'Your location is only shared according to your privacy settings. You can choose to share with close friends only, all friends, or mutual friends. We do not sell location data to third parties.',
+          body: 'Live location is shared according to your audience, hide and block settings. Selecting No tonight shows you counts rather than other people’s live identities. Eligible venue visits, without GPS coordinates, can remain visible for 90 days to people who were allowed to see your location at the time; current sharing restrictions are checked again. Your private replay is visible only to you. You can choose to share with close friends only, all friends, or mutual friends. We do not sell location data to third parties.',
         },
         {
           heading: '4. Information Sharing',
@@ -59,7 +59,7 @@ export default function PrivacyScreen() {
         },
         {
           heading: '7. Data Retention',
-          body: 'We retain your data while your account is active. When you delete your account, we delete your personal data within 30 days, except where required by law.',
+          body: 'At 5am in your profile city, tonight’s live content stops appearing. This is not a promise that every stored copy is immediately erased: private replays, eligible 90-day venue visits, account data and operational records have separate retention. Account deletion is available in Settings. Screenshot protection is enabled on supported native devices for DMs, Newsfeed and Activity Center; it cannot prevent someone photographing a screen with another device.',
         },
         {
           heading: "8. Children's Privacy",

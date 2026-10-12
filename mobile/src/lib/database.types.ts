@@ -2578,6 +2578,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_friends_night_counts: { Args: Record<PropertyKey, never>; Returns: Json };
+      send_dm_once: { Args: { p_id: string; p_thread: string; p_text: string; p_image?: string | null }; Returns: Database["public"]["Tables"]["dm_messages"]["Row"][] };
+
       get_party_invite_recipients: { Args: Record<PropertyKey, never>; Returns: { id: string }[] };
       commit_night_status: { Args: { p_patch: Json; p_fix?: Json; p_audience?: string }; Returns: Json }
       get_post_share_recipients: { Args: { p_post: string }; Returns: { id: string; display_name: string; avatar_url: string | null; is_out: boolean }[] }

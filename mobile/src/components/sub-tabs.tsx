@@ -29,7 +29,7 @@ export function SubTabs<T extends string>({
   trailing?: ReactNode;
 }) {
   return (
-    <View className="flex-row items-center px-4 pt-2 pb-3" accessibilityRole="tablist">
+    <View className="flex-row flex-wrap items-center px-4 pt-2 pb-3 gap-y-2" accessibilityRole="tablist">
       {tabs.map((tab) => {
         const selected = value === tab.key;
         const color = selected ? '#ffffff' : 'rgba(255,255,255,0.45)';
@@ -39,10 +39,10 @@ export function SubTabs<T extends string>({
             onPress={() => onChange(tab.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            className="mr-6"
+            className="mr-4 min-h-11 justify-center flex-shrink"
           >
             <View className="flex-row items-center gap-1.5">
-              <Text className="font-sans-semibold text-2xl" style={{ color }}>
+              <Text className="font-sans-semibold text-xl" style={{ color }}>
                 {tab.label}
               </Text>
               {tab.icon ? <SymbolView name={tab.icon} size={15} tintColor={color} /> : null}
