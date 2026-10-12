@@ -39,7 +39,7 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
  const pair=async n=>{await profile(n);await nominate(n,1,'+12025550101');await nominate(n,2,'+12025550102');};
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261012021331_launch_admin_center.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261012034343_member_nomination_progress.sql'),'utf8'));
- for(const f of ['20261012073318_recent_venue_visit_audiences.sql','20261012073319_launch_planning_pool.sql']) await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',f),'utf8'));
+ for(const f of ['20261012073318_recent_venue_visit_audiences.sql','20261012073319_launch_planning_pool.sql','20261012075847_restrict_raw_historical_checkins.sql']) await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',f),'utf8'));
  const admin=(action,data={},n=1)=>rpc(n,'launch_admin',[action,data]);
  const guest=async phone=>(await q('select * from spotted_private.launch_guests where phone=$1',[phone]))[0];
  const create=async(capacity=100)=>ok(await admin('create_wave',{id:id(90),name:'First 100',capacity}));
@@ -184,5 +184,12 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
   await q("update profiles set location_sharing_level='mutual_friends' where id=$1",[id(1)]);await q('update night_statuses set updated_at=now() where user_id=$1',[id(1)]);assert.equal((await history(3)).length,0);
  });
 
+ await test('Raw endpoint exposes only current shared checkins; historic data cannot bypass snapshots',async()=>{
+  await visitSetup();await checkin();assert.equal(ok(await actor(2,'select id from checkins where user_id=$1',[id(1)])).length,1);
+  await endVisit();assert.equal(ok(await actor(2,'select id from checkins where user_id=$1',[id(1)])).length,0);assert.equal(ok(await actor(1,'select id from checkins where user_id=$1',[id(1)])).length,1);assert.equal((await history(2)).length,1);
+ });
+ await test('Deleting your checkin withdraws its historical audience too',async()=>{
+  await visitSetup();await checkin();await endVisit();ok(await actor(1,'delete from checkins where id=$1',[id(601)]));assert.equal((await history(2)).length,0);
+ });
  console.log(`${passed}/${passed+failed} passed`);await db.close();process.exitCode=failed?1:0;
 })().catch(e=>{console.error(e.message);process.exitCode=1;});
