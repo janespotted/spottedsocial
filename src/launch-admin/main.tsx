@@ -1,3 +1,4 @@
+import { PlanningPool } from './planning-pool';
 import { createRoot } from "react-dom/client";
 import { useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
@@ -47,7 +48,7 @@ function App() {
     [code, setCode] = useState(""),
     [codeSent, setCodeSent] = useState(false),
     [authReady, setAuthReady] = useState(false);
-  const [wave, setWave] = useState("all"),
+  const [wave, setWave] = useState(location.hash === "#planning-pool" ? "pool" : "all"),
     [status, setStatus] = useState("all"),
     [search, setSearch] = useState(""),
     [offset, setOffset] = useState(0),
@@ -196,7 +197,7 @@ function App() {
     }
   }, [session?.user.id]);
   useEffect(() => {
-    if (!snapshot) return;
+    if (!snapshot || wave === "pool") return;
     const t = setTimeout(
       () => void loadGuests().catch((e) => setError(e.message)),
       180,
@@ -387,6 +388,7 @@ function App() {
           <span>Next up</span>
           <span>{snapshot?.pending ?? "—"}</span>
         </button>
+        <button className={wave === "pool" ? "nav active" : "nav"} onClick={() => { setWave("pool"); history.replaceState(null, '', '#planning-pool'); }}><span>Planning pool</span><span>↗</span></button>
         <div className="sidebar-title">YOUR WAVES</div>
         {snapshot?.waves.map((w) => (
           <button
@@ -450,17 +452,17 @@ function App() {
             <p className="eyebrow">A GOOD NIGHT STARTS WITH GOOD PEOPLE</p>
             <h1>
               {activeWave?.name ||
-                (wave === "queue" ? "Who’s next." : "Let the right people in.")}
+                (wave === "pool" ? "Your first circle." : wave === "queue" ? "Who’s next." : "Let the right people in.")}
             </h1>
             <p>
-              {activeWave
+              {wave === "pool" ? "Save everyone here. Choose your first 100 when you’re ready." : activeWave
                 ? "Every place has a name. Every invitation stays accounted for."
                 : wave === "queue"
                   ? "Completed nominations and your hand-picked guests, ready for a future wave."
                   : "Build your circle in waves. See exactly who’s on the list—and who’s joined."}
             </p>
           </div>
-          <button onClick={() => openModal("import")}>＋ Add people</button>
+          {wave !== "pool" && <button onClick={() => openModal("import")}>＋ Add people</button>}
         </section>
         {error && (
           <div role="alert" className="error">
@@ -494,7 +496,7 @@ function App() {
                 : "Your private guest lists are being loaded."}
             </p>
           </section>
-        ) : (
+        ) : wave === "pool" ? <PlanningPool key={session?.user.id || "preview"} preview={preview} onQueue={() => setWave("queue")} /> : (
           <>
             <section className="metrics">
               <div>

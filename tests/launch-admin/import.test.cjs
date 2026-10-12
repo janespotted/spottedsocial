@@ -43,3 +43,10 @@ test("CSV export neutralizes spreadsheet formula injection and preserves quotes"
   assert.equal(csvCell('=HYPERLINK("x")'), '"\'=HYPERLINK(""x"")"');
   assert.equal(csvCell("+12025550101"), '"\'+12025550101"');
 });
+const planning={};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../../src/launch-admin/planning-import.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:planning});
+test('Planning import preserves event status, commas, quotes, blank columns and newlines without inventing phones',()=>{
+ const r=planning.parsePlanningImport('\uFEFFName,Status,RSVP date,Invited By,Is Plus One Of\r\n"Alex, A",Approved,,"Jane ""J""",\r\n"Sam\nLee",Invited,Oct 12,,Alex\r\n');
+ assert.equal(r.length,2);assert.equal(r[0].name,'Alex, A');assert.equal(r[0].invited_by,'Jane "J"');assert.equal(r[0].rsvp_date,'');assert.equal(r[1].name,'Sam\nLee');assert.equal(r[1].event_status,'Invited');assert.equal(r[1].phone,undefined);
+ assert.throws(()=>planning.parsePlanningImport('Name\n"unfinished'));assert.throws(()=>planning.parsePlanningImport('Email\na@example.com'));
+});

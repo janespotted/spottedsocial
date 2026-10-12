@@ -52,3 +52,9 @@ Tests: isolated PostgreSQL cases cover role denial, Apple/phone admission, capac
 - Run the existing mobile checks and the root Vite production build.
 
 The full consumer-web TypeScript check currently reports 52 pre-existing errors. Excluding the new admin directory produces identical diagnostics; the dedicated admin TypeScript check passes. The full Vite production build succeeds. These older web type errors are not silently waived as passing checks.
+
+## Planning pool
+
+Open **Planning pool** to save people before you have their phone numbers. Import a CSV with `Name`; the event columns `Status`, `RSVP date`, `Invited By`, and `Is Plus One Of` are preserved as event context. Reimporting the same source rows is idempotent. Event “Invited” never means a Spotted invitation was sent.
+
+Shortlist anyone while collecting numbers. Open a person, save their phone, then explicitly add them to the invitation queue. In **Next up**, select those guests and assign them to **The first 100** draft wave. Existing membership, phone duplication, nomination reservations, wave capacity and admission checks remain enforced on the server. Importing and shortlisting alone grant no access and send no messages. The planning pool can exceed the capacity of a wave.

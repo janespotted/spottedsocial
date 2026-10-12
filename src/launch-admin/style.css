@@ -842,3 +842,12 @@ td > small {
     display: none;
   }
 }
+
+.pool-import, .pool-detail { margin-bottom: 24px; }
+.pool-import label { display: block; max-width: 540px; margin-top: 20px; }
+.pool-detail form { display: flex; align-items: end; gap: 12px; max-width: 600px; margin: 22px 0; }
+.pool-detail form label { flex: 1; }
+.pool-detail form button { white-space: nowrap; }
+.planning-pool .pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px; }
+.planning-pool .empty { padding: 20px; }
+@media(max-width:600px) { .pool-detail form { flex-direction: column; align-items: stretch; } }

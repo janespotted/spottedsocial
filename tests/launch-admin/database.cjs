@@ -39,6 +39,7 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
  const pair=async n=>{await profile(n);await nominate(n,1,'+12025550101');await nominate(n,2,'+12025550102');};
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261012021331_launch_admin_center.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261012034343_member_nomination_progress.sql'),'utf8'));
+ for(const f of ['20261012073318_recent_venue_visit_audiences.sql','20261012073319_launch_planning_pool.sql']) await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',f),'utf8'));
  const admin=(action,data={},n=1)=>rpc(n,'launch_admin',[action,data]);
  const guest=async phone=>(await q('select * from spotted_private.launch_guests where phone=$1',[phone]))[0];
  const create=async(capacity=100)=>ok(await admin('create_wave',{id:id(90),name:'First 100',capacity}));
@@ -116,5 +117,72 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
   await q('update auth.users set phone_confirmed_at=null where id=$1',[id(4)]);
   assert.equal((await progress(3))[0].status,'waiting');
  });
+ // Build 55: planning pool and historical sharing audiences.
+ const pool=(action,data={},n=1)=>rpc(n,'launch_pool',[action,data]);
+ await test('Planning pool stores all 127 phoneless guests, idempotently, without assigning or inviting',async()=>{
+  const rows=Array.from({length:127},(_,n)=>({name:'Planning person '+n,event_status:n<87?'Approved':n<119?'Invited':n<126?'Can’t Go':'Pending',rsvp_date:'Oct 12',invited_by:'Host',plus_one_of:''}));
+  let result=value(await pool('import',{source:'Synthetic party.csv',rows}));assert.equal(result.added,127);
+  assert.equal(value(await pool('import',{source:'Synthetic party.csv',rows})).duplicates,127);
+  const all=value(await pool('list'));assert.equal(all.total,127);assert.equal(all.rows.length,100);assert.equal(all.summary.missingPhone,127);assert.equal(all.summary.shortlisted,0);
+  assert.equal(value(await pool('list',{offset:100})).rows.length,27);
+  for(const table of ['launch_guests','launch_waves','launch_messages'])assert.equal(await scalar('select count(*) from spotted_private.'+table),0);
+ });
+ await test('Planning pool denies normal users and anonymous readers/writers',async()=>{
+  for(const action of ['list','import','update','queue']) {deny(await pool(action,{},2));deny(await actor(null,'select launch_pool($1,$2)',[action,{}],'anon'));}
+  deny(await actor(2,'select * from spotted_private.launch_prospects'));
+ });
+ await test('Shortlist, phone validation, existing-member collisions and queue are separate steps',async()=>{
+  value(await pool('import',{source:'test',rows:[{name:'One'},{name:'Two'}]}));const rows=value(await pool('list')).rows;
+  assert((await pool('queue',{id:rows[0].id})).error);
+  value(await pool('update',{id:rows[0].id,shortlisted:true}));assert.equal(value(await pool('list',{status:'shortlisted'})).total,1);
+  assert((await pool('update',{id:rows[0].id,phone:'bad'})).error);
+  value(await pool('update',{id:rows[0].id,phone:'+12025550001'}));assert((await pool('queue',{id:rows[0].id})).error);
+  value(await pool('update',{id:rows[0].id,phone:'+12025550177'}));assert((await pool('update',{id:rows[1].id,phone:'+12025550177'})).error);
+  value(await pool('queue',{id:rows[0].id}));value(await pool('queue',{id:rows[0].id}));const g=await guest('+12025550177');assert.equal(g.wave_id,null);assert.equal(g.activated_at,null);assert.equal(g.invited_at,null);assert.equal(g.consent_at,null);
+ });
+ const history=async n=>value(await rpc(n,'get_recent_venue_visits',['nyc']));
+ async function visitSetup(audience='all_friends') {
+  for(const n of [3,4])await q('insert into spotted_private.launch_members(user_id,profile_saved_at,completed_at) values($1,now(),now())',[id(n)]);
+  await q("insert into venues(id,name,neighborhood,type,lat,lng,is_demo,city) values($1,'Test Club','Test','club',40,-73,false,'nyc')",[id(500)]);
+  for(const [a,b] of [[1,2],[2,3]])await q("insert into friendships(user_id,friend_id,status) values($1,$2,'accepted')",[id(a),id(b)]);
+  await q('update profiles set location_sharing_level=$1 where id=$2',[audience,id(1)]);
+  await q("insert into night_statuses(user_id,status,venue_id,venue_name,expires_at) values($1,'out',$2,'Test Club',now()+interval '6 hours')",[id(1),id(500)]);
+ }
+ async function checkin(n=601,started="now()",ended='null') {await q(`insert into checkins(id,user_id,venue_id,venue_name,lat,lng,started_at,ended_at) values($1,$2,$3,'Test Club',40,-73,${started},${ended})`,[id(n),id(1),id(500)]);}
+ async function endVisit(n=601){await q('update checkins set ended_at=now() where id=$1',[id(n)]);}
+ await test('History is visible to the audience at the visit, remains when owner is home, and contains no GPS',async()=>{
+  await visitSetup();await checkin();assert.equal((await history(2)).length,0);await endVisit();assert.equal((await history(2)).length,1);
+  await q("update night_statuses set status='home' where user_id=$1",[id(1)]);const r=(await history(2))[0];assert(r);assert.equal(r.user_id,id(1));assert.deepEqual(Object.keys(r).sort(),['avatar_url','display_name','expires_at','user_id','venue_id']);
+  assert.equal((await history(3)).length,0);assert.equal((await history(1)).length,0);
+ });
+ await test('Friendship or expanded sharing after a visit never exposes the old visit',async()=>{
+  await visitSetup();await checkin();await endVisit();await q("update profiles set location_sharing_level='mutual_friends' where id=$1",[id(1)]);
+  await q("insert into friendships(user_id,friend_id,status) values($1,$2,'accepted')",[id(1),id(4)]);
+  assert.equal((await history(3)).length,0);assert.equal((await history(4)).length,0);
+ });
+ await test('Close friends, hidden recipients, permitted mutuals and current privacy revocation are enforced',async()=>{
+  await visitSetup('mutual_friends');await q("insert into location_hidden(user_id,hidden_from_id) values($1,$2)",[id(1),id(2)]);await checkin();await endVisit();assert.equal((await history(2)).length,0);assert.equal((await history(3)).length,1);
+  await q('delete from location_hidden where user_id=$1',[id(1)]);assert.equal((await history(2)).length,0);
+  await q("update profiles set location_sharing_level='close_friends' where id=$1",[id(1)]);assert.equal((await history(3)).length,0);
+  await q('insert into close_friends(user_id,close_friend_id) values($1,$2)',[id(1),id(2)]);await checkin(602);await endVisit(602);assert.equal((await history(2)).length,1);
+  await q('insert into blocked_users(blocker_id,blocked_id) values($1,$2)',[id(2),id(1)]);assert.equal((await history(2)).length,0);
+ });
+ await test('History survives raw checkin cleanup, expires at 90 days, and cannot be read or forged directly',async()=>{
+  await visitSetup();await checkin();await endVisit();assert.equal(await scalar("select expires_at-captured_at=interval '90 days' from spotted_private.venue_visits limit 1"),true);
+  await q('delete from checkins where id=$1',[id(601)]);assert.equal((await history(2)).length,1);
+  await q("update spotted_private.venue_visits set expires_at=now()+interval '1 day',captured_at=now()-interval '89 days'");assert.equal((await history(2)).length,1);
+  await q('update spotted_private.venue_visits set expires_at=now()');assert.equal((await history(2)).length,0);await q('select spotted_private.cleanup_venue_visits()');assert.equal(await scalar('select count(*) from spotted_private.venue_visit_audience'),0);
+  deny(await actor(2,'select * from spotted_private.venue_visit_audience'));deny(await actor(2,'select spotted_private.capture_venue_visit($1,$2)',[id(1),id(500)]));deny(await actor(null,"select get_recent_venue_visits('nyc')",[],'anon'));
+ });
+ await test('Old, ended and private-party checkins never acquire a newly inferred audience',async()=>{
+  await visitSetup();await checkin(601,"now()-interval '2 days'","now()-interval '1 day'");await checkin(602,"now()-interval '1 hour'");await endVisit(602);assert.equal(await scalar('select count(*) from spotted_private.venue_visits'),0);
+  await q('update night_statuses set is_private_party=true where user_id=$1',[id(1)]);await checkin(603);await endVisit(603);assert.equal((await history(2)).length,0);
+ });
+ await test('Checkin-first ordering captures once status arrives, not a later new friend',async()=>{
+  await visitSetup();await q('delete from night_statuses where user_id=$1',[id(1)]);await checkin();assert.equal(await scalar('select count(*) from spotted_private.venue_visit_audience'),0);
+  await q("insert into night_statuses(user_id,status,venue_id,venue_name,expires_at) values($1,'out',$2,'Test Club',now()+interval '6 hours')",[id(1),id(500)]);await endVisit();assert.equal((await history(2)).length,1);
+  await q("update profiles set location_sharing_level='mutual_friends' where id=$1",[id(1)]);await q('update night_statuses set updated_at=now() where user_id=$1',[id(1)]);assert.equal((await history(3)).length,0);
+ });
+
  console.log(`${passed}/${passed+failed} passed`);await db.close();process.exitCode=failed?1:0;
 })().catch(e=>{console.error(e.message);process.exitCode=1;});
