@@ -1,3 +1,4 @@
+import { isDemoMode } from './demo-mode';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
 import type { DmMessage } from './dm';
@@ -12,12 +13,14 @@ export function pendingDm(userId: string, threadId: string, text: string, image:
   return { id: randomUUID(), thread_id: threadId, sender_id: userId, text, image_url: image, created_at: new Date().toISOString() };
 }
 export async function readPendingDm(userId: string, threadId: string): Promise<PendingDm[]> {
+  if (isDemoMode()) return [];
   try {
     const value = JSON.parse(await AsyncStorage.getItem(key(userId, threadId)) ?? '[]');
     return Array.isArray(value) ? value.filter(m => m.sender_id === userId && m.thread_id === threadId && isFromTonight(m.created_at)).map(m => ({ ...m, failed: true })) : [];
   } catch { return []; }
 }
 export function savePendingDm(userId: string, threadId: string, rows: PendingDm[]): Promise<unknown> {
+  if (isDemoMode()) return Promise.resolve();
   const revision = getSessionRevision();
   const k = key(userId, threadId);
   const next = (writes.get(k) ?? Promise.resolve()).catch(() => {}).then(() => {

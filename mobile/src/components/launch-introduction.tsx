@@ -10,24 +10,24 @@ import { INTRO_STEPS, cachedIntroStep, readIntroStep, saveIntroStep } from '@/li
 import { INK, MIST, NEON } from '@/lib/theme';
 
 /** Mounted after profile entry, before the two required nominations. */
-export function LaunchIntroduction({ userId, enabled, children }: { userId?: string; enabled: boolean; children: ReactNode }) {
-  const [step, setStep] = useState<number | null>(() => cachedIntroStep(userId));
+export function LaunchIntroduction({ userId, enabled, children, preview = false }: { userId?: string; enabled: boolean; children: ReactNode; preview?: boolean }) {
+  const [step, setStep] = useState<number | null>(() => preview ? 0 : cachedIntroStep(userId));
   useEffect(() => {
     let active = true;
-    if (enabled && userId) void readIntroStep(userId).then(value => { if (active) setStep(value); });
+    if (!preview && enabled && userId) void readIntroStep(userId).then(value => { if (active) setStep(value); });
     return () => { active = false; };
   }, [userId, enabled]);
   if (!enabled || !userId || step === INTRO_STEPS.length) return children;
   if (step === null) return <View className="flex-1 items-center justify-center" style={{ backgroundColor: INK }} accessibilityLabel="Loading introduction"><SpottedMark size={40} /></View>;
-  return <IntroductionPages initialStep={step} onStep={value => {
-    void saveIntroStep(userId, value);
+  return <IntroductionPages preview={preview} initialStep={step} onStep={value => {
+    if (!preview) void saveIntroStep(userId, value);
     if (value === INTRO_STEPS.length) setStep(value);
   }} />;
 }
 
 const PAGE_EASE = Easing.bezier(0.22, 1, 0.36, 1);
 
-export function IntroductionPages({ initialStep, onStep }: { initialStep: number; onStep: (step: number) => void }) {
+export function IntroductionPages({ initialStep, onStep, preview = false }: { preview?: boolean; initialStep: number; onStep: (step: number) => void }) {
   const [step, setStep] = useState(initialStep);
   const [busy, setBusy] = useState(false);
   const [target, setTarget] = useState(initialStep);
@@ -77,7 +77,7 @@ export function IntroductionPages({ initialStep, onStep }: { initialStep: number
     });
   };
   return <View style={{ flex: 1, backgroundColor: INK }}>
-      <View className="flex-row items-center justify-between px-7 pt-safe-offset-5 pb-6">
+      <View className={preview ? "flex-row items-center justify-between px-7 pt-5 pb-6" : "flex-row items-center justify-between px-7 pt-safe-offset-5 pb-6"}>
         <View className="flex-row items-center gap-2">
           {step > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Previous introduction" disabled={busy} onPress={() => move(step - 1)} className="h-11 w-11 items-center justify-center rounded-full border border-white/15 active:opacity-60"><SymbolView name="arrow.left" size={19} tintColor={MIST} /></Pressable> : <View className="h-11 w-11 items-center justify-center"><SpottedMark size={30} glow={false} /></View>}
           <Text className="text-white text-sm font-sans-medium" style={{ letterSpacing: 3 }} maxFontSizeMultiplier={1.3}>Spotted</Text>

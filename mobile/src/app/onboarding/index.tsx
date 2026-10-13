@@ -13,6 +13,7 @@ import { nomineeName, readNomineeLabels, saveNomineeLabel, type NomineeLabels } 
 import { readIntroStep } from '@/lib/launch-intro';
 import { supabase } from '@/lib/supabase';
 import { formatE164 } from '@/lib/country-codes';
+import { previewLaunchState, previewLaunchAction } from '@/lib/onboarding-preview';
 import { INK, MIST, NEON } from '@/lib/theme';
 
 function LaunchOnboarding() {
@@ -22,27 +23,29 @@ function LaunchOnboarding() {
 
 export default LaunchOnboarding;
 
-function LaunchSetup() {
+export function LaunchSetup({ preview = false, onDone }: { preview?: boolean; onDone?: () => void } = {}) {
   const { session, launch, refreshOnboardingStatus } = useSession();
-  useEffect(() => { if (session?.user.id) void readIntroStep(session.user.id); }, [session?.user.id]);
-  const [state, setState] = useState<LaunchState | null>(launch);
-  const appleName = typeof session?.user.user_metadata?.full_name === 'string' ? session.user.user_metadata.full_name : '';
-  const [name, setName] = useState<string>((launch?.profileSaved ? launch.profile?.name : '') || appleName);
+  useEffect(() => { if (!preview && session?.user.id) void readIntroStep(session.user.id); }, [session?.user.id]);
+  const [state, setState] = useState<LaunchState | null>(() => preview ? previewLaunchState() : launch);
+  const appleName = !preview && typeof session?.user.user_metadata?.full_name === 'string' ? session.user.user_metadata.full_name : '';
+  const [name, setName] = useState<string>((!preview && launch?.profileSaved ? launch.profile?.name : '') || appleName);
   useEffect(() => { if (appleName) setName(current => current || appleName); }, [appleName]);
-  const [username, setUsername] = useState(launch?.profileSaved ? launch.profile?.username || '' : '');
+  const [username, setUsername] = useState(!preview && launch?.profileSaved ? launch.profile?.username || '' : '');
   const [terms, setTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const [error, setError] = useState<string | null>(null);
   // Keep the opening view to two cards; show entry controls after a choice.
-  const [slot, setSlot] = useState(launch?.nominations.length === 1 ? 2 : 0);
+  const [slot, setSlot] = useState(!preview && launch?.nominations.length === 1 ? 2 : 0);
   const [phone, setPhone] = useState('');
   const [contactName, setContactName] = useState('');
   const [nomineeLabels, setNomineeLabels] = useState<NomineeLabels>({});
-  useEffect(() => { let active = true; if (session) void readNomineeLabels(session.user.id).then(value => { if (active) setNomineeLabels(value); }); return () => { active = false; }; }, [session?.user.id]);
+  useEffect(() => { let active = true; if (!preview && session) void readNomineeLabels(session.user.id).then(value => { if (active) setNomineeLabels(value); }); return () => { active = false; }; }, [session?.user.id]);
   const [verifyPhone, setVerifyPhone] = useState(false);
   const usernameInput = useRef<TextInput>(null);
-  useEffect(() => { if (launch) setState(launch); }, [launch]);
+  useEffect(() => { if (!preview && launch) setState(launch); }, [launch]);
+  const invoke = (name: Parameters<typeof launchRpc>[0], args?: Record<string, unknown>): Promise<LaunchState> => preview ? Promise.resolve(previewLaunchAction(state!, name, args)) : launchRpc(name, args);
+  const finish = async () => { if (preview) onDone?.(); else await refreshOnboardingStatus(); };
   const stage = state ? launchStage(state) : 'waiting';
   async function perform(work: () => Promise<void>) {
     if (saving.current) return;
@@ -50,7 +53,7 @@ function LaunchSetup() {
     try { await work(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not save. Try again.'); }
     finally { saving.current = false; setBusy(false); }
   }
-  const refresh = () => perform(async () => { const next = await launchRpc('get_launch_state'); setState(next); if (next.complete) await refreshOnboardingStatus(); });
+  const refresh = () => perform(async () => { const next = await invoke('get_launch_state'); setState(next); if (next.complete) await finish(); });
   useEffect(() => {
     if (stage !== 'waiting') return;
     const sub = AppState.addEventListener('change', value => { if (value === 'active') refresh(); });
@@ -58,14 +61,14 @@ function LaunchSetup() {
   }, [stage]);
   const errorView = error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" className="text-red-300 text-sm leading-5 mt-4 mb-4">{error}</Text> : null;
 
-  if (stage === 'phone') return <LaunchShell key="phone" title="Your number. Your invitation." subtitle="Verify the number you were invited on to unlock your place.">
+  if (stage === 'phone') return <LaunchShell preview={preview} key="phone" title="Your number. Your invitation." subtitle="Verify the number you were invited on to unlock your place.">
     <PhoneVerifyForm onVerified={() => { refresh(); }} />
     {errorView}
     <Text className="text-white/60 text-sm leading-5 mt-6">Apple stays connected to this account. Your verified number checks your invitation.</Text>
     <Pressable className="py-5" onPress={() => void supabase.auth.signOut()}><Text className="text-white/70 text-center">Already have an account? Sign in with your phone</Text></Pressable>
   </LaunchShell>;
 
-  if (stage === 'waiting') return <LaunchShell key="waiting" title="Your night is coming." subtitle="New York opens in small waves. Your invitation unlocks your place.">
+  if (stage === 'waiting') return <LaunchShell preview={preview} key="waiting" title="Your night is coming." subtitle="New York opens in small waves. Your invitation unlocks your place.">
     <View className="rounded-3xl bg-white/5 border border-white/10 p-6 mb-8 gap-3">
       <SymbolView name="sparkles" tintColor={NEON} size={28} />
       <Text className="text-white text-lg font-sans-medium">First, your invitation.</Text>
@@ -81,7 +84,7 @@ function LaunchSetup() {
     <Pressable className="py-4" onPress={() => void supabase.auth.signOut()}><Text className="text-white/60 text-center">Use another account</Text></Pressable>
   </LaunchShell>;
 
-  if (stage === 'profile') return <LaunchShell key="profile" step={1} title="Make an entrance." subtitle="Your name. Your handle.">
+  if (stage === 'profile') return <LaunchShell preview={preview} key="profile" step={1} title="Make an entrance." subtitle="Your name. Your handle.">
     <Text className="text-sm text-white/65 mb-2">Your name</Text>
     <TextInput accessibilityLabel="Your name" value={name} onChangeText={setName} maxLength={50} textContentType="name" returnKeyType="next" onSubmitEditing={() => usernameInput.current?.focus()} className="text-white text-2xl font-sans-light border-b border-white/20 pb-3 mb-7" placeholder="First and last name" placeholderTextColor={MIST} />
     <Text className="text-sm text-white/65 mb-2">Username</Text>
@@ -95,13 +98,14 @@ function LaunchSetup() {
     </View>
     {errorView}
     <View className="mt-auto pt-7"><LaunchButton label={busy ? 'Saving…' : 'Continue'} disabled={busy || !name.trim() || !/^[a-z0-9_.]{3,20}$/.test(username) || !terms} onPress={() => void perform(async () => {
-      const next = await launchRpc('save_launch_profile', { p_name: name.trim(), p_username: username, p_terms: terms });
+      const next = await invoke('save_launch_profile', { p_name: name.trim(), p_username: username, p_terms: terms });
       Keyboard.dismiss(); setState(next); void Haptics.selectionAsync();
     })} /></View>
   </LaunchShell>;
 
   const choices = state?.nominations || [];
   const pickContact = () => perform(async () => {
+    if (preview) { setPhone(slot === 1 ? '+12025550101' : '+12025550102'); setContactName(slot === 1 ? 'Alex Demo' : 'Sam Demo'); return; }
     const contact = await Contacts.presentContactPickerAsync();
     if (!contact) return;
     const numbers = [...new Set((contact.phoneNumbers || []).map(p => p.number).filter((p): p is string => !!p))];
@@ -111,8 +115,8 @@ function LaunchSetup() {
     if (Platform.OS === 'ios') ActionSheetIOS.showActionSheetWithOptions({ title: 'Choose their number', options: [...numbers, 'Cancel'], cancelButtonIndex: numbers.length }, i => { if (numbers[i]) chooseNumber(numbers[i]); });
     else Alert.alert('Choose their number', undefined, [...numbers.slice(0, 2).map(number => ({ text: number, onPress: () => chooseNumber(number) })), { text: 'Cancel', style: 'cancel' }]);
   });
-  return <LaunchIntroduction userId={session?.user.id} enabled={!!session && stage === 'nominate'}>
-  <LaunchShell key="nominate" step={2} title="Who’s next?" subtitle="Two new people. A future wave.">
+  return <LaunchIntroduction userId={session?.user.id} preview={preview} enabled={!!session && stage === 'nominate'}>
+  <LaunchShell preview={preview} key="nominate" step={2} title="Who’s next?" subtitle="Two new people. A future wave.">
     <View className="gap-3 mb-6">
       {[1, 2].map(n => {
         const choice = choices.find(c => c.slot === n);
@@ -129,10 +133,10 @@ function LaunchSetup() {
       <TextInput accessibilityLabel={`Phone number for nominee ${slot}`} value={phone} onChangeText={value => { setPhone(value); setContactName(''); }} keyboardType="phone-pad" placeholder="Or enter a phone number" placeholderTextColor={MIST} maxLength={30} className="text-white text-lg border-b border-white/20 py-3" />
       <Text className="text-white/55 text-xs leading-5 mt-2 mb-4">US numbers or +country code. Only the number you confirm is shared with Spotted.</Text>
       <Pressable accessibilityRole="button" disabled={busy || !nominationPhone(phone)} onPress={() => void perform(async () => {
-        const next = await launchRpc('save_launch_nomination', { p_slot: slot, p_phone: nominationPhone(phone) });
-        if (session) {
+        const next = await invoke('save_launch_nomination', { p_slot: slot, p_phone: nominationPhone(phone) });
+        {
           const confirmedPhone = nominationPhone(phone)!;
-          await saveNomineeLabel(session.user.id, slot, confirmedPhone, contactName);
+          if (session && !preview) await saveNomineeLabel(session.user.id, slot, confirmedPhone, contactName);
           setNomineeLabels(current => ({ ...current, [slot]: { phone: confirmedPhone, name: contactName } }));
         }
         setContactName(''); setState(next); setPhone(''); setSlot(next.nominations.length === 2 ? 0 : next.nominations.some(c => c.slot === 1) ? 2 : 1); Keyboard.dismiss(); void Haptics.selectionAsync();
@@ -142,7 +146,7 @@ function LaunchSetup() {
     <Text className="text-white/65 text-sm leading-5">Both are required. No invitations sent yet.</Text>
     {errorView}
     <View className="mt-auto pt-7"><LaunchButton label={busy ? 'Saving…' : choices.length === 2 ? 'Let’s go' : `${choices.length} of 2 chosen`} disabled={busy || choices.length !== 2 || slot !== 0} onPress={() => void perform(async () => {
-      await launchRpc('complete_launch_onboarding'); Keyboard.dismiss(); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); await refreshOnboardingStatus();
+      await invoke('complete_launch_onboarding'); Keyboard.dismiss(); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); await finish();
     })} /></View>
   </LaunchShell>
   </LaunchIntroduction>;

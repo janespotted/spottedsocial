@@ -51,7 +51,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       const state = await launchRpc('get_launch_state');
       const needed = !state.complete;
-      if (revision === getSessionRevision()) { setLaunch(state); setDemoAuthorization(state.cityTester); setOnboardingNeeded(needed); setOnboardingError(null); }
+      if (revision === getSessionRevision()) { setLaunch(state); setDemoAuthorization(state.cityTester || state.waveAdmin); setOnboardingNeeded(needed); setOnboardingError(null); }
     } catch (error) {
       if (revision === getSessionRevision()) setOnboardingError('Could not load your profile. Your account has not been reset.');
       throw error;
@@ -101,7 +101,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     setLaunch(null); setDemoAuthorization(false); setOnboardingNeeded(null); setOnboardingError(null);
     launchRpc('get_launch_state').then((state) => {
-      if (!cancelled) { setLaunch(state); setDemoAuthorization(state.cityTester); setOnboardingNeeded(!state.complete); }
+      if (!cancelled) { setLaunch(state); setDemoAuthorization(state.cityTester || state.waveAdmin); setOnboardingNeeded(!state.complete); }
     }).catch(() => {
       if (!cancelled) setOnboardingError('Could not load your profile. Your account has not been reset.');
     });

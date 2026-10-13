@@ -76,7 +76,7 @@ function setupHarness(launch, save = async () => ({ ...launch, profileSaved: tru
   const element = (type, props) => ({ type, props });
   const hook = initial => {
     const i = cursor++;
-    if (!(i in hooks)) hooks[i] = initial;
+    if (!(i in hooks)) hooks[i] = typeof initial === 'function' ? initial() : initial;
     return [hooks[i], value => { hooks[i] = typeof value === 'function' ? value(hooks[i]) : value; }];
   };
   const { launchStage } = load('lib/launch.ts', { '@/lib/supabase': { supabase: {} } });

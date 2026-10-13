@@ -69,6 +69,7 @@ function managerHarness({gate='answered',initial=null,failRegistration=false,sta
  '@/lib/push':{registerPushToken:async(uid,opts)=>{registrations.push(opts);if(failures-->0)throw Error('offline');return 'granted';},routeForNotification:data=>data?.type==='dm'?'/messages':'/map'},
  '@/hooks/use-own-night-status':{useOwnNightStatus:()=>({data:{status:{status}},isError:false})},
  '@/lib/live-preview':{LIVE_ACTIVITY_TYPES:['friend_out','friend_planning','friend_arrived_venue'],withholdLivePreview:(value,resolved)=>!resolved||!['out','planning'].includes(value)},
+ '@/lib/demo-mode':{isDemoMode:()=>false,useDemoMode:()=>false},
  '@/hooks/use-session':{useSession:()=>({session:{user:{id:'alice'}},onboardingNeeded:false,onboardingResolved:true})}};
  const compiled=ts.transpileModule(fs.readFileSync(path.join(__dirname,'../src/components/push-notification-manager.tsx'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
  const mod={exports:{}};new Function('require','module','exports','setTimeout','clearTimeout',compiled)(n=>deps[n],mod,mod.exports,(fn,ms)=>{timers.set(++next,{fn,ms});return next;},id=>timers.delete(id));

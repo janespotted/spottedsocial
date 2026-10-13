@@ -1,3 +1,4 @@
+import { isDemoMode, useDemoMode } from '@/lib/demo-mode';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
@@ -16,7 +17,7 @@ Notifications.setNotificationHandler({
     const receiver = notification.request.content.data?.receiver_id;
     const type = notification.request.content.data?.type;
     const live = typeof type === 'string' && LIVE_ACTIVITY_TYPES.includes(type);
-    const allowed = !!foregroundUser && (typeof receiver !== 'string' || receiver === foregroundUser) && (!live || foregroundLiveAllowed);
+    const allowed = !isDemoMode() && !!foregroundUser && (typeof receiver !== 'string' || receiver === foregroundUser) && (!live || foregroundLiveAllowed);
     return {
       shouldShowBanner: allowed, shouldShowList: allowed,
       shouldPlaySound: allowed, shouldSetBadge: allowed,
@@ -28,7 +29,8 @@ Notifications.setNotificationHandler({
  * Failed writes never latch registration as successful. */
 export function PushNotificationManager() {
   const { session, onboardingNeeded, onboardingResolved } = useSession();
-  const userId = session?.user.id;
+  const demo = useDemoMode();
+  const userId = demo ? undefined : session?.user.id;
   const own = useOwnNightStatus();
   const liveAllowed = !withholdLivePreview(own.data?.status?.status, !!own.data && !own.isError);
   useEffect(() => {

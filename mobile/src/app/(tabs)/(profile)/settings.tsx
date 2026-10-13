@@ -17,8 +17,8 @@ import { ALL_CITY_IDS, DEMO_CITIES, getCityLabel } from '@/lib/city-neighborhood
 import { setActiveCity } from '@/lib/tonight';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { useNightMode } from '@/hooks/use-night-mode';
-import { NIGHT_MODE_KEY, setNightModeEnforced, setNightModeOverride } from '@/lib/night-mode';
-import { buildMyRecapNow, NIGHT_RECAP_KEY } from '@/lib/night-recap';
+import { NIGHT_MODE_KEY, setNightModeOverride } from '@/lib/night-mode';
+import { invalidatePrivateViews } from '@/lib/private-views';
 import { PURPLE } from '@/lib/theme';
 
 function SettingsRow({
@@ -128,14 +128,20 @@ export default function SettingsScreen() {
   const demoOn = useDemoMode();
   const { data: own } = useOwnNightStatus();
   const ownCity = own?.city ?? null;
+  const [demoBusy, setDemoBusy] = useState(false);
   const toggleDemo = async (value: boolean) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await setDemoMode(value);
-    await queryClient.invalidateQueries();
+    if (demoBusy || !userId) return;
+    setDemoBusy(true);
+    try {
+      await setDemoMode(value, { userId, name: launch?.profile?.name || 'You', username: launch?.profile?.username || 'you', city: ownCity || 'nyc' });
+      void Haptics.selectionAsync();
+    } catch (error) { Alert.alert('Demo not changed', error instanceof Error ? error.message : 'Try again.'); }
+    finally { setDemoBusy(false); }
   };
 
   const changeCity = () => {
     if (!launch?.cityTester) return;
+    if (demoOn) { Alert.alert('Switch city outside Demo', 'Exit Demo, choose your city, then turn Demo data on again.'); return; }
     const cities = demoOn ? ALL_CITY_IDS : ALL_CITY_IDS.filter((c) => !DEMO_CITIES.has(c));
     ActionSheetIOS.showActionSheetWithOptions(
       {
@@ -155,41 +161,12 @@ export default function SettingsScreen() {
     );
   };
 
-  // Night Mode tester tools (DAY-NIGHT-MODE-PLAN.md D8) — tester accounts
-  // only (spotted_private.night_mode_testers, added by SQL). The server
-  // refuses these calls for anyone else.
+  // Launch operators and legacy testers can override their own mode.
+  // The server checks that capability independently of this Settings UI.
   const nightMode = useNightMode();
   const [nightBusy, setNightBusy] = useState(false);
   const putNightState = (state: Awaited<ReturnType<typeof setNightModeOverride>>) =>
     queryClient.setQueryData([NIGHT_MODE_KEY, userId], state);
-
-  const toggleEnforced = (next: boolean) => {
-    if (nightBusy) return;
-    Alert.alert(
-      next ? 'Enforce Night Mode for everyone?' : 'Stop enforcing Night Mode?',
-      next
-        ? 'Before the opening time, the server will refuse Out, TBD, Meet Ups and venue invites for every user. Builds without Day Mode will see errors instead of the opening screen.'
-        : 'The server will allow Out, TBD, Meet Ups and venue invites at any hour again. The app still shows Day Mode.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: next ? 'Enforce' : 'Stop enforcing',
-          style: next ? 'default' : 'destructive',
-          onPress: async () => {
-            setNightBusy(true);
-            try {
-              putNightState(await setNightModeEnforced(next));
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } catch (e) {
-              Alert.alert('Could not change it', e instanceof Error ? e.message : 'Try again.');
-            } finally {
-              setNightBusy(false);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const MODE_OPTIONS = ['auto', 'day', 'night'] as const;
   const MODE_LABEL = { auto: 'Auto — follow the schedule', day: 'Day', night: 'Night' } as const;
@@ -197,16 +174,19 @@ export default function SettingsScreen() {
     ActionSheetIOS.showActionSheetWithOptions(
       {
         title: 'Mode for this account',
-        message: 'Forces Day or Night on this account only — the app and the server both follow it.',
+        message: demoOn ? 'Changes this demo only. Your live account keeps its saved mode.' : 'Forces Day or Night on this account only — the app and the server both follow it.',
         options: [...MODE_OPTIONS.map((m) => MODE_LABEL[m]), 'Cancel'],
         cancelButtonIndex: MODE_OPTIONS.length,
       },
       async (index) => {
         const next = MODE_OPTIONS[index];
-        if (!next || next === (nightMode.override ?? 'auto')) return;
+        if (nightBusy || !next || next === (nightMode.override ?? 'auto')) return;
         setNightBusy(true);
         try {
           putNightState(await setNightModeOverride(next));
+          invalidatePrivateViews(queryClient);
+          await queryClient.invalidateQueries();
+          void Haptics.selectionAsync();
         } catch (e) {
           Alert.alert('Could not switch', e instanceof Error ? e.message : 'Try again.');
         } finally {
@@ -214,21 +194,6 @@ export default function SettingsScreen() {
         }
       }
     );
-  };
-
-  // The real recap is built at 5 AM; this previews it from tonight so far.
-  const buildRecapNow = async () => {
-    if (nightBusy) return;
-    setNightBusy(true);
-    try {
-      await buildMyRecapNow();
-      await queryClient.invalidateQueries({ queryKey: [NIGHT_RECAP_KEY] });
-      router.push('/morning-after');
-    } catch (e) {
-      Alert.alert('Could not build the recap', e instanceof Error ? e.message : 'Try again.');
-    } finally {
-      setNightBusy(false);
-    }
   };
 
   // Background location ("Always"). It was only ever offered on the payoff
@@ -388,74 +353,31 @@ export default function SettingsScreen() {
         <SettingsRow
           icon="bell"
           title="Push Notifications"
-          subtitle={pushSubtitle}
-          onPress={pushPermission === 'granted' ? undefined : onPushRow}
+          subtitle={demoOn ? 'Device permissions stay unchanged in Demo' : pushSubtitle}
+          onPress={demoOn || pushPermission === 'granted' ? undefined : onPushRow}
         />
         <SettingsRow
           icon="location"
           title="Location"
-          subtitle={upgradingLocation ? 'Asking…' : locationSubtitle}
-          onPress={onLocationRow}
+          subtitle={demoOn ? 'GPS paused in Demo' : upgradingLocation ? 'Asking…' : locationSubtitle}
+          onPress={demoOn ? undefined : onLocationRow}
         />
 
-        {/* Demo mode — seeded content and the Lahore test city. OFF by
-            default in every build (SOW §15); this switch is how the
-            Lahore-based developer tests against venues they can reach,
-            while everyone else's app is untouched. */}
-        {launch?.cityTester ? <SettingsRow
-          icon="wrench.and.screwdriver"
-          title="Demo Mode"
-          subtitle={demoOn ? 'On — demo venues, users and Lahore' : 'Off — real content only'}
-          right={
-            <Switch
-              value={demoOn}
-              onValueChange={toggleDemo}
-              trackColorOnClassName="accent-[#a855f7]"
-            />
-          }
-        /> : null}
-        {launch?.cityTester ? (
-          <SettingsRow
-            icon="building.2"
-            title="City"
-            subtitle={`${getCityLabel(ownCity ?? 'nyc')} — tap to change`}
-            onPress={changeCity}
-          />
-        ) : null}
-
-        {launch?.waveAdmin ? <SettingsRow icon="person.2" title="Rollout waves" subtitle="Review the queue and open the next wave" onPress={() => router.push('/rollout-waves')} /> : null}
-
-        {/* Night Mode tester tools — tester accounts only. */}
-        {nightMode.tester ? (
-          <>
-            <Text className="text-white/45 text-xs font-sans-medium mt-3 mb-1 px-1">NIGHT MODE · TESTERS</Text>
-            <SettingsRow
-              icon="moon.stars"
-              title="Enforce Night Mode for everyone"
-              subtitle={nightMode.enforced ? 'On — follows the schedule' : 'Off — allowed at any hour'}
-              right={
-                <Switch
-                  value={nightMode.enforced}
-                  disabled={nightBusy}
-                  onValueChange={toggleEnforced}
-                  trackColorOnClassName="accent-[#a855f7]"
-                />
-              }
-            />
-            <SettingsRow
-              icon="sun.max"
-              title="Mode for this account"
-              subtitle={nightMode.override ? `Forced ${nightMode.override === 'day' ? 'Day' : 'Night'}` : 'Auto — follows the schedule'}
-              onPress={nightBusy ? undefined : chooseMode}
-            />
-            <SettingsRow
-              icon="sunrise"
-              title="Build my recap from tonight so far"
-              subtitle="Preview Morning After without waiting for 5 AM"
-              onPress={nightBusy ? undefined : buildRecapNow}
-            />
-          </>
-        ) : null}
+        {launch?.cityTester || launch?.waveAdmin || nightMode.tester ? <>
+          <Text className="text-white/45 text-xs font-sans-medium mt-4 mb-1 px-1">ADMIN TESTING</Text>
+          <SettingsRow icon="circle.lefthalf.filled" title="Day / Night mode"
+            subtitle={nightBusy ? 'Switching…' : nightMode.override ? `${nightMode.override === 'day' ? 'Day' : 'Night'} · ${demoOn ? 'demo only' : 'this account only'}` : 'Automatic · follows your city’s schedule'}
+            onPress={nightBusy ? undefined : chooseMode} />
+          {launch?.cityTester || launch?.waveAdmin ? <>
+            <SettingsRow icon="sparkles" title="Demo data" subtitle={demoOn ? 'On · sample people, posts, plans and chats' : 'Try the app with a sample social circle'}
+              right={<Switch accessibilityLabel="Demo data" value={demoOn} disabled={demoBusy} onValueChange={toggleDemo} trackColorOnClassName="accent-[#a855f7]" />} />
+            <Text className="text-white/45 text-xs leading-5 px-2">Demo actions stay on this phone. Nothing is sent. Exit to return to your real account.</Text>
+            <SettingsRow icon="play.rectangle" title="Preview onboarding" subtitle="Profile, app tour and two nominations"
+              onPress={() => router.push('/admin-onboarding' as never)} />
+          </> : null}
+          {launch?.cityTester ? <SettingsRow icon="building.2" title="Test city" subtitle={`${getCityLabel(ownCity ?? 'nyc')} · admin only`} onPress={changeCity} /> : null}
+        </> : null}
+        {launch?.waveAdmin && !demoOn ? <SettingsRow icon="person.2" title="Rollout waves" subtitle="Review the queue and open the next wave" onPress={() => router.push('/rollout-waves')} /> : null}
 
         {/* The permanent explanation the client asked for (addendum v3 §3):
             what clears, what stays, in the same words as onboarding. */}

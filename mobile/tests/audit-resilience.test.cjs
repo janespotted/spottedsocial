@@ -13,6 +13,7 @@ function outbox() {
   let user = 'a', revision = 1, calls = 0, reject = false;
   const stored = new Map();
   const api = load('lib/dm-outbox.ts', {
+    './demo-mode': { isDemoMode: () => false },
     '@react-native-async-storage/async-storage': { getItem: async k => stored.get(k), setItem: async (k, v) => stored.set(k, v), removeItem: async k => stored.delete(k), getAllKeys: async () => [...stored.keys()], multiRemove: async keys => keys.forEach(k => stored.delete(k)) },
     'expo-crypto': { randomUUID: () => 'stable-id' },
     './tonight': { isFromTonight: value => value !== 'expired' },

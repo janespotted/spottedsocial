@@ -75,6 +75,8 @@ test('Group photo is signed only after the stored key is confirmed', async () =>
 
 function publisher({ isDevice = false, upload = async () => ({ status: 200 }), insert = () => ({ data: { id: 'post' }, error: null }), mux = {} } = {}) {
   return load('lib/publish-post.ts', {
+    './demo-mode': { isDemoMode: () => false },
+    './session-identity': { getSessionRevision: () => 1, assertSessionRevision: () => {} },
     'expo-file-system': { File: class { constructor(uri) { this.uri = uri; } upload(url, options) { return upload(url, options, this.uri); } } },
     'expo-device': { isDevice }, 'react-native': { Platform: { OS: 'ios' } },
     './media-prep': { prepareForUpload: async m => ({ ...m, fileExt: 'jpg', width: 10, height: 10 }) },

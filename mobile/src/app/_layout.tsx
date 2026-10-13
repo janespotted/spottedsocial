@@ -2,7 +2,7 @@ import { signOutWithPushCleanup } from '@/lib/push';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { AccountScope } from '@/components/account-scope';
 import '../../global.css';
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import {
   Montserrat_300Light,
   Montserrat_400Regular,
@@ -12,11 +12,12 @@ import {
 } from '@expo-google-fonts/montserrat';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router/stack';
+import { useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { HeroUINativeProvider } from 'heroui-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
-import { SafeAreaListener, SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PortalProvider } from 'react-native-teleport';
 import { Uniwind, useResolveClassNames } from 'uniwind';
 import { SessionProvider, useSession } from '@/hooks/use-session';
@@ -27,15 +28,14 @@ import { NightStatusGate } from '@/components/night-status-gate';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import { ToastHost } from '@/components/toast-host';
 import { ConfettiHost } from '@/components/confetti';
-import { hydrateDemoMode } from '@/lib/demo-mode';
+import { hydrateDemoMode, setDemoMode, useDemoMode } from '@/lib/demo-mode';
 import { queryClient } from '@/lib/query-client';
 import { subscribeRelationshipEvents } from '@/lib/relationship-events';
 
 // Native splash only: the lime S on midnight stays up until fonts and the
 // session are known, then fades out over the real first screen.
 SplashScreen.preventAutoHideAsync().catch(() => {});
-// Demo mode is a saved per-device preference (off by default) — read it
-// before anything queries, so a demo session survives a restart.
+// Demo starts off after a cold launch and requires a verified admin session.
 void hydrateDemoMode();
 SplashScreen.setOptions({ fade: true, duration: 500 });
 
@@ -64,7 +64,7 @@ function RelationshipEvents() {
 const SHEET_CONTENT_STYLE = { backgroundColor: INK_LIGHT } as const;
 
 function RootNavigator() {
-  const { session, loading, onboardingNeeded, onboardingError, refreshOnboardingStatus } = useSession();
+  const { session, launch, loading, onboardingNeeded, onboardingError, refreshOnboardingStatus } = useSession();
   const contentStyle = useResolveClassNames('bg-background');
   const gradientStyle = useResolveClassNames(SCREEN_GRADIENT);
 
@@ -86,6 +86,9 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={!session}>
         <Stack.Screen name="auth" />
+      </Stack.Protected>
+      <Stack.Protected guard={!!session && !onboardingNeeded && !!(launch?.cityTester || launch?.waveAdmin)}>
+        <Stack.Screen name="admin-onboarding" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
       </Stack.Protected>
       <Stack.Screen name="terms" options={{ presentation: 'modal' }} />
       <Stack.Screen name="privacy" options={{ presentation: 'modal' }} />
@@ -273,6 +276,27 @@ function RootNavigator() {
   );
 }
 
+
+function DemoFrame({ children }: { children: React.ReactNode }) {
+  const demo = useDemoMode();
+  const insets = useSafeAreaInsets();
+  const segments = useSegments();
+  // Native modals cover the toolbar and still own their full safe area.
+  const toolbarOwnsTop = demo && ['(tabs)', 'thread', 'explore', 'nominations', 'rollout-waves', 'business'].includes(segments[0]);
+  // The demo toolbar owns the top safe area; screen headers must not add it twice.
+  useLayoutEffect(() => {
+    Uniwind.updateInsets({ ...insets, top: toolbarOwnsTop ? 0 : insets.top });
+    return () => Uniwind.updateInsets(insets);
+  }, [toolbarOwnsTop, insets.top, insets.bottom, insets.left, insets.right]);
+  return <View style={{ flex: 1 }}>
+    {demo ? <View style={{ paddingTop: insets.top, backgroundColor: "#110a24" }} className="px-4 pb-1 flex-row items-center justify-between border-b border-[#d4ff00]/25">
+      <Text className="text-[#d4ff00] text-xs font-sans-semibold">DEMO · Only on this phone</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Exit demo data" className="min-h-11 px-3 justify-center" onPress={() => void setDemoMode(false)}><Text className="text-[#d4ff00] text-sm font-sans-semibold">Exit</Text></Pressable>
+    </View> : null}
+    {children}
+  </View>;
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Montserrat_300Light,
@@ -286,7 +310,6 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <SafeAreaListener onChange={({ insets }) => Uniwind.updateInsets(insets)}>
           <KeyboardProvider>
             <HeroUINativeProvider>
               <SessionProvider>
@@ -295,7 +318,7 @@ export default function RootLayout() {
                     {/* react-native-teleport: a feed post's media is re-parented
                         into the post detail screen (POST-DETAIL-PLAN.md) */}
                     <PortalProvider>
-                      <RootNavigator />
+                      <DemoFrame><RootNavigator /></DemoFrame>
                     </PortalProvider>
                     <RelationshipEvents />
                     <NightStatusGate />
@@ -310,7 +333,6 @@ export default function RootLayout() {
               </SessionProvider>
             </HeroUINativeProvider>
           </KeyboardProvider>
-        </SafeAreaListener>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

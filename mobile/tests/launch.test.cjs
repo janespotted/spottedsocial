@@ -43,10 +43,8 @@ test('Failed network or duplicate response never confirms a nomination',async()=
   await assert.rejects(rpc.launchRpc('save_launch_nomination',{p_slot:1,p_phone:'+12025550101'}));
  }
 });
-test('Saved demo preference is ineffective until trusted authorization and clears on account change',async()=>{
- const demo=load('lib/demo-mode.ts',{react:{useSyncExternalStore:()=>{}},'@react-native-async-storage/async-storage':{getItem:async()=> '1',setItem:async()=>{}}});
- await demo.hydrateDemoMode();assert.equal(demo.isDemoMode(),false);demo.setDemoAuthorization(true);assert.equal(demo.isDemoMode(),true);demo.setDemoAuthorization(false);assert.equal(demo.isDemoMode(),false);await demo.setDemoMode(true);assert.equal(demo.isDemoMode(),false);
-});
+// Demo preference/account isolation is covered by admin-testing.test.cjs;
+// demo data now starts off on every cold launch instead of restoring a device preference.
 test('Wave activation survives lost replies and a screen restart without opening another batch',async()=>{
  const saved=new Map(),calls=[];let fail=true;
  const mocks={'@react-native-async-storage/async-storage':{getItem:async k=>saved.get(k)||null,setItem:async(k,v)=>saved.set(k,v),removeItem:async k=>saved.delete(k)},'expo-crypto':{randomUUID:()=> '00000000-0000-4000-8000-000000000090'},'@/lib/launch':{launchRpc:async(name,args)=>{calls.push(args);if(fail)throw Error('reply lost');return {pending:0};}}};

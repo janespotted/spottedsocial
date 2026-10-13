@@ -65,7 +65,7 @@ test('QA-07 meetup reports rejected recipient as failure and accepted recipient 
 });
 test('QA-09 check-in uses one atomic RPC; local resume failure never reports committed save as failed',async()=>{
  for(const failed of [false,true]){
-  let calls=0;const api=load('lib/night-status.ts',{'./session-identity':{},'./supabase':{supabase:{rpc:async(name)=>{assert.equal(name,'commit_night_status');calls++;return{data:{gps_shared:false},error:null}}}},'./tonight':{},'./venue-arrival-engine':{markManualCheckin:()=>{}},'./location-ready':{automaticUpdatesEnabled:async()=>false},'./location-quality':{validFix:()=>true},'./background-location':{pauseLocationForStatusChange:async()=>{},allowLocationAfterCheckin:async()=>{if(failed)throw Error('local storage')}}});
+  let calls=0;const api=load('lib/night-status.ts',{'./session-identity':{getSessionRevision:()=>1,assertSessionRevision:()=>{}},'./supabase':{supabase:{rpc:async(name)=>{assert.equal(name,'commit_night_status');calls++;return{data:{gps_shared:false},error:null}}}},'./tonight':{},'./venue-arrival-engine':{markManualCheckin:()=>{}},'./location-ready':{automaticUpdatesEnabled:async()=>false},'./location-quality':{validFix:()=>true},'./background-location':{pauseLocationForStatusChange:async()=>{},allowLocationAfterCheckin:async()=>{if(failed)throw Error('local storage')}}});
   const result=await api.goOutAtVenue('a',{venue:{id:null,name:'Test'}});assert.equal(calls,1);assert.equal(result.gpsShared,false);assert.equal(result.trackingReady,!failed);
  }
 });
@@ -117,7 +117,7 @@ test('QA-16/20 failed plan child reads cannot masquerade as empty; authorized em
 });
 test('QA-25 realtime posts: RLS-delivered mutual post is hydrated and shown without a direct-friend filter; deletes drop; failures re-read',async()=>{
  let posts=[],refreshed=0,fail=false;const listeners={};
- const effect=callback('hooks/use-feed.ts','useEffect',"name: 'feed-realtime'",{userId:'viewer',friendIds:['direct'],refresh:()=>refreshed++,runOrDefer:fn=>fn(),setPosts:f=>posts=f(posts),isDemoMode:()=>false,getSessionRevision:()=>1,
+ const effect=callback('hooks/use-feed.ts','useEffect',"name: 'feed-realtime'",{userId:'viewer',friendIds:['direct'],refresh:()=>refreshed++,runOrDefer:fn=>fn(),setPosts:f=>posts=f(posts),isDemoMode:()=>false,getSessionRevision:()=>1,assertSessionRevision:()=>{},
   hydratePosts:async rows=>{if(fail)throw Error('offline');return{posts:rows.map(r=>({id:r.id,user_id:r.user_id})),likedByMe:new Set()}},
   createResilientChannel:config=>{const ch={on:(_t,f,fn)=>{listeners[f.event]=fn;return ch}};config.configure(ch);return()=>{}}});
  effect.fn();
@@ -141,7 +141,7 @@ test('QA-27 standalone Like toggles cached state and rolls back failed writes',a
  }
 });
 test('QA-17 launch-state read failures preserve the gate and offer Retry',async()=>{
- let needed=true,reported=null;const fn=extract('hooks/use-session.tsx','refreshOnboardingStatus',{getSessionRevision:()=>1,supabase:{auth:{getSession:async()=>({data:{session:{user:{id:'a'}}}})}},launchRpc:async()=>{throw Error('offline')},setOnboardingError:v=>reported=v,setOnboardingNeeded:v=>needed=v});
+ let needed=true,reported=null;const fn=extract('hooks/use-session.tsx','refreshOnboardingStatus',{getSessionRevision:()=>1,assertSessionRevision:()=>{},supabase:{auth:{getSession:async()=>({data:{session:{user:{id:'a'}}}})}},launchRpc:async()=>{throw Error('offline')},setOnboardingError:v=>reported=v,setOnboardingNeeded:v=>needed=v});
  await assert.rejects(fn(),/offline/);assert.equal(needed,true);assert.match(reported,/not been reset/);
  assert.match(source('app/_layout.tsx'),/if \(onboardingError\) return/);
 });
