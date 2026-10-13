@@ -37,7 +37,8 @@ import {
 } from '@/hooks/use-own-night-status';
 import {Avatar} from '@/components/avatar';
 import {openFriendCard} from '@/lib/friend-card';
-import {DropdownMenu} from '@/components/dropdown-menu';
+import {MapFriendsPopup} from '@/components/map-friends-popup';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   isDefaultMapFilters,
   peopleFilterIncludes,
@@ -182,11 +183,11 @@ function FriendMarker({
 function FriendGroupMarker({
   cluster,
   index,
-  onSelectMember,
+  onPress,
 }: {
   cluster: MapFriend[];
   index: number;
-  onSelectMember: (friend: MapFriend) => void;
+  onPress: (cluster: MapFriend[]) => void;
 }) {
   const order: Record<string, number> = {close: 0, direct: 1, mutual: 2};
   const sorted = [...cluster].sort(
@@ -219,18 +220,7 @@ function FriendGroupMarker({
           .damping(14)
           .delay(index * 60)}
       >
-        <DropdownMenu
-          title={venueName ? `Friends at ${venueName}` : 'Friends here'}
-          options={sorted.map((f) => ({
-            key: f.user_id,
-            label: f.display_name,
-            avatar: {name: f.display_name, url: f.avatar_url},
-          }))}
-          selectedKey={null}
-          onSelect={(key) => {
-            const member = cluster.find((f) => f.user_id === key);
-            if (member) onSelectMember(member);
-          }}
+        <Pressable onPress={() => onPress(sorted)}
           accessibilityLabel={`${cluster.length} friends${venueName ? ` at ${venueName}` : ' here'}`}
         >
           <View style={{width: size, height: size}}>
@@ -248,7 +238,7 @@ function FriendGroupMarker({
               </View>
             ) : null}
           </View>
-        </DropdownMenu>
+        </Pressable>
       </Animated.View>
     </MarkerView>
   );
@@ -303,6 +293,8 @@ function LiveMapScreen() {
   const cameraRef = useRef<Camera>(null);
   const mapRef = useRef<MapView>(null);
   const {height: windowHeight} = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [groupPopup, setGroupPopup] = useState<{ people: MapFriend[]; x: number; y: number } | null>(null);
 
   const {data: city} = useQuery({
     queryKey: ['home-city', session?.user.id],
@@ -334,6 +326,8 @@ function LiveMapScreen() {
   });
 
   const {data} = useMapData(city ?? null);
+  // A permission/status refresh must never leave an old roster on screen.
+  useEffect(() => { setGroupPopup(null); }, [data?.friends]);
   const now = useLocationClock();
   // `?? []` would be a NEW array each render, so the clustering memo below
   // would recompute every time and re-animate every marker.
@@ -517,6 +511,21 @@ function LiveMapScreen() {
     router.push({pathname: '/venue', params: {venueId}});
   };
 
+  const openGroup = async (people: MapFriend[]) => {
+    const coordinate = [people[0].lng, people[0].lat];
+    try {
+      let point = await mapRef.current!.getPointInView(coordinate);
+      // Give the roster room above the pin when it is near the top edge.
+      if (point[1] < insets.top + 260) {
+        cameraRef.current?.setCamera({ centerCoordinate: coordinate, padding: { paddingTop: 200, paddingBottom: 0, paddingLeft: 0, paddingRight: 0 }, animationDuration: 300 });
+        await new Promise(resolve => setTimeout(resolve, 350));
+        point = await mapRef.current!.getPointInView(coordinate);
+      }
+      Haptics.selectionAsync();
+      setGroupPopup({ people, x: point[0], y: point[1] });
+    } catch { /* A moving/unmounted map has no valid anchor; keep the pin tappable. */ }
+  };
+
   // Tapping a person opens their card over the map (the same /friend-card
   // sheet every other surface uses) with the pin highlighted; the card is
   // content-sized, so the pan is shallower than for the venue sheet.
@@ -613,8 +622,11 @@ function LiveMapScreen() {
         logoEnabled={false}
         attributionPosition={{bottom: 150, left: 8}}
         scaleBarEnabled={false}
-        onPress={() => setFocusMode((prev) => !prev)}
+        onPress={() => { setGroupPopup(null); setFocusMode((prev) => !prev); }}
         onCameraChanged={(e) => {
+          // The final event from our own pan can arrive after the roster opens.
+          // Only a user's new map gesture dismisses that anchored roster.
+          if (e.gestures?.isGestureActive) setGroupPopup(null);
           const zoom = e.properties?.zoom ?? 13;
           setShouldCluster((prev) => {
             const next = zoom < NO_CLUSTER_ZOOM;
@@ -687,7 +699,7 @@ function LiveMapScreen() {
                 .join('-')}`}
               cluster={cluster}
               index={index}
-              onSelectMember={handleFriendPress}
+              onPress={openGroup}
             />
           ) : (
             cluster.map((friend) => (
@@ -967,6 +979,7 @@ function LiveMapScreen() {
           ))}
         </View>
       ) : null}
+      {groupPopup ? <MapFriendsPopup people={groupPopup.people} point={groupPopup} onClose={() => setGroupPopup(null)} onSelect={friend => { setGroupPopup(null); void handleFriendPress(friend); }} /> : null}
     </View>
   );
 }

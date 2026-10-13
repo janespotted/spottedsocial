@@ -22,9 +22,8 @@ export function DayVenueMap() {
   const { city } = useNightMode();
   const { session } = useSession();
   const { unreadCount } = useNotifications();
-  const [selected, setSelected] = useState<string | null>(null);
   const [savedOnly, setSavedOnly] = useState(false);
-  useEffect(() => { setSelected(null); setSavedOnly(false); }, [city]);
+  useEffect(() => { setSavedOnly(false); }, [city]);
   const saved = useQuery({ queryKey: ['saved-venues', session?.user.id], enabled: !!session, queryFn: () => fetchSavedVenueNames(session!.user.id) });
   const plans = usePlans();
   const venues = useQuery({ queryKey: ['day-map-venues', city], queryFn: async () => {
@@ -35,7 +34,6 @@ export function DayVenueMap() {
   const center = CITY_CENTERS[city] ?? CITY_CENTERS.nyc;
   const rows = (venues.data ?? []).filter(v => !savedOnly || saved.data?.includes(v.name) || plans.data?.plans.some(p => p.venue_id === v.id));
   const featureCollection: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: rows.map(v => ({ type: 'Feature', id: v.id, properties: { id: v.id, saved: !!(saved.data?.includes(v.name) || plans.data?.plans.some(p => p.venue_id === v.id)) }, geometry: { type: 'Point', coordinates: [v.lng!, v.lat!] } })) };
-  const spot = rows.find(v => v.id === selected);
   const controls = <View className={`px-4 py-3 gap-3 ${fontScale >= 1.6 ? 'items-start' : 'flex-row flex-wrap items-center'}`}><Text className={`text-white text-lg font-sans-semibold ${fontScale >= 1.6 ? '' : 'flex-1'}`}>Spots for tonight</Text><Pressable accessibilityRole="button" accessibilityState={{ selected: savedOnly }} onPress={() => setSavedOnly(v => !v)} className="min-h-11 px-3 py-2 rounded-full bg-white/10 justify-center"><Text className="text-white text-xs font-sans">{savedOnly ? 'Saved + planned' : 'All spots'}</Text></Pressable></View>;
   return <View key={fontScale} className="flex-1 bg-[#110a24]">
     <View className="pt-safe-offset-3"><TabHeaderRow city={city} unreadCount={unreadCount} /><ModeCountdownStrip /></View>
@@ -47,12 +45,12 @@ export function DayVenueMap() {
     {venues.isError || (savedOnly && (saved.isError || plans.isError)) ? <ErrorState title="Couldn’t load spots" onRetry={() => { void venues.refetch(); void saved.refetch(); void plans.refetch(); }} /> : <View className="flex-1">
       <MapView key={city} style={{ flex: 1 }} styleURL="mapbox://styles/mapbox/dark-v11" scaleBarEnabled={false}>
         <Camera defaultSettings={{ centerCoordinate: [center.lng, center.lat], zoomLevel: 12 }} />
-        <ShapeSource id="day-venues" shape={featureCollection} onPress={e => setSelected(String(e.features[0]?.properties?.id ?? ''))}>
+        <ShapeSource id="day-venues" shape={featureCollection} onPress={e => { const venueId = e.features[0]?.properties?.id; if (venueId) router.push({ pathname: '/venue', params: { venueId: String(venueId) } }); }}>
           <CircleLayer id="day-venue-points" style={{ circleRadius: 7, circleColor: ['case', ['get', 'saved'], '#d4ff00', '#a88acc'], circleStrokeColor: '#110a24', circleStrokeWidth: 2 }} />
         </ShapeSource>
       </MapView>
       <View className="absolute bottom-24 left-4 right-4 rounded-2xl p-4 bg-[#1a0f2e] border border-white/10 gap-2">
-        {spot ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/venue', params: { venueId: spot.id } })} className="min-h-11 justify-center gap-1"><Text className="text-white font-sans-semibold">{spot.name} ↗</Text><Text className="text-white/60 text-xs font-sans">{spot.neighborhood}</Text></Pressable> : <Text className="text-white/65 text-sm font-sans">{venues.isLoading ? 'Loading spots…' : savedOnly && !rows.length ? 'Save a spot or make a plan to see it here.' : 'Tap a spot. Plan your night.'}</Text>}
+        <Text className="text-white/65 text-sm font-sans">{venues.isLoading ? 'Loading spots…' : savedOnly && !rows.length ? 'Save a spot or make a plan to see it here.' : 'Tap a spot. Plan your night.'}</Text>
         <Pressable accessibilityRole="button" onPress={() => router.push('/explore')} className="min-h-11 justify-center"><Text className="text-[#d4ff00] text-sm font-sans-medium">Browse spots</Text></Pressable>
       </View>
     </View>}</>}
