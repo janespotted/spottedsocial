@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation, type NativeStackNavigationProp } from 'expo-router';
 import { DEFAULT_AUDIENCE, loadPostAudience } from '@/lib/audience';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
-import { useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
+import { dismissKeyboardNow, useDismissKeyboardOnLeave } from '@/hooks/use-dismiss-keyboard-on-leave';
 import type { CapturedMedia } from '@/lib/post-media';
 import type { PublishedPost } from '@/lib/publish-post';
 import { SpottedCamera } from '@/components/spotted-camera';
@@ -13,7 +13,7 @@ import { PostShared } from '@/components/post-shared';
 type Mode = 'camera' | 'compose' | 'shared';
 
 /**
- * Camera → capture/select → preview + caption → share (client feedback §4).
+ * Photo/video → camera, or Text → composer. Both share one draft and publisher.
  *
  * One full-screen route with two modes so the draft (caption, venue,
  * audience) survives Retake: the camera never knows about the form, and the
@@ -21,8 +21,12 @@ type Mode = 'camera' | 'compose' | 'shared';
  */
 export default function CreatePostScreen() {
   useDismissKeyboardOnLeave();
+  const { kind } = useLocalSearchParams<{ kind?: string }>();
+  const navigation = useNavigation<NativeStackNavigationProp<{ 'create-post': { kind?: string } | undefined }>>();
   const { data: ownNight } = useOwnNightStatus();
-  const [mode, setMode] = useState<Mode>('camera');
+  const [mode, setMode] = useState<Mode>(() => kind === 'text' ? 'compose' : 'camera');
+  const returnToComposer = useRef(kind === 'text');
+  const [presented, setPresented] = useState(false);
   const [media, setMedia] = useState<CapturedMedia | null>(null);
   const [published, setPublished] = useState<PublishedPost | null>(null);
   const [draft, setDraft] = useState<PostDraft>({
@@ -33,6 +37,16 @@ export default function CreatePostScreen() {
     taggedFriends: [],
   });
   const [venuePrefilled, setVenuePrefilled] = useState(false);
+
+  useEffect(() => {
+    // Wait for the native presentation before raising the keyboard. The fallback
+    // also covers deep links/restored routes that do not emit transitionEnd.
+    const timer = setTimeout(() => setPresented(true), 500);
+    const unsubscribe = navigation.addListener('transitionEnd', (event) => {
+      if (!event.data.closing) { clearTimeout(timer); setPresented(true); }
+    });
+    return () => { clearTimeout(timer); unsubscribe(); };
+  }, [navigation]);
 
   const patchDraft = (patch: Partial<PostDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -64,9 +78,21 @@ export default function CreatePostScreen() {
     setMode('compose');
   };
 
+  const openCamera = () => {
+    returnToComposer.current = true;
+    dismissKeyboardNow();
+    setMode('camera');
+  };
+
+  const openText = () => {
+    returnToComposer.current = true;
+    setMedia(null);
+    setMode('compose');
+  };
+
   // Closing the camera: back to the draft if there is one, else dismiss
   const closeCamera = () => {
-    if (hasDraft) setMode('compose');
+    if (returnToComposer.current || hasDraft) setMode('compose');
     else router.back();
   };
 
@@ -76,13 +102,14 @@ export default function CreatePostScreen() {
       router.back();
       return;
     }
-    Alert.alert('Discard this post?', 'Your photo and caption will be lost.', [
+    Alert.alert('Discard this post?', 'Your draft will be lost.', [
       { text: 'Keep editing', style: 'cancel' },
       { text: 'Discard', style: 'destructive', onPress: () => router.back() },
     ]);
   };
 
   const shared = (post: PublishedPost) => {
+    dismissKeyboardNow();
     setPublished(post);
     setMode('shared');
   };
@@ -99,8 +126,8 @@ export default function CreatePostScreen() {
       <SpottedCamera
         onCapture={capture}
         onClose={closeCamera}
-        closeLabel={hasDraft ? 'Back to post' : 'Close'}
-        onTextPost={() => setMode('compose')}
+        closeLabel={returnToComposer.current || hasDraft ? 'Back to post' : 'Close'}
+        onTextPost={openText}
       />
     );
   }
@@ -113,8 +140,9 @@ export default function CreatePostScreen() {
     <PostComposer
       media={media}
       draft={draft}
+      focusText={presented && !media}
       onDraftChange={patchDraft}
-      onRetake={() => setMode('camera')}
+      onRetake={openCamera}
       onClose={closeComposer}
       onShared={shared}
     />

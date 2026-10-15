@@ -6,15 +6,17 @@ import { Image } from '@/components/styled';
 import { SymbolView } from 'expo-symbols';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { validatePostText, validateVenueName } from '@/lib/validation';
-import { savePostAudience, type Audience } from '@/lib/audience';
+import { audienceLabel, openAudiencePicker, savePostAudience, type Audience } from '@/lib/audience';
 import { savePostTags, tagLine, type TaggedFriend } from '@/lib/post-tags';
 import { openTagPicker } from '@/lib/tag-picker';
-import { RESET_COPY, RESET_TITLE } from '@/lib/reset-copy';
+import { RESET_COPY } from '@/lib/reset-copy';
 import { PublishError, publishPost, type PublishPhase, type PublishedPost } from '@/lib/publish-post';
 import { useSession } from '@/hooks/use-session';
 import { AudienceRow } from '@/components/audience-row';
+import { GradientRingAvatar } from '@/components/post-card';
 import type { CapturedMedia } from '@/lib/post-media';
 import { NEON, INK } from '@/lib/theme';
 
@@ -86,14 +88,13 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 }
 
 /**
- * Preview + caption + venue + audience + Share. The second half of the
- * camera-first flow: media (or a text-only post) is already decided when
- * this renders. Retake hands control back to the camera without losing the
- * draft.
+ * Text starts with the writing field; media starts with its preview.
+ * Both keep the same optional venue/tags, audience and publication behavior.
  */
 export function PostComposer({
   media,
   draft,
+  focusText = false,
   onDraftChange,
   onRetake,
   onClose,
@@ -101,13 +102,26 @@ export function PostComposer({
 }: {
   media: CapturedMedia | null;
   draft: PostDraft;
+  focusText?: boolean;
   onDraftChange: (patch: Partial<PostDraft>) => void;
   onRetake: () => void;
   onClose: () => void;
   onShared: (post: PublishedPost) => void;
 }) {
-  const { session } = useSession();
+  const { session, launch } = useSession();
   const { width } = useWindowDimensions();
+  const captionInput = useRef<TextInput>(null);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const { data: me } = useQuery({
+    queryKey: ['profile-avatar', session?.user.id],
+    enabled: !!session && !media,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('profiles').select('display_name, avatar_url').eq('id', session!.user.id).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
   const [suggestions, setSuggestions] = useState<VenueSuggestion[]>([]);
   const [phase, setPhase] = useState<PublishPhase | null>(null);
   const [progress, setProgress] = useState(0);
@@ -119,6 +133,10 @@ export function PostComposer({
   const abortRef = useRef<AbortController | null>(null);
   const { caption, venueName, venueId, visibility, taggedFriends } = draft;
   const posting = phase !== null;
+
+  useEffect(() => {
+    if (focusText && !media) captionInput.current?.focus();
+  }, [focusText, media]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -166,7 +184,7 @@ export function PostComposer({
     setProgress(0);
     setPhase(media ? 'preparing' : 'publishing');
     // Reuse the uploaded file only if the media is still the same capture
-    const reusable = uploadedRef.current?.uri === media?.uri ? uploadedRef.current?.key : null;
+    const reusable = media && uploadedRef.current?.uri === media.uri ? uploadedRef.current.key : null;
     try {
       const { post } = await publishPost({
         userId: session.user.id,
@@ -239,12 +257,12 @@ export function PostComposer({
         </Pressable>
         <View className="items-center">
           <Text className="text-white text-base font-sans-semibold">New post</Text>
-          <Text
+          {media || posting ? <Text
             className={`text-[11px] font-sans ${posting ? 'text-[#d4ff00]/90' : 'text-white/55'}`}
             style={{ fontVariant: ['tabular-nums'] }}
           >
             {statusLine}
-          </Text>
+          </Text> : null}
         </View>
         <Pressable
           onPress={share}
@@ -272,6 +290,21 @@ export function PostComposer({
         keyboardShouldPersistTaps="handled"
         bottomOffset={24}
       >
+        {!media ? (
+          <View className="flex-row items-center gap-3 pt-2">
+            <GradientRingAvatar name={me?.display_name ?? launch?.profile?.name ?? 'You'} url={me?.avatar_url ?? null} />
+            <View className="flex-1 min-w-0">
+              <Text className="text-white text-sm font-sans-semibold" numberOfLines={1}>{me?.display_name ?? launch?.profile?.name ?? 'You'}</Text>
+              <Pressable onPress={() => openAudiencePicker({ value: visibility, context: 'post', onConfirm: (value) => onDraftChange({ visibility: value }) })}
+                disabled={posting} accessibilityRole="button" accessibilityLabel={`Visible to ${audienceLabel(visibility)}. Change audience`}
+                className="self-start flex-row items-center gap-1.5 min-h-11 active:opacity-70">
+                <SymbolView name="person.2" size={13} tintColor="rgba(255,255,255,0.6)" />
+                <Text className="text-white/65 text-xs font-sans">{audienceLabel(visibility)}</Text>
+                <SymbolView name="chevron.down" size={10} tintColor="rgba(255,255,255,0.6)" />
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
         {/* Media hero */}
         {media ? (
           <View
@@ -313,35 +346,44 @@ export function PostComposer({
               </View>
             </View>
           </View>
-        ) : (
-          <Pressable
-            onPress={onRetake}
-            className="h-28 rounded-3xl items-center justify-center gap-1.5 active:opacity-80"
-            style={{ backgroundColor: GLASS_BG, borderWidth: 1, borderColor: 'rgba(212,255,0,0.3)', borderStyle: 'dashed' }}
-          >
-            <SymbolView name="camera.fill" size={22} tintColor={NEON} />
-            <Text className="text-white/70 text-sm font-sans-medium">Add a photo or video</Text>
-          </Pressable>
-        )}
+        ) : null}
 
         {/* Caption */}
-        <Card className="px-4 pt-3 pb-2">
+        <View className={media ? 'px-4 pt-3 pb-2 rounded-2xl' : 'pt-1 pb-2'}
+          style={media ? { backgroundColor: GLASS_BG, borderWidth: 1, borderColor: GLASS_BORDER } : undefined}>
           <TextInput
+            ref={captionInput}
             value={caption}
             onChangeText={(t) => onDraftChange({ caption: t })}
             placeholder="What's the vibe tonight?"
-            placeholderTextColorClassName="accent-white/30"
+            accessibilityLabel="Post text"
+            placeholderTextColorClassName={media ? 'accent-white/30' : 'accent-white/50'}
             multiline
             editable={!posting}
             maxLength={CAPTION_MAX}
-            className="min-h-20 text-white text-[16px] font-sans leading-6"
+            className={media ? 'min-h-20 text-white text-[16px] font-sans leading-6' : 'min-h-40 text-white text-[22px] font-sans leading-8'}
             style={{ textAlignVertical: 'top' }}
           />
           <Text className="text-white/40 text-[11px] font-sans text-right">
             {caption.length}/{CAPTION_MAX}
           </Text>
-        </Card>
+        </View>
 
+        {!media ? <View className="flex-row flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-2">
+          <Pressable onPress={onRetake} disabled={posting} accessibilityRole="button" accessibilityLabel="Add photo or video"
+            className="min-h-11 flex-row items-center gap-2 pr-3 active:opacity-70">
+            <SymbolView name="camera" size={19} tintColor="#ffffff" />
+            <Text className="text-white/85 text-xs font-sans-medium">Add photo/video</Text>
+          </Pressable>
+          <Pressable onPress={() => setDetailsExpanded((value) => !value)} disabled={posting} accessibilityRole="button"
+            accessibilityLabel="Venue and friend tags" accessibilityState={{ expanded: detailsExpanded }}
+            className="min-h-11 flex-row items-center gap-1.5 active:opacity-70">
+            <Text className="text-white/65 text-xs font-sans">Venue & tags{venueName || taggedFriends.length ? ' · Added' : ''}</Text>
+            <SymbolView name={detailsExpanded ? 'chevron.up' : 'chevron.down'} size={11} tintColor="rgba(255,255,255,0.6)" />
+          </Pressable>
+        </View> : null}
+
+        {media || detailsExpanded ? <>
         {/* Venue */}
         <Card>
           <View className="flex-row items-center gap-3 px-4">
@@ -421,9 +463,10 @@ export function PostComposer({
             )}
           </Pressable>
         </Card>
+        </> : null}
 
         {/* Audience — same names and selector as live statuses, separate preference */}
-        <AudienceRow value={visibility} onChange={(a) => onDraftChange({ visibility: a })} context="post" />
+        {media ? <AudienceRow value={visibility} onChange={(a) => onDraftChange({ visibility: a })} context="post" /> : null}
 
         {error ? (
           <View
@@ -459,8 +502,7 @@ export function PostComposer({
         <View className="flex-row items-center gap-2 px-1">
           <SymbolView name="moon.stars" size={13} tintColor="rgba(255,255,255,0.5)" />
           <Text className="text-white/55 text-xs font-sans flex-1">
-            {RESET_TITLE} Posts, Yaps, DMs, meetups and invites from tonight disappear — fun for
-            the night, gone by sunrise.
+            {RESET_COPY.postPreview}
           </Text>
         </View>
       </KeyboardAwareScrollView>

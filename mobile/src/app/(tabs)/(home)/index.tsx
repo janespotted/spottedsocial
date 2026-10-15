@@ -35,6 +35,7 @@ import { ForTonight } from '@/components/venue-recommendations';
 import { HomePlansPreview } from '@/components/home-plans-preview';
 import { useQueryClient } from '@tanstack/react-query';
 import { PostCard } from '@/components/post-card';
+import { PostFab } from '@/components/post-fab';
 // Empty Home previews shared plans; the full Plans feed stays in Chat.
 import { Avatar } from '@/components/avatar';
 import { HeaderActions } from '@/components/header-actions';
@@ -460,21 +461,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
           (49pt) plus the home indicator, with a visible gap above it.
           Home is the Newsfeed only now, so the FAB is always "Post"; the
           Plan FAB moved to the Chat tab's Plans view. */}
-      {keyboardOpen ? null : (
-        <Pressable
-          onPress={() => router.push('/create-post')}
-          accessibilityRole="button"
-          accessibilityLabel="New post"
-          className="absolute bottom-safe-offset-16 left-4 h-14 pl-4 pr-5 rounded-full flex-row items-center gap-2 active:opacity-90"
-          style={{
-            backgroundColor: NEON,
-            boxShadow: '0 4px 20px rgba(212, 255, 0, 0.2)',
-          }}
-        >
-          <SymbolView name="camera.fill" size={20} tintColor="#1a0f2e" weight="semibold" />
-          <Text className="text-[15px] font-sans-semibold text-[#1a0f2e]">Post</Text>
-        </Pressable>
-      )}
+      {keyboardOpen ? null : <PostFab />}
     </View>
   );
 }

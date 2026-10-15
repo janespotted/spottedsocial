@@ -8,7 +8,7 @@ class PublishError extends Error {
   }
 }
 
-function composer(publishPost) {
+function composer(publishPost, overrides = {}) {
   const state = { errors: [], phases: [], shared: [], closed: 0 };
   const scope = {
     session: { user: { id: 'test-owner' } }, posting: false,
@@ -22,6 +22,7 @@ function composer(publishPost) {
     setError: value => state.errors.push(value), setPhase: value => state.phases.push(value),
     setProgress: () => {}, savePostAudience: () => {},
     onShared: value => state.shared.push(value), onClose: () => state.closed++,
+    ...overrides,
   };
   return {
     state, scope,
@@ -38,6 +39,43 @@ test('Two Share taps before a render start only one publication', async () => {
   assert.equal(calls, 1);
   finish({ post: { id: 'published-once' } });
   await Promise.all([first, second]);
+  assert.equal(h.state.shared.length, 1);
+});
+
+test('A text-only post publishes without media and retains its audience and venue', async () => {
+  let input;
+  const h = composer(async value => { input = value; return { post: { id: 'text-only' } }; }, { media: null });
+  await h.share();
+  assert.equal(input.media, null);
+  assert.equal(input.text, 'A draft worth keeping');
+  assert.equal(input.visibility, 'close_friends');
+  assert.equal(input.venueName, 'Test venue');
+  assert.equal(h.state.phases[0], 'publishing');
+  assert.equal(h.state.shared[0].id, 'text-only');
+});
+
+test('An empty text-only draft cannot publish', async () => {
+  let calls = 0;
+  const h = composer(async () => { calls++; }, { media: null, caption: '' });
+  await h.share();
+  assert.equal(calls, 0);
+  assert.equal(h.state.shared.length, 0);
+  assert.equal(h.state.errors.at(-1).retryable, false);
+});
+
+test('A failed text post retains its content and can retry without an upload', async () => {
+  const inputs = [];
+  const h = composer(async value => {
+    inputs.push(value);
+    if (inputs.length === 1) throw new PublishError('Offline');
+    return { post: { id: 'text-retry' } };
+  }, { media: null });
+  await h.share();
+  assert.equal(h.state.errors.at(-1).retryable, true);
+  await h.share();
+  assert.equal(inputs[1].text, inputs[0].text);
+  assert.equal(inputs[1].visibility, inputs[0].visibility);
+  assert.equal(inputs[1].uploadedKey, null);
   assert.equal(h.state.shared.length, 1);
 });
 

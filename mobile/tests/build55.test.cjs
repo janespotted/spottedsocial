@@ -27,7 +27,7 @@ test('no history renders no row; authorized history shows exact label and tappab
 });
 test('night Home keeps its yellow bottom-left Post action independently of feed emptiness',()=>{
  const s=source('app/(tabs)/(home)/index.tsx'),fab=s.slice(s.indexOf('{/* Compose FAB'));
- assert.match(fab,/\{keyboardOpen \? null :/);assert.match(fab,/left-4/);assert.match(fab,/backgroundColor: NEON/);assert.doesNotMatch(fab,/feed\.posts|hasPosts|friendCount/);
+ assert.match(fab,/\{keyboardOpen \? null :/);assert.match(fab,/<PostFab/);const control=source('components/post-fab.tsx');assert.match(control,/left-4/);assert.match(control,/backgroundColor: NEON/);assert.doesNotMatch(fab+control,/feed\.posts|hasPosts|friendCount/);
  const venue=source('app/venue.tsx');assert.match(venue,/\[moreInfoOpen, setMoreInfoOpen\] = useState\(false\)/);assert.match(venue,/setMoreInfoOpen\(false\).*\[venueId\]/s);
 });
 test('DM inbox name opens Friend ID while the conversation row still opens chat',()=>{
