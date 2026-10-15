@@ -512,6 +512,9 @@ export function SpottedCamera({
 
   const [facing, setFacing] = useState<Facing>('back');
   const device = useCameraDevice(facing);
+  // Keep the native preview and saved photo/video mirrored together for selfies.
+  // `auto` lets iOS choose independently for each output connection.
+  const mirrorMode = facing === 'front' ? 'on' : 'off';
   const [flash, setFlash] = useState<Flash>('off');
   const [ready, setReady] = useState(false);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
@@ -818,7 +821,7 @@ export function SpottedCamera({
               isActive={foreground}
               device={device}
               outputs={[photoOutput, videoOutput]}
-              mirrorMode="auto"
+              mirrorMode={mirrorMode}
               zoom={zoom}
               torchMode={recording && flash === 'on' && device.hasTorch ? 'on' : 'off'}
               onConfigured={() => setReady(true)}
