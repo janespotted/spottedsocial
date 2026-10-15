@@ -45,7 +45,7 @@
      {
        icon: Megaphone,
        title: 'Promote Your Venue',
-       description: 'Boost visibility on the leaderboard and map',
+       description: 'Boost visibility on Hot Spots and the map',
      },
      {
        icon: MessageSquare,

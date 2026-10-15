@@ -229,7 +229,7 @@ function LeaderboardHeader({
 
       {/* Title + subtitle — full-width rows below the top bar */}
       <View className="px-4 pt-2">
-        <Text className="text-3xl font-sans-semibold text-white">Leaderboard</Text>
+        <Text className="text-3xl font-sans-semibold text-white">Hot Spots</Text>
         <Text className="text-white/50 text-sm mt-0.5 font-sans">Spotted picks + check-ins</Text>
       </View>
 

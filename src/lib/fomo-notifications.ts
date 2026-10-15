@@ -353,7 +353,7 @@ export async function checkGroupForming(
 
 // ── 7. Top venue tonight ──
 // Trigger: periodic check (e.g. 10-11pm), when a venue is #1 on leaderboard
-// "A ton of people are heading to Sound Nightclub — it's #1 on the leaderboard tonight. Go out?"
+// "A ton of people are heading to Sound Nightclub — it's #1 on Hot Spots tonight. Go out?"
 
 export async function checkTopVenueTonight(userId: string, city: string): Promise<void> {
   if (rateLimited(`fomo_top_venue_${userId}`, 6 * 60 * 60 * 1000)) return;
@@ -408,7 +408,7 @@ export async function checkTopVenueTonight(userId: string, city: string): Promis
       receiver_id: userId,
       sender_id: userId,
       type: 'top_venue_tonight',
-      message: `A ton of people are heading to ${topVenue.name} — it's #1 on the leaderboard tonight. Go out?`,
+      message: `A ton of people are heading to ${topVenue.name} — it's #1 on Hot Spots tonight. Go out?`,
     });
   } catch (err) {
     console.error('[FOMO:TopVenue] Error:', err);

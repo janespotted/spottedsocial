@@ -7,7 +7,7 @@ export default function LeaderboardLayout() {
   return (
     <Stack screenOptions={{ contentStyle }}>
       {/* Custom static header inside the screen (web PageHeader parity) */}
-      <Stack.Screen name="leaderboard" options={{ title: 'Leaderboard', headerShown: false }} />
+      <Stack.Screen name="leaderboard" options={{ title: 'Hot Spots', headerShown: false }} />
     </Stack>
   );
 }

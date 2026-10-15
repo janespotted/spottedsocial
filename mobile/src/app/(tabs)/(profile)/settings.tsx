@@ -146,7 +146,7 @@ export default function SettingsScreen() {
     ActionSheetIOS.showActionSheetWithOptions(
       {
         title: 'Your city',
-        message: 'Changes which venues, leaderboard and map you see.',
+        message: 'Changes the city for venues, Hot Spots and the map.',
         options: [...cities.map((c) => getCityLabel(c)), 'Cancel'],
         cancelButtonIndex: cities.length,
       },

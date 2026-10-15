@@ -4,7 +4,7 @@ export const INTRO_STEPS = [
   { label: 'CHECK IN', title: 'Set your night.', subtitle: 'Choose your spot and who can see you.' },
   { label: 'THE MAP', title: 'Find your people.', subtitle: 'See where your friends are sharing tonight.' },
   { label: 'YOUR CIRCLE', title: 'Make it a night.', subtitle: 'Your friends. Your plans. Your night.' },
-  { label: 'LEADERBOARD', title: 'Find your next spot.', subtitle: 'See the top spots in your city right now' },
+  { label: 'HOT SPOTS', title: 'Find your next spot.', subtitle: 'See the top spots in your city right now' },
 ] as const;
 
 const key = (userId: string) => `spotted.launchIntro.v2.${userId}`;

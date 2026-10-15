@@ -130,7 +130,7 @@ export default function Admin() {
       fetchVenues();
     } catch (err) {
       console.error('Error promoting venue:', err);
-      toast.error('Failed to add venue to leaderboard promoted');
+      toast.error('Failed to promote venue on Hot Spots');
     }
   };
 
@@ -161,11 +161,11 @@ export default function Admin() {
         }
       }
 
-      toast.success(`${venue.name} removed from leaderboard promoted`);
+      toast.success(`${venue.name} removed from Hot Spots promotions`);
       fetchVenues();
     } catch (err) {
       console.error('Error removing promoted venue:', err);
-      toast.error('Failed to remove venue from leaderboard promoted');
+      toast.error('Failed to remove venue from Hot Spots promotions');
     }
   };
 
@@ -191,7 +191,7 @@ export default function Admin() {
         .update({ leaderboard_promo_order: newOrder })
         .eq('id', venue.id);
 
-      toast.success(`${venue.name} activated! Now showing on leaderboard.`);
+      toast.success(`${venue.name} activated! Now showing on Hot Spots.`);
       fetchVenues();
     } catch (err) {
       console.error('Error activating venue:', err);
@@ -363,7 +363,7 @@ export default function Admin() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-white text-sm flex items-center gap-2">
                   <Star className="h-4 w-4 text-primary" />
-                  Leaderboard Promoted
+                  Hot Spots Promotions
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -373,7 +373,7 @@ export default function Admin() {
                     <Badge variant="default" className="bg-green-600 text-white">
                       ACTIVE SPOTS ({activeVenues.length}/{MAX_ACTIVE_SPOTS})
                     </Badge>
-                    <span className="text-white/50 text-xs">Visible on leaderboard</span>
+                    <span className="text-white/50 text-xs">Visible on Hot Spots</span>
                   </div>
                   
                   {loading ? (
@@ -666,7 +666,7 @@ export default function Admin() {
                             onClick={() => venue.is_leaderboard_promoted ? removeFromLeaderboardPromoted(venue) : addToLeaderboardPromoted(venue)}
                             className={!venue.is_leaderboard_promoted ? 'border-white/20 text-white hover:bg-white/10 text-xs h-7' : 'text-xs h-7'}
                           >
-                            {venue.is_leaderboard_promoted ? '−LB' : '+LB'}
+                            {venue.is_leaderboard_promoted ? '−HS' : '+HS'}
                           </Button>
                           <Button
                             size="sm"
