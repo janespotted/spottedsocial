@@ -244,6 +244,15 @@ function RootNavigator() {
         }}
       />
       <Stack.Screen
+        name="new-group"
+        options={{
+          // A modal preserves the bounded list between the fields and footer;
+          // native formSheet expands its descendant scroller over the header.
+          presentation: 'modal',
+          contentStyle: SHEET_CONTENT_STYLE,
+        }}
+      />
+      <Stack.Screen
         name="friend-card"
         options={{
           presentation: 'formSheet',

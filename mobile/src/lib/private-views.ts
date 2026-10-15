@@ -7,7 +7,7 @@ export const PRIVATE_VIEW_KEYS = [
   'plan-participants', 'plan-comments', 'notifications', 'activity', 'dm-threads',
   'comments', 'comments-post-exists', 'post-likes', 'post-detail', 'venue-card',
   'party-details', 'party-guests', 'share-friends', 'share-post-friends', 'tag-friends', 'leaderboard',
-  'night-recap', 'venue-visits',
+  'night-recap', 'venue-visits', 'new-group-friends',
 ] as const;
 let revision = 0;
 export const privateViewRevision = () => revision;

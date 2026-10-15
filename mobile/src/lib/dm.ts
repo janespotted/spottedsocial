@@ -191,6 +191,25 @@ export async function createDmThread(friendId: string): Promise<string> {
   return data as string;
 }
 
+export const MAX_GROUP_FRIENDS = 64;
+
+/** The RPC creates the group and all memberships in one permission-checked transaction. */
+export async function createGroupThread(memberIds: string[], name = ''): Promise<string> {
+  const members = [...new Set(memberIds)];
+  if (members.length < 2 || members.length > MAX_GROUP_FRIENDS || members.some(id => !id)) {
+    throw new Error(`Choose between 2 and ${MAX_GROUP_FRIENDS} friends.`);
+  }
+  const groupName = name.trim();
+  if ([...groupName].length > 100) throw new Error('Keep the group name under 101 characters.');
+  const { data, error } = await supabase.rpc('create_group_thread', {
+    member_ids: members,
+    group_name: groupName || undefined,
+  });
+  if (error) throw error;
+  if (typeof data !== 'string' || !data) throw new Error('Group creation returned no conversation.');
+  return data;
+}
+
 export async function markThreadRead(threadId: string, userId: string): Promise<void> {
   await supabase
     .from('dm_read_receipts')

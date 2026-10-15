@@ -3,9 +3,9 @@ import { TabHeaderRow } from '@/components/tab-header-row';
 import { CaptureGuard } from '@/components/capture-guard';
 import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
 import { friendCardPress } from '@/lib/friend-card';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, Text, View } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LegendList } from '@legendapp/list/react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -150,6 +150,12 @@ export default function MessagesScreen() {
   const friendsQuery = useFriendIds(session?.user.id);
   const friendIds = friendsQuery.data;
   const hasFriends = (friendIds?.length ?? 0) > 0;
+
+  // Memberships and group names are not in the realtime publication.
+  // Refresh on return so a newly created group appears before its first message.
+  useFocusEffect(useCallback(() => {
+    if (session?.user.id) void queryClient.invalidateQueries({ queryKey: ['dm-threads', session.user.id] });
+  }, [session?.user.id, queryClient]));
 
   // DM changes refresh the list.
   useEffect(() => {

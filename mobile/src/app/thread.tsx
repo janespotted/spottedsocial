@@ -594,7 +594,10 @@ function ThreadScreenContent() {
         ],
         cancelButtonIndex: groupInfo.members.length,
       },
-      () => {}
+      (index) => {
+        const member = groupInfo.members[index];
+        if (member) openFriendCard(member.user_id, userId);
+      }
     );
   };
 
@@ -996,6 +999,8 @@ function ThreadScreenContent() {
             />
             <Pressable
               onPress={send}
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
               disabled={!draft.trim()}
               hitSlop={8}
               className="w-10 h-10 rounded-full items-center justify-center disabled:opacity-30"
