@@ -253,6 +253,10 @@ function RootNavigator() {
         }}
       />
       <Stack.Screen
+        name="group-members"
+        options={{ presentation: 'modal', contentStyle: SHEET_CONTENT_STYLE }}
+      />
+      <Stack.Screen
         name="friend-card"
         options={{
           presentation: 'formSheet',

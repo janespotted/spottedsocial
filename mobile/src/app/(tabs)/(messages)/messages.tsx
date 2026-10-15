@@ -111,6 +111,8 @@ function RowSkeleton() {
 
 export default function MessagesScreen() {
   const { fontScale } = useWindowDimensions();
+  const [focused, setFocused] = useState(false);
+  useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
   useNoKeyboardOnFocus(); // back from a thread must never leave the keyboard up
   const { session } = useSession();
   const { unreadCount } = useNotifications();
@@ -145,6 +147,7 @@ export default function MessagesScreen() {
     queryKey: ['dm-threads', session?.user.id],
     enabled: !!session,
     staleTime: 15_000,
+    refetchInterval: focused && activeTab === 'messages' ? 5000 : false,
     queryFn: () => fetchDmThreads(session!.user.id),
   });
   const friendsQuery = useFriendIds(session?.user.id);

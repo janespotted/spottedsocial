@@ -2671,6 +2671,14 @@ export type Database = {
         Returns: undefined
       }
       create_dm_thread: { Args: { friend_id: string }; Returns: string }
+      add_group_members: {
+        Args: { p_thread: string; p_members: string[] }
+        Returns: undefined
+      }
+      remove_group_member: {
+        Args: { p_thread: string; p_member: string }
+        Returns: undefined
+      }
       create_group_thread: {
         Args: { group_name?: string; member_ids: string[] }
         Returns: string

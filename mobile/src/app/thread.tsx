@@ -177,7 +177,6 @@ function ThreadScreenContent() {
       if (cancelled || current !== request || privacy !== privateViewRevision()) return;
       if (threadFailure || memberFailure) throw threadFailure ?? memberFailure;
       if (!threadData) { setThreadAccess('unavailable'); setMessages([]); setMemberMap(new Map()); setOtherMember(null); setGroupInfo(null); return; }
-      setThreadAccess('allowed');
       if (myProfile?.display_name) setMyName(myProfile.display_name);
 
       const memberIds = (members ?? []).map((m) => m.user_id);
@@ -233,16 +232,23 @@ function ThreadScreenContent() {
         setGroupInfo(null);
         setOtherMember(allMembers[0] ?? null);
       }
+      setThreadAccess('allowed');
       } catch {
         if (!cancelled && current === request) { setThreadAccess('error'); setOtherMember(null); setGroupInfo(null); setMessages([]); }
       }
     };
     void refresh();
-    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 15_000);
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 5_000);
+    const foreground = AppState.addEventListener('change', state => {
+      if (state === 'active') { setThreadAccess('loading'); void refresh(); }
+    });
     return () => {
-      cancelled = true; clearInterval(timer);
+      cancelled = true; clearInterval(timer); foreground.remove();
     };
   }, [threadId, userId, withheld, metadataRevision]);
+
+  // Returning from membership/photo controls refreshes the header immediately.
+  useFocusEffect(useCallback(() => { setMetadataRevision(n => n + 1); }, [threadId]));
 
   // RLS exposes peer receipts only when both users currently opt in. Refresh
   // on focus/foreground and while visible so preference revocation clears Seen.
@@ -315,7 +321,9 @@ function ThreadScreenContent() {
   useEffect(() => onNightBoundary(() => { setMessages([]); setSharedPosts(new Map()); void fetchMessages(); }), [fetchMessages]);
 
   useEffect(() => {
-    if (!threadId || !userId) return;
+    if (!threadId || !userId || threadAccess !== 'allowed') return;
+    // Rejoining an open group restores tonight's history; removal also tears
+    // down its live subscription instead of leaving a stale conversation.
     fetchMessages();
     markThreadRead(threadId, userId);
 
@@ -365,7 +373,7 @@ function ThreadScreenContent() {
     });
 
     return teardown;
-  }, [threadId, userId, fetchMessages]);
+  }, [threadId, userId, fetchMessages, threadAccess]);
 
   /* ── My reactions on visible messages ── */
   useEffect(() => {
@@ -582,23 +590,8 @@ function ThreadScreenContent() {
   );
 
   const showGroupMembers = () => {
-    if (!groupInfo) return;
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: groupInfo.name ?? 'Members',
-        options: [
-          ...groupInfo.members.map((m) =>
-            m.venue_name ? `${m.display_name} — @ ${m.venue_name}` : m.display_name
-          ),
-          'Close',
-        ],
-        cancelButtonIndex: groupInfo.members.length,
-      },
-      (index) => {
-        const member = groupInfo.members[index];
-        if (member) openFriendCard(member.user_id, userId);
-      }
-    );
+    if (!groupInfo || !threadId) return;
+    router.push({ pathname: '/group-members', params: { threadId } });
   };
 
   const renameGroup = () => {
@@ -608,6 +601,9 @@ function ThreadScreenContent() {
       undefined,
       async (name) => {
         const newName = name?.trim() || null;
+        if (newName && [...newName].length > 100) {
+          Alert.alert('Name too long', 'Use 100 characters or fewer.'); return;
+        }
         try {
           const { data, error } = await supabase
             .from('dm_threads')
@@ -663,7 +659,7 @@ function ThreadScreenContent() {
     if (!groupInfo) return;
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        options: ['View Members', 'Rename Group', 'Change Group Photo', 'Cancel'],
+        options: ['Group Members', 'Rename Group', 'Change Group Photo', 'Cancel'],
         cancelButtonIndex: 3,
       },
       (index) => {
@@ -676,10 +672,10 @@ function ThreadScreenContent() {
 
   const headerTitle = groupInfo
     ? (groupInfo.name ??
-      groupInfo.members
+      (groupInfo.members
         .map((m) => m.display_name.split(' ')[0])
         .slice(0, 3)
-        .join(', '))
+        .join(', ') || 'Group chat'))
     : (otherMember?.display_name ?? params.title ?? '');
   const headerAvatar = groupInfo
     ? groupInfo.group_avatar_url
@@ -713,6 +709,8 @@ function ThreadScreenContent() {
           <SymbolView name="chevron.left" size={22} tintColor="rgba(255,255,255,0.6)" />
         </Pressable>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={groupInfo ? 'Group options' : 'View friend card'}
           onPress={groupInfo ? showGroupOptions : friendCardPress(otherMember?.user_id, userId)}
           className="flex-1 flex-row items-center gap-3"
         >

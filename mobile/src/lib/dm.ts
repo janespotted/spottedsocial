@@ -52,6 +52,7 @@ export interface DmMessage {
 export function threadTitle(thread: DmThreadPreview): string {
   if (thread.is_group) {
     if (thread.name) return thread.name;
+    if (!thread.members.length) return 'Group chat';
     const names = thread.members.map((m) => m.display_name.split(' ')[0]);
     if (names.length <= 3) return names.join(', ');
     return `${names.slice(0, 2).join(', ')} & ${names.length - 2} others`;
@@ -158,7 +159,7 @@ export async function fetchDmThreads(userId: string): Promise<DmThreadPreview[]>
         };
       })
       .filter((m): m is DmMember => m !== null);
-    if (members.length === 0) continue;
+    if (!info || (!info.is_group && members.length === 0)) continue;
 
     const last = latestByThread.get(threadId) ?? null;
     const myRead = readAt.get(threadId);
