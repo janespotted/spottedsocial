@@ -67,3 +67,11 @@ verify_jwt = false
 
 [functions.private-media-cleanup]
 verify_jwt = true
+
+[functions.launch-send-invitations]
+verify_jwt = true
+
+# Twilio authenticates with a signature checked against the exact callback URL,
+# all form fields, and the configured account. No Supabase user JWT is provided.
+[functions.launch-sms-callback]
+verify_jwt = false

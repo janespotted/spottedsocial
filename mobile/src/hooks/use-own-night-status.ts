@@ -1,3 +1,4 @@
+import { invalidatePrivateViews } from '@/lib/private-views';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { endNightLocally, fetchOwnNightStatus, type OwnNightStatus } from '@/lib/night-status';
@@ -21,6 +22,7 @@ export const NIGHT_STATUS_QUERY_KEYS = [
 ] as const;
 
 export function invalidateNightStatusQueries(queryClient: QueryClient): void {
+  invalidatePrivateViews(queryClient);
   for (const key of NIGHT_STATUS_QUERY_KEYS) queryClient.invalidateQueries({ queryKey: [key] });
 }
 

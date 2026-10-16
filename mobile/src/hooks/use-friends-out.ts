@@ -23,20 +23,20 @@ export interface FriendsOutData {
   outFriends: FriendNightStatus[];
   planningFriends: FriendNightStatus[];
   /**
-   * True when the viewer answered "No" tonight: friends are listed, but
-   * their venues are withheld (aggregate cues only, like the map) until
-   * the viewer updates their status.
+   * True until the viewer participates as TBD or Out. Only aggregate counts
+   * are returned; no names, avatars, status rows, or venues.
    */
   venuesWithheld: boolean;
+  outCount: number;
+  planningCount: number;
 }
 
 /**
  * Friends who are out or planning tonight. Visibility (sharing level, hide,
  * block) is enforced server-side by RLS on night_statuses — this hook only
- * shapes the data, plus the one client-side rule that a viewer who is
- * staying in does not see precise venues (client feedback §8).
+ * shapes authorized identities or count-only data for a nonparticipating viewer.
  */
-export function useFriendsOut() {
+export function useFriendsOut({ enabled = true }: { enabled?: boolean } = {}) {
   const { session } = useSession();
   const { data: friendIds } = useFriendIds(session?.user.id);
   const { data: own } = useOwnNightStatus();
@@ -45,7 +45,7 @@ export function useFriendsOut() {
 
   // Realtime: refetch Out/Planning cards whenever any night status changes.
   useEffect(() => {
-    if (!session) return;
+    if (!session || !enabled) return;
     const invalidate = () => queryClient.invalidateQueries({ queryKey: ['friends-out'] });
     return createResilientChannel({
       name: 'night-status-realtime',
@@ -57,17 +57,26 @@ export function useFriendsOut() {
           invalidate
         ),
     });
-  }, [session, queryClient]);
+  }, [session, queryClient, enabled]);
 
   return useQuery({
     queryKey: ['friends-out', session?.user.id, friendIds, viewerStayingIn],
-    enabled: !!session && !!friendIds,
+    enabled: enabled && !!session && !!friendIds,
     staleTime: 30_000,
+    // RLS deliberately withholds identity-bearing status events from No viewers.
+    // Refresh their aggregate endpoint without widening the realtime audience.
+    refetchInterval: viewerStayingIn ? 30_000 : false,
     queryFn: async (): Promise<FriendsOutData> => {
       if (!friendIds || friendIds.length === 0) {
-        return { outFriends: [], planningFriends: [], venuesWithheld: false };
+        return { outFriends: [], planningFriends: [], venuesWithheld: viewerStayingIn, outCount: 0, planningCount: 0 };
       }
 
+      if (viewerStayingIn) {
+        const { data, error } = await supabase.rpc('get_friends_night_counts');
+        if (error) throw error;
+        const counts = data as { out?: number; planning?: number } | null;
+        return { outFriends: [], planningFriends: [], venuesWithheld: true, outCount: counts?.out ?? 0, planningCount: counts?.planning ?? 0 };
+      }
       const [{ data: statuses, error: statusError }, profiles] = await Promise.all([
         supabase
           .from('night_statuses')
@@ -95,6 +104,8 @@ export function useFriendsOut() {
       return {
         outFriends: rows.filter((r) => r.status === 'out'),
         planningFriends: rows.filter((r) => r.status === 'planning'),
+        outCount: rows.filter(r => r.status === 'out').length,
+        planningCount: rows.filter(r => r.status === 'planning').length,
         venuesWithheld: viewerStayingIn,
       };
     },

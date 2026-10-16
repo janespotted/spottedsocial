@@ -34,6 +34,7 @@ function harness() {
   };
   const storage={getItem:async key=>memory.get(key)??null,setItem:async(key,val)=>{memory.set(key,val);},removeItem:async key=>{memory.delete(key);}};
   const api=loadModule('background-location.ts',{
+    './demo-mode': { isDemoMode: () => false },
     'react-native':{AppState:{currentState:'active'}},
     '@react-native-async-storage/async-storage':storage,
     'react-native-background-geolocation':sdk,

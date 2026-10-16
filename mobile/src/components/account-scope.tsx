@@ -1,3 +1,4 @@
+import { clearPendingDms } from '@/lib/dm-outbox';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { Image } from 'expo-image';
 import { getSessionRevision, getSessionUserId, onSessionIdentityChange } from '@/lib/session-identity';
@@ -19,7 +20,8 @@ import { stopBackgroundLocation } from '@/lib/background-location';
 // (no previous account) keeps the cache — that is what makes the feed instant.
 let previousUserId: string | null = null;
 onSessionIdentityChange(() => {
-  if (previousUserId) {
+  if (previousUserId && previousUserId !== getSessionUserId()) {
+    void clearPendingDms(previousUserId).catch(() => {});
     Image.clearMemoryCache().catch(() => {});
     Image.clearDiskCache().catch(() => {});
   }

@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { useRef, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -247,9 +248,9 @@ export default function ContactsSyncSheet() {
           ) : (
             matches.map((match) => (
               <View key={match.user_id} className="flex-row items-center gap-3 py-2.5">
-                <Avatar name={match.display_name} url={match.avatar_url} size="md" />
+                <Avatar userId={match.user_id} name={match.display_name} url={match.avatar_url} size="md" />
                 <View className="flex-1 min-w-0">
-                  <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
+                  <Text className="text-white text-base font-sans-medium" numberOfLines={1} onPress={friendCardPress(match.user_id)} accessibilityRole="button">
                     {match.display_name}
                   </Text>
                   <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>

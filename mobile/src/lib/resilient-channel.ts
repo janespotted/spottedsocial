@@ -1,3 +1,4 @@
+import { getDemoSandbox } from './demo-mode';
 import { AppState } from 'react-native';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from './supabase';
@@ -42,6 +43,18 @@ let topicCounter = 0;
  */
 export function createResilientChannel(opts: ResilientChannelOptions): () => void {
   const { configure, onReconnect, onStatus } = opts;
+  const demo = getDemoSandbox();
+  if (demo) {
+    const tables = new Set<string>();
+    const local = { on: (kind: string, filter: { table?: string }) => {
+      if (kind === 'postgres_changes' && filter.table) tables.add(filter.table);
+      return local;
+    } };
+    configure(local as unknown as RealtimeChannel);
+    return demo.subscribe(changes => {
+      if (changes.some(table => table === '*' || tables.has(table))) onReconnect?.();
+    });
+  }
   const baseTopic = `${opts.name}-r${++topicCounter}`;
 
   let channel: RealtimeChannel | null = null;

@@ -1,6 +1,6 @@
 import { resolvePrivateMedia } from './private-media';
 import type { Database } from './database.types';
-import { isDemoMode } from './demo-mode';
+import { getDemoSandbox, isDemoMode } from './demo-mode';
 import { fetchTagsForPosts, type TaggedFriend } from './post-tags';
 import { buildProfileMap, fetchProfilesSafe } from './profiles';
 import { supabase } from './supabase';
@@ -190,6 +190,8 @@ async function resolvePostMedia(
 
 export async function resolvePostImageUrl(imageUrl: string | null): Promise<string | null> {
   if (!imageUrl) return null;
+  // Local group photos have no public URL or server object and expire with Demo.
+  if (imageUrl.startsWith('demo-media://')) return getDemoSandbox()?.resolveMedia(imageUrl) ?? null;
   return (await resolvePostImageUrls([imageUrl])).get(imageUrl) ?? null;
 }
 

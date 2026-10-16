@@ -1,76 +1,44 @@
 import { useSyncExternalStore } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DemoSandbox, type DemoSeed } from './demo-sandbox';
+import { getSessionUserId, onSessionIdentityChange, resetSessionDataScope, sessionFetch } from './session-identity';
 
-/**
- * Demo-content visibility. SOW §15: demo content must never reach a real
- * user by accident — so it is OFF by default in every build, and only a
- * deliberate switch in Settings turns it on for that device.
- *
- * Why it is a runtime toggle and not `__DEV__`: the developer is
- * Lahore-based and needs the Lahore demo city on a TestFlight build to
- * exercise venue detection, arrival prompts and the map against venues
- * they can walk to, while Jane's build of the same binary keeps showing
- * NYC / LA / Palm Beach untouched.
- *
- * `EXPO_PUBLIC_DEMO_MODE=1` in mobile/.env pre-arms it for a dev client;
- * everything else starts off.
- *
- * Seed/clear demo data with the `seed-demo-data` edge function; the Lahore
- * venues are plain rows with is_demo = true (migration 20260918150000).
- */
-
-const STORAGE_KEY = 'spotted.demoMode';
-
-let enabled = process.env.EXPO_PUBLIC_DEMO_MODE === '1';
-let hydrated = false;
+let authorized = false;
+let owner: string | null = null;
+let sandbox: DemoSandbox | null = null;
 const listeners = new Set<() => void>();
-
-function emit(): void {
-  for (const listener of listeners) listener();
-}
-
-/**
- * Read the saved preference once at launch. Call before the first screen
- * renders (root layout) so a demo session survives a restart.
- */
-export async function hydrateDemoMode(): Promise<void> {
-  if (hydrated) return;
-  hydrated = true;
-  try {
-    const saved = await AsyncStorage.getItem(STORAGE_KEY);
-    if (saved !== null) {
-      enabled = saved === '1';
-      emit();
-    }
-  } catch {
-    /* unreadable storage — stay off */
-  }
-}
-
-export async function setDemoMode(next: boolean): Promise<void> {
-  enabled = next;
+const emit = () => { for (const listener of listeners) listener(); };
+export function setDemoAuthorization(value: boolean): void {
+  authorized = value; owner = getSessionUserId();
+  if (!value && sandbox) { sandbox = null; resetSessionDataScope(); }
   emit();
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, next ? '1' : '0');
-  } catch {
-    /* best effort — the in-memory value still applies this session */
-  }
 }
-
-/**
- * Non-reactive read, for query functions and other plain modules. UI that
- * must re-render when the switch flips uses `useDemoMode()`.
- */
-export function isDemoMode(): boolean {
-  return enabled;
+onSessionIdentityChange(() => {
+  if (owner !== getSessionUserId()) { authorized = false; owner = null; sandbox = null; emit(); }
+});
+// Deliberately off on every cold launch. No saved switch can activate fixtures.
+export async function hydrateDemoMode(): Promise<void> {}
+export async function setDemoMode(next: boolean, seed?: DemoSeed): Promise<void> {
+  if (next && (!authorized || !owner || seed?.userId !== owner)) throw new Error('Admin access is required for demo data.');
+  if (next === !!sandbox) return;
+  sandbox = next ? new DemoSandbox(seed!) : null;
+  resetSessionDataScope(); emit();
 }
-
+export function isDemoMode(): boolean { return authorized && !!sandbox && owner === getSessionUserId(); }
+export function getDemoSandbox(): DemoSandbox | null { return isDemoMode() ? sandbox : null; }
 export function useDemoMode(): boolean {
-  return useSyncExternalStore(
-    (callback) => {
-      listeners.add(callback);
-      return () => listeners.delete(callback);
-    },
-    () => enabled
-  );
+  return useSyncExternalStore(callback => { listeners.add(callback); return () => { listeners.delete(callback); }; }, isDemoMode);
+}
+/** Only authentication refresh and a read-only capability check can leave Demo.
+ * Unknown tables, RPCs, storage and Edge Functions never reach production. */
+export async function appFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+  const demo = getDemoSandbox();
+  const control = url.pathname === '/rest/v1/rpc/get_launch_state';
+  const refresh = url.pathname === '/auth/v1/token' && url.searchParams.get('grant_type') === 'refresh_token';
+  if (demo && !control && !refresh) return sessionFetch(input, init, demo.fetch.bind(demo));
+  // Late sample actions after leaving demo must never be sent to real people.
+  if (!demo && /de000000-0000-4000-8000-/.test(url.href + (typeof init?.body === 'string' ? init.body : ''))) {
+    return new Response(JSON.stringify({ code: 'DEMO_ENDED', message: 'Demo ended. Reopen the action to continue.' }), { status: 400, headers: { 'content-type': 'application/json' } });
+  }
+  return sessionFetch(input, init);
 }

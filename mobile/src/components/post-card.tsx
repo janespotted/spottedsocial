@@ -7,7 +7,7 @@ import { Portal } from 'react-native-teleport';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTimeAgo, type FeedPost } from '@/hooks/use-feed';
 import { blockUser, reportContent } from '@/lib/moderation';
-import { openFriendCard } from '@/lib/friend-card';
+import { openFriendCard, friendCardPress } from '@/lib/friend-card';
 import { openPostDetail, syncPostDetail, usePostDetail } from '@/lib/post-detail';
 import { supabase } from '@/lib/supabase';
 import { NEON, PURPLE } from '@/lib/theme';
@@ -262,7 +262,7 @@ export function PostCard({
 
         {hasMedia && post.text ? (
           <Text className="text-white text-sm font-sans mt-1" numberOfLines={3}>
-            <Text className="font-sans-semibold">{post.display_name}</Text> {post.text}
+            <Text className="font-sans-semibold" onPress={friendCardPress(post.user_id, currentUserId)} accessibilityRole="button">{post.display_name}</Text> {post.text}
           </Text>
         ) : null}
 

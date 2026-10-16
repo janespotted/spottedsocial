@@ -58,20 +58,23 @@ test('legacy and canonical arrival taps route to map; local arrival opens correc
  const h=harness();for(const type of ['friend_arrived','friend_arrived_venue'])assert.equal(h.api.routeForNotification({type}),'/map');
  assert.equal(h.api.routeForNotification({url:'/check-in'}),'/check-in');assert.equal(h.api.routeForNotification({type:'dm'}),'/messages?tab=dms');
 });
-function managerHarness({gate='answered',initial=null,failRegistration=false}={}) {
- const effects=[];const callbacks={};const destinations=[];const parked=[];const registrations=[];const timers=new Map();let next=0;let failures=failRegistration?1:0;
- const sdk={DEFAULT_ACTION_IDENTIFIER:'default',setNotificationHandler:handler=>{callbacks.presentation=handler.handleNotification;},clearLastNotificationResponseAsync:async()=>{},getLastNotificationResponseAsync:async()=>initial,
+function managerHarness({gate='answered',initial=null,failRegistration=false,status='planning',presented=[]}={}) {
+ const dismissed=[];const effects=[];const callbacks={};const destinations=[];const parked=[];const registrations=[];const timers=new Map();let next=0;let failures=failRegistration?1:0;
+ const sdk={getPresentedNotificationsAsync:async()=>presented,dismissNotificationAsync:async id=>dismissed.push(id),DEFAULT_ACTION_IDENTIFIER:'default',setNotificationHandler:handler=>{callbacks.presentation=handler.handleNotification;},clearLastNotificationResponseAsync:async()=>{},getLastNotificationResponseAsync:async()=>initial,
  addNotificationResponseReceivedListener:cb=>{callbacks.tap=cb;return {remove(){}};},addPushTokenListener:cb=>{callbacks.token=cb;return {remove(){}};}};
  const native={AppState:{currentState:'active',addEventListener:(_,cb)=>{callbacks.app=cb;return {remove(){}};}}};
  const deps={'react':{useEffect:fn=>effects.push(fn),useRef:value=>({current:value})},'react-native':native,'expo-router':{router:{push:v=>destinations.push(v)}},'expo-notifications':sdk,
  '@react-native-community/netinfo':{addEventListener:cb=>{callbacks.network=cb;return ()=>{};}},
  '@/lib/night-gate':{deferDeepLink:v=>parked.push(v),getNightGateState:()=>gate,takePendingDeepLink:()=>null},
  '@/lib/push':{registerPushToken:async(uid,opts)=>{registrations.push(opts);if(failures-->0)throw Error('offline');return 'granted';},routeForNotification:data=>data?.type==='dm'?'/messages':'/map'},
+ '@/hooks/use-own-night-status':{useOwnNightStatus:()=>({data:{status:{status}},isError:false})},
+ '@/lib/live-preview':{LIVE_ACTIVITY_TYPES:['friend_out','friend_planning','friend_arrived_venue'],withholdLivePreview:(value,resolved)=>!resolved||!['out','planning'].includes(value)},
+ '@/lib/demo-mode':{isDemoMode:()=>false,useDemoMode:()=>false},
  '@/hooks/use-session':{useSession:()=>({session:{user:{id:'alice'}},onboardingNeeded:false,onboardingResolved:true})}};
  const compiled=ts.transpileModule(fs.readFileSync(path.join(__dirname,'../src/components/push-notification-manager.tsx'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
  const mod={exports:{}};new Function('require','module','exports','setTimeout','clearTimeout',compiled)(n=>deps[n],mod,mod.exports,(fn,ms)=>{timers.set(++next,{fn,ms});return next;},id=>timers.delete(id));
  mod.exports.PushNotificationManager();const cleanups=effects.map(fn=>fn());
- return {callbacks,destinations,parked,registrations,timers,cleanup:()=>cleanups.forEach(f=>f?.())};
+ return {dismissed,callbacks,destinations,parked,registrations,timers,cleanup:()=>cleanups.forEach(f=>f?.())};
 }
 const response=(receiver='alice')=>({actionIdentifier:'default',notification:{request:{identifier:'one',content:{data:{type:'dm',receiver_id:receiver}}}}});
 test('cold-start notification is consumed once even when listener repeats it',async()=>{
@@ -143,4 +146,15 @@ test('nightlife and private-party notifications route to usable screens',()=>{
  for(const type of ['friend_out','friend_planning','friend_arrived_venue']) assert.equal(h.api.routeForNotification({type}),'/map');
  for(const type of ['private_party_invite','address_request','party_invite_accepted','party_address_approved']) assert.equal(h.api.routeForNotification({type,data:{host_id:id}}),`/party?hostId=${id}`);
  assert.equal(h.api.routeForNotification({type:'address_request',data:{host_id:'invalid'}}),'/activity');
+});
+
+
+test('No suppresses live foreground banners and removes delivered live alerts, preserving DMs',async()=>{
+ const live={request:{identifier:'live',content:{data:{receiver_id:'alice',type:'friend_out'}}}};
+ const dm=response().notification;
+ const h=managerHarness({status:'home',presented:[live,dm]});await tick();
+ assert.equal((await h.callbacks.presentation(live)).shouldShowBanner,false);
+ assert.equal((await h.callbacks.presentation(dm)).shouldShowBanner,true);
+ assert.deepEqual(h.dismissed,['live']);h.cleanup();
+ const active=managerHarness({status:'planning'});await tick();assert.equal((await active.callbacks.presentation(live)).shouldShowBanner,true);active.cleanup();
 });

@@ -42,17 +42,16 @@ export default function EditPlanScreen() {
   });
 
   const handleSubmit = async (values: PlanFormValues) => {
-    if (!session || !params.planId) return;
+    if (!session || !params.planId) throw new Error('Plan unavailable');
     try {
       await savePlan(params.planId, values);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['plans'] });
       queryClient.invalidateQueries({ queryKey: ['plan-participants', params.planId] });
-      router.back();
     } catch (e) {
       console.error('Error updating plan:', e);
-      Alert.alert('Failed to update plan', 'Try again.');
+      throw e;
     }
   };
 

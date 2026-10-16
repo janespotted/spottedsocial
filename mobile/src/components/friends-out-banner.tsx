@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -9,9 +10,9 @@ import { NEON } from '@/lib/theme';
  * useFriendsOut, which already refreshes on every night_statuses change,
  * so the count updates live.
  */
-export function FriendsOutBanner({ count, names }: { count: number; names: string[] }) {
+export function FriendsOutBanner({ count, friends }: { count: number; friends: { user_id: string; display_name: string }[] }) {
   if (count === 0) return null;
-  const first = names.slice(0, 2).map((n) => n.split(' ')[0]);
+  const first = friends.slice(0, 2).map((p) => p.display_name.split(' ')[0]);
   const who =
     count === 1
       ? `${first[0]} is out now`
@@ -30,7 +31,7 @@ export function FriendsOutBanner({ count, names }: { count: number; names: strin
         <SymbolView name="figure.walk.motion" size={18} tintColor={NEON} />
       </View>
       <View className="flex-1 min-w-0">
-        <Text className="text-white text-sm font-sans-semibold" numberOfLines={1}>{who}</Text>
+        <Text className="text-white text-sm font-sans-semibold" numberOfLines={1}>{friends.slice(0, 2).map((p,i)=><Text key={p.user_id} onPress={friendCardPress(p.user_id)} accessibilityRole="button">{i ? (count === 2 ? ' and ' : ', ') : ''}{p.display_name.split(' ')[0]}</Text>)}{count === 1 ? ' is out now' : count === 2 ? ' are out now' : ` and ${count-2} more are out now`}</Text>
         <Text className="text-white/60 text-xs font-sans">You&apos;re TBD — heading out? Tap to update.</Text>
       </View>
       <SymbolView name="chevron.right" size={13} tintColor={NEON} />

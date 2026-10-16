@@ -1,6 +1,6 @@
 import { parseConfirmationPeople, parseNotificationIds, parseThreadIds } from '@/lib/route-input';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +9,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  useReducedMotion,
   withTiming,
 } from 'react-native-reanimated';
 import { useResolveClassNames } from 'uniwind';
@@ -33,19 +34,6 @@ export interface SentConfirmationParams {
   threadIds: string;
 }
 
-interface Person {
-  id: string;
-  display_name: string;
-  avatar_url: string | null;
-}
-
-function joinNames(people: Person[]): string {
-  if (people.length === 0) return 'nobody';
-  if (people.length === 1) return people[0].display_name;
-  if (people.length === 2) return `${people[0].display_name} and ${people[1].display_name}`;
-  return `${people[0].display_name}, ${people[1].display_name}, +${people.length - 2} more`;
-}
-
 /**
  * The original build's celebratory success card, restored (addendum v3
  * §1 / §11.6): "Invites Sent!" after venue invites and "You sent a Meet Up
@@ -64,11 +52,12 @@ export default function SentConfirmationScreen() {
 
   // The route is a transparent modal with no native animation; the fade in
   // and fade out are driven here so both directions are visible and smooth.
+  const reduceMotion = useReducedMotion();
   const reveal = useSharedValue(0);
   const closing = useRef(false);
   useEffect(() => {
-    reveal.value = withTiming(1, { duration: 340, easing: Easing.out(Easing.quad) });
-  }, [reveal]);
+    reveal.value = withTiming(1, { duration: reduceMotion ? 0 : 340, easing: Easing.out(Easing.quad) });
+  }, [reveal, reduceMotion]);
   const backdropStyle = useAnimatedStyle(() => ({ opacity: reveal.value }));
   const cardStyle = useAnimatedStyle(() => ({
     opacity: reveal.value,
@@ -88,7 +77,7 @@ export default function SentConfirmationScreen() {
   const close = () => {
     if (closing.current) return;
     closing.current = true;
-    reveal.value = withTiming(0, { duration: 240, easing: Easing.in(Easing.quad) }, (done) => {
+    reveal.value = withTiming(0, { duration: reduceMotion ? 0 : 240, easing: Easing.in(Easing.quad) }, (done) => {
       if (done) runOnJS(pop)();
     });
   };
@@ -131,6 +120,7 @@ export default function SentConfirmationScreen() {
     }
   };
 
+  const openPerson = (id: string) => { close(); setTimeout(() => openFriendCard(id, session?.user.id), 350); };
   const headline = kind === 'meetup' ? `You sent a Meet Up Request to ${first?.display_name ?? 'them'}!` : 'Invites Sent!';
 
   if (!friends.length || !inviteIds.length) return <View className="flex-1 items-center justify-center bg-[#110a24] p-6 gap-4">
@@ -140,7 +130,8 @@ export default function SentConfirmationScreen() {
 
   return (
     <Animated.View className="flex-1" style={backdropStyle}>
-    <Pressable onPress={close} className="flex-1 items-center justify-center px-5" style={gradient}>
+    <Pressable accessible={false} onPress={close} className="flex-1 px-5 pt-safe-offset-4 pb-safe-offset-4" style={gradient}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 16 }} showsVerticalScrollIndicator={false}>
       {/* Plain fade + a hair of scale: a spring zoom plus a 40 pt blurred
           shadow, re-rendered under moving confetti, read as flicker */}
       <Animated.View
@@ -181,10 +172,10 @@ export default function SentConfirmationScreen() {
           <Text className="text-6xl mb-3" accessibilityElementsHidden>
             🥳
           </Text>
-          <Text className="text-white text-2xl font-sans-semibold text-center mb-2">{headline}</Text>
+          <Text className="text-white text-2xl font-sans-semibold text-center mb-2">{kind === 'meetup' ? <>You sent a Meet Up Request to <Text onPress={() => first && openPerson(first.id)}>{first?.display_name ?? 'them'}</Text>!</> : headline}</Text>
           {kind === 'invites' ? (
             <Text className="text-white/80 text-[15px] font-sans text-center leading-5">
-              You invited <Text style={{ color: NEON }} className="font-sans-semibold">{joinNames(friends)}</Text> to{' '}
+              You invited {friends.map((p,i)=><Text key={p.id} style={{ color: NEON }} className="font-sans-semibold" onPress={() => openPerson(p.id)} accessibilityRole="button">{i ? ', ' : ''}{p.display_name}</Text>)} to{' '}
               <Text style={{ color: NEON }} className="font-sans-semibold">{params.venueName ?? 'the spot'}</Text>
             </Text>
           ) : (
@@ -193,18 +184,18 @@ export default function SentConfirmationScreen() {
             </Text>
           )}
           <Text className="text-white/60 text-xs font-sans mt-2">
-            {kind === 'meetup' ? 'Meet up sent · expires at 5am' : 'Expires at 5am'}
+            Expires at 5am
           </Text>
 
           {/* Circular actions */}
           <View className="flex-row items-center justify-center gap-8 mt-8">
-            <Pressable onPress={undo} disabled={busy} className="items-center gap-1 active:opacity-80">
+            <Pressable accessibilityRole="button" accessibilityLabel="Undo" onPress={undo} disabled={busy} className="items-center gap-1 active:opacity-80">
               <View className="w-16 h-16 rounded-full bg-white/20 items-center justify-center">
                 <SymbolView name="arrow.uturn.backward" size={26} tintColor="#ffffff" />
               </View>
               <Text className="text-white/90 text-xs font-sans-medium">Undo</Text>
             </Pressable>
-            <Pressable onPress={chat} disabled={busy || !first} className="items-center gap-1 active:opacity-80">
+            <Pressable accessibilityRole="button" accessibilityLabel="Chat" onPress={chat} disabled={busy || !first} className="items-center gap-1 active:opacity-80">
               <View className="w-16 h-16 rounded-full bg-white/20 items-center justify-center">
                 <SymbolView name="bubble.left.fill" size={26} tintColor="#ffffff" />
               </View>
@@ -213,9 +204,10 @@ export default function SentConfirmationScreen() {
           </View>
         </View>
       </Animated.View>
-      <Text className="text-white/40 text-xs font-sans mt-6">Tap anywhere to close</Text>
+      <Text className="text-white/40 text-xs font-sans mt-6">Tap outside to close</Text>
+      </ScrollView>
       {/* Above the card, like the original's canvas layer */}
-      <Confetti count={90} duration={2600} />
+      {!reduceMotion ? <Confetti count={90} duration={2600} /> : null}
     </Pressable>
     </Animated.View>
   );

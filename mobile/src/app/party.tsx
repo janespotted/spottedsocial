@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useState } from "react";
 import {
@@ -189,7 +190,7 @@ export default function Party() {
             {query.data.requests.map((r) => (
               <View key={r.id} className="bg-surface rounded-xl p-4">
                 <Text className="text-white">
-                  {name(r.guest_id)} ·{" "}
+                  <Text onPress={friendCardPress(r.guest_id)}>{name(r.guest_id)}</Text> ·{" "}
                   {r.kind === "invite" ? "Invitation" : "Address request"} ·
                   {" "}
                   {r.state}

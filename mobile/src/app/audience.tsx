@@ -53,7 +53,7 @@ export default function AudienceSheet() {
 
   return (
     <View className="px-5 pt-6 pb-8 gap-4">
-      <Text className="text-white text-xl font-sans-semibold">Who can see this?</Text>
+      <View className="flex-row items-center gap-3"><Text className="text-white text-xl font-sans-semibold flex-1">Who can see this?</Text><Pressable accessibilityRole="button" accessibilityLabel="Close audience picker" disabled={pending} onPress={() => router.canGoBack() ? router.back() : router.replace('/')} className="min-h-11 min-w-11 items-center justify-center"><SymbolView name="xmark" size={18} tintColor="white" /></Pressable></View>
 
       <View className="rounded-2xl bg-[#2d1b4e]/50 border border-white/[0.06] overflow-hidden">
         {AUDIENCE_OPTIONS.map((opt, i) => {

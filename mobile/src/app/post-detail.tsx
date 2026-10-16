@@ -1,3 +1,4 @@
+import { CaptureGuard } from '@/components/capture-guard';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { onRelationshipChanged } from '@/lib/relationship-events';
 import { onPrivateViewsInvalidated, privateViewRevision } from '@/lib/private-views';
@@ -63,7 +64,7 @@ import { NEON, PURPLE } from '@/lib/theme';
  * the reel as a shared value through ReanimatedTrueSheetProvider, which is
  * why the screen is split in two here.
  */
-export default function PostDetailScreen() {
+function PostDetailScreenContent() {
   return (
     <ReanimatedTrueSheetProvider>
       <PostDetail />
@@ -540,3 +541,5 @@ async function toggleLikeStandalone(post: FeedPost, isLiked: boolean, userId: st
     : await supabase.from('post_likes').insert({ post_id: post.id, user_id: userId });
   if (error) throw error;
 }
+
+export default function PostDetailScreen() { return <CaptureGuard name="post-detail"><PostDetailScreenContent /></CaptureGuard>; }

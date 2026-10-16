@@ -44,7 +44,7 @@ export function StatusPill() {
       hitSlop={4}
       accessibilityRole="button"
       accessibilityLabel={answered ? `Update status. Tonight: ${label}` : 'Set your status for tonight'}
-      className="h-9 pl-2.5 pr-3 rounded-full flex-row items-center gap-1.5 border active:opacity-80"
+      className="min-h-11 py-2 pl-2.5 pr-3 rounded-full flex-row items-center gap-1.5 border active:opacity-80"
       style={{
         backgroundColor: answered ? 'rgba(212,255,0,0.12)' : 'rgba(255,255,255,0.10)',
         borderColor: answered ? 'rgba(212,255,0,0.45)' : 'rgba(255,255,255,0.12)',
@@ -69,7 +69,7 @@ function DayPill() {
       hitSlop={4}
       accessibilityRole="button"
       accessibilityLabel="Day Mode. See when Night Mode opens"
-      className={`h-9 pl-2.5 pr-3 rounded-full flex-row items-center gap-1.5 active:opacity-80 ${control.ordinary}`}
+      className={`min-h-11 py-2 pl-2.5 pr-3 rounded-full flex-row items-center gap-1.5 active:opacity-80 ${control.ordinary}`}
     >
       <SymbolView name="sun.max" size={15} tintColor={controlTint.ordinary} />
       <Text className="text-xs font-sans-semibold" style={{ color: controlTint.ordinary }}>

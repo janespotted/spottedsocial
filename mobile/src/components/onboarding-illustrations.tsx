@@ -1,12 +1,18 @@
-import { Text, View } from 'react-native';
+import { memo, useMemo } from 'react';
+import { Animated, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 import { OnboardingPanel } from '@/components/onboarding-scaffold';
-import { LAVENDER, NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
+import { SceneHalo, sceneArrival, useSceneMotion } from '@/components/onboarding-scene-motion';
+import { INK, LAVENDER, MIST, NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
 
 /**
- * The static mock UI inside the onboarding tour. These are illustrations,
- * not live controls: nothing here reads or writes state, so a tour screen
+ * Memoized tour scenes keep page/progress updates from rebuilding untouched
+ * SVG and symbol trees. Stable scene values drive cached artwork directly;
+ * active/Reduce Motion changes still run the motion hook without recreating it.
+ *
+ * The local mock UI inside the onboarding tour. These are illustrations,
+ * not live controls: motion never reads or writes account state, so a tour screen
  * can never leave a half-set preference behind. The real versions live in
  * the app (audience sheet, /check-in, the map).
  */
@@ -83,51 +89,57 @@ function VenuePin({ size = 26, color }: { size?: number; color: string }) {
 }
 
 /** 01 — the map: friends out, two venue pins. */
-export function MapIllustration() {
-  return (
-    <View
-      className="flex-1 rounded-3xl border border-white/10 overflow-hidden"
-      style={{ backgroundColor: '#1b1330' }}
-    >
-      <MapStreets />
-
-      {/* Friends-out pill, floating over the map like the real one */}
-      <View className="absolute left-3 right-3 top-3 flex-row items-center justify-between rounded-full border border-white/10 bg-[#241a3d]/90 py-1.5 pl-1.5 pr-3">
-        <FaceStack />
-        <View className="flex-row items-center gap-1">
-          <Text className="text-[12px] text-white/85 font-sans">4 friends are out</Text>
-          <SymbolView name="chevron.right" size={10} tintColor="rgba(255,255,255,0.5)" />
+export const MapIllustration = memo(function MapIllustration({ animated = false, active = true }: { animated?: boolean; active?: boolean }) {
+  const scene = useSceneMotion(animated, active);
+  return useMemo(() => {
+    return (
+      <View
+        className="flex-1 rounded-3xl border border-white/10 overflow-hidden"
+        style={{ backgroundColor: '#1b1330' }}
+      >
+        <MapStreets />
+        <View className="absolute items-center justify-center" style={{ top: '42%', left: '22%', width: 24, height: 28 }}>
+          <SceneHalo scene={scene} />
         </View>
-      </View>
 
-      {/* Friends on the map — lime ring = out, white ring = mutual */}
-      <View className="absolute" style={{ top: '26%', left: '8%' }}>
-        <MockFace size={36} ring={NEON} variant={0} />
-      </View>
-      <View className="absolute" style={{ top: '24%', right: '12%' }}>
-        <MockFace size={36} ring="rgba(255,255,255,0.55)" variant={1} />
-      </View>
-      <View className="absolute" style={{ top: '64%', left: '13%' }}>
-        <MockFace size={36} ring="rgba(255,255,255,0.55)" variant={3} />
-      </View>
+        {/* Friends-out pill, floating over the map like the real one */}
+        <Animated.View className="absolute left-3 right-3 top-3 flex-row items-center justify-between rounded-full border border-white/10 bg-[#241a3d]/90 py-1.5 pl-1.5 pr-3" style={sceneArrival(scene, 5)}>
+          <FaceStack />
+          <View className="flex-row items-center gap-1">
+            <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white/85 font-sans">4 friends are out</Text>
+            <SymbolView name="chevron.right" size={10} tintColor="rgba(255,255,255,0.5)" />
+          </View>
+        </Animated.View>
 
-      <View className="absolute flex-row items-center gap-1.5" style={{ top: '42%', left: '22%' }}>
-        <VenuePin size={24} color={NEON} />
-        <View>
-          <Text className="text-[12px] text-white font-sans-medium">The Violet Room</Text>
-          <Text className="text-[10px] text-white/50 font-sans">West Village</Text>
-        </View>
+        {/* Friends on the map — lime ring = out, white ring = mutual */}
+        <Animated.View className="absolute" style={[{ top: '26%', left: '8%' }, sceneArrival(scene, 0, true)]}>
+          <MockFace size={36} ring={NEON} variant={0} />
+        </Animated.View>
+        <Animated.View className="absolute" style={[{ top: '24%', right: '12%' }, sceneArrival(scene, 2, true)]}>
+          <MockFace size={36} ring="rgba(255,255,255,0.55)" variant={1} />
+        </Animated.View>
+        <Animated.View className="absolute" style={[{ top: '64%', left: '13%' }, sceneArrival(scene, 4, true)]}>
+          <MockFace size={36} ring="rgba(255,255,255,0.55)" variant={3} />
+        </Animated.View>
+
+        <Animated.View className="absolute flex-row items-center gap-1.5" style={[{ top: '42%', left: '22%' }, sceneArrival(scene, 1, true)]}>
+          <VenuePin size={24} color={NEON} />
+          <View>
+            <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white font-sans-medium">The Violet Room</Text>
+            <Text maxFontSizeMultiplier={1.2} className="text-[10px] text-white/50 font-sans">West Village</Text>
+          </View>
+        </Animated.View>
+        <Animated.View className="absolute flex-row items-center gap-1.5" style={[{ top: '55%', left: '44%' }, sceneArrival(scene, 3, true)]}>
+          <VenuePin size={24} color={PURPLE} />
+          <View>
+            <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white font-sans-medium">Good Company</Text>
+            <Text maxFontSizeMultiplier={1.2} className="text-[10px] text-white/50 font-sans">East Village</Text>
+          </View>
+        </Animated.View>
       </View>
-      <View className="absolute flex-row items-center gap-1.5" style={{ top: '55%', left: '44%' }}>
-        <VenuePin size={24} color={PURPLE} />
-        <View>
-          <Text className="text-[12px] text-white font-sans-medium">Good Company</Text>
-          <Text className="text-[10px] text-white/50 font-sans">East Village</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
+    );
+  }, [scene]);
+});
 
 /**
  * The street layer. Drawn as a vector rather than a grid of Views: a plain
@@ -210,38 +222,53 @@ function StatusPills({ selected }: { selected?: 'yes' | 'tbd' | 'no' }) {
 }
 
 /** 02 — "Are you out?" with Yes chosen and a check-in. */
-export function CheckedInIllustration() {
-  return (
-    <OnboardingPanel>
-      <Text className="text-[18px] font-sans-semibold text-white text-center mb-5">
-        Are you out?
-      </Text>
-      <StatusPills selected="yes" />
-
-      <View className="h-px bg-white/10 my-5" />
-
-      <View className="flex-row items-center gap-3.5">
-        <View
-          className="h-11 w-11 rounded-full items-center justify-center"
-          style={{ backgroundColor: 'rgba(168,85,247,0.2)' }}
-        >
-          <VenuePin size={20} color={PURPLE} />
-        </View>
-        <View className="flex-1">
-          <Text className="text-[13px] text-white/55 font-sans">Checked in at</Text>
-          <Text className="text-[17px] text-white font-sans-semibold mt-0.5">The Violet Room</Text>
-        </View>
-        <SymbolView name="chevron.right" size={14} tintColor="rgba(255,255,255,0.4)" />
+export const CheckedInIllustration = memo(function CheckedInIllustration({ concise = false, animated = false, active = true }: { concise?: boolean; animated?: boolean; active?: boolean }) {
+  const scene = useSceneMotion(animated && concise, active);
+  return useMemo(() => {
+    if (concise) return <OnboardingPanel>
+      <Text maxFontSizeMultiplier={1.2} className="text-white text-lg font-sans-medium mb-5">Are you out tonight?</Text>
+      <View className="flex-row items-center gap-2 mb-6">
+        {["I’m out", 'TBD', 'Staying in'].map((label, i) => <Animated.View key={label} className="flex-1 rounded-full min-h-11 px-1 py-2 items-center justify-center" style={{ backgroundColor: i === 0 ? NEON : 'rgba(255,255,255,0.05)' }}><Text maxFontSizeMultiplier={1.2} className="text-xs font-sans-medium text-center" style={{ color: i === 0 ? INK : MIST }}>{label}</Text></Animated.View>)}
       </View>
+      <Animated.View className="flex-row items-center gap-3 mb-5" style={sceneArrival(scene, 0)}><VenuePin color={PURPLE} size={25} /><View className="flex-1"><Text maxFontSizeMultiplier={1.2} className="text-xs font-sans mb-1" style={{ color: MIST }}>Your spot</Text><Text maxFontSizeMultiplier={1.2} className="text-white text-base font-sans-medium">The Violet Room</Text></View></Animated.View>
+      <Animated.View className="flex-row items-center gap-2 mb-6" style={sceneArrival(scene, 1)}><SymbolView name="person.2" size={16} tintColor={MIST} /><Text maxFontSizeMultiplier={1.2} className="text-sm font-sans" style={{ color: MIST }}>Visible to Friends</Text><SymbolView name="chevron.down" size={10} tintColor={MIST} /></Animated.View>
+      <View className="rounded-xl border border-white/15 min-h-11 items-center justify-center py-3">
+        <Animated.View className="absolute inset-0 rounded-xl border" style={{ borderColor: NEON, opacity: scene.detail.interpolate({ inputRange: [0, 1], outputRange: [0, 0.35] }) }} />
+        <Text maxFontSizeMultiplier={1.2} className="text-sm font-sans-medium" style={{ color: NEON }}>Confirm check-in</Text>
+      </View>
+    </OnboardingPanel>;
+    return (
+      <OnboardingPanel>
+        <Text maxFontSizeMultiplier={1.2} className="text-[18px] font-sans-semibold text-white text-center mb-5">
+          Are you out?
+        </Text>
+        <StatusPills selected="yes" />
 
-      <Text className="text-[14px] text-white/60 font-sans underline mt-3 ml-15">Change spot</Text>
+        <View className="h-px bg-white/10 my-5" />
 
-      <View className="h-px bg-white/10 my-5" />
+        <View className="flex-row items-center gap-3.5">
+          <View
+            className="h-11 w-11 rounded-full items-center justify-center"
+            style={{ backgroundColor: 'rgba(168,85,247,0.2)' }}
+          >
+            <VenuePin size={20} color={PURPLE} />
+          </View>
+          <View className="flex-1">
+            <Text maxFontSizeMultiplier={1.2} className="text-[13px] text-white/55 font-sans">Checked in at</Text>
+            <Text maxFontSizeMultiplier={1.2} className="text-[17px] text-white font-sans-semibold mt-0.5">The Violet Room</Text>
+          </View>
+          <SymbolView name="chevron.right" size={14} tintColor="rgba(255,255,255,0.4)" />
+        </View>
 
-      <Text className="text-[14px] text-white/45 font-sans text-center">At a private party?</Text>
-    </OnboardingPanel>
-  );
-}
+        <Text maxFontSizeMultiplier={1.2} className="text-[14px] text-white/60 font-sans underline mt-3 ml-15">Change spot</Text>
+
+        <View className="h-px bg-white/10 my-5" />
+
+        <Text maxFontSizeMultiplier={1.2} className="text-[14px] text-white/45 font-sans text-center">At a private party?</Text>
+      </OnboardingPanel>
+    );
+  }, [scene, concise]);
+});
 
 /** 03 — concentric rings with the three audience tiers below. */
 export function PrivacyRingIllustration() {
@@ -424,48 +451,80 @@ export function YapIllustration() {
   );
 }
 
-/** 07 — tonight's leaderboard. */
-export function LeaderboardIllustration() {
-  const spots = [
-    { rank: 1, name: 'The Violet Room', hood: 'West Village' },
-    { rank: 2, name: 'After Hours', hood: 'Lower East Side' },
-    { rank: 3, name: 'Good Company', hood: 'East Village' },
-  ];
-  return (
-    <OnboardingPanel>
-      <Text className="text-[16px] text-white font-sans-semibold">Tonight in NYC</Text>
-      <Text className="text-[12px] text-white/50 font-sans mt-0.5">Total Spotted check-ins</Text>
-
-      <View className="gap-2.5 mt-4">
-        {spots.map((spot) => {
-          const lead = spot.rank === 1;
-          return (
-            <View
-              key={spot.rank}
-              className="flex-row items-center gap-4 rounded-2xl px-4 py-3"
-              style={{
-                backgroundColor: lead ? 'rgba(212,255,0,0.10)' : 'rgba(255,255,255,0.04)',
-                borderLeftWidth: lead ? 3 : 0,
-                borderLeftColor: NEON,
-              }}
-            >
-              <Text
-                className="text-[20px] font-sans-semibold w-5"
-                style={{ color: lead ? NEON : 'rgba(255,255,255,0.65)' }}
-              >
-                {spot.rank}
-              </Text>
-              <View className="flex-1">
-                <Text className="text-[15px] text-white font-sans-medium">{spot.name}</Text>
-                <Text className="text-[12px] text-white/50 font-sans mt-0.5">{spot.hood}</Text>
-              </View>
-            </View>
-          );
-        })}
+/** Friend actions, presented as a local illustration with no send controls. */
+export const SocialNightIllustration = memo(function SocialNightIllustration({ animated = false, active = true }: { animated?: boolean; active?: boolean }) {
+  const scene = useSceneMotion(animated, active);
+  return useMemo(() => {
+    const actions = [
+      { title: 'Meet Ups', detail: 'Get together', icon: 'person.2' },
+      { title: 'Invites', detail: 'Send a spot', icon: 'paperplane' },
+      { title: 'DMs', detail: 'Make a plan', icon: 'bubble.left.and.bubble.right' },
+      { title: 'Newsfeed', detail: 'Post to friends', icon: 'square.stack' },
+    ] as const;
+    return <OnboardingPanel>
+      <View className="flex-row flex-wrap gap-3">
+        {actions.map((action, i) => <Animated.View key={action.title} className="flex-grow rounded-2xl border border-white/10 bg-white/4 p-4" style={[{ flexBasis: '44%' }, sceneArrival(scene, i)]}>
+          <SymbolView name={action.icon} size={24} tintColor={LAVENDER} />
+          <Text maxFontSizeMultiplier={1.2} className="text-white text-sm font-sans-medium mt-3">{action.title}</Text>
+          <Text maxFontSizeMultiplier={1.2} className="text-xs font-sans mt-1" style={{ color: MIST }}>{action.detail}</Text>
+        </Animated.View>)}
       </View>
-    </OnboardingPanel>
-  );
-}
+      <View className="border-t border-white/10 mt-5 pt-5">
+        <View className="flex-row items-center gap-2"><SymbolView name="clock" size={17} tintColor={NEON} /><Text maxFontSizeMultiplier={1.2} className="flex-1 text-sm font-sans-medium" style={{ color: NEON }}>Tonight clears at 5am — no hangxiety</Text></View>
+        <Text maxFontSizeMultiplier={1.2} className="text-xs font-sans mt-2" style={{ color: MIST }}>Your profile and friends stay.</Text>
+      </View>
+    </OnboardingPanel>;
+  }, [scene]);
+});
+
+/** 07 — tonight's leaderboard. */
+export const LeaderboardIllustration = memo(function LeaderboardIllustration({ animated = false, active = true }: { animated?: boolean; active?: boolean }) {
+  const scene = useSceneMotion(animated, active);
+  return useMemo(() => {
+    const spots = [
+      { rank: 1, name: 'The Violet Room', hood: 'West Village' },
+      { rank: 2, name: 'After Hours', hood: 'Lower East Side' },
+      { rank: 3, name: 'Good Company', hood: 'East Village' },
+    ];
+    return (
+      <OnboardingPanel>
+        <Text maxFontSizeMultiplier={1.2} className="text-[16px] text-white font-sans-semibold">Tonight in NYC</Text>
+        <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white/60 font-sans mt-0.5">Activity shared with you</Text>
+
+        <View className="gap-2.5 mt-4">
+          {spots.map((spot) => {
+            const lead = spot.rank === 1;
+            return (
+              <Animated.View
+                key={spot.rank}
+                className="flex-row items-center gap-4 rounded-2xl px-4 py-3"
+                style={[sceneArrival(scene, spot.rank - 1), {
+                  backgroundColor: lead ? 'rgba(212,255,0,0.10)' : 'rgba(255,255,255,0.04)',
+                  borderLeftWidth: lead ? 3 : 0,
+                  borderLeftColor: NEON,
+                }]}
+              >
+                <Text
+                  className="text-[20px] font-sans-semibold w-5"
+                  style={{ color: lead ? NEON : 'rgba(255,255,255,0.65)' }}
+                >
+                  {spot.rank}
+                </Text>
+                <View className="flex-1">
+                  <Text maxFontSizeMultiplier={1.2} className="text-[15px] text-white font-sans-medium">{spot.name}</Text>
+                  <Text maxFontSizeMultiplier={1.2} className="text-[12px] text-white/50 font-sans mt-0.5">{spot.hood}</Text>
+                  <View className="h-0.5 rounded-full overflow-hidden mt-2" style={{ width: `${100 - (spot.rank - 1) * 24}%`, backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                    <Animated.View style={{ flex: 1, backgroundColor: lead ? NEON : LAVENDER, opacity: lead ? 0.6 : 0.25, transformOrigin: 'left', transform: [{ scaleX: scene.detail }] }} />
+                  </View>
+                </View>
+              </Animated.View>
+            );
+          })}
+        </View>
+      </OnboardingPanel>
+    );
+  }, [scene]);
+});
 
 /**
  * 08 — the friend search, as a still. Like every other screen in the tour

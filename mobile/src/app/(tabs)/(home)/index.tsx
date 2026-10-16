@@ -1,3 +1,9 @@
+import { useWindowDimensions } from 'react-native';
+import { TabHeaderRow } from '@/components/tab-header-row';
+import { CaptureGuard } from '@/components/capture-guard';
+import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
+import { CompactRecapEntry } from '@/components/compact-recap-entry';
+import { friendCardPress } from '@/lib/friend-card';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -25,10 +31,12 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { EmptyState, ErrorState } from '@/components/empty-state';
 import { addFriendsActions } from '@/lib/add-friends';
 import { FriendsOutBanner } from '@/components/friends-out-banner';
+import { ForTonight } from '@/components/venue-recommendations';
+import { HomePlansPreview } from '@/components/home-plans-preview';
+import { useQueryClient } from '@tanstack/react-query';
 import { PostCard } from '@/components/post-card';
-// Plans moved out of Home into the Chat tab (client change, Sept 2026).
-// Kept imported nowhere here on purpose — see app/(tabs)/(messages)/messages.tsx.
-// import { PlansFeed } from '@/components/plans-feed';
+import { PostFab } from '@/components/post-fab';
+// Empty Home previews shared plans; the full Plans feed stays in Chat.
 import { Avatar } from '@/components/avatar';
 import { HeaderActions } from '@/components/header-actions';
 import { DayHome } from '@/components/day-home';
@@ -50,10 +58,10 @@ function OutTonightCard({
 }: {
   friends: FriendNightStatus[];
   onMeetUp: (friend: FriendNightStatus) => void;
-  /** Viewer said "No" tonight: names only, no venues, with the way back in. */
+  /** Never render cached identities for a viewer who chose No. */
   venuesWithheld?: boolean;
 }) {
-  if (friends.length === 0) return null;
+  if (venuesWithheld || friends.length === 0) return null;
   return (
     <View className="rounded-2xl bg-[#1a0a2e]/80 border border-white/10 p-4 gap-3">
       <View className="flex-row items-center gap-2">
@@ -69,7 +77,7 @@ function OutTonightCard({
           style={{ backgroundColor: 'rgba(212,255,0,0.08)', borderWidth: 1, borderColor: 'rgba(212,255,0,0.3)' }}
         >
           <Text className="flex-1 text-white/75 text-xs font-sans leading-4">
-            Live friend locations are hidden while you are Staying In. Shared posts, Plans and invitations remain available.
+            Check in as TBD or Out to see who’s out.
           </Text>
           <SymbolView name="chevron.right" size={12} tintColor={NEON} />
         </Pressable>
@@ -80,10 +88,10 @@ function OutTonightCard({
           className="flex-row items-center gap-3 p-2.5 rounded-xl bg-white/5"
         >
           <View className="rounded-full border-2 border-[#d4ff00]">
-            <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+            <Avatar userId={friend.user_id} name={friend.display_name} url={friend.avatar_url} size="sm" />
           </View>
           <View className="flex-1 min-w-0">
-            <Text className="text-white font-sans-medium text-sm" numberOfLines={1}>
+            <Text className="text-white font-sans-medium text-sm" numberOfLines={1} onPress={friendCardPress(friend.user_id)} accessibilityRole="button">
               {friend.display_name}
             </Text>
             <Text className="text-[#d4ff00] text-xs font-sans" numberOfLines={1}>
@@ -93,7 +101,7 @@ function OutTonightCard({
           <Pressable
             onPress={() => onMeetUp(friend)}
             accessibilityRole="button"
-            className="min-h-9 px-3.5 rounded-full items-center justify-center bg-[#d4ff00] active:opacity-80"
+            className="min-h-11 px-3.5 rounded-full items-center justify-center bg-[#d4ff00] active:opacity-80"
           >
             <Text className="text-[#1a0f2e] text-xs font-sans-semibold">Meet Up</Text>
           </Pressable>
@@ -118,10 +126,10 @@ function PlanningTonightCard({ friends }: { friends: FriendNightStatus[] }) {
           className="flex-row items-center gap-3 p-2.5 rounded-xl bg-white/5"
         >
           <View className="rounded-full border-2 border-white/20">
-            <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+            <Avatar userId={friend.user_id} name={friend.display_name} url={friend.avatar_url} size="sm" />
           </View>
           <View className="flex-1 min-w-0">
-            <Text className="text-white font-sans-medium text-sm" numberOfLines={1}>
+            <Text className="text-white font-sans-medium text-sm" numberOfLines={1} onPress={friendCardPress(friend.user_id)} accessibilityRole="button">
               {friend.display_name}
             </Text>
             <Text className="text-white/50 text-xs font-sans" numberOfLines={1}>
@@ -141,8 +149,8 @@ function PlanningTonightCard({ friends }: { friends: FriendNightStatus[] }) {
 
 /**
  * Empty feed, by situation (client feedback §8): no friends → add some;
- * friends but nothing posted → say so and offer to post. Friends who are
- * out or TBD still show above, so an empty feed is never a dead end.
+ * friends but nothing posted → real activity, shared plans, nightlife picks, then Post.
+ * With posts present, recommendations appear only after the last loaded page.
  */
 function EmptyFeed({
   friendCount,
@@ -157,39 +165,13 @@ function EmptyFeed({
   venuesWithheld: boolean;
   onMeetUp: (friend: FriendNightStatus) => void;
 }) {
-  if (friendCount === 0) {
-    return (
-      <EmptyState
-        icon="person.2"
-        title="Add friends to see their nights"
-        body="Posts from your friends show up here until 5 AM. Find people you know to get started."
-        actions={[
-          ...addFriendsActions(),
-          { label: 'Post something', icon: 'camera.fill', onPress: () => router.push('/create-post') },
-        ]}
-      />
-    );
-  }
-
-  const nobodyAround = outFriends.length === 0 && planningFriends.length === 0;
   return (
-    <View className="px-4 py-4 gap-6">
-      <OutTonightCard friends={outFriends} onMeetUp={onMeetUp} venuesWithheld={venuesWithheld} />
-      <PlanningTonightCard friends={planningFriends} />
-
-      <EmptyState
-        icon={nobodyAround ? 'moon.stars' : 'camera'}
-        title={nobodyAround ? 'Nothing from your circle yet' : 'No posts yet tonight'}
-        body={
-          nobodyAround
-            ? "None of your friends have posted or shared a plan tonight. Posts live here until 5 AM — be the first."
-            : 'Friends are around, but nobody has posted yet. Start it off.'
-        }
-        actions={[
-          { label: "Share what you're up to", icon: 'camera.fill', primary: true, onPress: () => router.push('/create-post') },
-        ]}
-        compact={!nobodyAround}
-      />
+    <View className="py-4 gap-6">
+      {friendCount === 0 ? <View className="px-4"><EmptyState compact icon="person.2" title="Find your people" body="Your friends’ nights start here." actions={addFriendsActions()} /></View> : !venuesWithheld && (outFriends.length > 0 || planningFriends.length > 0) ? <View className="px-4 gap-4">
+        <OutTonightCard friends={outFriends} onMeetUp={onMeetUp} venuesWithheld={venuesWithheld} />
+        <PlanningTonightCard friends={planningFriends} />
+      </View> : null}
+      <ForTonight />
     </View>
   );
 }
@@ -222,25 +204,7 @@ function HomeHeader({
         borderBottomColor: 'rgba(255, 255, 255, 0.06)',
       }}
     >
-      <View className={`flex-row items-center justify-between px-4 h-10 ${children ? '' : 'mb-3'}`}>
-        {/* Wordmark is anchored: same size on every tab, never animates */}
-        <Text
-          className="text-white font-sans-light"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
-          style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
-        >
-          Spotted
-        </Text>
-        <View className="flex-row items-center gap-2">
-          {city ? (
-            <View className="px-2.5 py-1 rounded-full bg-white/10">
-              <Text className="text-white/70 text-xs font-sans-medium uppercase">{city}</Text>
-            </View>
-          ) : null}
-          <HeaderActions unreadCount={unreadCount} />
-        </View>
-      </View>
+      <TabHeaderRow city={city} unreadCount={unreadCount} />
       {children}
     </View>
   );
@@ -255,49 +219,27 @@ function HomeHeader({
  * only mounts at night, and so does the Post button: posting opens with
  * Night Mode (D1).
  */
-export default function HomeScreen() {
+function HomeScreenContent() {
   const { isNight, city } = useNightMode();
   const { unreadCount } = useNotifications();
-  const [tab, setTab] = useState<HomeTab>(isNight ? 'feed' : 'morning');
-  // Each mode opens on its own default tab, including when it flips while open
-  const [tabMode, setTabMode] = useState(isNight);
-  if (tabMode !== isNight) {
-    setTabMode(isNight);
-    setTab(isNight ? 'feed' : 'morning');
-  }
   return (
     <View className="flex-1 bg-[#110a24]">
-      <HomeHeader city={city} unreadCount={unreadCount}>
-        {!isNight ? <SubTabs<HomeTab>
-          tabs={[
-            { key: 'morning', label: 'Morning After' },
-            // The moon marks a section that is closed until Night Mode
-            { key: 'feed', label: 'Newsfeed', icon: 'moon' },
-          ]}
-          value={tab}
-          onChange={setTab}
-        /> : null}
-      </HomeHeader>
-      {isNight ? (
-        <NewsfeedScreen active />
-      ) : tab === 'morning' ? (
-        <DayHome />
-      ) : (
-        <NightOpeningScreen kind="newsfeed" />
-      )}
+      <HomeHeader city={city} unreadCount={unreadCount}><ModeCountdownStrip /></HomeHeader>
+      {isNight ? <NewsfeedScreen active /> : <DayHome />}
     </View>
   );
 }
 
-type HomeTab = 'morning' | 'feed';
-
 /** The live feed, its roster pill and the Post button. `active` = its tab is showing. */
 function NewsfeedScreen({ active }: { active: boolean }) {
+  const { fontScale } = useWindowDimensions();
   useNoKeyboardOnFocus(); // back from comments / search must never leave the keyboard up
   const { session } = useSession();
   const feed = useFeed();
+  const queryClient = useQueryClient();
   const { data: friendsData, refetch: refetchFriends } = useFriendsOut();
-  const { data: friendIds } = useFriendIds(session?.user.id);
+  const friendsQuery = useFriendIds(session?.user.id);
+  const friendIds = friendsQuery.data;
   const { data: ownNight } = useOwnNightStatus();
   const isPlanning = ownNight?.status?.status === 'planning';
   // pb clears the native tab bar, home indicator and the Post FAB
@@ -409,7 +351,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
     : (reelPostId ?? (isFocused || postDetailActive ? viewportVideoId : null));
 
   return (
-    <View className="flex-1">
+    <View key={fontScale} className="flex-1">
       <LegendList
         ref={listRef}
         data={feed.posts}
@@ -431,6 +373,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
             onRefresh={() => {
               feed.refresh({ userInitiated: true });
               refetchFriends();
+              void queryClient.invalidateQueries({ queryKey: ['plans', session?.user.id] });
             }}
             tintColorClassName="accent-[#d4ff00]"
           />
@@ -441,9 +384,10 @@ function NewsfeedScreen({ active }: { active: boolean }) {
               <ActivityIndicator color={NEON} />
             </View>
           ) : (
-            <Text className="text-white/45 text-xs font-sans text-center py-6">
-              you&apos;re all caught up
-            </Text>
+            <View className="pt-6">
+              <ForTonight />
+              <Text className="text-white/45 text-xs font-sans text-center py-6">you&apos;re all caught up</Text>
+            </View>
           )
         }
         ListHeaderComponent={
@@ -455,15 +399,16 @@ function NewsfeedScreen({ active }: { active: boolean }) {
               pickVisibleVideo();
             }}
           >
+            <View className="pt-4 pb-3 gap-4"><HomePlansPreview /><CompactRecapEntry /></View>
             {isPlanning && outFriends.length > 0 ? (
               <View className="px-4 pt-4">
-                <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
+                <FriendsOutBanner count={outFriends.length} friends={outFriends} />
               </View>
             ) : null}
           </View>
         }
         ListEmptyComponent={
-          feed.isLoading ? (
+          feed.isLoading || (feed.posts.length === 0 && friendsQuery.isLoading) ? (
             <View className="px-4 py-8 gap-4">
               {[0, 1].map((i) => (
                 <View key={i} className="gap-3">
@@ -475,10 +420,10 @@ function NewsfeedScreen({ active }: { active: boolean }) {
                 </View>
               ))}
             </View>
-          ) : feed.isError ? (
+          ) : feed.isError || (feed.posts.length === 0 && friendsQuery.isError) ? (
             <ErrorState
               title="Couldn't load your feed"
-              onRetry={() => void feed.refresh({ userInitiated: true })}
+              onRetry={() => { void feed.refresh({ userInitiated: true }); void friendsQuery.refetch(); }}
               retrying={feed.isRefreshing}
             />
           ) : (
@@ -503,11 +448,11 @@ function NewsfeedScreen({ active }: { active: boolean }) {
         )}
       />
 
-      {/* "N out · M TBD" roster pill — lower left, as in the original build
+      {/* "N out · M TBD" roster pill — lower right, clear of the always-visible Post button
           (addendum v3 §11.1); the roster used to live only in the empty
           state, so it vanished the moment one post existed */}
       {!keyboardOpen ? (
-        <View className="absolute bottom-safe-offset-16 left-4">
+        <View className="absolute bottom-safe-offset-16 right-4">
           <FriendsOutPill />
         </View>
       ) : null}
@@ -516,21 +461,9 @@ function NewsfeedScreen({ active }: { active: boolean }) {
           (49pt) plus the home indicator, with a visible gap above it.
           Home is the Newsfeed only now, so the FAB is always "Post"; the
           Plan FAB moved to the Chat tab's Plans view. */}
-      {keyboardOpen ? null : (
-        <Pressable
-          onPress={() => router.push('/create-post')}
-          accessibilityRole="button"
-          accessibilityLabel="New post"
-          className="absolute bottom-safe-offset-16 right-4 h-14 pl-4 pr-5 rounded-full flex-row items-center gap-2 active:opacity-90"
-          style={{
-            backgroundColor: NEON,
-            boxShadow: '0 4px 20px rgba(212, 255, 0, 0.35)',
-          }}
-        >
-          <SymbolView name="camera.fill" size={20} tintColor="#1a0f2e" weight="semibold" />
-          <Text className="text-[#1a0f2e] text-[15px] font-sans-semibold">Post</Text>
-        </Pressable>
-      )}
+      {keyboardOpen ? null : <PostFab />}
     </View>
   );
 }
+
+export default function HomeScreen() { return <CaptureGuard name="newsfeed"><HomeScreenContent /></CaptureGuard>; }

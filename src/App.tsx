@@ -311,7 +311,7 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Layout>
-                <PageErrorBoundary pageName="Leaderboard">
+                <PageErrorBoundary pageName="Hot Spots">
                   <Leaderboard />
                 </PageErrorBoundary>
               </Layout>
