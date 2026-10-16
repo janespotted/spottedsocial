@@ -27,6 +27,7 @@ import { HeaderActions } from '@/components/header-actions';
 import { DayTabScreen } from '@/components/night-opening-screen';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
+import { HOT_SPOTS_LAUNCH } from '@/lib/leaderboard-ranking';
 
 function openVenue(venueName: string, venueId?: string | null) {
   if (venueId) {
@@ -333,7 +334,7 @@ function LiveLeaderboardScreen() {
         unreadCount={unreadCount}
         onSelectNeighborhood={setNeighborhood}
       />
-      <Pressable accessibilityRole="button" onPress={() => Alert.alert('How spots rank', 'Rankings blend our nightlife picks with eligible check-ins: 70% picks and 30% activity at launch. Activity gradually grows to 90% as more people check in. Promoted spots are marked separately.')} className="px-4 py-2 min-h-11 justify-center"><Text className="text-white/55 text-xs font-sans">Curated + live activity ⓘ</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => Alert.alert('How spots rank', `${Math.round(HOT_SPOTS_LAUNCH.curatedWeight * 100)}% Spotted picks, ${Math.round(HOT_SPOTS_LAUNCH.liveWeight * 100)}% eligible live activity. The activity score reaches its maximum at ${HOT_SPOTS_LAUNCH.liveUserThreshold} people sharing a spot. Promoted spots are labeled separately.`)} className="px-4 py-2 min-h-11 justify-center"><Text className="text-white/55 text-xs font-sans">Curated + live activity ⓘ</Text></Pressable>
 
       <LegendList
         data={venues}
