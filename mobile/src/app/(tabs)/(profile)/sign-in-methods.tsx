@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import { useQueryClient } from '@tanstack/react-query';
 import { useResolveClassNames } from 'uniwind';
+import { ErrorState } from '@/components/empty-state';
 import { AUTH_ACCOUNT_KEY, useAuthAccount } from '@/hooks/use-auth-account';
 import { connectApple, disconnectApple, isAppleSignInAvailable } from '@/lib/apple-sign-in';
 import { formatE164 } from '@/lib/country-codes';
@@ -17,6 +18,7 @@ function MethodRow({
   action,
   onPress,
   busy,
+  disabled,
 }: {
   icon: SFSymbol;
   title: string;
@@ -24,11 +26,13 @@ function MethodRow({
   action?: string;
   onPress?: () => void;
   busy?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      disabled={!onPress || busy}
+      disabled={!onPress || busy || disabled}
+      accessibilityState={{ disabled: !onPress || busy || disabled, busy }}
       accessibilityRole={onPress ? 'button' : undefined}
       className="flex-row items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] active:bg-white/[0.06]"
     >
@@ -56,7 +60,7 @@ function MethodRow({
  */
 export default function SignInMethodsScreen() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading, refetch } = useAuthAccount();
+  const { data: user, isLoading, isError, isFetching, refetch } = useAuthAccount();
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   // pb-32 clears the native tab bar + home indicator (see settings.tsx)
@@ -132,14 +136,18 @@ export default function SignInMethodsScreen() {
           <View className="py-10 items-center">
             <ActivityIndicator color={NEON} />
           </View>
+        ) : !user ? (
+          <ErrorState title="Couldn’t load sign-in methods" body="Your account hasn’t changed. Try loading it again." onRetry={() => void refetch()} retrying={isFetching} />
         ) : (
           <>
+            {isError ? <ErrorState compact title="Couldn’t refresh sign-in methods" body="Showing your last saved details. Retry before making changes." onRetry={() => void refetch()} retrying={isFetching} /> : null}
             <MethodRow
               icon="phone"
               title="Phone number"
               subtitle={phone ?? 'Not added — friends can’t find you from their contacts'}
               action={phone ? 'Change' : 'Add'}
               onPress={() => router.push('/add-phone')}
+              disabled={isError || isFetching || busy}
             />
             {appleAvailable || apple ? (
               <MethodRow
@@ -149,6 +157,7 @@ export default function SignInMethodsScreen() {
                 action={apple ? 'Disconnect' : 'Connect'}
                 onPress={apple ? onDisconnect : onConnect}
                 busy={busy}
+                disabled={isError || isFetching}
               />
             ) : null}
             <Text className="text-white/55 text-xs font-sans leading-5 px-1 mt-2">

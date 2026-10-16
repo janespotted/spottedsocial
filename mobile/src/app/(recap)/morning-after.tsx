@@ -245,7 +245,7 @@ function ScrapbookPhoto({
     straight.value = withTiming(1, { duration: reduce ? 0 : 140 });
     // Navigate once it is upright: the zoom measures the picture when the
     // transition starts, and an upright picture is exactly its frame.
-    setTimeout(() => router.push({ pathname: '/recap-photo', params: { index: String(i) } }), reduce ? 0 : 140);
+    setTimeout(() => router.push({ pathname: '/recap-photo', params: { index: String(i), sourcePhotoId: photo.id } }), reduce ? 0 : 140);
   };
 
   return (

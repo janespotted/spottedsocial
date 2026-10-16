@@ -74,8 +74,8 @@ export function PostFab() {
   return <>
     <Pressable ref={trigger} onPress={open} accessibilityRole="button" accessibilityLabel="New post"
       accessibilityHint="Choose a photo, video, or text post" accessibilityState={{ expanded: visible }}
-      className="absolute bottom-safe-offset-16 left-4 min-h-14 py-3 pl-4 pr-5 rounded-full flex-row items-center gap-2 active:opacity-90"
-      style={buttonStyle}>{triggerContent(false)}</Pressable>
+      className="absolute left-4 min-h-14 py-3 pl-4 pr-5 rounded-full flex-row items-center gap-2 active:opacity-90"
+      style={[buttonStyle, { bottom: insets.bottom + 16 }]}>{triggerContent(false)}</Pressable>
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent navigationBarTranslucent
       onRequestClose={close} onDismiss={presentComposer}
       onShow={() => Animated.timing(reveal, { toValue: 1, duration: reduceMotion ? 0 : 180,

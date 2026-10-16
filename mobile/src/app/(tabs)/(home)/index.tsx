@@ -1,4 +1,5 @@
 import { useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TabHeaderRow } from '@/components/tab-header-row';
 import { CaptureGuard } from '@/components/capture-guard';
 import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
@@ -232,6 +233,7 @@ function HomeScreenContent() {
 
 /** The live feed, its roster pill and the Post button. `active` = its tab is showing. */
 function NewsfeedScreen({ active }: { active: boolean }) {
+  const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   useNoKeyboardOnFocus(); // back from comments / search must never leave the keyboard up
   const { session } = useSession();
@@ -452,7 +454,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
           (addendum v3 §11.1); the roster used to live only in the empty
           state, so it vanished the moment one post existed */}
       {!keyboardOpen ? (
-        <View className="absolute bottom-safe-offset-16 right-4">
+        <View className="absolute right-4" style={{ bottom: insets.bottom + 16 }}>
           <FriendsOutPill />
         </View>
       ) : null}

@@ -145,6 +145,11 @@ export class DemoSandbox {
   private rpc(name: string, p: Row): unknown {
     const me = this.seed.userId;
     switch (name) {
+      // Reserved fictional numbers; only this in-memory sandbox owns these rows.
+      case 'get_my_nomination_progress': return { nominations: [
+        { id: demoId(701), slot: 1, phone: '+12025550101', status: 'waiting' },
+        { id: demoId(702), slot: 2, phone: '+12025550102', status: 'invited' },
+      ] };
       case 'get_profiles_safe': return this.tables.profiles.map(r => this.participates() || r.id === me ? r : { ...r, is_out: false, last_known_lat: null, last_known_lng: null, last_location_at: null });
       case 'get_own_night_status': return this.tables.night_statuses.filter(r => r.user_id === me);
       case 'get_friends_night_counts': return { out: this.tables.night_statuses.filter(r => r.user_id !== me && r.status === 'out').length, planning: this.tables.night_statuses.filter(r => r.user_id !== me && r.status === 'planning').length };

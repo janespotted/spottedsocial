@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -15,11 +15,13 @@ import {
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import Transition from 'react-native-screen-transitions';
+import { BlankStackScreen } from 'react-native-screen-transitions/expo-router';
+import { EmptyState, ErrorState } from '@/components/empty-state';
 import { Image } from '@/components/styled';
 import { PressableScale } from '@/components/motion';
 import { useNightRecap, useRecapPictures, type RecapPicture } from '@/hooks/use-night-recap';
 import { SPRING } from '@/lib/motion';
-import { RECAP_PHOTO_GROUP, recapActivePhotoId } from '@/lib/recap-transitions';
+import { RECAP_PHOTO_GROUP, recapActivePhotoId, photoViewerOptions, unmaskedPhotoInterpolator } from '@/lib/recap-transitions';
 import { INK, NEON, outlineControl } from '@/lib/theme';
 
 const GAP = 20;
@@ -179,10 +181,42 @@ function Dot({ i, page }: { i: number; page: SharedValue<number> }) {
  * double-tap to look closer. Gesture Handler 3 on the UI thread. Owner only.
  */
 export default function RecapPhotoScreen() {
+  const recapQuery = useNightRecap();
+  const { pictures: photos } = useRecapPictures(recapQuery.data);
+  const insets = useSafeAreaInsets();
+  // A direct link has no source Polaroid to mask against. Keep recovery UI
+  // visible even when the recap is loading, expired, empty or unavailable.
+  const { sourcePhotoId } = useLocalSearchParams<{ sourcePhotoId?: string }>();
+  const canZoom = photos.some(photo => photo.id === sourcePhotoId);
+  return <>
+    <BlankStackScreen options={{
+      ...photoViewerOptions,
+      navigationMaskEnabled: canZoom,
+      gestureEnabled: canZoom,
+      screenStyleInterpolator: canZoom ? photoViewerOptions.screenStyleInterpolator : unmaskedPhotoInterpolator,
+    }} />
+    {photos.length ? <PhotoViewer photos={photos} /> : (
+      <View style={{ flex: 1, backgroundColor: INK, paddingTop: insets.top + 6, paddingBottom: insets.bottom }} accessibilityViewIsModal>
+        <PressableScale onPress={closeRecapPhoto} accessibilityLabel="Close picture" className="ml-4 w-11 h-11 rounded-full items-center justify-center bg-white/10 border border-white/15">
+          <SymbolView name="xmark" size={15} tintColor="#ffffff" weight="semibold" />
+        </PressableScale>
+        <View className="flex-1 justify-center px-4">
+          {recapQuery.isLoading ? <ActivityIndicator accessibilityLabel="Loading pictures" color={NEON} /> : recapQuery.isError ? (
+            <ErrorState title="Couldn’t load pictures" body="Try again, or return to Morning After." onRetry={() => void recapQuery.refetch()} retrying={recapQuery.isFetching} />
+          ) : <EmptyState icon="photo" title="No pictures to show" body="Your Spotted photos will appear here." actions={[{ label: 'Back to Morning After', onPress: () => router.replace('/morning-after'), primary: true }]} />}
+        </View>
+      </View>
+    )}
+  </>;
+}
+
+function closeRecapPhoto() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/morning-after');
+}
+
+function PhotoViewer({ photos }: { photos: RecapPicture[] }) {
   const { index: raw } = useLocalSearchParams<{ index?: string }>();
-  const { data: recap } = useNightRecap();
-  // The chapter's list, in the chapter's order (saved, then camera roll)
-  const { pictures: photos } = useRecapPictures(recap);
   const { width: winW, height: winH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -244,7 +278,7 @@ export default function RecapPhotoScreen() {
     zoom.value = 1;
     panX.value = 0;
     panY.value = 0;
-    router.back();
+    closeRecapPhoto();
   };
 
   // Sideways only — vertical drags belong to the route's dismiss gesture.
@@ -317,7 +351,6 @@ export default function RecapPhotoScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: INK }} accessibilityViewIsModal>
-      <Stack.Screen options={{ headerShown: false }} />
 
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         {photos.map((photo, i) => (

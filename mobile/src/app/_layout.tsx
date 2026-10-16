@@ -1,5 +1,5 @@
 import { signOutWithPushCleanup } from '@/lib/push';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { AccountScope } from '@/components/account-scope';
 import '../../global.css';
 import { useEffect, useLayoutEffect } from 'react';
@@ -291,6 +291,7 @@ function RootNavigator() {
 
 
 function DemoFrame({ children }: { children: React.ReactNode }) {
+  const { fontScale } = useWindowDimensions();
   const demo = useDemoMode();
   const insets = useSafeAreaInsets();
   const segments = useSegments();
@@ -304,7 +305,7 @@ function DemoFrame({ children }: { children: React.ReactNode }) {
   return <View style={{ flex: 1 }}>
     {demo ? <View style={{ paddingTop: insets.top, backgroundColor: "#110a24" }} className="px-4 pb-1 flex-row items-center justify-between border-b border-[#d4ff00]/25">
       <Text style={{ fontSize: 12 }} className="flex-1 mr-3 text-[#d4ff00] font-sans-semibold">DEMO · Only on this phone</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Exit demo data" className="min-h-11 px-3 justify-center" onPress={() => void setDemoMode(false)}><Text style={{ fontSize: 14 }} className="text-[#d4ff00] font-sans-semibold">Exit</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Exit demo data" style={{ flexShrink: 0, minWidth: 24 + 36 * fontScale }} className="min-h-11 px-3 items-center justify-center" onPress={() => void setDemoMode(false)}><Text style={{ fontSize: 14 }} className="text-[#d4ff00] font-sans-semibold">Exit</Text></Pressable>
     </View> : null}
     {children}
   </View>;

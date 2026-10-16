@@ -17,6 +17,7 @@ export function useAuthAccount() {
     queryFn: async () => {
       const { data, error } = await supabase.auth.getUser();
       if (error) throw error;
+      if (!data.user) throw new Error("Couldn’t load your sign-in methods. Please try again.");
       return data.user;
     },
   });

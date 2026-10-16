@@ -1,5 +1,5 @@
 import { interpolate, makeMutable } from 'react-native-reanimated';
-import Transition, { type ScreenStyleInterpolator, type ScreenTransitionConfig } from 'react-native-screen-transitions';
+import Transition, { NAVIGATION_MASK_ELEMENT_STYLE_ID, type ScreenStyleInterpolator, type ScreenTransitionConfig } from 'react-native-screen-transitions';
 import { INK } from '@/lib/theme';
 
 /**
@@ -19,11 +19,23 @@ export const RECAP_PHOTO_GROUP = 'recap';
  */
 export const recapActivePhotoId = makeMutable<string | null>(null);
 
-const photoViewerInterpolator: ScreenStyleInterpolator = ({ bounds }) => {
+export const unmaskedPhotoInterpolator: ScreenStyleInterpolator = ({ layouts }) => {
+  'worklet';
+  // Recovery and direct links may be the first route in this nested stack.
+  // Their progress need not animate from 0 to 1; content must always be visible.
+  return {
+    content: { style: { opacity: 1, transform: [{ translateX: 0 }, { translateY: 0 }, { scale: 1 }] } },
+    [NAVIGATION_MASK_ELEMENT_STYLE_ID]: { style: { width: layouts.screen.width, height: layouts.screen.height } },
+  };
+};
+
+const photoViewerInterpolator: ScreenStyleInterpolator = (props) => {
   'worklet';
   const id = recapActivePhotoId.value;
-  if (!id) return null;
-  return bounds({ group: RECAP_PHOTO_GROUP, id }).navigation.zoom({
+  if (!id) return unmaskedPhotoInterpolator(props);
+  const photoBounds = props.bounds({ group: RECAP_PHOTO_GROUP, id });
+  if (!photoBounds.link()?.source?.bounds) return unmaskedPhotoInterpolator(props);
+  return photoBounds.navigation.zoom({
     target: 'bound',
     backdropColor: INK,
     backdropOpacity: 0.6,

@@ -96,13 +96,12 @@ export function IntroductionPages({ initialStep, onStep, preview = false }: { pr
         <Text className="text-xs font-sans-medium tracking-widest mb-4" style={{ color: NEON }}>{page.label}</Text>
         <Text accessibilityRole="header" className="text-white text-[34px] leading-[40px] font-sans-light">{page.title}</Text>
         <Text className="text-base leading-6 font-sans mt-3" style={{ color: MIST }}>{page.subtitle}</Text>
-        <View className="flex-1 justify-center py-7" style={{ minHeight: 320 }}>
+        <View className="justify-center py-7" style={{ flexGrow: 1, flexShrink: 0, minHeight: 320 }}>
           <View accessible accessibilityLabel={index === 0 ? 'Example: I’m out, The Violet Room, visible to Friends. Confirm your check-in.' : index === 1 ? 'Example map with friends and venue pins. Only shared locations appear.' : index === 2 ? 'Send Meet Ups, venue invites and DMs. Post to your friends in the newsfeed. Tonight clears at 5am — no hangxiety. Your profile and friends stay.' : 'Example Hot Spots ranking showing three venues ranked by activity visible to you.'}>
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none">
               {index === 0 ? <CheckedInIllustration concise animated active={index === step || index === target} /> : index === 1 ? <View style={{ height: Math.max(300, Math.min(390, height * 0.4)) }}><MapIllustration animated active={index === step || index === target} /></View> : index === 2 ? <SocialNightIllustration animated active={index === step || index === target} /> : <LeaderboardIllustration animated active={index === step || index === target} />}
             </View>
           </View>
-          <Text className="text-[10px] font-sans tracking-widest text-center mt-4" style={{ color: MIST }}>A GLIMPSE OF NIGHT MODE</Text>
         </View>
       </ScrollView>
       </Animated.View>)}

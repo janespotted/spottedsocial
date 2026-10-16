@@ -1,6 +1,6 @@
 import { BlankStack } from 'react-native-screen-transitions/expo-router';
 import Transition from 'react-native-screen-transitions';
-import { photoViewerOptions, softPushInterpolator } from '@/lib/recap-transitions';
+import { photoViewerOptions, softPushInterpolator, unmaskedPhotoInterpolator } from '@/lib/recap-transitions';
 
 /**
  * Morning After's flow runs on react-native-screen-transitions' blank stack
@@ -13,7 +13,7 @@ export default function RecapLayout() {
   return (
     <BlankStack screenOptions={{ gestureEnabled: false }}>
       <BlankStack.Screen name="morning-after" />
-      <BlankStack.Screen name="recap-photo" options={photoViewerOptions} />
+      <BlankStack.Screen name="recap-photo" options={({ route }) => route.params && 'sourcePhotoId' in route.params && route.params.sourcePhotoId ? photoViewerOptions : { ...photoViewerOptions, navigationMaskEnabled: false, gestureEnabled: false, screenStyleInterpolator: unmaskedPhotoInterpolator }} />
       <BlankStack.Screen
         name="crossed-paths"
         options={{

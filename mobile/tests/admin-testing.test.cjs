@@ -238,3 +238,14 @@ test('A query built in Demo cannot escape to live data after Exit, even if start
  const result = await pending;
  assert(result.error); assert.equal(network, 0);
 });
+
+test('Demo nominations return two stable fictional examples through the actual RPC client', async () => {
+ const { db } = sandbox();
+ const first = await db.rpc('get_my_nomination_progress');
+ assert.equal(first.error, null);
+ assert.deepEqual(first.data.nominations.map(n => n.slot), [1, 2]);
+ assert.deepEqual(first.data.nominations.map(n => n.phone), ['+12025550101', '+12025550102']);
+ assert.deepEqual(first.data.nominations.map(n => n.status), ['waiting', 'invited']);
+ assert.deepEqual((await db.rpc('get_my_nomination_progress')).data, first.data);
+ assert.equal((await db.from('notifications').select('*')).data.length, 1, 'Viewing nominations must not send an invitation');
+});
