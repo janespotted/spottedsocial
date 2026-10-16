@@ -99,6 +99,35 @@ test('Demo blocks all outgoing data traffic; exit discards edits and rejects sta
  await h.api.setDemoMode(true, seed); assert.equal(h.api.getDemoSandbox().tables.posts.length, 8);
 });
 const preview = load('lib/onboarding-preview.ts');
+test('Demo read receipts and messages do not revoke an open chat, while membership removal still does', async () => {
+ const { db, store } = sandbox();
+ const { createResilientChannel } = load('lib/resilient-channel.ts', {
+  './demo-mode': { getDemoSandbox: () => store }, 'react-native': {},
+  './supabase': { supabase: { channel: () => assert.fail('Demo must not open a socket') } },
+ });
+ let revocations = 0, messages = 0, receipts = 0;
+ const subscribe = (table, fn) => createResilientChannel({ name: table, onReconnect: fn,
+  configure: ch => ch.on('postgres_changes', { table, event: '*', schema: 'public' }, fn) });
+ const stops = [subscribe('relationship_events', () => revocations++), subscribe('dm_messages', () => messages++), subscribe('dm_read_receipts', () => receipts++)];
+ const group = store.tables.dm_threads.find(t => t.is_group && t.created_by === userId);
+ for (let i = 0; i < 3; i++) await db.from('dm_read_receipts').upsert({ user_id: userId, thread_id: group.id, last_read_at: new Date().toISOString() }, { onConflict: 'user_id,thread_id' });
+ assert.equal(receipts, 3); assert.equal(revocations, 0); assert.equal(messages, 0);
+ await db.rpc('send_dm_once', { p_thread: group.id, p_id: demoId(903), p_text: 'Hi everyone' });
+ assert.equal(messages, 1); assert.equal(revocations, 0);
+ await db.rpc('remove_group_member', { p_thread: group.id, p_member: demoId(1) });
+ assert.equal(revocations, 1);
+ stops.forEach(stop => stop());
+ await db.from('dm_read_receipts').insert({ user_id: userId, thread_id: group.id });
+ assert.equal(receipts, 3);
+});
+test('Demo typing never opens a live presence connection', () => {
+ const { callback } = require('./product-test-runtime.cjs');
+ const effect = callback('hooks/use-typing-indicator.ts', 'useEffect', 'supabase.channel', {
+  threadId: demoId(1000), userId, demoOn: true,
+  supabase: { channel: () => assert.fail('Sample typing must not leave the phone') },
+ });
+ assert.equal(effect.fn(), undefined); assert.match(effect.deps, /demoOn/);
+});
 test('All 24 demo friends can be selected in both group pickers, without exposing samples in live mode', async () => {
  const { store } = sandbox();
  const { queryFunction } = require('./product-test-runtime.cjs');

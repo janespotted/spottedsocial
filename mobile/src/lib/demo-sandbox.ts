@@ -11,10 +11,10 @@ export class DemoSandbox {
   mode: 'auto' | 'day' | 'night' = 'night';
   private sequence = 1000;
   private media = new Map<string, string>();
-  private listeners = new Set<() => void>();
+  private listeners = new Set<(tables: readonly string[]) => void>();
   constructor(readonly seed: DemoSeed) { this.reset(); }
-  subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
-  private changed() { for (const listener of this.listeners) listener(); }
+  subscribe(listener: (tables: readonly string[]) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  private changed(...tables: string[]) { for (const listener of this.listeners) listener(tables); }
   private id() { return demoId(++this.sequence); }
   private now() { return new Date().toISOString(); }
   private expires() { return getNightResetIso(this.seed.city); }
@@ -89,7 +89,7 @@ export class DemoSandbox {
     this.row('dm_messages', { thread_id: crew, sender_id: friendIds[1], text: 'I’m in. See you there.', image_url: null });
     const later = this.group(friendIds[5], [userId, ...friendIds.slice(6, 10)], 'One more stop');
     this.row('dm_messages', { thread_id: later, sender_id: friendIds[5], text: 'Saving this group for our next stop.', image_url: null });
-    this.changed();
+    this.changed('*');
   }
   private group(creator: string, members: string[], name: string | null): string {
     const thread = this.row('dm_threads', { is_group: true, name, created_by: creator, group_avatar_url: null });
@@ -115,7 +115,7 @@ export class DemoSandbox {
     if (!group || !/^file:\/\//.test(uri)) throw new Error('Choose a photo from this phone.');
     const key = `demo-media://${this.id()}/${++mediaSequence}`;
     if (group.group_avatar_url) this.media.delete(group.group_avatar_url);
-    this.media.set(key, uri); group.group_avatar_url = key; this.changed(); return key;
+    this.media.set(key, uri); group.group_avatar_url = key; this.changed('dm_threads'); return key;
   }
   resolveMedia(key: string): string | null { return this.media.get(key) ?? null; }
   private thread(peer: string): string {
@@ -255,14 +255,33 @@ export class DemoSandbox {
         const count = rows.length;
         const offset = Number(url.searchParams.get('offset') ?? 0), limit = Number(url.searchParams.get('limit') ?? 1000);
         rows = rows.slice(offset, offset + limit);
-        if (!['GET', 'HEAD'].includes(method)) this.changed();
+        if (!['GET', 'HEAD'].includes(method)) this.changed(table,
+          ...(['friendships', 'close_friends', 'blocked_users', 'location_hidden', 'profiles', 'night_statuses', 'dm_thread_members'].includes(table) ? ['relationship_events'] : []));
         if (headers.get('accept')?.includes('vnd.pgrst.object')) {
           if (rows.length !== 1) return reply({ code: 'PGRST116', message: `JSON object requested, ${rows.length} rows returned`, details: `The result contains ${rows.length} rows` }, 406);
           return reply(rows[0], 200, count);
         }
         return reply(rows, 200, count);
       }
-      if (!['GET', 'HEAD'].includes(method) && !path.startsWith('rpc/get_')) this.changed();
+      // Match table subscriptions, rather than treating every write as a
+      // reconnect. A read receipt must never repeatedly revoke an open chat.
+      const changedByRpc: Record<string, string[]> = {
+        commit_night_status: ['night_statuses', 'profiles', 'relationship_events'],
+        set_night_mode_override: ['night_statuses'],
+        create_dm_thread: ['dm_threads', 'dm_thread_members'],
+        create_group_thread: ['dm_threads', 'dm_thread_members'],
+        add_group_members: ['dm_thread_members'],
+        remove_group_member: ['dm_thread_members', 'relationship_events'],
+        send_dm_once: ['dm_messages'],
+        send_meetup: ['invites', 'dm_messages', 'dm_threads', 'dm_thread_members'],
+        send_venue_invites: ['invites', 'dm_messages', 'dm_threads', 'dm_thread_members'],
+        respond_to_invite: ['invites', 'notifications'],
+        withdraw_invites: ['invites', 'dm_messages'],
+        share_post_to_dm: ['dm_messages', 'dm_threads', 'dm_thread_members'],
+        save_plan: ['plans', 'plan_participants'],
+      };
+      const changes = changedByRpc[path.slice(4)];
+      if (changes && !['GET', 'HEAD'].includes(method)) this.changed(...changes);
       if (headers.get('accept')?.includes('vnd.pgrst.object') && Array.isArray(data)) return data.length === 1 ? reply(data[0]) : reply({ code: 'PGRST116', message: 'No row', details: 'The result contains 0 rows' }, 406);
       return reply(data);
     } catch (error) { return reply({ code: 'DEMO_ONLY', message: error instanceof Error ? error.message : 'Demo action unavailable' }, 400); }
