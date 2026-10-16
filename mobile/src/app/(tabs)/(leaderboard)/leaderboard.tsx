@@ -69,7 +69,7 @@ function PromotedCard({ venue }: { venue: LeaderboardVenue }) {
     <Pressable
       onPress={() => openVenue(venue.venue_name, venue.venue_id)}
       accessibilityRole="button"
-      accessibilityLabel={`${venue.venue_name}, promoted. Open venue`}
+      accessibilityLabel={`${venue.venue_name}, promoted. ${subLine}. Open venue`}
       className="rounded-2xl p-4 mb-3 bg-[#1e1338] border border-white/[0.06] active:opacity-80"
     >
       <View className="flex-row items-center gap-3">
@@ -83,7 +83,7 @@ function PromotedCard({ venue }: { venue: LeaderboardVenue }) {
             {venue.venue_name}
           </Text>
           {subLine ? (
-            <Text className="text-white/55 text-xs mt-0.5 font-sans" numberOfLines={1}>
+            <Text className="text-white/55 text-xs mt-0.5 font-sans">
               {subLine}
             </Text>
           ) : null}
@@ -114,7 +114,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
     <Pressable
       onPress={() => openVenue(venue.venue_name, venue.venue_id)}
       accessibilityRole="button"
-      accessibilityLabel={`Number ${venue.rank}, ${venue.venue_name}. Open venue`}
+      accessibilityLabel={`Number ${venue.rank}, ${venue.venue_name}. ${subLine}. Open venue`}
       className={`relative overflow-hidden rounded-2xl mb-3 active:opacity-80 ${
         isTop1
           ? 'bg-[#221540] p-5 border border-[#d4ff00]/20'
@@ -166,7 +166,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
             ) : null}
           </View>
           {subLine ? (
-            <Text className="text-white/55 text-xs mt-0.5 font-sans" numberOfLines={1}>
+            <Text className="text-white/55 text-xs mt-0.5 font-sans">
               {subLine}
             </Text>
           ) : null}
