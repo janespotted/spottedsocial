@@ -5,10 +5,12 @@ import { getNightKey, getNightResetIso } from './tonight';
 type Row = Record<string, any>;
 export interface DemoSeed { userId: string; name: string; username: string; city: string }
 export const demoId = (n: number) => `de000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+let mediaSequence = 0;
 export class DemoSandbox {
   readonly tables: Record<string, Row[]> = {};
   mode: 'auto' | 'day' | 'night' = 'night';
   private sequence = 1000;
+  private media = new Map<string, string>();
   private listeners = new Set<() => void>();
   constructor(readonly seed: DemoSeed) { this.reset(); }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
@@ -22,9 +24,14 @@ export class DemoSandbox {
   }
   reset() {
     for (const key of Object.keys(this.tables)) delete this.tables[key];
-    this.mode = 'night'; this.sequence = 1000;
+    this.mode = 'night'; this.sequence = 1000; this.media.clear();
     const { userId, city } = this.seed;
-    const names = ['Alex Demo', 'Sam Demo', 'Jordan Demo', 'Riley Demo'];
+    const names = ['Alex', 'Sam', 'Jordan', 'Riley', 'Casey', 'Morgan', 'Taylor', 'Cameron',
+      'Jamie', 'Avery', 'Quinn', 'Drew', 'Blake', 'Charlie', 'Reese', 'Parker',
+      'Skyler', 'Finley', 'Emerson', 'Hayden', 'Sage', 'Rowan', 'Dakota', 'Robin'];
+    // Keep fixtures in separate ID ranges from venues, posts and plans.
+    const friendIds = names.map((_, i) => demoId(i < 4 ? i + 1 : 100 + i));
+    const statuses = names.map((_, i) => i < 2 || (i >= 4 && i < 14) ? 'out' : i < 20 ? 'planning' : 'home');
     const spots = city === 'la'
       ? [['The Echo', 'Echo Park', 34.0775, -118.2607], ['Sound', 'Hollywood', 34.1002, -118.3297], ['Academy LA', 'Hollywood', 34.1023, -118.3226]]
       : city === 'lhr' ? [['Demo Rooftop', 'Gulberg', 31.5204, 74.3587], ['Demo Garden', 'DHA', 31.477, 74.386], ['Demo Social', 'Gulberg', 31.510, 74.349]]
@@ -35,32 +42,38 @@ export class DemoSandbox {
       address: 'Sample venue · demo data', image_url: null, google_rating: null,
       rating: null, price_level: null, opening_hours: null, description: null, website: null,
     }));
-    const profiles = [{ id: userId, display_name: `${this.seed.name || 'You'} · Demo`, username: this.seed.username || 'you' }, ...names.map((name, i) => ({ id: demoId(i + 1), display_name: name, username: name.toLowerCase().replace(' ', '_') }))];
+    const profiles = [{ id: userId, display_name: `${this.seed.name || 'You'} · Demo`, username: this.seed.username || 'you' }, ...names.map((name, i) => ({ id: friendIds[i], display_name: `${name} Demo`, username: `${name.toLowerCase()}_demo` }))];
+    const statusAt = (i: number) => i === 0 ? 'out' : statuses[i - 1];
     profiles.forEach((p, i) => this.row('profiles', {
-      ...p, avatar_url: null, city, is_demo: true, is_out: i < 3, push_enabled: false,
+      ...p, avatar_url: null, city, is_demo: true, is_out: statusAt(i) === 'out', push_enabled: false,
       show_read_receipts: true, location_sharing_level: 'all_friends',
-      last_known_lat: i < 3 ? spots[i % 3][2] : null, last_known_lng: i < 3 ? spots[i % 3][3] : null,
+      last_known_lat: statusAt(i) === 'out' ? spots[i % 3][2] : null, last_known_lng: statusAt(i) === 'out' ? spots[i % 3][3] : null,
       last_location_at: this.now(), bio: 'Sample profile. Only visible in your demo.',
     }));
     profiles.forEach((p, i) => this.row('night_statuses', {
-      user_id: p.id, status: i < 3 ? 'out' : 'planning', venue_id: i < 3 ? demoId(10 + i % 3) : null,
-      venue_name: i < 3 ? spots[i % 3][0] : null, lat: i < 3 ? spots[i % 3][2] : null, lng: i < 3 ? spots[i % 3][3] : null,
-      planning_visibility: 'all_friends', planning_neighborhood: i >= 3 ? spots[0][1] : null,
+      user_id: p.id, status: statusAt(i), venue_id: statusAt(i) === 'out' ? demoId(10 + i % 3) : null,
+      venue_name: statusAt(i) === 'out' ? spots[i % 3][0] : null, lat: statusAt(i) === 'out' ? spots[i % 3][2] : null, lng: statusAt(i) === 'out' ? spots[i % 3][3] : null,
+      planning_visibility: 'all_friends', planning_neighborhood: statusAt(i) === 'planning' ? spots[i % 3][1] : null,
       is_demo: true, is_private_party: false, automatic_venue_updates: false,
       manual_venue_until: null, party_neighborhood: null, updated_at: this.now(), expires_at: this.expires(),
     }));
     profiles.slice(1).forEach((p, i) => {
       this.row('friendships', { user_id: userId, friend_id: p.id, status: 'accepted' });
-      if (i === 0) this.row('close_friends', { user_id: userId, close_friend_id: p.id });
-      this.row('posts', { id: demoId(30 + i), user_id: p.id, text: ['Found our spot for tonight.', 'Who’s joining us?', 'One more stop?', 'See you on the dance floor.'][i], image_url: null,
+      if (i < 6) this.row('close_friends', { user_id: userId, close_friend_id: p.id });
+      if (i < 8) this.row('posts', { id: demoId(30 + i), user_id: p.id, text: ['Found our spot for tonight.', 'Who’s joining us?', 'One more stop?', 'See you on the dance floor.', 'Meet us inside.', 'Making a plan for later.', 'This is the spot.', 'Who’s still out?'][i], image_url: null,
         media_type: null, mux_playback_id: null, venue_id: demoId(10 + i % 3), venue_name: spots[i % 3][0], visibility: 'all_friends',
         is_demo: true, likes_count: 0, comments_count: 0, expires_at: this.expires() });
-      if (i < 2) this.row('plans', { id: demoId(40 + i), user_id: p.id, venue_id: demoId(10 + i), venue_name: spots[i][0],
+      if (i < 4) this.row('plans', { id: demoId(40 + i), user_id: p.id, venue_id: demoId(10 + i % 3), venue_name: spots[i % 3][0],
         plan_date: getNightKey(new Date(), city), plan_time: i === 0 ? '21:30' : '22:00', plan_type: 'party',
-        description: null, visibility: 'all_friends', score: 3 - i, comments_count: 0, is_demo: true, expires_at: this.expires() });
+        description: null, visibility: 'all_friends', score: 4 - i, comments_count: 0, is_demo: true, expires_at: this.expires() });
     });
     this.row('plan_participants', { plan_id: demoId(40), user_id: demoId(2) });
     this.row('plan_downs', { plan_id: demoId(40), user_id: demoId(3) });
+    friendIds.slice(4, 10).forEach((id, i) => {
+      this.row('plan_participants', { plan_id: demoId(40 + i % 4), user_id: id });
+      this.row('post_likes', { post_id: demoId(30 + i % 4), user_id: id });
+    });
+    this.row('post_comments', { post_id: demoId(30), user_id: friendIds[4], text: 'See you there.', expires_at: this.expires() });
     this.row('wishlist_places', { user_id: userId, venue_id: demoId(11), venue_name: spots[1][0] });
     this.row('checkins', { user_id: userId, venue_id: demoId(10), venue_name: spots[0][0], started_at: this.now(), ended_at: null });
     const thread = this.thread(demoId(1));
@@ -68,13 +81,49 @@ export class DemoSandbox {
     const request = this.invite(demoId(2), userId, 'venue', demoId(11));
     this.row('notifications', { receiver_id: userId, sender_id: demoId(2), type: 'venue_invite', message: `Sam invited you to ${spots[1][0]}. Want to go?`, is_read: false,
       data: { invite_id: request.id, thread_id: request.thread_id, venue_id: demoId(11), status: 'pending' } });
+    for (const [index, message] of [[2, 'What’s the plan for later?'], [4, 'We’re here. Come find us!']] as const) {
+      this.row('dm_messages', { thread_id: this.thread(friendIds[index]), sender_id: friendIds[index], text: message, image_url: null });
+    }
+    const crew = this.group(userId, friendIds.slice(0, 5), 'Tonight’s crew');
+    this.row('dm_messages', { thread_id: crew, sender_id: friendIds[0], text: `Starting at ${spots[0][0]}. Who’s in?`, image_url: null });
+    this.row('dm_messages', { thread_id: crew, sender_id: friendIds[1], text: 'I’m in. See you there.', image_url: null });
+    const later = this.group(friendIds[5], [userId, ...friendIds.slice(6, 10)], 'One more stop');
+    this.row('dm_messages', { thread_id: later, sender_id: friendIds[5], text: 'Saving this group for our next stop.', image_url: null });
     this.changed();
   }
+  private group(creator: string, members: string[], name: string | null): string {
+    const thread = this.row('dm_threads', { is_group: true, name, created_by: creator, group_avatar_url: null });
+    for (const user_id of new Set([creator, ...members])) this.row('dm_thread_members', { thread_id: thread.id, user_id });
+    return thread.id;
+  }
+  private requireFriend(id: string) {
+    if (!this.tables.friendships.some(f => f.status === 'accepted' &&
+      ((f.user_id === this.seed.userId && f.friend_id === id) || (f.friend_id === this.seed.userId && f.user_id === id)))) throw new Error('Choose one of your demo friends.');
+  }
+  private requireMember(thread: string) {
+    if (!this.tables.dm_thread_members.some(m => m.thread_id === thread && m.user_id === this.seed.userId)) throw new Error('This demo group is unavailable.');
+  }
+  private managedGroup(id: string) {
+    this.requireMember(id);
+    const group = this.tables.dm_threads.find(t => t.id === id && t.is_group && t.created_by === this.seed.userId);
+    if (!group) throw new Error('Only the group creator can change members.');
+    return group;
+  }
+  saveGroupPhoto(threadId: string, uri: string): string {
+    this.requireMember(threadId);
+    const group = this.tables.dm_threads.find(t => t.id === threadId && t.is_group);
+    if (!group || !/^file:\/\//.test(uri)) throw new Error('Choose a photo from this phone.');
+    const key = `demo-media://${this.id()}/${++mediaSequence}`;
+    if (group.group_avatar_url) this.media.delete(group.group_avatar_url);
+    this.media.set(key, uri); group.group_avatar_url = key; this.changed(); return key;
+  }
+  resolveMedia(key: string): string | null { return this.media.get(key) ?? null; }
   private thread(peer: string): string {
+    this.requireFriend(peer);
     const mine = this.tables.dm_thread_members?.filter(m => m.user_id === this.seed.userId).map(m => m.thread_id) ?? [];
-    const existing = this.tables.dm_thread_members?.find(m => m.user_id === peer && mine.includes(m.thread_id));
+    const existing = this.tables.dm_thread_members?.find(m => m.user_id === peer && mine.includes(m.thread_id) && this.tables.dm_threads.some(t => t.id === m.thread_id && !t.is_group));
     if (existing) return existing.thread_id;
-    const t = this.row('dm_threads', { is_group: false, name: null, group_avatar_url: null });
+    const t = this.row('dm_threads', { is_group: false, name: null, group_avatar_url: null, created_by: this.seed.userId });
     for (const user_id of [this.seed.userId, peer]) this.row('dm_thread_members', { thread_id: t.id, user_id });
     return t.id;
   }
@@ -92,7 +141,7 @@ export class DemoSandbox {
     switch (name) {
       case 'get_profiles_safe': return this.tables.profiles.map(r => this.participates() || r.id === me ? r : { ...r, is_out: false, last_known_lat: null, last_known_lng: null, last_location_at: null });
       case 'get_own_night_status': return this.tables.night_statuses.filter(r => r.user_id === me);
-      case 'get_friends_night_counts': return { out: 2, planning: 2 };
+      case 'get_friends_night_counts': return { out: this.tables.night_statuses.filter(r => r.user_id !== me && r.status === 'out').length, planning: this.tables.night_statuses.filter(r => r.user_id !== me && r.status === 'planning').length };
       case 'get_night_mode': return { tester: true, enforced: true, override: this.mode === 'auto' ? null : this.mode };
       case 'set_night_mode_override':
         if (!['auto', 'day', 'night'].includes(p.p_mode)) throw new Error('Invalid mode');
@@ -108,13 +157,36 @@ export class DemoSandbox {
       }
       case 'get_mutual_friend_ids': case 'get_mutual_friends_with': return [];
       case 'get_demo_status_locations': return this.participates() ? this.tables.night_statuses.filter(r => r.status === 'out').map(r => ({ user_id: r.user_id, lat: r.lat, lng: r.lng })) : [];
-      case 'get_recent_venue_visits': return this.tables.profiles.slice(1, 3).map((r, i) => ({ user_id: r.id, friend_id: r.id, venue_id: demoId(10 + i), display_name: r.display_name, avatar_url: null, visited_at: this.now(), last_visited_at: this.now(), expires_at: new Date(Date.now() + 90 * 86400000).toISOString() }));
+      case 'get_recent_venue_visits': return this.tables.profiles.slice(1, 13).map((r, i) => ({ user_id: r.id, friend_id: r.id, venue_id: demoId(10 + i % 3), display_name: r.display_name, avatar_url: null, visited_at: this.now(), last_visited_at: this.now(), expires_at: new Date(Date.now() + 90 * 86400000).toISOString() }));
       case 'get_night_recap': return { id: demoId(99), night_date: getNightKey(new Date(), this.seed.city), expires_at: this.expires(), photos: [],
         stops: this.tables.venues.slice(0, 2).map(v => ({ venue_id: v.id, venue_name: v.name, neighborhood: v.neighborhood, arrived_at: this.now(), left_at: null })),
         people: [{ friend_id: demoId(1), display_name: 'Alex Demo', avatar_url: null, venue_id: demoId(10), venue_name: this.tables.venues[0].name }] };
       case 'build_my_recap_now': return true;
       case 'create_dm_thread': return this.thread(p.friend_id);
+      case 'create_group_thread': {
+        const ids = [...new Set<string>(p.member_ids ?? [])];
+        const name = typeof p.group_name === 'string' ? p.group_name.trim() : '';
+        if (ids.length < 2 || ids.length > 64 || [...name].length > 100) throw new Error('Choose at least two demo friends and a name up to 100 characters.');
+        ids.forEach(id => this.requireFriend(id));
+        return this.group(me, ids, name || null);
+      }
+      case 'add_group_members': {
+        this.managedGroup(p.p_thread);
+        const ids = [...new Set<string>(p.p_members ?? [])];
+        ids.forEach(id => this.requireFriend(id));
+        const current = this.tables.dm_thread_members.filter(m => m.thread_id === p.p_thread);
+        const added = ids.filter(id => !current.some(m => m.user_id === id));
+        if (!ids.length || current.length + added.length > 65) throw new Error('Choose friends within the group limit.');
+        added.forEach(user_id => this.row('dm_thread_members', { thread_id: p.p_thread, user_id }));
+        return null;
+      }
+      case 'remove_group_member':
+        this.managedGroup(p.p_thread);
+        if (p.p_member === me) throw new Error('The creator cannot be removed.');
+        this.tables.dm_thread_members = this.tables.dm_thread_members.filter(m => !(m.thread_id === p.p_thread && m.user_id === p.p_member));
+        return null;
       case 'send_dm_once': {
+        this.requireMember(p.p_thread);
         const existing = this.tables.dm_messages?.find(r => r.id === p.p_id);
         return [existing ?? this.row('dm_messages', { id: p.p_id, thread_id: p.p_thread, sender_id: me, text: p.p_text, image_url: p.p_image ?? null })];
       }

@@ -58,6 +58,7 @@ test('Group photo is signed only after the stored key is confirmed', async () =>
   for (const denied of [false, true]) {
     const order = []; let photo = 'before';
     const change = extract('app/thread.tsx', 'changeGroupPhoto', {
+      getDemoSandbox: () => null,
       threadId: 'thread', ImagePicker: picker, fetch: photoBytes,
       Alert: { alert: () => order.push('error') },
       resolvePostImageUrl: async key => { assert.equal(key, 'saved-key'); order.push('sign'); return 'signed-url'; },

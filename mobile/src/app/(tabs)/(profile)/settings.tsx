@@ -369,7 +369,7 @@ export default function SettingsScreen() {
             subtitle={nightBusy ? 'Switching…' : nightMode.override ? `${nightMode.override === 'day' ? 'Day' : 'Night'} · ${demoOn ? 'demo only' : 'this account only'}` : 'Automatic · follows your city’s schedule'}
             onPress={nightBusy ? undefined : chooseMode} />
           {launch?.cityTester || launch?.waveAdmin ? <>
-            <SettingsRow icon="sparkles" title="Demo data" subtitle={demoOn ? 'On · sample people, posts, plans and chats' : 'Try the app with a sample social circle'}
+            <SettingsRow icon="sparkles" title="Demo data" subtitle={demoOn ? 'On · 24 friends, posts, plans and groups' : 'Try the app with 24 sample friends'}
               right={<Switch accessibilityLabel="Demo data" value={demoOn} disabled={demoBusy} onValueChange={toggleDemo} trackColorOnClassName="accent-[#a855f7]" />} />
             <Text className="text-white/45 text-xs leading-5 px-2">Demo actions stay on this phone. Nothing is sent. Exit to return to your real account.</Text>
             <SettingsRow icon="play.rectangle" title="Preview onboarding" subtitle="Profile, app tour and two nominations"

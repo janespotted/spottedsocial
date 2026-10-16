@@ -45,6 +45,7 @@ import {
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { resolveMuxPosters } from '@/lib/mux';
 import { resolvePostImageUrl, resolvePostImageUrls } from '@/lib/posts';
+import { getDemoSandbox } from '@/lib/demo-mode';
 import { isFromTonight } from '@/lib/time-context';
 import { useSession } from '@/hooks/use-session';
 import { useTypingIndicator } from '@/hooks/use-typing-indicator';
@@ -624,6 +625,7 @@ function ThreadScreenContent() {
 
   const changeGroupPhoto = async () => {
     if (!threadId) return;
+    const demo = getDemoSandbox();
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -633,6 +635,12 @@ function ThreadScreenContent() {
     const asset = result.assets?.[0];
     if (result.canceled || !asset) return;
     try {
+      if (getDemoSandbox() !== demo) return;
+      if (demo) {
+        const key = demo.saveGroupPhoto(threadId, asset.uri);
+        setGroupInfo(prev => prev ? { ...prev, group_avatar_url: demo.resolveMedia(key) } : prev);
+        return;
+      }
       const ext = asset.mimeType === 'image/png' ? 'png' : 'jpg';
       const path = `group-avatars/${threadId}/private-v1/${Date.now()}.${ext}`;
       const body = await fetch(asset.uri).then((r) => r.arrayBuffer());

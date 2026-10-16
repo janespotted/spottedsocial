@@ -10,6 +10,7 @@ import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
 import { createGroupThread, MAX_GROUP_FRIENDS } from '@/lib/dm';
+import { isDemoMode } from '@/lib/demo-mode';
 import { fetchProfilesSafe, type SafeProfile } from '@/lib/profiles';
 import { friendCardPress } from '@/lib/friend-card';
 import { NEON } from '@/lib/theme';
@@ -43,7 +44,7 @@ function GroupComposer() {
       if (!friendship.data?.length) return [];
       const ids = new Set(friendship.data);
       return (await fetchProfilesSafe())
-        .filter(p => ids.has(p.id) && p.id !== userId && !p.is_demo)
+        .filter(p => ids.has(p.id) && p.id !== userId && (isDemoMode() || !p.is_demo))
         .sort((a, b) => a.display_name.localeCompare(b.display_name));
     },
   });

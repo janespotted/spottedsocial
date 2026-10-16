@@ -13,18 +13,18 @@ function sandbox() {
 }
 test('Demo data populates friends, posts, plans, direct messages and activity through the real client', async () => {
  const { db } = sandbox();
- for (const [table, count] of [['friendships', 4], ['posts', 4], ['plans', 2], ['dm_threads', 2], ['notifications', 1]]) {
+ for (const [table, count] of [['friendships', 24], ['posts', 8], ['plans', 4], ['dm_threads', 6], ['notifications', 1]]) {
   const r = await db.from(table).select('*'); assert.equal(r.error, null, table); assert.equal(r.data.length, count, table);
  }
  const own = await db.rpc('get_own_night_status').maybeSingle(); assert.equal(own.error, null); assert.equal(own.data.user_id, userId);
 });
 test('Demo No reveals counts only; TBD restores sample friend identities', async () => {
  const { db } = sandbox(); await db.rpc('commit_night_status', { p_patch: { status: 'home' } });
- assert.deepEqual((await db.rpc('get_friends_night_counts')).data, { out: 2, planning: 2 });
+ assert.deepEqual((await db.rpc('get_friends_night_counts')).data, { out: 12, planning: 8 });
  assert.equal((await db.from('night_statuses').select('*').neq('user_id', userId)).data.length, 0);
  assert((await db.rpc('get_profiles_safe')).data.filter(p => p.id !== userId).every(p => p.last_known_lat === null && !p.is_out));
  await db.rpc('commit_night_status', { p_patch: { status: 'planning' } });
- assert.equal((await db.from('night_statuses').select('*').neq('user_id', userId)).data.length, 4);
+ assert.equal((await db.from('night_statuses').select('*').neq('user_id', userId)).data.length, 24);
 });
 test('Demo Day blocks a night check-in; Night restores it without changing another store', async () => {
  const { db } = sandbox(), other = sandbox();
@@ -96,9 +96,91 @@ test('Demo blocks all outgoing data traffic; exit discards edits and rejects sta
  await db.rpc('get_launch_state'); assert.equal(h.network.length, 1, 'read-only capability check stays real');
  await h.api.setDemoMode(false); assert.equal(h.api.getDemoSandbox(), null);
  const stale = await db.from('posts').insert({ user_id: demoId(1), text: 'stale' }); assert.equal(stale.error.code, 'DEMO_ENDED'); assert.equal(h.network.length, 1);
- await h.api.setDemoMode(true, seed); assert.equal(h.api.getDemoSandbox().tables.posts.length, 4);
+ await h.api.setDemoMode(true, seed); assert.equal(h.api.getDemoSandbox().tables.posts.length, 8);
 });
 const preview = load('lib/onboarding-preview.ts');
+test('All 24 demo friends can be selected in both group pickers, without exposing samples in live mode', async () => {
+ const { store } = sandbox();
+ const { queryFunction } = require('./product-test-runtime.cjs');
+ for (const file of ['app/new-group.tsx', 'app/group-members.tsx']) {
+  for (const demo of [true, false]) {
+   const fetch = queryFunction(file, 'new-group-friends', {
+    userId, friendship: { data: store.tables.friendships.map(f => f.friend_id) },
+    isDemoMode: () => demo, fetchProfilesSafe: async () => store.tables.profiles,
+   });
+   assert.equal((await fetch()).length, demo ? 24 : 0, file);
+  }
+ }
+});
+test('Demo groups support create, rename, add, remove and message; a DM never reuses a group', async () => {
+ const { db } = sandbox();
+ const group = await db.rpc('create_group_thread', { member_ids: [demoId(1), demoId(104)], group_name: '  New crew  ' });
+ assert.equal(group.error, null);
+ assert.equal((await db.from('dm_threads').select('*').eq('id', group.data).single()).data.name, 'New crew');
+ const dm = await db.rpc('create_dm_thread', { friend_id: demoId(104) });
+ assert.notEqual(dm.data, group.data);
+ assert.equal((await db.from('dm_threads').select('*').eq('id', dm.data).single()).data.is_group, false);
+ await db.from('dm_threads').update({ name: 'Friday plans' }).eq('id', group.data);
+ assert.equal((await db.from('dm_threads').select('*').eq('id', group.data).single()).data.name, 'Friday plans');
+ assert.equal((await db.rpc('add_group_members', { p_thread: group.data, p_members: [demoId(105), demoId(105)] })).error, null);
+ assert.equal((await db.from('dm_thread_members').select('*').eq('thread_id', group.data)).data.length, 4);
+ assert.equal((await db.rpc('remove_group_member', { p_thread: group.data, p_member: demoId(1) })).error, null);
+ assert.equal((await db.from('dm_thread_members').select('*').eq('thread_id', group.data)).data.length, 3);
+ const sent = await db.rpc('send_dm_once', { p_id: demoId(901), p_thread: group.data, p_text: 'On my way' });
+ assert.equal(sent.error, null); assert.equal(sent.data[0].text, 'On my way');
+});
+test('Demo group permissions reject strangers, invalid groups and edits to another creator’s roster', async () => {
+ const { db, store } = sandbox();
+ const other = store.tables.dm_threads.find(t => t.is_group && t.created_by !== userId);
+ const owned = store.tables.dm_threads.find(t => t.is_group && t.created_by === userId);
+ const before = JSON.stringify(store.tables.dm_thread_members);
+ for (const [rpc, args] of [
+  ['create_group_thread', { member_ids: [demoId(1)] }],
+  ['create_group_thread', { member_ids: [demoId(1), 'stranger'] }],
+  ['create_group_thread', { member_ids: [demoId(1), demoId(2)], group_name: 'a'.repeat(101) }],
+  ['add_group_members', { p_thread: other.id, p_members: [demoId(2)] }],
+  ['remove_group_member', { p_thread: other.id, p_member: demoId(105) }],
+  ['remove_group_member', { p_thread: owned.id, p_member: userId }],
+  ['send_dm_once', { p_id: demoId(902), p_thread: 'missing', p_text: 'No' }],
+ ]) assert((await db.rpc(rpc, args)).error, rpc);
+ assert.equal(JSON.stringify(store.tables.dm_thread_members), before);
+});
+test('Demo group photos stay on device, resolve only in their session and disappear after reset', async () => {
+ const { store } = sandbox();
+ const group = store.tables.dm_threads.find(t => t.is_group);
+ const uri = 'file:///demo-picker/photo.jpg';
+ const key = store.saveGroupPhoto(group.id, uri);
+ assert.equal(group.group_avatar_url, key); assert.equal(store.resolveMedia(key), uri);
+ const { extract } = require('./product-test-runtime.cjs');
+ let current = store;
+ const resolve = extract('lib/posts.ts', 'resolvePostImageUrl', { getDemoSandbox: () => current, resolvePostImageUrls: () => assert.fail('Local photo must not request a server link') });
+ assert.equal(await resolve(key), uri);
+ current = null; assert.equal(await resolve(key), null);
+ assert.throws(() => store.saveGroupPhoto(group.id, 'https://example.com/photo.jpg'));
+ store.reset(); assert.equal(store.resolveMedia(key), null);
+ const newKey = store.saveGroupPhoto(store.tables.dm_threads.find(t => t.is_group).id, uri);
+ assert.notEqual(newKey, key);
+});
+test('Native demo photo selection never uploads and cannot finish into a different session', async () => {
+ const { extract } = require('./product-test-runtime.cjs');
+ for (const exitDuringPicker of [false, true]) {
+  const { store } = sandbox(); let current = store, shown = null;
+  const group = store.tables.dm_threads.find(t => t.is_group);
+  const change = extract('app/thread.tsx', 'changeGroupPhoto', {
+   threadId: group.id, getDemoSandbox: () => current,
+   ImagePicker: { launchImageLibraryAsync: async () => {
+    if (exitDuringPicker) current = null;
+    return { canceled: false, assets: [{ uri: 'file:///local/test.jpg' }] };
+   } },
+   setGroupInfo: f => { shown = f({}).group_avatar_url; },
+   fetch: () => assert.fail('Demo must never upload'),
+   supabase: { storage: { from: () => assert.fail('Demo must never access storage') } },
+   Alert: { alert: () => assert.fail('Demo photo should work') },
+  });
+  await change(); assert.equal(shown, exitDuringPicker ? null : 'file:///local/test.jpg');
+  assert.equal(group.group_avatar_url === null, exitDuringPicker);
+ }
+});
 test('Onboarding preview enforces profile and two distinct nominations using only local state', () => {
  const original = preview.previewLaunchState();
  assert.throws(() => preview.previewLaunchAction(original, 'complete_launch_onboarding'));

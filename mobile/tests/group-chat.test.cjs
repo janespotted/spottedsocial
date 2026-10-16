@@ -88,7 +88,7 @@ test('Group picker includes current real friends, retaining different friends wi
     { id: 'me', display_name: 'Me', is_demo: false },
   ];
   const fetch = queryFunction('app/new-group.tsx', 'new-group-friends', {
-    userId: 'me', friendship: { data: ['one', 'two', 'demo', 'me'] }, fetchProfilesSafe: async () => friends,
+    isDemoMode: () => false, userId: 'me', friendship: { data: ['one', 'two', 'demo', 'me'] }, fetchProfilesSafe: async () => friends,
   });
   assert.deepEqual((await fetch()).map(f => f.id), ['one', 'two']);
 });

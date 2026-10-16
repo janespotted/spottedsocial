@@ -10,6 +10,7 @@ import { useSession } from '@/hooks/use-session';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { addGroupMembers, fetchGroupMembers, removeGroupMember } from '@/lib/group-members';
+import { isDemoMode } from '@/lib/demo-mode';
 import { MAX_GROUP_FRIENDS } from '@/lib/dm';
 import { friendCardPress } from '@/lib/friend-card';
 import { Avatar } from '@/components/avatar';
@@ -48,7 +49,7 @@ function GroupMembersContent() {
     enabled: !!userId && friendship.data !== undefined,
     queryFn: async () => {
       const ids = new Set(friendship.data ?? []);
-      return (await fetchProfilesSafe()).filter(p => ids.has(p.id) && p.id !== userId && !p.is_demo)
+      return (await fetchProfilesSafe()).filter(p => ids.has(p.id) && p.id !== userId && (isDemoMode() || !p.is_demo))
         .sort((a, b) => a.display_name.localeCompare(b.display_name));
     },
   });
