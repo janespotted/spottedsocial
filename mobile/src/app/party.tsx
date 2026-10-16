@@ -112,6 +112,7 @@ export default function Party() {
         options={{
           title: "Private party",
           headerShown: true,
+          headerBackButtonDisplayMode: "minimal",
           headerTintColor: "#fff",
           headerStyle: { backgroundColor: INK_LIGHT },
         }}

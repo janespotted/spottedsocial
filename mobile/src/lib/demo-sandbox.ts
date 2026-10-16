@@ -117,6 +117,12 @@ export class DemoSandbox {
     if (group.group_avatar_url) this.media.delete(group.group_avatar_url);
     this.media.set(key, uri); group.group_avatar_url = key; this.changed('dm_threads'); return key;
   }
+  saveMedia(path: string, uri: string): void {
+    if (!path.startsWith(`${this.seed.userId}/private-v1/`) || !uri.startsWith('file://')) {
+      throw new Error('Choose a photo from this phone.');
+    }
+    this.media.set(path, uri);
+  }
   resolveMedia(key: string): string | null { return this.media.get(key) ?? null; }
   private thread(peer: string): string {
     this.requireFriend(peer);

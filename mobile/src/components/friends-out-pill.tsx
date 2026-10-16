@@ -24,7 +24,7 @@ function statusLine(f: FriendNightStatus, venuesWithheld: boolean): { text: stri
   }
   return {
     text: f.planning_venue_name
-      ? `thinking ${f.planning_venue_name}`
+      ? `TBD | ${f.planning_venue_name}`
       : `TBD${f.planning_neighborhood ? ` · ${f.planning_neighborhood}` : ' · down for anything'}`,
     lime: false,
   };

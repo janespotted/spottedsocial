@@ -72,7 +72,7 @@ import { INK_LIGHT, NEON, primaryControl, primaryControlText } from '@/lib/theme
 import { SymbolView } from 'expo-symbols';
 
 /** Which part of the sheet is showing. The answer itself is `answer`. */
-type View_ = 'main' | 'spot' | 'party' | 'done';
+type View_ = 'main' | 'spot' | 'area' | 'party' | 'done';
 type Answer = 'yes' | 'tbd' | 'no';
 
 /**
@@ -97,7 +97,7 @@ const SEGMENTS: Array<{ key: Answer; label: string }> = [
 const MAX_SPOT_ROWS = 12;
 
 /** Which screen is deeper, so moving between them can push or pop. */
-const VIEW_DEPTH: Record<View_, number> = { main: 0, spot: 1, party: 2, done: 3 };
+const VIEW_DEPTH: Record<View_, number> = { main: 0, spot: 1, area: 1, party: 2, done: 3 };
 
 /* ────────────────────────── Motion ────────────────────────── */
 
@@ -522,7 +522,7 @@ function AreaChips({
  * - **I'm out** shows a suggested spot (GPS venue guess, or tonight's spot
  *   if already out) with Change → "Find your spot" (nearby, search, free
  *   text, Private party). Primary: "Check in".
- * - **TBD**: no location at all; an optional area. Primary: "Set as TBD".
+ * - **TBD**: no live location; an optional area or intended venue. Primary: "Set as TBD".
  * - **Staying in**: Primary: "Set as staying in".
  *
  * Presented two ways:
@@ -669,6 +669,8 @@ function CheckInFlow() {
   const [searchResults, setSearchResults] = useState<Spot[]>([]);
   const [neighborhood, setNeighborhood] = useState<string | null>(null);
   const [areaOpen, setAreaOpen] = useState(false);
+  const [planningSpot, setPlanningSpot] = useState<Spot | null>(null);
+  const [spotPurpose, setSpotPurpose] = useState<'checkin' | 'planning'>('checkin');
   const [detectingHood, setDetectingHood] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -701,7 +703,11 @@ function CheckInFlow() {
   useEffect(() => {
     if (seededArea.current || current?.status !== 'planning') return;
     seededArea.current = true;
-    if (current.planning_neighborhood) {
+    if (current.planning_venue_id && current.planning_venue_name) {
+      setPlanningSpot({ id: current.planning_venue_id, name: current.planning_venue_name });
+    }
+    if (isAudience(current.planning_visibility)) setAudienceOverride(current.planning_visibility);
+    if (current.planning_neighborhood && !current.planning_venue_id) {
       setNeighborhood(current.planning_neighborhood);
       setAreaOpen(true);
     }
@@ -820,6 +826,7 @@ function CheckInFlow() {
   };
 
   const openSpotPicker = () => {
+    setSpotPurpose('checkin');
     setError(null);
     setView('spot');
   };
@@ -854,8 +861,15 @@ function CheckInFlow() {
 
   const chooseSpot = (next: Spot) => {
     Haptics.selectionAsync();
-    setSpotChoice(next);
-    setAnswerChoice('yes');
+    if (spotPurpose === 'planning') {
+      seededArea.current = true;
+      setPlanningSpot(next);
+      setAreaOpen(false);
+      setAnswerChoice('tbd');
+    } else {
+      setSpotChoice(next);
+      setAnswerChoice('yes');
+    }
     backToMain();
   };
 
@@ -956,7 +970,8 @@ function CheckInFlow() {
     setSubmitting(true);
     setError(null);
     try {
-      await goPlanning(userId, { city, neighborhood: areaOpen ? neighborhood : null, visibility: audience });
+      await goPlanning(userId, { city, neighborhood: areaOpen ? neighborhood : null,
+        venueId: !areaOpen ? planningSpot?.id : null, venueName: !areaOpen ? planningSpot?.name : null, visibility: audience });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refreshStatusQueries();
       await showPayoff('planning', null);
@@ -1042,14 +1057,15 @@ function CheckInFlow() {
       <View>
         {/* ── Are you out tonight? ── */}
         {view === 'main' ? (
-          <Animated.View key="main" entering={viewEntering} exiting={FADE_AWAY} className="pt-7 pb-8 px-5 gap-5">
-            <View className="gap-1.5">
+          <Animated.View key="main" collapsable={false} entering={viewEntering} exiting={FADE_AWAY} style={{ maxHeight: fullSheetHeight }} className="pt-7 pb-8 px-5 gap-5">
+            <View collapsable={false} className="gap-1.5">
               <Text className="text-white text-[26px] font-sans-semibold">Are you out tonight?</Text>
               <Text className="text-white/60 text-[15px] font-sans">You can change this anytime.</Text>
             </View>
 
             <Segments value={answer} onChange={chooseAnswer} disabled={submitting} />
 
+            <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ gap: 20 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Animated.View key={answer} entering={answerEntering} exiting={FADE_AWAY}>
               {answer === 'yes' ? (
                 <View className="gap-2.5">
@@ -1101,16 +1117,24 @@ function CheckInFlow() {
               ) : answer === 'tbd' ? (
                 <View className="gap-4">
                   <InfoCard lines={['Friends get a TBD update.', 'Your live location stays private.']} />
-                  {areaOpen ? (
-                    <Animated.View entering={FadeIn.duration(220)} className="gap-2.5">
-                      <SectionLabel>Area · optional</SectionLabel>
-                      <AreaChips city={city} value={neighborhood} onChange={setNeighborhood} allowNone />
-                    </Animated.View>
-                  ) : (
-                    <Animated.View exiting={FADE_AWAY} className="self-start">
-                      <LinkAction label="Add an area · optional" onPress={() => setAreaOpen(true)} />
-                    </Animated.View>
-                  )}
+                  <View className="gap-2">
+                    <SectionLabel>Where are you thinking? · optional</SectionLabel>
+                    <View className="flex-row flex-wrap gap-2">
+                      <LinkAction label="Choose an area" onPress={() => { seededArea.current = true; setView('area'); }} />
+                      <LinkAction label="Search for a venue" onPress={() => { seededArea.current = true; setSpotPurpose('planning'); setError(null); setView('spot'); }} />
+                    </View>
+                  </View>
+                  {areaOpen && neighborhood ? (
+                    <View className="flex-row items-center gap-3 rounded-2xl bg-white/5 p-3">
+                      <Text className="flex-1 text-white font-sans-medium" style={{ fontSize: 15 }}>TBD | {neighborhood}</Text>
+                      <LinkAction label="Remove" onPress={() => { setNeighborhood(null); setAreaOpen(false); }} />
+                    </View>
+                  ) : planningSpot ? (
+                    <View className="flex-row items-center gap-3 rounded-2xl bg-white/5 p-3">
+                      <Text className="flex-1 text-white font-sans-medium" style={{ fontSize: 15 }}>TBD | {planningSpot.name}</Text>
+                      <LinkAction label="Remove" onPress={() => setPlanningSpot(null)} />
+                    </View>
+                  ) : null}
                 </View>
               ) : (
                 <InfoCard lines={['Your location stays private.', 'See how many people are out. Choose TBD or Out to see who.']} />
@@ -1133,6 +1157,7 @@ function CheckInFlow() {
                 text={answer === 'yes' ? RESET_COPY.checkInClears : RESET_COPY.statusClears}
               />
             </Animated.View>
+            </ScrollView>
             <Animated.View layout={SHEET_LAYOUT}>
               {answer === 'yes' ? (
                 <PrimaryButton label="Check in" onPress={checkIn} disabled={!profile || !spot} loading={submitting} />
@@ -1142,6 +1167,19 @@ function CheckInFlow() {
                 <PrimaryButton label="Set as staying in" onPress={answerNo} loading={submitting} />
               )}
             </Animated.View>
+          </Animated.View>
+        ) : null}
+
+        {view === 'area' ? (
+          <Animated.View key="area" entering={viewEntering} exiting={FADE_AWAY} style={{ height: fullSheetHeight }} className="pt-7 px-5 gap-5">
+            <BackLink onPress={backToMain} />
+            <Text className="text-white font-sans-semibold" style={{ fontSize: 26 }}>Choose an area</Text>
+            <Text className="text-white/60 font-sans" style={{ fontSize: 14 }}>Where you might go, without sharing your live location.</Text>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+              <AreaChips city={city} value={neighborhood} allowNone onChange={value => {
+                setNeighborhood(value); setAreaOpen(!!value); setPlanningSpot(null); backToMain();
+              }} />
+            </ScrollView>
           </Animated.View>
         ) : null}
 
@@ -1156,7 +1194,7 @@ function CheckInFlow() {
           >
             <View className="gap-3">
               <BackLink onPress={backToMain} />
-              <Text className="text-white text-[26px] font-sans-semibold">Find your spot</Text>
+              <Text className="text-white text-[26px] font-sans-semibold">{spotPurpose === 'planning' ? 'Where might you go?' : 'Find your spot'}</Text>
             </View>
 
             <View className="flex-row items-center gap-2.5 rounded-2xl bg-black/25 border border-white/15 px-4">
@@ -1185,13 +1223,13 @@ function CheckInFlow() {
               automaticallyAdjustKeyboardInsets
               showsVerticalScrollIndicator={false}
             >
-              {!searching ? (
+              {!searching && spotPurpose !== 'planning' ? (
                 <View className="pb-1">
                   <SectionLabel>Nearby</SectionLabel>
                 </View>
               ) : null}
 
-              {!searching && listed.length === 0 ? (
+              {!searching && spotPurpose !== 'planning' && listed.length === 0 ? (
                 <View className="flex-row items-center gap-3 py-4 border-b border-white/10">
                   {spotPlaceholder.busy ? <ActivityIndicator size="small" color={NEON} /> : null}
                   <Text className="flex-1 text-white/55 text-sm font-sans">
@@ -1205,14 +1243,14 @@ function CheckInFlow() {
                 </View>
               ) : null}
 
-              {listed.map((v, i) => (
+              {(spotPurpose === 'planning' && !searching ? [] : listed).map((v, i) => (
                 // Rows arrive with the GPS fix or a search; they ripple in.
                 <Animated.View key={v.id ?? v.name} entering={FadeIn.duration(200).delay(Math.min(i, 8) * 24)}>
                   <SpotRow name={v.name} selected={isSelected(v)} onPress={() => chooseSpot(v)} />
                 </Animated.View>
               ))}
 
-              {typedIsNew ? (
+              {typedIsNew && spotPurpose !== 'planning' ? (
                 <SpotRow
                   name={`Use “${trimmed}”`}
                   subtitle="Not on the list? Check in by name."
@@ -1221,12 +1259,14 @@ function CheckInFlow() {
                 />
               ) : null}
 
-              <SpotRow
+              {spotPurpose === 'planning' && !searching ? <Text className="text-white/60 font-sans py-4" style={{ fontSize: 14 }}>Search for the venue you’re considering. This won’t check you in.</Text> : null}
+              {spotPurpose === 'planning' && searching && listed.length === 0 ? <Text className="text-white/60 font-sans py-4" style={{ fontSize: 14 }}>No matching venues. Try another name or choose an area.</Text> : null}
+              {spotPurpose !== 'planning' ? <SpotRow
                 name="Private party"
                 subtitle="Share the label, without a home address."
                 icon={House}
                 onPress={enterParty}
-              />
+              /> : null}
             </ScrollView>
           </Animated.View>
         ) : null}

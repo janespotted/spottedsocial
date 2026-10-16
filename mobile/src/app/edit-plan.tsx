@@ -1,3 +1,4 @@
+import { planAudience } from '@/lib/plan-audience';
 import { usePrivateQuery } from '@/hooks/use-private-query';
 import { supabase } from '@/lib/supabase';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
@@ -76,7 +77,7 @@ export default function EditPlanScreen() {
         planTime: plan.plan_time,
         planType: plan.plan_type || null,
         description: plan.description ?? '',
-        visibility: plan.visibility === 'close_friends' ? 'close_friends' : 'friends',
+        visibility: planAudience(plan.visibility),
         friends,
       }}
       onSubmit={handleSubmit}

@@ -27,6 +27,8 @@ import { PLAN_TYPES } from '@/lib/plans';
 import { useFriendIds } from '@/hooks/use-friend-ids';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
+import { DropdownMenu, DropdownMenuSurface } from '@/components/dropdown-menu';
+import { PLAN_AUDIENCES, type PlanAudience } from '@/lib/plan-audience';
 import { RESET_COPY } from '@/lib/reset-copy';
 import { NEON } from '@/lib/theme';
 
@@ -49,7 +51,7 @@ export interface PlanFormValues {
   planTime: string;
   planType: string | null;
   description: string;
-  visibility: 'friends' | 'close_friends';
+  visibility: PlanAudience;
   friends: PlanFriend[];
 }
 
@@ -141,7 +143,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
   const [planTime, setPlanTime] = useState(initial?.planTime ?? '21:00');
   const [planType, setPlanType] = useState<string | null>(initial?.planType ?? null);
   const [description, setDescription] = useState(initial?.description ?? '');
-  const [visibility, setVisibility] = useState<'friends' | 'close_friends'>(
+  const [visibility, setVisibility] = useState<PlanAudience>(
     initial?.visibility ?? 'friends'
   );
   const [selectedFriends, setSelectedFriends] = useState<PlanFriend[]>(initial?.friends ?? []);
@@ -235,11 +237,11 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
   const closeIds = closeQuery.data;
   const friendLoading = friendIdsQuery.isLoading || friendsQuery.isLoading || (visibility === 'close_friends' && closeQuery.isLoading);
   const friendFailed = friendIdsQuery.isError || friendsQuery.isError || (visibility === 'close_friends' && closeQuery.isError);
-  const eligibleFriends = friends.filter(f => visibility === 'friends' || closeIds?.includes(f.id));
+  const eligibleFriends = friends.filter(f => visibility !== 'close_friends' || closeIds?.includes(f.id));
   useEffect(() => {
     if (!friendIds || (visibility === 'close_friends' && !closeIds)) return;
     setSelectedFriends(previous => previous.filter(f => friendIds.includes(f.id) &&
-      (visibility === 'friends' || closeIds!.includes(f.id))));
+      (visibility !== 'close_friends' || closeIds!.includes(f.id))));
   }, [visibility, friendIds, closeIds]);
 
   const filteredVenues = venues.filter(
@@ -291,6 +293,7 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
     : 'Just a plan';
 
   return (
+    <DropdownMenuSurface style={{ flex: 1 }}>
     <View className="flex-1 bg-[#110a24]">
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 min-h-12 mt-2">
@@ -506,32 +509,19 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
             {/* Visibility */}
             <View>
               <Text className="text-white/55 text-xs font-sans mb-1.5">Who can see this</Text>
-              <View className="flex-row gap-2">
-                {(
-                  [
-                    { value: 'friends', label: 'Friends' },
-                    { value: 'close_friends', label: 'Close Friends' },
-                  ] as const
-                ).map((opt) => (
-                  <Pressable
-                    key={opt.value}
-                    onPress={() => setVisibility(opt.value)}
-                    className={`flex-1 py-2 rounded-full items-center ${
-                      visibility === opt.value
-                        ? 'bg-[#d4ff00]'
-                        : 'bg-[#1a1230] border border-white/10'
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs font-sans-medium ${
-                        visibility === opt.value ? 'text-black' : 'text-white/50'
-                      }`}
-                    >
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
+              <DropdownMenu
+                options={PLAN_AUDIENCES}
+                selectedKey={visibility}
+                onSelect={key => setVisibility(key as PlanAudience)}
+                accessibilityLabel="Plan audience"
+              >
+                <View className="min-h-12 flex-row items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#1a1230] border border-white/10">
+                  <Text className="flex-1 text-white font-sans-medium" style={{ fontSize: 14 }}>
+                    {PLAN_AUDIENCES.find(option => option.key === visibility)?.label}
+                  </Text>
+                  <SymbolView name="chevron.down" size={13} tintColor="rgba(255,255,255,0.6)" />
+                </View>
+              </DropdownMenu>
             </View>
 
             {submitError ? <Text accessibilityRole="alert" className="text-red-300 text-sm font-sans">Couldn’t save. Your draft is still here — try again.</Text> : null}
@@ -556,5 +546,6 @@ export function PlanForm({ title, submitLabel, submittingLabel, initial, onSubmi
         </Pressable>
       </KeyboardAwareScrollView>
     </View>
+    </DropdownMenuSurface>
   );
 }

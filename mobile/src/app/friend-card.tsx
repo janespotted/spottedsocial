@@ -85,7 +85,7 @@ export default function FriendCardScreen() {
       } else if (status?.status === 'planning') {
         statusKind = 'planning';
         statusLine = status.planning_venue_name
-          ? `TBD tonight — thinking ${status.planning_venue_name}`
+          ? `TBD | ${status.planning_venue_name}`
           : status.planning_neighborhood
             ? `TBD tonight — ${status.planning_neighborhood}`
             : 'TBD tonight — down for anything';

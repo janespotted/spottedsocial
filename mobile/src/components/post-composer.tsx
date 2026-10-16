@@ -1,4 +1,5 @@
-import { Alert } from 'react-native';
+import { useDemoMode } from '@/lib/demo-mode';
+import { Alert, Keyboard } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -108,6 +109,7 @@ export function PostComposer({
   onClose: () => void;
   onShared: (post: PublishedPost) => void;
 }) {
+  const demo = useDemoMode();
   const { session, launch } = useSession();
   const { width } = useWindowDimensions();
   const captionInput = useRef<TextInput>(null);
@@ -166,7 +168,9 @@ export function PostComposer({
   const share = async () => {
     // State reaches the button on the next render; the controller locks the
     // attempt immediately so two taps cannot upload or publish twice.
-    if (!session || posting || abortRef.current) return;
+    if (posting || abortRef.current) return;
+    Keyboard.dismiss();
+    if (!session) { setError({ message: 'Sign in again to share. Your draft is still here.', retryable: false }); return; }
     const textCheck = validatePostText(caption);
     const venueCheck = validateVenueName(venueName);
     if (!textCheck.success || !venueCheck.success) {
@@ -240,7 +244,7 @@ export function PostComposer({
       ? `Uploading ${media?.type === 'video' ? 'video' : 'photo'} · ${percent}%`
       : phase === 'publishing'
         ? 'Publishing…'
-        : RESET_COPY.postPreview;
+        : demo ? 'Demo · Only on this phone' : RESET_COPY.postPreview;
 
   return (
     <View className="flex-1 bg-linear-to-b from-[#34215c] via-[#1d1240] to-[#110a24]">
@@ -268,7 +272,8 @@ export function PostComposer({
           onPress={share}
           disabled={!canShare}
           hitSlop={6}
-          accessibilityLabel="Share post"
+          accessibilityLabel={posting ? statusLine : "Share post"}
+          accessibilityState={{ busy: posting, disabled: !canShare }}
           className="min-h-10 min-w-21 px-5 rounded-full items-center justify-center active:opacity-90 disabled:opacity-40"
           style={{ backgroundColor: NEON, boxShadow: canShare ? '0 6px 20px rgba(212,255,0,0.3)' : undefined }}
         >
@@ -284,6 +289,38 @@ export function PostComposer({
         </Pressable>
       </View>
       <UploadBar progress={phase === 'publishing' ? 1 : progress} visible={posting && !!media} />
+
+        {error ? (
+          <View
+            accessibilityRole="alert" accessibilityLiveRegion="polite"
+            className="mx-4 my-2 rounded-2xl px-3.5 py-3 gap-2.5"
+            style={{ backgroundColor: 'rgba(251,191,36,0.08)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)' }}
+          >
+            <View className="flex-row items-start gap-2">
+              <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor="#fbbf24" />
+              <View className="flex-1 gap-0.5">
+                <Text className="text-amber-100 text-[13px] font-sans-semibold">
+                  {error.retryable ? "Couldn't share your post" : 'Almost there'}
+                </Text>
+                <Text selectable style={{ fontSize: 12 }} className="text-amber-200/80 font-sans">
+                  {error.message}
+                  {error.retryable ? ' Your draft is saved.' : ''}
+                </Text>
+              </View>
+            </View>
+            {error.retryable ? (
+              <Pressable
+                onPress={share}
+                accessibilityLabel="Retry sharing"
+                className="self-start flex-row items-center gap-1.5 min-h-11 px-4 rounded-full active:opacity-80"
+                style={{ backgroundColor: NEON }}
+              >
+                <SymbolView name="arrow.clockwise" size={13} tintColor={INK} />
+                <Text className="text-[#110a24] text-[13px] font-sans-semibold">Retry</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
       <KeyboardAwareScrollView
         contentContainerClassName="px-4 pt-1 gap-4 pb-safe-offset-8"
@@ -468,36 +505,7 @@ export function PostComposer({
         {/* Audience — same names and selector as live statuses, separate preference */}
         {media ? <AudienceRow value={visibility} onChange={(a) => onDraftChange({ visibility: a })} context="post" /> : null}
 
-        {error ? (
-          <View
-            className="rounded-2xl px-3.5 py-3 gap-2.5"
-            style={{ backgroundColor: 'rgba(251,191,36,0.08)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)' }}
-          >
-            <View className="flex-row items-start gap-2">
-              <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor="#fbbf24" />
-              <View className="flex-1 gap-0.5">
-                <Text className="text-amber-100 text-[13px] font-sans-semibold">
-                  {error.retryable ? "Couldn't share your post" : 'Almost there'}
-                </Text>
-                <Text selectable className="text-amber-200/80 text-xs font-sans leading-4">
-                  {error.message}
-                  {error.retryable ? ' Your draft is saved.' : ''}
-                </Text>
-              </View>
-            </View>
-            {error.retryable ? (
-              <Pressable
-                onPress={share}
-                accessibilityLabel="Retry sharing"
-                className="self-start flex-row items-center gap-1.5 h-9 px-4 rounded-full active:opacity-80"
-                style={{ backgroundColor: NEON }}
-              >
-                <SymbolView name="arrow.clockwise" size={13} tintColor={INK} />
-                <Text className="text-[#110a24] text-[13px] font-sans-semibold">Retry</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
+
 
         <View className="flex-row items-center gap-2 px-1">
           <SymbolView name="moon.stars" size={13} tintColor="rgba(255,255,255,0.5)" />

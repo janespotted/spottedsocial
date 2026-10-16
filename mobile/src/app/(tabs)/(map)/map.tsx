@@ -1,3 +1,4 @@
+import { useDemoMode } from '@/lib/demo-mode';
 import { TabHeaderRow } from '@/components/tab-header-row';
 import { DayVenueMap } from '@/components/day-venue-map';
 import { withholdLivePreview } from '@/lib/live-preview';
@@ -292,7 +293,10 @@ function LiveMapScreen() {
   const queryClient = useQueryClient();
   const cameraRef = useRef<Camera>(null);
   const mapRef = useRef<MapView>(null);
-  const {height: windowHeight} = useWindowDimensions();
+  const {height: windowHeight, width: windowWidth} = useWindowDimensions();
+  const demo = useDemoMode();
+  const [mapFrame, setMapFrame] = useState({ width: windowWidth, height: windowHeight });
+  const [bottomControlsHeight, setBottomControlsHeight] = useState(100);
   const insets = useSafeAreaInsets();
   const [groupPopup, setGroupPopup] = useState<{ people: MapFriend[]; x: number; y: number } | null>(null);
 
@@ -515,12 +519,6 @@ function LiveMapScreen() {
     const coordinate = [people[0].lng, people[0].lat];
     try {
       let point = await mapRef.current!.getPointInView(coordinate);
-      // Give the roster room above the pin when it is near the top edge.
-      if (point[1] < insets.top + 260) {
-        cameraRef.current?.setCamera({ centerCoordinate: coordinate, padding: { paddingTop: 200, paddingBottom: 0, paddingLeft: 0, paddingRight: 0 }, animationDuration: 300 });
-        await new Promise(resolve => setTimeout(resolve, 350));
-        point = await mapRef.current!.getPointInView(coordinate);
-      }
       Haptics.selectionAsync();
       setGroupPopup({ people, x: point[0], y: point[1] });
     } catch { /* A moving/unmounted map has no valid anchor; keep the pin tappable. */ }
@@ -614,7 +612,7 @@ function LiveMapScreen() {
   };
 
   return (
-    <View className='flex-1 bg-[#110a24]'>
+    <View className='flex-1 bg-[#110a24]' onLayout={e => { setMapFrame(e.nativeEvent.layout); setGroupPopup(null); }}>
       <MapView
         ref={mapRef}
         style={{flex: 1}}
@@ -787,7 +785,7 @@ function LiveMapScreen() {
 
       {/* My Location — bottom right, above the legend (original placement) */}
       {!focusMode ? (
-        <View className='absolute bottom-safe-offset-28 right-4'>
+        <View className='absolute right-4' style={{ bottom: insets.bottom + 76 + bottomControlsHeight }}>
           <IconButton
             icon={locating ? 'location.fill' : 'location'}
             label='Recenter on me'
@@ -795,13 +793,6 @@ function LiveMapScreen() {
             state={locating ? 'selected' : 'ordinary'}
             onPress={recenter}
           />
-        </View>
-      ) : null}
-
-      {/* "N out · M TBD" roster pill — bottom left (original placement) */}
-      {!focusMode ? (
-        <View className='absolute bottom-safe-offset-16 left-4'>
-          <FriendsOutPill />
         </View>
       ) : null}
 
@@ -879,7 +870,8 @@ function LiveMapScreen() {
       {/* Status pill — current status, Update status, Stop sharing */}
       {!focusMode ? (
         <View
-          className='absolute bottom-safe-offset-28 left-16 right-16 items-center'
+          className='absolute left-4 right-16 items-center'
+          style={{ bottom: insets.bottom + 76 + bottomControlsHeight }}
           pointerEvents='box-none'
         >
           {myStatus?.status === 'out' ? (
@@ -961,7 +953,9 @@ function LiveMapScreen() {
 
       {/* Relationship legend — bottom-left above the tab bar */}
       {!focusMode ? (
-        <View className='absolute bottom-safe-offset-16 right-4 flex-row gap-3 px-3 py-2 rounded-full bg-[#1a0f2e]/90 border border-white/10'>
+        <View className='absolute left-4 right-4 gap-2 items-start' style={{ bottom: insets.bottom + 64 }} onLayout={e => setBottomControlsHeight(e.nativeEvent.layout.height)}>
+          <FriendsOutPill />
+          <View className='flex-row flex-wrap gap-x-3 gap-y-2 px-3 py-2 rounded-2xl bg-[#1a0f2e]/90 border border-white/10'>
           {(
             [
               ['close', 'Close Friend'],
@@ -977,9 +971,10 @@ function LiveMapScreen() {
               <Text className='text-white/70 text-xs font-sans-medium'>{label}</Text>
             </View>
           ))}
+          </View>
         </View>
       ) : null}
-      {groupPopup ? <MapFriendsPopup people={groupPopup.people} point={groupPopup} onClose={() => setGroupPopup(null)} onSelect={friend => { setGroupPopup(null); void handleFriendPress(friend); }} /> : null}
+      {groupPopup ? <MapFriendsPopup people={groupPopup.people} point={groupPopup} frame={mapFrame} topInset={demo ? 0 : insets.top} bottomInset={insets.bottom + 64} onClose={() => setGroupPopup(null)} onSelect={friend => { setGroupPopup(null); void handleFriendPress(friend); }} /> : null}
     </View>
   );
 }

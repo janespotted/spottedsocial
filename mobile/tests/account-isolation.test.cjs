@@ -57,7 +57,7 @@ test('media links: one batched request, fresh links reused, unauthorized items d
  const invoke=async(name,{body})=>{asked.push({name,...body});const ok=p=>allow&&!p.startsWith('other/');
   return{data:{paths:Object.fromEntries(body.paths.filter(ok).map(p=>[p,{url:'https://project.invalid/storage/v1/object/sign/post-images/'+p+'?token=x',expires_at:now+1800}])),
    playback:Object.fromEntries(body.playback_ids.filter(()=>allow).map(id=>[id,{stream:'https://stream.mux.com/'+id+'.m3u8?token=v',poster:'https://image.mux.com/'+id+'/thumbnail.jpg?token=t',expires_at:now+1800}]))},error:null}};
- const media=load('private-media.ts',{'./supabase':{supabase:{functions:{invoke}}},'./session-identity':identity});
+ const media=load('private-media.ts',{'./demo-mode':{getDemoSandbox:()=>null},'./supabase':{supabase:{functions:{invoke}}},'./session-identity':identity});
  const first=await media.resolvePrivateMedia({paths:['A/private-v1/1.jpg','other/private-v1/2.jpg'],playbackIds:['vid']});
  assert.equal(asked.length,1);assert.equal(asked[0].name,'private-media');
  assert.equal(first.paths.get('A/private-v1/1.jpg').includes('/object/sign/'),true);assert.equal(first.paths.has('other/private-v1/2.jpg'),false);

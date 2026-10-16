@@ -351,7 +351,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
                       ) : (
                         <Text className="text-[#a855f7] text-sm font-sans" numberOfLines={1}>
                           {friend.planning_venue_name
-                            ? `thinking ${friend.planning_venue_name}`
+                            ? `TBD | ${friend.planning_venue_name}`
                             : `TBD · ${friend.planning_neighborhood || 'down for anything'}`}
                         </Text>
                       )}

@@ -19,7 +19,7 @@ test('QA-06 confirmed messages reconcile HTTP/realtime in either order',()=>{
 test('QA-06 failed delayed send keeps a retryable row and does not replace a newer draft',async()=>{
  let draft='hello',finish; const pendingRef={current:[]};const sendingRef={current:false};
  const updatePending=rows=>pendingRef.current=rows;
- const scope={userId:'a',threadId:'t',sendingRef,pendingRef,updatePending,isFromTonight:()=>true,setMessages:()=>{},confirmMessage:threadState.confirmMessage,
+ const scope={setUploading:()=>{},getSessionUserId:()=> 'a',userId:'a',threadId:'t',sendingRef,pendingRef,updatePending,isFromTonight:()=>true,setMessages:()=>{},confirmMessage:threadState.confirmMessage,
   deliverDm:()=>new Promise((resolve,reject)=>{finish=()=>reject(Error('offline'))})};
  const retryMessage=extract('app/thread.tsx','retryMessage',scope);
  const send=extract('app/thread.tsx','send',{...scope,draft,setDraft:v=>draft=v,retryMessage,pendingDm:(_u,_t,text)=>({id:'stable-id',text,created_at:new Date().toISOString()})});
@@ -246,7 +246,7 @@ test('QA-21 a delayed confirmation cannot restore a previous-night DM',async()=>
  for(const currentNight of [false,true]){
  let rows=[],finish,checks=0;const message={id:'stable-id',created_at:'2026-10-12T08:00:00Z'};
  const pendingRef={current:[message]};
- const retry=extract('app/thread.tsx','retryMessage',{sendingRef:{current:false},pendingRef,userId:'a',getSessionUserId:()=> 'a',confirmedIds:{current:new Set()},updatePending:r=>pendingRef.current=r,isFromTonight:()=>++checks===1||currentNight,deliverDm:()=>new Promise(r=>finish=r),setMessages:f=>rows=f(rows),confirmMessage:threadState.confirmMessage});
+ const retry=extract('app/thread.tsx','retryMessage',{setUploading:()=>{},sendingRef:{current:false},pendingRef,userId:'a',getSessionUserId:()=> 'a',confirmedIds:{current:new Set()},updatePending:r=>pendingRef.current=r,isFromTonight:()=>++checks===1||currentNight,deliverDm:()=>new Promise(r=>finish=r),setMessages:f=>rows=f(rows),confirmMessage:threadState.confirmMessage});
  const work=retry(message);finish(message);await work;assert.equal(rows.length,currentNight?1:0);
  }
  assert.match(source('app/thread.tsx'),/if \(!isFromTonight\(newMsg.created_at\)\) return/);

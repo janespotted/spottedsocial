@@ -1,3 +1,4 @@
+import type { PlanAudience } from './plan-audience';
 import { supabase } from './supabase';
 import { buildProfileMap, fetchProfilesSafe, type SafeProfile } from './profiles';
 import { isDemoMode } from './demo-mode';
@@ -339,7 +340,7 @@ export async function toggleEventRsvp(
 /** Server validates audience, venue and participants, then commits them together. */
 export async function savePlan(planId: string | null, values: {
   venue: { id: string }; planDate: string; planTime: string; planType: string | null;
-  description: string; visibility: 'friends' | 'close_friends'; friends: { id: string }[];
+  description: string; visibility: PlanAudience; friends: { id: string }[];
 }): Promise<string> {
   const { data, error } = await supabase.rpc('save_plan', {
     p_id: planId,

@@ -1,3 +1,4 @@
+import { getDemoSandbox } from './demo-mode';
 import { supabase } from './supabase';
 import { getSessionRevision, onSessionIdentityChange } from './session-identity';
 
@@ -45,6 +46,11 @@ export async function resolvePrivateMedia({
   playbackIds?: readonly string[];
   posterWidth?: number;
 }): Promise<{ paths: Map<string, string>; playback: Map<string, PlaybackLink> }> {
+  const demo = getDemoSandbox();
+  if (demo) return { paths: new Map(paths.flatMap(path => {
+    const uri = demo.resolveMedia(path);
+    return uri ? [[path, uri] as [string, string]] : [];
+  })), playback: new Map() };
   const revision = getSessionRevision();
   const wantPaths = [...new Set(paths)];
   const wantIds = [...new Set(playbackIds)];

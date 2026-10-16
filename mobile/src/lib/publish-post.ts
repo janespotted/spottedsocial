@@ -1,5 +1,5 @@
 import { assertSessionRevision, getSessionRevision } from './session-identity';
-import { isDemoMode } from './demo-mode';
+import { isDemoMode, getDemoSandbox } from './demo-mode';
 import { File } from 'expo-file-system';
 import { isDevice } from 'expo-device';
 import { Platform } from 'react-native';
@@ -94,7 +94,9 @@ export async function uploadMedia(
   onProgress?: (fraction: number) => void,
   signal?: AbortSignal
 ): Promise<void> {
-  if (isDemoMode()) throw new Error('Photo and video uploads use live services. Try a text post in Demo.');
+  if (signal?.aborted) throw new Error('Upload cancelled.');
+  const demo = getDemoSandbox();
+  if (demo) { demo.saveMedia(path, media.uri); onProgress?.(1); return; }
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error('Signed out. Sign in again to post.');
@@ -179,7 +181,7 @@ async function uploadVideoToMux(
 export async function publishPost(input: PublishInput): Promise<PublishResult> {
   const operation = getSessionRevision();
   const { userId, media, onPhase, onProgress, signal } = input;
-  if (isDemoMode() && media) throw new PublishError('Try a text post in Demo. Photo and video uploads use live services.', null);
+  if (isDemoMode() && media?.type === 'video') throw new PublishError('Videos need live services. You can share photos and text in Demo.', null);
   let uploadedKey = input.uploadedKey ?? null;
   let prepared: PreparedMedia | null = null;
   const isVideo = media?.type === 'video';

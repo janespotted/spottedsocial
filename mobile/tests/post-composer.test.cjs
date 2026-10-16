@@ -18,7 +18,7 @@ function composer(publishPost, overrides = {}) {
     uploadedRef: { current: null }, abortRef: { current: null },
     validatePostText: value => ({ success: true, data: value }),
     validateVenueName: value => ({ success: true, data: value }),
-    AbortController, PublishError, publishPost,
+    AbortController, Keyboard: { dismiss() {} }, PublishError, publishPost,
     setError: value => state.errors.push(value), setPhase: value => state.phases.push(value),
     setProgress: () => {}, savePostAudience: () => {},
     onShared: value => state.shared.push(value), onClose: () => state.closed++,

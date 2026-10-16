@@ -1,5 +1,4 @@
 import { TabHeaderRow } from '@/components/tab-header-row';
-import { Alert } from 'react-native';
 import { useEffect, useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { Pressable, RefreshControl, Text, View } from 'react-native';
@@ -27,7 +26,6 @@ import { HeaderActions } from '@/components/header-actions';
 import { DayTabScreen } from '@/components/night-opening-screen';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
-import { HOT_SPOTS_LAUNCH } from '@/lib/leaderboard-ranking';
 
 function openVenue(venueName: string, venueId?: string | null) {
   if (venueId) {
@@ -231,8 +229,8 @@ function LeaderboardHeader({
 
       {/* Title + subtitle — full-width rows below the top bar */}
       <View className="px-4 pt-2">
-        <Text className="text-3xl font-sans-semibold text-white">Hot Spots</Text>
-        <Text className="text-white/50 text-sm mt-0.5 font-sans">Spotted picks + check-ins</Text>
+        <Text style={{ fontSize: 30 }} className="font-sans-semibold text-white">Hot Spots</Text>
+        <Text style={{ fontSize: 14 }} className="text-white/50 mt-0.5 font-sans">Spotted picks + check-ins</Text>
       </View>
 
       {/* Neighborhood filter — the original build's Spotted dropdown, not
@@ -245,7 +243,7 @@ function LeaderboardHeader({
           accessibilityLabel="Filter by neighborhood"
         >
           <View className="flex-row items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/15">
-            <Text className="text-white font-sans-medium text-sm">
+            <Text style={{ fontSize: 14 }} className="text-white font-sans-medium">
               {neighborhood || `All ${cityLabel}`}
             </Text>
             <SymbolView name="chevron.down" size={12} tintColor="rgba(255,255,255,0.6)" />
@@ -334,7 +332,6 @@ function LiveLeaderboardScreen() {
         unreadCount={unreadCount}
         onSelectNeighborhood={setNeighborhood}
       />
-      <Pressable accessibilityRole="button" onPress={() => Alert.alert('How spots rank', `${Math.round(HOT_SPOTS_LAUNCH.curatedWeight * 100)}% Spotted picks, ${Math.round(HOT_SPOTS_LAUNCH.liveWeight * 100)}% eligible live activity. The activity score reaches its maximum at ${HOT_SPOTS_LAUNCH.liveUserThreshold} people sharing a spot. Promoted spots are labeled separately.`)} className="px-4 py-2 min-h-11 justify-center"><Text className="text-white/55 text-xs font-sans">Curated + live activity ⓘ</Text></Pressable>
 
       <LegendList
         data={venues}

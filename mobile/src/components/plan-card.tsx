@@ -246,7 +246,7 @@ export function PlanCard({ plan, currentUserId, userVote, onEdit, onDeleted }: P
                 tintColor="rgba(255,255,255,0.6)"
               />
               <Text className="text-white/60 text-xs font-sans">
-                {isCloseFriends ? 'Close Friends' : 'Friends'}
+                {isCloseFriends ? 'Close Friends' : plan.visibility === 'mutual_friends' ? 'Friends + Mutuals' : 'Friends'}
               </Text>
             </View>
           </View>

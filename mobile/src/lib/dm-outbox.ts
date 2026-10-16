@@ -6,7 +6,7 @@ import { supabase } from './supabase';
 import { isFromTonight } from './tonight';
 import { getSessionUserId, getSessionRevision } from './session-identity';
 
-export type PendingDm = DmMessage & { localAsset?: string; failed?: boolean };
+export type PendingDm = DmMessage & { localAsset?: string; localMimeType?: string; failed?: boolean };
 const key = (uid: string, thread: string) => `spotted.pending-dm.v1.${uid}.${thread}`;
 const writes = new Map<string, Promise<unknown>>();
 export function pendingDm(userId: string, threadId: string, text: string, image: string | null = null): PendingDm {

@@ -1,3 +1,4 @@
+import { uploadPendingDmPhoto } from '@/lib/dm-photo';
 import { pendingDm, readPendingDm, savePendingDm, deliverDm, type PendingDm } from '@/lib/dm-outbox';
 import { getSessionUserId } from '@/lib/session-identity';
 import { onPrivateViewsInvalidated, privateViewRevision } from '@/lib/private-views';
@@ -444,8 +445,12 @@ function ThreadScreenContent() {
   const retryMessage = async (message: PendingDm) => {
     if (sendingRef.current || !isFromTonight(message.created_at)) return;
     sendingRef.current = true;
+    if (message.localAsset) setUploading(true);
     updatePending(pendingRef.current.map(m => m.id === message.id ? { ...m, failed: false } : m));
     try {
+      if (message.localAsset && !message.image_url) message = await uploadPendingDmPhoto(message);
+      if (getSessionUserId() !== userId) return;
+      updatePending(pendingRef.current.map(m => m.id === message.id ? { ...message, failed: false } : m));
       const saved = await deliverDm(message);
       if (getSessionUserId() !== userId) return;
       const image = saved.image_url ? message.localAsset ?? await resolvePostImageUrl(saved.image_url) : null;
@@ -454,7 +459,7 @@ function ThreadScreenContent() {
       setMessages(prev => confirmMessage(prev, message.id, { ...saved, image_url: image }, isFromTonight(saved.created_at)));
     } catch {
       updatePending(pendingRef.current.map(m => m.id === message.id ? { ...m, failed: true } : m));
-    } finally { sendingRef.current = false; }
+    } finally { sendingRef.current = false; setUploading(false); }
   };
   const send = async () => {
     const text = draft.trim();
@@ -469,48 +474,9 @@ function ThreadScreenContent() {
   const sendImageAsset = useCallback(
     async (asset: { uri: string; mimeType?: string | null }) => {
     if (!userId || !threadId || sendingRef.current) return;
-    sendingRef.current = true;
-    setUploading(true);
-    const imageMessage = pendingDm(userId, threadId, '');
-    const optimisticId = imageMessage.id;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: optimisticId,
-        thread_id: threadId,
-        sender_id: userId,
-        text: '',
-        image_url: asset.uri,
-        created_at: new Date().toISOString(),
-      },
-    ]);
-    try {
-      const ext = asset.mimeType === 'image/png' ? 'png' : 'jpg';
-      const path = `${userId}/private-v1/dm/${threadId}/${Date.now()}.${ext}`;
-      const body = await fetch(asset.uri).then((r) => r.arrayBuffer());
-      const { error: uploadErr } = await supabase.storage
-        .from('post-images')
-        .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: false });
-      if (uploadErr) throw uploadErr;
-      imageMessage.image_url = path;
-      imageMessage.localAsset = asset.uri;
-      updatePending([...pendingRef.current, imageMessage]);
-      const inserted = await deliverDm(imageMessage);
-      if (getSessionUserId() !== userId) return;
-      confirmedIds.current.add(inserted.id);
-      updatePending(pendingRef.current.filter(m => m.id !== imageMessage.id));
-      // Keep the local uri for display — the stored value is a private path
-      setMessages((prev) =>
-        confirmMessage(prev, optimisticId, { ...(inserted as DmMessage), image_url: asset.uri }, isFromTonight(inserted!.created_at))
-      );
-    } catch {
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-      if (imageMessage.image_url) updatePending(pendingRef.current.map(m => m.id === imageMessage.id ? { ...m, failed: true } : m));
-      else Alert.alert('Photo upload failed', 'The photo wasn’t sent. Please choose it again.');
-    } finally {
-      sendingRef.current = false;
-      setUploading(false);
-    }
+    const imageMessage: PendingDm = { ...pendingDm(userId, threadId, ''), localAsset: asset.uri, localMimeType: asset.mimeType ?? 'image/jpeg' };
+    updatePending([...pendingRef.current, imageMessage]);
+    await retryMessage(imageMessage);
     },
     [userId, threadId, updatePending]
   );
@@ -920,9 +886,9 @@ function ThreadScreenContent() {
                         isMine ? 'bg-[#4c2f6e] rounded-br-sm' : 'bg-white/95 rounded-bl-sm'
                       }`}
                     >
-                      {item.image_url ? (
+                      {item.image_url || (item as PendingDm).localAsset ? (
                         <Image
-                          source={{ uri: (item as PendingDm).localAsset ?? item.image_url }}
+                          source={{ uri: (item as PendingDm).localAsset ?? item.image_url ?? undefined }}
                           className="w-60 aspect-[4/3]"
                           contentFit="cover"
                         />

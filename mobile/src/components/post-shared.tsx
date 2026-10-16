@@ -1,3 +1,4 @@
+import { useDemoMode } from '@/lib/demo-mode';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
@@ -86,6 +87,7 @@ export function PostShared({
   onDone: () => void;
 }) {
   const { session } = useSession();
+  const demo = useDemoMode();
   const { width, height } = useWindowDimensions();
   const [me, setMe] = useState<{ display_name: string; avatar_url: string | null } | null>(null);
   const cityLabel = getCityLabel(getActiveCity() ?? 'nyc');
@@ -130,7 +132,7 @@ export function PostShared({
           <SuccessMark />
           <Text className="text-white text-[26px] font-sans-semibold tracking-tight">Posted</Text>
           <Text className="text-white/55 text-sm font-sans text-center leading-5">
-            Visible to {audienceLabel(post.visibility)} until 5:00 AM {cityLabel}.
+            {demo ? 'Saved in Demo · Only on this phone.' : `Visible to ${audienceLabel(post.visibility)} until 5:00 AM ${cityLabel}.`}
             {post.media?.type === 'video' ? ' Your video is processing and will play in the feed in a moment.' : ''}
           </Text>
         </Animated.View>

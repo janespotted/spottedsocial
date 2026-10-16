@@ -1,3 +1,5 @@
+import { useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { friendCardPress } from '@/lib/friend-card';
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useState } from 'react';
@@ -32,6 +34,8 @@ interface ShareFriend {
  * Sharing someone else's post is limited to mutual friends of the author.
  */
 export default function SharePostSheet() {
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { postId, authorName } = useLocalSearchParams<{
     postId: string;
     authorId: string;
@@ -73,13 +77,14 @@ export default function SharePostSheet() {
     });
   };
 
+  // Keep the native container: iOS formSheet otherwise stretches its first ScrollView over the footer.
   return (
-    <View className="pt-6 pb-8" style={{ maxHeight: 560 }}>
+    <View collapsable={false} className="pt-6" style={{ height: Math.min(600, height - insets.top - 32), paddingBottom: Math.max(insets.bottom, 16) }}>
       <Text className="text-white text-lg font-sans-semibold px-5 mb-3">Send to</Text>
       {isLoading ? <ActivityIndicator color={NEON} /> : null}
       {isError ? <Text className="text-red-300 px-5 py-3" onPress={() => void refetch()}>Could not load eligible recipients. Tap to retry.</Text> : null}
       {!postId ? <Text className="text-white/60 px-5">This post is unavailable.</Text> : null}
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}>
         {(friends ?? []).map((friend) => (
           <View key={friend.id} className="flex-row items-center gap-3 py-2.5">
             <View className={friend.is_out ? 'rounded-full border-2 border-[#d4ff00]' : ''}>

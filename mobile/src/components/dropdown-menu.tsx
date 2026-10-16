@@ -1,5 +1,5 @@
 import { createContext, useContext, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 import { Portal, PortalHost } from 'react-native-teleport';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -11,13 +11,13 @@ type MenuSurface = { ref: RefObject<View | null>; name: string; width: number; h
 const MenuSurfaceContext = createContext<MenuSurface | null>(null);
 
 /** Keep a sheet's trigger and overlay in the same native coordinate space. */
-export function DropdownMenuSurface({ children }: { children: ReactNode }) {
+export function DropdownMenuSurface({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const ref = useRef<View>(null);
   const name = useId();
   const [size, setSize] = useState({ width: 0, height: 0 });
   return (
     <MenuSurfaceContext.Provider value={{ ref, name, ...size }}>
-      <View ref={ref} collapsable={false} onLayout={({ nativeEvent }) => setSize(nativeEvent.layout)}>
+      <View ref={ref} style={style} collapsable={false} onLayout={({ nativeEvent }) => setSize(nativeEvent.layout)}>
         {children}
         <PortalHost name={name} style={StyleSheet.absoluteFill} />
       </View>
@@ -134,9 +134,8 @@ export function DropdownMenu({
                     <Avatar name={option.avatar.name} url={option.avatar.url} size="sm" />
                   ) : null}
                   <Text
-                    className={`flex-1 text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
-                    style={{ color: selected ? NEON : '#ffffff' }}
-                    numberOfLines={1}
+                    className={`flex-1 ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+                    style={{ fontSize: 14, color: selected ? NEON : '#ffffff' }}
                   >
                     {option.label}
                   </Text>

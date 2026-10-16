@@ -107,6 +107,8 @@ export interface OwnNightStatus {
   is_private_party: boolean;
   party_neighborhood: string | null;
   planning_neighborhood: string | null;
+  planning_venue_id: string | null;
+  planning_venue_name: string | null;
   planning_visibility: string | null;
   expires_at: string;
 }
@@ -150,6 +152,8 @@ export async function fetchOwnNightStatus(userId: string): Promise<OwnNightStatu
     is_private_party: !!data.is_private_party,
     party_neighborhood: data.party_neighborhood,
     planning_neighborhood: data.planning_neighborhood,
+    planning_venue_id: data.planning_venue_id,
+    planning_venue_name: data.planning_venue_name,
     planning_visibility: data.planning_visibility,
     expires_at: data.expires_at!,
   };

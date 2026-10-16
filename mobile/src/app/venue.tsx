@@ -643,14 +643,14 @@ export default function VenueScreen() {
           {!photoFailed && venueId ? (
             <Image
               source={{ uri: getVenuePhotoUrl(venueId, 0) }}
-              className="w-full h-36"
+              className="absolute inset-0 w-full h-full"
               contentFit="cover"
               transition={200}
               onError={() => setPhotoFailedFor(venueId)}
             />
           ) : (
             <View
-              className="w-full h-36 items-center justify-center"
+              className="absolute inset-0 items-center justify-center"
               style={{
                 experimental_backgroundImage:
                   'linear-gradient(135deg, rgba(168,85,247,0.25), #1a0f2e 55%, rgba(212,255,0,0.15))',
@@ -684,7 +684,7 @@ export default function VenueScreen() {
           >
             <SymbolView name="xmark" size={14} tintColor="#ffffff" />
           </Pressable>
-          <View className="absolute bottom-0 left-0 right-0 px-5 pb-3">
+          <View pointerEvents="box-none" className="px-5 pb-3 pt-14" style={{ minHeight: 144, justifyContent: 'flex-end' }}>
             {reviewedPick ? (
               <View className="self-start px-2 py-0.5 mb-1.5 rounded-full bg-[#d4ff00]/15 border border-[#d4ff00]/20">
                 <Text className="text-[10px] font-sans-medium" style={{ color: NEON }}>
@@ -692,7 +692,7 @@ export default function VenueScreen() {
                 </Text>
               </View>
             ) : null}
-            <Text className="text-xl font-sans-semibold text-white leading-tight">
+            <Text style={{ fontSize: 20 }} className="font-sans-semibold text-white">
               {venue?.name ?? ''}
             </Text>
           </View>

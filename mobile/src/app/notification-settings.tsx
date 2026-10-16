@@ -49,6 +49,7 @@ export default function NotificationSettings() {
         options={{
           title: "Friend activity alerts",
           headerShown: true,
+          headerBackButtonDisplayMode: "minimal",
           headerTintColor: "#fff",
           headerStyle: { backgroundColor: INK_LIGHT },
         }}
