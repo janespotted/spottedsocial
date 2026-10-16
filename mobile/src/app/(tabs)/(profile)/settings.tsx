@@ -37,6 +37,7 @@ function SettingsRow({
   return (
     <Pressable
       onPress={onPress}
+      accessible={!!onPress}
       disabled={!onPress}
       className="flex-row items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] active:bg-white/[0.06]"
     >
