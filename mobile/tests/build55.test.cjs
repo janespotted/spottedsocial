@@ -1,11 +1,10 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {load,extract,source}=require('./product-test-runtime.cjs');
 const {leaderboardWeights,rankNightlife}=load('lib/leaderboard-ranking.ts');
-test('ranking starts 70/30; real activity overtakes seed and is capped at 90%',()=>{
- for(const n of [0,1,20]){assert.equal(leaderboardWeights(n).live,.3);assert.equal(leaderboardWeights(n).curated,.7)}
- assert(leaderboardWeights(100).live>.5);assert(Math.abs(leaderboardWeights(200).live-.9)<1e-9);assert.equal(leaderboardWeights(200).live,leaderboardWeights(1000).live);
- const rows=[{venue_id:'favorite',venue_name:'Seed',popularity_rank:1,count:0},{venue_id:'organic',venue_name:'Organic',popularity_rank:15,count:20}];
- assert.equal(rankNightlife(rows,20)[0].venue_id,'favorite');assert.equal(rankNightlife(rows,200)[0].venue_id,'organic');assert.equal(rows[0].venue_id,'favorite');
+test('launch ranking holds 70/30 as activity grows and caps the ten-user live boost',()=>{
+ for(const n of [0,1,20,100,200,1000]){assert.equal(leaderboardWeights(n).live,.3);assert.equal(leaderboardWeights(n).curated,.7)}
+ const rows=[{venue_id:'favorite',venue_name:'Seed',popularity_rank:1,count:0},{venue_id:'organic',venue_name:'Organic',popularity_rank:8,count:10}];
+ assert.equal(rankNightlife(rows,20)[0].venue_id,'organic');assert.equal(rankNightlife(rows,200)[0].venue_id,'organic');assert.equal(rows[0].venue_id,'favorite');
  assert.equal(rankNightlife(rows.map(r=>({...r,count:0})),0)[0].venue_id,'favorite');
 });
 test('expired, malformed, duplicate and self venue badges are dropped',()=>{

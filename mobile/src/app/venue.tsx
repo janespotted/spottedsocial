@@ -1,3 +1,5 @@
+import { fetchVisibleVenuePresence } from '@/lib/venue-presence';
+import { editorialForVenue } from '@/lib/hot-spots-editorial';
 import { openFriendCard, friendCardPress } from '@/lib/friend-card';
 import { withholdLivePreview } from '@/lib/live-preview';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
@@ -72,6 +74,7 @@ interface VenueCardData {
   isInWishlist: boolean;
   distance: string | null;
   friendsAtVenue: FriendAtVenue[];
+  nextPresenceExpiry: number | null;
   friendsPlanning: FriendAtVenue[];
   similarVenues: SimilarVenue[];
 }
@@ -197,6 +200,7 @@ export default function VenueScreen() {
     queryKey: ['venue-card', venueId, session?.user.id, friendIds, isNight],
     enabled: !!venueId && !!session && (!isNight || friendIds !== undefined),
     retry: 1,
+    refetchInterval: isNight ? 30_000 : false,
     queryFn: async (): Promise<VenueCardData | null> => {
       const nowIso = new Date().toISOString();
       const { data: venue, error: venueError } = await supabase
@@ -219,12 +223,7 @@ export default function VenueScreen() {
           .eq('user_id', session!.user.id)
           .eq('venue_name', venue.name)
           .maybeSingle(),
-        isNight ? supabase
-          .from('night_statuses')
-          .select('user_id')
-          .eq('venue_name', venue.name)
-          .not('expires_at', 'is', null)
-          .gt('expires_at', nowIso) : Promise.resolve({data: [], error: null}),
+        isNight ? fetchVisibleVenuePresence(venue.id).then(data => ({data, error: null})) : Promise.resolve({data: [], error: null}),
         isNight ? supabase
           .from('plans')
           .select('id, user_id')
@@ -310,11 +309,19 @@ export default function VenueScreen() {
         isInWishlist: !!wishlistEntry,
         distance,
         friendsAtVenue,
+        nextPresenceExpiry: statuses?.length ? Math.min(...statuses.map(s => Date.parse(s.expires_at!))) : null,
         friendsPlanning,
         similarVenues: (similar ?? []) as SimilarVenue[],
       };
     },
   });
+
+  useEffect(() => {
+    const expiry = rawData?.nextPresenceExpiry;
+    if (!expiry) return;
+    const timer = setTimeout(() => { void queryClient.resetQueries({ queryKey: ['venue-card', venueId] }); }, Math.max(0, expiry-Date.now()) + 10);
+    return () => clearTimeout(timer);
+  }, [rawData?.nextPresenceExpiry, queryClient, venueId]);
 
   // Hours + photos + rating: live edge function with cached-columns fallback
   const data = rawData && withheld ? { ...rawData, friendsAtVenue: [] } : rawData;
@@ -518,6 +525,8 @@ export default function VenueScreen() {
   if (reviewedPick) metaParts.push(reviewedPick.category === 'club' ? 'Club' : 'Bar');
   else if (typeInfo) metaParts.push(typeInfo.label);
   if (venue?.neighborhood) metaParts.push(venue.neighborhood);
+  const accessLabel = venue ? editorialForVenue(venue)?.accessLabel : null;
+  if (accessLabel) metaParts.push(accessLabel);
   if (!isNaN(distNum) && distNum <= 10) metaParts.push(`${data!.distance} mi`);
 
   const friendsHere = data?.friendsAtVenue ?? [];

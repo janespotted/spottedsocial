@@ -38,7 +38,7 @@ export class DemoSandbox {
       : [['Gospel', 'SoHo', 40.7213, -73.9966], ['Public Records', 'Brooklyn', 40.6827, -73.9867], ['Nowadays', 'Queens', 40.7096, -73.9015]];
     spots.forEach(([name, neighborhood, lat, lng], i) => this.row('venues', {
       id: demoId(10 + i), name, neighborhood, lat, lng, city, is_demo: false,
-      venue_type: 'nightclub', category: 'nightclub', popularity_rank: i + 1, popularity_score: 95 - i * 8,
+      venue_type: 'nightclub', type: 'nightclub', category: 'nightclub', leaderboard_eligible: true, google_place_id: null, is_leaderboard_promoted: false, leaderboard_promo_order: null, operating_hours: null, opened_at: null, popularity_rank: i + 1, popularity_score: 95 - i * 8,
       address: 'Sample venue · demo data', image_url: null, google_rating: null,
       rating: null, price_level: null, opening_hours: null, description: null, website: null,
     }));

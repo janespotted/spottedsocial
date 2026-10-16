@@ -34,8 +34,7 @@ test('QA-03/04 Plans and group DM routes preserve destination; invalid source us
 });
 test('QA-02/28 leaderboard uses authorized status columns, surfaces errors, and has no invented movement/energy',async()=>{
  const s=source('hooks/use-leaderboard.ts');assert.doesNotMatch(s,/\.not\('(lat|lng)'/);assert.doesNotMatch(s,/Math\.random|const topBootstrapVenue/);
- const energy=extract('hooks/use-leaderboard.ts','calculateEnergyLevel');assert.equal(energy(1,0),0);assert.equal(energy(20,10),3);
- const fail=extract('hooks/use-leaderboard.ts','fetchLeaderboard',{currentPicks:()=>[],rankNightlife:load('lib/leaderboard-ranking.ts').rankNightlife,supabase:{from:()=>builder({data:null,error:new Error('denied')})},isDemoMode:()=>false,fetchProfilesSafe:async()=>[]});await assert.rejects(fail('nyc',null,'a',[]),/denied/);
+ const fail=extract('hooks/use-leaderboard.ts','fetchLeaderboard',{fetchHotSpotsCatalog:async()=>{throw Error('denied')},fetchVisibleVenuePresence:async()=>[],isDemoMode:()=>false,fetchProfilesSafe:async()=>[]});await assert.rejects(fail('nyc',null,'a',[]),/denied/);
 });
 test('QA-35 shared card opens post detail while ordinary messages retain reactions',()=>{
  const s=source('app/thread.tsx');const calls=[];extract('app/thread.tsx','openSharedPost',{router:{push:route=>calls.push(route)}})('visible-post');assert.equal(calls[0].pathname,'/post-detail');assert.equal(calls[0].params.postId,'visible-post');assert.match(s,/onPress=\{\(\) => openSharedPost\(sharedPost.id\)\}/);assert.match(s,/onPress=\{\(\) => onMessageTap\(item.id\)\}/);
@@ -235,9 +234,10 @@ test('QA-23 editable Plan route loads authoritative owner data; deleted/unauthor
 });
 test('QA-02/28 successful leaderboard retains real activity but catalog-only data never claims movement',async()=>{
  for(const occupied of [false,true]){
- const catalogue=[{id:'v',name:'Test',city:'nyc',popularity_rank:1,is_leaderboard_promoted:false,opened_at:null,operating_hours:null,neighborhood:'N'}];let venueReads=0;
- const status=occupied?[{venue_id:'v',venue_name:'Test',user_id:'friend',updated_at:new Date().toISOString(),venues:catalogue[0]}]:[];
- const fn=extract('hooks/use-leaderboard.ts','fetchLeaderboard',{currentPicks:()=>[],rankNightlife:load('lib/leaderboard-ranking.ts').rankNightlife,supabase:{from:t=>builder({data:t==='night_statuses'?status:venueReads++===0?[]:catalogue,error:null})},isDemoMode:()=>false,fetchProfilesSafe:async()=>[{id:'friend',display_name:'Friend'}],buildProfileMap:rows=>new Map(rows.map(p=>[p.id,p])),BOOTSTRAP_MODE:true,isVenueOpen:()=>true,isNightlifeHours:()=>true,calculateEnergyLevel:extract('hooks/use-leaderboard.ts','calculateEnergyLevel')});
+ const api=require('./hot-spots-test-runtime.cjs');
+ const catalogue=[api.venue('v')];
+ const status=occupied?[api.status('friend','v',{expires_at:'2099-01-01T00:00:00Z'})]:[];
+ const fn=extract('hooks/use-leaderboard.ts','fetchLeaderboard',{fetchHotSpotsCatalog:async()=>catalogue,fetchVisibleVenuePresence:async()=>status,buildHotSpotsBoard:api.buildHotSpotsBoard,isDemoMode:()=>false,fetchProfilesSafe:async()=>[{id:'friend',display_name:'Friend'}]});
  const result=await fn('nyc',null,'me',['friend']);assert.equal(result.venues[0].count,occupied?1:0);assert.equal(result.venues[0].energyLevel,occupied?1:0);assert.equal(result.venues[0].movement,'same');assert.equal(!!result.biggestMover,occupied);
  }
 });
@@ -266,7 +266,7 @@ test('QA-13 late failed Like never restores a revoked post snapshot',async()=>{
 
 test('QA-16/20 failed venue Plan child read cannot look like zero people; Plan card offers retry',async()=>{
  const {queryFunction}=require('./product-test-runtime.cjs');
- const fn=queryFunction('app/venue.tsx','venue-card',{isNight:true,session:{user:{id:'a'}},venueId:'v',friendIds:['friend'],getNightKey:()=> '2026-09-25',fetchProfilesSafe:async()=>[],buildProfileMap:()=>new Map(),uniquePeople:x=>x,toFriend:x=>x,supabase:{from:table=>builder(table==='venues'?{data:{id:'v',name:'Bar'},error:null}:table==='plans'?{data:[{id:'p'}],error:null}:table==='plan_downs'?{data:null,error:Error('child offline')}:{data:[],error:null})}});
+ const fn=queryFunction('app/venue.tsx','venue-card',{isNight:true,fetchVisibleVenuePresence:async()=>[],session:{user:{id:'a'}},venueId:'v',friendIds:['friend'],getNightKey:()=> '2026-09-25',fetchProfilesSafe:async()=>[],buildProfileMap:()=>new Map(),uniquePeople:x=>x,toFriend:x=>x,supabase:{from:table=>builder(table==='venues'?{data:{id:'v',name:'Bar'},error:null}:table==='plans'?{data:[{id:'p'}],error:null}:table==='plan_downs'?{data:null,error:Error('child offline')}:{data:[],error:null})}});
  await assert.rejects(fn(),/child offline/);
  const s=source('components/plan-card.tsx');assert.match(s,/Could not load everyone on this plan/);assert.match(s,/!participantsError && !downsError && participants.length === 0/);assert.match(s,/disabled=\{isTogglingDown \|\| downsError\}/);
 });

@@ -61,7 +61,7 @@ function FriendStack({ friends }: { venueName: string; friends: LeaderboardFrien
 /* ── Cards ── */
 
 function PromotedCard({ venue }: { venue: LeaderboardVenue }) {
-  const subLine = [venue.neighborhood, venue.count > 0 ? `${venue.count} sharing this spot` : null]
+  const subLine = [venue.accessLabel, venue.neighborhood, venue.count > 0 ? `${venue.count} sharing this spot` : null]
     .filter(Boolean)
     .join(' · ');
   // Whole row opens the venue (client feedback §9), not just the name
@@ -104,6 +104,7 @@ function VenueCard({ venue }: { venue: LeaderboardVenue }) {
   const isTop3 = venue.rank >= 1 && venue.rank <= 3;
 
   const subParts: string[] = [];
+  if (venue.accessLabel) subParts.push(venue.accessLabel);
   if (venue.neighborhood) subParts.push(venue.neighborhood);
   if (venue.count > 0) subParts.push(`${venue.count} sharing this spot`);
   const subLine = subParts.join(' · ');
