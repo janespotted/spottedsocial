@@ -114,27 +114,27 @@ function WhosHere({ friends, planning }: { friends: FriendAtVenue[]; planning: F
       style={{ backgroundColor: 'rgba(212,255,0,0.08)', borderWidth: 1, borderColor: 'rgba(212,255,0,0.3)' }}
     >
       <View className="flex-row items-center gap-3">
-        <View className="flex-row -space-x-3">
-          {visible.map((friend) => (
-            <View key={friend.id} className="rounded-full border-2 border-[#0d0a18]">
-              <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="md" />
-            </View>
-          ))}
-          {remaining > 0 ? (
-            <View className="w-10 h-10 rounded-full bg-[#a855f7]/40 border-2 border-[#0d0a18] items-center justify-center">
-              <Text className="text-white text-xs font-sans-semibold">+{remaining}</Text>
-            </View>
-          ) : null}
-        </View>
         <View className="flex-1 min-w-0">
           <Text className="text-white text-base font-sans-semibold">
             {count} {count === 1 ? 'friend is' : 'friends are'} here
           </Text>
-          <Text className="text-white/60 text-xs font-sans" numberOfLines={expanded ? undefined : 1}>
+          <Text className="text-white/60 text-xs font-sans" numberOfLines={expanded ? undefined : 2}>
             {friends.slice(0, 3).map((friend, i) => <Text key={friend.id} onPress={friendCardPress(friend.id)} accessibilityRole="button">{i ? ', ' : ''}{friend.display_name.split(' ')[0]}</Text>)}{friends.length > 3 ? ` and ${friends.length - 3} others` : ''}
           </Text>
         </View>
         <SymbolView name={expanded ? 'chevron.up' : 'chevron.down'} size={12} tintColor="rgba(255,255,255,0.4)" />
+      </View>
+      <View className="flex-row">
+        {visible.map((friend, index) => (
+          <View key={friend.id} className="rounded-full border-2 border-[#0d0a18]" style={{ marginLeft: index ? -12 : 0 }}>
+            <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="md" />
+          </View>
+        ))}
+        {remaining > 0 ? (
+          <View className="w-10 h-10 rounded-full bg-[#a855f7]/40 border-2 border-[#0d0a18] items-center justify-center" style={{ marginLeft: -12 }}>
+            <Text className="text-white text-xs font-sans-semibold">+{remaining}</Text>
+          </View>
+        ) : null}
       </View>
       {expanded ? (
         <View className="gap-1.5 pt-1 border-t border-white/10">
