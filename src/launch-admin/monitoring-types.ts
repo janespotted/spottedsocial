@@ -1,4 +1,6 @@
+import type { CommandReport } from './command-center';
 export interface MonitorReport {
+  command?: CommandReport;
   live?: { active_15m: number; checkins_15m: number; events_15m: number };
   conversion?: { invited: number; claimed: number; completed: number; claim_percent: number | null; completion_percent: number | null };
   client_health?: { reports: number; affected_people: number; reporting_people: number; last_report_at: string | null; last_heartbeat_at: string | null; native_status: string; groups: { platform: string; kind: string; reports: number }[] };
@@ -52,6 +54,13 @@ export interface LaunchAlert {
  opened_at: string; last_seen_at: string; resolved_at: string | null; acknowledged_at: string | null;
 }
 export const alertLabels: Record<string,{title:string;detail:string}> = {
+ api_errors:{title:'API requests are failing',detail:'At least 10 server/network failures among 20 or more measured requests in 5 minutes. Check service logs and recent app changes.'},
+ api_slow:{title:'API requests are slow',detail:'Measured p95 exceeds 2 seconds across at least 20 requests in 5 minutes. This includes the phone’s network time.'},
+ reset_job:{title:'Nightly reset needs attention',detail:'A known NYC/LA reset job failed, was disabled, or has no run evidence within 26 hours. Verify expiration and scheduler logs.'},
+ database_capacity:{title:'Database connections are high',detail:'Observed connections exceed 80% of the configured database limit. Inspect the connection pool and backend traffic.'},
+ activity_drop:{title:'Foreground activity dropped',detail:'At least 20 foreground users were sampled 15–30 minutes ago; now 2 or fewer remain. Check for outages or a natural end to the night.'},
+ email_delivery:{title:'Email alerts could not be sent',detail:'An alert email exhausted its retries. Check the sender credentials, verified domain and provider logs.'},
+ email_worker:{title:'Email alert worker is stale',detail:'Email is enabled but the worker has not checked in within 5 minutes. Inspect the email worker and sender configuration.'},
  push_backlog: {title:'Push queue is overdue',detail:'Pending or sending items are more than 5 minutes overdue. Check the push worker and provider logs.'},
  push_failures: {title:'Push attempts are failing',detail:'At least 3 logged failures in 15 minutes, excluding privacy and availability skips.'},
  push_terminal: {title:'Push delivery exhausted its retries',detail:'At least one terminal failure remains in the push queue. Inspect provider and transport failures before retrying.'},

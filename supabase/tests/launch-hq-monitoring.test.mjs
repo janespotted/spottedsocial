@@ -95,4 +95,6 @@ assert.equal(boundary[0].d,'2026-10-31');
 console.log('PASS: event capture, exclusions, auth/anon/delegated/revoked access, direct-table denial, privacy, bounded periods, push categories, job allowlist, DST and non-blocking failures.');
 const { testLiveMonitoring } = await import('./launch-hq-live.test.mjs');
 await testLiveMonitoring(db,{founder,member,demo,delegated});
+const {testCommandCenter}=await import('./command-center.test.mjs');
+await testCommandCenter(db,{founder,member,demo,delegated});
 await db.close();
