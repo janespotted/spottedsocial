@@ -22,7 +22,7 @@ The public RPC is a security-invoker wrapper around a private, fixed-search-path
 
 No anonymous execute grant. No new raw-table access. RLS remains enabled. No service key in the browser. The response contains counts, city/night buckets, fixed labels and operational timestamps; no user IDs, names, phone numbers, message bodies, precise locations, tokens or raw errors. Existing invite-management screens keep their authorized operational behavior.
 
-The UI clears a report before refetch, on failure, and on account change/unmount, and ignores cancelled requests. It refreshes once per minute while visible. Preview fixtures require the existing explicit localhost development gate and are eliminated from production builds.
+The UI retains its timestamped snapshot during a routine refresh to keep the page steady, clears it when the period changes or a request fails, clears it on account change/unmount, and ignores cancelled requests. It refreshes once per minute while visible. Preview fixtures require the existing explicit localhost development gate and are eliminated from production builds.
 
 ## Deployment and tests
 

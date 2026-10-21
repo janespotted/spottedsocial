@@ -11,7 +11,7 @@ export function Monitoring({preview}: {preview: boolean}) {
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
-    setReport(null); setError(''); setBusy(true);
+    setReport(current => current?.days === days ? current : null); setError(''); setBusy(true);
     async function load() {
       try {
         if (preview && import.meta.env.DEV) {
@@ -23,7 +23,7 @@ export function Monitoring({preview}: {preview: boolean}) {
           if (!data || data.days !== days || !Array.isArray(data.nightly)) throw Error('Invalid monitoring response');
           if (!cancelled) setReport(data);
         }
-      } catch (e) { if (!cancelled) setError(monitoringError(e as {code?: string})); }
+      } catch (e) { if (!cancelled) { setReport(null); setError(monitoringError(e as {code?: string})); } }
       finally { if (!cancelled) setBusy(false); }
     }
     void load();
@@ -45,7 +45,7 @@ export function Monitoring({preview}: {preview: boolean}) {
     {error && <div role="alert" className="error">{error}</div>}
     {report && <>
       <div className="monitor-note">Founder access · aggregate counts only. Product activity excludes demo accounts, night-mode testers and excluded accounts. Nightly windows run from 5am to 5am in each profile city. Current nights are partial.</div>
-      {!report.coverage.last_event_at && <div className="notice">No eligible usage events have arrived yet. Zeros below mean no recorded activity, not proof that nobody used the app. App-open coverage requires an iOS build containing UsageManager.</div>}
+      {!report.coverage.last_event_at && <div className="notice">No eligible usage events have arrived yet. Zeros below mean no recorded activity, not proof that nobody used the app. App openings appear only from iOS builds that include session tracking.</div>}
       <section className="metrics" aria-label="Recorded activity">
         <Metric label="Active people" value={report.activity.active_users} note="Unique people with a session or successful action" />
         <Metric label="App openers" value={report.activity.app_openers} note="Unique people with a recorded foreground session" />
