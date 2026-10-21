@@ -877,3 +877,7 @@ td > small {
 @media(max-width:600px) { .monitor-card { padding:18px; } .monitor-card dl > div { flex-wrap:wrap; } .monitor-card dd { text-align:left; } }
 
 .launch-alerts{display:grid;gap:12px;margin-top:18px}.launch-alert{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px;border:1px solid #dec994;border-left:4px solid #ad792b;border-radius:10px;background:#fffbef}.launch-alert p{margin:6px 0}.launch-alert.critical{border-left-color:#b04840;background:#fff5f1}.launch-alert.resolved{border-left-color:#63925c;background:#f4f7f0}.launch-alert small{display:block}.launch-alert button{flex-shrink:0}@media(max-width:650px){.launch-alert{align-items:flex-start;flex-direction:column}.monitor-card .metrics{grid-template-columns:1fr}}
+
+.command-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:20px 0; }
+.command-tabs button { min-height:44px; }
+.command-tabs button[aria-pressed="true"] { outline:2px solid currentColor; outline-offset:2px; }

@@ -394,7 +394,7 @@ function App() {
           <span>{snapshot?.pending ?? "—"}</span>
         </button>
         <button className={wave === "pool" ? "nav active" : "nav"} onClick={() => { setWave("pool"); history.replaceState(null, '', '#planning-pool'); }}><span>Planning pool</span><span>↗</span></button>
-        <button className={wave === "monitoring" ? "nav active" : "nav"} onClick={() => { setWave("monitoring"); history.replaceState(null, "", "#monitoring"); }}><span>Monitoring</span><span>↗</span></button>
+        <button className={wave === "monitoring" ? "nav active" : "nav"} onClick={() => { setWave("monitoring"); history.replaceState(null, "", "#monitoring"); }}><span>Command Center</span><span>↗</span></button>
         <div className="sidebar-title">YOUR WAVES</div>
         {snapshot?.waves.map((w) => (
           <button
@@ -458,7 +458,7 @@ function App() {
             <p className="eyebrow">A GOOD NIGHT STARTS WITH GOOD PEOPLE</p>
             <h1>
               {activeWave?.name ||
-                (wave === "monitoring" ? "Your launch, in view." : wave === "pool" ? "Your first circle." : wave === "queue" ? "Who’s next." : "Let the right people in.")}
+                (wave === "monitoring" ? "Your launch, live." : wave === "pool" ? "Your first circle." : wave === "queue" ? "Who’s next." : "Let the right people in.")}
             </h1>
             <p>
               {wave === "monitoring" ? "Invitations, activity and technical health. Private to the founder." : wave === "pool" ? "Save everyone here. Choose your first 100 when you’re ready." : activeWave

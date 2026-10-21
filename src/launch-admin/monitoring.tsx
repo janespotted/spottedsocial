@@ -1,3 +1,4 @@
+import { CommandCenterPanels } from './command-center';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { actionLabels, alertLabels, percentage, runnerHealth, jobHealth, monitoringError, nightCoverage, type MonitorReport } from './monitoring-types';
@@ -20,7 +21,7 @@ export function Monitoring({preview}: {preview: boolean}) {
           const { monitoringPreview } = await import('./monitoring-preview');
           if (!cancelled) setReport(monitoringPreview(days));
         } else {
-          const {data,error: failure} = await (supabase as any).rpc('launch_monitor_live',{p_days: days}).abortSignal(controller.signal);
+          const {data,error: failure} = await (supabase as any).rpc('command_center',{p_days: days}).abortSignal(controller.signal);
           if (failure) throw failure;
           if (!data || data.days !== days || !Array.isArray(data.nightly)) throw Error('Invalid monitoring response');
           if (!cancelled) setReport(data);
@@ -75,7 +76,7 @@ export function Monitoring({preview}: {preview: boolean}) {
     </div>
     {error && <div role="alert" className="error">{error}</div>}
     {report && <>
-      <div className="monitor-note">Founder access · aggregate counts only. Product activity excludes demo accounts, night-mode testers and excluded accounts. Nightly windows run from 5am to 5am in each profile city. Current nights are partial.</div>
+      <div className="monitor-note">Founder access · aggregate metrics, with account diagnostics in People. Product activity excludes demo accounts, night-mode testers and excluded accounts. Nightly windows run from 5am to 5am in each profile city. Current nights are partial.</div>
       {!report.coverage.last_event_at && <div className="notice">No eligible usage events have arrived yet. Zeros below mean no recorded activity, not proof that nobody used the app. App openings appear only from iOS builds that include session tracking.</div>}
       {report.live && <section className="metrics" aria-label="Live activity">
         <Metric label="Active in the last 15 minutes" value={report.live.active_15m} note="Unique people with a recorded session or successful action" />
@@ -92,6 +93,7 @@ export function Monitoring({preview}: {preview: boolean}) {
           {!a.resolved_at && !a.acknowledged_at && <button className="secondary" disabled={!!alertBusy} onClick={()=>void acknowledge(a.id)}>{alertBusy===a.id?'Saving…':'Acknowledge'}</button>}
         </article>)}</div>
       </section>
+      {report.command && <CommandCenterPanels data={report.command} preview={preview} />}
       {report.conversion && <section className="panel monitor-card"><h2>Invite conversions</h2><p>People marked invited during the selected period · revoked invitations excluded</p><section className="metrics">
         <Metric label="Invited" value={report.conversion.invited} note="Shared denominator for both conversion rates" />
         <Metric label="Claimed after invitation" value={percentage(report.conversion.claim_percent)} note={`${report.conversion.claimed} of ${report.conversion.invited} invited people`} />
