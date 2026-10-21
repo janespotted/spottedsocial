@@ -892,16 +892,31 @@ export type Database = {
       }
       notification_preferences: {
         Row: {
+          messages_enabled: boolean
+          planning_enabled: boolean
+          recap_enabled: boolean
+          planning_hour: number
+          planning_days: number[]
           moves_scope: string
           out_scope: string
           user_id: string
         }
         Insert: {
+          messages_enabled?: boolean
+          planning_enabled?: boolean
+          recap_enabled?: boolean
+          planning_hour?: number
+          planning_days?: number[]
           moves_scope?: string
           out_scope?: string
           user_id: string
         }
         Update: {
+          messages_enabled?: boolean
+          planning_enabled?: boolean
+          recap_enabled?: boolean
+          planning_hour?: number
+          planning_days?: number[]
           moves_scope?: string
           out_scope?: string
           user_id?: string
@@ -2578,6 +2593,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      record_usage: { Args: { p_event: string; p_feature?: string | null }; Returns: undefined }
       get_friends_night_counts: { Args: Record<PropertyKey, never>; Returns: Json };
       send_dm_once: { Args: { p_id: string; p_thread: string; p_text: string; p_image?: string | null }; Returns: Database["public"]["Tables"]["dm_messages"]["Row"][] };
 

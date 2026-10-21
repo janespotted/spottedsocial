@@ -86,7 +86,8 @@ export function useNotifications() {
     refetchOnMount: 'always',
     queryFn: async (): Promise<AppNotification[]> => {
         const [{ data: rows, error }, profiles] = await Promise.all([
-          // From tonight only. Notifications carry no expires_at of their own
+          // Tonight plus active plan conversations and pending friend requests.
+          // RLS rechecks the source and plan expiry. Notifications carry no expires_at of their own
           // and are deleted by the nightly cron — which is an hour late in
           // daylight time — so the boundary is enforced at read time too, or
           // last night's invites stay actionable (addendum v3 §2/§4).
@@ -94,7 +95,7 @@ export function useNotifications() {
             .from('notifications')
             .select('id, sender_id, type, message, is_read, created_at, data')
             .eq('receiver_id', session!.user.id)
-            .gte('created_at', nightStartAt().toISOString())
+            .or(`created_at.gte.${nightStartAt().toISOString()},type.in.(plan_invite,plan_down,plan_comment,friend_request)`)
             .order('created_at', { ascending: false })
             .limit(50),
           fetchProfilesSafe(),

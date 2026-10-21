@@ -19,7 +19,7 @@ test('QA-06 confirmed messages reconcile HTTP/realtime in either order',()=>{
 test('QA-06 failed delayed send keeps a retryable row and does not replace a newer draft',async()=>{
  let draft='hello',finish; const pendingRef={current:[]};const sendingRef={current:false};
  const updatePending=rows=>pendingRef.current=rows;
- const scope={setUploading:()=>{},getSessionUserId:()=> 'a',userId:'a',threadId:'t',sendingRef,pendingRef,updatePending,isFromTonight:()=>true,setMessages:()=>{},confirmMessage:threadState.confirmMessage,
+ const scope={recordUsage:async()=>{},setUploading:()=>{},getSessionUserId:()=> 'a',userId:'a',threadId:'t',sendingRef,pendingRef,updatePending,isFromTonight:()=>true,setMessages:()=>{},confirmMessage:threadState.confirmMessage,
   deliverDm:()=>new Promise((resolve,reject)=>{finish=()=>reject(Error('offline'))})};
  const retryMessage=extract('app/thread.tsx','retryMessage',scope);
  const send=extract('app/thread.tsx','send',{...scope,draft,setDraft:v=>draft=v,retryMessage,pendingDm:(_u,_t,text)=>({id:'stable-id',text,created_at:new Date().toISOString()})});
@@ -28,7 +28,7 @@ test('QA-06 failed delayed send keeps a retryable row and does not replace a new
 });
 test('QA-03/04 Plans and group DM routes preserve destination; invalid source uses inbox',()=>{
  const calls=[];extract('app/activity.tsx','goToPlans',{router:{back:()=>{},navigate:x=>calls.push(x)},setTimeout:fn=>fn()})();assert.equal(calls[0],'/messages?tab=plans');
- const routes=load('lib/push.ts',{'@react-native-async-storage/async-storage':{},'react-native':{},'expo-notifications':{},'./supabase':{}});
+ const routes=load('lib/push.ts',{'@react-native-async-storage/async-storage':{},'react-native':{},'expo-notifications':{},'./supabase':{},'./plan-navigation':load('lib/plan-navigation.ts')});
  const id='00000000-0000-4000-8000-000000000007';assert.equal(routes.routeForNotification({type:'dm',data:{thread_id:id}}),`/thread?threadId=${id}`);assert.equal(routes.routeForNotification({type:'dm',data:{}}),'/messages?tab=dms');
  const dmBlock=source('app/activity.tsx').split('{dms.map')[1].split('</>')[0];assert.match(dmBlock,/routeForNotification/);assert.doesNotMatch(dmBlock,/openThreadWith/);
 });
@@ -220,7 +220,7 @@ test('QA-34 failed receipt setting does not confirm success; successful save rev
 });
 test('QA-20 every Plans child event revalidates parent, comments, downs and participants',()=>{
  const handlers={},invalidated=[];const fn=callback('hooks/use-plans.ts','useEffect',"name: 'plans-realtime'",{session:{user:{id:'a'}},queryClient:{invalidateQueries:({queryKey})=>invalidated.push(queryKey[0])},OWN_NIGHT_STATUS_KEY:'own-night-status',setTimeout:fn=>{fn();return 1},clearTimeout:()=>{},createResilientChannel:opts=>{const ch={on:(_kind,config,fn)=>{handlers[config.table]=fn;return ch;}};opts.configure(ch);return()=>{}}});
- fn.fn();for(const table of ['plan_downs','plan_votes','plan_comments','plan_participants','plans']){invalidated.length=0;handlers[table]();assert.deepEqual(invalidated,['plans','plan-downs','plan-participants','plan-comments']);}
+ fn.fn();for(const table of ['plan_downs','plan_comments','plan_participants','plans']){invalidated.length=0;handlers[table]();assert.deepEqual(invalidated,['plans','plan-detail','plan-downs','plan-participants','plan-comments']);}
 });
 test('QA-21 offline 5AM rollover clears local messages before network revalidation',()=>{
  let boundary,rows=[{text:'last-night'}],cards=new Map([['p','private']]),retried=0;

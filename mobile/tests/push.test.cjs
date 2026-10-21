@@ -25,7 +25,7 @@ function harness() {
       }};return q;}};
   const sdk={getPermissionsAsync:async()=>({status:state.permission,canAskAgain:true}),requestPermissionsAsync:async()=>({status:state.permission}),getDevicePushTokenAsync:async()=>({data:state.nativeToken}),
     dismissAllNotificationsAsync:async()=>calls.push(['dismiss']),cancelAllScheduledNotificationsAsync:async()=>{},clearLastNotificationResponseAsync:async()=>{},setBadgeCountAsync:async()=>{}};
-  const api=load('lib/push.ts',{'expo-notifications':sdk,'./supabase':{supabase:db},'react-native':{Alert:{alert:(...a)=>alerts.push(a)}},'@react-native-async-storage/async-storage':{getItem:async k=>memory.get(k)??null,setItem:async(k,v)=>memory.set(k,v),removeItem:async k=>memory.delete(k)}});
+  const api=load('lib/push.ts',{'expo-notifications':sdk,'./supabase':{supabase:db},'./plan-navigation':load('lib/plan-navigation.ts',{}),'react-native':{Alert:{alert:(...a)=>alerts.push(a)}},'@react-native-async-storage/async-storage':{getItem:async k=>memory.get(k)??null,setItem:async(k,v)=>memory.set(k,v),removeItem:async k=>memory.delete(k)}});
   return {api,state,calls,alerts,memory};
 }
 test('failed token detachment and save reject instead of returning granted',async()=>{
@@ -55,15 +55,15 @@ test('offline cleanup failure does not falsely sign out and can be retried',asyn
  h.state.clearError=false;await h.api.signOutWithPushCleanup();assert.equal(h.state.uid,null);
 });
 test('legacy and canonical arrival taps route to map; local arrival opens correction',()=>{
- const h=harness();for(const type of ['friend_arrived','friend_arrived_venue'])assert.equal(h.api.routeForNotification({type}),'/map');
+ const h=harness();for(const type of ['friend_arrived','friend_arrived_venue'])assert.equal(h.api.routeForNotification({type}),'/activity');
  assert.equal(h.api.routeForNotification({url:'/check-in'}),'/check-in');assert.equal(h.api.routeForNotification({type:'dm'}),'/messages?tab=dms');
 });
-function managerHarness({gate='answered',initial=null,failRegistration=false,status='planning',presented=[]}={}) {
+function managerHarness({gate='answered',initial=null,failRegistration=false,status='planning',presented=[],isNight=true}={}) {
  const dismissed=[];const effects=[];const callbacks={};const destinations=[];const parked=[];const registrations=[];const timers=new Map();let next=0;let failures=failRegistration?1:0;
  const sdk={getPresentedNotificationsAsync:async()=>presented,dismissNotificationAsync:async id=>dismissed.push(id),DEFAULT_ACTION_IDENTIFIER:'default',setNotificationHandler:handler=>{callbacks.presentation=handler.handleNotification;},clearLastNotificationResponseAsync:async()=>{},getLastNotificationResponseAsync:async()=>initial,
  addNotificationResponseReceivedListener:cb=>{callbacks.tap=cb;return {remove(){}};},addPushTokenListener:cb=>{callbacks.token=cb;return {remove(){}};}};
  const native={AppState:{currentState:'active',addEventListener:(_,cb)=>{callbacks.app=cb;return {remove(){}};}}};
- const deps={'react':{useEffect:fn=>effects.push(fn),useRef:value=>({current:value})},'react-native':native,'expo-router':{router:{push:v=>destinations.push(v)}},'expo-notifications':sdk,
+ const deps={'@/lib/usage':{recordUsage:async()=>{}},'@/hooks/use-night-mode':{useNightMode:()=>({isNight})},'react':{useEffect:fn=>effects.push(fn),useRef:value=>({current:value})},'react-native':native,'expo-router':{router:{push:v=>destinations.push(v)}},'expo-notifications':sdk,
  '@react-native-community/netinfo':{addEventListener:cb=>{callbacks.network=cb;return ()=>{};}},
  '@/lib/night-gate':{deferDeepLink:v=>parked.push(v),getNightGateState:()=>gate,takePendingDeepLink:()=>null},
  '@/lib/push':{registerPushToken:async(uid,opts)=>{registrations.push(opts);if(failures-->0)throw Error('offline');return 'granted';},routeForNotification:data=>data?.type==='dm'?'/messages':'/map'},
@@ -80,8 +80,8 @@ const response=(receiver='alice')=>({actionIdentifier:'default',notification:{re
 test('cold-start notification is consumed once even when listener repeats it',async()=>{
  const r=response();const h=managerHarness({initial:r});await tick();h.callbacks.tap(r);assert.deepEqual(h.destinations,['/messages']);h.cleanup();
 });
-test('night gate defers notification route and wrong-account notifications are discarded',async()=>{
- const h=managerHarness({gate:'open',initial:response()});await tick();assert.deepEqual(h.parked,['/messages']);assert.deepEqual(h.destinations,[]);h.cleanup();
+test('night gate permits DMs directly and wrong-account notifications are discarded',async()=>{
+ const h=managerHarness({gate:'open',initial:response()});await tick();assert.deepEqual(h.parked,[]);assert.deepEqual(h.destinations,['/messages']);h.cleanup();
  const other=managerHarness({initial:response('bob')});await tick();assert.deepEqual(other.destinations,[]);other.cleanup();
 });
 test('registration recovers on reconnect, foreground and token rotation',async()=>{
@@ -143,7 +143,7 @@ test('APNs retry identity and metadata are stable and badge is not hardcoded',as
 
 test('nightlife and private-party notifications route to usable screens',()=>{
  const h=harness();const id='11111111-1111-4111-8111-111111111111';
- for(const type of ['friend_out','friend_planning','friend_arrived_venue']) assert.equal(h.api.routeForNotification({type}),'/map');
+ for(const type of ['friend_out','friend_planning','friend_arrived_venue']) assert.equal(h.api.routeForNotification({type}),'/activity');
  for(const type of ['private_party_invite','address_request','party_invite_accepted','party_address_approved']) assert.equal(h.api.routeForNotification({type,data:{host_id:id}}),`/party?hostId=${id}`);
  assert.equal(h.api.routeForNotification({type:'address_request',data:{host_id:'invalid'}}),'/activity');
 });
@@ -157,4 +157,14 @@ test('No suppresses live foreground banners and removes delivered live alerts, p
  assert.equal((await h.callbacks.presentation(dm)).shouldShowBanner,true);
  assert.deepEqual(h.dismissed,['live']);h.cleanup();
  const active=managerHarness({status:'planning'});await tick();assert.equal((await active.callbacks.presentation(live)).shouldShowBanner,true);active.cleanup();
+});
+test('live taps still wait for status; day mode and expired alerts cannot open old locations',async()=>{
+ const live=response();live.notification.request.content.data.type='friend_out';
+ const gated=managerHarness({gate:'open',initial:live});await tick();assert.deepEqual(gated.parked,['/map']);assert.deepEqual(gated.destinations,[]);gated.cleanup();
+ const day=managerHarness({isNight:false,initial:live});await tick();assert.deepEqual(day.destinations,['/activity']);day.cleanup();
+ live.notification.request.content.data.expires_at='2000-01-01T00:00:00Z';
+ const expired=managerHarness({initial:live});await tick();assert.deepEqual(expired.destinations,['/activity']);expired.cleanup();
+});
+test('plan chat and recap are valid push types and use their own titles',()=>{
+ const h=serverHarness();assert.equal(h.api.getNotificationContent('plan_comment','reply').title,'Plan chat');assert.equal(h.api.getNotificationContent('morning_after','replay').url,'/morning-after');
 });

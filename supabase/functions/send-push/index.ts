@@ -44,6 +44,8 @@ const VALID_NOTIFICATION_TYPES = [
   "rally",
   "plan_down",
   "plan_invite",
+  "plan_comment",
+  "morning_after",
   "post_tag",
   "address_request",
   "private_party_invite",
@@ -653,6 +655,7 @@ async function sendApnsPushToHost(
     receiver_id: notificationPayload.receiver_id,
     notification_id: notificationPayload.notification_id,
     data: notificationPayload.data,
+    expires_at: notificationPayload.expires_at,
   };
 
   console.log(
@@ -824,10 +827,14 @@ function getNotificationContent(
       };
     case "weekend_rally":
       return {
-        title: "Your weekend starts here",
+        title: "Make a plan for tonight",
         body: message,
         url: "/messages?tab=plans",
       };
+    case "morning_after":
+      return { title: "Your private replay", body: message, url: "/morning-after" };
+    case "plan_comment":
+      return { title: "Plan chat", body: message, url: "/messages?tab=plans" };
     case "friend_out":
       return { title: "Spotted", body: message, url: "/" };
     case "private_party_invite":
@@ -909,7 +916,7 @@ function getNotificationContent(
     case "friend_checkin":
       return { title: "📍 Friend Checked In", body: message, url: "/" };
     case "friend_planning":
-      return { title: "👀 Friend Making Plans", body: message, url: "/" };
+      return { title: "Spotted", body: message, url: "/" };
     case "post_like":
       return { title: "❤️ Post Liked", body: message, url: "/feed" };
     case "post_comment":
@@ -1128,7 +1135,7 @@ Deno.serve(async (req) => {
       receiver_id,
       notification_id: payload.notification_id,
       type,
-      data: stored.data,
+      data: { ...stored.data, actor_id: sender_id },
       expires_at: lease.expires_at,
     };
 

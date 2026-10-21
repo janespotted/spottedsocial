@@ -1,7 +1,10 @@
+import { useEffect } from 'react';
+import { recordUsage } from '@/lib/usage';
 import { Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
+import { isUuid } from '@/lib/plan-navigation';
 import { savePlan } from '@/lib/plans';
 import { parseConfirmationPeople } from '@/lib/route-input';
 import { useSession } from '@/hooks/use-session';
@@ -11,12 +14,13 @@ import { PlanForm, type PlanFormValues, type PlanFriend } from '@/components/pla
 /** New-plan composer — modal from the Plans tab. Port of the web CreatePlanDialog. */
 export default function CreatePlanScreen() {
   useDismissKeyboardOnLeave();
+  useEffect(() => { void recordUsage('plan_started', 'plan'); }, []);
   const { session } = useSession();
   const queryClient = useQueryClient();
   // "Make plans" on a friend (Activity, friend card) arrives with them
   // already chosen, so the composer opens with the tag in place.
   // Morning After's "Same crew, new plan" brings the whole crew (`withPeople`).
-  const params = useLocalSearchParams<{ withId?: string; withName?: string; withAvatar?: string; withPeople?: string }>();
+  const params = useLocalSearchParams<{ withId?: string; withName?: string; withAvatar?: string; withPeople?: string; venueId?: string; venueName?: string; neighborhood?: string }>();
   const preselected: PlanFriend[] = params.withId
     ? [
         {
@@ -36,7 +40,7 @@ export default function CreatePlanScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['plans'] });
     } catch (e) {
-      console.error('Error creating plan:', e);
+      void recordUsage('action_failed', 'plan');
       throw e;
     }
   };
@@ -46,7 +50,7 @@ export default function CreatePlanScreen() {
       title="New Plan"
       submitLabel="Share Plan"
       submittingLabel="Sharing..."
-      initial={{ friends: preselected }}
+      initial={{ friends: preselected, venue: isUuid(params.venueId) && params.venueName ? { id: params.venueId, name: params.venueName.slice(0, 150), neighborhood: params.neighborhood?.slice(0, 100) ?? '' } : null }}
       onSubmit={handleSubmit}
     />
   );

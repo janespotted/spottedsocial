@@ -5,6 +5,7 @@ import * as Contacts from 'expo-contacts/legacy';
 import * as Haptics from 'expo-haptics';
 import { SymbolView } from 'expo-symbols';
 import { useSession } from '@/hooks/use-session';
+import { ContactsDiscovery } from '../contacts-sync';
 import { LaunchButton, LaunchShell } from '@/components/launch-shell';
 import { LaunchIntroduction } from '@/components/launch-introduction';
 import { PhoneVerifyForm } from '@/components/phone-verify-form';
@@ -41,6 +42,7 @@ export function LaunchSetup({ preview = false, onDone }: { preview?: boolean; on
   const [contactName, setContactName] = useState('');
   const [nomineeLabels, setNomineeLabels] = useState<NomineeLabels>({});
   useEffect(() => { let active = true; if (!preview && session) void readNomineeLabels(session.user.id).then(value => { if (active) setNomineeLabels(value); }); return () => { active = false; }; }, [session?.user.id]);
+  const [findFriends, setFindFriends] = useState(false);
   const [verifyPhone, setVerifyPhone] = useState(false);
   const usernameInput = useRef<TextInput>(null);
   useEffect(() => { if (!preview && launch) setState(launch); }, [launch]);
@@ -60,6 +62,13 @@ export function LaunchSetup({ preview = false, onDone }: { preview?: boolean; on
     return () => sub.remove();
   }, [stage]);
   const errorView = error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" className="text-red-300 text-sm leading-5 mt-4 mb-4">{error}</Text> : null;
+
+  if (findFriends) return <LaunchShell preview={preview} title="Find your people." subtitle="Your two nominations are saved. Now add friends who are already here.">
+    <ContactsDiscovery onboarding preview={preview} />
+    {errorView}
+    <LaunchButton label={busy ? 'Opening Spotted…' : 'Continue to Spotted'} disabled={busy} onPress={() => void perform(finish)} />
+    <Text className="text-white/60 text-sm text-center mt-4">Contact access is optional. You can do this later from your profile.</Text>
+  </LaunchShell>;
 
   if (stage === 'phone') return <LaunchShell preview={preview} key="phone" title="Your number. Your invitation." subtitle="Verify the number you were invited on to unlock your place.">
     <PhoneVerifyForm onVerified={() => { refresh(); }} />
@@ -146,7 +155,7 @@ export function LaunchSetup({ preview = false, onDone }: { preview?: boolean; on
     <Text className="text-white/65 text-sm leading-5">Both are required. No invitations sent yet.</Text>
     {errorView}
     <View className="mt-auto pt-7"><LaunchButton label={busy ? 'Saving…' : choices.length === 2 ? 'Let’s go' : `${choices.length} of 2 chosen`} disabled={busy || choices.length !== 2 || slot !== 0} onPress={() => void perform(async () => {
-      await invoke('complete_launch_onboarding'); Keyboard.dismiss(); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); await finish();
+      await invoke('complete_launch_onboarding'); Keyboard.dismiss(); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setFindFriends(true);
     })} /></View>
   </LaunchShell>
   </LaunchIntroduction>;

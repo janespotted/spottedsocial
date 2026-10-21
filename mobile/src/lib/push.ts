@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import type { Href } from 'expo-router';
+import { isUuid, planDestination } from './plan-navigation';
 import { supabase } from './supabase';
 
 /**
@@ -14,9 +15,9 @@ import { supabase } from './supabase';
  */
 export function routeForNotification(data: Record<string, unknown> | undefined): Href {
   const details = (data?.data && typeof data.data === 'object' ? data.data : {}) as Record<string, unknown>;
-  const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value);
+  const uuid = isUuid;
   const url = typeof data?.url === 'string' ? data.url : '';
-  if (url.startsWith('/check-in')) return url as Href;
+  if (url === '/check-in') return url as Href;
   switch (data?.type) {
     case 'dm':
       return uuid(details.thread_id) ? `/thread?threadId=${details.thread_id}` as Href : '/messages?tab=dms' as Href;
@@ -40,9 +41,11 @@ export function routeForNotification(data: Record<string, unknown> | undefined):
     case 'daily_nudge_second':
       return '/check-in';
     case 'weekend_rally':
+      return '/messages?tab=plans' as Href;
     case 'plan_invite':
     case 'plan_down':
-      return '/messages?tab=plans' as Href;
+    case 'plan_comment':
+      return uuid(details.plan_id) ? planDestination(details.plan_id) : '/messages?tab=plans' as Href;
 
     case 'private_party_invite':
     case 'address_request':
@@ -55,7 +58,8 @@ export function routeForNotification(data: Record<string, unknown> | undefined):
     case 'friend_checkin':
     case 'friend_arrived_venue':
     case 'friends_at_venue':
-      return '/map';
+      if (uuid(details.status_venue_id ?? details.venue_id)) return { pathname: '/venue', params: { venueId: (details.status_venue_id ?? details.venue_id) as string } };
+      return uuid(details.actor_id) ? { pathname: '/friend-card', params: { userId: details.actor_id } } : '/activity';
     case 'venue_arrival_planning':
       return '/check-in';
     default:

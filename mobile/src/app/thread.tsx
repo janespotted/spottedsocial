@@ -1,3 +1,4 @@
+import { recordUsage } from '@/lib/usage';
 import { uploadPendingDmPhoto } from '@/lib/dm-photo';
 import { pendingDm, readPendingDm, savePendingDm, deliverDm, type PendingDm } from '@/lib/dm-outbox';
 import { getSessionUserId } from '@/lib/session-identity';
@@ -458,6 +459,7 @@ function ThreadScreenContent() {
       updatePending(pendingRef.current.filter(m => m.id !== message.id));
       setMessages(prev => confirmMessage(prev, message.id, { ...saved, image_url: image }, isFromTonight(saved.created_at)));
     } catch {
+      void recordUsage('action_failed', 'dm');
       updatePending(pendingRef.current.map(m => m.id === message.id ? { ...m, failed: true } : m));
     } finally { sendingRef.current = false; setUploading(false); }
   };

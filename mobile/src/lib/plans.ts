@@ -17,6 +17,7 @@ export interface Plan {
   score: number;
   comments_count: number;
   created_at: string;
+  expires_at?: string;
   user?: {
     id: string;
     display_name: string;
@@ -123,13 +124,14 @@ export function getPlanExpiry(planDate: string, city?: string | null): string {
   return nightResetAfterDate(planDate, city).toISOString();
 }
 
-/** Unexpired plans, highest score first, with author profiles attached. */
+/** Unexpired plans ordered by date and time, without popularity votes. */
 export async function fetchPlans(): Promise<Plan[]> {
   let query = supabase
     .from('plans')
     .select('*')
     .gte('expires_at', new Date().toISOString())
-    .order('score', { ascending: false })
+    .order('plan_date', { ascending: true })
+    .order('plan_time', { ascending: true })
     .order('created_at', { ascending: false });
   if (!isDemoMode()) query = query.eq('is_demo', false);
 
@@ -154,6 +156,18 @@ export async function fetchPlans(): Promise<Plan[]> {
         },
       };
     });
+}
+
+/** Exact, permission-checked destination. Missing, expired and revoked all return null. */
+export async function fetchPlan(id: string): Promise<Plan | null> {
+  const { data, error } = await supabase.from('plans').select('*').eq('id', id)
+    .gt('expires_at', new Date().toISOString()).maybeSingle();
+  if (error) throw error;
+  if (!data || (!isDemoMode() && data.is_demo)) return null;
+  const author = (await fetchProfilesSafe()).find(p => p.id === data.user_id);
+  if (!author) return null;
+  return { ...data, score: data.score ?? 0, comments_count: data.comments_count ?? 0,
+    created_at: data.created_at ?? '', user: author };
 }
 
 /** The caller's up/down votes, keyed by plan id. */

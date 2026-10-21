@@ -1,3 +1,4 @@
+import { recordUsage } from '@/lib/usage';
 import { isDemoMode, useDemoMode } from '@/lib/demo-mode';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
@@ -7,6 +8,7 @@ import * as Notifications from 'expo-notifications';
 import { deferDeepLink, getNightGateState, takePendingDeepLink } from '@/lib/night-gate';
 import { registerPushToken, routeForNotification } from '@/lib/push';
 import { useSession } from '@/hooks/use-session';
+import { useNightMode } from '@/hooks/use-night-mode';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { LIVE_ACTIVITY_TYPES, withholdLivePreview } from '@/lib/live-preview';
 
@@ -32,7 +34,8 @@ export function PushNotificationManager() {
   const demo = useDemoMode();
   const userId = demo ? undefined : session?.user.id;
   const own = useOwnNightStatus();
-  const liveAllowed = !withholdLivePreview(own.data?.status?.status, !!own.data && !own.isError);
+  const { isNight } = useNightMode();
+  const liveAllowed = isNight && !withholdLivePreview(own.data?.status?.status, !!own.data && !own.isError);
   useEffect(() => {
     foregroundLiveAllowed = liveAllowed;
     if (!liveAllowed) void Notifications.getPresentedNotificationsAsync().then(rows => Promise.all(rows.filter(n => {
@@ -108,8 +111,12 @@ export function PushNotificationManager() {
       if (seen.current.size > 100) seen.current.delete(seen.current.values().next().value!);
       void Notifications.clearLastNotificationResponseAsync().catch(() => {});
       if (typeof data?.receiver_id === 'string' && data.receiver_id !== userId) return;
+      void recordUsage('notification_opened', 'notifications');
       const target = routeForNotification(data);
-      if (data?.type === 'morning_after') { router.push(target); return; }
+      const live = typeof data?.type === 'string' && LIVE_ACTIVITY_TYPES.includes(data.type);
+      if (!live) { router.push(target); return; }
+      const expiry = typeof data?.expires_at === 'string' ? Date.parse(data.expires_at) : NaN;
+      if (!isNight || (Number.isFinite(expiry) && expiry <= Date.now())) { router.push('/activity'); return; }
       if (getNightGateState() !== 'answered') {
         if (!String(target).startsWith('/check-in')) deferDeepLink(target);
       } else router.push(target);
@@ -117,6 +124,6 @@ export function PushNotificationManager() {
     const sub = Notifications.addNotificationResponseReceivedListener(handle);
     void Notifications.getLastNotificationResponseAsync().then(handle).catch(() => {});
     return () => { cancelled = true; sub.remove(); };
-  }, [userId, onboardingNeeded, onboardingResolved]);
+  }, [userId, onboardingNeeded, onboardingResolved, isNight]);
   return null;
 }

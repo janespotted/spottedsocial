@@ -9,10 +9,11 @@ import { getNightKey } from '@/lib/tonight';
 import { MIST, NEON } from '@/lib/theme';
 import { Avatar } from './avatar';
 import { ErrorState } from './empty-state';
+import { planDestination } from '@/lib/plan-navigation';
 
 export function previewPlans(plans: Plan[], nightKey: string) {
   const { tonight, upcoming } = splitTonightUpcoming(plans, p => p.plan_date, nightKey);
-  // Keep the Plans feed's score order tonight; upcoming starts with the nearest date.
+  // Keep the Plans feed's date/time order tonight; upcoming starts with the nearest date.
   return {
     tonight: tonight.length > 0,
     plans: (tonight.length ? tonight : upcoming.sort((a, b) => a.plan_date.localeCompare(b.plan_date))).slice(0, 2),
@@ -28,7 +29,7 @@ export function HomePlansPreview() {
   const openPlans = () => router.push('/messages?tab=plans');
   if (query.isPending) return <View accessibilityLabel="Loading plans" className="mx-4 h-28 rounded-2xl bg-white/5" />;
   if (query.isError && !query.data) return <View className="px-4"><ErrorState compact title="Couldn’t load plans" onRetry={() => { void query.refetch(); }} /></View>;
-  if (!preview.plans.length) return <Pressable onPress={openPlans} accessibilityRole="button" accessibilityLabel="Make a plan. Open Plans" className="mx-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 flex-row items-center gap-3 active:opacity-70">
+  if (!preview.plans.length) return <Pressable onPress={() => router.push('/create-plan')} accessibilityRole="button" accessibilityLabel="Make a plan" className="mx-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 flex-row items-center gap-3 active:opacity-70">
     <SymbolView name="calendar" size={20} tintColor={MIST} />
     <Text className="flex-1 text-white text-sm font-sans-medium">Make a plan</Text>
     <SymbolView name="arrow.up.right" size={14} tintColor={NEON} />
@@ -42,7 +43,7 @@ export function HomePlansPreview() {
     {preview.plans.map(plan => {
       const date = preview.tonight ? '' : new Date(`${plan.plan_date}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
       const detail = [plan.user?.display_name, date, formatTimeTo12Hour(plan.plan_time)].filter(Boolean).join(' · ');
-      return <Pressable key={plan.id} accessibilityRole="button" accessibilityLabel={`${plan.venue_name}. ${detail}. Open Plans`} onPress={openPlans} className="px-4 py-3 border-t border-white/5 flex-row items-center gap-3 active:opacity-70">
+      return <Pressable key={plan.id} accessibilityRole="button" accessibilityLabel={`${plan.venue_name}. ${detail}. Open plan`} onPress={() => router.push(planDestination(plan.id))} className="px-4 py-3 border-t border-white/5 flex-row items-center gap-3 active:opacity-70">
         <Avatar userId={plan.user_id} name={plan.user?.display_name ?? ''} url={plan.user?.avatar_url ?? null} size="sm" />
         <View className="flex-1 min-w-0 gap-1">
           <Text className="text-white font-sans-medium text-sm" numberOfLines={1}>{plan.venue_name}</Text>

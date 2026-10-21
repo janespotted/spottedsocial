@@ -25,6 +25,8 @@ import { INK_LIGHT, SCREEN_GRADIENT } from '@/lib/theme';
 import * as SplashScreen from 'expo-splash-screen';
 import { BackgroundLocationManager } from '@/components/background-location-manager';
 import { NightStatusGate } from '@/components/night-status-gate';
+import { SharedVenueManager } from '@/components/shared-venue-manager';
+import { UsageManager } from '@/components/usage-manager';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import { ToastHost } from '@/components/toast-host';
 import { ConfettiHost } from '@/components/confetti';
@@ -145,6 +147,7 @@ function RootNavigator() {
         }}
       />
       <Stack.Screen name="create-plan" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="plan-detail" />
       <Stack.Screen name="edit-plan" options={{ presentation: 'modal' }} />
       <Stack.Screen name="post-likes" options={{ presentation: 'modal' }} />
       <Stack.Screen name="activity" options={{ presentation: 'modal' }} />
@@ -337,7 +340,7 @@ export default function RootLayout() {
                     <RelationshipEvents />
                     <NightStatusGate />
                     <BackgroundLocationManager />
-                    <PushNotificationManager />
+                    <PushNotificationManager /><UsageManager /><SharedVenueManager />
                     <StatusBar style="light" />
                     <SplashController />
                     <ToastHost />

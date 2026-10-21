@@ -13,7 +13,7 @@ export const RESET_TITLE = 'Tonight resets at 5am.';
 
 /** The full explanation — onboarding card and the Settings row. */
 export const RESET_BODY =
-  'Live sharing, posts, DMs, meetups and invites clear from tonight at 5am. Your private replay and eligible recent venue visits can remain. Your profile and friends stay.';
+  'Live sharing, posts, DMs and tonight’s meetups clear at 5am. Future plans and their chats stay until the planned night ends. Your private replay and eligible recent venue visits can remain. Your profile and friends stay.';
 
 /** What survives, for the Settings detail. */
 export const RESET_KEPT =
@@ -36,11 +36,11 @@ export const RESET_COPY = {
   /** Friend card, under a friend's visible venue. */
   friendCard: 'Shared for tonight · clears at 5am.',
   /** Plans landing screen, a compact row under the header. */
-  plansHeader: 'Tonight resets at 5am — meetups + invites disappear then.',
+  plansHeader: 'Tonight resets at 5am. Future plans and their chats stay until the planned night ends.',
   /** Immediately above the final send in each composer. */
   meetupCompose: 'This meetup disappears at 5am.',
   inviteCompose: 'This invite disappears at 5am.',
-  planCompose: 'This plan disappears at 5am.',
+  planCompose: 'This plan and its chat stay until 5am after the planned night.',
   /** Sent / received meetup + invite cards. */
   expiresAt: 'Expires at 5am',
   meetupSentToast: 'Meetup sent · expires at 5am',

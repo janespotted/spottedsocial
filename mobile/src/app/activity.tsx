@@ -180,12 +180,10 @@ function ActivityCard({
 const EXPIRING_TYPES = new Set([
   'meetup_request',
   'venue_invite',
-  'plan_invite',
   'meetup_accepted',
   'venue_invite_accepted',
   'venue_invite_declined',
   'meetup_declined',
-  'plan_down',
 ]);
 
 /** Invites and meet ups sent since the DM cards carry the row id; older rows don't. */
@@ -489,7 +487,7 @@ function ActivityScreenContent() {
                     // A plan invite has nothing to accept here — "I'm down"
                     // lives on the plan card itself, so open Plans.
                     n.type === 'plan_invite'
-                      ? { label: 'See plan', onPress: goToPlans }
+                      ? { label: 'See plan', onPress: () => router.push(routeForNotification({ type: n.type, data: n.data })) }
                       : status
                         ? {
                             label: 'Chat',
@@ -552,7 +550,8 @@ function ActivityScreenContent() {
                     // Invite replies open the thread holding the card
                     onPress: () => {
                       const threadId = threadIdOf(n);
-                      if (threadId) openThread(threadId, n.sender_name ?? 'Chat', n.sender_avatar_url);
+                      if (n.type === 'plan_down') router.push(routeForNotification({ type: n.type, data: n.data }));
+                      else if (threadId) openThread(threadId, n.sender_name ?? 'Chat', n.sender_avatar_url);
                       else if (n.sender_id) openThreadWith(n.sender_id, n.sender_name ?? 'Chat', n.sender_avatar_url);
                     },
                   }}

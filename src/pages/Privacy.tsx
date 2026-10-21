@@ -36,6 +36,7 @@ export default function Privacy() {
               <li>Location data when you check in</li>
               <li>Content you post (messages, stories, posts)</li>
               <li>Friend connections and interactions</li>
+              <li>Basic usage events, such as app opens, saves, plan replies, failed actions and notification opt-outs. These are linked to your account for up to 90 days. Usage events do not include message text, contact numbers or GPS coordinates.</li>
             </ul>
           </section>
 

@@ -3,7 +3,7 @@ import { useCallback, useEffect } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { createResilientChannel } from '@/lib/resilient-channel';
-import { fetchEventsWithFriends, fetchMyVotes, fetchPlans } from '@/lib/plans';
+import { fetchEventsWithFriends, fetchPlans } from '@/lib/plans';
 import type { NightStatusKind } from '@/lib/night-status';
 import { OWN_NIGHT_STATUS_KEY, useOwnNightStatus } from './use-own-night-status';
 import { useFriendIds } from './use-friend-ids';
@@ -32,7 +32,7 @@ export function useMyNightStatus() {
   return { ...query, data };
 }
 
-/** Unexpired plans (score-sorted) plus the caller's votes. */
+/** Unexpired plans, ordered by their planned date and time. */
 export function usePlans() {
   const { session } = useSession();
   const queryClient = useQueryClient();
@@ -46,8 +46,7 @@ export function usePlans() {
     enabled: !!session,
     staleTime: 30_000,
     queryFn: async () => {
-      const [plans, votes] = await Promise.all([fetchPlans(), fetchMyVotes(session!.user.id)]);
-      return { plans, votes };
+      return { plans: await fetchPlans() };
     },
   });
 }
@@ -81,7 +80,7 @@ export function usePlansRealtime() {
     const invalidatePlans = () => {
       clearTimeout(plansTimer);
       plansTimer = setTimeout(
-        () => { for (const key of ['plans', 'plan-downs', 'plan-participants', 'plan-comments']) void queryClient.invalidateQueries({ queryKey: [key] }); },
+        () => { for (const key of ['plans', 'plan-detail', 'plan-downs', 'plan-participants', 'plan-comments']) void queryClient.invalidateQueries({ queryKey: [key] }); },
         1500
       );
     };
@@ -102,7 +101,6 @@ export function usePlansRealtime() {
       configure: (ch) =>
         ch
           .on('postgres_changes', { event: '*', schema: 'public', table: 'plans' }, invalidatePlans)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'plan_votes' }, invalidatePlans)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'plan_participants' }, invalidatePlans)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'plan_comments' }, invalidatePlans)
           .on(

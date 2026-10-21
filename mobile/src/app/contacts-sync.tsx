@@ -39,7 +39,9 @@ type Step = 'intro' | 'loading' | 'results' | 'denied' | 'error';
  * ContactsSync: US-normalized numbers matched via the match-contacts edge
  * function with authenticated, bounded matching; address books are not retained.
  */
-export default function ContactsSyncSheet() {
+export default function ContactsSyncSheet() { return <ContactsDiscovery />; }
+
+export function ContactsDiscovery({ onboarding = false, preview = false }: { onboarding?: boolean; preview?: boolean }) {
   const { session } = useSession();
   const userId = session?.user.id;
   const [step, setStep] = useState<Step>('intro');
@@ -63,14 +65,15 @@ export default function ContactsSyncSheet() {
   }, [step]);
 
   const sync = async () => {
+    if (preview) { setStep('results'); return; }
     if (!userId) return;
+    setStep('loading');
+    try {
     const { status } = await Contacts.requestPermissionsAsync();
     if (status !== 'granted') {
       setStep('denied');
       return;
     }
-    setStep('loading');
-    try {
       const { data: contacts } = await Contacts.getContactsAsync({
         fields: [Contacts.Fields.PhoneNumbers],
       });
@@ -105,10 +108,11 @@ export default function ContactsSyncSheet() {
 
       // Exclude existing friends/pending in either direction
       const existing = new Set<string>();
-      const [{ data: sent }, { data: recv }] = await Promise.all([
+      const [{ data: sent, error: sentError }, { data: recv, error: recvError }] = await Promise.all([
         supabase.from('friendships').select('friend_id').eq('user_id', userId),
         supabase.from('friendships').select('user_id').eq('friend_id', userId),
       ]);
+      if (sentError || recvError) throw sentError ?? recvError;
       for (const f of sent ?? []) existing.add(f.friend_id);
       for (const f of recv ?? []) existing.add(f.user_id);
 
@@ -159,20 +163,20 @@ export default function ContactsSyncSheet() {
 
   return (
     <View className="pt-6 pb-10 px-5" style={{ maxHeight: 620 }}>
-      <Text className="text-white text-lg font-sans-semibold mb-1">Find Friends from Contacts</Text>
+      <Text className="text-white text-lg font-sans-semibold mb-1">Add people from your contacts</Text>
 
       {step === 'intro' ? (
         <View className="gap-4 pt-3">
           <Text className="text-white/60 text-sm font-sans leading-5">
             See which of your contacts are already on Spotted. Phone numbers are matched securely
-            and never stored.
+            and never stored. Adding someone sends a friend request they can accept.
           </Text>
           <Pressable
             onPress={sync}
             className="rounded-full py-3.5 items-center active:opacity-90"
             style={{ backgroundColor: NEON }}
           >
-            <Text className="text-[#1a0f2e] text-base font-sans-semibold">Sync Contacts</Text>
+            <Text className="text-[#1a0f2e] text-base font-sans-semibold">Find people on Spotted</Text>
           </Pressable>
         </View>
       ) : null}
@@ -202,7 +206,7 @@ export default function ContactsSyncSheet() {
           >
             <Text className="text-[#1a0f2e] font-sans-semibold">Open Settings</Text>
           </Pressable>
-          <View className="flex-row gap-2 w-full pt-1">
+          {!onboarding ? <View className="flex-row gap-2 w-full pt-1">
             <Pressable
               onPress={() => {
                 router.back();
@@ -225,7 +229,7 @@ export default function ContactsSyncSheet() {
               <SymbolView name="paperplane" size={14} tintColor="#ffffff" />
               <Text className="text-white text-sm font-sans-semibold">Invite friends</Text>
             </Pressable>
-          </View>
+          </View> : null}
         </View>
       ) : null}
 
@@ -233,24 +237,24 @@ export default function ContactsSyncSheet() {
         <View className="gap-4 py-6">
           <Text className="text-white/70 text-sm">{syncError}</Text>
           <Pressable onPress={sync} className="py-3"><Text className="text-white">Try again</Text></Pressable>
-          <Pressable onPress={() => router.push('/invite-friends')} className="py-3"><Text className="text-white">Invite friends by link</Text></Pressable>
+          {!onboarding ? <Pressable onPress={() => router.push('/invite-friends')} className="py-3"><Text className="text-white">Invite friends by link</Text></Pressable> : null}
         </View>
       ) : null}
 
       {step === 'results' ? (
         <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
-        {limited ? <Text className="text-white/60 text-sm px-5 py-2">Checked the first 500 contacts. You can invite other friends by link.</Text> : null}
+        {limited ? <Text className="text-white/60 text-sm px-5 py-2">Checked up to 500 phone numbers from the contacts you shared.</Text> : null}
           <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider pt-3 pb-2">
             On Spotted ({matches.length})
           </Text>
           {matches.length === 0 ? (
-            <Text className="text-white/55 text-sm font-sans">No contacts on Spotted yet.</Text>
+            <Text className="text-white/55 text-sm font-sans">No new people to add from these contacts.</Text>
           ) : (
             matches.map((match) => (
               <View key={match.user_id} className="flex-row items-center gap-3 py-2.5">
                 <Avatar userId={match.user_id} name={match.display_name} url={match.avatar_url} size="md" />
                 <View className="flex-1 min-w-0">
-                  <Text className="text-white text-base font-sans-medium" numberOfLines={1} onPress={friendCardPress(match.user_id)} accessibilityRole="button">
+                  <Text className="text-white text-base font-sans-medium" numberOfLines={1} onPress={onboarding ? undefined : friendCardPress(match.user_id)} accessibilityRole="button">
                     {match.display_name}
                   </Text>
                   <Text className="text-white/55 text-xs font-sans" numberOfLines={1}>
@@ -260,7 +264,7 @@ export default function ContactsSyncSheet() {
                 <Pressable
                   onPress={() => addFriend(match)}
                   disabled={requested.has(match.user_id)}
-                  className="px-4 py-2 rounded-full active:opacity-90"
+                  className="px-4 min-h-11 justify-center rounded-full active:opacity-90"
                   style={{
                     backgroundColor: requested.has(match.user_id)
                       ? 'rgba(212,255,0,0.25)'
@@ -275,7 +279,7 @@ export default function ContactsSyncSheet() {
             ))
           )}
 
-          {inviteable.length > 0 ? (
+          {!onboarding && inviteable.length > 0 ? (
             <>
               <Text className="text-white/60 text-xs font-sans-semibold uppercase tracking-wider pt-5 pb-2">
                 Invite to Spotted

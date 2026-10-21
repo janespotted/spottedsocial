@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 
 export const PRIVATE_VIEW_KEYS = [
-  'morning-after', 'edit-plan', 'venue-events', 'friend-requests-count', 'plan-friends', 'blocked-hidden', 'friend-ids', 'friends-out', 'map-data', 'friend-card', 'profile-page', 'friends',
+  'morning-after', 'plan-detail', 'edit-plan', 'venue-events', 'friend-requests-count', 'plan-friends', 'blocked-hidden', 'friend-ids', 'friends-out', 'map-data', 'friend-card', 'profile-page', 'friends',
   'mutual-friends-with', 'audience-counts', 'plan-close-friends', 'friends-page',
   'planning-friends', 'close-friend-ids', 'plans', 'plan-events', 'plan-downs',
   'plan-participants', 'plan-comments', 'notifications', 'activity', 'dm-threads',

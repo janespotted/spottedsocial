@@ -30,7 +30,7 @@ import { reportContent } from '@/lib/moderation';
 import { getHoursDisplayString, type VenueHours, type VenueHoursDisplay } from '@/lib/venue-hours';
 import { calculateDistanceMiles, getVenuePhotoUrl, getVenueTypeDisplay } from '@/lib/venues';
 import { sendVenueInvites, type InviteFriend } from '@/lib/dm-invites';
-import { APP_BASE_URL, fetchOrCreateInviteCode, getInviteUrl } from '@/lib/invites';
+import { APP_BASE_URL } from '@/lib/invites';
 import { NEON, control, outlineControl } from '@/lib/theme';
 import { RESET_COPY } from '@/lib/reset-copy';
 import { useFriendIds } from '@/hooks/use-friend-ids';
@@ -409,13 +409,13 @@ export default function VenueScreen() {
 
   // Share carries the user's invite link so a friend who isn't on Spotted
   // yet lands somewhere useful (there is no public venue page)
+  const makePlanHere = () => {
+    if (venue) router.push({ pathname: '/create-plan', params: { venueId: venue.id, venueName: venue.name, neighborhood: venue.neighborhood ?? '' } });
+  };
+
   const shareVenue = async () => {
     if (!venue) return;
-    let url = APP_BASE_URL;
-    if (session) {
-      const invite = await fetchOrCreateInviteCode(session.user.id).catch(() => null);
-      if (invite) url = getInviteUrl(invite.code);
-    }
+    const url = `${APP_BASE_URL}/venue-link?venueId=${encodeURIComponent(venue.id)}`;
     Share.share({
       message: `Check out ${venue.name}${venue.neighborhood ? ` in ${venue.neighborhood}` : ''} on Spotted 🎉 ${url}`,
     });
@@ -736,7 +736,7 @@ export default function VenueScreen() {
           <VenueSharedVisits venueId={venue.id} />
 
           {/* ── ZONE 2: Social — who's here leads the card ── */}
-          <View className="mb-3 gap-3">
+          {isNight ? <View className="mb-3 gap-3">
             {friendsHere.length > 0 ? (
               <WhosHere friends={friendsHere} planning={friendsPlanning} />
             ) : (
@@ -747,17 +747,16 @@ export default function VenueScreen() {
                 {friendsPlanning.length > 0 ? <PlanningRow friends={friendsPlanning} /> : null}
               </>
             )}
-          </View>
+          </View> : <Text className="text-white/65 text-sm mb-4">Save this spot or make a plan for later.</Text>}
 
           {/* Invite: the headline action when nobody is here, quieter once
               the who's-here card carries the story. A venue invite means
               "join me here now", so it opens with Night Mode
               (DAY-NIGHT-MODE-PLAN.md §4.8). */}
           {!isNight ? (
-            <View className="w-full min-h-11 mb-3 rounded-xl flex-row items-center justify-center gap-2 border border-white/10">
-              <SymbolView name="moon.stars" size={14} tintColor="rgba(255,255,255,0.6)" />
-              <Text className="text-white/60 font-sans-medium text-sm">Invites open at {opensLabel}</Text>
-            </View>
+            <Pressable onPress={makePlanHere} accessibilityRole="button" className="w-full min-h-11 mb-3 rounded-xl items-center justify-center" style={{ backgroundColor: NEON }}>
+              <Text className="text-black font-sans-semibold text-[15px]">Make a plan here</Text>
+            </Pressable>
           ) : (
           <Pressable
             onPress={() => setInvitePickerOpen(true)}
@@ -771,6 +770,8 @@ export default function VenueScreen() {
             </Text>
           </Pressable>
           )}
+
+          {isNight ? <Pressable onPress={makePlanHere} accessibilityRole="button" className="min-h-11 mb-3 items-center justify-center rounded-xl border border-white/20"><Text className="text-white font-sans-medium">Make a plan here</Text></Pressable> : null}
 
           {/* ── ZONE 3: Utility row — Save has a label and a clear on state ── */}
           <View className="flex-row items-center gap-2 mb-3">

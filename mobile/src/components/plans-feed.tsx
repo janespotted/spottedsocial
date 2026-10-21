@@ -43,7 +43,7 @@ function sortFeedItems(a: FeedItem, b: FeedItem): number {
     return b.data.friendsInterested.length - a.data.friendsInterested.length;
   }
   if (a.type === 'plan' && b.type === 'plan') {
-    return b.data.score - a.data.score;
+    return a.data.plan_date.localeCompare(b.data.plan_date) || a.data.plan_time.localeCompare(b.data.plan_time) || b.data.created_at.localeCompare(a.data.created_at);
   }
   if (a.type === 'event' && b.type === 'plan') {
     return a.data.friendsInterested.length >= 2 ? -1 : 1;
@@ -181,7 +181,6 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
   const handlePlanDeleted = () => queryClient.invalidateQueries({ queryKey: ['plans'] });
 
   const plans = plansQuery.data?.plans ?? [];
-  const votes = plansQuery.data?.votes ?? {};
   const outFriends = friendsData?.outFriends ?? [];
   const planningFriends = friendsData?.planningFriends ?? [];
 
@@ -225,7 +224,6 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
         key={`plan-${item.data.id}`}
         plan={item.data}
         currentUserId={userId}
-        userVote={votes[item.data.id] ?? null}
         onEdit={handleEditPlan}
         onDeleted={handlePlanDeleted}
       />
@@ -249,6 +247,10 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
         />
       }
     >
+      <View className="flex-row items-center justify-between gap-3">
+        <Text className="text-white text-2xl font-sans-semibold flex-1">Plans</Text>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/create-plan')} className="min-h-11 px-5 rounded-full bg-[#d4ff00] justify-center"><Text className="text-black font-sans-semibold">New plan</Text></Pressable>
+      </View>
       {/* Persistent, compact — meetups and invites go with the night
           (addendum v3 §3). Not a modal, not dismissible. */}
       {isNight ? (
@@ -389,21 +391,6 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
           <View>
             <Text className="text-white font-sans-semibold text-xl mb-3">Plans</Text>
 
-            {/* Share a plan — lightweight dashed row */}
-            <Pressable
-              onPress={() => router.push('/create-plan')}
-              className="flex-row items-center gap-4 p-4 rounded-2xl border border-dashed border-white/15 mb-4 active:bg-white/[0.02]"
-            >
-              <View className="w-11 h-11 rounded-full bg-[#d4ff00]/10 items-center justify-center">
-                <SymbolView name="plus" size={18} tintColor={NEON} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-white font-sans-medium text-[15px]">Share a plan</Text>
-                <Text className="text-white/45 text-xs font-sans mt-0.5">
-                  Post when & where — see who&apos;s down
-                </Text>
-              </View>
-            </Pressable>
 
             <View className="gap-4">
               {tonightItems.length === 0 && upcomingItems.length > 0 ? (

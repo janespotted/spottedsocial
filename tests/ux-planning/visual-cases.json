@@ -1,0 +1,16 @@
+{
+  "scope": "Focused regression for approved UX priorities 1–7, 9–10, with mandatory nominations retained",
+  "instructions": "Use the spotted-regression workflow. Open and inspect actual native screenshots. Record each device, text scale, mode and fixture. A successful tap or unit test alone is not a visual pass. Restore synthetic data. Never seed production.",
+  "cases": [
+    {"id":"ux-home-planning","states":["day-empty-composer-shortcut","day-existing-plan-exact-destination","morning-recap","afternoon-plans-first","night-current-activity-first"]},
+    {"id":"ux-plan-header","states":["long-author-and-venue","invited-versus-interested","owner-options","compact-width","large-text"]},
+    {"id":"ux-plan-chat","states":["empty","keyboard-draft-send-visible","sent-and-reopened","failed-send-retains-draft","future-plan-after-earlier-reset","expired-or-revoked-plan"]},
+    {"id":"ux-notifications","states":["activity-scopes","planning-off","planning-days-and-time","recap-opt-in","last-row-system-settings","save-error"]},
+    {"id":"ux-notification-routes","states":["exact-plan-before-status-gate","exact-chat-before-status-gate","live-venue-respects-gate","stale-or-private-destination"]},
+    {"id":"ux-venue-planning","states":["day-primary-plan","night-invite-directions-plan","prefilled-composer","share-through-sign-in-and-required-onboarding"]},
+    {"id":"ux-day-discovery","states":["for-you-empty-catalog-fallback","catalog-error-retry","saved-tab","five-tabs-retained"]},
+    {"id":"ux-required-nominations-contacts","states":["zero-of-two-cannot-finish","one-of-two-cannot-finish","two-nominations-then-contacts","contacts-permission-denied-continue","no-matches-continue","already-on-spotted-request","pending-and-existing-friends-filtered","failed-request-retry","compact-width","large-text"]}
+  ],
+  "automated_commands": ["cd mobile && npm run test:location", "cd mobile && npm run typecheck", "SPOTTED_PGLITE_MODULE=/path/to/pglite node tests/ux-planning/database.cjs"],
+  "physical_device_followup": ["APNs delivery and taps", "iOS contact permission limited/full/denied with a synthetic address book", "fresh install venue-link return through TestFlight", "compact phone and Dynamic Type 1.3 or greater"]
+}

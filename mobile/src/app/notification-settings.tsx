@@ -1,111 +1,55 @@
-import { useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
-import { Stack } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
-import { useSession } from "@/hooks/use-session";
-import { supabase } from "@/lib/supabase";
-import { control, controlTint, INK_LIGHT } from "@/lib/theme";
+import { useRef, useState } from 'react';
+import { Alert, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Stack } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
+import { useSession } from '@/hooks/use-session';
+import { supabase } from '@/lib/supabase';
+import { control, controlTint, INK_LIGHT, NEON } from '@/lib/theme';
 
-type Scope = "all" | "close" | "none";
+type Scope = 'all' | 'close' | 'none';
+interface Preferences { out_scope: Scope; moves_scope: Scope; messages_enabled: boolean; planning_enabled: boolean; recap_enabled: boolean; planning_hour: number; planning_days: number[] }
+const defaults: Preferences = { out_scope: 'all', moves_scope: 'close', messages_enabled: true, planning_enabled: false, recap_enabled: false, planning_hour: 17, planning_days: [5,6] };
 export default function NotificationSettings() {
   const { session } = useSession();
-  const db = supabase;
   const saving = useRef(false);
   const [pending, setPending] = useState(false);
-  const query = useQuery({
-    queryKey: ["notification-preferences", session?.user.id],
-    enabled: !!session,
-    queryFn: async () => {
-      const { data, error } = await db.from("notification_preferences").select(
-        "out_scope,moves_scope",
-      ).eq("user_id", session!.user.id).maybeSingle();
+  const query = useQuery({ queryKey: ['notification-preferences', session?.user.id], enabled: !!session,
+    queryFn: async (): Promise<Preferences> => {
+      const { data, error } = await supabase.from('notification_preferences').select('out_scope,moves_scope,messages_enabled,planning_enabled,recap_enabled,planning_hour,planning_days').eq('user_id', session!.user.id).maybeSingle();
       if (error) throw error;
-      return data ?? { out_scope: "all", moves_scope: "close" };
-    },
-  });
-  const save = async (key: string, value: Scope) => {
+      return data ? { ...data, out_scope: data.out_scope as Scope, moves_scope: data.moves_scope as Scope } : defaults;
+    } });
+  const save = async <K extends keyof Preferences>(key: K, value: Preferences[K]) => {
     if (!session || saving.current || !query.data) return;
     saving.current = true; setPending(true);
     try {
-      const { error } = await db.from("notification_preferences").upsert({
-        user_id: session.user.id,
-        ...query.data,
-        [key]: value,
-      }, { onConflict: "user_id" });
+      const { error } = await supabase.from('notification_preferences').upsert({ user_id: session.user.id, ...query.data, [key]: value }, { onConflict: 'user_id' });
       if (error) throw error;
       await query.refetch();
-    } catch {
-      Alert.alert("Could not save", "Please try again.");
-    } finally {
-      saving.current = false; setPending(false);
-    }
+    } catch { Alert.alert('Could not save', 'Please try again.'); }
+    finally { saving.current = false; setPending(false); }
   };
-  return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{ padding: 20, gap: 20 }}
-    >
-      <Stack.Screen
-        options={{
-          title: "Friend activity alerts",
-          headerShown: true,
-          headerBackButtonDisplayMode: "minimal",
-          headerTintColor: "#fff",
-          headerStyle: { backgroundColor: INK_LIGHT },
-        }}
-      />
-      <Text className="text-white/70 font-sans">
-        These settings never expand who can see a friend's status. Their sharing
-        audience always applies.
-      </Text>
-      {pending ? <Text className="text-white/60">Saving…</Text> : null}
-      {query.isError
-        ? (
-          <Pressable onPress={() => query.refetch()}>
-            <Text className="text-white">
-              Couldn't load preferences. Tap to retry.
-            </Text>
-          </Pressable>
-        )
-        : null}
-      {(["out_scope", "moves_scope"] as const).map((key) => (
-        <View key={key} className="gap-3">
-          <Text className="text-white text-xl font-sans-semibold">
-            {key === "out_scope"
-              ? "Who's out or making plans"
-              : "Friends changing bars"}
-          </Text>
-          {([["all", "All eligible friends & mutuals"], [
-            "close",
-            "Close friends only",
-          ], ["none", "Off"]] as const).map(([value, label]) => (
-            <Pressable
-              key={value}
-              disabled={pending || !query.data}
-              onPress={() => save(key, value)}
-              className={`rounded-2xl p-4 ${
-                control[query.data?.[key] === value ? "selected" : "ordinary"]
-              }`}
-            >
-              <Text
-                className="font-sans"
-                style={{
-                  color: controlTint[
-                    query.data?.[key] === value ? "selected" : "ordinary"
-                  ],
-                }}
-              >
-                {label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      ))}
-      <Text className="text-white/60 font-sans">
-        One first-out and one TBD alert per friend each night. Bar changes are
-        limited to three per friend per night, at least 30 minutes apart. Direct
-        messages and invitations are unaffected.
-      </Text>
-    </ScrollView>
-  );
+  const toggle = (key: 'messages_enabled' | 'planning_enabled' | 'recap_enabled', title: string, body: string) => <View className="gap-2">
+    <View className="flex-row items-center gap-4"><Text className="text-white font-sans-semibold text-lg flex-1">{title}</Text><Switch accessibilityLabel={title} value={query.data?.[key] ?? defaults[key]} disabled={pending || !query.data} onValueChange={value => void save(key, value)} trackColor={{ true: NEON }} /></View>
+    <Text className="text-white/65 font-sans text-sm leading-5">{body}</Text>
+  </View>;
+  return <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 70, gap: 24 }}>
+    <Stack.Screen options={{ title: 'Notifications', headerShown: true, headerBackButtonDisplayMode: 'minimal', headerTintColor: '#fff', headerStyle: { backgroundColor: INK_LIGHT } }} />
+    <Text className="text-white/70 font-sans">Choose what you hear about. A friend’s sharing settings always apply.</Text>
+    {pending ? <Text className="text-white/60">Saving…</Text> : null}
+    {query.isError ? <Pressable onPress={() => query.refetch()} className="min-h-11 justify-center"><Text className="text-white">Couldn’t load preferences. Tap to retry.</Text></Pressable> : null}
+    {toggle('messages_enabled', 'Messages & invitations', 'Direct messages, plan chat replies, invitations and friend requests. Day or night.')}
+    <View className="gap-3"><Text className="text-white text-xl font-sans-semibold">Friend activity</Text><Text className="text-white/65 text-sm leading-5">Nighttime only, while you’re Out or TBD. At most two activity alerts per night, at least an hour apart. Messages and direct invitations have no activity cap.</Text></View>
+    {(['out_scope','moves_scope'] as const).map(key => <View key={key} className="gap-2">
+      <Text className="text-white text-base font-sans-medium">{key === 'out_scope' ? 'Friends going out or making plans' : 'Friends changing venues'}</Text>
+      {([['all','Friends who share with me'],['close','My close friends only'],['none','Off']] as const).map(([value,label]) => <Pressable key={value} accessibilityRole="radio" accessibilityState={{ checked: query.data?.[key] === value }} disabled={pending || !query.data} onPress={() => void save(key,value)} className={`rounded-2xl p-4 min-h-11 ${control[query.data?.[key] === value ? 'selected' : 'ordinary']}`}><Text className="font-sans" style={{ color: controlTint[query.data?.[key] === value ? 'selected' : 'ordinary'] }}>{label}</Text></Pressable>)}
+    </View>)}
+    {toggle('planning_enabled', 'Planning reminder', 'A reminder to make a plan before the night starts. Uses your Spotted city’s time.')}
+    {query.data?.planning_enabled ? <View className="gap-3">
+      <Text className="text-white font-sans-medium">Send at</Text><View className="flex-row flex-wrap gap-2">{[12,13,14,15,16,17].map(hour => <Pressable key={hour} accessibilityRole="radio" accessibilityState={{checked: query.data?.planning_hour === hour}} disabled={pending} onPress={() => void save('planning_hour',hour)} className={`min-h-11 px-4 justify-center rounded-full ${control[query.data?.planning_hour === hour ? 'selected' : 'ordinary']}`}><Text style={{color:controlTint[query.data?.planning_hour === hour ? 'selected' : 'ordinary']}}>{hour === 12 ? 12 : hour-12} PM</Text></Pressable>)}</View>
+      <Text className="text-white font-sans-medium">On these days</Text><View className="flex-row flex-wrap gap-2">{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day,i) => { const selected=query.data!.planning_days.includes(i+1); return <Pressable key={day} accessibilityRole="checkbox" accessibilityState={{checked:selected}} disabled={pending} onPress={() => void save('planning_days',selected ? query.data!.planning_days.filter(d=>d!==i+1) : [...query.data!.planning_days,i+1])} className={`min-h-11 px-4 justify-center rounded-full ${control[selected ? 'selected' : 'ordinary']}`}><Text style={{color:controlTint[selected ? 'selected' : 'ordinary']}}>{day}</Text></Pressable>; })}</View>
+    </View> : null}
+    {toggle('recap_enabled', 'Private replay reminder', 'At 10 AM, only when you have a replay from last night.')}
+    <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} className="min-h-11 justify-center"><Text className="text-[#d4ff00] font-sans-medium">Open iPhone notification settings →</Text></Pressable>
+  </ScrollView>;
 }

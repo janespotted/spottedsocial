@@ -71,7 +71,7 @@ test('Home plans preview distinguishes a failed read from a successful empty lis
  const tree=fn(); const types=[];const visit=n=>{if(Array.isArray(n))return n.forEach(visit);if(n&&typeof n==='object'){types.push(n.type);visit(n.props?.children)}};visit(tree);
  assert.equal(types.includes('ErrorState'),mode==='error');
  if(mode==='loading')assert.equal(tree.props.accessibilityLabel,'Loading plans');
- if(mode==='empty')assert.equal(tree.props.accessibilityLabel,'Make a plan. Open Plans');
+ if(mode==='empty')assert.equal(tree.props.accessibilityLabel,'Make a plan');
  if(mode==='content')assert(types.includes('Avatar'));
  }
 });

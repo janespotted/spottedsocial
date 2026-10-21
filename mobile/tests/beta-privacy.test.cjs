@@ -169,6 +169,7 @@ function inboxHarness(result, profileFailure = false) {
     eq() {
       return this;
     },
+    or() { return this; },
     gte() {
       return this;
     },

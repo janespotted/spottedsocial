@@ -381,13 +381,14 @@ function NewsfeedScreen({ active }: { active: boolean }) {
           />
         }
         ListFooterComponent={
-          feed.posts.length === 0 ? null : feed.hasMore ? (
+          feed.posts.length === 0 ? <CompactRecapEntry /> : feed.hasMore ? (
             <View className="py-6 items-center">
               <ActivityIndicator color={NEON} />
             </View>
           ) : (
             <View className="pt-6">
               <ForTonight />
+              <CompactRecapEntry />
               <Text className="text-white/45 text-xs font-sans text-center py-6">you&apos;re all caught up</Text>
             </View>
           )
@@ -401,7 +402,7 @@ function NewsfeedScreen({ active }: { active: boolean }) {
               pickVisibleVideo();
             }}
           >
-            <View className="pt-4 pb-3 gap-4"><HomePlansPreview /><CompactRecapEntry /></View>
+            <View className="pt-4 pb-3 gap-4"><HomePlansPreview /></View>
             {isPlanning && outFriends.length > 0 ? (
               <View className="px-4 pt-4">
                 <FriendsOutBanner count={outFriends.length} friends={outFriends} />

@@ -15,6 +15,7 @@ export default function PrivacyScreen() {
             'Location data when you check in',
             'Content you post (messages, stories, posts)',
             'Friend connections and interactions',
+            'Basic usage events, such as app opens, saves, plan replies, failed actions and notification opt-outs. These are linked to your account for up to 90 days to understand whether Spotted is useful. Usage events do not include message text, contact numbers or GPS coordinates.',
           ],
         },
         {

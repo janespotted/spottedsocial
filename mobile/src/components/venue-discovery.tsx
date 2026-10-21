@@ -52,25 +52,27 @@ export function VenueDiscovery({ liveKind, standalone = false }: { liveKind?: 'm
   const savedOnly = mode === 'saved';
   const forYou = mode === 'for-you';
   const featured = useVenueRecommendations(forYou, term);
+  const catalogFallback = forYou && !featured.isLoading && !featured.isError && featured.rows.length === 0;
+  const showPicks = forYou && !catalogFallback;
   useEffect(() => { const timer = setTimeout(() => setTerm(search.trim()), 200); return () => clearTimeout(timer); }, [search]);
   const saved = useQuery({ queryKey: ['saved-venues', session?.user.id], enabled: !!session,
     queryFn: () => fetchSavedVenueNames(session!.user.id) });
   const venues = useInfiniteQuery({
     queryKey: ['venue-discovery', session?.user.id, city, term, savedOnly ? saved.data : null, savedOnly],
-    enabled: !!session && !forYou && (!savedOnly || saved.isSuccess),
+    enabled: !!session && !showPicks && (!savedOnly || saved.isSuccess),
     initialPageParam: 0,
     queryFn: ({ pageParam }) => fetchDiscoveryVenues(city, term, pageParam, savedOnly ? saved.data : undefined),
     getNextPageParam: (last, pages) => last.length === VENUE_PAGE_SIZE ? pages.length : undefined,
     staleTime: 60_000,
   });
   const { refreshing, onRefresh } = usePullToRefresh(async () => {
-    if (forYou) await featured.refresh();
+    if (showPicks) await featured.refresh();
     else await Promise.all([saved.refetch(), venues.refetch()]);
   });
-  const rows = forYou ? featured.rows : venues.data?.pages.flat() ?? [];
+  const rows = showPicks ? featured.rows : venues.data?.pages.flat() ?? [];
   const contentContainerStyle = useResolveClassNames(standalone ? 'px-5 pb-safe-offset-8' : 'px-4 pb-32');
-  const waiting = search.trim() !== term || (forYou ? featured.isLoading : venues.isLoading || (savedOnly && saved.isLoading));
-  const failed = forYou ? featured.isError : venues.isError || (savedOnly && saved.isError);
+  const waiting = search.trim() !== term || (showPicks ? featured.isLoading : venues.isLoading || (savedOnly && saved.isLoading));
+  const failed = showPicks ? featured.isError : venues.isError || (savedOnly && saved.isError);
   return (
     <View className="flex-1">
       <View className="px-5 pt-4 pb-3 gap-4">
@@ -92,10 +94,10 @@ export function VenueDiscovery({ liveKind, standalone = false }: { liveKind?: 'm
       <LegendList key={mode} data={waiting && search.trim() !== term ? [] : rows} keyExtractor={item => item.id} recycleItems contentContainerStyle={contentContainerStyle}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColorClassName="accent-[#d4ff00]" />}
-        onEndReached={() => { if (!forYou && venues.hasNextPage && !venues.isFetching && !venues.isError) void venues.fetchNextPage(); }} onEndReachedThreshold={0.4}
-        ListHeaderComponent={forYou && rows.length > 0 ? <Text className="text-white/55 text-xs font-sans pb-4">Clubs & bars, selected by Spotted.</Text> : null}
+        onEndReached={() => { if (!showPicks && venues.hasNextPage && !venues.isFetching && !venues.isError) void venues.fetchNextPage(); }} onEndReachedThreshold={0.4}
+        ListHeaderComponent={rows.length > 0 ? <Text className="text-white/55 text-xs font-sans pb-4">{showPicks ? "Clubs & bars, selected by Spotted." : catalogFallback ? "Explore spots in your city. Save a favorite or make a plan." : ""}</Text> : null}
         ListEmptyComponent={waiting ? <ActivityIndicator color={NEON} className="py-12" /> : failed ? <ErrorState compact title="Couldn’t load spots" onRetry={onRefresh} retrying={refreshing} /> : <EmptyState compact icon={savedOnly ? 'bookmark' : 'magnifyingglass'} title={term ? 'No matches' : savedOnly ? 'Your next spots' : forYou ? 'More picks soon' : 'More spots soon'} body={term ? undefined : savedOnly ? 'Save a venue to find it here.' : undefined} actions={term ? [{label:'Clear search',onPress:()=>setSearch(''),primary:true}] : savedOnly ? [{label:'Explore spots',onPress:()=>setMode('all'),primary:true}] : forYou ? [{label:'Browse all spots',onPress:()=>setMode('all'),primary:true}] : []} />}
-        ListFooterComponent={!forYou && venues.isFetchingNextPage ? <ActivityIndicator color={NEON} className="py-5" /> : failed && rows.length > 0 ? <ErrorState compact title="Couldn’t refresh spots" body="" onRetry={onRefresh} retrying={refreshing} /> : null}
+        ListFooterComponent={!showPicks && venues.isFetchingNextPage ? <ActivityIndicator color={NEON} className="py-5" /> : failed && rows.length > 0 ? <ErrorState compact title="Couldn’t refresh spots" body="" onRetry={onRefresh} retrying={refreshing} /> : null}
         renderItem={({item}) => 'pick' in item ? <View className="mb-4"><RecommendedVenueCard venue={item as RecommendedVenue} /></View> : <VenueRow city={city} venue={item} saved={saved.data?.includes(item.name) ?? false} />}
       />
     </View>
