@@ -29,6 +29,7 @@ export default function InviteLanding() {
   const [inviter, setInviter] = useState<InviterInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const safeCode = /^[A-HJ-NP-Z2-9]{8}$/.test((code ?? '').toUpperCase()) ? code!.toUpperCase() : null;
 
   useEffect(() => {
     if (code) {
@@ -154,10 +155,11 @@ export default function InviteLanding() {
             {inviter?.display_name} invited you!
           </h2>
           <p className="text-white/60 mb-8">
-            Join Spotted to see where your friends are going out tonight 🎉
+            Find your friend on Spotted and make plans together. New members still need an active wave invitation.
           </p>
 
           {/* Join Button */}
+          {isIOS && !isNativePlatform() && safeCode ? <a href={`spotted://invite/${safeCode}`} className="block w-full rounded-xl bg-[#d4ff00] text-[#211037] font-semibold py-4 mb-3">Open invitation in Spotted</a> : null}
           <Button
             onClick={handleJoin}
             className="w-full bg-[#a855f7] hover:bg-[#a855f7]/90 shadow-[0_0_15px_rgba(168,85,247,0.6)] hover:shadow-[0_0_25px_rgba(168,85,247,0.8)] transition-all text-white font-semibold text-lg py-6"
@@ -169,9 +171,10 @@ export default function InviteLanding() {
 
           <p className="text-white/40 text-sm mt-4">
             {isIOS && !isNativePlatform()
-              ? 'Install the app, then tap this link again to connect'
+              ? 'After installing, return here and choose Open invitation in Spotted. Complete your admission and nominations, then send a friend request.'
               : "You'll automatically become friends after signing up"}
           </p>
+          {isIOS && safeCode ? <p className="text-white/60 text-sm mt-4">Your friend’s code: <strong className="text-white select-all">{safeCode}</strong>. You can also enter it under Share Spotted in the app.</p> : null}
         </CardContent>
       </Card>
     </div>
