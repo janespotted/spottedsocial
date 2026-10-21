@@ -10,7 +10,7 @@
     "backgroundColor": "#110a24",
     "ios": {
       "bundleIdentifier": "com.janereynolds.spotted",
-      "buildNumber": "62",
+      "buildNumber": "63",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Spotted uses your location to show which friends are nearby and detect when you arrive at venues.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Spotted uses background location to notify you when friends arrive at venues and auto-detect your check-ins, even when the app is closed. Your location is only shared with friends you choose.",
