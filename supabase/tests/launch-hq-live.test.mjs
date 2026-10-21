@@ -5,7 +5,7 @@ export async function testLiveMonitoring(db,{founder,member,demo,delegated}) {
  await db.exec(`reset role; create table auth.users(id uuid primary key); insert into auth.users values('${founder}'),('${member}');
  create function cron.schedule(text,text,text) returns bigint language sql as $$select 9::bigint$$;
  delete from spotted_private.usage_exclusions;`);
- await db.exec(await readFile(new URL('../migrations/20261021215950_launch_hq_live_alerts.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../migrations/20261021220858_launch_hq_live_alerts.sql',import.meta.url),'utf8'));
  await db.exec(`set role anon;`);
  for(const sql of ['select public.launch_monitor_live(7)','select * from public.launch_monitor_signal',"select public.record_client_health(gen_random_uuid(),'heartbeat','web')","select public.acknowledge_launch_alert(gen_random_uuid())"])
   await assert.rejects(db.query(sql),/permission denied/);

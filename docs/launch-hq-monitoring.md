@@ -44,7 +44,7 @@ Revert the frontend commit to remove the tab. To disable access immediately, cle
 
 ## Live monitoring and alerts (22 October 2026)
 
-The next additive migration is `20261021215950_launch_hq_live_alerts.sql`. Apply only this migration to the already-current project; do not replay older branch migrations. `launch_monitor_live` wraps the unchanged v1 report and its founder authorization. It adds 15-minute activity, invitation-cohort conversions, fixed-vocabulary client-error aggregates and persistent incident history.
+The next additive migration is `20261021220858_launch_hq_live_alerts.sql`. Apply only this migration to the already-current project; do not replay older branch migrations. `launch_monitor_live` wraps the unchanged v1 report and its founder authorization. It adds 15-minute activity, invitation-cohort conversions, fixed-vocabulary client-error aggregates and persistent incident history.
 
 Realtime publishes only the singleton `public.launch_monitor_signal` timestamp. Its RLS policy checks the current private founder role. Every signal causes a fresh authorized RPC, throttled in the UI; visible pages also refresh every 15 seconds, including on return to foreground or network recovery. No raw usage, contact, push, check-in or crash rows enter the publication. Trigger failures are isolated from product mutations. Signal writes are throttled with a nonblocking transaction advisory lock.
 
