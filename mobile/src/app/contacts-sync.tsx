@@ -1,5 +1,5 @@
 import { friendCardPress } from '@/lib/friend-card';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { sendFriendRequest } from '@/lib/friends';
 import { useSession } from '@/hooks/use-session';
 import { Avatar } from '@/components/avatar';
+import { LaunchButton } from '@/components/launch-shell';
 import { NEON, PURPLE } from '@/lib/theme';
 
 interface ContactMatch {
@@ -41,7 +42,7 @@ type Step = 'intro' | 'loading' | 'results' | 'denied' | 'error';
  */
 export default function ContactsSyncSheet() { return <ContactsDiscovery />; }
 
-export function ContactsDiscovery({ onboarding = false, preview = false }: { onboarding?: boolean; preview?: boolean }) {
+export function ContactsDiscovery({ onboarding = false, preview = false, footer }: { onboarding?: boolean; preview?: boolean; footer?: (step: Step) => ReactNode }) {
   const { session } = useSession();
   const userId = session?.user.id;
   const [step, setStep] = useState<Step>('intro');
@@ -162,22 +163,22 @@ export function ContactsDiscovery({ onboarding = false, preview = false }: { onb
   };
 
   return (
-    <View className="pt-6 pb-10 px-5" style={{ maxHeight: 620 }}>
-      <Text className="text-white text-lg font-sans-semibold mb-1">Add people from your contacts</Text>
+    <View className={onboarding ? 'flex-1' : 'pt-6 pb-10 px-5'} style={onboarding ? undefined : { maxHeight: 620 }}>
+      {!onboarding ? <Text className="text-white text-lg font-sans-semibold mb-1">Add people from your contacts</Text> : null}
 
       {step === 'intro' ? (
-        <View className="gap-4 pt-3">
-          <Text className="text-white/60 text-sm font-sans leading-5">
+        <View className={onboarding ? 'mt-auto pt-12' : 'gap-4 pt-3'}>
+          {!onboarding ? <Text className="text-white/60 text-sm font-sans leading-5">
             See which of your contacts are already on Spotted. Phone numbers are matched securely
             and never stored. Adding someone sends a friend request they can accept.
-          </Text>
-          <Pressable
+          </Text> : null}
+          {onboarding ? <LaunchButton label="Find friends" onPress={sync} /> : <Pressable
             onPress={sync}
             className="rounded-full py-3.5 items-center active:opacity-90"
             style={{ backgroundColor: NEON }}
           >
             <Text className="text-[#1a0f2e] text-base font-sans-semibold">Find people on Spotted</Text>
-          </Pressable>
+          </Pressable>}
         </View>
       ) : null}
 
@@ -304,6 +305,7 @@ export function ContactsDiscovery({ onboarding = false, preview = false }: { onb
           ) : null}
         </ScrollView>
       ) : null}
+      {footer ? <View className={step === 'intro' ? 'pt-2' : 'mt-auto pt-6'}>{footer(step)}</View> : null}
     </View>
   );
 }

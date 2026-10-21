@@ -63,11 +63,17 @@ export function LaunchSetup({ preview = false, onDone }: { preview?: boolean; on
   }, [stage]);
   const errorView = error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" className="text-red-300 text-sm leading-5 mt-4 mb-4">{error}</Text> : null;
 
-  if (findFriends) return <LaunchShell preview={preview} title="Find your people." subtitle="Your two nominations are saved. Now add friends who are already here.">
-    <ContactsDiscovery onboarding preview={preview} />
-    {errorView}
-    <LaunchButton label={busy ? 'Opening Spotted…' : 'Continue to Spotted'} disabled={busy} onPress={() => void perform(finish)} />
-    <Text className="text-white/60 text-sm text-center mt-4">Contact access is optional. You can do this later from your profile.</Text>
+  if (findFriends) return <LaunchShell preview={preview} focused title="Find your people." subtitle="See which of your contacts are on Spotted.">
+    <ContactsDiscovery onboarding preview={preview} footer={step => <>
+      {errorView}
+      <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => void perform(finish)} className="min-h-12 items-center justify-center px-4 py-3 active:opacity-70">
+        <Text className="text-white/65 text-sm font-sans-medium text-center">{busy ? 'Opening Spotted…' : step === 'results' ? 'Continue to Spotted' : 'Skip for now'}</Text>
+      </Pressable>
+      <View className="flex-row items-center justify-center gap-1.5 mt-4">
+        <SymbolView name="lock" size={12} tintColor={MIST} />
+        <Text className="text-white/60 text-xs font-sans text-center">We don’t save your contacts.</Text>
+      </View>
+    </>} />
   </LaunchShell>;
 
   if (stage === 'phone') return <LaunchShell preview={preview} key="phone" title="Your number. Your invitation." subtitle="Verify the number you were invited on to unlock your place.">

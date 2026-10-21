@@ -5,13 +5,16 @@ import { SpottedMark } from '@/components/spotted-mark';
 import { LaunchReveal, useLaunchReducedMotion } from '@/components/launch-motion';
 import { SPRING } from '@/lib/motion';
 import { INK, MIST, NEON } from '@/lib/theme';
-export function LaunchShell({ title, subtitle, step, children, preview = false }: { preview?: boolean; title: string; subtitle: string; step?: number; children: ReactNode }) {
+export function LaunchShell({ title, subtitle, step, children, preview = false, focused = false }: { preview?: boolean; focused?: boolean; title: string; subtitle: string; step?: number; children: ReactNode }) {
+  const heading = <>
+    <Text accessibilityRole="header" className={`text-white text-[34px] leading-[39px] font-sans-light${focused ? ' text-center' : ''}`}>{title}</Text>
+    <Text style={{ color: MIST, ...(focused ? { maxWidth: 285 } : {}) }} className={`text-base leading-6 font-sans mt-3${focused ? ' text-center' : ' mb-8'}`}>{subtitle}</Text>
+  </>;
   return <KeyboardAwareScrollView style={{ flex: 1, backgroundColor: INK }} contentContainerClassName={preview ? "flex-grow px-7 pt-6 pb-safe-offset-6" : "flex-grow px-7 pt-safe-offset-6 pb-safe-offset-6"} keyboardShouldPersistTaps="handled" bottomOffset={24}>
-    <View className="flex-row items-center justify-between mb-10"><SpottedMark size={36} /><Text style={{ color: MIST }} className="text-xs font-sans-medium tracking-widest flex-1 text-right ml-4">NEW YORK · FIRST WAVE</Text></View>
+    <View className={`flex-row items-center justify-between${focused ? '' : ' mb-10'}`}><SpottedMark size={36} />{!focused ? <Text style={{ color: MIST }} className="text-xs font-sans-medium tracking-widest flex-1 text-right ml-4">NEW YORK · FIRST WAVE</Text> : null}</View>
     <LaunchReveal key={title} style={{ flex: 1 }}>
       {step !== undefined ? <Text style={{ color: NEON }} className="text-xs font-sans-medium tracking-widest mb-4" accessibilityLabel={`Step ${step} of 2`}>{step === 1 ? '01 / YOUR PROFILE' : '02 / YOUR TWO'}</Text> : null}
-      <Text accessibilityRole="header" className="text-white text-[34px] leading-[39px] font-sans-light">{title}</Text>
-      <Text style={{ color: MIST }} className="text-base leading-6 font-sans mt-3 mb-8">{subtitle}</Text>
+      {focused ? <View className="items-center pt-16 pb-10">{heading}</View> : heading}
       {children}
     </LaunchReveal>
   </KeyboardAwareScrollView>;
