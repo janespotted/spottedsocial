@@ -1,0 +1,27 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const ts=require('typescript');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../src/lib/telemetry-core.ts'),'utf8');
+const output=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+const mod={exports:{}};new Function('exports','module','require',output)(mod.exports,mod,require);
+const {createCollector,timedFetch,installMeasurementSink,networkSurface,routeSurface}=mod.exports;
+(async()=>{
+ let now=Date.now(),seq=0,fail=true;const storage=new Map(),sent=[],presence=[];
+ const c=createCollector({now:()=>now,uuid:()=>`id-${++seq}`,read:async k=>storage.get(k)??null,write:async(k,v)=>storage.set(k,v),remove:async k=>storage.delete(k),send:async batch=>{sent.push(batch);if(fail)throw Error('offline');},touch:async(id,state)=>presence.push([id,state])});
+ await c.identify('user-a');c.start();const oldSink=c.captureSink();
+ c.record({event:'screen_view',surface:'map'});await c.flush();assert.equal(c.pending(),1);
+ fail=false;await c.flush();assert.equal(c.pending(),0);assert.equal(sent[0][0].id,sent[1][0].id,'retry uses identical event ID');
+ c.heartbeat();c.end();c.heartbeat();assert.deepEqual(presence.map(x=>x[1]),[true,true,false]);
+ const before=c.pending();c.record({event:'screen_view',surface:'home'});assert.equal(c.pending(),before,'background does not record views');
+ await c.identify('user-b');c.start();oldSink({event:'api_request',surface:'messages',duration_ms:10,outcome:'ok'});assert.equal(c.pending(),0,'late response cannot become another user event');
+ for(let i=0;i<500;i++)c.record({event:'screen_view',surface:'home'});assert.equal(c.pending(),300,'offline queue is bounded');
+ now+=86400001;await c.flush();assert.equal(c.pending(),0,'stale events expire');
+ await c.identify(null);c.record({event:'screen_view',surface:'home'});assert.equal(c.pending(),0,'signed out cannot record');
+ const reports=[];installMeasurementSink(e=>reports.push(e));
+ const request=timedFetch(async()=>new Response('{}',{status:500}));await request('https://example.com/rest/v1/dm_messages?body=PRIVATE',{body:'SECRET',method:'POST'});
+ assert.equal(reports[0].outcome,'server_error');assert.equal(reports[0].surface,'messages');assert.ok(!JSON.stringify(reports).includes('SECRET'));assert.ok(!JSON.stringify(reports).includes('PRIVATE'));
+ await request('https://example.com/rest/v1/rpc/record_command_events');assert.equal(reports.length,1,'collector does not measure itself');
+ await assert.rejects(timedFetch(async()=>{throw Error('offline')})('https://example.com/rest/v1/checkins'),/offline/);assert.equal(reports[1].outcome,'network_error');
+ assert.equal(routeSurface('/(tabs)/(leaderboard)/leaderboard'),'hot_spots');assert.equal(routeSurface('/thread?thread=PRIVATE'),'messages');assert.equal(networkSurface('/rest/v1/rpc/touch_app_session'),null);
+ console.log('PASS: offline replay, stable IDs, account isolation, foreground lifecycle, queue/time limits, network outcomes, recursion exclusion, and no URL/body capture.');
+})().catch(e=>{console.error(e);process.exitCode=1});

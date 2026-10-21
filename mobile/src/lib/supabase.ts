@@ -5,13 +5,14 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 import { appFetch, getDemoSandbox } from './demo-mode';
 import { sessionFetch } from './session-identity';
+import { timedFetch } from './telemetry-core';
 import type { DemoSandbox } from './demo-sandbox';
 
 export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 export const SUPABASE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
 const liveClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  global: { fetch: appFetch },
+  global: { fetch: timedFetch(appFetch) },
   auth: {
     storage: AsyncStorage,
     persistSession: true,
