@@ -3,6 +3,11 @@ import type { MonitorReport } from './monitoring-types';
 export function monitoringPreview(days: number): MonitorReport {
  const generated = new Date(), since = new Date(generated.getTime()-days*86400000).toISOString();
  return {
+  live:{active_15m:12,checkins_15m:8,events_15m:31},
+  conversion:{invited:72,claimed:39,completed:27,claim_percent:54.2,completion_percent:37.5},
+  client_health:{reports:2,affected_people:1,reporting_people:18,last_report_at:generated.toISOString(),last_heartbeat_at:generated.toISOString(),native_status:'not_connected',groups:[{platform:'web',kind:'render_error',reports:2}]},
+  alerts_evaluated_at:generated.toISOString(),
+  alerts:[{id:'preview-alert',alert_key:'push_failures',severity:'warning',observed_count:3,opened_at:generated.toISOString(),last_seen_at:generated.toISOString(),resolved_at:null,acknowledged_at:null}],
   generated_at:generated.toISOString(),since,days,
   coverage:{usage_started_at:since,extended_events_started_at:since,last_event_at:generated.toISOString(),last_session_at:generated.toISOString(),native_crashes:'not_instrumented'},
   invites:{selected:100,invited:72,claimed:39,joined:27,sms_failed:2},

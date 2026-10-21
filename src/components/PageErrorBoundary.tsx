@@ -1,3 +1,4 @@
+import { reportClientHealth } from '@/lib/client-health';
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
@@ -24,6 +25,7 @@ export class PageErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    void reportClientHealth('render_error');
     logger.error('page:crash', {
       page: this.props.pageName || 'unknown',
       error: error.message,

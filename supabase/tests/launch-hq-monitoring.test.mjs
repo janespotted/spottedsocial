@@ -93,4 +93,6 @@ assert.equal((await q('select count(*)::int n from public.checkins'))[0].n,3,'Ca
 const boundary=await q(`select (('2026-11-01T09:59:00Z'::timestamptz at time zone 'America/New_York')-interval '5 hours')::date::text d`);
 assert.equal(boundary[0].d,'2026-10-31');
 console.log('PASS: event capture, exclusions, auth/anon/delegated/revoked access, direct-table denial, privacy, bounded periods, push categories, job allowlist, DST and non-blocking failures.');
+const { testLiveMonitoring } = await import('./launch-hq-live.test.mjs');
+await testLiveMonitoring(db,{founder,member,demo,delegated});
 await db.close();

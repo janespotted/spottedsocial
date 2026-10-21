@@ -1,4 +1,9 @@
 export interface MonitorReport {
+  live?: { active_15m: number; checkins_15m: number; events_15m: number };
+  conversion?: { invited: number; claimed: number; completed: number; claim_percent: number | null; completion_percent: number | null };
+  client_health?: { reports: number; affected_people: number; reporting_people: number; last_report_at: string | null; last_heartbeat_at: string | null; native_status: string; groups: { platform: string; kind: string; reports: number }[] };
+  alerts_evaluated_at?: string | null;
+  alerts?: LaunchAlert[];
   generated_at: string; since: string; days: number;
   coverage: { usage_started_at: string; extended_events_started_at: string; last_event_at: string | null; last_session_at: string | null; native_crashes: string };
   invites: { selected: number; invited: number; claimed: number; joined: number; sms_failed: number };
@@ -40,4 +45,25 @@ export function nightCoverage(night: string, city: string, began: string): 'unav
   if (Number(part('hour')) < 5) date.setUTCDate(date.getUTCDate()-1);
   const firstNight = date.toISOString().slice(0,10);
   return night < firstNight ? 'unavailable' : night === firstNight ? 'partial' : 'available';
+}
+
+export interface LaunchAlert {
+ id: string; alert_key: string; severity: 'warning' | 'critical'; observed_count: number;
+ opened_at: string; last_seen_at: string; resolved_at: string | null; acknowledged_at: string | null;
+}
+export const alertLabels: Record<string,{title:string;detail:string}> = {
+ push_backlog: {title:'Push queue is overdue',detail:'Pending or sending items are more than 5 minutes overdue. Check the push worker and provider logs.'},
+ push_failures: {title:'Push attempts are failing',detail:'At least 3 logged failures in 15 minutes, excluding privacy and availability skips.'},
+ push_terminal: {title:'Push delivery exhausted its retries',detail:'At least one terminal failure remains in the push queue. Inspect provider and transport failures before retrying.'},
+ push_disabled: {title:'Push delivery is switched off',detail:'Notifications are waiting while delivery is disabled. Check the launch delivery setting.'},
+ client_errors: {title:'App errors reported',detail:'At least one client error was reported in 15 minutes. Review error coverage below.'},
+ action_failures: {title:'Product actions are failing',detail:'At least 5 recorded action failures in 15 minutes. Review affected features below.'},
+ sms_failures: {title:'Invitation SMS failed',detail:'At least one failed or undelivered invitation was updated in the last 15 minutes.'},
+ push_job: {title:'Push worker needs attention',detail:'Work is waiting and the scheduled worker is disabled, missing or has no successful/running job in 5 minutes.'},
+};
+export const percentage = (value:number|null|undefined) => value == null ? '—' : `${value}%`;
+export function runnerHealth(at:string|null|undefined, now:number=Date.now()) {
+ if (!at) return 'Waiting for the first alert check';
+ const age=now-Date.parse(at);
+ return !Number.isFinite(age) || age>150_000 ? 'Alert checks are stale — inspect the scheduler' : 'Server checks running every minute';
 }
