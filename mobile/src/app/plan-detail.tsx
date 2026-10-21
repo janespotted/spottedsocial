@@ -20,7 +20,7 @@ export default function PlanDetail() {
     refetchOnMount: 'always', staleTime: 0, queryFn: () => fetchPlan(planId!) });
   const plan = query.data;
   const expired = !!plan?.expires_at && new Date(plan.expires_at).getTime() <= now;
-  return <KeyboardAwareScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 16 }} keyboardShouldPersistTaps="handled">
+  return <KeyboardAwareScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 16 }} keyboardShouldPersistTaps="handled" bottomOffset={32}>
     <Stack.Screen options={{ headerShown: true, title: 'Plan', headerBackButtonDisplayMode: 'minimal', headerTintColor: '#fff', headerStyle: { backgroundColor: INK_LIGHT } }} />
     {!isUuid(planId) || (!query.isPending && !query.isError && (!plan || expired)) ?
       <EmptyState icon="calendar" title="This plan is no longer available" body="It may have ended, been removed, or its sharing settings changed." actions={[{ label: 'See other plans', onPress: () => router.replace('/messages?tab=plans'), primary: true }, { label: 'Make a plan', onPress: () => router.replace('/create-plan') }]} /> :
