@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {jobHealth,monitoringError,nightCoverage} from './monitoring-types';
+import {jobHealth,monitoringError,nightCoverage,percentage,runnerHealth} from './monitoring-types';
 describe('monitoring states',()=>{
  const now='2026-10-21T22:00:00Z';
  const job={name:'spotted-push-delivery',enabled:true,last_run:'2026-10-21T21:59:00Z',last_finished:now,status:'succeeded'};
@@ -23,4 +23,12 @@ it('marks uninstrumented nights and assigns pre-5am / DST events to the prior ni
  expect(nightCoverage('2026-10-22','nyc','2026-10-21T21:27:00Z')).toBe('available');
  expect(nightCoverage('2026-10-31','nyc','2026-11-01T09:59:00Z')).toBe('partial');
  expect(nightCoverage('2026-10-31','la','2026-11-01T12:59:00Z')).toBe('partial');
+});
+
+it('shows zero-denominator conversion and stale scheduler evidence honestly',()=>{
+ expect(percentage(null)).toBe('—');expect(percentage(0)).toBe('0%');expect(percentage(54.2)).toBe('54.2%');
+ expect(runnerHealth(null)).toContain('first');
+ expect(runnerHealth('invalid')).toContain('stale');
+ expect(runnerHealth('2026-10-22T01:00:00Z',Date.parse('2026-10-22T01:02:00Z'))).toContain('running');
+ expect(runnerHealth('2026-10-22T01:00:00Z',Date.parse('2026-10-22T01:03:00Z'))).toContain('stale');
 });

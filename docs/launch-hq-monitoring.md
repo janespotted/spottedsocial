@@ -41,3 +41,38 @@ Reproduce the SQL fixture with `PGLITE_MODULE` pointing to a pinned `@electric-s
 ## Rollback
 
 Revert the frontend commit to remove the tab. To disable access immediately, clear `founder_monitor` on the private operator row using an authorized database session. The new event capture triggers can be dropped independently without touching product rows. Retain the event enum expansion and private settings when disabling capture; avoid deleting collected history or replaying older migrations.
+
+## Live monitoring and alerts (22 October 2026)
+
+The next additive migration is `20261021220858_launch_hq_live_alerts.sql`. Apply only this migration to the already-current project; do not replay older branch migrations. `launch_monitor_live` wraps the unchanged v1 report and its founder authorization. It adds 15-minute activity, invitation-cohort conversions, fixed-vocabulary client-error aggregates and persistent incident history.
+
+Realtime publishes only the singleton `public.launch_monitor_signal` timestamp. Its RLS policy checks the current private founder role. Every signal causes a fresh authorized RPC, throttled in the UI; visible pages also refresh every 15 seconds, including on return to foreground or network recovery. No raw usage, contact, push, check-in or crash rows enter the publication. Trigger failures are isolated from product mutations. Signal writes are throttled with a nonblocking transaction advisory lock.
+
+The cohort denominator is non-revoked guests marked invited during the selected period. Claim counts require claiming after invitation; completion requires completion after that claim. Both rates use the same invited denominator. A zero denominator is null, displayed as —. Rates are observed through now, so younger invitation cohorts are incomplete.
+
+`spotted-launch-alerts` runs each minute even with the dashboard closed. It creates one open incident per condition, retains acknowledgement without treating it as recovery, resolves the incident when its condition clears, and creates a fresh unacknowledged incident if it recurs. Resolved incidents display for 24 hours and are retained for 90 days. It never sends emails, SMS or app pushes. Optional browser notifications require a user click and the dashboard to remain open; their text contains no metrics or user information. Browser background throttling can delay their display.
+
+| Condition | Threshold |
+| --- | --- |
+| Push backlog | Any pending/sending item >5 minutes overdue |
+| Push failures | At least 3 non-skip logged failures in 15 minutes |
+| Terminal push failure | Any failed item remaining in the queue, including transport failure |
+| Push switched off | Delivery disabled while work is queued |
+| Push job | Queued work, with job absent/disabled or no succeeded/running execution within 5 minutes |
+| Client errors | At least 1 eligible report in 15 minutes |
+| Product-action failures | At least 5 eligible recorded failures in 15 minutes |
+| Invitation SMS | At least 1 failed/undelivered message updated in 15 minutes |
+
+Alert runner freshness is independent of the report timestamp; after 150 seconds the dashboard says the checks are stale. Database outage detection is limited to the open dashboard's failed refresh, because a database cannot monitor its own downtime from inside itself.
+
+### Crash coverage
+
+This release instruments the website's React error boundaries, uncaught JavaScript errors and unhandled rejections. Signed-in production sessions send a heartbeat every five minutes while visible. Only a generated deduplication UUID, fixed kind and platform are accepted; there are no arbitrary metadata, error-message or stack-trace fields. Browser collection is best effort, capped at ten requests/minute. The database independently serializes per-user rate limiting (ten errors/minute) and heartbeat deduplication. Reports are retained for 30 days; demo/test exclusions apply at ingestion and read time. The dashboard is intentionally not counted as product traffic.
+
+No external crash-reporting account exists. **Native iOS/Android process crashes, pre-sign-in errors and reliable post-crash replay remain unconnected.** No mobile binary is released by this change. `native_status` stays `not_connected`; ordinary clients cannot submit a `native_crash` event or claim trusted provenance. Counts are client-reported signals, not a crash-free percentage or authenticated proof of a crash. The native collector must be integrated into the current iOS release branch and tested on device before native coverage can be claimed.
+
+### Verification and rollback
+
+Run the combined PostgreSQL tests with the documented PGlite runtime, dashboard TypeScript, `vitest run src/launch-admin src/lib/client-health.test.ts`, and `vite build`. Tests cover denial for anonymous/member/delegated/revoked roles, private raw-table access, signal-table RLS, invalid and null inputs, demo/excluded users, deduplication/rate limits, exact cohorts, incident acknowledgement/recovery/reopening and forbidden output fields. Browser QA covers existing navigation, period selection, acknowledgment, desktop and 390px layouts. Production must exclude design fixtures.
+
+Rollback the frontend to v1 independently. Disable only the new scheduler with `select cron.unschedule('spotted-launch-alerts')` if needed. Revoke execute on `public.launch_monitor_live(integer)` or clear the existing founder flag for immediate access shutdown. Keep historical reports/alerts; do not drop product tables or replay prior migrations. The change does not widen access to precise locations.
