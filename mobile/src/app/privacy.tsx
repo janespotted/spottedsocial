@@ -27,6 +27,7 @@ export default function PrivacyScreen() {
             'Connect you with friends at venues',
             'Send notifications about friend activity',
             'Ensure safety and security',
+            'Measure app sessions, screen categories, successful actions and technical failures to improve Spotted. These operational events are linked to your account privately for up to 90 days; founder reports show aggregate activity and limited account diagnostics for setup, connections and repeated technical failures. We do not record message content, contact lists, screenshots or GPS in this analytics stream.',
           ],
         },
         {
@@ -40,7 +41,7 @@ export default function PrivacyScreen() {
             'With friends according to your privacy settings',
             'With service providers who assist our operations',
             'When required by law or to protect rights',
-            'In aggregated, anonymized form for analytics',
+            'In aggregate reports for product analytics',
           ],
         },
         {

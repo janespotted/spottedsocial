@@ -1,3 +1,5 @@
+import { reportRenderError } from '@/lib/telemetry';
+import type { ErrorBoundaryProps } from 'expo-router';
 import { signOutWithPushCleanup } from '@/lib/push';
 import { Alert, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { AccountScope } from '@/components/account-scope';
@@ -355,4 +357,9 @@ export default function RootLayout() {
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+}
+
+export function ErrorBoundary({retry}:ErrorBoundaryProps) {
+ useEffect(()=>{void reportRenderError();},[]);
+ return <View style={{flex:1,backgroundColor:'#090b16',justifyContent:'center',padding:28,gap:18}}><Text style={{color:'white',fontSize:22}}>Something went wrong.</Text><Text style={{color:'#c6c8d0'}}>Try opening this screen again.</Text><Pressable accessibilityRole="button" onPress={()=>void retry()} style={{padding:16,backgroundColor:'#d4ff00',borderRadius:18}}><Text style={{color:'#090b16',textAlign:'center'}}>Try again</Text></Pressable></View>;
 }
