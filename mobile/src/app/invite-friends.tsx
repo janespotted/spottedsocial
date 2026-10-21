@@ -1,5 +1,6 @@
 import { useDemoMode } from '@/lib/demo-mode';
 import { useState } from 'react';
+import { router } from 'expo-router';
 import { ActivityIndicator, Alert, Pressable, Share, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -52,6 +53,7 @@ export default function InviteFriendsSheet() {
   if (demo) return <View className="p-6 gap-3"><Text className="text-white text-lg font-sans-semibold">Demo stays here.</Text><Text className="text-white/60 leading-6">Exit Demo to share Spotted with real friends. Meet Ups and venue invites can be tested with your sample friends.</Text></View>;
   return (
     <View className="pt-6 pb-10 px-5 gap-5 items-center">
+      <Pressable accessibilityRole="button" onPress={() => router.push('/invite-connect' as never)} className="min-h-11 justify-center self-stretch"><Text style={{ color: NEON }}>Have a friend’s code? Find them →</Text></Pressable>
       <View className="flex-row items-center gap-3 self-stretch">
         <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: PURPLE }}>
           <SymbolView name="link" size={20} tintColor="#ffffff" />

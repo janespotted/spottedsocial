@@ -18,7 +18,7 @@ const GATE_HREF: Href = { pathname: '/check-in', params: { gate: '1' } };
 
 // Screens the check-in sheet itself opens on top of the pending question.
 // '(recap)' is the Morning After flow (morning-after, recap-photo, crossed-paths).
-const ALLOWED_ABOVE_GATE = new Set(['check-in', 'audience', 'morning-after', '(recap)', 'admin-onboarding', 'thread', 'plan-detail', 'create-plan', 'edit-plan', 'notification-settings']);
+const ALLOWED_ABOVE_GATE = new Set(['check-in', 'audience', 'morning-after', '(recap)', 'admin-onboarding', 'thread', 'plan-detail', 'create-plan', 'edit-plan', 'notification-settings', 'friends', 'invite-connect', 'activity', 'party']);
 
 // setTimeout overflows past ~24.8 days; clamp so a long-lived session
 // re-arms instead of firing immediately.

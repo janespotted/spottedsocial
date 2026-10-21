@@ -19,6 +19,10 @@ export function routeForNotification(data: Record<string, unknown> | undefined):
   const url = typeof data?.url === 'string' ? data.url : '';
   if (url === '/check-in') return url as Href;
   switch (data?.type) {
+    case 'friend_request':
+    case 'friend_accepted':
+    case 'invite_accepted':
+      return '/friends';
     case 'dm':
       return uuid(details.thread_id) ? `/thread?threadId=${details.thread_id}` as Href : '/messages?tab=dms' as Href;
     case 'venue_yap':

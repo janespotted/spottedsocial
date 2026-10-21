@@ -1,4 +1,5 @@
-import { recordUsage } from '@/lib/usage';
+import { recordNotificationOpen } from '@/lib/usage';
+import { isVisibleConversation } from '@/lib/conversation-notifications';
 import { isDemoMode, useDemoMode } from '@/lib/demo-mode';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
@@ -20,9 +21,10 @@ Notifications.setNotificationHandler({
     const type = notification.request.content.data?.type;
     const live = typeof type === 'string' && LIVE_ACTIVITY_TYPES.includes(type);
     const allowed = !isDemoMode() && !!foregroundUser && (typeof receiver !== 'string' || receiver === foregroundUser) && (!live || foregroundLiveAllowed);
+    const alreadyReading = !!foregroundUser && AppState.currentState === 'active' && isVisibleConversation(foregroundUser, notification.request.content.data ?? {});
     return {
-      shouldShowBanner: allowed, shouldShowList: allowed,
-      shouldPlaySound: allowed, shouldSetBadge: allowed,
+      shouldShowBanner: allowed && !alreadyReading, shouldShowList: allowed && !alreadyReading,
+      shouldPlaySound: allowed && !alreadyReading, shouldSetBadge: allowed && !alreadyReading,
     };
   },
 });
@@ -81,6 +83,8 @@ export function PushNotificationManager() {
         if (again && !cancelled) { again = false; void register(false); }
       }
     };
+    // Retire the old unconditional local recap; the server checks actual recap content.
+    void Notifications.cancelScheduledNotificationAsync('morning-after-recap').catch(() => {});
     void register(false);
     const app = AppState.addEventListener('change', (state) => {
       if (state === 'active') void register(false);
@@ -111,7 +115,7 @@ export function PushNotificationManager() {
       if (seen.current.size > 100) seen.current.delete(seen.current.values().next().value!);
       void Notifications.clearLastNotificationResponseAsync().catch(() => {});
       if (typeof data?.receiver_id === 'string' && data.receiver_id !== userId) return;
-      void recordUsage('notification_opened', 'notifications');
+      void recordNotificationOpen(data?.notification_id);
       const target = routeForNotification(data);
       const live = typeof data?.type === 'string' && LIVE_ACTIVITY_TYPES.includes(data.type);
       if (!live) { router.push(target); return; }

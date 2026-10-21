@@ -26,6 +26,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { BackgroundLocationManager } from '@/components/background-location-manager';
 import { NightStatusGate } from '@/components/night-status-gate';
 import { SharedVenueManager } from '@/components/shared-venue-manager';
+import { InvitationLinkManager } from '@/components/invitation-link-manager';
 import { UsageManager } from '@/components/usage-manager';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import { ToastHost } from '@/components/toast-host';
@@ -114,6 +115,7 @@ function RootNavigator() {
       <Stack.Screen name="rollout-waves" />
       <Stack.Screen name="explore" />
       <Stack.Screen name="nominations" />
+      <Stack.Screen name="invite-connect" />
       <Stack.Screen name="thread" options={{ contentStyle: gradientStyle }} />
       {/* Camera-first composer: full screen, no swipe-dismiss (the sheet
           guards populated drafts itself) */}
@@ -340,7 +342,7 @@ export default function RootLayout() {
                     <RelationshipEvents />
                     <NightStatusGate />
                     <BackgroundLocationManager />
-                    <PushNotificationManager /><UsageManager /><SharedVenueManager />
+                    <PushNotificationManager /><UsageManager /><SharedVenueManager /><InvitationLinkManager />
                     <StatusBar style="light" />
                     <SplashController />
                     <ToastHost />

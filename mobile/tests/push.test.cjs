@@ -58,12 +58,12 @@ test('legacy and canonical arrival taps route to map; local arrival opens correc
  const h=harness();for(const type of ['friend_arrived','friend_arrived_venue'])assert.equal(h.api.routeForNotification({type}),'/activity');
  assert.equal(h.api.routeForNotification({url:'/check-in'}),'/check-in');assert.equal(h.api.routeForNotification({type:'dm'}),'/messages?tab=dms');
 });
-function managerHarness({gate='answered',initial=null,failRegistration=false,status='planning',presented=[],isNight=true}={}) {
+function managerHarness({gate='answered',initial=null,failRegistration=false,status='planning',presented=[],isNight=true,visibleConversation=false}={}) {
  const dismissed=[];const effects=[];const callbacks={};const destinations=[];const parked=[];const registrations=[];const timers=new Map();let next=0;let failures=failRegistration?1:0;
- const sdk={getPresentedNotificationsAsync:async()=>presented,dismissNotificationAsync:async id=>dismissed.push(id),DEFAULT_ACTION_IDENTIFIER:'default',setNotificationHandler:handler=>{callbacks.presentation=handler.handleNotification;},clearLastNotificationResponseAsync:async()=>{},getLastNotificationResponseAsync:async()=>initial,
+ const sdk={cancelScheduledNotificationAsync:async()=>{},getPresentedNotificationsAsync:async()=>presented,dismissNotificationAsync:async id=>dismissed.push(id),DEFAULT_ACTION_IDENTIFIER:'default',setNotificationHandler:handler=>{callbacks.presentation=handler.handleNotification;},clearLastNotificationResponseAsync:async()=>{},getLastNotificationResponseAsync:async()=>initial,
  addNotificationResponseReceivedListener:cb=>{callbacks.tap=cb;return {remove(){}};},addPushTokenListener:cb=>{callbacks.token=cb;return {remove(){}};}};
  const native={AppState:{currentState:'active',addEventListener:(_,cb)=>{callbacks.app=cb;return {remove(){}};}}};
- const deps={'@/lib/usage':{recordUsage:async()=>{}},'@/hooks/use-night-mode':{useNightMode:()=>({isNight})},'react':{useEffect:fn=>effects.push(fn),useRef:value=>({current:value})},'react-native':native,'expo-router':{router:{push:v=>destinations.push(v)}},'expo-notifications':sdk,
+ const deps={'@/lib/usage':{recordNotificationOpen:async()=>{}},'@/lib/conversation-notifications':{isVisibleConversation:()=>visibleConversation},'@/hooks/use-night-mode':{useNightMode:()=>({isNight})},'react':{useEffect:fn=>effects.push(fn),useRef:value=>({current:value})},'react-native':native,'expo-router':{router:{push:v=>destinations.push(v)}},'expo-notifications':sdk,
  '@react-native-community/netinfo':{addEventListener:cb=>{callbacks.network=cb;return ()=>{};}},
  '@/lib/night-gate':{deferDeepLink:v=>parked.push(v),getNightGateState:()=>gate,takePendingDeepLink:()=>null},
  '@/lib/push':{registerPushToken:async(uid,opts)=>{registrations.push(opts);if(failures-->0)throw Error('offline');return 'granted';},routeForNotification:data=>data?.type==='dm'?'/messages':'/map'},
@@ -168,3 +168,5 @@ test('live taps still wait for status; day mode and expired alerts cannot open o
 test('plan chat and recap are valid push types and use their own titles',()=>{
  const h=serverHarness();assert.equal(h.api.getNotificationContent('plan_comment','reply').title,'Plan chat');assert.equal(h.api.getNotificationContent('morning_after','replay').url,'/morning-after');
 });
+
+test('reading the same conversation suppresses foreground sound and banner',async()=>{const h=managerHarness({visibleConversation:true});const show=await h.callbacks.presentation(response().notification);assert.equal(show.shouldShowBanner,false);assert.equal(show.shouldPlaySound,false);h.cleanup();});
