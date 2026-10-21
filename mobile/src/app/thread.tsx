@@ -1,4 +1,5 @@
 import { recordUsage } from '@/lib/usage';
+import { ConversationAlertControl } from '@/components/conversation-alert-control';
 import { uploadPendingDmPhoto } from '@/lib/dm-photo';
 import { pendingDm, readPendingDm, savePendingDm, deliverDm, type PendingDm } from '@/lib/dm-outbox';
 import { getSessionUserId } from '@/lib/session-identity';
@@ -729,6 +730,7 @@ function ThreadScreenContent() {
         </Pressable>
       </View>
 
+      <View className="px-4 flex-row justify-end"><ConversationAlertControl kind="dm" id={threadId} /></View>
       {/* A slim system row under the name: the thread survives the reset,
           the messages don't (addendum v3 §3) */}
       <View className="px-4 py-1.5 border-b border-white/[0.06] bg-white/[0.02]">

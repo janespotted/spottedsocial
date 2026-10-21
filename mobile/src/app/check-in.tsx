@@ -1,4 +1,3 @@
-import { morningAfterAt } from '@/lib/tonight';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -39,7 +38,6 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import * as Notifications from 'expo-notifications';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { isDemoMode } from '@/lib/demo-mode';
@@ -165,25 +163,6 @@ interface Payoff {
 interface AutoUpdates extends TrackingResult {
   /** The user has tapped "Turn on" at least once this session. */
   asked: boolean;
-}
-
-/** Schedule the 10am morning-after recap (web scheduleMorningAfterNotification). */
-async function scheduleMorningAfter(city: string, userId: string): Promise<void> {
-  try {
-    const next = morningAfterAt(new Date(), city);
-    await Notifications.cancelScheduledNotificationAsync('morning-after-recap');
-    await Notifications.scheduleNotificationAsync({
-      identifier: 'morning-after-recap', // same id → replaces prior schedule
-      content: {
-        title: 'Last night on Spotted ☀️',
-        body: 'Replay the night — your stops, pictures and familiar faces.',
-        data: { type: 'morning_after', url: '/morning-after', receiver_id: userId },
-      },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: next },
-    });
-  } catch {
-    /* notifications denied — skip */
-  }
 }
 
 /** Friends out / deciding right now — the immediate payoff after sharing. */
@@ -908,7 +887,6 @@ function CheckInFlow() {
       // The check-in is saved. Automatic updates are a separate outcome,
       // reported on the payoff screen — never as a check-in failure.
       void settleAutomaticUpdates(userId);
-      void scheduleMorningAfter(city, userId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refreshStatusQueries();
       await showPayoff('out', spot.name);
@@ -952,7 +930,6 @@ function CheckInFlow() {
       });
       // No background tracking at a private party: the exact spot is for
       // close friends only and a house party does not move.
-      void scheduleMorningAfter(city, userId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refreshStatusQueries();
       await showPayoff('out', venueName, true);

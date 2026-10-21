@@ -8,6 +8,7 @@ import { useClockMinute } from '@/lib/night-clock';
 import { fetchPlan } from '@/lib/plans';
 import { editPlanDestination, isUuid } from '@/lib/plan-navigation';
 import { PlanCard } from '@/components/plan-card';
+import { ConversationAlertControl } from '@/components/conversation-alert-control';
 import { EmptyState, ErrorState } from '@/components/empty-state';
 import { INK_LIGHT, NEON } from '@/lib/theme';
 
@@ -27,6 +28,7 @@ export default function PlanDetail() {
       query.isError ? <ErrorState title="Couldn’t load this plan" onRetry={() => void query.refetch()} /> :
       !plan || !session ? <ActivityIndicator color={NEON} /> : <>
         <Text className="text-white/65 text-sm leading-5">Everyone who can see this plan can read and join its chat.</Text>
+        <View className="flex-row justify-end"><ConversationAlertControl kind="plan" id={plan.id} /></View>
         <PlanCard key={plan.id} plan={plan} currentUserId={session.user.id} onEdit={p => router.push(editPlanDestination(p))} onDeleted={() => router.replace('/messages?tab=plans')} discussionOpen />
         <Pressable accessibilityRole="button" onPress={() => router.push('/messages?tab=plans')} className="min-h-11 justify-center"><Text style={{ color: NEON }}>See all plans</Text></Pressable>
       </>}
