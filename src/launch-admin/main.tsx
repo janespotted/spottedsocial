@@ -14,6 +14,10 @@ import {
   type GuestPage,
 } from "./types";
 import "./style.css";
+import spottedMark from "./assets/spotted-mark.svg";
+function Brand() {
+  return <><img className="brand-mark" src={spottedMark} width="26" height="41" alt="" /><span className="brand-name">Spotted</span></>;
+}
 const preview =
   import.meta.env.DEV &&
   import.meta.env.VITE_LAUNCH_PREVIEW === "true" &&
@@ -287,14 +291,14 @@ function App() {
   if (!authReady)
     return (
       <main className="login">
-        <span className="mark">S</span>
+        <div className="wordmark"><Brand /></div>
         <p>Opening Launch Center…</p>
       </main>
     );
   if (!preview && !session)
     return (
       <main className="login">
-        <span className="mark">S</span>
+        <div className="wordmark"><Brand /></div>
         <p className="eyebrow">SPOTTED / PRIVATE ACCESS</p>
         <h1>
           Your people.
@@ -373,10 +377,10 @@ function App() {
     );
   return (
     <div className="workspace">
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <aside>
-        <a className="wordmark" href="/launch-admin.html">
-          <span className="mark">S</span>spotted
-          <span className="wordmark-dot">.</span>
+        <a className="wordmark" href="/launch-admin.html" aria-label="Spotted Launch Center home">
+          <Brand />
         </a>
         <div className="sidebar-title">LAUNCH CENTER</div>
         <button
@@ -437,7 +441,7 @@ function App() {
           )}
         </div>
       </aside>
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <header>
           <span>{wave === "monitoring" ? "NEW YORK + LOS ANGELES" : "NEW YORK CITY"}</span>
           <span className="mode">
@@ -455,10 +459,10 @@ function App() {
         )}
         <section className="heading">
           <div>
-            <p className="eyebrow">A GOOD NIGHT STARTS WITH GOOD PEOPLE</p>
+            <p className="eyebrow"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v16M2 10h16M4 4l12 12M16 4 4 16" /></svg>A GOOD NIGHT STARTS WITH GOOD PEOPLE</p>
             <h1>
               {activeWave?.name ||
-                (wave === "monitoring" ? "Your launch, live." : wave === "pool" ? "Your first circle." : wave === "queue" ? "Who’s next." : "Let the right people in.")}
+                (wave === "monitoring" ? <>Your launch, <span className="brand-accent">live.</span></> : wave === "pool" ? "Your first circle." : wave === "queue" ? "Who’s next." : "Let the right people in.")}
             </h1>
             <p>
               {wave === "monitoring" ? "Invitations, activity and technical health. Private to the founder." : wave === "pool" ? "Save everyone here. Choose your first 100 when you’re ready." : activeWave
