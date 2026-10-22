@@ -24,6 +24,8 @@ async function setup(){
  await db.exec(await migration('20261012021331_launch_admin_center.sql'));
  await db.exec(await migration('20261022110449_requested_invites.sql'));
  await db.exec(await migration('20261022113542_request_wave_outreach.sql'));
+ await db.exec(await migration('20261022115607_outreach_audit_account_deletion.sql'));
+ assert.equal((await db.query("select confdeltype from pg_constraint where conname='launch_outreach_batches_created_by_fkey'")).rows[0].confdeltype,'n');
  await db.exec(`insert into auth.users(id) values('${admin}'),('${member}');insert into spotted_private.launch_operators(user_id,wave_admin) values('${admin}',true);
  insert into spotted_private.launch_waves(id,name,capacity,status,activated_at,invitation_count) values('${wave}','The first 100',100,'draft',null,0),('${second}','Second',1,'draft',null,0);`);
  return db;
