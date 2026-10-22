@@ -1,3 +1,4 @@
+import { WaveOutreach } from './wave-outreach';
 import { RequestedInvites } from './requested-invites';
 import { Monitoring } from './monitoring';
 import { PlanningPool } from './planning-pool';
@@ -83,6 +84,7 @@ function App() {
     const hash = wave === "requests" ? "#requested-invites" : wave === "monitoring" ? "#monitoring" : wave === "pool" ? "#planning-pool" : "";
     history.replaceState(null, "", location.pathname + location.search + hash);
   }, [wave]);
+  const [outreachWave,setOutreachWave]=useState<string|null>(null);
   const activeWave = snapshot?.waves.find((w) => w.id === wave);
   const detailWave = snapshot?.waves.find((w) => w.id === detail?.wave_id);
   useEffect(() => {
@@ -508,7 +510,7 @@ function App() {
                 : "Your private guest lists are being loaded."}
             </p>
           </section>
-        ) : wave === "requests" ? <RequestedInvites key={session?.user.id || "preview"} preview={preview} /> : wave === "monitoring" ? <Monitoring key={session?.user.id || "preview"} preview={preview} /> : wave === "pool" ? <PlanningPool key={session?.user.id || "preview"} preview={preview} onQueue={() => setWave("queue")} /> : (
+        ) : wave === "requests" ? <RequestedInvites key={session?.user.id || "preview"} preview={preview} onChanged={()=>{if(!preview)void load().catch(e=>setError(e.message));}} /> : wave === "monitoring" ? <Monitoring key={session?.user.id || "preview"} preview={preview} /> : wave === "pool" ? <PlanningPool key={session?.user.id || "preview"} preview={preview} onQueue={() => setWave("queue")} /> : (
           <>
             <section className="panel" aria-label="Launch readiness">
               <h2>Before you open a wave</h2>
@@ -593,6 +595,7 @@ function App() {
                   </div>
                   {wave === w.id && (
                     <div className="wave-actions">
+                      <button className="secondary" onClick={()=>setOutreachWave(w.id)}>Prepare wave outreach</button>
                       <button onClick={() => openModal("review")}>
                         {w.status === "draft"
                           ? "Review & open wave"
@@ -1003,7 +1006,7 @@ function App() {
                               await mutate("queue_sms", { id: detail.id });
                               const { error } = await supabase.functions.invoke(
                                 "launch-send-invitations",
-                                { body: {} },
+                                { body: {guestId:detail.id} },
                               );
                               if (error)
                                 throw Error(
@@ -1244,7 +1247,7 @@ function App() {
                       await mutate("open_wave", { id: wave });
                       setModal(null);
                       setNotice(
-                        "Wave opened. Review each invitation before sending.",
+                        "Wave opened. Prepare wave outreach to review and send invitations together.",
                       );
                     })
                   }
@@ -1280,6 +1283,35 @@ function App() {
             )}
           </section>
         </div>
+      )}
+      {outreachWave && snapshot && (
+        <WaveOutreach
+          key={`${session?.user.id || "preview"}:${outreachWave}`}
+          wave={outreachWave}
+          preview={preview}
+          onClose={() => setOutreachWave(null)}
+          onUpdated={() => {
+            if (!preview) {
+              void load().catch(e => setError(e.message));
+              void loadGuests().catch(e => setError(e.message));
+            }
+          }}
+          onSetup={() => { setOutreachWave(null); openModal("settings"); }}
+          onGuest={(id, phone) => {
+            const current = generation.current;
+            setOutreachWave(null);
+            setWave(outreachWave);
+            void run(async () => {
+              const result = preview
+                ? await import("./preview").then(x => ({ rows: x.guests }))
+                : await api<GuestPage>("guests", { wave: outreachWave, search: phone });
+              if (current !== generation.current) return;
+              const guest = result.rows.find(g => g.id === id);
+              if (guest) setDetail(guest);
+              else setNotice("Find this person in the wave guest list to review their invitation.");
+            });
+          }}
+        />
       )}
     </div>
   );

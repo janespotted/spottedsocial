@@ -31,8 +31,41 @@ Deno.serve(async (req) => {
     service: Deno.env.get("LAUNCH_TWILIO_MESSAGING_SERVICE_SID"),
     callback: `${url}/functions/v1/launch-sms-callback`,
   };
+  let input: Record<string, string>;
+  try {
+    input = await req.json();
+    if (!input || typeof input !== "object" || Array.isArray(input))
+      throw Error();
+  } catch {
+    return json({ error: "Invalid request" }, 400);
+  }
+  const scope: Record<string, string> = {};
+  for (const key of ["batchId", "waveId", "guestId"]) {
+    if (input[key] !== undefined) {
+      if (
+        typeof input[key] !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          input[key],
+        )
+      )
+        return json({ error: "Invalid recipient scope" }, 400);
+      scope[key] = input[key];
+    }
+  }
+  if (input.action && input.action !== "preflight")
+    return json({ error: "Unknown action" }, 400);
+  const ready = !!(
+    dashboard.settings.smsEnabled &&
+    dashboard.settings.gated &&
+    dashboard.settings.requirePhone &&
+    Deno.env.get("LAUNCH_SMS_MODE") === "live" &&
+    config.account &&
+    config.token &&
+    config.service
+  );
+  if (input.action === "preflight") return json({ ready });
   if (
-    !dashboard.settings.smsEnabled ||
+    !ready ||
     Deno.env.get("LAUNCH_SMS_MODE") !== "live" ||
     !config.account ||
     !config.token ||
@@ -51,10 +84,11 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   );
   const totals = { processed: 0, accepted: 0, failed: 0, unknown: 0 };
-  for (let i = 0; i < 10; i++) {
+  const started = Date.now();
+  for (let i = 0; i < 10 && Date.now() - started < 20000; i++) {
     const { data: job, error } = await service.rpc("launch_message_job", {
       p_action: "claim",
-      p_data: {},
+      p_data: scope,
     });
     if (error)
       return json(
