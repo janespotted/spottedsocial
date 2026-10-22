@@ -1,3 +1,4 @@
+import { RequestedInvites } from './requested-invites';
 import { Monitoring } from './monitoring';
 import { PlanningPool } from './planning-pool';
 import { createRoot } from "react-dom/client";
@@ -53,7 +54,7 @@ function App() {
     [code, setCode] = useState(""),
     [codeSent, setCodeSent] = useState(false),
     [authReady, setAuthReady] = useState(false);
-  const [wave, setWave] = useState(location.hash === "#monitoring" ? "monitoring" : location.hash === "#planning-pool" ? "pool" : "all"),
+  const [wave, setWave] = useState(location.hash === "#requested-invites" ? "requests" : location.hash === "#monitoring" ? "monitoring" : location.hash === "#planning-pool" ? "pool" : "all"),
     [status, setStatus] = useState("all"),
     [search, setSearch] = useState(""),
     [offset, setOffset] = useState(0),
@@ -79,7 +80,7 @@ function App() {
     locked = useRef(false),
     requestId = useRef(crypto.randomUUID());
   useEffect(() => {
-    const hash = wave === "monitoring" ? "#monitoring" : wave === "pool" ? "#planning-pool" : "";
+    const hash = wave === "requests" ? "#requested-invites" : wave === "monitoring" ? "#monitoring" : wave === "pool" ? "#planning-pool" : "";
     history.replaceState(null, "", location.pathname + location.search + hash);
   }, [wave]);
   const activeWave = snapshot?.waves.find((w) => w.id === wave);
@@ -206,7 +207,7 @@ function App() {
     }
   }, [session?.user.id]);
   useEffect(() => {
-    if (!snapshot || wave === "pool" || wave === "monitoring") return;
+    if (!snapshot || wave === "pool" || wave === "monitoring" || wave === "requests") return;
     const t = setTimeout(
       () => void loadGuests().catch((e) => setError(e.message)),
       180,
@@ -397,6 +398,7 @@ function App() {
           <span>Next up</span>
           <span>{snapshot?.pending ?? "—"}</span>
         </button>
+        <button className={wave === "requests" ? "nav active" : "nav"} onClick={() => setWave("requests")}><span>Requested invites</span><span>↗</span></button>
         <button className={wave === "pool" ? "nav active" : "nav"} onClick={() => { setWave("pool"); history.replaceState(null, '', '#planning-pool'); }}><span>Planning pool</span><span>↗</span></button>
         <button className={wave === "monitoring" ? "nav active" : "nav"} onClick={() => { setWave("monitoring"); history.replaceState(null, "", "#monitoring"); }}><span>Command Center</span><span>↗</span></button>
         <div className="sidebar-title">YOUR WAVES</div>
@@ -462,17 +464,17 @@ function App() {
             <p className="eyebrow"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v16M2 10h16M4 4l12 12M16 4 4 16" /></svg>A GOOD NIGHT STARTS WITH GOOD PEOPLE</p>
             <h1>
               {activeWave?.name ||
-                (wave === "monitoring" ? <>Your launch, <span className="brand-accent">live.</span></> : wave === "pool" ? "Your first circle." : wave === "queue" ? "Who’s next." : "Let the right people in.")}
+                (wave === "requests" ? <>Your next <span className="brand-accent">circle.</span></> : wave === "monitoring" ? <>Your launch, <span className="brand-accent">live.</span></> : wave === "pool" ? "Your first circle." : wave === "queue" ? "Who’s next." : "Let the right people in.")}
             </h1>
             <p>
-              {wave === "monitoring" ? "Invitations, activity and technical health. Private to the founder." : wave === "pool" ? "Save everyone here. Choose your first 100 when you’re ready." : activeWave
+              {wave === "requests" ? "Everyone who raised their hand on joinspottedapp.com." : wave === "monitoring" ? "Invitations, activity and technical health. Private to the founder." : wave === "pool" ? "Save everyone here. Choose your first 100 when you’re ready." : activeWave
                 ? "Every place has a name. Every invitation stays accounted for."
                 : wave === "queue"
                   ? "Completed nominations and your hand-picked guests, ready for a future wave."
                   : "Build your circle in waves. See exactly who’s on the list—and who’s joined."}
             </p>
           </div>
-          {wave !== "pool" && wave !== "monitoring" && <button onClick={() => openModal("import")}>＋ Add people</button>}
+          {wave !== "pool" && wave !== "monitoring" && wave !== "requests" && <button onClick={() => openModal("import")}>＋ Add people</button>}
         </section>
         {error && (
           <div role="alert" className="error">
@@ -506,7 +508,7 @@ function App() {
                 : "Your private guest lists are being loaded."}
             </p>
           </section>
-        ) : wave === "monitoring" ? <Monitoring key={session?.user.id || "preview"} preview={preview} /> : wave === "pool" ? <PlanningPool key={session?.user.id || "preview"} preview={preview} onQueue={() => setWave("queue")} /> : (
+        ) : wave === "requests" ? <RequestedInvites key={session?.user.id || "preview"} preview={preview} /> : wave === "monitoring" ? <Monitoring key={session?.user.id || "preview"} preview={preview} /> : wave === "pool" ? <PlanningPool key={session?.user.id || "preview"} preview={preview} onQueue={() => setWave("queue")} /> : (
           <>
             <section className="panel" aria-label="Launch readiness">
               <h2>Before you open a wave</h2>
