@@ -33,3 +33,5 @@ node --test tests/seamless-entry.test.cjs tests/launch.test.cjs tests/launch-int
 The admin-preview test's telemetry mock was updated to match the current native source; no admin-preview product behavior changed. Backend tests cover active/draft/paused waves, existing members, uninvited and Apple users, resume/retry, required distinct nominees, private access controls and outreach idempotency.
 
 Pending release verification: native keyboard/VoiceOver and layout checks on two phones, actual SMS/Apple sign-in, installation and universal-link handoff. The existing audit simulator and build were left intact. Source implementation is complete; this branch has not been uploaded to or made available in TestFlight.
+
+The recipient-facing address is `https://spottedsocial.vercel.app/join`. Its production-domain association file must be publicly fetchable. The Command Center branch preview remains protected; never send its preview address to recipients. The existing public site receives only a static landing page and association paths on `codex/public-invite-entry`.
