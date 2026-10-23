@@ -3,16 +3,19 @@ import { supabase } from "../integrations/supabase/client";
 import "./requested-invites.css";
 import { normalizePhone } from "./types";
 import { defaultRequestWave, type RequestWave } from "./request-wave";
+import { RemoveFromWave } from "./remove-from-wave";
 function WaveAction({
   person,
   waves,
   busy,
   move,
+  remove,
 }: {
   person: InviteRequest;
   waves: RequestWave[];
   busy: boolean;
   move: (r: InviteRequest, wave: string) => void;
+  remove: (r: InviteRequest) => void;
 }) {
   const [chosen, setChosen] = useState("");
   const target = waves.some(
@@ -54,6 +57,8 @@ function WaveAction({
           >
             {person.wave_id ? "Move to wave" : "Add to wave"}
           </button>
+          {person.wave_id && waves.some(w => w.id === person.wave_id && w.status === "draft") &&
+            <button className="quiet" disabled={busy} aria-label={`Remove ${person.first_name} ${person.last_name} from wave`} onClick={() => remove(person)}>Remove from wave</button>}
         </>
       ) : (
         <small>Review in guest list</small>
@@ -182,6 +187,7 @@ export function RequestedInvites({
     } | null>(null),
     [phone, setPhone] = useState("");
   const assignDialog = useRef<HTMLDialogElement>(null);
+  const [removal, setRemoval] = useState<InviteRequest | null>(null);
   useEffect(() => {
     if (assignment && !assignDialog.current?.open)
       assignDialog.current?.showModal();
@@ -506,6 +512,7 @@ export function RequestedInvites({
                       waves={page.waves}
                       busy={busy}
                       move={move}
+                      remove={setRemoval}
                     />
                   </td>
                   <td>{r.neighborhood || "—"}</td>
@@ -623,6 +630,24 @@ export function RequestedInvites({
           </section>
         </dialog>
       )}
+      {removal && <RemoveFromWave waveName={removal.wave_name || "this wave"} count={1}
+        personName={`${removal.first_name} ${removal.last_name}`} onClose={() => setRemoval(null)}
+        onRemove={async () => {
+          if (preview) {
+            previewRows.current = previewRows.current.map(r => r.guest_id === removal.guest_id ? { ...r, wave_id: null, wave_name: null } : r);
+            previewWaves.current = previewWaves.current.map(w => ({ ...w, selected: previewRows.current.filter(r => r.wave_id === w.id).length }));
+          } else {
+            const { error } = await (supabase as any).rpc("launch_admin", {
+              p_action: "remove_from_wave", p_data: { wave: removal.wave_id, guests: [removal.guest_id] },
+            });
+            if (error) throw Error(error.message);
+          }
+          if (alive.current) {
+            setNotice(`${removal.first_name} returned to Next up. Their request stays saved here.`);
+            setRevision(x => x + 1);
+            onChanged();
+          }
+        }} />}
       {assignment && (
         <dialog
           ref={assignDialog}

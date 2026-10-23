@@ -614,6 +614,11 @@ td > small {
   font-size: 30px;
   margin-bottom: 13px;
 }
+.guest-actions .remove-wave-button { display: block; font-size: 12px; white-space: nowrap; }
+.wave-removal { max-width: min(520px, calc(100vw - 32px)); }
+.wave-removal h2 { overflow-wrap: anywhere; }
+.wave-removal p { line-height: 1.6; }
+.wave-removal .wave-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
 .dialog p {
   margin: 12px 0;
   font-size: 13px;
