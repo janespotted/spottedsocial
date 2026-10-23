@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { InputOTP } from 'heroui-native';
 import {
@@ -18,7 +18,7 @@ import {
 import { confirmPhoneCode, PhoneTakenError, sendPhoneCode } from '@/lib/phone-link';
 import { NEON } from '@/lib/theme';
 
-const RESEND_COOLDOWN_S = 30;
+const RESEND_COOLDOWN_S = 60;
 
 /**
  * Add or change the signed-in account's phone number: the number (with the
@@ -32,6 +32,9 @@ export function PhoneVerifyForm({ onVerified }: { onVerified: (e164: string) => 
   const [digits, setDigits] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const { width } = useWindowDimensions();
+  const slotWidth = Math.min(48, Math.floor((width - 56 - 40) / 6));
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
   const [touched, setTouched] = useState(false);
@@ -69,12 +72,13 @@ export function PhoneVerifyForm({ onVerified }: { onVerified: (e164: string) => 
   };
 
   const send = async () => {
+    if (pending.current) return;
     setTouched(true);
     if (problem) {
       setError(problem);
       return;
     }
-    setBusy(true);
+    pending.current = true; setBusy(true);
     setError(null);
     try {
       await sendPhoneCode(e164);
@@ -84,13 +88,13 @@ export function PhoneVerifyForm({ onVerified }: { onVerified: (e164: string) => 
     } catch (e) {
       setError(e instanceof PhoneTakenError ? e.message : e instanceof Error ? e.message.toLowerCase() : 'could not send the code');
     } finally {
-      setBusy(false);
+      pending.current = false; setBusy(false);
     }
   };
 
   const verify = async (token: string) => {
-    if (busy || token.trim().length < 6) return;
-    setBusy(true);
+    if (pending.current || !/^\d{6}$/.test(token.trim())) return;
+    pending.current = true; setBusy(true);
     setError(null);
     try {
       await confirmPhoneCode(e164, token);
@@ -98,19 +102,19 @@ export function PhoneVerifyForm({ onVerified }: { onVerified: (e164: string) => 
     } catch (e) {
       setError(e instanceof Error ? e.message.toLowerCase() : 'that code didn’t work');
     } finally {
-      setBusy(false);
+      pending.current = false; setBusy(false);
     }
   };
 
   const resend = async () => {
-    if (cooldown > 0 || busy) return;
-    setError(null);
+    if (cooldown > 0 || pending.current) return;
+    pending.current = true; setBusy(true); setError(null);
     try {
       await sendPhoneCode(e164);
       setCooldown(RESEND_COOLDOWN_S);
     } catch (e) {
-      setError(e instanceof Error ? e.message.toLowerCase() : 'could not resend the code');
-    }
+      setError(e instanceof Error ? e.message.toLowerCase() : 'Couldn’t resend the code. Try again.');
+    } finally { pending.current = false; setBusy(false); }
   };
 
   const invalid = touched && !!problem && digits.length > 0;
@@ -127,7 +131,7 @@ export function PhoneVerifyForm({ onVerified }: { onVerified: (e164: string) => 
         >
           <InputOTP.Group className="gap-2">
             {[0, 1, 2, 3, 4, 5].map((i) => (
-              <InputOTP.Slot key={i} index={i} className="w-12 h-14 rounded-xl border border-white/15 bg-white/5" />
+              <InputOTP.Slot key={i} index={i} style={{ width: slotWidth }} className="h-14 rounded-xl border border-white/15 bg-white/5" />
             ))}
           </InputOTP.Group>
         </InputOTP>
