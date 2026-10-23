@@ -1,3 +1,4 @@
+import { isDemoMode, useDemoMode } from '@/lib/demo-mode';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
@@ -6,12 +7,17 @@ import * as Notifications from 'expo-notifications';
 import { deferDeepLink, getNightGateState, takePendingDeepLink } from '@/lib/night-gate';
 import { registerPushToken, routeForNotification } from '@/lib/push';
 import { useSession } from '@/hooks/use-session';
+import { useOwnNightStatus } from '@/hooks/use-own-night-status';
+import { LIVE_ACTIVITY_TYPES, withholdLivePreview } from '@/lib/live-preview';
 
 let foregroundUser: string | undefined;
+let foregroundLiveAllowed = false;
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const receiver = notification.request.content.data?.receiver_id;
-    const allowed = !!foregroundUser && (typeof receiver !== 'string' || receiver === foregroundUser);
+    const type = notification.request.content.data?.type;
+    const live = typeof type === 'string' && LIVE_ACTIVITY_TYPES.includes(type);
+    const allowed = !isDemoMode() && !!foregroundUser && (typeof receiver !== 'string' || receiver === foregroundUser) && (!live || foregroundLiveAllowed);
     return {
       shouldShowBanner: allowed, shouldShowList: allowed,
       shouldPlaySound: allowed, shouldSetBadge: allowed,
@@ -23,7 +29,18 @@ Notifications.setNotificationHandler({
  * Failed writes never latch registration as successful. */
 export function PushNotificationManager() {
   const { session, onboardingNeeded, onboardingResolved } = useSession();
-  const userId = session?.user.id;
+  const demo = useDemoMode();
+  const userId = demo ? undefined : session?.user.id;
+  const own = useOwnNightStatus();
+  const liveAllowed = !withholdLivePreview(own.data?.status?.status, !!own.data && !own.isError);
+  useEffect(() => {
+    foregroundLiveAllowed = liveAllowed;
+    if (!liveAllowed) void Notifications.getPresentedNotificationsAsync().then(rows => Promise.all(rows.filter(n => {
+      const type = n.request.content.data?.type;
+      return typeof type === 'string' && LIVE_ACTIVITY_TYPES.includes(type);
+    }).map(n => Notifications.dismissNotificationAsync(n.request.identifier)))).catch(() => {});
+    return () => { foregroundLiveAllowed = false; };
+  }, [userId, liveAllowed]);
   const seen = useRef(new Set<string>());
   const previousUser = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -61,7 +78,7 @@ export function PushNotificationManager() {
         if (again && !cancelled) { again = false; void register(false); }
       }
     };
-    void register(true);
+    void register(false);
     const app = AppState.addEventListener('change', (state) => {
       if (state === 'active') void register(false);
       else if (retry) { clearTimeout(retry); retry = undefined; }

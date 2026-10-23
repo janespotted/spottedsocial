@@ -1,5 +1,7 @@
+import { TabHeaderRow } from '@/components/tab-header-row';
+import { ErrorState } from '@/components/empty-state';
+import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
 import { invalidatePrivateViews } from '@/lib/private-views';
-import { signOutWithPushCleanup } from '@/lib/push';
 import { useState } from 'react';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { RESET_COPY } from '@/lib/reset-copy';
@@ -92,6 +94,7 @@ async function fetchProfileData(userId: string): Promise<ProfileData> {
       .maybeSingle(),
   ]);
 
+  for (const result of [profileRes, checkinsRes, wishlistRes, postsRes, inviteRes]) if (result.error) throw result.error;
   const checkins = checkinsRes.data ?? [];
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   // Recent spots: unique venues, most recent first
@@ -130,9 +133,9 @@ async function fetchProfileData(userId: string): Promise<ProfileData> {
   };
 }
 
-function GridTile({ label, imageUrl }: { label: string; imageUrl?: string | null }) {
+function GridTile({ label, imageUrl, onPress }: { label: string; imageUrl?: string | null; onPress: () => void }) {
   return (
-    <View className="gap-1.5" style={{ width: '31%' }}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} className="gap-1.5 active:opacity-70" style={{ width: '31%' }}>
       <View className="aspect-square rounded-xl overflow-hidden bg-[#1a0a2e] border border-white/[0.08] items-center justify-center">
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} className="w-full h-full" contentFit="cover" />
@@ -143,7 +146,7 @@ function GridTile({ label, imageUrl }: { label: string; imageUrl?: string | null
       <Text className="text-white text-xs font-sans-medium text-center" numberOfLines={1}>
         {label}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -169,7 +172,7 @@ export default function ProfileScreen() {
   const { data: pendingCount, refetch: refetchRequests } = useFriendRequestCount(session?.user.id);
   const [spotsView, setSpotsView] = useState<SpotsView>('recent');
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['profile-page', session?.user.id],
     enabled: !!session,
     queryFn: () => fetchProfileData(session!.user.id),
@@ -232,7 +235,7 @@ export default function ProfileScreen() {
   };
 
   const statusKind = status?.status ?? null;
-  const statusHeadline =
+  const statusHeadline = !isNight ? 'Day Mode' :
     statusKind === 'out'
       ? 'Out tonight'
       : statusKind === 'planning'
@@ -240,7 +243,7 @@ export default function ProfileScreen() {
         : statusKind === 'off'
           ? 'Out tonight · hidden'
           : 'Not out tonight';
-  const statusLine =
+  const statusLine = !isNight ? 'Tonight starts at 6 PM' :
     statusKind === 'out'
       ? (status?.venue_name ?? 'Somewhere')
       : statusKind === 'planning'
@@ -251,9 +254,12 @@ export default function ProfileScreen() {
 
   const shareProfile = () => router.push('/invite-friends');
 
-  const cycleSpotsView = () => {
-    const order: SpotsView[] = ['recent', 'wishlist', 'posts'];
-    setSpotsView(order[(order.indexOf(spotsView) + 1) % order.length]);
+  const openSpot = async (name: string, id?: string | null) => {
+    if (id) { router.push({ pathname: '/venue', params: { venueId: id } }); return; }
+    const { data: venues, error } = await supabase.from('venues').select('id').eq('name', name).eq('city', ownNight?.city ?? 'nyc').limit(1);
+    if (error) { Alert.alert('Couldn’t load spot', 'Please try again.'); return; }
+    if (!venues?.[0]) { Alert.alert('Spot unavailable', 'This spot is no longer in the catalog.'); return; }
+    router.push({ pathname: '/venue', params: { venueId: venues[0].id } });
   };
 
   // Re-measure mounted native text when Dynamic Type changes.
@@ -261,19 +267,8 @@ export default function ProfileScreen() {
     <View key={fontScale} className="flex-1">
       {/* Header — static, web PageHeader parity */}
       <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
-        <View className="flex-row items-center justify-between px-4 min-h-10 mb-2">
-          <Text
-            className="flex-1 text-white font-sans-light"
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.65}
-            maxFontSizeMultiplier={1.25}
-            style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
-          >
-            Spotted
-          </Text>
-          <HeaderActions unreadCount={unreadCount} />
-        </View>
+        <TabHeaderRow unreadCount={unreadCount} />
+        <ModeCountdownStrip />
       </View>
 
       <ScrollView
@@ -320,10 +315,6 @@ export default function ProfileScreen() {
               {(friendIds?.length ?? 0) === 1 ? 'friend' : 'friends'}
             </Text>
           </Pressable>
-          <Text className="text-white/40">·</Text>
-          <Text className="text-sm text-white/65 font-sans">
-            <Text className="text-white font-sans-medium">{data?.weeklyCount ?? 0}</Text> this week
-          </Text>
         </View>
 
         {/* Edit profile / Share profile / Settings — full labels so neither
@@ -372,7 +363,7 @@ export default function ProfileScreen() {
             {statusLine}
           </Text>
 
-          {statusKind === 'out' ? (
+          {!isNight ? <Text className="text-xs text-white/55 font-sans">Make plans now. Set your status tonight.</Text> : statusKind === 'out' ? (
             <>
               <AudienceRow value={sharingLevel} onChange={setSharingLevel} live compact />
               {/* The rule, next to the audience it applies to (addendum v3 §3) */}
@@ -385,11 +376,11 @@ export default function ProfileScreen() {
             </>
           ) : statusKind === 'off' ? (
             <Text className="text-xs text-white/55 font-sans">
-              Friends can&apos;t see you right now. Update your status to share again.
+              Your location isn’t shared.
             </Text>
           ) : (
             <Text className="text-xs text-white/55 font-sans">
-              Going out after all? Update your status to see who&apos;s where.
+              Live friend locations are hidden while you’re in.
             </Text>
           )}
 
@@ -400,8 +391,8 @@ export default function ProfileScreen() {
               rounded edge. Splitting the rows also matches the hierarchy:
               moving spots is the common action, the other two are not. */}
           {(() => {
-            const hasPrimary = statusKind === 'out' || statusKind === 'off';
-            const canStop = statusKind === 'out' || statusKind === 'planning';
+            const hasPrimary = isNight && (statusKind === 'out' || statusKind === 'off');
+            const canStop = isNight && (statusKind === 'out' || statusKind === 'planning');
             return (
               <View className="gap-2 mt-1">
                 {hasPrimary ? (
@@ -422,7 +413,7 @@ export default function ProfileScreen() {
                 ) : null}
                 <View className="flex-row gap-2">
                   <Pressable
-                    onPress={() => router.push('/check-in')}
+                    onPress={() => router.push(isNight ? '/check-in' : '/create-plan')}
                     className={`flex-1 py-2.5 rounded-full items-center active:opacity-90 ${
                       hasPrimary ? 'border border-white/20' : ''
                     }`}
@@ -434,7 +425,7 @@ export default function ProfileScreen() {
                       }`}
                       numberOfLines={1}
                     >
-                      Update status
+                      {isNight ? 'Update status' : 'Make a plan'}
                     </Text>
                   </Pressable>
                   {canStop ? (
@@ -497,27 +488,25 @@ export default function ProfileScreen() {
                 </View>
               ) : null}
             </View>
-            <Text className="text-white/55 text-xs font-sans">Find, invite and stay connected</Text>
           </View>
           <SymbolView name="chevron.right" size={13} tintColor="rgba(255,255,255,0.3)" />
         </Pressable>
 
         {/* Spots section */}
         <View>
-          <Pressable onPress={cycleSpotsView} className="flex-row items-center gap-2 mb-1">
-            <Text className="text-xl font-sans-semibold text-white">
-              {SPOTS_LABELS[spotsView]}
-            </Text>
-            <SymbolView name="chevron.up.chevron.down" size={13} tintColor="rgba(255,255,255,0.5)" />
-          </Pressable>
-          <Text className="text-white/60 text-sm font-sans mb-3">Only you can see</Text>
+          <View accessibilityRole="tablist" className="flex-row flex-wrap gap-2 mb-2">
+            {(Object.keys(SPOTS_LABELS) as SpotsView[]).map(key => <Pressable key={key} accessibilityRole="tab" accessibilityState={{ selected: spotsView === key }} onPress={() => setSpotsView(key)} className={`min-h-11 px-3 py-2 rounded-full justify-center ${spotsView === key ? 'bg-white/10' : ''}`}><Text className={`${spotsView === key ? 'text-white' : 'text-white/60'} text-sm font-sans-medium`}>{SPOTS_LABELS[key]}</Text></Pressable>)}
+          </View>
+          <Text className="text-white/60 text-xs font-sans mb-3">{spotsView === 'posts' ? 'Shared with each post’s audience · until 5am' : spotsView === 'recent' ? 'Your history · eligible friends may see recent visits' : 'Only you can see your saved list'}</Text>
+          {isError ? <ErrorState compact title="Couldn’t load your profile" onRetry={() => void refetch()} /> : null}
 
-          {spotsView === 'recent' ? (
+          {isError ? null : spotsView === 'recent' ? (
             (data?.recentSpots ?? []).length > 0 ? (
               <View className="flex-row flex-wrap gap-3">
                 {(data?.recentSpots ?? []).map((spot) => (
                   <GridTile
                     key={spot.venue_name}
+                    onPress={() => void openSpot(spot.venue_name, spot.venue_id)}
                     label={spot.venue_name}
                     imageUrl={spot.venue_id ? getVenuePhotoUrl(spot.venue_id, 0) : null}
                   />
@@ -526,22 +515,22 @@ export default function ProfileScreen() {
             ) : (
               <EmptyCard
                 icon="mappin.and.ellipse"
-                title="Your night out history starts here"
-                subtitle="Share your spot at venues and they'll show up on your profile."
+                title="Your recent spots"
+                subtitle="Check in to start your list."
               />
             )
           ) : spotsView === 'wishlist' ? (
             (data?.wishlist ?? []).length > 0 ? (
               <View className="flex-row flex-wrap gap-3">
                 {(data?.wishlist ?? []).map((place) => (
-                  <GridTile key={place.id} label={place.venue_name} />
+                  <GridTile key={place.id} label={place.venue_name} onPress={() => void openSpot(place.venue_name)} />
                 ))}
               </View>
             ) : (
               <EmptyCard
                 icon="bookmark"
-                title="Build your wishlist"
-                subtitle="Save spots you want to check out. They'll live here."
+                title="Your next spots"
+                subtitle="Save a venue to find it here."
               />
             )
           ) : (data?.posts ?? []).length > 0 ? (
@@ -549,6 +538,7 @@ export default function ProfileScreen() {
               {(data?.posts ?? []).map((post) => (
                 <GridTile
                   key={post.id}
+                  onPress={() => router.push({ pathname: '/post-detail', params: { postId: post.id } })}
                   label={`♥ ${post.likes_count ?? 0} · 💬 ${post.comments_count ?? 0}`}
                   imageUrl={post.thumb_url}
                 />
@@ -558,19 +548,11 @@ export default function ProfileScreen() {
             <EmptyCard
               icon="camera"
               title="No posts yet"
-              subtitle="Share moments from your nights out and they'll appear here."
+              subtitle="Your posts appear here until 5am."
             />
           )}
         </View>
 
-        {/* Log out */}
-        <Pressable
-          onPress={() => void signOutWithPushCleanup()}
-          className="flex-row items-center justify-center gap-2 py-3 rounded-full border border-red-500/40 active:bg-red-500/10"
-        >
-          <SymbolView name="rectangle.portrait.and.arrow.right" size={15} tintColor="#f87171" />
-          <Text className="text-red-400 text-sm font-sans-medium">Log Out</Text>
-        </Pressable>
       </ScrollView>
     </View>
   );

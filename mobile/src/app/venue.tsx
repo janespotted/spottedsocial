@@ -1,8 +1,11 @@
+import { fetchVisibleVenuePresence } from '@/lib/venue-presence';
+import { editorialForVenue } from '@/lib/hot-spots-editorial';
+import { openFriendCard, friendCardPress } from '@/lib/friend-card';
 import { withholdLivePreview } from '@/lib/live-preview';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { getNightKey } from '@/lib/tonight';
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -35,6 +38,8 @@ import { useFriendsOut } from '@/hooks/use-friends-out';
 import { useSession } from '@/hooks/use-session';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { Avatar } from '@/components/avatar';
+import { pickForVenue } from '@/lib/venue-recommendations';
+import { VenueSharedVisits } from '@/components/venue-shared-visits';
 import { VenueEventsSection } from '@/components/venue-events-section';
 
 interface VenueData {
@@ -69,6 +74,7 @@ interface VenueCardData {
   isInWishlist: boolean;
   distance: string | null;
   friendsAtVenue: FriendAtVenue[];
+  nextPresenceExpiry: number | null;
   friendsPlanning: FriendAtVenue[];
   similarVenues: SimilarVenue[];
 }
@@ -108,34 +114,34 @@ function WhosHere({ friends, planning }: { friends: FriendAtVenue[]; planning: F
       style={{ backgroundColor: 'rgba(212,255,0,0.08)', borderWidth: 1, borderColor: 'rgba(212,255,0,0.3)' }}
     >
       <View className="flex-row items-center gap-3">
-        <View className="flex-row -space-x-3">
-          {visible.map((friend) => (
-            <View key={friend.id} className="rounded-full border-2 border-[#0d0a18]">
-              <Avatar name={friend.display_name} url={friend.avatar_url} size="md" />
-            </View>
-          ))}
-          {remaining > 0 ? (
-            <View className="w-10 h-10 rounded-full bg-[#a855f7]/40 border-2 border-[#0d0a18] items-center justify-center">
-              <Text className="text-white text-xs font-sans-semibold">+{remaining}</Text>
-            </View>
-          ) : null}
-        </View>
         <View className="flex-1 min-w-0">
           <Text className="text-white text-base font-sans-semibold">
             {count} {count === 1 ? 'friend is' : 'friends are'} here
           </Text>
-          <Text className="text-white/60 text-xs font-sans" numberOfLines={expanded ? undefined : 1}>
-            {namesLine(friends)}
+          <Text className="text-white/60 text-xs font-sans" numberOfLines={expanded ? undefined : 2}>
+            {friends.slice(0, 3).map((friend, i) => <Text key={friend.id} onPress={friendCardPress(friend.id)} accessibilityRole="button">{i ? ', ' : ''}{friend.display_name.split(' ')[0]}</Text>)}{friends.length > 3 ? ` and ${friends.length - 3} others` : ''}
           </Text>
         </View>
         <SymbolView name={expanded ? 'chevron.up' : 'chevron.down'} size={12} tintColor="rgba(255,255,255,0.4)" />
+      </View>
+      <View className="flex-row">
+        {visible.map((friend, index) => (
+          <View key={friend.id} className="rounded-full border-2 border-[#0d0a18]" style={{ marginLeft: index ? -12 : 0 }}>
+            <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="md" />
+          </View>
+        ))}
+        {remaining > 0 ? (
+          <View className="w-10 h-10 rounded-full bg-[#a855f7]/40 border-2 border-[#0d0a18] items-center justify-center" style={{ marginLeft: -12 }}>
+            <Text className="text-white text-xs font-sans-semibold">+{remaining}</Text>
+          </View>
+        ) : null}
       </View>
       {expanded ? (
         <View className="gap-1.5 pt-1 border-t border-white/10">
           {friends.map((friend) => (
             <View key={friend.id} className="flex-row items-center gap-2 pt-1.5">
-              <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
-              <Text className="text-white text-sm font-sans">{friend.display_name}</Text>
+              <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
+              <Text className="text-white text-sm font-sans" onPress={friendCardPress(friend.id)} accessibilityRole="button">{friend.display_name}</Text>
             </View>
           ))}
         </View>
@@ -156,7 +162,7 @@ function PlanningRow({ friends }: { friends: FriendAtVenue[] }) {
     <View className="flex-row items-center gap-3">
       <View className="flex-row -space-x-2">
         {visible.map((friend) => (
-          <Avatar key={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
+          <Avatar key={friend.id} userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
         ))}
       </View>
       <Text className="text-sm text-white/60 font-sans">
@@ -176,22 +182,25 @@ export default function VenueScreen() {
   const { data: friendIds } = useFriendIds(session?.user.id);
   const queryClient = useQueryClient();
   const { height: windowHeight } = useWindowDimensions();
-  // Open by default: hours, events and Trending Nearby are the reason to
-  // open a venue, and the sheet sizes to its content either way.
-  const [moreInfoOpen, setMoreInfoOpen] = useState(true);
-  // Keyed by venueId so Trending Nearby swaps retry the new venue's photo
+  // Each venue starts compact, including when a Nearby spot reuses this route.
+  const [moreInfoOpen, setMoreInfoOpen] = useState(false);
+  useEffect(() => setMoreInfoOpen(false), [venueId]);
+  // Keyed by venueId so Nearby spots swaps retry the new venue's photo
   const [photoFailedFor, setPhotoFailedFor] = useState<string | null>(null);
   const photoFailed = photoFailedFor === venueId;
   const [wishlistOverride, setWishlistOverride] = useState<boolean | null>(null);
+  const savingWishlist = useRef(false);
+  useEffect(() => setWishlistOverride(null), [venueId]);
   const [invitePickerOpen, setInvitePickerOpen] = useState(false);
   const [selectedInvitees, setSelectedInvitees] = useState<Set<string>>(new Set());
   const [sendingInvites, setSendingInvites] = useState(false);
 
   // Relationships are part of the key so an old eligible guest list is never reused.
   const { data: rawData, isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ['venue-card', venueId, session?.user.id, friendIds],
-    enabled: !!venueId && !!session && friendIds !== undefined,
+    queryKey: ['venue-card', venueId, session?.user.id, friendIds, isNight],
+    enabled: !!venueId && !!session && (!isNight || friendIds !== undefined),
     retry: 1,
+    refetchInterval: isNight ? 30_000 : false,
     queryFn: async (): Promise<VenueCardData | null> => {
       const nowIso = new Date().toISOString();
       const { data: venue, error: venueError } = await supabase
@@ -203,7 +212,7 @@ export default function VenueScreen() {
       if (!venue) return null;
 
       const [
-        { data: wishlistEntry },
+        { data: wishlistEntry, error: wishlistError },
         { data: statuses, error: statusError },
         { data: venuePlans, error: plansError },
         profiles,
@@ -214,22 +223,17 @@ export default function VenueScreen() {
           .eq('user_id', session!.user.id)
           .eq('venue_name', venue.name)
           .maybeSingle(),
-        supabase
-          .from('night_statuses')
-          .select('user_id')
-          .eq('venue_name', venue.name)
-          .not('expires_at', 'is', null)
-          .gt('expires_at', nowIso),
-        supabase
+        isNight ? fetchVisibleVenuePresence(venue.id).then(data => ({data, error: null})) : Promise.resolve({data: [], error: null}),
+        isNight ? supabase
           .from('plans')
           .select('id, user_id')
           .eq('venue_id', venueId!)
           .eq('plan_date', getNightKey())
-          .gt('expires_at', nowIso),
-        fetchProfilesSafe(),
+          .gt('expires_at', nowIso) : Promise.resolve({data: [], error: null}),
+        isNight ? fetchProfilesSafe() : Promise.resolve([]),
       ]);
 
-      if (statusError || plansError) throw statusError ?? plansError;
+      if (wishlistError || statusError || plansError) throw wishlistError ?? statusError ?? plansError;
       const myProfile = profiles.find(p => p.id === session!.user.id);
       const profileMap = buildProfileMap(profiles);
       const friendSet = new Set(friendIds ?? []);
@@ -278,10 +282,11 @@ export default function VenueScreen() {
         );
       }
 
-      // Trending nearby: same neighborhood, fall back to same city
+      // Nearby spots: same neighborhood, fall back to same city
       let { data: similar } = await supabase
         .from('venues')
         .select('id, name, neighborhood')
+        .eq('is_demo', false)
         .eq('neighborhood', venue.neighborhood ?? '')
         .eq('city', venue.city ?? '')
         .neq('id', venueId!)
@@ -291,6 +296,7 @@ export default function VenueScreen() {
         const { data: cityVenues } = await supabase
           .from('venues')
           .select('id, name, neighborhood')
+        .eq('is_demo', false)
           .eq('city', venue.city ?? '')
           .neq('id', venueId!)
           .order('popularity_rank', { ascending: true })
@@ -303,11 +309,19 @@ export default function VenueScreen() {
         isInWishlist: !!wishlistEntry,
         distance,
         friendsAtVenue,
+        nextPresenceExpiry: statuses?.length ? Math.min(...statuses.map(s => Date.parse(s.expires_at!))) : null,
         friendsPlanning,
         similarVenues: (similar ?? []) as SimilarVenue[],
       };
     },
   });
+
+  useEffect(() => {
+    const expiry = rawData?.nextPresenceExpiry;
+    if (!expiry) return;
+    const timer = setTimeout(() => { void queryClient.resetQueries({ queryKey: ['venue-card', venueId] }); }, Math.max(0, expiry-Date.now()) + 10);
+    return () => clearTimeout(timer);
+  }, [rawData?.nextPresenceExpiry, queryClient, venueId]);
 
   // Hours + photos + rating: live edge function with cached-columns fallback
   const data = rawData && withheld ? { ...rawData, friendsAtVenue: [] } : rawData;
@@ -357,7 +371,8 @@ export default function VenueScreen() {
 
   // Optimistic, and rolled back if the write fails (it never was before)
   const toggleWishlist = async () => {
-    if (!venue || !session) return;
+    if (!venue || !session || savingWishlist.current) return;
+    savingWishlist.current = true;
     const wasSaved = isInWishlist;
     setWishlistOverride(!wasSaved);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -370,6 +385,7 @@ export default function VenueScreen() {
       : await supabase
           .from('wishlist_places')
           .insert({ user_id: session.user.id, venue_name: venue.name, venue_image_url: null });
+    savingWishlist.current = false;
     if (error) {
       setWishlistOverride(wasSaved);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -378,6 +394,8 @@ export default function VenueScreen() {
     }
     if (!wasSaved) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     queryClient.invalidateQueries({ queryKey: ['profile-page'] });
+    queryClient.invalidateQueries({ queryKey: ['saved-venues', session.user.id] });
+    queryClient.invalidateQueries({ queryKey: ['venue-card', venueId] });
   };
 
   const openDirections = () => {
@@ -427,7 +445,7 @@ export default function VenueScreen() {
   // Grouped like the original InviteFriendsModal (addendum v3 §11.6):
   // Friends Out Now (with their venue), TBD Tonight (with their plan),
   // Staying in. A viewer who is in tonight sees names but not venues.
-  const { data: friendsOut } = useFriendsOut();
+  const { data: friendsOut } = useFriendsOut({ enabled: isNight });
   const inviteGroups = (() => {
     const outRows = (friendsOut?.outFriends ?? []).map((f) => ({
       id: f.user_id,
@@ -500,11 +518,15 @@ export default function VenueScreen() {
     );
   };
 
+  const reviewedPick = venue ? pickForVenue(venue.id, venue.city ?? '', venue.name) : undefined;
   const typeInfo = venue?.type ? getVenueTypeDisplay(venue.type) : null;
   const distNum = data?.distance ? parseFloat(data.distance) : NaN;
   const metaParts: string[] = [];
-  if (typeInfo) metaParts.push(typeInfo.label);
+  if (reviewedPick) metaParts.push(reviewedPick.category === 'club' ? 'Club' : 'Bar');
+  else if (typeInfo) metaParts.push(typeInfo.label);
   if (venue?.neighborhood) metaParts.push(venue.neighborhood);
+  const accessLabel = venue ? editorialForVenue(venue)?.accessLabel : null;
+  if (accessLabel) metaParts.push(accessLabel);
   if (!isNaN(distNum) && distNum <= 10) metaParts.push(`${data!.distance} mi`);
 
   const friendsHere = data?.friendsAtVenue ?? [];
@@ -567,9 +589,9 @@ export default function VenueScreen() {
                       >
                         {selected ? <SymbolView name="checkmark" size={11} tintColor="#000000" weight="bold" /> : null}
                       </View>
-                      <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+                      <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="sm" />
                       <View className="flex-1 min-w-0">
-                        <Text className="text-white text-sm font-sans-medium" numberOfLines={1}>
+                        <Text className="text-white text-sm font-sans-medium" numberOfLines={1} onPress={friendCardPress(friend.id)} accessibilityRole="button">
                           {friend.display_name}
                         </Text>
                         <Text className="text-xs font-sans" style={{ color: friend.lineColor }} numberOfLines={1}>
@@ -609,9 +631,8 @@ export default function VenueScreen() {
 
   // The sheet is sized to this content (fitToContents). A ScrollView as the
   // root child breaks that measurement on iOS — the sheet opens tall with the
-  // content pinned to its bottom — so the card is a plain View and only the
-  // expandable More Info section scrolls, inside a bounded height (the same
-  // nested pattern the check-in sheet uses).
+  // content pinned to its bottom — so the card and collapsed More Info are plain
+  // content-sized Views.
   return (
     <View className="bg-[#0d0a18]">
       <View className="pb-safe-offset-6">
@@ -664,10 +685,10 @@ export default function VenueScreen() {
             <SymbolView name="xmark" size={14} tintColor="#ffffff" />
           </Pressable>
           <View className="absolute bottom-0 left-0 right-0 px-5 pb-3">
-            {venue?.is_map_promoted ? (
+            {reviewedPick ? (
               <View className="self-start px-2 py-0.5 mb-1.5 rounded-full bg-[#d4ff00]/15 border border-[#d4ff00]/20">
                 <Text className="text-[10px] font-sans-medium" style={{ color: NEON }}>
-                  Featured Tonight
+                  Spotted pick
                 </Text>
               </View>
             ) : null}
@@ -711,6 +732,8 @@ export default function VenueScreen() {
           {metaParts.length > 0 ? (
             <Text className="text-xs text-white/60 font-sans mb-3">{metaParts.join(' · ')}</Text>
           ) : null}
+
+          <VenueSharedVisits venueId={venue.id} />
 
           {/* ── ZONE 2: Social — who's here leads the card ── */}
           <View className="mb-3 gap-3">
@@ -785,7 +808,7 @@ export default function VenueScreen() {
             </Pressable>
           </View>
 
-          {/* More Info — open by default */}
+          {/* More Info — collapsed on every new venue */}
           <Pressable
             onPress={() => setMoreInfoOpen((v) => !v)}
             className="flex-row items-center justify-between py-2"
@@ -800,7 +823,7 @@ export default function VenueScreen() {
           {moreInfoOpen ? (
             // A plain View, NOT a ScrollView: under fitToContents the sheet
             // measures once, and a nested scroller that fills after its data
-            // arrives (hours, Trending Nearby) overflows the measured height
+            // arrives (hours, Nearby spots) overflows the measured height
             // and paints over the card. Sized content grows the sheet instead.
             <View className="pt-2 pb-1 gap-3">
               <VenueEventsSection venueId={venue.id} />
@@ -815,7 +838,7 @@ export default function VenueScreen() {
               {data!.similarVenues.length > 0 ? (
                 <View>
                   <Text className="text-xs font-sans-semibold text-white/50 mb-1.5">
-                    Trending Nearby
+                    Nearby spots
                   </Text>
                   <View className="gap-1.5">
                     {data!.similarVenues.map((sv) => (

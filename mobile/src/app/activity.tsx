@@ -1,3 +1,4 @@
+import { CaptureGuard } from '@/components/capture-guard';
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { liveActivityMessage, withholdLivePreview } from '@/lib/live-preview';
@@ -9,7 +10,7 @@ import { SymbolView } from 'expo-symbols';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { createDmThread } from '@/lib/dm';
-import { openFriendCard } from '@/lib/friend-card';
+import { openFriendCard, friendCardPress } from '@/lib/friend-card';
 import { acceptMeetUp, acceptVenueInvite } from '@/lib/meet-up';
 import { notificationInviteStatus, respondToInvite, type InviteStatus } from '@/lib/dm-invites';
 import { showToast } from '@/lib/toast';
@@ -96,7 +97,7 @@ function ActivityCard({
     >
       <View className="flex-row items-center gap-3">
         <Pressable
-          onPress={() => n.sender_id && openFriendCard(n.sender_id)}
+          onPress={friendCardPress(n.sender_id)}
           disabled={!n.sender_id}
           className="active:opacity-70"
         >
@@ -106,7 +107,7 @@ function ActivityCard({
         </Pressable>
         <View className="flex-1 min-w-0">
           <View className="flex-row items-center gap-2">
-            <Text className="text-white text-sm font-sans-semibold shrink" numberOfLines={1}>
+            <Text className="text-white text-sm font-sans-semibold shrink" numberOfLines={1} onPress={n.sender_id ? friendCardPress(n.sender_id) : undefined} accessibilityRole={n.sender_id ? "button" : undefined}>
               {n.sender_name ?? 'Spotted'}
             </Text>
             <Text className="text-white/55 text-xs font-sans shrink-0" numberOfLines={1}>
@@ -197,7 +198,7 @@ function threadIdOf(n: AppNotification): string | null {
   return typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
 }
 
-export default function ActivityScreen() {
+function ActivityScreenContent() {
   const { session } = useSession();
   const userId = session?.user.id;
   const queryClient = useQueryClient();
@@ -436,11 +437,11 @@ export default function ActivityScreen() {
                 <View key={f.user_id} className={`${CARD} mb-2 flex-row items-center gap-3`}>
                   <Pressable onPress={() => openFriendCard(f.user_id, userId)} className="active:opacity-70">
                     <View className="rounded-full border-2 border-[#a855f7]/60">
-                      <Avatar name={f.display_name} url={f.avatar_url} size="md" />
+                      <Avatar userId={f.user_id} name={f.display_name} url={f.avatar_url} size="md" />
                     </View>
                   </Pressable>
                   <View className="flex-1 min-w-0">
-                    <Text className="text-white text-sm font-sans-medium" numberOfLines={1}>
+                    <Text className="text-white text-sm font-sans-medium" numberOfLines={1} onPress={friendCardPress(f.user_id)} accessibilityRole="button">
                       {f.display_name}
                     </Text>
                     <Text className="text-[#a855f7] text-xs font-sans mt-0.5" numberOfLines={1}>
@@ -609,3 +610,5 @@ export default function ActivityScreen() {
     </View>
   );
 }
+
+export default function ActivityScreen() { return <CaptureGuard name="activity"><ActivityScreenContent /></CaptureGuard>; }

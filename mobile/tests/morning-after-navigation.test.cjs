@@ -10,39 +10,14 @@ function nodes(tree) {
   return [tree, ...nodes(tree.props?.children)];
 }
 
-test('Home switches Day Morning After → Night feed → Day Morning After without leaving a recap overlay', () => {
-  let isNight = false, cursor = 0, changed = false;
-  const state = [];
-  const useState = initial => {
-    const index = cursor++;
-    if (!(index in state)) state[index] = initial;
-    return [state[index], value => { changed ||= state[index] !== value; state[index] = value; }];
-  };
-  const code = source('app/(tabs)/(home)/index.tsx').split('export default function HomeScreen()')[1].split('\ntype HomeTab')[0];
-  const { render } = compile('export function render()' + code, {
-    require: name => { assert.equal(name, 'react/jsx-runtime'); return jsxRuntime; },
-    useState, useNightMode: () => ({ isNight, city: 'nyc' }), useNotifications: () => ({ unreadCount: 0 }),
-    View: 'View', HomeHeader: 'Header', SubTabs: 'Tabs', DayHome: 'Recap',
-    NewsfeedScreen: 'Feed', NightOpeningScreen: 'Opening',
-  });
-  const screen = () => {
-    let tree;
-    do { cursor = 0; changed = false; tree = render(); } while (changed);
-    return nodes(tree);
-  };
-  let tree = screen();
-  assert(tree.some(n => n.type === 'Recap'));
-  assert(!tree.some(n => n.type === 'Feed'));
-  tree.find(n => n.type === 'Tabs').props.onChange('feed');
-  assert(screen().some(n => n.type === 'Opening'));
-  isNight = true;
-  tree = screen();
-  assert(!tree.some(n => ['Tabs', 'Recap', 'Opening'].includes(n.type)));
-  assert.equal(tree.find(n => n.type === 'Feed').props.active, true);
-  isNight = false;
-  tree = screen();
-  assert(tree.some(n => n.type === 'Recap'));
-  assert.equal(tree.find(n => n.type === 'Tabs').props.value, 'morning');
+test('Unified Home changes content at the boundary without a second feed segment', () => {
+ const { extract } = require('./product-test-runtime.cjs');
+ let isNight=false;
+ const render=extract('app/(tabs)/(home)/index.tsx','HomeScreenContent',{
+  require:()=>jsxRuntime,useNightMode:()=>({isNight,city:'nyc'}),useNotifications:()=>({unreadCount:0}),
+  View:'View',HomeHeader:'Header',ModeCountdownStrip:'Clock',DayHome:'DayHome',NewsfeedScreen:'Feed',
+ });
+ for(const night of [false,true,false]){isNight=night;const tree=nodes(render());assert.equal(tree.filter(n=>n.type==='Clock').length,1);assert.equal(tree.some(n=>n.type==='Feed'),night);assert.equal(tree.some(n=>n.type==='DayHome'),!night);assert(!tree.some(n=>n.type==='Tabs'));}
 });
 
 test('Profile exposes one accessible Morning After shortcut at night and opens the existing recap route', () => {

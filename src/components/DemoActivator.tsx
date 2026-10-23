@@ -133,7 +133,7 @@ async function activateDemo(city: SupportedCity, userId: string) {
     const cityName = city === 'nyc' ? 'NYC' : city === 'la' ? 'LA' : 'Palm Beach';
     if (venueName) {
       toast.success(`Welcome to Spotted! You're "at" ${venueName} in ${cityName} 🎉`, {
-        description: 'Explore the map, check the leaderboard, and yap about the vibes!'
+        description: 'Explore the map, check Hot Spots, and yap about the vibes!'
       });
     } else {
       toast.success(`Welcome! Demo mode activated with ${cityName} nightlife data 🎉`);

@@ -180,6 +180,8 @@ function inboxHarness(result, profileFailure = false) {
     },
   };
   const api = load("hooks/use-notifications.ts", {
+    "@/lib/live-preview": { withholdLivePreview: () => false, LIVE_ACTIVITY_TYPES: [] },
+    "./use-own-night-status": { useOwnNightStatus: () => ({ isSuccess: true }) },
     "react": { useEffect() {} },
     "react-native": { AppState: {} },
     "@/hooks/use-private-query": {

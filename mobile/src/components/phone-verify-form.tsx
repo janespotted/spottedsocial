@@ -23,7 +23,7 @@ const RESEND_COOLDOWN_S = 30;
 /**
  * Add or change the signed-in account's phone number: the number (with the
  * same country picker and formatting as the login screen), then the texted
- * code. Used by onboarding's optional phone step and Settings → Sign-in
+ * code. Used by onboarding's required invitation check and Settings → Sign-in
  * methods. `onVerified` runs once the number is on the account.
  */
 export function PhoneVerifyForm({ onVerified }: { onVerified: (e164: string) => void }) {

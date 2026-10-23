@@ -1,0 +1,133 @@
+.requested-invites .metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.request-connection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0 24px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.request-connection small {
+  flex-basis: 100%;
+}
+.requested-invites table td {
+  max-width: 260px;
+  overflow-wrap: anywhere;
+}
+.requested-invites .person {
+  max-width: 310px;
+}
+.requested-invites .person > span:last-child {
+  min-width: 0;
+  text-align: left;
+}
+.requested-invites .person small {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.request-details {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 12px 24px;
+  margin: 24px 0;
+}
+.request-details dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.request-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .requested-invites .metrics {
+    grid-template-columns: 1fr;
+  }
+  .request-details {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .request-details dd {
+    margin-bottom: 12px;
+  }
+}
+.requested-invites .request-connection {
+  padding: 0 24px;
+}
+.requested-invites table {
+  min-width: 900px;
+}
+.requested-invites table th:first-child,
+.requested-invites table td:first-child {
+  width: 300px;
+  min-width: 260px;
+}
+.requested-invites .person {
+  width: 100%;
+}
+.requested-invites .avatar {
+  flex-shrink: 0;
+  min-width: 36px;
+  width: 36px;
+  height: 36px;
+}
+.request-wave {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 190px;
+}
+.request-wave select {
+  width: 100%;
+  font-size: 12px;
+}
+.request-wave .badge {
+  align-self: flex-start;
+}
+.request-wave button {
+  font-size: 12px;
+  padding: 9px 12px;
+}
+.requested-invites table {
+  min-width: 950px;
+}
+.requested-invites table th:nth-child(2),
+.requested-invites table td:nth-child(2) {
+  display: table-cell !important;
+  width: 220px;
+}
+.requested-invites .pool-dialog label {
+  display: block;
+  margin: 20px 0 10px;
+}
+.requested-invites .pool-dialog input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+.requested-invites .wave-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+@media (max-width: 700px) {
+  .requested-invites table {
+    min-width: 480px;
+  }
+  .requested-invites table th:first-child,
+  .requested-invites table td:first-child {
+    min-width: 210px;
+    width: 210px;
+  }
+  .requested-invites table th:nth-child(4),
+  .requested-invites table td:nth-child(4) {
+    display: none;
+  }
+  .requested-invites .request-wave {
+    min-width: 175px;
+  }
+}

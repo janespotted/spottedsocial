@@ -605,7 +605,7 @@ export default function Leaderboard() {
     <div className="bg-gradient-to-b from-[#1a0f2e] to-[#110a24]">
       {/* Header */}
       <PageHeader
-        title="Leaderboard"
+        title="Hot Spots"
         subtitle="Top spots tonight"
         onSearchPress={() => setShowFriendSearch(true)}
         rightActions={

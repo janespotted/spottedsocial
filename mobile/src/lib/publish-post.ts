@@ -1,3 +1,5 @@
+import { assertSessionRevision, getSessionRevision } from './session-identity';
+import { isDemoMode } from './demo-mode';
 import { File } from 'expo-file-system';
 import { isDevice } from 'expo-device';
 import { Platform } from 'react-native';
@@ -92,6 +94,7 @@ export async function uploadMedia(
   onProgress?: (fraction: number) => void,
   signal?: AbortSignal
 ): Promise<void> {
+  if (isDemoMode()) throw new Error('Photo and video uploads use live services. Try a text post in Demo.');
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error('Signed out. Sign in again to post.');
@@ -174,7 +177,9 @@ async function uploadVideoToMux(
  * the uploaded path so the caller can retry without re-sending the file.
  */
 export async function publishPost(input: PublishInput): Promise<PublishResult> {
+  const operation = getSessionRevision();
   const { userId, media, onPhase, onProgress, signal } = input;
+  if (isDemoMode() && media) throw new PublishError('Try a text post in Demo. Photo and video uploads use live services.', null);
   let uploadedKey = input.uploadedKey ?? null;
   let prepared: PreparedMedia | null = null;
   const isVideo = media?.type === 'video';
@@ -184,6 +189,7 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
     // pixel size and ThumbHash, and the prep is a few hundred ms.
     onPhase?.('preparing');
     prepared = await prepareForUpload(media);
+    assertSessionRevision(operation);
     if (signal?.aborted) throw new PublishError('Upload cancelled.', uploadedKey, true);
   }
 
@@ -207,6 +213,7 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
 
   if (signal?.aborted) throw new PublishError('Upload cancelled.', uploadedKey, true);
 
+  assertSessionRevision(operation);
   onPhase?.('publishing');
   const { data, error } = await supabase
     .from('posts')

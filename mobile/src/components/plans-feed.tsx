@@ -27,11 +27,9 @@ import { useFriendIds } from '@/hooks/use-friend-ids';
 import { Avatar } from '@/components/avatar';
 import { PlanCard } from '@/components/plan-card';
 import { EventCard } from '@/components/event-card';
-import { EmptyState, ErrorState, type EmptyAction } from '@/components/empty-state';
+import { EmptyState, ErrorState } from '@/components/empty-state';
 import { addFriendsActions } from '@/lib/add-friends';
 import { FriendsOutBanner } from '@/components/friends-out-banner';
-import { DayPlaceholder } from '@/components/day-placeholder';
-import { CalendarDays, CalendarHeart, CalendarPlus, Martini } from 'lucide-react-native';
 import { RESET_COPY } from '@/lib/reset-copy';
 import { NEON } from '@/lib/theme';
 
@@ -93,13 +91,13 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
   const plansQuery = usePlans();
   const eventsQuery = usePlanEvents(city);
   const events = eventsQuery.data ?? [];
-  const friendsOutQuery = useFriendsOut();
-  const friendsData = friendsOutQuery.data;
-  const { data: friendIds } = useFriendIds(userId || undefined);
-  usePlansRealtime();
-  // Day Mode (DAY-NIGHT-MODE-PLAN.md §4.6): Plans stay open all day, but
-  // nothing live — no "Around tonight" Meet Ups, no status nudges.
   const { isNight } = useNightMode();
+  const friendsOutQuery = useFriendsOut({ enabled: isNight });
+  const friendsData = friendsOutQuery.data;
+  const friendsQuery = useFriendIds(userId || undefined);
+  const friendIds = friendsQuery.data;
+  usePlansRealtime();
+  // Day plans never start live friend queries.
 
   const [aroundExpanded, setAroundExpanded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -114,6 +112,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
       ...['plans', 'plan-downs', 'plan-participants', 'plan-comments'].map(key => queryClient.invalidateQueries({ queryKey: [key] })),
       queryClient.invalidateQueries({ queryKey: ['plan-events'] }),
       queryClient.invalidateQueries({ queryKey: ['friends-out'] }),
+      friendsQuery.refetch(),
       invalidateNightStatusQueries(queryClient),
     ]);
     setIsRefreshing(false);
@@ -209,69 +208,16 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
     ? aroundTonight
     : aroundTonight.slice(0, AROUND_TONIGHT_COLLAPSE);
   const hasContent = aroundTonight.length > 0 || feedItems.length > 0;
-  const loadFailed = plansQuery.isError || friendsOutQuery.isError || eventsQuery.isError;
+  const loadFailed = plansQuery.isError || (isNight && friendsOutQuery.isError) || eventsQuery.isError || friendsQuery.isError;
   const friendCount = friendIds?.length ?? 0;
   const venuesWithheld = friendsData?.venuesWithheld ?? false;
 
-  // Empty Plans, by situation — never "update your status" at someone who
-  // already has (client feedback §8)
-  const emptyState = (): { icon: 'person.2' | 'moon.stars' | 'figure.walk' | 'calendar'; title: string; body: string; actions: EmptyAction[]; tone?: 'positive' } => {
-    const sharePlan: EmptyAction = { label: 'Share a plan', icon: 'calendar.badge.plus', onPress: () => router.push('/create-plan') };
-    if (friendCount === 0) {
-      return {
-        icon: 'person.2',
-        title: 'Add friends to see who\'s out',
-        body: 'Plans and tonight\'s activity come from your friends. Find people you know to get started.',
-        actions: addFriendsActions(),
-      };
-    }
-    if (!isNight) {
-      return {
-        icon: 'calendar',
-        title: 'No plans yet',
-        body: 'Make a plan for tonight or later this week and see who\'s down.',
-        actions: [{ ...sharePlan, primary: true }],
-      };
-    }
-    if (isUserOut) {
-      return {
-        icon: 'figure.walk',
-        tone: 'positive',
-        title: 'You\'re out — nobody else yet',
-        body: 'None of your friends are sharing their spot yet. They\'ll show up here the moment they do.',
-        actions: [{ ...sharePlan, primary: true }],
-      };
-    }
-    if (isUserPlanning) {
-      return {
-        icon: 'moon.stars',
-        tone: 'positive',
-        title: 'You\'re down to go',
-        body: 'None of your friends are sharing their spot yet. We\'ll flag it here the moment someone heads out.',
-        actions: [{ ...sharePlan, primary: true }],
-      };
-    }
-    if (myStatus?.status === 'home') {
-      return {
-        icon: 'moon.stars',
-        title: 'Quiet night so far',
-        body: 'None of your friends are sharing their spot yet. Going out after all?',
-        actions: [
-          { label: 'Update status', icon: 'location.fill', primary: true, onPress: handleSwitchToOut },
-          sharePlan,
-        ],
-      };
-    }
-    return {
-      icon: 'calendar',
-      title: 'Nobody\'s out yet',
-      body: 'Be the first — say you\'re out, or share a plan and see who\'s down.',
-      actions: [
-        { label: 'Update status', icon: 'location.fill', primary: true, onPress: handleSwitchToOut },
-        sharePlan,
-      ],
-    };
-  };
+  // Status already lives in the header; the empty list needs one next step.
+  const emptyState = () => friendCount === 0
+    ? { icon: 'person.2' as const, title: 'Find your people', actions: addFriendsActions() }
+    : { icon: 'calendar' as const, title: 'No plans yet', actions: [
+      { label: 'Make a plan', icon: 'calendar.badge.plus' as const, primary: true, onPress: () => router.push('/create-plan') },
+    ] };
 
   const renderItem = (item: FeedItem) =>
     item.type === 'plan' ? (
@@ -319,7 +265,7 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
 
       {/* TBD: surface friends heading out the moment it happens */}
       {isNight && isUserPlanning && outFriends.length > 0 ? (
-        <FriendsOutBanner count={outFriends.length} names={outFriends.map((f) => f.display_name)} />
+        <FriendsOutBanner count={outFriends.length} friends={outFriends} />
       ) : null}
 
       {/* "No" tonight: names only, venues withheld, with the way back in */}
@@ -331,13 +277,13 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
           style={{ backgroundColor: 'rgba(212,255,0,0.08)', borderWidth: 1, borderColor: 'rgba(212,255,0,0.3)' }}
         >
           <Text className="flex-1 text-white/75 text-xs font-sans leading-4">
-            Live friend locations are hidden while you are Staying In. Shared posts, Plans and invitations remain available.
+            Live friend locations are hidden while you’re in.
           </Text>
           <SymbolView name="chevron.right" size={12} tintColor={NEON} />
         </Pressable>
       ) : null}
 
-      {plansQuery.isLoading || friendsOutQuery.isLoading ? (
+      {plansQuery.isLoading || (isNight && friendsOutQuery.isLoading) || eventsQuery.isLoading || (!hasContent && friendsQuery.isLoading) ? (
         <View className="gap-5">
           <SkeletonCard />
           <SkeletonCard />
@@ -345,17 +291,10 @@ export function PlansFeed({ city, onScroll }: PlansFeedProps) {
         </View>
       ) : loadFailed && !hasContent ? (
         <ErrorState title="Couldn't load tonight's plans" onRetry={refreshAll} retrying={isRefreshing} />
-      ) : !hasContent && !isNight && friendCount > 0 ? (
-        <DayPlaceholder
-          icons={[CalendarHeart, Martini, CalendarDays]}
-          title="No plans yet"
-          body="Make one for tonight or later this week and see who’s down."
-          action={{ label: 'Share a plan', icon: CalendarPlus, onPress: () => router.push('/create-plan') }}
-        />
       ) : !hasContent ? (
         (() => {
           const s = emptyState();
-          return <EmptyState icon={s.icon} title={s.title} body={s.body} actions={s.actions} tone={s.tone} />;
+          return <EmptyState icon={s.icon} title={s.title} actions={s.actions} />;
         })()
       ) : (
         <>

@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
@@ -119,6 +120,20 @@ export default function NewChatSheet() {
     <View className="pt-6 pb-safe-offset-4 gap-3">
       <Text className="text-white text-lg font-sans-semibold px-5">New Chat</Text>
 
+      <Pressable
+        onPress={() => router.replace('/new-group')}
+        disabled={!!creating}
+        accessibilityRole="button"
+        accessibilityLabel="New group"
+        className="mx-5 flex-row items-center gap-3 py-3 active:opacity-70"
+      >
+        <View className="w-11 h-11 rounded-full bg-[#d4ff00]/10 items-center justify-center">
+          <SymbolView name="person.2.fill" size={20} tintColor={NEON} />
+        </View>
+        <Text className="flex-1 text-[#d4ff00] text-base font-sans-semibold">New group</Text>
+        <SymbolView name="chevron.right" size={14} tintColor="rgba(255,255,255,0.4)" />
+      </Pressable>
+
       {friends && friends.length > 0 ? (
         <View className="px-5">
           <View className="flex-row items-center gap-2 rounded-2xl bg-white/5 border border-white/15 px-3">
@@ -167,9 +182,9 @@ export default function NewChatSheet() {
               disabled={!!creating}
               className="flex-row items-center gap-3 py-2.5 active:opacity-70"
             >
-              <Avatar name={friend.display_name} url={friend.avatar_url} size="md" />
+              <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="md" />
               <View className="flex-1 min-w-0">
-                <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
+                <Text className="text-white text-base font-sans-medium" numberOfLines={1} onPress={friendCardPress(friend.id)} accessibilityRole="button">
                   {friend.display_name}
                 </Text>
                 {friend.venue_name ? (

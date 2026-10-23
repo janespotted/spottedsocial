@@ -1,0 +1,3 @@
+Spotted mark: https://joinspottedapp.com/assets/spotted-mark.svg
+Brand palette and typography: https://joinspottedapp.com/styles.css, inspected 2026-10-22.
+Montserrat variable font, Latin and Latin Extended subsets: Google Fonts Montserrat v31; self-hosted to avoid third-party font requests from the private dashboard. See Montserrat-OFL.txt.

@@ -28,7 +28,7 @@ export default {
       system: 'You are a thorough QA agent. Verify every outcome on screen.',
       context: [
         'Spotted is a nightlife app: friends share whether they are out tonight and where.',
-        'Tabs along the bottom: Home (newsfeed), Leaderboard, Map, Chat (Plans | DMs), Profile (the S mark).',
+        'Tabs along the bottom: Home (newsfeed), Hot Spots, Map, Chat (Plans | DMs), Profile (the S mark).',
         'The header pill on the right reads Status, Out, TBD or In and opens the "Are you out tonight?" check-in sheet.',
         'Sheets slide up from the bottom; swipe one down to dismiss it.',
       ].join('\n'),

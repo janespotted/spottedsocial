@@ -53,7 +53,7 @@ export default function TabsLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="(leaderboard)">
         <NativeTabs.Trigger.Icon sf="chart.bar.xaxis" />
-        <NativeTabs.Trigger.Label>Leaderboard</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Hot Spots</NativeTabs.Trigger.Label>
         {isNight ? null : <NativeTabs.Trigger.Badge>☾</NativeTabs.Trigger.Badge>}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="(map)">

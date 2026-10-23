@@ -31,12 +31,19 @@ export function setSessionIdentity(id: string | null, token: string | null): voi
   for (const listener of listeners) listener();
   if (tokenChanged) for (const listener of tokenListeners) listener();
 }
+export function resetSessionDataScope(): void {
+  revision += 1;
+  for (const request of requests) request.abort();
+  requests.clear();
+  for (const listener of listeners) listener();
+}
+
 export function assertSessionRevision(captured: number): void {
   if (captured !== revision) throw new Error('Account changed; discard the previous account response');
 }
 
 /** Reject delayed responses even when the underlying transport ignores abort. */
-export async function sessionFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+export async function sessionFetch(input: RequestInfo | URL, init?: RequestInit, transport: typeof fetch = fetch): Promise<Response> {
   const captured = revision;
   const controller = new AbortController();
   const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
@@ -45,7 +52,7 @@ export async function sessionFetch(input: RequestInfo | URL, init?: RequestInit)
   signal?.addEventListener('abort', abort, { once: true });
   requests.add(controller);
   try {
-    const response = await fetch(input, { ...init, signal: controller.signal });
+    const response = await transport(input, { ...init, signal: controller.signal });
     assertSessionRevision(captured);
     // Headers may arrive before a slow body. Guard the decoding boundary too.
     for (const method of ['json', 'text', 'blob', 'arrayBuffer', 'formData'] as const) {

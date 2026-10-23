@@ -1,3 +1,4 @@
+import { useDemoMode } from '@/lib/demo-mode';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
@@ -10,7 +11,8 @@ import { getLocationPermission } from '@/lib/location-ready';
  * events own background sampling; JS timers are never sold as background GPS. */
 export function BackgroundLocationManager() {
   const { session } = useSession();
-  const userId = session?.user.id;
+  const demo = useDemoMode();
+  const userId = demo ? undefined : session?.user.id;
   const { data: own } = useOwnNightStatus();
   const revision = own?.status?.updated_at;
   const kind = own?.status?.status;

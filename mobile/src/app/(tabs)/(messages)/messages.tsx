@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useWindowDimensions } from 'react-native';
+import { TabHeaderRow } from '@/components/tab-header-row';
+import { CaptureGuard } from '@/components/capture-guard';
+import { ModeCountdownStrip } from '@/components/mode-countdown-strip';
+import { friendCardPress } from '@/lib/friend-card';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, Text, View } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LegendList } from '@legendapp/list/react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -55,11 +60,13 @@ function ThreadRow({ thread, userId, onPress }: { thread: DmThreadPreview; userI
       {thread.is_group ? (
         <GroupAvatar thread={thread} />
       ) : (
-        <Avatar name={title} url={thread.members[0]?.avatar_url ?? null} size="md" />
+        <Avatar userId={thread.members[0]?.user_id} name={title} url={thread.members[0]?.avatar_url ?? null} size="md" />
       )}
       <View className="flex-1 min-w-0 gap-0.5">
         <Text
           className={`text-base ${thread.unread ? 'text-white font-sans-semibold' : 'text-white font-sans-medium'}`}
+          onPress={thread.is_group ? undefined : friendCardPress(thread.members[0]?.user_id, userId)}
+          accessibilityRole={thread.is_group ? undefined : 'button'}
           numberOfLines={1}
         >
           {title}
@@ -103,13 +110,16 @@ function RowSkeleton() {
 }
 
 export default function MessagesScreen() {
+  const { fontScale } = useWindowDimensions();
+  const [focused, setFocused] = useState(false);
+  useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
   useNoKeyboardOnFocus(); // back from a thread must never leave the keyboard up
   const { session } = useSession();
   const { unreadCount } = useNotifications();
   const queryClient = useQueryClient();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
-  const [activeTab, setActiveTab] = useState<TabType>('plans');
-  useEffect(() => { if (tab === 'plans' || tab === 'dms') setActiveTab(tab === 'dms' ? 'messages' : 'plans'); }, [tab]);
+  // Keep the selection in the route so repeated Home → Plans links always open Plans.
+  const activeTab: TabType = tab === 'plans' ? 'plans' : 'messages';
   // pb clears the native tab bar + home indicator so the last row is reachable
   const contentContainerStyle = useResolveClassNames('px-4 pb-28');
 
@@ -137,10 +147,18 @@ export default function MessagesScreen() {
     queryKey: ['dm-threads', session?.user.id],
     enabled: !!session,
     staleTime: 15_000,
+    refetchInterval: focused && activeTab === 'messages' ? 5000 : false,
     queryFn: () => fetchDmThreads(session!.user.id),
   });
-  const { data: friendIds } = useFriendIds(session?.user.id);
+  const friendsQuery = useFriendIds(session?.user.id);
+  const friendIds = friendsQuery.data;
   const hasFriends = (friendIds?.length ?? 0) > 0;
+
+  // Memberships and group names are not in the realtime publication.
+  // Refresh on return so a newly created group appears before its first message.
+  useFocusEffect(useCallback(() => {
+    if (session?.user.id) void queryClient.invalidateQueries({ queryKey: ['dm-threads', session.user.id] });
+  }, [session?.user.id, queryClient]));
 
   // DM changes refresh the list.
   useEffect(() => {
@@ -188,26 +206,11 @@ export default function MessagesScreen() {
   };
 
   return (
-    <View className="flex-1">
+    <CaptureGuard name="dm-inbox" enabled={activeTab === 'messages'}><View key={fontScale} className="flex-1">
       {/* Header — static, web PageHeader parity */}
       <View className="pt-safe-offset-3 z-10" style={{ backgroundColor: 'rgba(26, 15, 46, 0.95)' }}>
-        <View className="flex-row items-center justify-between px-4 h-10">
-          <View className="flex-row items-center gap-2 flex-1 min-w-0">
-            <Text
-              className="text-white font-sans-light"
-              numberOfLines={1}
-              style={{ fontSize: 20, letterSpacing: 20 * 0.28 }}
-            >
-              Spotted
-            </Text>
-            {city ? (
-              <View className="px-2.5 py-1 rounded-full bg-white/10">
-                <Text className="text-white/70 text-xs font-sans-medium uppercase">{city}</Text>
-              </View>
-            ) : null}
-          </View>
-          <HeaderActions unreadCount={unreadCount} />
-        </View>
+        <TabHeaderRow city={city} unreadCount={unreadCount} />
+        <ModeCountdownStrip />
 
         {/* Plans and direct/group messages. */}
         <SubTabs<TabType>
@@ -216,9 +219,9 @@ export default function MessagesScreen() {
             { key: 'messages', label: 'DMs' },
           ]}
           value={activeTab}
-          onChange={setActiveTab}
+          onChange={value => router.setParams({ tab: value === 'messages' ? 'dms' : 'plans' })}
           trailing={
-            activeTab === 'messages' ? (
+            activeTab === 'messages' && (threads?.length ?? 0) > 0 ? (
               // Compose icon, same flow as the empty-state "New chat" button
               <Pressable
                 onPress={() => router.push('/new-chat')}
@@ -253,27 +256,25 @@ export default function MessagesScreen() {
             />
           }
           ListEmptyComponent={
-            isLoading ? (
+            isLoading || (!threads?.length && friendsQuery.isLoading) ? (
               <View>
                 <RowSkeleton />
                 <RowSkeleton />
                 <RowSkeleton />
               </View>
-            ) : threadsError ? (
-              <ErrorState title="Couldn't load your messages" onRetry={() => refetch()} retrying={threadsRefetching} />
+            ) : threadsError || (!threads?.length && friendsQuery.isError) ? (
+              <ErrorState title="Couldn't load your messages" onRetry={() => { void refetch(); void friendsQuery.refetch(); }} retrying={threadsRefetching || friendsQuery.isRefetching} />
             ) : !hasFriends ? (
               // No friends means nobody to chat with: grow the graph first
               <EmptyState
                 icon="person.2"
-                title="Add friends to start chatting"
-                body="Messages on Spotted are between friends. Find people you know and the chat opens up."
+                title="Find your people"
                 actions={addFriendsActions()}
               />
             ) : (
               <EmptyState
                 icon="bubble.left"
-                title="No messages yet"
-                body="Start a conversation with a friend, or meet up with someone who's out."
+                title="Say hey"
                 actions={[
                   { label: 'New chat', icon: 'square.and.pencil', primary: true, onPress: () => router.push('/new-chat') },
                 ]}
@@ -283,6 +284,6 @@ export default function MessagesScreen() {
           renderItem={({ item }) => <ThreadRow thread={item} userId={session?.user.id} onPress={() => openThread(item)} />}
         />
       )}
-    </View>
+    </View></CaptureGuard>
   );
 }
