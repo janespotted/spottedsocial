@@ -6,7 +6,10 @@
         "appID": "WAG8BQTW69.com.janereynolds.spotted",
         "paths": [
           "/invite/*",
-          "/auth/*"
+          "/auth/*",
+          "/join",
+          "/join.html",
+          "/venue-link"
         ]
       }
     ]

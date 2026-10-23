@@ -469,7 +469,7 @@ function App() {
                 (wave === "requests" ? <>Your next <span className="brand-accent">circle.</span></> : wave === "monitoring" ? <>Your launch, <span className="brand-accent">live.</span></> : wave === "pool" ? "Your first circle." : wave === "queue" ? "Who’s next." : "Let the right people in.")}
             </h1>
             <p>
-              {wave === "requests" ? "Everyone who raised their hand on joinspottedapp.com." : wave === "monitoring" ? "Invitations, activity and technical health. Private to the founder." : wave === "pool" ? "Save everyone here. Choose your first 100 when you’re ready." : activeWave
+              {wave === "requests" ? "Everyone who requested a place on the website or in Spotted." : wave === "monitoring" ? "Invitations, activity and technical health. Private to the founder." : wave === "pool" ? "Save everyone here. Choose your first 100 when you’re ready." : activeWave
                 ? "Every place has a name. Every invitation stays accounted for."
                 : wave === "queue"
                   ? "Completed nominations and your hand-picked guests, ready for a future wave."

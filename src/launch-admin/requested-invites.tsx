@@ -66,6 +66,8 @@ export interface InviteRequest {
   first_name: string;
   last_name: string;
   email: string;
+  source_kind?: "website" | "app";
+  invitation_texts_at?: string | null;
   phone: string;
   neighborhood: string;
   referred_by: string;
@@ -375,11 +377,11 @@ export function RequestedInvites({
   }
   return (
     <div className="requested-invites">
-      <section className="metrics" aria-label="Website request totals">
+      <section className="metrics" aria-label="Invitation request totals">
         <div>
           <span>Requests received</span>
           <strong>{page?.summary.total ?? "—"}</strong>
-          <small>From joinspottedapp.com</small>
+          <small>From the website and app</small>
         </div>
         <div>
           <span>New to review</span>
@@ -491,7 +493,7 @@ export function RequestedInvites({
                         <b>
                           {r.first_name} {r.last_name}
                         </b>
-                        <small>{r.email}</small>
+                        <small>{r.email || "Verified phone · Spotted app"}</small>
                         <small>
                           {r.assigned_phone || r.phone || "No phone provided"}
                         </small>
@@ -532,7 +534,7 @@ export function RequestedInvites({
           <p className="empty">
             {search || status !== "all"
               ? "No matching requests. Try another search or filter."
-              : "Invite requests will appear here when someone submits the website form."}
+              : "Requests from the website and Spotted app will appear here."}
           </p>
         )}
         <div className="pagination">
@@ -585,7 +587,9 @@ export function RequestedInvites({
             </div>
             <dl className="request-details">
               <dt>Email</dt>
-              <dd>{detail.email}</dd>
+              <dd>{detail.email || "Not requested in the app"}</dd>
+              <dt>Source</dt><dd>{detail.source_kind === "app" ? "Spotted app · verified phone" : "Website"}</dd>
+              <dt>Invitation text requested</dt><dd>{detail.invitation_texts_at ? date(detail.invitation_texts_at) : "Not recorded"}</dd>
               <dt>Phone</dt>
               <dd>{detail.assigned_phone || detail.phone || "Not provided"}</dd>
               <dt>Usually goes out in</dt>

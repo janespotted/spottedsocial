@@ -51,10 +51,10 @@ export interface GuestPage {
 export const stateLabels: Record<string, string> = {
   queued: "Waiting for a wave",
   selected: "Selected",
-  ready: "Not invited yet",
-  invited: "Invited · not joined",
+  ready: "Access activated · not sent",
+  invited: "Invitation sent · not joined",
   started: "Started onboarding",
-  joined: "Joined",
+  joined: "Onboarding completed",
   revoked: "Revoked",
 };
 // Strict, explicit phone parsing. A country code is required outside US/Canada.
