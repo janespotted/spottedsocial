@@ -1,4 +1,5 @@
 import { WaveOutreach } from './wave-outreach';
+import { RemoveFromWave } from './remove-from-wave';
 import { RequestedInvites } from './requested-invites';
 import { Monitoring } from './monitoring';
 import { PlanningPool } from './planning-pool';
@@ -14,6 +15,7 @@ import {
   type Snapshot,
   type Guest,
   type GuestPage,
+  type Wave,
 } from "./types";
 import "./style.css";
 import spottedMark from "./assets/spotted-mark.svg";
@@ -85,6 +87,7 @@ function App() {
     history.replaceState(null, "", location.pathname + location.search + hash);
   }, [wave]);
   const [outreachWave,setOutreachWave]=useState<string|null>(null);
+  const [removal, setRemoval] = useState<{ wave: Wave; guests: string[]; personName?: string } | null>(null);
   const activeWave = snapshot?.waves.find((w) => w.id === wave);
   const detailWave = snapshot?.waves.find((w) => w.id === detail?.wave_id);
   useEffect(() => {
@@ -150,6 +153,7 @@ function App() {
         setPage({ rows: [], total: 0 });
         setDetail(null);
         setSelected([]);
+        setRemoval(null);
       }
     });
     return () => data.subscription.unsubscribe();
@@ -290,6 +294,13 @@ function App() {
       setModal(null);
       setDetail(null);
     }
+  };
+  const canRemove = (g: Guest) => g.state === "selected" && snapshot?.waves.some(w => w.id === g.wave_id && w.status === "draft");
+  const removePerson = (g: Guest) => {
+    const from = snapshot?.waves.find(w => w.id === g.wave_id);
+    if (!from || !canRemove(g)) return;
+    setDetail(null);
+    setRemoval({ wave: from, guests: [g.id], personName: g.name || g.phone });
   };
   if (!authReady)
     return (
@@ -706,14 +717,9 @@ function App() {
                     <button
                       className="quiet"
                       disabled={busy}
-                      onClick={() =>
-                        void run(async () => {
-                          await mutate("remove", { guests: selected });
-                          setSelected([]);
-                        })
-                      }
+                      onClick={() => setRemoval({ wave: activeWave, guests: [...selected] })}
                     >
-                      Return to queue
+                      Remove from wave
                     </button>
                   )}
                 </div>
@@ -804,7 +810,7 @@ function App() {
                           </span>
                           <small>{date(g.invited_at)}</small>
                         </td>
-                        <td>
+                        <td className="guest-actions">
                           <button
                             aria-label={`Open ${g.name || g.phone}`}
                             className="quiet"
@@ -812,6 +818,10 @@ function App() {
                           >
                             ↗
                           </button>
+                          {canRemove(g) && <button className="quiet remove-wave-button" disabled={busy}
+                            aria-label={`Remove ${g.name || g.phone} from wave`} onClick={() => removePerson(g)}>
+                            Remove from wave
+                          </button>}
                         </td>
                       </tr>
                     ))}
@@ -915,6 +925,7 @@ function App() {
                         : "Not recorded"}
                   </dd>
                 </dl>
+                {canRemove(detail) && <button className="secondary" disabled={busy} onClick={() => removePerson(detail)}>Remove from wave</button>}
                 {detailWave?.status === "open" &&
                   ["ready", "invited"].includes(detail.state) && (
                     <>
@@ -1284,6 +1295,18 @@ function App() {
           </section>
         </div>
       )}
+      {removal && <RemoveFromWave waveName={removal.wave.name} count={removal.guests.length} personName={removal.personName}
+        onClose={() => setRemoval(null)} onRemove={async () => {
+          if (preview) throw Error("This guest list is a visual preview. Try removal in Requested invites using its sample people.");
+          const current = generation.current;
+          const result = await api<{ removed: number }>("remove_from_wave", { wave: removal.wave.id, guests: removal.guests });
+          if (current !== generation.current) return;
+          setError("");
+          setSelected([]);
+          setNotice(result.removed ? `${result.removed === 1 ? "Person" : `${result.removed} people`} returned to Next up. You can add them to a wave again later.` : "Already in Next up. No further changes needed.");
+          try { await load(); await loadGuests(); }
+          catch { setError("Removal saved. Refresh to update the guest list."); }
+        }} />}
       {outreachWave && snapshot && (
         <WaveOutreach
           key={`${session?.user.id || "preview"}:${outreachWave}`}

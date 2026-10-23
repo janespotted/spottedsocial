@@ -25,6 +25,8 @@ async function setup(){
  await db.exec(await migration('20261022110449_requested_invites.sql'));
  await db.exec(await migration('20261022113542_request_wave_outreach.sql'));
  await db.exec(await migration('20261022115607_outreach_audit_account_deletion.sql'));
+ await db.exec(await migration('20261012073319_launch_planning_pool.sql'));
+ await db.exec(await migration('20261023162950_remove_from_wave.sql'));
  assert.equal((await db.query("select confdeltype from pg_constraint where conname='launch_outreach_batches_created_by_fkey'")).rows[0].confdeltype,'n');
  await db.exec(`insert into auth.users(id) values('${admin}'),('${member}');insert into spotted_private.launch_operators(user_id,wave_admin) values('${admin}',true);
  insert into spotted_private.launch_waves(id,name,capacity,status,activated_at,invitation_count) values('${wave}','The first 100',100,'draft',null,0),('${second}','Second',1,'draft',null,0);`);
@@ -51,6 +53,60 @@ test('request assignment: roles, normalization, duplicates, capacity, atomic mov
  await db.exec(`reset role;update auth.users set phone='+12125550104' where id='${member}';insert into spotted_private.launch_members(user_id,completed_at) values('${member}',now());set role authenticated`);await assert.rejects(call('assign',{id:id(4),wave}),/already joined/);
  await db.exec('reset role');assert.equal((await db.query('select count(*) n from spotted_private.launch_messages')).rows[0].n,0,'assignment sends nothing');
  await db.exec(`update spotted_private.launch_operators set wave_admin=false;set role authenticated`);await assert.rejects(call('list'),/Admin access/);await db.close();
+});
+test('draft removal preserves contacts and sources, frees capacity, deduplicates retries and allows re-adding',async()=>{
+ const db=await setup();
+ const rpc=async(name,action,data={})=>(await db.query(`select public.${name}($1,$2) r`,[action,data])).rows[0].r;
+ const request={id:'a'.repeat(24),form_id:'6aa44b3bf24f7a00081682c2',first_name:'Alex',last_name:'Sample',email:'alex@example.com',phone:'+12125550101',submitted_at:new Date().toISOString()};
+ await db.query('select public.ingest_invite_request($1,true)',[request]);
+ await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${admin}',false)`);
+ const g=await rpc('requested_invites','assign',{id:request.id,wave:second});
+ await db.exec(`reset role;update spotted_private.launch_guests set consent_at=now(),consent_note='Asked for invitation text' where id='${g.guest_id}';
+ insert into spotted_private.launch_prospects(source_key,source,name,phone,shortlisted,guest_id) values('sample','Test event','Alex Sample','+12125550101',true,'${g.guest_id}');`);
+ const before=(await db.query('select * from spotted_private.launch_guests where id=$1',[g.guest_id])).rows[0];
+ await db.exec('set role authenticated');
+ const remove=()=>rpc('launch_admin','remove_from_wave',{wave:second,guests:[g.guest_id,g.guest_id]});
+ assert.equal((await remove()).removed,1);assert.equal((await remove()).removed,0,'uncertain response retry is harmless');
+ let inbox=await rpc('requested_invites','list');assert.equal(inbox.total,1);assert.equal(inbox.rows[0].guest_id,g.guest_id);assert.equal(inbox.rows[0].wave_id,null);assert.equal(inbox.waves.find(w=>w.id===second).selected,0);
+ const pool=await rpc('launch_pool','list');assert.equal(pool.total,1);assert.equal(pool.rows[0].guest_id,g.guest_id);assert.equal(pool.rows[0].shortlisted,true);assert.equal(pool.rows[0].wave_name,null);
+ const queue=await rpc('launch_admin','guests',{wave:'queue'});assert.equal(queue.rows[0].id,g.guest_id);assert.equal(queue.rows[0].state,'queued');
+ await db.exec('reset role');assert.deepEqual((await db.query('select * from spotted_private.launch_guests where id=$1',[g.guest_id])).rows[0],{...before,wave_id:null});
+ const audit=(await db.query("select details from spotted_private.launch_audit where action='remove'")).rows;assert.equal(audit.length,1);assert.equal(audit[0].details.count,1);
+ await db.exec('set role authenticated');
+ await rpc('launch_admin','import',{rows:[{name:'Other Sample',phone:'+12125550102'}]});
+ const other=(await rpc('launch_admin','guests',{search:'+12125550102'})).rows[0];
+ await rpc('launch_admin','assign',{id:second,guests:[other.id]});
+ await assert.rejects(rpc('requested_invites','assign',{id:request.id,wave:second}),/capacity/);
+ await rpc('launch_admin','remove_from_wave',{wave:second,guests:[other.id]});
+ await rpc('requested_invites','assign',{id:request.id,wave:second});
+ inbox=await rpc('requested_invites','list');assert.equal(inbox.rows[0].wave_id,second);assert.equal(inbox.rows[0].guest_id,g.guest_id);
+ await db.exec('reset role');assert.equal((await db.query('select count(*) n from spotted_private.launch_messages')).rows[0].n,0);await db.close();
+});
+test('draft removal rejects non-admins, stale/missing selections and mixed active members atomically',async()=>{
+ const db=await setup();
+ await db.exec(`insert into spotted_private.launch_guests(phone,name,source,wave_id) values('+12125550101','One','seed','${wave}'),('+12125550102','Two','seed','${wave}');`);
+ const ids=(await db.query('select id from spotted_private.launch_guests order by phone')).rows.map(r=>r.id);
+ const remove=data=>db.query("select public.launch_admin('remove_from_wave',$1)",[data||{wave,guests:ids}]);
+ await db.exec('set role anon');await assert.rejects(remove(),/permission denied/);
+ await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${member}',false)`);await assert.rejects(remove(),/Admin access/);
+ await db.exec(`select set_config('request.jwt.claim.sub','${admin}',false)`);
+ for(const data of [{},null,{wave,guests:[]},{guests:ids},{wave,guests:[null]}])await assert.rejects(remove(data||{}),/Choose|Refresh/);
+ await assert.rejects(remove({wave,guests:[ids[0],'99999999-0000-0000-0000-000000000000']}),/guest list changed/);
+ await db.exec(`reset role;update spotted_private.launch_guests set wave_id='${second}' where id='${ids[1]}';set role authenticated`);
+ await assert.rejects(remove(),/another wave/);
+ await db.exec(`reset role;update spotted_private.launch_guests set wave_id='${wave}' where id='${ids[1]}';set role authenticated`);
+ for(const [column,value] of [['activated_at','now()'],['invited_at','now()'],['claimed_at','now()'],['claimed_by',`'${member}'`],['revoked_at','now()']]){
+  await db.exec(`reset role;update spotted_private.launch_guests set ${column}=${value} where id='${ids[1]}';set role authenticated`);
+  await assert.rejects(remove(),/no people were removed/);
+  await db.exec('reset role');assert.equal((await db.query('select count(*) n from spotted_private.launch_guests where wave_id=$1',[wave])).rows[0].n,2);
+  await db.exec(`update spotted_private.launch_guests set ${column}=null where id='${ids[1]}';set role authenticated`);
+ }
+ for(const status of ['open','paused']){
+  await db.exec(`reset role;update spotted_private.launch_waves set status='${status}' where id='${wave}';set role authenticated`);
+  await assert.rejects(remove(),/membership history/);
+ }
+ await db.exec('reset role');assert.equal((await db.query("select count(*) n from spotted_private.launch_audit where action='remove'")).rows[0].n,0);
+ assert.equal((await db.query('select count(*) n from auth.users')).rows[0].n,2);await db.close();
 });
 test('wave outreach: exact review, stale review, consent/exclusions, batch replay, scoped claims, opt-out and delivery uncertainty',async()=>{
  const db=await setup();

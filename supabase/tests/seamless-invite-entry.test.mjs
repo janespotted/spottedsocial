@@ -14,7 +14,7 @@ async function setup() {
  create table public.profiles(id uuid primary key,display_name text,username text unique,avatar_url text,city text);
  create table public.user_roles(user_id uuid,role text);create table spotted_private.night_mode_testers(user_id uuid);
  insert into auth.users(id) values('${admin}'),('${legacy}');insert into public.user_roles values('${admin}','admin');`);
- for(const name of ['20261010230431_nyc_onboarding_waves.sql','20261012021331_launch_admin_center.sql','20261022110449_requested_invites.sql','20261022113542_request_wave_outreach.sql','20261022115607_outreach_audit_account_deletion.sql','20261023060223_seamless_invite_entry.sql','20261023063347_public_invite_destination.sql']) {
+ for(const name of ['20261010230431_nyc_onboarding_waves.sql','20261012021331_launch_admin_center.sql','20261022110449_requested_invites.sql','20261022113542_request_wave_outreach.sql','20261022115607_outreach_audit_account_deletion.sql','20261023060223_seamless_invite_entry.sql','20261023063347_public_invite_destination.sql','20261023162950_remove_from_wave.sql']) {
   await db.exec(await readFile(new URL('../migrations/'+name,import.meta.url),'utf8'));
  }
  await db.exec(`insert into auth.users values('${invited}','12125550102',now()),('${waiting}','12125550103',now()),('${apple}',null,null);
