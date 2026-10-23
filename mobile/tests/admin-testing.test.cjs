@@ -231,6 +231,7 @@ test('A query built in Demo cannot escape to live data after Exit, even if start
   '@react-native-async-storage/async-storage': { __esModule: true, default: { getItem: async () => null, setItem: async () => {}, removeItem: async () => {} } },
   '@supabase/supabase-js': { createClient: boundCreate },
   './demo-mode': { appFetch: net, getDemoSandbox: () => current },
+  './telemetry-core': { timedFetch: transport => transport },
   './session-identity': { sessionFetch: (url, options, transport) => (transport || net)(url, options) },
  })[n] });
  const pending = api.supabase.from('posts').insert({ user_id: userId, text: 'Not a real post' }).select('*');

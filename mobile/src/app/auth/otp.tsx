@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { InputOTP } from 'heroui-native';
@@ -8,12 +8,15 @@ import { SpottedMark } from '@/components/spotted-mark';
 import { formatE164 } from '@/lib/country-codes';
 import { NEON } from '@/lib/theme';
 
-const RESEND_COOLDOWN_S = 30;
+const RESEND_COOLDOWN_S = 60;
 
 export default function OtpScreen() {
   const { phone } = useLocalSearchParams<{ phone: string }>();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const { width } = useWindowDimensions();
+  const slotWidth = Math.min(48, Math.floor((width - 48 - 40) / 6));
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_S);
 
@@ -24,29 +27,25 @@ export default function OtpScreen() {
   }, [cooldown]);
 
   const verifyCode = async (token: string) => {
-    if (!phone || busy) return;
-    setBusy(true);
-    setError(null);
-    const { error: err } = await supabase.auth.verifyOtp({
-      phone,
-      token: token.trim(),
-      type: 'sms',
-    });
-    setBusy(false);
-    if (err) setError(err.message);
-    // The session gate opens the introduction/setup for new members,
-    // or the app for an already-complete account. Invalid codes stay here.
+    if (!phone || pending.current || !/^\d{6}$/.test(token.trim())) return;
+    pending.current = true; setBusy(true); setError(null);
+    try {
+      const { error: err } = await supabase.auth.verifyOtp({ phone, token: token.trim(), type: 'sms' });
+      if (err) throw err;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      setError(/expired|invalid|otp/i.test(message) ? 'That code didn’t work. Try again or request a new one.' : 'Couldn’t verify your code. Check your connection and try again.');
+    } finally { pending.current = false; setBusy(false); }
   };
-
   const resend = async () => {
-    if (!phone || cooldown > 0) return;
-    setError(null);
-    const { error: err } = await supabase.auth.signInWithOtp({ phone });
-    if (err) {
-      setError(err.message);
-      return;
-    }
-    setCooldown(RESEND_COOLDOWN_S);
+    if (!phone || cooldown > 0 || pending.current) return;
+    pending.current = true; setBusy(true); setError(null);
+    try {
+      const { error: err } = await supabase.auth.signInWithOtp({ phone });
+      if (err) throw err;
+      setCooldown(RESEND_COOLDOWN_S);
+    } catch { setError('Couldn’t resend your code. Wait a minute and try again.'); }
+    finally { pending.current = false; setBusy(false); }
   };
 
   return (
@@ -57,7 +56,7 @@ export default function OtpScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Pressable
-          onPress={() => router.back()}
+          accessibilityRole="button" accessibilityLabel="Change phone number" disabled={busy} onPress={() => router.canGoBack() ? router.back() : router.replace('/auth')}
           hitSlop={12}
           className="absolute left-4 top-safe-offset-10 p-2"
         >
@@ -76,14 +75,15 @@ export default function OtpScreen() {
           maxLength={6}
           onComplete={verifyCode}
           onChange={setCode}
-          textInputProps={{ autoFocus: true, textContentType: 'oneTimeCode' }}
+          textInputProps={{ autoFocus: true, textContentType: 'oneTimeCode', keyboardType: 'number-pad' }}
         >
           <InputOTP.Group className="gap-2">
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <InputOTP.Slot
                 key={i}
                 index={i}
-                className="w-12 h-14 rounded-xl border border-white/15 bg-white/5"
+                style={{ width: slotWidth }}
+                className="h-14 rounded-xl border border-white/15 bg-white/5"
               />
             ))}
           </InputOTP.Group>

@@ -11,6 +11,7 @@ import { LaunchIntroduction } from '@/components/launch-introduction';
 import { PhoneVerifyForm } from '@/components/phone-verify-form';
 import { launchRpc, launchStage, nominationPhone, type LaunchState } from '@/lib/launch';
 import { nomineeName, readNomineeLabels, saveNomineeLabel, type NomineeLabels } from '@/lib/nomination-progress';
+import { readLaunchDraft, saveLaunchDraft, clearLaunchDraft } from '@/lib/launch-draft';
 import { readIntroStep } from '@/lib/launch-intro';
 import { supabase } from '@/lib/supabase';
 import { formatE164 } from '@/lib/country-codes';
@@ -33,17 +34,38 @@ export function LaunchSetup({ preview = false, onDone }: { preview?: boolean; on
   useEffect(() => { if (appleName) setName(current => current || appleName); }, [appleName]);
   const [username, setUsername] = useState(!preview && launch?.profileSaved ? launch.profile?.username || '' : '');
   const [terms, setTerms] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (preview || !session?.user.id) return;
+    void readLaunchDraft(session.user.id).then(draft => {
+      if (!active) return;
+      if (draft && !launch?.profileSaved) {
+        setName(current => current || draft.name); setUsername(current => current || draft.username); setTerms(current => current || draft.terms);
+      }
+      setDraftReady(true);
+    });
+    return () => { active = false; };
+  }, [session?.user.id, preview]);
+  useEffect(() => {
+    if (preview || !draftReady || !session?.user.id || state?.profileSaved) return;
+    const uid = session.user.id;
+    const timer = setTimeout(() => { void saveLaunchDraft(uid, { name, username, terms }); }, 200);
+    return () => clearTimeout(timer);
+  }, [preview, draftReady, session?.user.id, state?.profileSaved, name, username, terms]);
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const [error, setError] = useState<string | null>(null);
   // Keep the opening view to two cards; show entry controls after a choice.
-  const [slot, setSlot] = useState(!preview && launch?.nominations.length === 1 ? 2 : 0);
+  const [slot, setSlot] = useState(!preview && launch?.nominations.length === 1 ? (launch.nominations[0].slot === 1 ? 2 : 1) : 0);
   const [phone, setPhone] = useState('');
   const [contactName, setContactName] = useState('');
   const [nomineeLabels, setNomineeLabels] = useState<NomineeLabels>({});
   useEffect(() => { let active = true; if (!preview && session) void readNomineeLabels(session.user.id).then(value => { if (active) setNomineeLabels(value); }); return () => { active = false; }; }, [session?.user.id]);
   const [findFriends, setFindFriends] = useState(false);
   const [verifyPhone, setVerifyPhone] = useState(false);
+  const [requestName, setRequestName] = useState(appleName);
+  const [invitationTexts, setInvitationTexts] = useState(false);
   const usernameInput = useRef<TextInput>(null);
   useEffect(() => { if (!preview && launch) setState(launch); }, [launch]);
   const invoke = (name: Parameters<typeof launchRpc>[0], args?: Record<string, unknown>): Promise<LaunchState> => preview ? Promise.resolve(previewLaunchAction(state!, name, args)) : launchRpc(name, args);
@@ -58,8 +80,9 @@ export function LaunchSetup({ preview = false, onDone }: { preview?: boolean; on
   const refresh = () => perform(async () => { const next = await invoke('get_launch_state'); setState(next); if (next.complete) await finish(); });
   useEffect(() => {
     if (stage !== 'waiting') return;
-    const sub = AppState.addEventListener('change', value => { if (value === 'active') refresh(); });
-    return () => sub.remove();
+    const sub = AppState.addEventListener('change', value => { if (value === 'active') void refresh(); });
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 30000);
+    return () => { sub.remove(); clearInterval(timer); };
   }, [stage]);
   const errorView = error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" className="text-red-300 text-sm leading-5 mt-4 mb-4">{error}</Text> : null;
 
@@ -80,23 +103,32 @@ export function LaunchSetup({ preview = false, onDone }: { preview?: boolean; on
     <PhoneVerifyForm onVerified={() => { refresh(); }} />
     {errorView}
     <Text className="text-white/60 text-sm leading-5 mt-6">Apple stays connected to this account. Your verified number checks your invitation.</Text>
-    <Pressable className="py-5" onPress={() => void supabase.auth.signOut()}><Text className="text-white/70 text-center">Already have an account? Sign in with your phone</Text></Pressable>
+    <Pressable accessibilityRole="button" disabled={busy} className="py-5" onPress={() => void perform(async () => { const { error } = await supabase.auth.signOut(); if (error) throw error; })}><Text className="text-white/70 text-center">Already have an account? Sign in with your phone</Text></Pressable>
   </LaunchShell>;
 
-  if (stage === 'waiting') return <LaunchShell preview={preview} key="waiting" title="Your night is coming." subtitle="New York opens in small waves. Your invitation unlocks your place.">
-    <View className="rounded-3xl bg-white/5 border border-white/10 p-6 mb-8 gap-3">
-      <SymbolView name="sparkles" tintColor={NEON} size={28} />
-      <Text className="text-white text-lg font-sans-medium">First, your invitation.</Text>
-      <Text style={{ color: MIST }} className="text-base leading-6">When it opens: your profile, two required nominations, then you’re in.</Text>
+  if (stage === 'waiting') return <LaunchShell preview={preview} key="waiting" title={state?.accessRequested ? "You’re on the list." : "Your night is coming."} subtitle="New York is opening in waves.">
+    <View className="rounded-3xl bg-white/5 border border-white/10 p-6 mb-6 gap-3">
+      <SymbolView name={state?.accessRequested ? "checkmark.circle" : "sparkles"} tintColor={NEON} size={28} />
+      <Text style={{ color: MIST }} className="text-base leading-6">{state?.accessRequested ? 'Your request is saved. Come back here when your invitation opens.' : 'Request your place in the next circle.'}</Text>
     </View>
     {!state?.hasPhone ? <>
-      <Text className="text-sm text-white/70 leading-5 mb-4">Invited by phone? Verify that number to claim your place.</Text>
-      {verifyPhone ? <PhoneVerifyForm onVerified={() => { setVerifyPhone(false); refresh(); }} /> : <Pressable onPress={() => setVerifyPhone(true)} className="py-4"><Text style={{ color: NEON }}>Claim a phone invitation</Text></Pressable>}
+      <Text className="text-sm text-white/70 leading-5 mb-4">Verify your number to check your invitation.</Text>
+      {verifyPhone ? <PhoneVerifyForm onVerified={() => { setVerifyPhone(false); void refresh(); }} /> : <LaunchButton label="Verify my number" onPress={() => setVerifyPhone(true)} />}
+    </> : !state.accessRequested ? <>
+      <TextInput accessibilityLabel="Your name for the invitation list" value={requestName} onChangeText={setRequestName} maxLength={80} textContentType="name" placeholder="Your name" placeholderTextColor={MIST} className="text-white text-xl border-b border-white/20 pb-3 mb-6" />
+      <Pressable accessibilityRole="checkbox" accessibilityLabel="Text me when my invitation opens" accessibilityState={{ checked: invitationTexts }} onPress={() => setInvitationTexts(!invitationTexts)} className="flex-row items-center gap-3 min-h-12 mb-5">
+        <View className="h-6 w-6 rounded-md border border-white/30 items-center justify-center" style={invitationTexts ? { backgroundColor: NEON } : undefined}>{invitationTexts ? <SymbolView name="checkmark" tintColor={INK} size={16} /> : null}</View>
+        <Text className="flex-1 text-white/65 text-sm leading-5">Text me when my invitation opens.</Text>
+      </Pressable>
+      <LaunchButton label={busy ? 'Saving…' : 'Request access'} disabled={busy || !requestName.trim()} onPress={() => void perform(async () => {
+        const next = await invoke('request_launch_access', { p_name: requestName.trim(), p_invitation_texts: invitationTexts });
+        Keyboard.dismiss(); setState(next); if (next.complete) await finish();
+      })} />
     </> : null}
     {errorView}
-    <LaunchButton label={busy ? 'Checking…' : 'Check my invitation'} disabled={busy} onPress={refresh} />
-    <Pressable className="py-5" onPress={() => void Linking.openURL('mailto:support@spotted.app')}><Text className="text-white/70 text-center">Contact Spotted</Text></Pressable>
-    <Pressable className="py-4" onPress={() => void supabase.auth.signOut()}><Text className="text-white/60 text-center">Use another account</Text></Pressable>
+    <Pressable accessibilityRole="button" disabled={busy} className="min-h-12 items-center justify-center mt-4" onPress={() => void refresh()}><Text style={{ color: NEON }}>{busy ? 'Checking…' : 'Check my invitation'}</Text></Pressable>
+    <Pressable accessibilityRole="button" className="min-h-12 items-center justify-center" onPress={() => void perform(async () => { await Linking.openURL('https://joinspottedapp.com/'); })}><Text className="text-white/70 text-center">Visit Spotted</Text></Pressable>
+    <Pressable accessibilityRole="button" disabled={busy} className="min-h-12 items-center justify-center" onPress={() => void perform(async () => { const { error } = await supabase.auth.signOut(); if (error) throw error; })}><Text className="text-white/60 text-center">Use another number</Text></Pressable>
   </LaunchShell>;
 
   if (stage === 'profile') return <LaunchShell preview={preview} key="profile" step={1} title="Make an entrance." subtitle="Your name. Your handle.">
@@ -114,7 +146,7 @@ export function LaunchSetup({ preview = false, onDone }: { preview?: boolean; on
     {errorView}
     <View className="mt-auto pt-7"><LaunchButton label={busy ? 'Saving…' : 'Continue'} disabled={busy || !name.trim() || !/^[a-z0-9_.]{3,20}$/.test(username) || !terms} onPress={() => void perform(async () => {
       const next = await invoke('save_launch_profile', { p_name: name.trim(), p_username: username, p_terms: terms });
-      Keyboard.dismiss(); setState(next); void Haptics.selectionAsync();
+      Keyboard.dismiss(); setState(next); if (!preview && session) await clearLaunchDraft(session.user.id); void Haptics.selectionAsync();
     })} /></View>
   </LaunchShell>;
 

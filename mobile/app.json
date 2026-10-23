@@ -29,7 +29,11 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "appleTeamId": "WAG8BQTW69",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "associatedDomains": [
+        "applinks:spottedsocial.vercel.app",
+        "applinks:spottedsocial-git-codex-nyc-onboarding-waves-spottedsocial.vercel.app"
+      ]
     },
     "android": {
       "adaptiveIcon": {

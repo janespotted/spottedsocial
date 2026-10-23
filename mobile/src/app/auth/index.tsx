@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
@@ -46,6 +46,7 @@ export default function PhoneScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
   // Nothing is marked wrong until the field has been left or submitted —
@@ -96,21 +97,19 @@ export default function PhoneScreen() {
   };
 
   const sendCode = async () => {
+    if (pending.current) return;
     setTouched(true);
-    if (phoneProblem) {
-      setError(phoneProblem);
-      return;
-    }
+    if (phoneProblem) { setError(phoneProblem); return; }
     const e164 = toE164(digits, country);
-    setBusy(true);
-    setError(null);
-    const { error: err } = await supabase.auth.signInWithOtp({ phone: e164 });
-    setBusy(false);
-    if (err) {
-      setError(err.message.includes('Invalid phone') ? 'invalid phone number' : err.message);
-      return;
-    }
-    router.push({ pathname: '/auth/otp', params: { phone: e164 } });
+    pending.current = true; setBusy(true); setError(null);
+    try {
+      const { error: err } = await supabase.auth.signInWithOtp({ phone: e164 });
+      if (err) throw err;
+      router.push({ pathname: '/auth/otp', params: { phone: e164 } });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      setError(/rate|seconds|too many/i.test(message) ? 'Please wait a minute before requesting another code.' : /invalid phone/i.test(message) ? 'Check your phone number and try again.' : 'Couldn’t send your code. Check your connection and try again.');
+    } finally { pending.current = false; setBusy(false); }
   };
 
   const signInWithEmail = async () => {
@@ -136,8 +135,8 @@ export default function PhoneScreen() {
   };
 
   const continueWithApple = async () => {
-    if (busy) return;
-    setBusy(true);
+    if (pending.current) return;
+    pending.current = true; setBusy(true);
     setError(null);
     try {
       await signInWithApple();
@@ -145,7 +144,7 @@ export default function PhoneScreen() {
     } catch (e) {
       setError(e instanceof Error ? e.message.toLowerCase() : 'apple sign-in failed, please try again');
     } finally {
-      setBusy(false);
+      pending.current = false; setBusy(false);
     }
   };
 
@@ -188,7 +187,7 @@ export default function PhoneScreen() {
         <Text className="text-white/50 text-sm text-center font-sans mt-1 mb-6">
           New York, one circle at a time.
         </Text>
-        <Text className="text-white/60 text-xs text-center leading-5 mb-5">New members must nominate two people for a future wave.</Text>
+        <Text className="text-white/60 text-xs text-center leading-5 mb-5">An invitation gets you in. Two nominations bring the next circle.</Text>
 
         <View className="w-full gap-5">
           {mode === 'phone' ? (
