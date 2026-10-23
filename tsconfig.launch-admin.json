@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.app.json",
-  "include": ["src/launch-admin", "src/vite-env.d.ts"]
+  "include": ["src/launch-admin", "src/launch-entry", "src/vite-env.d.ts"]
 }
