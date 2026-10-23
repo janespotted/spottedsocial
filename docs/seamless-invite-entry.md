@@ -44,3 +44,7 @@ node node_modules/typescript/bin/tsc -p tsconfig.launch-admin.json --noEmit
 node node_modules/vitest/vitest.mjs run src/launch-entry/installation.test.ts src/launch-admin/request-wave.test.ts
 node node_modules/vite/bin/vite.js build
 ```
+
+## Public hosting correction
+
+The Command Center preview requires Vercel sign-in. Recipient links therefore use `https://spottedsocial.vercel.app/join`, served by the existing public production website. PR 16 adds only that static landing page, its brand assets and Apple association paths on the public branch. Preview protection remains in place for the admin site. Migration `20261023063347_public_invite_destination.sql` changes only the batch destination to this public address. Verify it without a browser session before enabling outreach.
