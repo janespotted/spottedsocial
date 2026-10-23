@@ -230,7 +230,7 @@ export function WaveOutreach({
             <div className="outreach-totals">
               <div>
                 <strong>{review.total}</strong>
-                <span>selected / {review.wave.capacity} places</span>
+                <span>selected / {review.wave.capacity} people</span>
               </div>
               <div>
                 <strong>{review.ready}</strong>
@@ -253,8 +253,8 @@ export function WaveOutreach({
               </ol>
               {review.total < review.wave.capacity && (
                 <p>
-                  {review.wave.capacity - review.total} places remain. You can
-                  launch a smaller wave when ready.
+                  You can add {review.wave.capacity - review.total} more people
+                  or launch a smaller wave when ready.
                 </p>
               )}
             </div>

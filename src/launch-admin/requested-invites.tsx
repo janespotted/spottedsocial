@@ -609,7 +609,7 @@ export function RequestedInvites({
               <dd>{detail.reviewed_at ? "Reviewed" : "New to review"}</dd>
             </dl>
             <p>
-              Adding someone to a wave reserves their place. Open the wave and
+              Adding someone to a wave puts them on its guest list. Open the wave and
               review outreach when you are ready to invite them.
             </p>
             {error && (

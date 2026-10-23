@@ -480,8 +480,8 @@ function App() {
                 (wave === "requests" ? <>Your next <span className="brand-accent">circle.</span></> : wave === "monitoring" ? <>Your launch, <span className="brand-accent">live.</span></> : wave === "pool" ? "Your first circle." : wave === "queue" ? "Who’s next." : "Let the right people in.")}
             </h1>
             <p>
-              {wave === "requests" ? "Everyone who requested a place on the website or in Spotted." : wave === "monitoring" ? "Invitations, activity and technical health. Private to the founder." : wave === "pool" ? "Save everyone here. Choose your first 100 when you’re ready." : activeWave
-                ? "Every place has a name. Every invitation stays accounted for."
+              {wave === "requests" ? "Everyone who requested an invitation on the website or in Spotted." : wave === "monitoring" ? "Invitations, activity and technical health. Private to the founder." : wave === "pool" ? "Save everyone here. Choose your first 100 when you’re ready." : activeWave
+                ? "See who’s invited and who’s joined."
                 : wave === "queue"
                   ? "Completed nominations and your hand-picked guests, ready for a future wave."
                   : "Build your circle in waves. See exactly who’s on the list—and who’s joined."}
@@ -579,7 +579,7 @@ function App() {
                   <h2>{w.name}</h2>
                   <div className="capacity">
                     <strong>{w.selected}</strong>
-                    <span>/ {w.capacity} places</span>
+                    <span>/ {w.capacity} people</span>
                   </div>
                   <div className="progress">
                     <span
@@ -709,7 +709,7 @@ function App() {
                       .filter((w) => w.status === "draft")
                       .map((w) => (
                         <option key={w.id} value={w.id}>
-                          {w.name} · {w.capacity - w.selected} places left
+                          {w.name} · add {w.capacity - w.selected} more people
                         </option>
                       ))}
                   </select>
@@ -929,10 +929,11 @@ function App() {
                 {detailWave?.status === "open" &&
                   ["ready", "invited"].includes(detail.state) && (
                     <>
-                      <h3>Send their invitation</h3>
+                      <h3>Send personally from your phone</h3>
                       <p>
-                        Personal sharing works without an automated SMS sender.
-                        Copying a message does not mark it as sent.
+                        Copy the invitation, send it in a one-to-one conversation
+                        from your personal number, then mark it sent below.
+                        Copying alone does not send or record a message.
                       </p>
                       <button
                         disabled={!snapshot?.settings.installUrl}
