@@ -521,7 +521,7 @@ function App() {
                 : "Your private guest lists are being loaded."}
             </p>
           </section>
-        ) : wave === "requests" ? <RequestedInvites key={session?.user.id || "preview"} preview={preview} onChanged={()=>{if(!preview)void load().catch(e=>setError(e.message));}} /> : wave === "monitoring" ? <Monitoring key={session?.user.id || "preview"} preview={preview} /> : wave === "pool" ? <PlanningPool key={session?.user.id || "preview"} preview={preview} onQueue={() => setWave("queue")} /> : (
+        ) : wave === "requests" ? <RequestedInvites key={session?.user.id || "preview"} preview={preview} onChanged={()=>{if(!preview)void load().catch(e=>setError(e.message));}} /> : wave === "monitoring" ? <Monitoring key={session?.user.id || "preview"} preview={preview} onSettings={()=>openModal("settings")} onWaves={()=>setWave("all")} /> : wave === "pool" ? <PlanningPool key={session?.user.id || "preview"} preview={preview} onQueue={() => setWave("queue")} /> : (
           <>
             <section className="panel" aria-label="Launch readiness">
               <h2>Before you open a wave</h2>

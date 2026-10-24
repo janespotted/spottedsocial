@@ -97,4 +97,6 @@ const { testLiveMonitoring } = await import('./launch-hq-live.test.mjs');
 await testLiveMonitoring(db,{founder,member,demo,delegated});
 const {testCommandCenter}=await import('./command-center.test.mjs');
 await testCommandCenter(db,{founder,member,demo,delegated});
+const {testLaunchNight}=await import('./command-launch-night.test.mjs');
+await testLaunchNight(db,{founder,member,demo,delegated});
 await db.close();

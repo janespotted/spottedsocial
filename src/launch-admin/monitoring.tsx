@@ -6,7 +6,7 @@ const stamp = (value: string | null) => value ? new Date(value).toLocaleString()
 function Metric({label,value,note}: {label: string; value: number | string; note: string}) {
   return <div><span>{label}</span><strong>{value}</strong><small>{note}</small></div>;
 }
-export function Monitoring({preview}: {preview: boolean}) {
+export function Monitoring({preview,onSettings,onWaves}: {preview: boolean;onSettings:()=>void;onWaves:()=>void}) {
   const [stream,setStream] = useState('Connecting live updates'), [desktop,setDesktop] = useState(false), [alertBusy,setAlertBusy] = useState<string|null>(null), [alertError,setAlertError] = useState('');
   const notified=useRef(new Set<string>());
   const [days,setDays] = useState(7), [revision,setRevision] = useState(0);
@@ -93,7 +93,7 @@ export function Monitoring({preview}: {preview: boolean}) {
           {!a.resolved_at && !a.acknowledged_at && <button className="secondary" disabled={!!alertBusy} onClick={()=>void acknowledge(a.id)}>{alertBusy===a.id?'Saving…':'Acknowledge'}</button>}
         </article>)}</div>
       </section>
-      {report.command && <CommandCenterPanels data={report.command} preview={preview} />}
+      {report.command && <CommandCenterPanels data={report.command} preview={preview} onSettings={onSettings} onWaves={onWaves} />}
       {report.conversion && <section className="panel monitor-card"><h2>Invite conversions</h2><p>People marked invited during the selected period · revoked invitations excluded</p><section className="metrics">
         <Metric label="Invited" value={report.conversion.invited} note="Shared denominator for both conversion rates" />
         <Metric label="Claimed after invitation" value={percentage(report.conversion.claim_percent)} note={`${report.conversion.claimed} of ${report.conversion.invited} invited people`} />
@@ -140,7 +140,7 @@ export function Monitoring({preview}: {preview: boolean}) {
         {!report.health.jobs?.length && <p>No scheduled-job evidence is available.</p>}
         <p className="monitor-note">Job completion confirms the scheduled database command ran; it does not confirm an external service succeeded.</p>
         <h3>Reported action failures</h3>{report.failures.length ? <dl>{report.failures.map(f=><div key={f.feature}><dt>{f.feature}</dt><dd>{f.events}</dd></div>)}</dl>:<p>No instrumented action failures recorded in this period.</p>}
-        <small>Action failure coverage includes instrumented plans, plan chat and direct messages. Full API latency/error monitoring is not connected.</small>
+        <small>Action failure coverage includes instrumented plans, plan chat and direct messages. API timing covers instrumented app requests only; see App health for current coverage.</small>
         <a className="monitor-link" href="https://supabase.com/dashboard/project/rwavbyvdytdegntdryll/logs/explorer" target="_blank" rel="noreferrer">Open Supabase service logs ↗</a>
       </section>
       {report.client_health && <section className="panel monitor-card"><h2>Crashes & client errors</h2><p>Private first-party reports · selected period · no error text, stack traces or locations collected</p>
