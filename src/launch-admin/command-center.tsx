@@ -1,4 +1,6 @@
 import {CommandPeople} from './command-people';
+import {NightOperations} from './night-operations';
+import {LaunchRoster} from './launch-roster';
 import { useState } from 'react';
 import { percentage } from './monitoring-types';
 
@@ -26,10 +28,12 @@ const title=(value:string)=>value==='hot_spots'?'Hot Spots':value.replace(/_/g,'
 function Stat({name,value,note}:{name:string;value:string|number;note:string}) {
  return <div><span>{name}</span><strong>{value}</strong><small>{note}</small></div>;
 }
-export function CommandCenterPanels({data:c,preview=false}:{data:CommandReport;preview?:boolean}) {
+export function CommandCenterPanels({data:c,preview=false,onSettings,onWaves}:{data:CommandReport;preview?:boolean;onSettings:()=>void;onWaves:()=>void}) {
  const [view,setView]=useState('Tonight');
  return <section aria-label="Command Center">
-  <div className="command-tabs" role="group" aria-label="Command Center views">{['Tonight','Traction','Journeys','App health','People','Coverage'].map(v=><button className={v===view?'':'secondary'} aria-pressed={v===view} key={v} onClick={()=>setView(v)}>{v}</button>)}</div>
+  <div className="command-tabs" role="group" aria-label="Command Center views">{['Tonight','Launch roster','Launch readiness','Traction','Journeys','App health','People','Coverage'].map(v=><button className={v===view?'':'secondary'} aria-pressed={v===view} key={v} onClick={()=>setView(v)}>{v}</button>)}</div>
+  {(view==='Tonight'||view==='Launch readiness')&&<NightOperations preview={preview} view={view} onSettings={onSettings} onWaves={onWaves}/>}
+  {view==='Launch roster'&&<LaunchRoster preview={preview} onWaves={onWaves}/>}
   {view==='Tonight' && <>
    <section className="metrics">
     <Stat name="Foreground now" value={c.active.last_heartbeat?c.active.foreground_now:'—'} note="Instrumented apps only · heartbeat within 90s; may briefly include disconnected phones"/>
