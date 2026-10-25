@@ -10,3 +10,11 @@ export function openFriendCard(userId: string, currentUserId?: string): void {
   if (!userId || userId === currentUserId) return;
   router.push({ pathname: '/friend-card' as never, params: { userId } });
 }
+
+/** Keep a name/avatar tap separate from its enclosing plan, chat, or selection. */
+export function friendCardPress(userId: string | null | undefined, currentUserId?: string) {
+  return (event: { stopPropagation(): void }) => {
+    event.stopPropagation();
+    if (userId) openFriendCard(userId, currentUserId);
+  };
+}

@@ -110,8 +110,8 @@ export default function BusinessPromote() {
     {
       type: 'leaderboard_boost' as const,
       icon: Trophy,
-      title: 'Leaderboard Boost',
-      description: 'Get featured in the top promoted spots on the neighborhood leaderboard',
+      title: 'Hot Spots Boost',
+      description: 'Get featured in the top promoted spots on Hot Spots in your neighborhood',
       weeklyPrice: 29,
       monthlyPrice: 79,
       benefits: [

@@ -1,3 +1,8 @@
+import { pendingDm, readPendingDm, savePendingDm, deliverDm, type PendingDm } from '@/lib/dm-outbox';
+import { getSessionUserId } from '@/lib/session-identity';
+import { onPrivateViewsInvalidated, privateViewRevision } from '@/lib/private-views';
+import { CaptureGuard } from '@/components/capture-guard';
+import { openFriendCard, friendCardPress } from '@/lib/friend-card';
 import { useOwnNightStatus } from '@/hooks/use-own-night-status';
 import { withholdLivePreview } from '@/lib/live-preview';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -40,6 +45,7 @@ import {
 import { fetchProfilesSafe } from '@/lib/profiles';
 import { resolveMuxPosters } from '@/lib/mux';
 import { resolvePostImageUrl, resolvePostImageUrls } from '@/lib/posts';
+import { getDemoSandbox } from '@/lib/demo-mode';
 import { isFromTonight } from '@/lib/time-context';
 import { useSession } from '@/hooks/use-session';
 import { useTypingIndicator } from '@/hooks/use-typing-indicator';
@@ -55,6 +61,7 @@ interface SharedPostData {
   image_url: string | null;
   venue_name: string | null;
   author_name: string;
+  author_id: string;
 }
 
 interface GroupInfo {
@@ -78,7 +85,7 @@ function timeLabel(iso: string): string {
     .toLowerCase();
 }
 
-export default function ThreadScreen() {
+function ThreadScreenContent() {
   const params = useLocalSearchParams<{ threadId: string; title?: string; avatarUrl?: string }>();
   const threadId = params.threadId;
   const { session } = useSession();
@@ -97,6 +104,25 @@ export default function ThreadScreen() {
   };
 
   const [messages, setMessages] = useState<DmMessage[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<PendingDm[]>([]);
+  const pendingRef = useRef<PendingDm[]>([]);
+  const confirmedIds = useRef(new Set<string>());
+  const updatePending = useCallback((rows: PendingDm[]) => {
+    if (getSessionUserId() !== userId) return;
+    rows = rows.filter(m => !confirmedIds.current.has(m.id) && isFromTonight(m.created_at));
+    pendingRef.current = rows; setPendingMessages(rows);
+    if (userId && threadId) void savePendingDm(userId, threadId, rows).catch(() => {});
+  }, [userId, threadId]);
+  useEffect(() => {
+    let active = true;
+    pendingRef.current = []; confirmedIds.current.clear(); setPendingMessages([]);
+    if (userId && threadId) void readPendingDm(userId, threadId).then(rows => {
+      if (active) updatePending([...rows.filter(m => !pendingRef.current.some(p => p.id === m.id)), ...pendingRef.current]);
+    });
+    return () => { active = false; };
+  }, [userId, threadId, updatePending]);
+  useEffect(() => onNightBoundary(() => updatePending([])), [updatePending]);
+
   const [memberMap, setMemberMap] = useState<Map<string, DmMember>>(new Map());
   const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
   const [otherMember, setOtherMember] = useState<DmMember | null>(null);
@@ -130,6 +156,7 @@ export default function ThreadScreen() {
     let request = 0;
     const refresh = async () => {
       const current = ++request;
+      const privacy = privateViewRevision();
       try {
       const [{ data: threadData, error: threadFailure }, { data: members, error: memberFailure }, profiles, { data: myProfile }] =
         await Promise.all([
@@ -148,10 +175,9 @@ export default function ThreadScreen() {
           fetchProfilesSafe().catch(() => []),
           supabase.from('profiles').select('display_name').eq('id', userId).maybeSingle(),
         ]);
-      if (cancelled || current !== request) return;
+      if (cancelled || current !== request || privacy !== privateViewRevision()) return;
       if (threadFailure || memberFailure) throw threadFailure ?? memberFailure;
       if (!threadData) { setThreadAccess('unavailable'); setMessages([]); setMemberMap(new Map()); setOtherMember(null); setGroupInfo(null); return; }
-      setThreadAccess('allowed');
       if (myProfile?.display_name) setMyName(myProfile.display_name);
 
       const memberIds = (members ?? []).map((m) => m.user_id);
@@ -191,13 +217,15 @@ export default function ThreadScreen() {
         newMap.set(id, member);
         allMembers.push(member);
       }
-      if (cancelled || current !== request) return;
+      if (cancelled || current !== request || privacy !== privateViewRevision()) return;
       setMemberMap(newMap);
 
       if (threadData?.is_group) {
+        const avatar = await resolvePostImageUrl(threadData.group_avatar_url ?? null);
+        if (cancelled || current !== request || privacy !== privateViewRevision()) return;
         setGroupInfo({
           name: threadData.name ?? null,
-          group_avatar_url: await resolvePostImageUrl(threadData.group_avatar_url ?? null),
+          group_avatar_url: avatar,
           members: allMembers,
         });
         setOtherMember(null);
@@ -205,16 +233,23 @@ export default function ThreadScreen() {
         setGroupInfo(null);
         setOtherMember(allMembers[0] ?? null);
       }
+      setThreadAccess('allowed');
       } catch {
         if (!cancelled && current === request) { setThreadAccess('error'); setOtherMember(null); setGroupInfo(null); setMessages([]); }
       }
     };
     void refresh();
-    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 15_000);
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 5_000);
+    const foreground = AppState.addEventListener('change', state => {
+      if (state === 'active') { setThreadAccess('loading'); void refresh(); }
+    });
     return () => {
-      cancelled = true; clearInterval(timer);
+      cancelled = true; clearInterval(timer); foreground.remove();
     };
   }, [threadId, userId, withheld, metadataRevision]);
+
+  // Returning from membership/photo controls refreshes the header immediately.
+  useFocusEffect(useCallback(() => { setMetadataRevision(n => n + 1); }, [threadId]));
 
   // RLS exposes peer receipts only when both users currently opt in. Refresh
   // on focus/foreground and while visible so preference revocation clears Seen.
@@ -246,14 +281,18 @@ export default function ThreadScreen() {
   /* ── Messages: fetch + realtime ── */
   const fetchMessages = useCallback(async () => {
     if (!threadId) return;
+    const privacy = privateViewRevision();
     const { data, error } = await supabase
       .from('dm_messages')
       .select('*')
       .eq('thread_id', threadId)
       .order('created_at', { ascending: true });
+    if (privacy !== privateViewRevision()) return;
     if (error) { setMessages([]); setThreadError('Could not load messages.'); return; }
     if (!data) return;
     const tonight = data.filter((m) => isFromTonight(m.created_at)) as DmMessage[];
+    for (const m of tonight) confirmedIds.current.add(m.id);
+    updatePending(pendingRef.current);
     // Fetched history must not play entrance animations — only live arrivals
     for (const m of tonight) seenIdsRef.current.add(m.id);
     setMessages(tonight);
@@ -261,13 +300,21 @@ export default function ThreadScreen() {
     const pathMsgs = tonight.filter((m) => m.image_url);
     for (const msg of pathMsgs) {
       const url = await resolvePostImageUrl(msg.image_url);
+      if (privacy !== privateViewRevision()) return;
       if (url) {
         setMessages((prev) =>
           prev.map((m) => (m.id === msg.id ? { ...m, image_url: url } : m))
         );
       }
     }
-  }, [threadId]);
+  }, [threadId, updatePending]);
+
+  useEffect(() => onPrivateViewsInvalidated(() => {
+    setMessages([]); setSharedPosts(new Map()); setMemberMap(new Map());
+    setOtherMember(null); setGroupInfo(null); setOtherReadAt(null);
+    setThreadAccess('loading'); setMetadataRevision(n => n + 1);
+    void fetchMessages();
+  }), [fetchMessages]);
 
   // At 5 AM the night's messages are gone — re-read rather than keep
   // showing them (addendum v3 §4). Messages live in local state, so the
@@ -275,7 +322,9 @@ export default function ThreadScreen() {
   useEffect(() => onNightBoundary(() => { setMessages([]); setSharedPosts(new Map()); void fetchMessages(); }), [fetchMessages]);
 
   useEffect(() => {
-    if (!threadId || !userId) return;
+    if (!threadId || !userId || threadAccess !== 'allowed') return;
+    // Rejoining an open group restores tonight's history; removal also tears
+    // down its live subscription instead of leaving a stale conversation.
     fetchMessages();
     markThreadRead(threadId, userId);
 
@@ -294,12 +343,16 @@ export default function ThreadScreen() {
           filter: `thread_id=eq.${threadId}`,
         },
         async (payload) => {
+          const privacy = privateViewRevision();
           const newMsg = payload.new as DmMessage;
           if (newMsg.image_url) {
             newMsg.image_url = await resolvePostImageUrl(newMsg.image_url);
           }
           // A media lookup may finish after the local 5 AM boundary.
           if (!isFromTonight(newMsg.created_at)) return;
+          if (privacy !== privateViewRevision()) return;
+          confirmedIds.current.add(newMsg.id);
+          updatePending(pendingRef.current);
           setMessages((prev) =>
             prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]
           );
@@ -321,7 +374,7 @@ export default function ThreadScreen() {
     });
 
     return teardown;
-  }, [threadId, userId, fetchMessages]);
+  }, [threadId, userId, fetchMessages, threadAccess]);
 
   /* ── My reactions on visible messages ── */
   useEffect(() => {
@@ -350,6 +403,7 @@ export default function ThreadScreen() {
     const ids = sharedPostIds ? sharedPostIds.split(',') : [];
     const refresh = async () => {
       const request = ++generation;
+      const privacy = privateViewRevision();
       // Keep the previous results on screen until the new ones replace them.
       if (!ids.length) { setSharedPosts(new Map()); return; }
       try {
@@ -367,10 +421,11 @@ export default function ThreadScreen() {
         ]);
         const resolved = (posts ?? []).map(p => ({
           id: p.id, text: p.text, venue_name: p.venue_name,
+          author_id: p.user_id,
           author_name: profileMap.get(p.user_id)?.display_name ?? 'Someone',
           image_url: isMux(p) ? posters.get(p.mux_playback_id!) ?? null : p.image_url ? images.get(p.image_url) ?? null : null,
         }));
-        if (active && request === generation) setSharedPosts(sharedPostResults(ids, resolved));
+        if (active && request === generation && privacy === privateViewRevision()) setSharedPosts(sharedPostResults(ids, resolved));
       } catch {
         if (active && request === generation) {
           setSharedPosts(sharedPostResults(ids, []));
@@ -386,38 +441,29 @@ export default function ThreadScreen() {
   }, [sharedPostIds]));
 
   /* ── Send ── */
-  const send = useCallback(async () => {
+  const retryMessage = async (message: PendingDm) => {
+    if (sendingRef.current || !isFromTonight(message.created_at)) return;
+    sendingRef.current = true;
+    updatePending(pendingRef.current.map(m => m.id === message.id ? { ...m, failed: false } : m));
+    try {
+      const saved = await deliverDm(message);
+      if (getSessionUserId() !== userId) return;
+      const image = saved.image_url ? message.localAsset ?? await resolvePostImageUrl(saved.image_url) : null;
+      confirmedIds.current.add(saved.id);
+      updatePending(pendingRef.current.filter(m => m.id !== message.id));
+      setMessages(prev => confirmMessage(prev, message.id, { ...saved, image_url: image }, isFromTonight(saved.created_at)));
+    } catch {
+      updatePending(pendingRef.current.map(m => m.id === message.id ? { ...m, failed: true } : m));
+    } finally { sendingRef.current = false; }
+  };
+  const send = async () => {
     const text = draft.trim();
     if (!text || !userId || !threadId || text.length > 2000 || sendingRef.current) return;
-    sendingRef.current = true;
-    const revision = draftRevision.current;
+    const message = pendingDm(userId, threadId, text);
+    updatePending([...pendingRef.current, message]);
     setDraft('');
-    const optimistic: DmMessage = {
-      id: `optimistic-${Date.now()}`,
-      thread_id: threadId,
-      sender_id: userId,
-      text,
-      image_url: null,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, optimistic]);
-    const { data: inserted, error } = await supabase
-      .from('dm_messages')
-      .insert({ thread_id: threadId, sender_id: userId, text })
-      .select()
-      .single().then(result => result, error => ({ data: null, error }));
-    sendingRef.current = false;
-    if (error || !inserted) {
-      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-      if (draftRevision.current === revision) setDraft(text);
-      Alert.alert('Message not confirmed', 'Your message could not be confirmed. Check the thread before retrying.', [{ text: 'OK' }]);
-      setThreadError(`Not confirmed: ${text}`);
-      return;
-    }
-    setMessages((prev) =>
-      confirmMessage(prev, optimistic.id, inserted as DmMessage, isFromTonight(inserted.created_at))
-    );
-  }, [draft, userId, threadId]);
+    await retryMessage(message);
+  };
 
   /** Upload + send one image, whatever produced it (camera or library). */
   const sendImageAsset = useCallback(
@@ -425,7 +471,8 @@ export default function ThreadScreen() {
     if (!userId || !threadId || sendingRef.current) return;
     sendingRef.current = true;
     setUploading(true);
-    const optimisticId = `optimistic-img-${Date.now()}`;
+    const imageMessage = pendingDm(userId, threadId, '');
+    const optimisticId = imageMessage.id;
     setMessages((prev) => [
       ...prev,
       {
@@ -445,25 +492,27 @@ export default function ThreadScreen() {
         .from('post-images')
         .upload(path, body, { contentType: asset.mimeType ?? 'image/jpeg', upsert: false });
       if (uploadErr) throw uploadErr;
-      const { data: inserted, error: insertErr } = await supabase
-        .from('dm_messages')
-        .insert({ thread_id: threadId, sender_id: userId, text: '', image_url: path })
-        .select()
-        .single();
-      if (insertErr || !inserted) throw insertErr ?? new Error('Message was not confirmed');
+      imageMessage.image_url = path;
+      imageMessage.localAsset = asset.uri;
+      updatePending([...pendingRef.current, imageMessage]);
+      const inserted = await deliverDm(imageMessage);
+      if (getSessionUserId() !== userId) return;
+      confirmedIds.current.add(inserted.id);
+      updatePending(pendingRef.current.filter(m => m.id !== imageMessage.id));
       // Keep the local uri for display — the stored value is a private path
       setMessages((prev) =>
         confirmMessage(prev, optimisticId, { ...(inserted as DmMessage), image_url: asset.uri }, isFromTonight(inserted!.created_at))
       );
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-      Alert.alert('Photo not confirmed', 'Check the thread before choosing the photo again.');
+      if (imageMessage.image_url) updatePending(pendingRef.current.map(m => m.id === imageMessage.id ? { ...m, failed: true } : m));
+      else Alert.alert('Photo upload failed', 'The photo wasn’t sent. Please choose it again.');
     } finally {
       sendingRef.current = false;
       setUploading(false);
     }
     },
-    [userId, threadId]
+    [userId, threadId, updatePending]
   );
 
   /**
@@ -542,20 +591,8 @@ export default function ThreadScreen() {
   );
 
   const showGroupMembers = () => {
-    if (!groupInfo) return;
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: groupInfo.name ?? 'Members',
-        options: [
-          ...groupInfo.members.map((m) =>
-            m.venue_name ? `${m.display_name} — @ ${m.venue_name}` : m.display_name
-          ),
-          'Close',
-        ],
-        cancelButtonIndex: groupInfo.members.length,
-      },
-      () => {}
-    );
+    if (!groupInfo || !threadId) return;
+    router.push({ pathname: '/group-members', params: { threadId } });
   };
 
   const renameGroup = () => {
@@ -565,6 +602,9 @@ export default function ThreadScreen() {
       undefined,
       async (name) => {
         const newName = name?.trim() || null;
+        if (newName && [...newName].length > 100) {
+          Alert.alert('Name too long', 'Use 100 characters or fewer.'); return;
+        }
         try {
           const { data, error } = await supabase
             .from('dm_threads')
@@ -585,6 +625,7 @@ export default function ThreadScreen() {
 
   const changeGroupPhoto = async () => {
     if (!threadId) return;
+    const demo = getDemoSandbox();
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -594,6 +635,12 @@ export default function ThreadScreen() {
     const asset = result.assets?.[0];
     if (result.canceled || !asset) return;
     try {
+      if (getDemoSandbox() !== demo) return;
+      if (demo) {
+        const key = demo.saveGroupPhoto(threadId, asset.uri);
+        setGroupInfo(prev => prev ? { ...prev, group_avatar_url: demo.resolveMedia(key) } : prev);
+        return;
+      }
       const ext = asset.mimeType === 'image/png' ? 'png' : 'jpg';
       const path = `group-avatars/${threadId}/private-v1/${Date.now()}.${ext}`;
       const body = await fetch(asset.uri).then((r) => r.arrayBuffer());
@@ -620,7 +667,7 @@ export default function ThreadScreen() {
     if (!groupInfo) return;
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        options: ['View Members', 'Rename Group', 'Change Group Photo', 'Cancel'],
+        options: ['Group Members', 'Rename Group', 'Change Group Photo', 'Cancel'],
         cancelButtonIndex: 3,
       },
       (index) => {
@@ -633,10 +680,10 @@ export default function ThreadScreen() {
 
   const headerTitle = groupInfo
     ? (groupInfo.name ??
-      groupInfo.members
+      (groupInfo.members
         .map((m) => m.display_name.split(' ')[0])
         .slice(0, 3)
-        .join(', '))
+        .join(', ') || 'Group chat'))
     : (otherMember?.display_name ?? params.title ?? '');
   const headerAvatar = groupInfo
     ? groupInfo.group_avatar_url
@@ -670,7 +717,9 @@ export default function ThreadScreen() {
           <SymbolView name="chevron.left" size={22} tintColor="rgba(255,255,255,0.6)" />
         </Pressable>
         <Pressable
-          onPress={groupInfo ? showGroupOptions : undefined}
+          accessibilityRole="button"
+          accessibilityLabel={groupInfo ? 'Group options' : 'View friend card'}
+          onPress={groupInfo ? showGroupOptions : friendCardPress(otherMember?.user_id, userId)}
           className="flex-1 flex-row items-center gap-3"
         >
           {groupInfo && !headerAvatar ? (
@@ -730,7 +779,7 @@ export default function ThreadScreen() {
       >
       {threadError ? <Pressable onPress={() => { setThreadError(null); void fetchMessages(); refreshSharedPostsRef.current(); }} className="px-4 py-2"><Text className="text-red-300">{threadError} Tap to refresh.</Text></Pressable> : null}
       <KeyboardAwareLegendList
-        data={messages}
+        data={[...messages, ...pendingMessages.filter(p => !messages.some(m => m.id === p.id))].sort((a,b) => a.created_at.localeCompare(b.created_at))}
         keyExtractor={(m: DmMessage) => m.id}
         // Rows run a one-shot FadeInDown gated on seenIdsRef; a recycled row
         // would replay or skip that animation against the wrong message.
@@ -798,6 +847,7 @@ export default function ThreadScreen() {
                       kind={pointer.kind}
                       invite={invites.get(inviteId)}
                       isMine={isMine}
+                      onOpenPerson={() => openFriendCard(isMine ? invites.get(inviteId)?.receiver_id ?? otherMember?.user_id ?? '' : item.sender_id, userId)}
                       otherFirstName={otherName?.split(' ')[0] || (isMine ? 'them' : 'Someone')}
                       createdAt={item.created_at}
                       busy={responding.has(inviteId)}
@@ -810,6 +860,7 @@ export default function ThreadScreen() {
               <View className={`flex-row items-end gap-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
                 {!isMine ? (
                   <Avatar
+                    userId={item.sender_id}
                     name={sender?.display_name ?? otherMember?.display_name ?? '?'}
                     url={sender?.avatar_url ?? otherMember?.avatar_url ?? null}
                     size="sm"
@@ -817,7 +868,7 @@ export default function ThreadScreen() {
                 ) : null}
                 <View className="max-w-[75%]">
                   {groupInfo && !isMine && sender ? (
-                    <Text className="text-white/50 text-xs font-sans mb-1 ml-1">
+                    <Text className="text-white/50 text-xs font-sans mb-1 ml-1" onPress={friendCardPress(item.sender_id, userId)} accessibilityRole="button">
                       {sender.display_name.split(' ')[0]}
                     </Text>
                   ) : null}
@@ -838,7 +889,7 @@ export default function ThreadScreen() {
                           />
                         ) : null}
                         <View className="px-3 py-2">
-                          <Text className="text-white text-xs font-sans-semibold mb-0.5">
+                          <Text className="text-white text-xs font-sans-semibold mb-0.5" onPress={friendCardPress(sharedPost.author_id, userId)} accessibilityRole="button">
                             {sharedPost.author_name}
                           </Text>
                           {sharedPost.text ? (
@@ -871,7 +922,7 @@ export default function ThreadScreen() {
                     >
                       {item.image_url ? (
                         <Image
-                          source={{ uri: item.image_url }}
+                          source={{ uri: (item as PendingDm).localAsset ?? item.image_url }}
                           className="w-60 aspect-[4/3]"
                           contentFit="cover"
                         />
@@ -896,6 +947,9 @@ export default function ThreadScreen() {
                 </View>
               </View>
               )}
+              {pendingMessages.some(p => p.id === item.id) && !messages.some(m => m.id === item.id) ? <View className="flex-row justify-end gap-3">
+                {pendingMessages.find(p => p.id === item.id)?.failed ? <><Pressable accessibilityRole="button" accessibilityLabel="Retry this message" onPress={() => void retryMessage(pendingMessages.find(p => p.id === item.id)!)} className="min-h-11 justify-center"><Text className="text-[#d4ff00] text-xs font-sans">Not sent · Retry</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Discard unsent message" onPress={() => updatePending(pendingRef.current.filter(p => p.id !== item.id))} className="min-h-11 justify-center"><Text className="text-white/50 text-xs">Discard</Text></Pressable></> : <Text accessibilityLiveRegion="polite" className="text-white/50 text-xs py-2">Sending…</Text>}
+              </View> : null}
               {showSeen ? (
                 <Text className="text-white/55 text-xs font-sans text-right mt-1 mr-1">Seen</Text>
               ) : null}
@@ -951,6 +1005,8 @@ export default function ThreadScreen() {
             />
             <Pressable
               onPress={send}
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
               disabled={!draft.trim()}
               hitSlop={8}
               className="w-10 h-10 rounded-full items-center justify-center disabled:opacity-30"
@@ -980,3 +1036,5 @@ export default function ThreadScreen() {
     </View>
   );
 }
+
+export default function ThreadScreen() { return <CaptureGuard name="thread"><ThreadScreenContent /></CaptureGuard>; }

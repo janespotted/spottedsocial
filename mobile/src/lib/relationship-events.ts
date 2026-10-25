@@ -1,6 +1,8 @@
+import { AppState } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import type { QueryClient } from '@tanstack/react-query';
 import { forgetPrivateMediaLinks } from './private-media';
-import { invalidatePrivateViews, PRIVATE_VIEW_KEYS } from './private-views';
+import { invalidatePrivateViews } from './private-views';
 import { createResilientChannel } from './resilient-channel';
 
 /**
@@ -22,15 +24,20 @@ export function onRelationshipChanged(listener: RelationshipListener): () => voi
   };
 }
 
-function refetchPrivateViews(queryClient: QueryClient) {
-  for (const key of PRIVATE_VIEW_KEYS) void queryClient.invalidateQueries({ queryKey: [key] });
-}
-
 export function subscribeRelationshipEvents(userId: string, queryClient: QueryClient): () => void {
-  return createResilientChannel({
+  const redact = () => { forgetPrivateMediaLinks(); invalidatePrivateViews(queryClient); };
+  let wasOffline = false;
+  const network = NetInfo.addEventListener(state => {
+    const offline = state.isConnected === false || state.isInternetReachable === false;
+    if (offline && !wasOffline) redact();
+    if (!offline && wasOffline) redact();
+    wasOffline = offline;
+  });
+  const foreground = AppState.addEventListener('change', state => { if (state === 'active') redact(); });
+  const stop = createResilientChannel({
     name: 'relationship-events',
     // Events missed while disconnected: re-read everything under current RLS.
-    onReconnect: () => refetchPrivateViews(queryClient),
+    onReconnect: redact,
     configure: (ch) =>
       ch.on(
         'postgres_changes',
@@ -49,8 +56,9 @@ export function subscribeRelationshipEvents(userId: string, queryClient: QueryCl
           // Screens first (an open reel closes before the feed drops its row),
           // then the queries.
           for (const listener of [...listeners]) listener(other);
-          refetchPrivateViews(queryClient);
+          invalidatePrivateViews(queryClient);
         }
       ),
   });
+  return () => { stop(); network(); foreground.remove(); };
 }

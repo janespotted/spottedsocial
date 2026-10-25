@@ -1,0 +1,164 @@
+[
+  {
+    "venueId": "3be42847-9df1-4ee3-b513-b2e82f1ac847",
+    "name": "Gospel",
+    "city": "nyc",
+    "neighborhood": "SoHo",
+    "category": "club",
+    "tags": [
+      "House",
+      "Late nights"
+    ],
+    "reason": "An intimate SoHo dance floor built around house music.",
+    "visitNote": "Check the night’s program and entry arrangements.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "NYLON",
+        "kind": "editorial",
+        "url": "https://www.nylon.com/nylon-nights/gospel-new-york-exclusive-nightclub"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.gospelnyc.com/home"
+      }
+    ]
+  },
+  {
+    "venueId": "33715e37-98ef-4c96-b4ef-8aa67e1def0c",
+    "name": "Gabriela",
+    "city": "nyc",
+    "neighborhood": "Williamsburg",
+    "category": "club",
+    "tags": [
+      "House",
+      "Intimate"
+    ],
+    "reason": "House and disco in a club with a house-party feel.",
+    "visitNote": "Check the lineup and admission details.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "Resident Advisor",
+        "kind": "editorial",
+        "url": "https://ra.co/guides/clubs-in-newyorkcity"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.gabriela.nyc/about"
+      }
+    ]
+  },
+  {
+    "venueId": "ba9c2dca-fa06-453c-b30f-a61e87912d8e",
+    "name": "Joyface",
+    "city": "nyc",
+    "neighborhood": "East Village",
+    "category": "bar",
+    "tags": [
+      "Disco",
+      "Dancing"
+    ],
+    "reason": "A disco-ball bar with a playful, packed-house feel.",
+    "visitNote": "Check the calendar for dance parties and door times.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "The Infatuation",
+        "kind": "editorial",
+        "url": "https://www.theinfatuation.com/new-york/guides/the-best-bars-in-the-east-village"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.joyface.nyc/"
+      }
+    ]
+  },
+  {
+    "venueId": "19d1fe64-3c88-4a0d-98a7-408684301d42",
+    "name": "Le Bain",
+    "city": "nyc",
+    "neighborhood": "Meatpacking",
+    "category": "club",
+    "tags": [
+      "DJs",
+      "Rooftop"
+    ],
+    "reason": "A skyline dance floor with a rotating DJ program.",
+    "visitNote": "Choose a DJ night; rooftop hours and access can differ.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "Time Out",
+        "kind": "editorial",
+        "url": "https://www.timeout.com/newyork/news/out-late-inside-a-queer-kink-party-at-le-bain-in-nycs-meatpacking-district-031224"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.standardhotels.com/new-york/features/le-bain"
+      }
+    ]
+  },
+  {
+    "venueId": "db5c9d56-e572-4f22-8b6d-15a5ed9e2d0d",
+    "name": "The Flower Shop",
+    "city": "nyc",
+    "neighborhood": "Lower East Side",
+    "category": "bar",
+    "tags": [
+      "Social",
+      "Late nights"
+    ],
+    "reason": "A downtown hangout with a lively basement bar.",
+    "visitNote": "Head downstairs for the bar; check current hours.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "The Infatuation",
+        "kind": "editorial",
+        "url": "https://www.theinfatuation.com/new-york/reviews/the-flower-shop"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://www.theflowershopnyc.com/"
+      }
+    ]
+  },
+  {
+    "venueId": "d9c99d8d-34cb-4e8b-8298-0351aed28c62",
+    "name": "Nowadays",
+    "city": "nyc",
+    "neighborhood": "Ridgewood",
+    "category": "club",
+    "tags": [
+      "Listening",
+      "Dance floor"
+    ],
+    "reason": "A music-first dance floor with a spacious garden.",
+    "visitNote": "Check the event and entry requirements.",
+    "reviewedAt": "2026-10-11",
+    "reviewBy": "2026-11-10",
+    "sources": [
+      {
+        "publisher": "Resident Advisor",
+        "kind": "editorial",
+        "url": "https://ra.co/guides/clubs-in-newyorkcity"
+      },
+      {
+        "publisher": "Official venue",
+        "kind": "official",
+        "url": "https://nowadays.nyc/about/"
+      }
+    ]
+  }
+]

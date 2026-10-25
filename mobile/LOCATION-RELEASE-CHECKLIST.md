@@ -34,5 +34,7 @@ permission state, sample ages, actual venue arrival times and battery change.
 - [ ] Deny notifications. Automatic updates still work without a prompt loop.
 - [ ] Measure battery use over a real 4–6 hour night, including walking and long
       stationary periods. Confirm no arrival watch stays active past two minutes.
-- [ ] Replace the October 7 trial SDK license before expiry and test a Release
-      build. Debug/simulator success does not establish Release licensing.
+- [x] Replace the October 7 trial SDK license: paid iOS/Android keys registered
+      October 11, 2026 (order #17585), injected by `app.config.js` from private build configuration.
+- [ ] Test paid licensing in a Release build on a real phone.
+      Debug/simulator success does not establish Release licensing.

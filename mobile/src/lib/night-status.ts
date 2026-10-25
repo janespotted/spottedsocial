@@ -1,4 +1,4 @@
-import { getSessionRevision } from './session-identity';
+import { getSessionRevision, assertSessionRevision } from './session-identity';
 import { supabase } from './supabase';
 import { getNightResetIso, isUnexpired } from './tonight';
 import { markManualCheckin } from './venue-arrival-engine';
@@ -164,8 +164,10 @@ export async function fetchOwnNightStatus(userId: string): Promise<OwnNightStatu
  */
 export async function endNightLocally(userId: string): Promise<void> {
   invalidateOutStatusCache();
+  const operation = getSessionRevision();
   const { pauseLocationForStatusChange } = await import('./background-location');
   await pauseLocationForStatusChange(userId);
+  assertSessionRevision(operation);
   await clearUserLocation(userId);
   must(
     await supabase
@@ -208,8 +210,10 @@ export interface GoPlanningOptions {
  * the address in the same transaction without granting raw column reads.
  */
 export async function goPlanning(userId: string, opts: GoPlanningOptions = {}): Promise<void> {
+  const operation = getSessionRevision();
   const { pauseLocationForStatusChange } = await import('./background-location');
   await pauseLocationForStatusChange(userId);
+  assertSessionRevision(operation);
   const now = new Date().toISOString();
   invalidateOutStatusCache();
 
@@ -258,8 +262,10 @@ async function endLiveSharing(
 
   // Lazy import: background-location imports fetchOwnNightStatus from this
   // module, so a top-level import here would be a require cycle.
+  const operation = getSessionRevision();
   const { pauseLocationForStatusChange } = await import('./background-location');
   await pauseLocationForStatusChange(userId);
+  assertSessionRevision(operation);
   must(
     await supabase.rpc('commit_night_status', {
       p_patch: {
@@ -311,9 +317,12 @@ export interface GoOutOptions {
  * enter profile GPS or ordinary check-in history. Address approval stays separate.
  */
 export async function goOutAtVenue(userId: string, opts: GoOutOptions): Promise<{ gpsShared: boolean; trackingReady: boolean }> {
+  const operation = getSessionRevision();
   const { pauseLocationForStatusChange, allowLocationAfterCheckin } = await import('./background-location');
   await pauseLocationForStatusChange(userId);
+  assertSessionRevision(operation);
   const automatic = !opts.privateParty && await automaticUpdatesEnabled() && await getLocationPermission() === 'always';
+  assertSessionRevision(operation);
   invalidateOutStatusCache();
   const fix = opts.coords?.recordedAt && opts.coords.accuracy != null
     ? { ...opts.coords, recordedAt: opts.coords.recordedAt, accuracy: opts.coords.accuracy, speed: null } : null;

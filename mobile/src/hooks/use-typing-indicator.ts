@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { useDemoMode } from '@/lib/demo-mode';
 import type { DmMember } from '@/lib/dm';
 
 /** Stop advertising typing after this long with no keystroke. */
@@ -34,6 +35,7 @@ export function useTypingIndicator(
   userId: string | undefined,
   memberMap: Map<string, DmMember>
 ) {
+  const demoOn = useDemoMode();
   const [typingNames, setTypingNames] = useState<string[]>([]);
   const lastTypingSentRef = useRef(0);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,7 +46,7 @@ export function useTypingIndicator(
   memberMapRef.current = memberMap;
 
   useEffect(() => {
-    if (!threadId || !userId) return;
+    if (!threadId || !userId || demoOn) return;
 
     const channel = supabase.channel(`typing:${threadId}`, {
       config: { presence: { key: userId } },
@@ -87,7 +89,7 @@ export function useTypingIndicator(
       // Removing the channel drops our presence — no explicit untrack needed
       supabase.removeChannel(channel);
     };
-  }, [threadId, userId]);
+  }, [threadId, userId, demoOn]);
 
   const setTyping = useCallback(() => {
     const channel = channelRef.current;

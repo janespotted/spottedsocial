@@ -131,6 +131,7 @@ export function VenueEventsSection({ venueId }: { venueId: string }) {
                 <View className="flex-row -space-x-1.5">
                   {event.friendsInterested.slice(0, 3).map((friend) => (
                     <Avatar
+                      userId={friend.id}
                       key={friend.id}
                       name={friend.display_name}
                       url={friend.avatar_url}

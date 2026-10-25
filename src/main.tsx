@@ -1,3 +1,4 @@
+import { startClientHealth } from './lib/client-health';
 import { createRoot } from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
 import App from "./App.tsx";
@@ -9,5 +10,7 @@ if ("serviceWorker" in navigator && !Capacitor.isNativePlatform()) {
     navigator.serviceWorker.register("/sw.js");
   });
 }
+
+startClientHealth();
 
 createRoot(document.getElementById("root")!).render(<App />);

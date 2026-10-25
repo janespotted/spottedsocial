@@ -1,3 +1,4 @@
+import { useDemoMode } from '@/lib/demo-mode';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Share, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
@@ -14,12 +15,13 @@ import { NEON, PURPLE, VIOLET_FILL } from '@/lib/theme';
  */
 export default function InviteFriendsSheet() {
   const { session } = useSession();
+  const demo = useDemoMode();
   const userId = session?.user.id;
   const [regenerating, setRegenerating] = useState(false);
 
   const { data: invite, isLoading, isError, refetch } = useQuery({
     queryKey: ['invite-code', userId],
-    enabled: !!session,
+    enabled: !!session && !demo,
     queryFn: () => fetchOrCreateInviteCode(userId!),
   });
 
@@ -29,7 +31,7 @@ export default function InviteFriendsSheet() {
     if (!inviteUrl) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Share.share({
-      message: `Hey! Join me on Spotted to see where friends are going out tonight 🎉 ${inviteUrl}`,
+      message: `Find me on Spotted. New York is opening in invitation waves: ${inviteUrl}`,
     });
   };
 
@@ -47,6 +49,7 @@ export default function InviteFriendsSheet() {
     }
   };
 
+  if (demo) return <View className="p-6 gap-3"><Text className="text-white text-lg font-sans-semibold">Demo stays here.</Text><Text className="text-white/60 leading-6">Exit Demo to share Spotted with real friends. Meet Ups and venue invites can be tested with your sample friends.</Text></View>;
   return (
     <View className="pt-6 pb-10 px-5 gap-5 items-center">
       <View className="flex-row items-center gap-3 self-stretch">
@@ -54,14 +57,14 @@ export default function InviteFriendsSheet() {
           <SymbolView name="link" size={20} tintColor="#ffffff" />
         </View>
         <View className="flex-1">
-          <Text className="text-white text-lg font-sans-semibold">Invite Friends</Text>
+          <Text className="text-white text-lg font-sans-semibold">Share Spotted</Text>
           <Text className="text-white/60 text-sm font-sans">
-            Share your link to add friends instantly
+            New members still need a wave invitation.
           </Text>
         </View>
       </View>
 
-      {isError || (!isLoading && !inviteUrl) ? (<Text className="text-red-300 py-5" onPress={() => void refetch()}>Could not load your invite link. Tap to retry.</Text>) : isLoading ? (
+      {isError || (!isLoading && !inviteUrl) ? (<Text className="text-red-300 py-5" onPress={() => void refetch()}>Could not load your profile link. Tap to retry.</Text>) : isLoading ? (
         <View className="py-16">
           <ActivityIndicator color={NEON} />
         </View>

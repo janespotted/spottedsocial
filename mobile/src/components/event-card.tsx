@@ -147,7 +147,7 @@ export function EventCard({ event, currentUserId }: EventCardProps) {
                   className="rounded-full border-2 border-[#110a24]"
                   style={{ marginLeft: i === 0 ? 0 : -8 }}
                 >
-                  <Avatar name={friend.display_name} url={friend.avatar_url} size="sm" />
+                  <Avatar userId={friend.user_id} name={friend.display_name} url={friend.avatar_url} size="sm" />
                 </View>
               ))}
               {event.friendsInterested.length > 5 ? (

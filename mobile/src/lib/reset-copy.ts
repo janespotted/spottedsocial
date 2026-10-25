@@ -13,11 +13,11 @@ export const RESET_TITLE = 'Tonight resets at 5am.';
 
 /** The full explanation — onboarding card and the Settings row. */
 export const RESET_BODY =
-  'Your live location, posts, Yaps, DMs, meetups and invites from tonight disappear at 5am. Your profile and friends stay. Tomorrow starts fresh.';
+  'Live sharing, posts, DMs, meetups and invites clear from tonight at 5am. Your private replay and eligible recent venue visits can remain. Your profile and friends stay.';
 
 /** What survives, for the Settings detail. */
 export const RESET_KEPT =
-  'Your account, profile and photo, your friends and Close Friends, saved venues and your settings all stay.';
+  'Your profile, friends, saved spots and settings stay. Your replay is private. Venue visits can appear for 90 days only to people eligible to see your location when you visited, subject to your current sharing controls.';
 
 export const RESET_COPY = {
   /** Status sheet footer, under Yes / TBD / No. */

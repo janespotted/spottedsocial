@@ -29,16 +29,15 @@ export default function CreatePlanScreen() {
     : parseConfirmationPeople(params.withPeople).map((p) => ({ ...p, username: '' }));
 
   const handleSubmit = async (values: PlanFormValues) => {
-    if (!session) return;
+    if (!session) throw new Error('Sign in to share a plan');
     try {
       await savePlan(null, values);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['plans'] });
-      router.back();
     } catch (e) {
       console.error('Error creating plan:', e);
-      Alert.alert('Failed to create plan', 'Try again.');
+      throw e;
     }
   };
 

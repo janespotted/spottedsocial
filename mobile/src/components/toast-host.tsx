@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Pressable, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { dismissToast, subscribeToast, type ToastItem } from '@/lib/toast';
 import { INK_LIGHT, NEON } from '@/lib/theme';
@@ -18,6 +18,7 @@ export function ToastHost() {
 
   useEffect(() => {
     if (!toast) return;
+    AccessibilityInfo.announceForAccessibility(toast.message);
     actedRef.current = false;
     const timer = setTimeout(() => {
       if (!actedRef.current) toast.onExpire?.();
@@ -56,7 +57,7 @@ export function ToastHost() {
               void onPress();
             }}
             accessibilityRole="button"
-            className="px-3 min-h-9 justify-center rounded-full active:opacity-70"
+            className="px-3 min-h-11 justify-center rounded-full active:opacity-70"
           >
             <Text className="text-sm font-sans-semibold" style={{ color: NEON }}>
               {toast.action.label}

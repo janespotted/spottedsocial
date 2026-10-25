@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
@@ -139,9 +140,9 @@ export default function TagFriendsSheet() {
                     <SymbolView name="checkmark" size={11} tintColor="#000000" weight="bold" />
                   ) : null}
                 </View>
-                <Avatar name={f.display_name} url={f.avatar_url} size="sm" />
+                <Avatar userId={f.id} name={f.display_name} url={f.avatar_url} size="sm" />
                 <View className="flex-1 min-w-0">
-                  <Text className="text-white text-sm font-sans-medium" numberOfLines={1}>
+                  <Text className="text-white text-sm font-sans-medium" numberOfLines={1} onPress={friendCardPress(f.id)} accessibilityRole="button">
                     {f.display_name}
                   </Text>
                   <Text className="text-white/45 text-xs font-sans" numberOfLines={1}>

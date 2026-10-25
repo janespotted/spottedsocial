@@ -1,3 +1,4 @@
+import { isDemoMode } from './demo-mode';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BackgroundGeolocation, { type Location, type Subscription } from 'react-native-background-geolocation';
@@ -176,6 +177,7 @@ export async function retryPendingLocation(): Promise<void> {
 
 /** One-shot, fresh and accuracy-checked. Does not prompt or start sharing. */
 export async function getCurrentPosition(): Promise<LocationFix | null> {
+  if (isDemoMode()) return null;
   try {
     if (!hasLocationAccess(await getLocationPermission())) return null;
     const native = await BackgroundGeolocation.getCurrentPosition({ timeout: 10, samples: 2, desiredAccuracy: 35, persist: false, maximumAge: 0 });
@@ -212,6 +214,7 @@ function installListeners(): void {
 /** Idempotent resume. Network failure leaves an existing valid watcher alive;
  * a known stop/private party/expiry shuts it down. Never prompts. */
 export function startBackgroundLocation(userId: string): Promise<TrackingResult> {
+  if (isDemoMode()) return Promise.resolve({ tracking: false, permission: 'not_determined' });
   if (starting) return starting;
   const version = generation;
   starting = (async (): Promise<TrackingResult> => {
@@ -292,12 +295,14 @@ export async function recordPresenceHeartbeat(userId: string): Promise<boolean> 
 /** Explicit status changes latch GPS off locally, including when offline.
  * Only a successfully completed, user-confirmed check-in clears this latch. */
 export async function pauseLocationForStatusChange(userId: string): Promise<void> {
+  if (isDemoMode()) return;
   pausedUsers.add(userId);
   const stopping = stopBackgroundLocation();
   await AsyncStorage.setItem(pausedKey(userId), '1');
   await stopping;
 }
 export async function allowLocationAfterCheckin(userId: string): Promise<void> {
+  if (isDemoMode()) return;
   await AsyncStorage.removeItem(pausedKey(userId));
   pausedUsers.delete(userId);
 }

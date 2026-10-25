@@ -1,9 +1,9 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
-import { useQueryClient } from '@tanstack/react-query';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
@@ -32,11 +32,7 @@ import Transition from 'react-native-screen-transitions';
 import { Polaroid } from '@/components/recap-cover';
 import { useNightMode } from '@/hooks/use-night-mode';
 import { useNightRecap, useRecapPictures, type RecapPicture } from '@/hooks/use-night-recap';
-import { useSession } from '@/hooks/use-session';
 import {
-  addLibraryPhoto,
-  MAX_RECAP_PHOTOS,
-  NIGHT_RECAP_KEY,
   recapChapters,
   recapDateLabel,
   type NightRecap,
@@ -272,112 +268,20 @@ function ScrapbookPhoto({
   );
 }
 
-/**
- * Photos are dealt onto the table; a tap opens one in the viewer. They are
- * the night's photo and video posts (a video shows its poster), anything
- * added from the library, and — once the user allows it — photos from the
- * camera roll taken during their stops, which stay on the phone. "Add from
- * your library" is a small extra once there is something here; an empty
- * chapter offers the camera roll instead, never an upload form.
- */
-function PicturesChapter({
-  recap,
-  when,
-}: {
-  recap: NightRecap;
-  when: SharedValue<number>;
-}) {
-  const { session } = useSession();
-  const queryClient = useQueryClient();
-  const { pictures, access, requestAccess, canSuggest } = useRecapPictures(recap);
-  const [adding, setAdding] = useState(false);
-  const full = recap.photos.length >= MAX_RECAP_PHOTOS;
-  const onDevice = pictures.some((p) => p.onDevice);
-  const askCameraRoll = canSuggest && access === 'undetermined';
-
-  const add = async () => {
-    if (!session || adding) return;
-    setAdding(true);
-    try {
-      const added = await addLibraryPhoto(recap.id, session.user.id);
-      if (added) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        await queryClient.invalidateQueries({ queryKey: [NIGHT_RECAP_KEY] });
-      }
-    } catch (e) {
-      Alert.alert('Couldn’t add that picture', e instanceof Error ? e.message : 'Try again.');
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const showCameraRoll = async () => {
-    const granted = await requestAccess();
-    if (granted === 'all' || granted === 'limited') void Haptics.selectionAsync();
-  };
-
-  if (pictures.length === 0) {
-    return (
-      <>
-        <Title when={when}>{'Camera roll\nconfidential.'}</Title>
-        <Reveal when={when} delay={140} from={{ y: 18, scale: 0.97 }}>
-          {askCameraRoll ? (
-            <ChapterPlaceholder
-              icon={Images}
-              title="Find your photos from last night"
-              body="Spotted looks only at photos you took during your stops. They stay on this phone."
-              action={{ label: 'Show my photos', onPress: showCameraRoll }}
-            />
-          ) : canSuggest && access === 'denied' ? (
-            <ChapterPlaceholder
-              icon={Images}
-              title="No pictures from last night"
-              body="Allow photo access in Settings and the photos you took during your stops show up here."
-              action={{ label: 'Open Settings', onPress: () => void Linking.openSettings() }}
-            />
-          ) : (
-            <ChapterPlaceholder
-              icon={Images}
-              title="No pictures from last night"
-              body="Photos and videos you post while you’re out, and photos you take during your stops, land here."
-            />
-          )}
-        </Reveal>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <Title when={when}>{'Camera roll\nconfidential.'}</Title>
-      <View className="flex-row flex-wrap gap-y-4 py-2">
-        {pictures.map((photo, i) => (
-          <ScrapbookPhoto key={photo.id} photo={photo} i={i} count={pictures.length} when={when} />
-        ))}
-      </View>
-      <Reveal when={when} delay={420} className="flex-row flex-wrap items-center gap-x-5 mt-3">
-        {full ? null : (
-          <PressableScale onPress={add} disabled={adding} className="flex-row items-center gap-2 min-h-11">
-            {adding ? <ActivityIndicator size="small" color={NEON} /> : <SymbolView name="plus" size={14} tintColor={NEON} />}
-            <Text className="text-[#d4ff00] text-sm font-sans-medium">Add from your library</Text>
-          </PressableScale>
-        )}
-        {askCameraRoll ? (
-          <PressableScale onPress={showCameraRoll} className="flex-row items-center gap-2 min-h-11">
-            <SymbolView name="photo.on.rectangle" size={14} tintColor={NEON} />
-            <Text className="text-[#d4ff00] text-sm font-sans-medium">Find more on your phone</Text>
-          </PressableScale>
-        ) : null}
-      </Reveal>
-      <Reveal when={when} delay={480}>
-        <Text className="text-white/60 text-xs font-sans mt-1">
-          {onDevice
-            ? 'Your night, saved here. Only you. Camera-roll photos stay on this phone.'
-            : 'Your night, saved here. Only you.'}
-        </Text>
-      </Reveal>
-    </>
-  );
+/** A private scrapbook of the photos and videos actually posted to Spotted. */
+function PicturesChapter({ recap, when }: { recap: NightRecap; when: SharedValue<number> }) {
+  const { pictures } = useRecapPictures(recap);
+  return <>
+    <Title when={when}>{'Camera roll\nconfidential.'}</Title>
+    {pictures.length ? <View className="flex-row flex-wrap gap-y-4 py-2">
+      {pictures.map((photo, i) => <ScrapbookPhoto key={photo.id} photo={photo} i={i} count={pictures.length} when={when} />)}
+    </View> : <Reveal when={when} delay={140} from={{ y: 18, scale: 0.97 }}>
+      <ChapterPlaceholder icon={Images} title="No pictures posted last night" body="Photos and videos you share on Spotted land here." />
+    </Reveal>}
+    <Reveal when={when} delay={480}>
+      <Text className="text-white/60 text-xs font-sans mt-3">Your Spotted posts. Saved just for you.</Text>
+    </Reveal>
+  </>;
 }
 
 /** Friends slide in one by one; each row lifts under the finger. */
@@ -408,10 +312,10 @@ function PeopleChapter({ recap, when }: { recap: NightRecap; when: SharedValue<n
             className={`flex-row items-center gap-3 py-3.5 ${i > 0 ? 'border-t border-white/10' : ''}`}
           >
             <View className="rounded-full border-2" style={{ borderColor: '#9273A5' }}>
-              <Avatar name={person.display_name} url={person.avatar_url} size="md" />
+              <Avatar userId={person.friend_id} name={person.display_name} url={person.avatar_url} size="md" />
             </View>
             <View className="flex-1 min-w-0">
-              <Text className="text-white text-[15px] font-sans-medium" numberOfLines={1}>
+              <Text className="text-white text-[15px] font-sans-medium" numberOfLines={1} onPress={friendCardPress(person.friend_id)} accessibilityRole="button">
                 {person.display_name}
               </Text>
               <Text className="text-white/60 text-xs font-sans mt-0.5" numberOfLines={1}>
@@ -484,7 +388,7 @@ function ChapterTab({
 export default function MorningAfter() {
   const recapQuery = useNightRecap();
   const recap = recapQuery.data ?? null;
-  // Warm the picture links and camera-roll scan before the chapter is reached
+  // Warm the posted picture links before the chapter is reached
   useRecapPictures(recap);
   const { city } = useNightMode();
   const reduce = useReducedMotion();
@@ -615,8 +519,8 @@ export default function MorningAfter() {
           <Animated.View entering={FadeInDown.springify().damping(18)} className="mt-6">
             <DayPlaceholder
               icons={[Sunrise, TicketIcon, Images]}
-              title="Nothing to replay yet"
-              body="Morning After shows the spots you checked into, your pictures and the friends you crossed paths with — after a night out."
+              title="No recap yet"
+              body="Your private replay after a night out."
               action={{ label: 'Make a plan', icon: CalendarPlus, onPress: () => router.push('/create-plan') }}
             />
           </Animated.View>

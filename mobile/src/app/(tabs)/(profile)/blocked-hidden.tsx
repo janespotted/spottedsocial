@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { useRef, useState } from 'react';
 import { invalidatePrivateViews } from '@/lib/private-views';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
@@ -88,8 +89,8 @@ export default function BlockedHiddenScreen() {
       ) : (
         rows.map((row) => (
           <View key={row.rowId} className="flex-row items-center gap-3 py-2">
-            <Avatar name={row.display_name} url={row.avatar_url} size="sm" />
-            <Text className="text-white text-sm font-sans-medium flex-1" numberOfLines={1}>
+            <Avatar userId={row.userId} name={row.display_name} url={row.avatar_url} size="sm" />
+            <Text className="text-white text-sm font-sans-medium flex-1" numberOfLines={1} onPress={friendCardPress(row.userId)} accessibilityRole="button">
               {row.display_name}
             </Text>
             <Pressable

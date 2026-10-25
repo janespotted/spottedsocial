@@ -52,6 +52,7 @@ export interface DmMessage {
 export function threadTitle(thread: DmThreadPreview): string {
   if (thread.is_group) {
     if (thread.name) return thread.name;
+    if (!thread.members.length) return 'Group chat';
     const names = thread.members.map((m) => m.display_name.split(' ')[0]);
     if (names.length <= 3) return names.join(', ');
     return `${names.slice(0, 2).join(', ')} & ${names.length - 2} others`;
@@ -158,7 +159,7 @@ export async function fetchDmThreads(userId: string): Promise<DmThreadPreview[]>
         };
       })
       .filter((m): m is DmMember => m !== null);
-    if (members.length === 0) continue;
+    if (!info || (!info.is_group && members.length === 0)) continue;
 
     const last = latestByThread.get(threadId) ?? null;
     const myRead = readAt.get(threadId);
@@ -189,6 +190,25 @@ export async function createDmThread(friendId: string): Promise<string> {
   )('create_dm_thread', { friend_id: friendId });
   if (error || !data) throw error ?? new Error('Thread creation returned empty result');
   return data as string;
+}
+
+export const MAX_GROUP_FRIENDS = 64;
+
+/** The RPC creates the group and all memberships in one permission-checked transaction. */
+export async function createGroupThread(memberIds: string[], name = ''): Promise<string> {
+  const members = [...new Set(memberIds)];
+  if (members.length < 2 || members.length > MAX_GROUP_FRIENDS || members.some(id => !id)) {
+    throw new Error(`Choose between 2 and ${MAX_GROUP_FRIENDS} friends.`);
+  }
+  const groupName = name.trim();
+  if ([...groupName].length > 100) throw new Error('Keep the group name under 101 characters.');
+  const { data, error } = await supabase.rpc('create_group_thread', {
+    member_ids: members,
+    group_name: groupName || undefined,
+  });
+  if (error) throw error;
+  if (typeof data !== 'string' || !data) throw new Error('Group creation returned no conversation.');
+  return data;
 }
 
 export async function markThreadRead(threadId: string, userId: string): Promise<void> {

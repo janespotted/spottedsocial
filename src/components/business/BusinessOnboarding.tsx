@@ -17,7 +17,7 @@
    {
      icon: Megaphone,
      title: 'Promote Your Venue',
-     description: 'Boost your visibility on the leaderboard and map to attract more visitors. Stand out from the crowd.',
+     description: 'Boost your visibility on Hot Spots and the map to attract more visitors. Stand out from the crowd.',
      color: '#a855f7',
    },
    {

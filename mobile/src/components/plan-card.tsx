@@ -47,7 +47,7 @@ function AvatarStack({
           className="rounded-full border-2 border-[#110a24]"
           style={{ marginLeft: i === 0 ? 0 : -8 }}
         >
-          <Avatar name={p.display_name} url={p.avatar_url} size="sm" />
+          <Avatar userId={p.user_id} name={p.display_name} url={p.avatar_url} size="sm" />
         </View>
       ))}
       {people.length > max ? (

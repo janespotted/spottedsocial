@@ -3,7 +3,7 @@ const {load,extract,callback,builder,flush,source}=require('./product-test-runti
 const threadState=load('lib/thread-state.ts');
 test('QA-01 unavailable shared post is bounded; eligible post appears on next scheduled revalidation',async()=>{
  let state=new Map(),queries=0,rows=[],timer;
- const scope={sharedPostIds:'p',refreshSharedPostsRef:{current:()=>{}},AppState:{currentState:'active'},setSharedPosts:x=>state=x,setThreadError:()=>{},supabase:{from:()=>{queries++;return builder({data:rows,error:null});}},fetchProfilesSafe:async()=>[{id:'a',display_name:'Jane'}],sharedPostResults:threadState.sharedPostResults,resolvePostImageUrls:async urls=>new Map(urls.filter(Boolean).map(u=>[u,u])),resolveMuxPosters:async()=>new Map(),onNightBoundary:()=>()=>{},setInterval:fn=>{timer=fn;return 1},clearInterval:()=>{}};
+ const scope={privateViewRevision:()=>0,sharedPostIds:'p',refreshSharedPostsRef:{current:()=>{}},AppState:{currentState:'active'},setSharedPosts:x=>state=x,setThreadError:()=>{},supabase:{from:()=>{queries++;return builder({data:rows,error:null});}},fetchProfilesSafe:async()=>[{id:'a',display_name:'Jane'}],sharedPostResults:threadState.sharedPostResults,resolvePostImageUrls:async urls=>new Map(urls.filter(Boolean).map(u=>[u,u])),resolveMuxPosters:async()=>new Map(),onNightBoundary:()=>()=>{},setInterval:fn=>{timer=fn;return 1},clearInterval:()=>{}};
  const effect=callback('app/thread.tsx','useFocusEffect','sharedPostResults',scope);
  assert.equal(effect.deps,'[sharedPostIds]');const stop=effect.fn();await flush();
  assert.equal(state.get('p'),null);assert.equal(queries,1);
@@ -16,14 +16,15 @@ test('QA-06 confirmed messages reconcile HTTP/realtime in either order',()=>{
   const result=threadState.confirmMessage(rows,'temp',{id:'server',text:'hello'});assert.equal(result.length,1);assert.equal(result[0].text,'hello');
  }
 });
-test('QA-06 failed delayed send preserves newer draft; unchanged draft can retry',async()=>{
- for(const changed of [false,true]){
- let rows=[],draft='hello',finish;const revision={current:0},sending={current:false};
- const q={insert:()=>q,select:()=>q,single:()=>new Promise(r=>finish=r)};
- const send=extract('app/thread.tsx','send',{draft,userId:'a',threadId:'t',sendingRef:sending,draftRevision:revision,setDraft:x=>draft=x,setMessages:f=>rows=f(rows),supabase:{from:()=>q},Alert:{alert:()=>{}},setThreadError:()=>{},confirmMessage:threadState.confirmMessage});
- const work=send();if(changed){draft='newer';revision.current++;}finish({data:null,error:{message:'offline'}});await work;
- assert.equal(draft,changed?'newer':'hello');assert.equal(sending.current,false);assert.equal(rows.length,0);
- }
+test('QA-06 failed delayed send keeps a retryable row and does not replace a newer draft',async()=>{
+ let draft='hello',finish; const pendingRef={current:[]};const sendingRef={current:false};
+ const updatePending=rows=>pendingRef.current=rows;
+ const scope={userId:'a',threadId:'t',sendingRef,pendingRef,updatePending,isFromTonight:()=>true,setMessages:()=>{},confirmMessage:threadState.confirmMessage,
+  deliverDm:()=>new Promise((resolve,reject)=>{finish=()=>reject(Error('offline'))})};
+ const retryMessage=extract('app/thread.tsx','retryMessage',scope);
+ const send=extract('app/thread.tsx','send',{...scope,draft,setDraft:v=>draft=v,retryMessage,pendingDm:(_u,_t,text)=>({id:'stable-id',text,created_at:new Date().toISOString()})});
+ const pending=send();draft='newer draft';finish();await pending;
+ assert.equal(draft,'newer draft');assert.equal(pendingRef.current[0].text,'hello');assert.equal(pendingRef.current[0].id,'stable-id');assert.equal(pendingRef.current[0].failed,true);assert.equal(sendingRef.current,false);
 });
 test('QA-03/04 Plans and group DM routes preserve destination; invalid source uses inbox',()=>{
  const calls=[];extract('app/activity.tsx','goToPlans',{router:{back:()=>{},navigate:x=>calls.push(x)},setTimeout:fn=>fn()})();assert.equal(calls[0],'/messages?tab=plans');
@@ -33,8 +34,7 @@ test('QA-03/04 Plans and group DM routes preserve destination; invalid source us
 });
 test('QA-02/28 leaderboard uses authorized status columns, surfaces errors, and has no invented movement/energy',async()=>{
  const s=source('hooks/use-leaderboard.ts');assert.doesNotMatch(s,/\.not\('(lat|lng)'/);assert.doesNotMatch(s,/Math\.random|const topBootstrapVenue/);
- const energy=extract('hooks/use-leaderboard.ts','calculateEnergyLevel');assert.equal(energy(1,0),0);assert.equal(energy(20,10),3);
- const fail=extract('hooks/use-leaderboard.ts','fetchLeaderboard',{supabase:{from:()=>builder({data:null,error:new Error('denied')})},isDemoMode:()=>false,fetchProfilesSafe:async()=>[]});await assert.rejects(fail('nyc',null,'a',[]),/denied/);
+ const fail=extract('hooks/use-leaderboard.ts','fetchLeaderboard',{fetchHotSpotsCatalog:async()=>{throw Error('denied')},fetchVisibleVenuePresence:async()=>[],isDemoMode:()=>false,fetchProfilesSafe:async()=>[]});await assert.rejects(fail('nyc',null,'a',[]),/denied/);
 });
 test('QA-35 shared card opens post detail while ordinary messages retain reactions',()=>{
  const s=source('app/thread.tsx');const calls=[];extract('app/thread.tsx','openSharedPost',{router:{push:route=>calls.push(route)}})('visible-post');assert.equal(calls[0].pathname,'/post-detail');assert.equal(calls[0].params.postId,'visible-post');assert.match(s,/onPress=\{\(\) => openSharedPost\(sharedPost.id\)\}/);assert.match(s,/onPress=\{\(\) => onMessageTap\(item.id\)\}/);
@@ -64,27 +64,27 @@ test('QA-07 meetup reports rejected recipient as failure and accepted recipient 
 });
 test('QA-09 check-in uses one atomic RPC; local resume failure never reports committed save as failed',async()=>{
  for(const failed of [false,true]){
-  let calls=0;const api=load('lib/night-status.ts',{'./session-identity':{},'./supabase':{supabase:{rpc:async(name)=>{assert.equal(name,'commit_night_status');calls++;return{data:{gps_shared:false},error:null}}}},'./tonight':{},'./venue-arrival-engine':{markManualCheckin:()=>{}},'./location-ready':{automaticUpdatesEnabled:async()=>false},'./location-quality':{validFix:()=>true},'./background-location':{pauseLocationForStatusChange:async()=>{},allowLocationAfterCheckin:async()=>{if(failed)throw Error('local storage')}}});
+  let calls=0;const api=load('lib/night-status.ts',{'./session-identity':{getSessionRevision:()=>1,assertSessionRevision:()=>{}},'./supabase':{supabase:{rpc:async(name)=>{assert.equal(name,'commit_night_status');calls++;return{data:{gps_shared:false},error:null}}}},'./tonight':{},'./venue-arrival-engine':{markManualCheckin:()=>{}},'./location-ready':{automaticUpdatesEnabled:async()=>false},'./location-quality':{validFix:()=>true},'./background-location':{pauseLocationForStatusChange:async()=>{},allowLocationAfterCheckin:async()=>{if(failed)throw Error('local storage')}}});
   const result=await api.goOutAtVenue('a',{venue:{id:null,name:'Test'}});assert.equal(calls,1);assert.equal(result.gpsShared,false);assert.equal(result.trackingReady,!failed);
  }
 });
-test('QA-13/16 private queries keep authorized data through a failed refetch and never poll',()=>{
+test('QA-13/16 private queries redact old data when refresh fails and preserve caller scheduling',()=>{
  let response={data:['allowed'],isError:false},options;
  const api=load('hooks/use-private-query.ts',{'@tanstack/react-query':{useQuery:o=>{options=o;return response;}}});
  assert.equal(api.usePrivateQuery({queryKey:['x'],staleTime:30000}).data[0],'allowed');
- // A network blip is not a revocation: revocation is RLS + the relationship signal.
- response={data:['allowed'],isError:true};const blip=api.usePrivateQuery({queryKey:['x']});assert.equal(blip.data[0],'allowed');assert.equal(blip.isError,true);
+ // A missed revocation while offline must not leave old private data visible.
+ response={data:['allowed'],isError:true};const blip=api.usePrivateQuery({queryKey:['x']});assert.equal(blip.data,undefined);assert.equal(blip.isError,true);
  api.usePrivateQuery({queryKey:['x'],staleTime:30000});assert.equal(options.refetchInterval,undefined);assert.equal(options.staleTime,30000);
  response={data:[],isError:false};assert.equal(api.usePrivateQuery({queryKey:['x']}).data.length,0);
 });
 test('QA-13 relationship signal reaches screens first, then refetches every private view',()=>{
  const order=[];let handler;
- const api=load('lib/relationship-events.ts',{'./private-media':{forgetPrivateMediaLinks:()=>order.push('forget')},'./private-views':{PRIVATE_VIEW_KEYS:['friend-ids','post-detail']},
+ const api=load('lib/relationship-events.ts',{'react-native':{AppState:{addEventListener:()=>({remove(){}})}},'@react-native-community/netinfo':{addEventListener:()=>()=>{}},'./private-media':{forgetPrivateMediaLinks:()=>order.push('forget')},'./private-views':{PRIVATE_VIEW_KEYS:['friend-ids','post-detail'],invalidatePrivateViews:()=>{order.push('reset:friend-ids');order.push('reset:post-detail')}},
   './resilient-channel':{createResilientChannel:config=>{config.configure({on:(_t,filter,fn)=>{assert.equal(filter.table,'relationship_events');assert.equal(filter.filter,'user_id=eq.viewer');handler=fn;return{}}});return()=>{}}}});
  api.onRelationshipChanged(other=>order.push('screen:'+other));
  api.subscribeRelationshipEvents('viewer',{invalidateQueries:({queryKey})=>order.push('refetch:'+queryKey[0])});
  handler({new:{other_user_id:'ex-friend'}});
- assert.deepEqual(order,['forget','screen:ex-friend','refetch:friend-ids','refetch:post-detail']);
+ assert.deepEqual(order,['forget','screen:ex-friend','reset:friend-ids','reset:post-detail']);
 });
 test('QA-13/20/21 privacy and 5AM reset cancels old reads before clearing every sensitive parent and child',()=>{
  const api=load('lib/private-views.ts');let redacted=0,calls=[];api.onPrivateViewsInvalidated(()=>redacted++);
@@ -116,7 +116,7 @@ test('QA-16/20 failed plan child reads cannot masquerade as empty; authorized em
 });
 test('QA-25 realtime posts: RLS-delivered mutual post is hydrated and shown without a direct-friend filter; deletes drop; failures re-read',async()=>{
  let posts=[],refreshed=0,fail=false;const listeners={};
- const effect=callback('hooks/use-feed.ts','useEffect',"name: 'feed-realtime'",{userId:'viewer',friendIds:['direct'],refresh:()=>refreshed++,runOrDefer:fn=>fn(),setPosts:f=>posts=f(posts),isDemoMode:()=>false,getSessionRevision:()=>1,
+ const effect=callback('hooks/use-feed.ts','useEffect',"name: 'feed-realtime'",{userId:'viewer',friendIds:['direct'],refresh:()=>refreshed++,runOrDefer:fn=>fn(),setPosts:f=>posts=f(posts),isDemoMode:()=>false,getSessionRevision:()=>1,assertSessionRevision:()=>{},
   hydratePosts:async rows=>{if(fail)throw Error('offline');return{posts:rows.map(r=>({id:r.id,user_id:r.user_id})),likedByMe:new Set()}},
   createResilientChannel:config=>{const ch={on:(_t,f,fn)=>{listeners[f.event]=fn;return ch}};config.configure(ch);return()=>{}}});
  effect.fn();
@@ -139,29 +139,26 @@ test('QA-27 standalone Like toggles cached state and rolls back failed writes',a
  if(!fails){scope.post=cached.post;scope.isLiked=true;scope.fetched={data:cached};await extract('app/post-detail.tsx','onLike',scope)();assert.equal(cached.isLiked,false);assert.equal(cached.post.likes_count,0);}
  }
 });
-test('QA-17 returning-profile read error does not become onboarding; genuine new and complete accounts still resolve',async()=>{
- for(const data of [null,{display_name:'Jane',username:'jane',created_at:'2026-09-01T00:00:00Z'}]){
- const fn=extract('hooks/use-session.tsx','fetchOnboardingNeeded',{supabase:{from:()=>builder({data,error:null}),auth:{getSession:async()=>({data:{session:{user:{id:'a'}}}})}},hasSeenTour:async()=>false,TOUR_FLAG_SHIPPED_AT:Date.parse('2026-09-22T00:00:00Z')});assert.equal(await fn('a'),data===null);
- }
- const denied=extract('hooks/use-session.tsx','fetchOnboardingNeeded',{supabase:{from:()=>builder({data:null,error:new Error('offline')})}});await assert.rejects(denied('a'),/offline/);
- assert.match(source('app/_layout.tsx'),/if \(onboardingError\) return/);assert.match(source('app/_layout.tsx'),/Retry loading profile/);
+test('QA-17 launch-state read failures preserve the gate and offer Retry',async()=>{
+ let needed=true,reported=null;const fn=extract('hooks/use-session.tsx','refreshOnboardingStatus',{getSessionRevision:()=>1,assertSessionRevision:()=>{},supabase:{auth:{getSession:async()=>({data:{session:{user:{id:'a'}}}})}},launchRpc:async()=>{throw Error('offline')},setOnboardingError:v=>reported=v,setOnboardingNeeded:v=>needed=v});
+ await assert.rejects(fn(),/offline/);assert.equal(needed,true);assert.match(reported,/not been reset/);
+ assert.match(source('app/_layout.tsx'),/if \(onboardingError\) return/);
 });
-test('QA-18 double Continue during permission prompt advances once; final step stays bounded and retry works',async()=>{
- let step=3,release;const busy={current:false};const scope={advancing:busy,setPending:()=>{},step:3,TOTAL:7,askForLocation:()=>new Promise(r=>release=r),finish:async()=>{},setStep:fn=>step=fn(step),setFinishing:()=>{},Alert:{alert:()=>{}}};
- const advance=extract('app/onboarding/welcome.tsx','advance',scope);const first=advance();await advance();assert.equal(step,3);release();await first;assert.equal(step,4);assert.equal(busy.current,false);
- scope.step=7;scope.finish=async()=>{throw Error('offline')};await extract('app/onboarding/welcome.tsx','advance',scope)();assert.equal(step,4);assert.equal(busy.current,false);
+test('QA-18 repeated onboarding taps submit once and an interrupted save remains retryable',async()=>{
+ let calls=0,release,error=null;const saving={current:false};const perform=extract('app/onboarding/index.tsx','perform',{Error,saving,setBusy:()=>{},setError:v=>error=v});
+ const first=perform(()=>{calls++;return new Promise(r=>release=r)});await perform(async()=>{calls++});assert.equal(calls,1);release();await first;
+ await perform(async()=>{throw Error('offline')});assert.equal(error,'offline');assert.equal(saving.current,false);
+ await perform(async()=>{calls++});assert.equal(calls,2);assert.equal(error,null);
 });
-test('QA-19 late username availability cannot approve a different edited handle',async()=>{
- let finish,available=null,err=null,checking=true;const revision={current:1};
- const fn=extract('app/onboarding/username.tsx','checkUsernameAvailability',{USERNAME_REGEX:/^[a-z0-9_.]{3,20}$/,RESERVED_USERNAMES:new Set(),usernameRevision:revision,setUsernameAvailable:x=>available=x,setUsernameError:x=>err=x,setSuggestions:()=>{},setUsernameChecking:x=>checking=x,supabase:{rpc:()=>new Promise(r=>finish=r)}});
- const old=fn('first',1);revision.current=2;finish({data:true,error:null});await old;assert.equal(available,null);
- const now=fn('second',2);finish({data:false,error:null});await now;assert.equal(available,false);assert.match(err,/taken/);assert.equal(checking,false);
- const good=fn('third',2);finish({data:true,error:null});await good;assert.equal(available,true);assert.equal(err,null);
+test('QA-19 profile save uses server uniqueness and cannot confirm an unavailable username',async()=>{
+ const {load}=require('./product-test-runtime.cjs');const calls=[];
+ const api=load('lib/launch.ts',{'@/lib/supabase':{supabase:{rpc:async(name,args)=>{calls.push({name,args});return {data:null,error:{code:'23505',message:'duplicate'}}}}}});
+ await assert.rejects(api.launchRpc('save_launch_profile',{p_name:'Jane',p_username:'jane',p_terms:true}),/username is taken/);
+ assert.equal(calls[0].args.p_username,'jane');
 });
 test('QA-23 malformed sent-confirmation payloads are unavailable, legitimate recipients survive',()=>{
  const api=load('lib/route-input.ts');for(const raw of [undefined,'null','{}','[]','not-json','[null,4,{}]'])assert.equal(api.parseConfirmationPeople(raw).length,0);
  const legit=JSON.stringify([{id:'a',display_name:'Jane',avatar_url:null}]);assert.equal(api.parseConfirmationPeople(legit)[0].display_name,'Jane');
- const join=extract('app/sent-confirmation.tsx','joinNames');assert.equal(join([]),'nobody');assert.equal(join(api.parseConfirmationPeople(legit)),'Jane');
  assert.equal(api.parseNotificationIds('null').length,0);assert.equal(api.parseNotificationIds('["00000000-0000-4000-8000-000000000001"]').length,1);
 });
 test('QA-24 both search and contact request failures roll back Sent; accepted requests stay Sent',async()=>{
@@ -237,17 +234,20 @@ test('QA-23 editable Plan route loads authoritative owner data; deleted/unauthor
 });
 test('QA-02/28 successful leaderboard retains real activity but catalog-only data never claims movement',async()=>{
  for(const occupied of [false,true]){
- const catalogue=[{id:'v',name:'Test',city:'nyc',popularity_rank:1,is_leaderboard_promoted:false,opened_at:null,operating_hours:null,neighborhood:'N'}];let venueReads=0;
- const status=occupied?[{venue_id:'v',venue_name:'Test',user_id:'friend',updated_at:new Date().toISOString(),venues:catalogue[0]}]:[];
- const fn=extract('hooks/use-leaderboard.ts','fetchLeaderboard',{supabase:{from:t=>builder({data:t==='night_statuses'?status:venueReads++===0?[]:catalogue,error:null})},isDemoMode:()=>false,fetchProfilesSafe:async()=>[{id:'friend',display_name:'Friend'}],buildProfileMap:rows=>new Map(rows.map(p=>[p.id,p])),BOOTSTRAP_MODE:true,isVenueOpen:()=>true,isNightlifeHours:()=>true,calculateEnergyLevel:extract('hooks/use-leaderboard.ts','calculateEnergyLevel')});
+ const api=require('./hot-spots-test-runtime.cjs');
+ const catalogue=[api.venue('v')];
+ const status=occupied?[api.status('friend','v',{expires_at:'2099-01-01T00:00:00Z'})]:[];
+ const fn=extract('hooks/use-leaderboard.ts','fetchLeaderboard',{fetchHotSpotsCatalog:async()=>catalogue,fetchVisibleVenuePresence:async()=>status,buildHotSpotsBoard:api.buildHotSpotsBoard,isDemoMode:()=>false,fetchProfilesSafe:async()=>[{id:'friend',display_name:'Friend'}]});
  const result=await fn('nyc',null,'me',['friend']);assert.equal(result.venues[0].count,occupied?1:0);assert.equal(result.venues[0].energyLevel,occupied?1:0);assert.equal(result.venues[0].movement,'same');assert.equal(!!result.biggestMover,occupied);
  }
 });
 
-test('QA-21 a delayed HTTP confirmation cannot restore a prior-night DM after 5 AM',async()=>{
+test('QA-21 a delayed confirmation cannot restore a previous-night DM',async()=>{
  for(const currentNight of [false,true]){
- let rows=[],finish;const send=extract('app/thread.tsx','send',{draft:'hello',userId:'a',threadId:'t',sendingRef:{current:false},draftRevision:{current:0},setDraft:()=>{},setMessages:f=>rows=f(rows),supabase:{from:()=>({insert(){return this},select(){return this},single:()=>new Promise(r=>finish=r)})},Alert:{alert:()=>{}},setThreadError:()=>{},confirmMessage:threadState.confirmMessage,isFromTonight:()=>currentNight});
- const pending=send();rows=[];finish({data:{id:'saved',created_at:'2026-09-25T08:59:59Z'},error:null});await pending;assert.equal(rows.length,currentNight?1:0);
+ let rows=[],finish,checks=0;const message={id:'stable-id',created_at:'2026-10-12T08:00:00Z'};
+ const pendingRef={current:[message]};
+ const retry=extract('app/thread.tsx','retryMessage',{sendingRef:{current:false},pendingRef,userId:'a',getSessionUserId:()=> 'a',confirmedIds:{current:new Set()},updatePending:r=>pendingRef.current=r,isFromTonight:()=>++checks===1||currentNight,deliverDm:()=>new Promise(r=>finish=r),setMessages:f=>rows=f(rows),confirmMessage:threadState.confirmMessage});
+ const work=retry(message);finish(message);await work;assert.equal(rows.length,currentNight?1:0);
  }
  assert.match(source('app/thread.tsx'),/if \(!isFromTonight\(newMsg.created_at\)\) return/);
 });
@@ -266,7 +266,28 @@ test('QA-13 late failed Like never restores a revoked post snapshot',async()=>{
 
 test('QA-16/20 failed venue Plan child read cannot look like zero people; Plan card offers retry',async()=>{
  const {queryFunction}=require('./product-test-runtime.cjs');
- const fn=queryFunction('app/venue.tsx','venue-card',{session:{user:{id:'a'}},venueId:'v',friendIds:['friend'],getNightKey:()=> '2026-09-25',fetchProfilesSafe:async()=>[],buildProfileMap:()=>new Map(),uniquePeople:x=>x,toFriend:x=>x,supabase:{from:table=>builder(table==='venues'?{data:{id:'v',name:'Bar'},error:null}:table==='plans'?{data:[{id:'p'}],error:null}:table==='plan_downs'?{data:null,error:Error('child offline')}:{data:[],error:null})}});
+ const fn=queryFunction('app/venue.tsx','venue-card',{isNight:true,fetchVisibleVenuePresence:async()=>[],session:{user:{id:'a'}},venueId:'v',friendIds:['friend'],getNightKey:()=> '2026-09-25',fetchProfilesSafe:async()=>[],buildProfileMap:()=>new Map(),uniquePeople:x=>x,toFriend:x=>x,supabase:{from:table=>builder(table==='venues'?{data:{id:'v',name:'Bar'},error:null}:table==='plans'?{data:[{id:'p'}],error:null}:table==='plan_downs'?{data:null,error:Error('child offline')}:{data:[],error:null})}});
  await assert.rejects(fn(),/child offline/);
  const s=source('components/plan-card.tsx');assert.match(s,/Could not load everyone on this plan/);assert.match(s,/!participantsError && !downsError && participants.length === 0/);assert.match(s,/disabled=\{isTogglingDown \|\| downsError\}/);
+});
+
+
+test('A DM fetch started before privacy revocation cannot restore its old messages',async()=>{
+ for(const revoked of [false,true]){
+  let revision=0,finish,rows=[],writes=0;
+  const query=new Proxy({then:resolve=>new Promise(r=>finish=()=>r({data:[{id:'m',created_at:'now',image_url:null}],error:null})).then(resolve)},{get:(o,k)=>k==='then'?o.then:()=>query});
+  const fn=extract('app/thread.tsx','fetchMessages',{threadId:'t',privateViewRevision:()=>revision,supabase:{from:()=>query},setThreadError:()=>{},isFromTonight:()=>true,confirmedIds:{current:new Set()},pendingRef:{current:[]},updatePending:()=>{},seenIdsRef:{current:new Set()},setMessages:v=>{writes++;rows=typeof v==='function'?v(rows):v;},resolvePostImageUrl:async()=>null});
+  const work=fn();await flush();if(revoked)revision++;finish();await work;assert.equal(writes,revoked?0:1);assert.equal(rows.length,revoked?0:1);
+ }
+});
+
+
+test('Plan save serializes rapid taps, keeps a failed draft, and leaves only after success',async()=>{
+ let attempts=0,finish,error=false,saved=false,busy=false;
+ const submissionLock={current:false};
+ const values={selectedVenue:{id:'v',name:'Test'},planDate:'2026-10-12',planTime:'21:00',planType:null,description:'Keep this note',visibility:'friends',selectedFriends:[]};
+ const submit=extract('components/plan-form.tsx','handleSubmit',{...values,saved:false,submissionLock,Keyboard:{dismiss(){}},setIsSubmitting:x=>busy=x,setSubmitError:x=>error=x,setSaved:x=>saved=x,onSubmit:v=>{attempts++;assert.equal(v.description,values.description);return new Promise((resolve,reject)=>finish=ok=>ok?resolve():reject(Error('offline')));}});
+ const first=submit();await submit();assert.equal(attempts,1);assert.equal(busy,true);finish(false);await first;
+ assert.equal(error,true);assert.equal(saved,false);assert.equal(busy,false);assert.equal(submissionLock.current,false);assert.equal(values.description,'Keep this note');
+ const retry=submit();finish(true);await retry;assert.equal(attempts,2);assert.equal(saved,true);assert.equal(error,false);
 });

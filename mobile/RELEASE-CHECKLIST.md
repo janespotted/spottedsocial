@@ -14,12 +14,20 @@ Copy/paste this section when asking:
      notifications in TestFlight/production don't work without it. The `.p8`
      also needs to be configured in the Supabase `send-push` edge function's
      secrets.
-2. **Transistorsoft background-geolocation license** — purchase the iOS
-   license (~$399, https://www.transistorsoft.com/shop/products/react-native-background-geolocation)
-   for bundle id `com.janereynolds.spotted`. **The current trial key expires
-   Oct 7 2026** — release builds stop tracking location after that. Send the
-   purchased key and we swap it into `app.json` → `TSLocationManagerLicense`.
-   (Android will need its own key later.)
+2. **Transistorsoft background-geolocation license — purchased October 11, 2026.**
+   Order #17585 is registered to `janespotted`; paid iOS and Android keys were
+   generated for `com.janereynolds.spotted`. The license is perpetual; the
+   customer dashboard lists the included update/support period through October 10, 2027.
+   `app.config.js` reads `TRANSISTORSOFT_IOS_LICENSE` and
+   `TRANSISTORSOFT_ANDROID_LICENSE`, or the gitignored
+   `transistorsoft.licenses.local.json` (`ios` and `android` properties).
+   Obtain keys from the [customer dashboard](https://www.transistorsoft.com/shop/customers).
+   Do not commit them: this repository is public. Production/preview config
+   fails if a required key is missing. For a single-platform local release,
+   set `SPOTTED_BUILD_PLATFORM=ios` or `android` (EAS supplies `EAS_BUILD_PLATFORM`).
+   After changing a key, regenerate the native project and rebuild; an OTA
+   JavaScript update cannot replace the native license. Verify the resulting
+   Release build on a real phone before treating release licensing as tested.
 3. **Twilio account** — the account behind phone-number login is suspended
    (error 20003). Either reactivate it (billing) or confirm we launch with
    email/password sign-in only.

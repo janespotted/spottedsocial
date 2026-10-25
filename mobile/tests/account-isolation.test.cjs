@@ -84,9 +84,10 @@ test('account boundary clears private module stores before returning and changes
  const mocks={react:{useSyncExternalStore:(_subscribe,get)=>get()},'react/jsx-runtime':{jsx:(type,props,key)=>({type,props,key})},'@/lib/session-identity':identity,'expo-image':{Image:{clearMemoryCache:()=>{calls.push('clearMemoryCache');return Promise.resolve(true)},clearDiskCache:()=>{calls.push('clearDiskCache');return Promise.resolve(true)}}}};
  for(const [module,names] of Object.entries({'post-detail':['resetPostDetail'],'audience':['clearAudienceRequest'],'tag-picker':['clearTagRequest'],'country-codes':['clearCountryRequest'],'toast':['dismissToast'],'night-status':['invalidateOutStatusCache'],'night-gate':['setNightGateState','takePendingDeepLink'],'map-filters':['resetMapFilters'],'tonight':['setActiveCity'],'venue-arrival-engine':['resetDwellTracker']}))mocks['@/lib/'+module]=Object.fromEntries(names.map(n=>[n,()=>calls.push(n)]));
  mocks['@/lib/background-location']={stopBackgroundLocation:()=>{calls.push('stopBackgroundLocation');return Promise.resolve()}};
+ mocks['@/lib/dm-outbox']={clearPendingDms:()=>{calls.push('clearPendingDms');return Promise.resolve()}};
  const scope=load('../components/account-scope.tsx',mocks);identity.setSessionIdentity('A','a');const a=scope.AccountScope({children:'private A'});calls.length=0;
  identity.setSessionIdentity('B','b');const b=scope.AccountScope({children:'B'});
- assert.notEqual(a.key,b.key);assert.equal(calls.length,14);assert(calls.includes('resetPostDetail'));
+ assert.notEqual(a.key,b.key);assert.equal(calls.length,15);assert(calls.includes('clearPendingDms'));assert(calls.includes('resetPostDetail'));
  // Disk-cached media of the previous account is never served to the next one.
  assert(calls.includes('clearMemoryCache'));assert(calls.includes('clearDiskCache'));assert(calls.includes('stopBackgroundLocation'));
 });

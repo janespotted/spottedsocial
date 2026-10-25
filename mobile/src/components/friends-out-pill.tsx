@@ -1,3 +1,6 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { popupBounds } from '@/lib/popup-bounds';
+import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { SymbolView } from 'expo-symbols';
@@ -52,16 +55,17 @@ export function FriendsOutPill() {
     },
   });
   const triggerRef = useRef<View>(null);
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
 
   const outFriends = data?.outFriends ?? [];
   const tbdFriends = data?.planningFriends ?? [];
-  if (isLoading || (outFriends.length === 0 && tbdFriends.length === 0)) return null;
+  if (isLoading || !(data?.outCount || data?.planningCount)) return null;
 
   const parts: string[] = [];
-  if (outFriends.length > 0) parts.push(`${outFriends.length} out`);
-  if (tbdFriends.length > 0) parts.push(`${tbdFriends.length} TBD`);
+  if (data?.outCount) parts.push(`${data.outCount} out`);
+  if (data?.planningCount) parts.push(`${data.planningCount} TBD`);
 
   const ringOf = (f: FriendNightStatus): Ring => (closeIds?.has(f.user_id) ? 'close' : 'friend');
   const byRing = (list: FriendNightStatus[]) => {
@@ -79,6 +83,7 @@ export function FriendsOutPill() {
   const venuesWithheld = data?.venuesWithheld ?? false;
 
   const open = () => {
+    if (venuesWithheld) { router.push('/check-in'); return; }
     triggerRef.current?.measureInWindow((x, y) => {
       Haptics.selectionAsync();
       setAnchor({ x, y });
@@ -90,7 +95,7 @@ export function FriendsOutPill() {
     setTimeout(() => openFriendCard(f.user_id, session?.user.id), 150);
   };
 
-  const listMaxHeight = Math.min(320, anchor ? anchor.y - 60 : 320);
+  const bounds = popupBounds({ x: anchor?.x ?? 0, y: anchor?.y ?? windowHeight / 2, width: windowWidth, height: windowHeight, topInset: insets.top, bottomInset: insets.bottom, desiredWidth: 288, desiredHeight: 360 });
 
   const Section = ({ title, group }: { title?: string; group: FriendNightStatus[] }) => (
     <View>
@@ -134,9 +139,9 @@ export function FriendsOutPill() {
         ref={triggerRef}
         onPress={open}
         accessibilityRole="button"
-        accessibilityLabel={`${parts.join(', ')} — see who`}
+        accessibilityLabel={`${parts.join(', ')} — ${venuesWithheld ? 'choose TBD or Out to see friends' : 'see who'}`}
         accessibilityState={{ expanded: !!anchor }}
-        className="flex-row items-center gap-2 pl-3.5 pr-3 min-h-9 rounded-full border border-white/10 active:opacity-90"
+        className="flex-row items-center gap-2 pl-3.5 pr-3 min-h-11 py-2 rounded-full border border-white/10 active:opacity-90"
         style={{ backgroundColor: 'rgba(26, 15, 46, 0.92)' }}
       >
         <View className="w-2 h-2 rounded-full" style={{ backgroundColor: NEON }} />
@@ -144,17 +149,18 @@ export function FriendsOutPill() {
         <SymbolView name="chevron.up" size={9} tintColor="rgba(255,255,255,0.4)" />
       </Pressable>
 
-      <Modal visible={!!anchor} transparent animationType="none" onRequestClose={close}>
+      <Modal visible={!!anchor && !venuesWithheld} transparent animationType="none" onRequestClose={close}>
         <Pressable className="flex-1" onPress={close} accessibilityLabel="Close">
           {anchor ? (
             <Animated.View
               entering={FadeIn.duration(140)}
               exiting={FadeOut.duration(100)}
-              className="absolute w-72 rounded-2xl border border-white/10 overflow-hidden"
+              className="absolute rounded-2xl border border-white/10 overflow-hidden"
               style={{
-                left: anchor.x,
-                bottom: windowHeight - anchor.y + 8,
-                maxHeight: listMaxHeight,
+                left: bounds.left,
+                bottom: windowHeight - (anchor?.y ?? 0) + 8,
+                width: bounds.width,
+                maxHeight: bounds.maxHeight,
                 backgroundColor: INK_LIGHT,
                 shadowColor: '#000',
                 shadowOpacity: 0.45,
@@ -162,7 +168,7 @@ export function FriendsOutPill() {
                 shadowOffset: { width: 0, height: 8 },
               }}
             >
-              <ScrollView bounces={false}>
+              <ScrollView bounces={false} style={{ maxHeight: bounds.maxHeight }} keyboardShouldPersistTaps="handled">
                 {RING_ORDER.map((ring) => {
                   const group = outByRing.get(ring);
                   return group ? (

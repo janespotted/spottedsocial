@@ -10,5 +10,6 @@ import { useQuery, type QueryKey, type UseQueryOptions, type UseQueryResult } fr
 export function usePrivateQuery<TQueryFnData = unknown, TError = Error, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey>(
   options: UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>
 ): UseQueryResult<TData, TError> {
-  return useQuery(options);
+  const result = useQuery(options);
+  return result.isError ? { ...result, data: undefined } as UseQueryResult<TData, TError> : result;
 }

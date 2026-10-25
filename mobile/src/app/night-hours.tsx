@@ -6,12 +6,7 @@ import { getNightKey } from '@/lib/tonight';
 import { primaryControl, primaryControlText } from '@/lib/theme';
 
 /** The schedule as the client wrote it; weekdays are the night's date (0 = Sunday). */
-const ROWS: { label: string; time: string; days: number[] }[] = [
-  { label: 'Monday – Thursday', time: '6 PM', days: [1, 2, 3, 4] },
-  { label: 'Friday', time: '4 PM', days: [5] },
-  { label: 'Saturday', time: '12 PM', days: [6] },
-  { label: 'Sunday', time: '3 PM', days: [0] },
-];
+const ROWS = [{ label: 'Every day', time: '6 PM', days: [0, 1, 2, 3, 4, 5, 6] }];
 
 /**
  * When Night Mode opens (client brief §6), opened from the Day pill and the

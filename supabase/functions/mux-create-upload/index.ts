@@ -35,6 +35,9 @@ Deno.serve(async (req) => {
   const { data: { user }, error: userError } = await supabaseUser.auth.getUser()
   if (userError || !user) return json({ error: 'Unauthorized' }, 401)
 
+  const { data: launch, error: launchError } = await supabaseUser.rpc('get_launch_state')
+  if (launchError || !launch?.complete) return json({ error: 'Finish onboarding before uploading.' }, 403)
+
   if (!muxConfigured() || !Deno.env.get('MUX_SIGNING_KEY_ID') || !Deno.env.get('MUX_SIGNING_PRIVATE_KEY')) {
     console.error('Secure Mux delivery is not configured')
     return json({ error: 'Video uploads are not available right now.' }, 503)

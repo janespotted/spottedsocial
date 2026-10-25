@@ -6,7 +6,7 @@ const at=(iso,tz)=>{const naive=new Date(iso+'Z');for(let d=new Date(naive),i=0;
 const NY='America/New_York',LA='America/Los_Angeles',LHR='Asia/Karachi';
 
 test('NM-01 opening hour per weekday in New York (week of Oct 5 2026)',()=>{
- const expect={'2026-10-05':18,'2026-10-06':18,'2026-10-07':18,'2026-10-08':18,'2026-10-09':16,'2026-10-10':12,'2026-10-11':15};
+ const expect={'2026-10-05':18,'2026-10-06':18,'2026-10-07':18,'2026-10-08':18,'2026-10-09':18,'2026-10-10':18,'2026-10-11':18};
  for(const [day,hour] of Object.entries(expect)){
   const opens=t.nightModeOpensAt(at(day+'T09:00',NY),'nyc');
   assert.equal(opens.getTime(),at(`${day}T${String(hour).padStart(2,'0')}:00`,NY).getTime(),day);
@@ -20,11 +20,11 @@ test('NM-02 open/closed around the opening and the 5 AM reset',()=>{
  assert.equal(t.isNightModeOpen(at('2026-10-06T05:00',NY),'nyc'),false,'Tuesday day starts at 5');
 });
 
-test('NM-03 1 AM Saturday belongs to Friday night; Saturday opens at noon',()=>{
+test('NM-03 1 AM Saturday belongs to Friday night; Saturday opens at 6 PM',()=>{
  assert.equal(t.isNightModeOpen(at('2026-10-10T01:00',NY),'nyc'),true);
- assert.equal(t.isNightModeOpen(at('2026-10-10T11:59',NY),'nyc'),false);
- assert.equal(t.isNightModeOpen(at('2026-10-10T12:00',NY),'nyc'),true);
- assert.equal(t.isNightModeOpen(at('2026-10-11T14:59',NY),'nyc'),false,'Sunday before 3 PM');
+ assert.equal(t.isNightModeOpen(at('2026-10-10T17:59',NY),'nyc'),false);
+ assert.equal(t.isNightModeOpen(at('2026-10-10T18:00',NY),'nyc'),true);
+ assert.equal(t.isNightModeOpen(at('2026-10-11T17:59',NY),'nyc'),false,'Sunday before 6 PM');
 });
 
 test('NM-04 next change: the opening in the day, the reset at night',()=>{
@@ -34,9 +34,9 @@ test('NM-04 next change: the opening in the day, the reset at night',()=>{
 
 test('NM-05 daylight saving: the opening stays at local wall-clock time',()=>{
  // US DST ends Sun Nov 1 2026, starts Sun Mar 8 2026.
- assert.equal(t.nightModeOpensAt(at('2026-11-01T09:00',NY),'nyc').getTime(),at('2026-11-01T15:00',NY).getTime());
+ assert.equal(t.nightModeOpensAt(at('2026-11-01T09:00',NY),'nyc').getTime(),at('2026-11-01T18:00',NY).getTime());
  assert.equal(t.nightModeOpensAt(at('2026-11-02T09:00',NY),'nyc').getTime(),at('2026-11-02T18:00',NY).getTime());
- assert.equal(t.nightModeOpensAt(at('2026-03-08T09:00',LA),'la').getTime(),at('2026-03-08T15:00',LA).getTime());
+ assert.equal(t.nightModeOpensAt(at('2026-03-08T09:00',LA),'la').getTime(),at('2026-03-08T18:00',LA).getTime());
  assert.equal(new Date(at('2026-11-02T18:00',NY)).toISOString(),'2026-11-02T23:00:00.000Z');
 });
 

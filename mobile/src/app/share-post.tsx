@@ -1,3 +1,4 @@
+import { friendCardPress } from '@/lib/friend-card';
 import { usePrivateQuery as useQuery } from '@/hooks/use-private-query';
 import { useState } from 'react';
 import {
@@ -82,10 +83,10 @@ export default function SharePostSheet() {
         {(friends ?? []).map((friend) => (
           <View key={friend.id} className="flex-row items-center gap-3 py-2.5">
             <View className={friend.is_out ? 'rounded-full border-2 border-[#d4ff00]' : ''}>
-              <Avatar name={friend.display_name} url={friend.avatar_url} size="md" />
+              <Avatar userId={friend.id} name={friend.display_name} url={friend.avatar_url} size="md" />
             </View>
             <View className="flex-1 min-w-0">
-              <Text className="text-white text-base font-sans-medium" numberOfLines={1}>
+              <Text className="text-white text-base font-sans-medium" numberOfLines={1} onPress={friendCardPress(friend.id)} accessibilityRole="button">
                 {friend.display_name}
               </Text>
               {friend.is_out ? (
