@@ -8,7 +8,8 @@
           "/invite/*",
           "/auth/*",
           "/join",
-          "/join.html"
+          "/join.html",
+          "/venue-link"
         ]
       }
     ]
