@@ -2,6 +2,10 @@
   "installCommand": "npm install --legacy-peer-deps",
   "rewrites": [
     {
+      "source": "/venue-link",
+      "destination": "/shared-venue.html"
+    },
+    {
       "source": "/join",
       "destination": "/join.html"
     },
